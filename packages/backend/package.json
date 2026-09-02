@@ -1,0 +1,21 @@
+{
+  "name": "@const/backend",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "convex dev",
+    "deploy": "convex deploy",
+    "check-types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "convex": "^1.24.0"
+  },
+  "devDependencies": {
+    "@const/typescript-config": "workspace:*",
+    "typescript": "^5.8.2"
+  },
+  "exports": {
+    "./_generated/*": "./convex/_generated/*",
+    "./*": "./convex/*"
+  }
+}
