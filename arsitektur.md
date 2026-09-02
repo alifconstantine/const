@@ -149,32 +149,20 @@ Const/
 │   │   │   └── lib/                  # cn, cva, utils
 │   │   └── tailwind.config.ts        # Shared Tailwind preset
 │   │
-│   ├── assets/                       # Shared Official Assets
+│   ├── typescript-config/            # Base TSConfig (@const/typescript-config: base, nextjs, react-library)
 │   │   ├── package.json
-│   │   ├── logos/                    # Const official logos (SVG, PNG, ICO)
-│   │   ├── icons/                    # Custom ecosystem icon set
-│   │   ├── illustrations/            # EduTech & Landing illustrations
-│   │   └── fonts/                    # Inter / Geist / JetBrains Mono font definitions
+│   │   ├── base.json
+│   │   ├── nextjs.json
+│   │   └── react-library.json
 │   │
-│   ├── config/                       # Shared Configurations & Tooling
-│   │   ├── eslint-config/            # Base ESLint configs
-│   │   ├── typescript-config/        # Base TSConfig (base.json, nextjs.json, react-library.json)
-│   │   └── tailwind-config/          # Shared Tailwind color system & tokens
-│   │
-│   └── types/                        # Shared Cross-App TypeScript Definitions
-│       ├── package.json
-│       ├── src/
-│       │   ├── auth.ts               # User DTOs, Session types, Auth payloads
-│       │   ├── router.ts             # AI Gateway models, completions request/response DTOs
-│       │   ├── learn.ts              # Course types, quiz evaluations, certificates
-│       │   └── common.ts             # Standard API error and response formats
-│       └── index.ts
+│   └── (Catatan: @const/types ditiadakan karena Convex menyediakan End-to-End Type Safety otomatis
+│        langsung via `convex/_generated/`, mencegah duplikasi dan over-engineering)
 │
-└── apps/                             # Deployable Applications
-    ├── accounts/                     # accounts.const.web.id (Central Auth & SSO Hub)
+└── apps/                             # Deployable Applications (Next.js 16 App Router)
+    ├── accounts/                     # accounts.const.web.id (Central Auth & Account Chooser Hub)
     │   ├── package.json
     │   ├── next.config.ts
-    │   └── src/                      # Next.js App Router (Login, Register, SSO redirect, Profile)
+    │   └── src/                      # Next.js 16 App Router (Account Chooser, Login, OAuth, SSO Callback)
     │
     ├── router/                       # router.const.web.id (AI Gateway API & Dashboard)
     │   ├── package.json
@@ -323,35 +311,62 @@ const submitQuiz = useMutation(api.learn.progress.submitQuiz);
 
 ## 5. Arsitektur Detail: Const Accounts (`accounts.const.web.id`)
 
-### A. Peran & Tanggung Jawab
-`accounts.const.web.id` berfungsi sebagai **Central Identity Provider (IdP)** tunggal. Setiap interaksi login, registrasi, reset password, dan manajemen profil pengguna di seluruh ekosistem Const diproses di aplikasi ini.
+### A. Peran & Filosofi Desain: "Google / z.ai Account Chooser Pattern"
+`accounts.const.web.id` berfungsi sebagai **Central Identity Provider (IdP)** tunggal bagi seluruh ekosistem Const. 
 
-### B. Multi-Platform Authentication Strategy
+Berbeda dengan sistem SSO tradisional yang memaksakan *silent/implicit login* (otomatis login diam-diam dengan sesi sebelumnya), Const Accounts mengadopsi model **Account Chooser (seperti Google & z.ai)**:
+1. **Multi-Account Awareness:** Pengguna sering memiliki peran berbeda (misal: akun developer/kantor di `router.const.web.id` dan akun pribadi/pelajar di `learn.const.web.id`). Sistem tidak otomatis memaksakan akun yang sedang aktif di browser jika pengguna membuka aplikasi baru.
+2. **Explicit User Consent & Account Switching:** Saat pengguna mengeklik *"Continue with Const"* di klien mana pun, `accounts.const.web.id` akan memeriksa sesi yang tersimpan di peramban dan menampilkan antarmuka pemilihan akun:
+   * **Pilih Akun Tersimpan:** Menampilkan daftar akun yang sedang aktif (Avatar, Nama, Email) — sekali klik untuk langsung masuk sebagai akun tersebut.
+   * **Use Another Account:** Memberikan opsi untuk login dengan akun baru (Google / GitHub / Email OTP) tanpa harus me-logout akun yang sudah ada.
+3. **Pemisahan Konteks Antar-Aplikasi:** Menghindari insiden salah akun atau tercampurnya kuota API AI dan progres belajar.
+
+### B. Multi-Platform Authentication Strategy & Alur Interaksi
 
 ```mermaid
 sequenceDiagram
     autonumber
     actor User as Pengguna
-    participant Client as Web / Desktop / Mobile App
+    participant Client as Web App (learn / router)
     participant AuthHub as accounts.const.web.id
     participant Backend as Convex Backend (domain/auth)
 
-    alt 1. Web Ecosystem (Cross-Subdomain SSO)
-        User->>Client: Buka learn.const.web.id (Belum Login)
-        Client->>AuthHub: Redirect ke https://accounts.const.web.id/login?continue=https://learn.const.web.id
-        AuthHub->>User: Render Form Login Elegan (Google / GitHub / Email OTP)
-        User->>AuthHub: Submit Kredensial Valid
-        AuthHub->>Backend: Validasi & Buat Session
-        Backend-->>AuthHub: Return Session Token
-        AuthHub->>AuthHub: Set Cookie `const_session` (Domain: .const.web.id, HttpOnly, Secure, SameSite: Lax)
-        AuthHub-->>Client: Redirect ke URL parameter `continue`
-        Client->>Backend: Query data user otomatis menggunakan `const_session` cookie
-        Client->>User: Tampilkan Dashboard Belajar (Status: Logged In)
+    alt 1. Web Ecosystem (Google / z.ai Account Chooser Flow)
+        User->>Client: Buka learn.const.web.id & Klik "Continue with Const"
+        Client->>AuthHub: Redirect ke https://accounts.const.web.id/signin?continue=https://learn.const.web.id
+        
+        alt A. Sesi Sudah Ada di Browser (Misal pernah login di Router)
+            AuthHub->>User: Render Layar "Choose an Account":<br/>• [Avatar] Akun A (alif@work.com) - Signed In<br/>• [+] Use another account
+            alt Pengguna Memilih Akun A
+                User->>AuthHub: Klik Akun A
+                AuthHub->>Backend: Generate Otentikasi Akses untuk Client Target
+                Backend-->>AuthHub: Return Authorization Token
+                AuthHub-->>Client: Redirect ke URL parameter `continue`?auth_token=...
+                Client->>Backend: Inisialisasi Sesi Aplikasi Klien
+                Client->>User: Tampilkan Dashboard Belajar (Masuk sebagai Akun A)
+            else Pengguna Memilih "Use another account"
+                User->>AuthHub: Klik "Use another account"
+                AuthHub->>User: Render Form Login (Google / GitHub / Email OTP)
+                User->>AuthHub: Login Berhasil dengan Akun B
+                AuthHub->>Backend: Daftarkan Akun B & Buat Sesi Baru
+                Backend-->>AuthHub: Return Token Akun B
+                AuthHub-->>Client: Redirect ke continue URL?auth_token=...
+                Client->>User: Tampilkan Dashboard Belajar (Masuk sebagai Akun B)
+            end
+        else B. Belum Ada Sesi di Browser
+            AuthHub->>User: Render Form Login Elegan (Google / GitHub / Email OTP)
+            User->>AuthHub: Submit Kredensial Valid
+            AuthHub->>Backend: Validasi Kredensial & Buat Sesi
+            Backend-->>AuthHub: Return Sesi Berhasil
+            AuthHub-->>Client: Redirect ke continue URL?auth_token=...
+            Client->>User: Tampilkan Dashboard Belajar
+        end
+
     else 2. Desktop App (OAuth2 PKCE / Deep Link)
         User->>Client: Klik "Login with Const" di Desktop App
         Client->>Client: Generate PKCE Code Verifier & Challenge
-        Client->>AuthHub: Buka Browser Sistem: `https://accounts.const.web.id/login?continue=const-auth://callback&code_challenge=...`
-        User->>AuthHub: Sukses Login di Browser
+        Client->>AuthHub: Buka Browser Sistem: `https://accounts.const.web.id/signin?continue=const-auth://callback&code_challenge=...`
+        User->>AuthHub: Pilih Akun / Login di Browser
         AuthHub->>Backend: Generate Authorization Code Terikat Challenge
         AuthHub-->>Client: Browser panggil Deep Link: `const-auth://callback?code=xyz123`
         Client->>AuthHub: POST /api/auth/token (Tukar Code + Code Verifier)
@@ -359,8 +374,8 @@ sequenceDiagram
         Client->>Client: Simpan Token di OS Encrypted Keyring
     else 3. Mobile App (Universal Link / Deep Link)
         User->>Client: Klik "Masuk" di Mobile App
-        Client->>AuthHub: Buka In-App Browser / Custom Tab ke `accounts.const.web.id/login?continue=const-learn://callback`
-        User->>AuthHub: Sukses Login
+        Client->>AuthHub: Buka In-App Browser ke `accounts.const.web.id/signin?continue=const-learn://callback`
+        User->>AuthHub: Pilih Akun / Login
         AuthHub-->>Client: Redirect ke `const-learn://callback?token=...`
         Client->>Client: Simpan Token di Secure Storage (Keychain / Keystore)
     end
@@ -374,10 +389,12 @@ sequenceDiagram
      - `http://localhost:*/*` (khusus mode development)
      - `const-auth://*` (Desktop Protocol)
      - `const-learn://*` (Mobile Protocol)
-   * Jika parameter `continue` tidak valid atau mengarah ke domain luar, aplikasi otomatis me-redirect user ke dashboard utama `accounts.const.web.id`.
+   * Jika parameter `continue` tidak valid atau mengarah ke domain luar, aplikasi otomatis me-redirect user ke dashboard profil utama `accounts.const.web.id`.
 2. **Session Hijacking & CSRF Defense:**
    * Cookie session menggunakan flag `HttpOnly`, `Secure`, dan `SameSite=Lax`.
    * State parameter acak (anti-CSRF) digunakan pada semua flow OAuth eksternal (Google/GitHub).
+3. **Granular Session Invalidation:**
+   * Pengguna dapat me-logout akun tertentu dari peramban tanpa memengaruhi akun lainnya (*Selective Account Sign-out*).
 
 ---
 
@@ -438,13 +455,13 @@ gantt
     dateFormat  YYYY-MM-DD
     section Fase 1: Core Foundation
     Inisialisasi Monorepo (pnpm + Turbo) :done, f1_1, 2026-09-02, 1d
-    Setup packages/backend & Convex Schema Modular :active, f1_2, after f1_1, 2d
-    Setup packages/ui, assets, config, types :f1_3, after f1_2, 1d
+    Setup packages/backend (Convex Core) :done, f1_2, after f1_1, 1d
+    Setup packages/ui & typescript-config :done, f1_3, after f1_2, 1d
     section Fase 2: Auth Hub & AI Router
-    Implementasi apps/accounts (Web SSO & Redirect) :f2_1, after f1_3, 3d
+    Implementasi apps/accounts (Account Chooser & Next.js 16) :f2_1, after f1_3, 3d
     Implementasi apps/router (Gateway API & Quota) :f2_2, after f2_1, 3d
     section Fase 3: Const Learn (Karya Utama)
-    Scaffold apps/learn (Web Platform) :f3_1, after f2_2, 4d
+    Scaffold apps/learn (Web Platform Next.js 16) :f3_1, after f2_2, 4d
     Fitur AI Adaptive Tutor & Code Sandbox :f3_2, after f3_1, 5d
     Integrasi Client Desktop & Mobile :f3_3, after f3_2, 4d
     section Fase 4: Finalisasi Lomba (16 Okt 2026)
@@ -453,9 +470,9 @@ gantt
 ```
 
 - [x] **Fase 1.1: Local Engine & Network Bridge** (Cloudflare Tunnel `engine.const.web.id` terhubung ke OmniRoute di Arch Linux).
-- [ ] **Fase 1.2: Inisialisasi Monorepo & Backend Core** (Turborepo + pnpm + Convex Modular Domain Subdirectories).
-- [ ] **Fase 1.3: Shared Packages** (`@const/ui`, `@const/assets`, `@const/config`, `@const/types`).
-- [ ] **Fase 2.1: Const Accounts App** (`accounts.const.web.id` dengan SSO Cookie `.const.web.id` & Multi-Platform Callback).
+- [x] **Fase 1.2: Inisialisasi Monorepo & Backend Core** (Turborepo + pnpm + Convex Clean Core).
+- [x] **Fase 1.3: Shared Packages** (`@const/ui` dengan 55 komponen shadcn & ThemeProvider, `@const/typescript-config`).
+- [ ] **Fase 2.1: Const Accounts App** (`accounts.const.web.id` dengan Google / z.ai Account Chooser Pattern & Next.js 16).
 - [ ] **Fase 2.2: Const Router Gateway** (`router.const.web.id` dengan BYOK, Quota Tracking di Convex, & SSE Streaming).
 - [ ] **Fase 3: Const Learn Development** (`learn.const.web.id` - Pembuatan platform edukasi interaktif untuk ICONFEST 2026).
 - [ ] **Fase 4: Finalisasi Dokumen & Video ICONFEST 2026** (Laporan penyisihan, video demo 75% progress, dan deployment).

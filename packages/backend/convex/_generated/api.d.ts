@@ -8,19 +8,13 @@
  * @module
  */
 
-import type * as schema_auth from "../schema/auth.js";
-import type * as schema_router from "../schema/router.js";
-
 import type {
   ApiFromModules,
   FilterApi,
   FunctionReference,
 } from "convex/server";
 
-declare const fullApi: ApiFromModules<{
-  "schema/auth": typeof schema_auth;
-  "schema/router": typeof schema_router;
-}>;
+declare const fullApi: ApiFromModules<{}>;
 
 /**
  * A utility for referencing Convex functions in your app's public API.

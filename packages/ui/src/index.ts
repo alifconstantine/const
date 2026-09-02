@@ -1,5 +1,8 @@
 export * from "./lib/utils";
 
+// Theme
+export * from "./components/theme-provider";
+
 // Hooks
 export * from "./hooks/use-toast";
 export * from "./hooks/use-mobile";
