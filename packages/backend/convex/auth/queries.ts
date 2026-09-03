@@ -18,3 +18,6 @@ export const currentUser = query({
     };
   },
 });
+
+export const getUser = currentUser;
+

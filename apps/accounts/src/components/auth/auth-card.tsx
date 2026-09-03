@@ -60,13 +60,13 @@ export function AuthCard() {
     setIsLoading(true);
     setError(null);
     try {
-      // Ensure redirect returns to Accounts page with continue parameter so AuthenticatedView is displayed
-      const returnTarget =
+      const returnUrl =
         typeof window !== "undefined"
-          ? `${window.location.origin}${window.location.pathname}?continue=${encodeURIComponent(continueUrl)}`
+          ? (window.location.search.includes("continue=")
+              ? window.location.href
+              : `${window.location.origin}${window.location.pathname}?continue=${encodeURIComponent(continueUrl)}`)
           : continueUrl;
-
-      await signIn("google", { redirectTo: returnTarget });
+      await signIn("google", { redirectTo: returnUrl });
     } catch (err: any) {
       console.error(err);
       const msg = err?.message || "Failed to sign in with Google. Please try again.";
@@ -114,15 +114,17 @@ export function AuthCard() {
         return;
       }
 
-      // 2. Perform magic link request returning to accounts with continue param
-      const returnTarget =
+      // 2. Perform magic link request
+      const returnUrl =
         typeof window !== "undefined"
-          ? `${window.location.origin}${window.location.pathname}?continue=${encodeURIComponent(continueUrl)}`
+          ? (window.location.search.includes("continue=")
+              ? window.location.href
+              : `${window.location.origin}${window.location.pathname}?continue=${encodeURIComponent(continueUrl)}`)
           : continueUrl;
 
       await signIn("resend", {
         email,
-        redirectTo: returnTarget,
+        redirectTo: returnUrl,
       });
 
       // 3. Trigger Sonner success notification
@@ -147,45 +149,42 @@ export function AuthCard() {
   };
 
   return (
-    <div className="relative z-10 w-full max-w-[440px] sm:max-w-[460px] rounded-[32px] bg-background/80 dark:bg-[#141413]/85 backdrop-blur-xl border border-border/40 dark:border-white/10 p-8 sm:p-10 shadow-2xl my-auto text-card-foreground transition-all animate-in fade-in duration-500">
+    <div className="relative z-10 w-full max-w-[440px] sm:max-w-[460px] rounded-[32px] bg-card/90 dark:bg-[#141414]/90 backdrop-blur-xl border border-border/70 p-8 sm:p-10 shadow-none my-auto text-card-foreground transition-all animate-in fade-in duration-500">
       {/* VIEW 1: Main Auth View */}
       {viewState === "main" && (
         <div>
-          {/* Transparent Logo & Serif Heading */}
+          {/* Logo & Lora Serif Heading */}
           <div className="flex flex-col items-center text-center mb-8">
-            {/* Logo with 100% transparent background, no box */}
             <div className="mb-5 inline-flex items-center justify-center transition-transform duration-300 hover:scale-105">
               <ConstLogoIcon size="xl" className="w-12 h-12 text-foreground" />
             </div>
 
-            {/* Title with Serif font matching const-ai */}
             <h1 className="text-3xl sm:text-[34px] font-serif font-normal tracking-tight text-foreground">
-              Welcome to Const
+              Welcome to Const.
             </h1>
-            <p className="mt-2 text-sm sm:text-base text-muted-foreground font-sans">
-              Unlock all features by logging in
+            <p className="mt-2 text-sm text-muted-foreground font-sans font-light">
+              One central account for the entire Const ecosystem.
             </p>
           </div>
 
           {/* Error Alert */}
           {error && (
-            <div className="mb-5 flex items-start gap-2.5 rounded-xl border border-destructive/30 bg-destructive/10 p-3.5 text-xs sm:text-sm text-destructive font-sans">
+            <div className="mb-5 flex items-start gap-2.5 rounded-2xl border border-destructive/30 bg-destructive/10 p-3.5 text-xs sm:text-sm text-destructive font-sans">
               <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
               <span className="leading-relaxed">{error}</span>
             </div>
           )}
 
-          {/* Buttons Stack */}
-          <div className="space-y-3.5 sm:space-y-4 font-sans">
-            {/* Primary Google Button */}
+          {/* Stadium Pill Buttons Stack */}
+          <div className="space-y-3 sm:space-y-3.5 font-sans">
             <Button
               type="button"
+              variant="default"
               onClick={handleGoogleSignIn}
               disabled={isLoading}
-              className="w-full h-12 sm:h-[52px] rounded-xl sm:rounded-2xl bg-zinc-900 text-white hover:bg-zinc-800 dark:bg-zinc-100 dark:text-zinc-900 dark:hover:bg-zinc-200 font-medium text-sm sm:text-base flex items-center justify-center gap-3 transition-all shadow-sm active:scale-[0.99] disabled:opacity-50"
+              className="w-full h-12 rounded-full font-medium text-sm flex items-center justify-center gap-3 transition-all cursor-pointer"
             >
-              {/* Official Google G Icon */}
-              <svg className="h-5 w-5 shrink-0" viewBox="0 0 24 24">
+              <svg className="h-4 w-4 shrink-0" viewBox="0 0 24 24">
                 <path
                   d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
                   fill="#4285F4"
@@ -206,15 +205,13 @@ export function AuthCard() {
               <span>Continue with Google</span>
             </Button>
 
-            {/* Divider with generous spacing and airy breathing room */}
-            <div className="relative my-7 sm:my-8 flex items-center justify-center">
-              <div className="w-full border-t border-border/40" />
-              <span className="absolute bg-background/95 dark:bg-[#141413]/95 px-4 text-[11px] font-medium tracking-widest uppercase text-muted-foreground/60 font-sans">
+            <div className="relative my-6 flex items-center justify-center">
+              <div className="w-full border-t border-border/50" />
+              <span className="absolute bg-card px-3 text-[11px] font-medium tracking-widest uppercase text-muted-foreground/60 font-sans">
                 or
               </span>
             </div>
 
-            {/* Continue with Email */}
             <Button
               type="button"
               variant="outline"
@@ -222,9 +219,9 @@ export function AuthCard() {
                 setError(null);
                 setViewState("email");
               }}
-              className="w-full h-12 sm:h-[52px] rounded-xl sm:rounded-2xl border-border/70 bg-secondary/50 hover:bg-secondary/80 text-foreground font-medium text-sm sm:text-base flex items-center justify-center gap-3 transition-all active:scale-[0.99]"
+              className="w-full h-12 rounded-full border-border/70 font-medium text-sm flex items-center justify-center gap-2.5 transition-all cursor-pointer"
             >
-              <Mail className="h-5 w-5 text-foreground/80 stroke-[1.8]" />
+              <Mail className="h-4 w-4 text-foreground/80 stroke-[1.8]" />
               <span>Continue with Email</span>
             </Button>
           </div>
@@ -234,74 +231,70 @@ export function AuthCard() {
       {/* VIEW 2: Email Magic Link Input Form */}
       {viewState === "email" && (
         <form onSubmit={handleEmailSubmit} className="space-y-5">
-          {/* Header with Back Button */}
           <div className="flex items-center justify-between mb-1">
-            <button
+            <Button
               type="button"
+              variant="ghost"
+              size="sm"
               onClick={() => {
                 setError(null);
                 setViewState("main");
               }}
-              className="inline-flex items-center gap-1.5 text-xs sm:text-sm text-muted-foreground hover:text-foreground transition-colors font-sans cursor-pointer"
+              className="rounded-full gap-1.5 text-xs text-muted-foreground hover:text-foreground cursor-pointer px-3"
             >
-              <ArrowLeft className="h-4 w-4" />
+              <ArrowLeft className="h-3.5 w-3.5" />
               <span>Back</span>
-            </button>
+            </Button>
           </div>
 
           <div className="text-center mb-6">
-            {/* Transparent mail icon without box */}
             <div className="mb-4 inline-flex items-center justify-center">
               <Mail className="h-10 w-10 text-foreground stroke-[1.5]" />
             </div>
 
             <h2 className="text-3xl sm:text-[32px] font-serif font-normal tracking-tight text-foreground">
-              Continue with Email
+              Continue with email.
             </h2>
-            <p className="mt-2 text-sm text-muted-foreground font-sans">
-              Enter your email address to receive a magic sign-in link
+            <p className="mt-2 text-sm text-muted-foreground font-sans font-light">
+              Enter your email to receive a passwordless magic link.
             </p>
           </div>
 
-          {/* Error Alert (e.g. Rate limit notification) */}
           {error && (
-            <div className="flex items-start gap-2.5 rounded-xl border border-destructive/30 bg-destructive/10 p-3.5 text-xs sm:text-sm text-destructive font-sans">
+            <div className="flex items-start gap-2.5 rounded-2xl border border-destructive/30 bg-destructive/10 p-3.5 text-xs sm:text-sm text-destructive font-sans">
               <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
               <span className="leading-relaxed">{error}</span>
             </div>
           )}
 
           <div className="space-y-2 text-left font-sans">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="email" className="text-xs sm:text-sm text-foreground font-medium">
-                Email Address
+            <div className="flex items-center justify-between px-1">
+              <Label htmlFor="email" className="text-xs text-foreground font-medium">
+                Email address
               </Label>
               <span className="text-[11px] text-muted-foreground/60 font-mono">
                 Max 3 / 10m
               </span>
             </div>
-            <div className="relative">
-              <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-              <Input
-                id="email"
-                type="email"
-                required
-                autoFocus
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="name@example.com"
-                className="pl-11 h-12 sm:h-[52px] rounded-xl sm:rounded-2xl bg-background border-border text-foreground text-sm sm:text-base placeholder:text-muted-foreground/60 focus-visible:ring-primary font-sans"
-              />
-            </div>
+            <Input
+              id="email"
+              type="email"
+              required
+              autoFocus
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="name@example.com"
+              className="h-12 rounded-full px-5 bg-muted/60 border-transparent text-sm placeholder:text-muted-foreground/60 focus-visible:bg-background focus-visible:border-border font-sans"
+            />
           </div>
 
           <Button
             type="submit"
             disabled={isLoading || !email}
-            className="w-full h-12 sm:h-[52px] rounded-xl sm:rounded-2xl bg-primary text-primary-foreground hover:bg-primary/90 font-semibold text-sm sm:text-base active:scale-[0.99] transition-all disabled:opacity-50 font-sans cursor-pointer"
+            className="w-full h-12 rounded-full font-medium text-sm transition-all disabled:opacity-50 cursor-pointer"
           >
             {isLoading ? (
-              <Loader2 className="h-5 w-5 animate-spin" />
+              <Loader2 className="h-4 w-4 animate-spin" />
             ) : (
               "Send Magic Link"
             )}
@@ -309,48 +302,45 @@ export function AuthCard() {
         </form>
       )}
 
-      {/* VIEW 3: Minimalist Post-Send Magic Link Layout with Cooldown */}
+      {/* VIEW 3: Post-Send Magic Link Layout */}
       {viewState === "emailSent" && (
         <div className="text-center py-2">
-          {/* Transparent Icon without box */}
-          <div className="mb-5 inline-flex items-center justify-center">
-            <MailCheck className="h-12 w-12 text-foreground stroke-[1.5]" />
+          {/* 30% Squircle Icon Frame */}
+          <div className="mb-5 inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-secondary/80 border border-border/50 text-foreground">
+            <MailCheck className="h-6 w-6 stroke-[1.75]" />
           </div>
 
-          {/* Heading in Serif */}
           <h2 className="text-3xl sm:text-[34px] font-serif font-normal tracking-tight text-foreground">
-            Check your inbox
+            Check your inbox.
           </h2>
 
           <div className="space-y-2 mt-3 font-sans">
-            <p className="text-sm sm:text-base text-muted-foreground leading-relaxed">
+            <p className="text-sm text-muted-foreground font-light leading-relaxed">
               We sent a temporary sign-in link to{" "}
-              <span className="font-semibold text-foreground underline underline-offset-4 decoration-muted-foreground/30">
+              <span className="font-medium text-foreground underline underline-offset-4 decoration-muted-foreground/40">
                 {email}
               </span>
             </p>
 
-            <p className="text-xs sm:text-sm text-muted-foreground/80 leading-normal max-w-xs mx-auto pt-1">
+            <p className="text-xs text-muted-foreground/80 leading-normal max-w-xs mx-auto pt-1">
               Click the link in the email to log in automatically.
             </p>
           </div>
 
-          {/* Error Alert (if resend hits rate limit) */}
           {error && (
-            <div className="mt-4 flex items-start gap-2.5 rounded-xl border border-destructive/30 bg-destructive/10 p-3.5 text-xs text-destructive font-sans text-left">
+            <div className="mt-4 flex items-start gap-2.5 rounded-2xl border border-destructive/30 bg-destructive/10 p-3.5 text-xs text-destructive font-sans text-left">
               <AlertCircle className="h-4 w-4 shrink-0 mt-0.5" />
               <span className="leading-relaxed">{error}</span>
             </div>
           )}
 
-          {/* Action Buttons with Cooldown Timer */}
           <div className="mt-8 space-y-3 font-sans">
             <Button
               type="button"
               variant="outline"
               onClick={() => handleEmailSubmit()}
               disabled={isLoading || resendCooldown > 0}
-              className="w-full h-12 sm:h-[50px] rounded-xl sm:rounded-2xl border-border/70 text-sm font-medium hover:bg-secondary/80 active:scale-[0.99] transition-all cursor-pointer disabled:opacity-60 flex items-center justify-center gap-2"
+              className="w-full h-12 rounded-full text-sm font-medium border-border/70 cursor-pointer disabled:opacity-60 flex items-center justify-center gap-2"
             >
               {isLoading ? (
                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -371,12 +361,11 @@ export function AuthCard() {
                 setError(null);
                 setViewState("main");
               }}
-              className="w-full h-11 text-xs sm:text-sm text-muted-foreground hover:text-foreground font-normal cursor-pointer"
+              className="w-full h-10 rounded-full text-xs text-muted-foreground hover:text-foreground cursor-pointer"
             >
               Back to sign in
             </Button>
 
-            {/* Rate limit transparency note */}
             <p className="text-[11px] text-muted-foreground/60 font-mono text-center pt-1">
               Rate limit: max 3 requests per 10 minutes
             </p>

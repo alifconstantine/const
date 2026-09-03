@@ -3,7 +3,8 @@
 import * as React from "react";
 import { useState, useEffect } from "react";
 import { useAuthActions, useAuthToken } from "@convex-dev/auth/react";
-import { ConstLogoIcon, toast } from "@const/ui";
+import { ConstLogoIcon, Button, toast } from "@const/ui";
+import { Loader2 } from "lucide-react";
 import { getSafeRedirectUrl, getDefaultRedirectUrl } from "@/lib/safe-redirect";
 
 interface AuthSuccessProps {
@@ -15,9 +16,26 @@ interface AuthSuccessProps {
   } | null;
 }
 
+function getStoredToken(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const sso = localStorage.getItem("const_sso_token");
+    if (sso) return sso;
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && (k.startsWith("__convexAuthJWT") || k.includes("AuthJWT"))) {
+        const val = localStorage.getItem(k);
+        if (val) return val;
+      }
+    }
+  } catch {}
+  return null;
+}
+
 export function AuthSuccess({ user }: AuthSuccessProps) {
   const { signOut } = useAuthActions();
-  const token = useAuthToken();
+  const tokenFromHook = useAuthToken();
+  const [activeToken, setActiveToken] = useState<string | null>(() => getStoredToken());
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [targetUrl, setTargetUrl] = useState<string | null>(null);
 
@@ -26,20 +44,62 @@ export function AuthSuccess({ user }: AuthSuccessProps) {
     targetUrl?.startsWith("const-learn://") ||
     targetUrl?.startsWith("const://");
 
+  // Synchronize and discover token
+  useEffect(() => {
+    if (tokenFromHook) {
+      setActiveToken(tokenFromHook);
+      return;
+    }
+    const stored = getStoredToken();
+    if (stored) {
+      setActiveToken(stored);
+      return;
+    }
+    const interval = setInterval(() => {
+      const retryToken = getStoredToken();
+      if (retryToken) {
+        setActiveToken(retryToken);
+        clearInterval(interval);
+      }
+    }, 150);
+    const timeout = setTimeout(() => clearInterval(interval), 3000);
+    return () => {
+      clearInterval(interval);
+      clearTimeout(timeout);
+    };
+  }, [tokenFromHook]);
+
   useEffect(() => {
     if (typeof window === "undefined") return;
 
-    // 1. Synchronize Cross-Subdomain SSO Cookie on *.const.web.id
-    if (token) {
-      const hostname = window.location.hostname.toLowerCase();
-      if (hostname === "const.web.id" || hostname.endsWith(".const.web.id")) {
-        // Shared 30-day cross-subdomain SSO session cookie
-        document.cookie = `const_sso_token=${encodeURIComponent(token)}; Domain=.const.web.id; Path=/; SameSite=Lax; Secure; Max-Age=${30 * 24 * 60 * 60}`;
-      }
+    // Wait until token is available before initiating any redirect
+    if (!activeToken) return;
+
+    // 1. Synchronize Cross-Subdomain SSO Cookie on *.const.web.id & localhost
+    const hostname = window.location.hostname.toLowerCase();
+    if (hostname === "const.web.id" || hostname.endsWith(".const.web.id")) {
+      document.cookie = `const_sso_token=${encodeURIComponent(activeToken)}; Domain=.const.web.id; Path=/; SameSite=Lax; Secure; Max-Age=${30 * 24 * 60 * 60}`;
+    } else if (hostname === "localhost" || hostname === "127.0.0.1") {
+      document.cookie = `const_sso_token=${encodeURIComponent(activeToken)}; Path=/; SameSite=Lax; Max-Age=${30 * 24 * 60 * 60}`;
     }
 
-    // 2. Resolve destination URL (with fallback to default ecosystem root)
+    try {
+      localStorage.setItem("const_sso_token", activeToken);
+    } catch {}
+
+    // 2. Check if user explicitly requested account switching / fresh login prompt
     const params = new URLSearchParams(window.location.search);
+    const shouldSwitchAccount =
+      params.get("prompt") === "select_account" ||
+      params.get("prompt") === "login" ||
+      params.get("action") === "switch_account";
+
+    if (shouldSwitchAccount) {
+      void handleSignOut();
+      return;
+    }
+
+    // 3. Resolve destination URL (with fallback to default ecosystem root)
     const rawTarget =
       params.get("continue") ||
       params.get("redirect") ||
@@ -47,28 +107,21 @@ export function AuthSuccess({ user }: AuthSuccessProps) {
     const safeTarget = getSafeRedirectUrl(rawTarget, { allowRelative: true });
     let destination = safeTarget || getDefaultRedirectUrl();
 
-    // 3. For native desktop/mobile deep links (const-auth:// or const-learn://) or localhost dev targets, attach token payload
-    const isNativeScheme =
-      destination.startsWith("const-auth://") ||
-      destination.startsWith("const-learn://") ||
-      destination.startsWith("const://");
-    const isLocalhostTarget =
-      destination.includes("localhost") || destination.includes("127.0.0.1");
-
-    if ((isNativeScheme || isLocalhostTarget) && token) {
+    // 4. Attach token payload for safe internal & native redirects
+    if (safeTarget) {
       const separator = destination.includes("?") ? "&" : "?";
-      destination = `${destination}${separator}token=${encodeURIComponent(token)}`;
+      destination = `${destination}${separator}token=${encodeURIComponent(activeToken)}`;
     }
 
     setTargetUrl(destination);
 
-    // 4. Smooth auto-redirect after brief visual confirmation
+    // 5. Smooth auto-redirect after brief visual confirmation (only if not switching)
     const timer = setTimeout(() => {
       window.location.href = destination;
-    }, 1200);
+    }, 1000);
 
     return () => clearTimeout(timer);
-  }, [token]);
+  }, [activeToken]);
 
   const handleManualProceed = () => {
     const destination = targetUrl || getDefaultRedirectUrl();
@@ -79,87 +132,136 @@ export function AuthSuccess({ user }: AuthSuccessProps) {
   const handleSignOut = async () => {
     setIsSigningOut(true);
     try {
-      // Clear cross-subdomain SSO cookie
-      if (typeof document !== "undefined") {
-        document.cookie = "const_sso_token=; Domain=.const.web.id; Path=/; SameSite=Lax; Secure; Max-Age=0";
-      }
+      // 1. Clear cross-subdomain SSO cookies on all potential scopes
+      const expireCookie = (cookieName: string) => {
+        document.cookie = `${cookieName}=; Domain=.const.web.id; Path=/; SameSite=Lax; Secure; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+        document.cookie = `${cookieName}=; Path=/; SameSite=Lax; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+        document.cookie = `${cookieName}=; Path=/; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+      };
+
+      expireCookie("const_sso_token");
+      expireCookie("__convexAuthJWT");
+
+      // 2. Clear LocalStorage session tokens
+      try {
+        localStorage.removeItem("const_sso_token");
+        const keysToRemove: string[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && (key.startsWith("__convexAuthJWT") || key.includes("AuthJWT") || key.includes("sso"))) {
+            keysToRemove.push(key);
+          }
+        }
+        keysToRemove.forEach((k) => localStorage.removeItem(k));
+      } catch {}
+
+      // 3. Invalidate Convex Auth server session
       await signOut();
-      toast.info("Signed out", { description: "You have been safely signed out." });
+
+      // Clean prompt param if present
+      if (typeof window !== "undefined") {
+        const params = new URLSearchParams(window.location.search);
+        params.delete("prompt");
+        params.delete("action");
+        const newQuery = params.toString() ? `?${params.toString()}` : "";
+        window.history.replaceState({}, document.title, `${window.location.pathname}${newQuery}`);
+      }
+
+      toast.info("Signed out", { description: "You can now sign in with a different account." });
     } finally {
       setIsSigningOut(false);
     }
   };
 
   return (
-    <div className="relative z-10 w-full max-w-4xl px-4 sm:px-6 py-12 flex flex-col items-center justify-center text-center select-none animate-in fade-in duration-500">
-      {/* Branding Logo: Transparent Icon + Brand Name */}
+    <div className="relative z-10 w-full max-w-xl px-4 sm:px-6 py-12 flex flex-col items-center justify-center text-center select-none animate-in fade-in duration-500">
+      {/* Branding Logo: Transparent Icon + Lora Brand Name */}
       <div className="flex items-center justify-center gap-3 mb-8 group">
         <ConstLogoIcon
           size="lg"
-          className="w-9 h-9 sm:w-10 sm:h-10 text-foreground transition-transform duration-300 group-hover:scale-105"
+          className="w-10 h-10 text-foreground transition-transform duration-300 group-hover:scale-105"
         />
         <span className="font-serif font-normal tracking-tight text-foreground text-3xl sm:text-4xl">
           Const
         </span>
       </div>
 
-      {/* Main Success Heading in a single line */}
-      <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-[40px] font-serif font-normal tracking-tight text-foreground mb-4 leading-tight whitespace-nowrap">
-        You have successfully authenticated.
+      {/* Main Success Heading with Lora Serif & period cadence */}
+      <h1 className="text-3xl sm:text-4xl md:text-[42px] font-serif font-normal tracking-tight text-foreground mb-3 leading-tight">
+        Authenticated successfully.
       </h1>
 
       {/* Prominent Action Button for Native Desktop / Mobile Apps */}
       {isNativeScheme ? (
         <div className="my-6 flex flex-col items-center gap-3">
-          <button
+          <Button
             type="button"
             onClick={handleManualProceed}
-            className="inline-flex items-center justify-center gap-2.5 rounded-xl bg-primary px-7 py-3.5 text-sm font-semibold text-primary-foreground shadow-md transition-all hover:opacity-90 active:scale-[0.98] cursor-pointer"
+            className="rounded-full px-8 py-3.5 text-sm font-semibold cursor-pointer h-12"
           >
             <span>Buka Aplikasi Const Learn</span>
-          </button>
-          <p className="text-xs text-muted-foreground max-w-md">
+          </Button>
+          <p className="text-xs text-muted-foreground max-w-md font-light leading-relaxed">
             Membuka aplikasi desktop... Jika muncul jendela dialog peramban <em>&quot;Buka Const Learn?&quot;</em>, silakan pilih <strong>Buka / Open</strong>.
           </p>
         </div>
       ) : (
-        /* Subtitle with redirect helper for regular web redirects */
-        <p className="text-sm sm:text-base text-muted-foreground font-sans leading-relaxed mb-10 max-w-xl">
-          You should be redirected back to the product.{" "}
-          <button
-            type="button"
-            onClick={handleManualProceed}
-            className="text-primary underline underline-offset-4 hover:text-foreground font-medium transition-colors cursor-pointer"
-          >
-            Click here
-          </button>{" "}
-          if not working.
+        <p className="text-sm sm:text-base text-muted-foreground font-sans font-light leading-relaxed mb-8 max-w-md">
+          Redirecting you to your destination application.
         </p>
       )}
 
-      {/* Minimalist Footer */}
-      <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground font-sans pt-4 border-t border-border/20">
-        <button
-          type="button"
-          onClick={handleSignOut}
-          disabled={isSigningOut}
-          className="hover:text-foreground transition-colors cursor-pointer disabled:opacity-50"
-        >
-          {isSigningOut ? "Signing out..." : "Sign out"}
-        </button>
-      </div>
-
-      {/* Subtle Account Indicator with role badge */}
+      {/* User Session Stadium Pill */}
       {user?.email && (
-        <div className="mt-6 flex items-center justify-center gap-2 text-[11px] text-muted-foreground/60 font-mono">
-          <span>Signed in as {user.email}</span>
+        <div className="mb-8 inline-flex items-center gap-3 rounded-full bg-secondary/70 border border-border/60 px-4 py-2 text-xs font-sans text-foreground transition-all">
+          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+          <span className="font-medium">{user.email}</span>
           {user.role && (
-            <span className="rounded bg-muted px-1.5 py-0.5 text-[10px] uppercase font-semibold text-muted-foreground">
+            <span className="rounded-full bg-foreground text-background px-2.5 py-0.5 text-[10px] uppercase font-semibold tracking-wider">
               {user.role}
             </span>
           )}
         </div>
       )}
+
+      {/* Redirect Indicator & Manual Link */}
+      <div className="flex flex-col items-center gap-3">
+        <div className="inline-flex items-center gap-2 text-xs text-muted-foreground font-sans">
+          <Loader2 className="h-3.5 w-3.5 animate-spin text-[#0066ff]" />
+          <span>If redirection doesn't happen automatically,</span>
+          <button
+            type="button"
+            onClick={handleManualProceed}
+            className="text-foreground underline underline-offset-4 hover:text-[#0066ff] font-medium transition-colors cursor-pointer"
+          >
+            click here
+          </button>
+        </div>
+
+        <div className="pt-6 flex items-center justify-center gap-3">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleSignOut}
+            disabled={isSigningOut}
+            className="rounded-full text-xs font-medium border-border/70 text-muted-foreground hover:text-foreground hover:bg-secondary cursor-pointer px-4 h-9"
+          >
+            {isSigningOut ? "Signing out..." : "Use another account"}
+          </Button>
+
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={handleSignOut}
+            disabled={isSigningOut}
+            className="rounded-full text-xs text-muted-foreground hover:text-destructive cursor-pointer h-9 px-3"
+          >
+            Sign out
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

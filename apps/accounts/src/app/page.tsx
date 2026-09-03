@@ -12,8 +12,7 @@ import { useState, useEffect } from "react";
 import { toast } from "@const/ui";
 
 function UnauthenticatedView() {
-  const { signIn } = useAuthActions();
-  const [isVerifyingCode, setIsVerifyingCode] = useState(false);
+  const [hasCodeInUrl, setHasCodeInUrl] = useState(false);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -33,31 +32,16 @@ function UnauthenticatedView() {
     }
 
     if (code) {
-      setIsVerifyingCode(true);
-      void signIn("resend" as any, { code } as any)
-        .then(() => {
-          toast.success("Authentication successful!", {
-            description: "Redirecting to your application...",
-          });
-          const cleanUrl = window.location.pathname;
-          window.history.replaceState({}, document.title, cleanUrl);
-        })
-        .catch((err) => {
-          console.error("Code verification error:", err);
-          toast.error("Sign-in link expired or invalid", {
-            description: "Please request a new magic sign-in link.",
-          });
-          setIsVerifyingCode(false);
-        });
+      setHasCodeInUrl(true);
     }
-  }, [signIn]);
+  }, []);
 
-  if (isVerifyingCode) {
+  if (hasCodeInUrl) {
     return (
       <div className="relative z-10 flex flex-col items-center justify-center gap-3 text-muted-foreground">
         <Loader2 className="h-6 w-6 animate-spin text-foreground" />
         <p className="text-xs font-mono tracking-wider uppercase text-muted-foreground">
-          Authenticating magic link...
+          Authenticating credentials...
         </p>
       </div>
     );

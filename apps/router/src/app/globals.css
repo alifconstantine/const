@@ -1,0 +1,107 @@
+@import "tailwindcss";
+
+@source "../../../packages/ui/src";
+
+@layer base {
+  :root {
+    /* Const Design System (Mobbin-inspired Monochrome Palette) */
+    --background: 0 0% 100%;             /* Canvas #ffffff */
+    --foreground: 0 0% 8%;               /* Ink Black #141414 */
+    --card: 0 0% 100%;                   /* Card #ffffff */
+    --card-foreground: 0 0% 8%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 8%;
+    --primary: 0 0% 8%;                  /* Primary Ink #141414 */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 0 0% 95.3%;             /* Soft Canvas #f3f3f3 */
+    --secondary-foreground: 0 0% 8%;
+    --muted: 0 0% 94.1%;                 /* Field Tint #f0f0f0 */
+    --muted-foreground: 0 0% 43.9%;      /* Text Muted #707070 */
+    --accent: 216 100% 50%;              /* Electric Blue #0066ff */
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 87.8%;                /* Hairline #e0e0e0 */
+    --input: 0 0% 94.1%;                 /* Field Fill #f0f0f0 */
+    --ring: 0 0% 8%;                     /* Ink Ring */
+    --radius: 1.5rem;                    /* 24px Container Geometry */
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 0 0% 15%;
+    --sidebar-primary: 0 0% 8%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 0 0% 95.3%;
+    --sidebar-accent-foreground: 0 0% 8%;
+    --sidebar-border: 0 0% 87.8%;
+    --sidebar-ring: 216 100% 50%;
+  }
+
+  .dark {
+    /* Dark Mode Inversion (Deep Obsidian & Charcoal) */
+    --background: 0 0% 4.7%;             /* #0c0c0c Deep Obsidian */
+    --foreground: 0 0% 98%;
+    --card: 0 0% 8.6%;                   /* #161616 Soft Ink */
+    --card-foreground: 0 0% 98%;
+    --popover: 0 0% 8.6%;
+    --popover-foreground: 0 0% 98%;
+    --primary: 0 0% 98%;                 /* Inverted Ink */
+    --primary-foreground: 0 0% 8%;
+    --secondary: 0 0% 14.5%;             /* #252525 Soft Tint */
+    --secondary-foreground: 0 0% 98%;
+    --muted: 0 0% 13%;                   /* #212121 Field */
+    --muted-foreground: 0 0% 64%;        /* #a3a3a3 */
+    --accent: 216 100% 50%;              /* Electric Blue #0066ff */
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 0 0% 16.5%;                /* #2a2a2a Hairline */
+    --input: 0 0% 14.5%;
+    --ring: 0 0% 80%;
+    --sidebar-background: 0 0% 8%;
+    --sidebar-foreground: 0 0% 98%;
+    --sidebar-primary: 216 100% 50%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 0 0% 14.5%;
+    --sidebar-accent-foreground: 0 0% 98%;
+    --sidebar-border: 0 0% 16.5%;
+    --sidebar-ring: 216 100% 50%;
+  }
+}
+
+@theme inline {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+}
+
+@layer base {
+  :root {
+    --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    --font-serif: 'Lora', 'Georgia', serif;
+  }
+  * {
+    border-color: hsl(var(--border));
+  }
+  html,
+  body {
+    font-family: var(--font-sans), 'Inter', sans-serif;
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    @apply antialiased selection:bg-primary selection:text-primary-foreground;
+  }
+}
