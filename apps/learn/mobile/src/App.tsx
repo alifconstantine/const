@@ -6,12 +6,22 @@ import { api } from "@const/backend/_generated/api";
 import { ConvexClientProvider } from "./components/convex-provider";
 import { Navbar } from "./components/navbar";
 
-function AuthenticatedContent({ onSignOut }: { onSignOut: () => void }) {
+function AuthenticatedContent({
+  onSignOut,
+  onSwitchAccount,
+}: {
+  onSignOut: () => void;
+  onSwitchAccount: () => void;
+}) {
   const user = useQuery(api.auth.queries.currentUser, {});
 
   return (
     <div className="min-h-screen w-full flex flex-col bg-background text-foreground">
-      <Navbar user={user} onSignOut={onSignOut} />
+      <Navbar
+        user={user}
+        onSignOut={onSignOut}
+        onSwitchAccount={onSwitchAccount}
+      />
       <main className="flex-1 w-full bg-background" />
     </div>
   );
@@ -23,9 +33,14 @@ export default function App() {
   });
   const [isWaitingAuth, setIsWaitingAuth] = useState(false);
 
-  // Set Accounts Hub URL: Default to localhost:3001
+  // Set Accounts Hub URL: Default to localhost:3001 in local dev, accounts.const.web.id in production
   const accountsBaseUrl =
-    (import.meta.env.VITE_ACCOUNTS_URL as string) || "http://localhost:3001";
+    (import.meta.env.VITE_ACCOUNTS_URL as string) ||
+    (typeof window !== "undefined" &&
+    window.location.hostname !== "localhost" &&
+    window.location.hostname !== "127.0.0.1"
+      ? "https://accounts.const.web.id"
+      : "http://localhost:3001");
 
   useEffect(() => {
     // 1. Check if token returned via URL query parameter (standard web/PWA flow)
@@ -60,7 +75,8 @@ export default function App() {
       ? `${window.location.origin}${window.location.pathname}`
       : "const-learn://callback";
 
-    const targetUrl = `${accountsBaseUrl}?continue=${encodeURIComponent(continueTarget)}&prompt=select_account`;
+    const base = accountsBaseUrl.replace(/\/+$/, "");
+    const targetUrl = `${base}/?continue=${encodeURIComponent(continueTarget)}&prompt=select_account`;
     window.location.href = targetUrl;
   };
 
@@ -71,13 +87,31 @@ export default function App() {
     setIsWaitingAuth(false);
   };
 
+  const handleSwitchAccount = () => {
+    localStorage.removeItem("const_learn_auth_token");
+    localStorage.removeItem("const_sso_token");
+    setToken(null);
+    setIsWaitingAuth(true);
+
+    const continueTarget = window.location.protocol.startsWith("http")
+      ? `${window.location.origin}${window.location.pathname}`
+      : "const-learn://callback";
+
+    const base = accountsBaseUrl.replace(/\/+$/, "");
+    const targetUrl = `${base}/?continue=${encodeURIComponent(continueTarget)}&action=switch_account`;
+    window.location.href = targetUrl;
+  };
+
   // -------------------------------------------------------------
   // 1. Authenticated View: Navbar at Top + Empty Main Area (Zero Dummy Data)
   // -------------------------------------------------------------
   if (token) {
     return (
       <ConvexClientProvider token={token} signOut={handleSignOut}>
-        <AuthenticatedContent onSignOut={handleSignOut} />
+        <AuthenticatedContent
+          onSignOut={handleSignOut}
+          onSwitchAccount={handleSwitchAccount}
+        />
       </ConvexClientProvider>
     );
   }

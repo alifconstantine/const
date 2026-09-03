@@ -7,12 +7,22 @@ import { ConvexClientProvider } from "./components/convex-provider";
 import { Navbar } from "./components/navbar";
 import authArt from "./assets/auth-art.jpg";
 
-function AuthenticatedContent({ onSignOut }: { onSignOut: () => void }) {
+function AuthenticatedContent({
+  onSignOut,
+  onSwitchAccount,
+}: {
+  onSignOut: () => void;
+  onSwitchAccount: () => void;
+}) {
   const user = useQuery(api.auth.queries.currentUser, {});
 
   return (
     <div className="min-h-screen w-full flex flex-col bg-background text-foreground">
-      <Navbar user={user} onSignOut={onSignOut} />
+      <Navbar
+        user={user}
+        onSignOut={onSignOut}
+        onSwitchAccount={onSwitchAccount}
+      />
       <main className="flex-1 w-full bg-background" />
     </div>
   );
@@ -24,9 +34,14 @@ export default function App() {
   });
   const [isWaitingAuth, setIsWaitingAuth] = useState(false);
 
-  // Set Accounts Hub URL: Default to localhost:3001 for development
+  // Set Accounts Hub URL: Default to localhost:3001 in local dev, accounts.const.web.id in production
   const accountsBaseUrl =
-    (import.meta.env.VITE_ACCOUNTS_URL as string) || "http://localhost:3001";
+    (import.meta.env.VITE_ACCOUNTS_URL as string) ||
+    (typeof window !== "undefined" &&
+    window.location.hostname !== "localhost" &&
+    window.location.hostname !== "127.0.0.1"
+      ? "https://accounts.const.web.id"
+      : "http://localhost:3001");
 
   // Listen for deep link callback in Electron or browser redirect
   useEffect(() => {
@@ -84,7 +99,8 @@ export default function App() {
       ? "const-learn://callback"
       : `${window.location.origin}${window.location.pathname}`;
 
-    const targetUrl = `${accountsBaseUrl}?continue=${encodeURIComponent(continueTarget)}&prompt=select_account`;
+    const base = accountsBaseUrl.replace(/\/+$/, "");
+    const targetUrl = `${base}/?continue=${encodeURIComponent(continueTarget)}&prompt=select_account`;
     setIsWaitingAuth(true);
 
     if (window.electron?.openExternal) {
@@ -101,13 +117,36 @@ export default function App() {
     setIsWaitingAuth(false);
   };
 
+  const handleSwitchAccount = async () => {
+    localStorage.removeItem("const_learn_auth_token");
+    localStorage.removeItem("const_sso_token");
+    setToken(null);
+    setIsWaitingAuth(true);
+
+    const continueTarget = window.electron?.openExternal
+      ? "const-learn://callback"
+      : `${window.location.origin}${window.location.pathname}`;
+
+    const base = accountsBaseUrl.replace(/\/+$/, "");
+    const targetUrl = `${base}/?continue=${encodeURIComponent(continueTarget)}&action=switch_account`;
+
+    if (window.electron?.openExternal) {
+      await window.electron.openExternal(targetUrl);
+    } else {
+      window.location.href = targetUrl;
+    }
+  };
+
   // -------------------------------------------------------------
   // 1. Authenticated View: Navbar at Top + Empty Main Area (Zero Dummy Data)
   // -------------------------------------------------------------
   if (token) {
     return (
       <ConvexClientProvider token={token} signOut={handleSignOut}>
-        <AuthenticatedContent onSignOut={handleSignOut} />
+        <AuthenticatedContent
+          onSignOut={handleSignOut}
+          onSwitchAccount={handleSwitchAccount}
+        />
       </ConvexClientProvider>
     );
   }

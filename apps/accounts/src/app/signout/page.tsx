@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAuthActions } from "@convex-dev/auth/react";
 import { ConstLogoIcon } from "@const/ui";
-import { getSafeRedirectUrl, getDefaultRedirectUrl } from "@/lib/safe-redirect";
+import { getSafeRedirectUrl, getDefaultRedirectUrl, isNativeRedirectUrl } from "@/lib/safe-redirect";
 import { Loader2 } from "lucide-react";
 
 export default function SignOutPage() {
@@ -15,7 +15,17 @@ export default function SignOutPage() {
 
     const performSignOut = async () => {
       try {
-        // 1. Clear cross-subdomain SSO cookies on all potential scopes
+        // 1. Call server-side API to expire HTTP-only cookies via Set-Cookie headers
+        try {
+          await fetch("/api/auth/signout", {
+            method: "POST",
+            cache: "no-store",
+          });
+        } catch (apiErr) {
+          console.warn("Server signout API warning:", apiErr);
+        }
+
+        // 2. Clear cross-subdomain and local cookies on client scope
         const expireCookie = (cookieName: string) => {
           document.cookie = `${cookieName}=; Domain=.const.web.id; Path=/; SameSite=Lax; Secure; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT`;
           document.cookie = `${cookieName}=; Path=/; SameSite=Lax; Max-Age=0; Expires=Thu, 01 Jan 1970 00:00:00 GMT`;
@@ -24,47 +34,69 @@ export default function SignOutPage() {
 
         expireCookie("const_sso_token");
         expireCookie("__convexAuthJWT");
+        expireCookie("__Host-__convexAuthJWT");
+        expireCookie("__convexAuthRefreshToken");
+        expireCookie("__Host-__convexAuthRefreshToken");
 
-        // 2. Clear LocalStorage session tokens
+        // 3. Clear LocalStorage session tokens across all namespaces
         try {
           localStorage.removeItem("const_sso_token");
           const keysToRemove: string[] = [];
           for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
-            if (key && (key.startsWith("__convexAuthJWT") || key.includes("AuthJWT") || key.includes("sso"))) {
+            if (
+              key &&
+              (key.includes("convex") ||
+                key.includes("AuthJWT") ||
+                key.includes("sso") ||
+                key.includes("token"))
+            ) {
               keysToRemove.push(key);
             }
           }
           keysToRemove.forEach((k) => localStorage.removeItem(k));
         } catch {}
 
-        // 3. Clear SessionStorage
+        // 4. Clear SessionStorage
         try {
           sessionStorage.clear();
         } catch {}
 
-        // 4. Invalidate Convex Auth server session
+        // 5. Invalidate Convex Auth client session
         try {
           await signOut();
         } catch (err) {
-          console.warn("SignOut API warning:", err);
+          console.warn("Convex signOut warning:", err);
         }
 
         setStatus("Session cleared. Redirecting...");
 
-        // 5. Redirect to destination (or accounts root login)
+        // 6. Redirect to destination (or accounts root login)
         const params = new URLSearchParams(window.location.search);
-        const rawTarget =
+        const redirectParam = params.get("redirect");
+        const continueParam =
           params.get("continue") ||
-          params.get("redirect") ||
           params.get("app");
-        const safeTarget = getSafeRedirectUrl(rawTarget, { allowRelative: true });
-        const destination = safeTarget || "/";
+
+        let destination = "/";
+        if (redirectParam) {
+          const safeRedirect = getSafeRedirectUrl(redirectParam, { allowRelative: true });
+          if (safeRedirect) destination = safeRedirect;
+        } else if (continueParam) {
+          const safeContinue = getSafeRedirectUrl(continueParam, { allowRelative: true });
+          if (safeContinue) {
+            if (isNativeRedirectUrl(safeContinue)) {
+              destination = `/?continue=${encodeURIComponent(safeContinue)}`;
+            } else {
+              destination = safeContinue;
+            }
+          }
+        }
 
         // Brief delay for state stabilization
         setTimeout(() => {
           window.location.href = destination;
-        }, 400);
+        }, 300);
       } catch (err) {
         console.error("SignOut error:", err);
         window.location.href = "/";

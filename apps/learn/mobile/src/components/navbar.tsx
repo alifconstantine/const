@@ -10,7 +10,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
 } from "@const/ui";
-import { Settings, LogOut, User as UserIcon } from "lucide-react";
+import { Settings, LogOut, User as UserIcon, ArrowLeftRight } from "lucide-react";
 
 export interface UserProfile {
   name?: string | null;
@@ -22,6 +22,7 @@ export interface UserProfile {
 interface NavbarProps {
   user?: UserProfile | null;
   onSignOut: () => void;
+  onSwitchAccount?: () => void;
 }
 
 export function getUserInitials(name?: string | null, email?: string | null): string {
@@ -46,7 +47,7 @@ export function getUserInitials(name?: string | null, email?: string | null): st
   return "U";
 }
 
-export function Navbar({ user, onSignOut }: NavbarProps) {
+export function Navbar({ user, onSignOut, onSwitchAccount }: NavbarProps) {
   const initials = getUserInitials(user?.name, user?.email);
 
   return (
@@ -78,7 +79,11 @@ export function Navbar({ user, onSignOut }: NavbarProps) {
             >
               <Avatar className="h-8 w-8 rounded-full border border-border/70 transition-transform active:scale-95">
                 {user?.image ? (
-                  <AvatarImage src={user.image} alt={user.name || "Avatar"} />
+                  <AvatarImage
+                    src={user.image}
+                    alt={user.name || "Avatar"}
+                    referrerPolicy="no-referrer"
+                  />
                 ) : null}
                 <AvatarFallback className="bg-secondary text-secondary-foreground font-sans text-xs font-medium">
                   {user === undefined ? (
@@ -121,6 +126,16 @@ export function Navbar({ user, onSignOut }: NavbarProps) {
             </DropdownMenuItem>
 
             <DropdownMenuSeparator />
+
+            {onSwitchAccount && (
+              <DropdownMenuItem
+                className="cursor-pointer flex items-center gap-2 text-xs py-2 px-2 text-muted-foreground hover:text-foreground"
+                onClick={onSwitchAccount}
+              >
+                <ArrowLeftRight className="h-4 w-4" />
+                <span>Switch account</span>
+              </DropdownMenuItem>
+            )}
 
             <DropdownMenuItem
               className="cursor-pointer flex items-center gap-2 text-xs py-2 px-2 text-destructive focus:text-destructive"

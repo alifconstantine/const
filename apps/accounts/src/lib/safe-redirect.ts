@@ -21,6 +21,52 @@ export function getDefaultRedirectUrl(): string {
   return "https://const.web.id";
 }
 
+/**
+ * Determines whether a target URL is a native app scheme (e.g. desktop/mobile deep link)
+ */
+export function isNativeRedirectUrl(target: string | null | undefined): boolean {
+  if (!target || typeof target !== "string") return false;
+  const trimmed = target.trim();
+  return (
+    trimmed.startsWith("const-learn://") ||
+    trimmed.startsWith("const-auth://") ||
+    trimmed.startsWith("const://")
+  );
+}
+
+/**
+ * Dynamically resolves the human-readable application name from a target URL
+ */
+export function getAppNameFromUrl(target: string | null | undefined): string {
+  if (!target || typeof target !== "string") return "Const";
+  const trimmed = target.trim();
+
+  if (trimmed.startsWith("const-learn://")) return "Const Learn";
+  if (trimmed.startsWith("const-auth://") || trimmed.startsWith("const://")) return "Const";
+
+  try {
+    const parsed = new URL(trimmed, "https://const.web.id");
+    const hostname = parsed.hostname.toLowerCase();
+    const port = parsed.port;
+
+    if (hostname === "router.const.web.id" || hostname.startsWith("router.") || port === "3002") {
+      return "Const Router";
+    }
+    if (hostname === "learn.const.web.id" || hostname.startsWith("learn.") || port === "5173") {
+      return "Const Learn";
+    }
+    if (hostname === "accounts.const.web.id" || hostname.startsWith("accounts.") || port === "3001") {
+      return "Const Accounts";
+    }
+    if (hostname === "const.web.id" || port === "3000") {
+      return "Const";
+    }
+    return "Const";
+  } catch {
+    return "Const";
+  }
+}
+
 export function getSafeRedirectUrl(
   target: string | null | undefined,
   options: { allowRelative?: boolean } = { allowRelative: false }
