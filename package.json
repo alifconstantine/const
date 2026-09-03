@@ -8,7 +8,8 @@
     "lint": "turbo lint",
     "check-types": "turbo check-types",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
-    "clear-auth": "pnpm --filter @const/backend exec convex run testing:clearAuthData"
+    "clear-auth": "pnpm --filter @const/backend exec convex run testing:clearAuthData",
+    "deploy:backend": "pnpm --filter @const/backend run deploy"
   },
   "devDependencies": {
     "prettier": "^3.5.3",
