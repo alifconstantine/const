@@ -19,7 +19,6 @@ import {
   Radio,
   User,
   Loader2,
-  Sparkles,
 } from "lucide-react";
 
 export default function HomePage() {
@@ -33,7 +32,7 @@ export default function HomePage() {
     <div className="min-h-screen flex flex-col bg-background text-foreground selection:bg-primary selection:text-primary-foreground">
       {/* Floating Stadium Navigation Pill (Mobbin nav-pill pattern) */}
       <div className="fixed top-5 inset-x-4 z-50 flex justify-center pointer-events-none">
-        <header className="pointer-events-auto w-full max-w-4xl h-14 rounded-full bg-card/85 dark:bg-[#161616]/90 border border-border/70 backdrop-blur-xl px-5 sm:px-6 flex items-center justify-between shadow-none transition-all">
+        <header className="pointer-events-auto w-full max-w-4xl h-14 rounded-full bg-card/85 border border-border/70 backdrop-blur-xl px-5 sm:px-6 flex items-center justify-between shadow-none transition-all">
           <Link href="/" className="flex items-center gap-2.5 group">
             <ConstLogoIcon
               size="md"
@@ -155,7 +154,7 @@ export default function HomePage() {
           {/* Architecture Cards Grid (24px Mobbin Geometry) */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-5 pt-16 text-left">
             {/* Tri-Rail Card */}
-            <div className="p-7 sm:p-8 rounded-3xl border border-border/60 bg-secondary/40 dark:bg-[#161616] space-y-4 transition-all hover:border-border">
+            <div className="p-7 sm:p-8 rounded-3xl border border-border/60 bg-card space-y-4 transition-all hover:border-border">
               {/* 30% iOS Squircle Icon Frame */}
               <div className="h-12 w-12 rounded-2xl border border-border/60 bg-card flex items-center justify-center text-foreground">
                 <Layers className="h-5 w-5 stroke-[1.75]" />
@@ -167,7 +166,7 @@ export default function HomePage() {
             </div>
 
             {/* Smart Combos Card */}
-            <div className="p-7 sm:p-8 rounded-3xl border border-border/60 bg-secondary/40 dark:bg-[#161616] space-y-4 transition-all hover:border-border">
+            <div className="p-7 sm:p-8 rounded-3xl border border-border/60 bg-card space-y-4 transition-all hover:border-border">
               <div className="h-12 w-12 rounded-2xl border border-border/60 bg-card flex items-center justify-center text-foreground">
                 <ShieldCheck className="h-5 w-5 stroke-[1.75]" />
               </div>
@@ -178,7 +177,7 @@ export default function HomePage() {
             </div>
 
             {/* SSE Streaming Card */}
-            <div className="p-7 sm:p-8 rounded-3xl border border-border/60 bg-secondary/40 dark:bg-[#161616] space-y-4 transition-all hover:border-border">
+            <div className="p-7 sm:p-8 rounded-3xl border border-border/60 bg-card space-y-4 transition-all hover:border-border">
               <div className="h-12 w-12 rounded-2xl border border-border/60 bg-card flex items-center justify-center text-foreground">
                 <Zap className="h-5 w-5 stroke-[1.75]" />
               </div>
