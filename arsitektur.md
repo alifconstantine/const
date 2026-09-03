@@ -150,6 +150,16 @@ Const/
 │   │   │   └── lib/                  # cn, cva, utils
 │   │   └── tailwind.config.ts        # Shared Tailwind preset
 │   │
+│   ├── agent/                        # Single Native Const Agent Engine (Refaktor & Adopsi Bersih dari Pi)
+│   │   ├── package.json
+│   │   ├── tsconfig.json
+│   │   └── src/
+│   │       ├── core/                 # Agent loop, state machine, trust-manager (approval gate)
+│   │       ├── ai/                   # Unified multi-provider SDK (Gemini 2.5 Flash default, OpenAI, BYOK)
+│   │       ├── drivers/              # LocalExecutionDriver (Desktop) & ComposioSandboxDriver (Mobile)
+│   │       ├── skills/               # Dynamic skill loader (SKILL.md)
+│   │       └── client/               # RPC client & transport stream
+│   │
 │   ├── typescript-config/            # Base TSConfig (@const/typescript-config: base, nextjs, react-library)
 │   │   ├── package.json
 │   │   ├── base.json
@@ -159,7 +169,7 @@ Const/
 │   └── (Catatan: @const/types ditiadakan karena Convex menyediakan End-to-End Type Safety otomatis
 │        langsung via `convex/_generated/`, mencegah duplikasi dan over-engineering)
 │
-└── apps/                             # Deployable Applications (Next.js 16 App Router)
+└── apps/                             # Deployable Applications (Next.js 16 App Router & Native Wrappers)
     ├── accounts/                     # accounts.const.web.id (Central Identity Provider & SSO Hub)
     │   ├── package.json
     │   ├── next.config.ts
@@ -170,10 +180,11 @@ Const/
     │   ├── next.config.ts
     │   └── src/                      # API /v1/chat/completions + Dashboard API Key Management
     │
-    ├── learn/                        # learn.const.web.id (ICONFEST 2026 EduTech Showcase)
-    │   ├── package.json
-    │   ├── next.config.ts
-    │   └── src/                      # Interactive courses, AI coding sandbox, quiz assessments
+    ├── learn/                        # learn.const.web.id + Desktop & Mobile (ICONFEST 2026 Core Platform)
+    │   ├── arsitektur.md             # Blueprint arsitektur detail Const Learn
+    │   ├── desktop/                  # Electron Desktop App (Hermes-style installer + 3-column workspace)
+    │   ├── mobile/                   # Mobile Companion App (PWA / Capacitor + Composio Cloud MCP)
+    │   └── web/                      # Web Learning Hub (Next.js 16 App Router)
     │
     ├── landing/                      # const.web.id (Ecosystem Landing & Showcase)
     │   ├── package.json
@@ -697,7 +708,142 @@ flowchart TD
 
 ---
 
-## 7. Roadmap Eksekusi Bertahap (ICONFEST 2026 Core)
+## 7. Arsitektur Detail: Const Learn (`learn.const.web.id`, Desktop & Mobile)
+
+### A. Peran, Filosofi Desain, & Visi EduTech ICONFEST 2026
+
+**Const Learn** adalah karya utama (*main flagship project*) yang diajukan pada ajang **ICONFEST 2026 (Kategori Software Development - Tema Pendidikan)**. 
+
+Berbeda dari aplikasi bimbingan belajar konvensional yang hanya menyajikan teks tanya-jawab statis, Const Learn dirancang sebagai platform **Actionable AI Research, Native Learning Agent, & Interactive Learning Hub**. Siswa tidak hanya membaca materi, tetapi didampingi oleh agen cerdas yang dapat memanipulasi file, menjalankan simulasi kode matematika/sains secara nyata, dan menyajikan visualisasi dinamis di atas kanvas **Hyperframe**.
+
+```mermaid
+flowchart TD
+    subgraph DesktopTier["🖥️ Desktop Powerhouse (Electron + React/Vite)"]
+        D_UI["3-Column Workspace UI\n(Sources - Socratic Chat - Studio/Terminal)"]
+        D_Bridge["Electron Preload & IPC Bridge"]
+        D_Engine["Native Const Agent Core\n(@const/agent)"]
+        D_Driver["Local Execution Driver\n• Node.js & uv/Python 3.11\n• Local File System & ripgrep\n• PowerShell/Bash Terminal Runner"]
+        D_Wizard["Hermes-Style Onboarding Wizard\n(16-Step Auto Runtimes Setup)"]
+        
+        D_UI <--> D_Bridge <--> D_Engine <--> D_Driver
+        D_Wizard -.->|"Auto-Provision at First Run"| D_Driver
+    end
+
+    subgraph MobileTier["📱 Mobile Companion (Capacitor / PWA)"]
+        M_UI["Mobile Responsive UI\n(Socratic Chat & Studio Preview)"]
+        M_Engine["Native Const Agent Core\n(@const/agent)"]
+        M_Driver["Composio Cloud Sandbox Driver\n(Remote MCP Execution)"]
+        
+        M_UI <--> M_Engine <--> M_Driver
+    end
+
+    subgraph BackendServices["☁️ Const Ecosystem Services"]
+        Accounts["Const Accounts Hub\n(accounts.const.web.id)\nCentral SSO & Deep Link Handshake"]
+        Router["Const Router AI Gateway\n(router.const.web.id)\nGemini 2.5 Flash Free Tier & BYOK"]
+        BackendConvex["Convex Modular Backend\n(learn tables: courses, progress, tutor)"]
+        ComposioCloud["Composio Cloud Container\n(Jupyter Sandbox, Terminal, File Vault)"]
+    end
+
+    %% Desktop Connections
+    D_UI <-->|"SSO Handshake: const-learn://callback"| Accounts
+    D_Engine <-->|"Inference Stream (Bearer Token)"| Router
+    D_UI <-->|"Sync Realtime Progress & Courses"| BackendConvex
+
+    %% Mobile Connections
+    M_UI <-->|"In-App SSO: const-learn://callback"| Accounts
+    M_Engine <-->|"Inference Stream (Bearer Token)"| Router
+    M_UI <-->|"Sync Realtime Progress & Courses"| BackendConvex
+    M_Driver <-->|"MCP Tools (Execute, Terminal, Files)"| ComposioCloud
+```
+
+---
+
+### B. Single Native Const Agent (`packages/agent`)
+
+Menghindari kerentanan dan kompleksitas *Meta-Agent Harness* yang membungkus bermacam-macam CLI pihak ketiga, Const Learn menggunakan **1 Single Native Agent Engine** bernama **Const Agent** yang diadopsi dan direfaktor dari arsitektur bersih **Pi** (`D:\Code\Clone\pi` karya Mario Zechner):
+
+1. **Pure TypeScript Architecture:** Ditulis menggunakan TypeScript standar tanpa framework runtime berat seperti Cordis (DeepSeek-Harness) atau Effect-TS (OpenCode), sehingga mudah dipelihara dan di-embed langsung ke Electron maupun Node.js runtime.
+2. **Native RPC Protocol (`@const/agent/client`):** Menggunakan protokol JSON-RPC ringan via stdio / WebSocket yang memungkinkan antarmuka desktop Electron berlangganan *event stream* agen secara real-time (`session.subscribe`).
+3. **Pluggable Execution Drivers:**
+   - **`LocalExecutionDriver` (Desktop):** Berinteraksi dengan file disk lokal siswa dan terminal lokal (PowerShell/Bash).
+   - **`ComposioSandboxDriver` (Mobile):** Mengalihkan eksekusi ke container awan via Composio Cloud Code Interpreter MCP.
+4. **Approval Gate & Policy Enforcement:** Mekanisme keamanan bawaan (*Human-in-the-Loop*) yang memunculkan konfirmasi persetujuan di UI sebelum agen mengeksekusi perintah terminal atau modifikasi berkas sensitif.
+5. **Dynamic Skill Loader:** Parser otomatis yang memuat instruksi dari berkas `SKILL.md` (YAML frontmatter + system prompt), seperti *Socratic Tutor*, *Slide Generator*, *D3 Visualizer*, dan *Doc Kami Parchment*.
+
+---
+
+### C. Desktop First-Run Onboarding Wizard (Hermes-Style Installer)
+
+Untuk menjamin kemudahan akses bagi seluruh siswa dan guru tanpa perlu pengetahuan teknis mendalam mengenai konfigurasi terminal/PATH, Const Learn Desktop dilengkapi antarmuka **First-Run Onboarding Wizard** yang terinspirasi dari **Hermes Agent**:
+
+```text
+┌─────────────────────────────────────────────────────────────┐
+│ 🪟 Const Learn Agent                                         _ □ ✕ │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│                      CONST LEARN AGENT                      │
+│                                                             │
+│       Agen edukasi adaptif pintar untuk riset & koding.     │
+│        Kami akan menyiapkan sistem Anda di latar belakang.   │
+│                                                             │
+│                         [ INSTALL ]                         │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
+```
+
+Saat tombol `[ INSTALL ]` ditekan, aplikasi menjalankan 16 tahapan persiapan otomatis di latar belakang:
+
+1. **Installing `uv` Package Manager:** Mengunduh binary mandiri `uv` (Rust-based Python package manager).
+2. **Installing Git Portabel:** Memastikan dependensi Git portabel tersedia.
+3. **Detecting Node.js:** Memverifikasi ketersediaan Node.js `>= 20` (auto-download jika absen).
+4. **Installing `ripgrep` & `ffmpeg`:** Memasang binary portabel `rg` (pencarian teks kilat) dan `ffmpeg` (render video Hyperframe).
+5. **Verifying Python 3.11:** Menjalankan isolasi runtime Python melalui `uv python install 3.11`.
+6. **Creating Python Virtual Environment:** Menginisialisasi virtual environment lokal di `%APPDATA%/ConstLearn/.venv`.
+7. **Installing Python Dependencies:** Mengunduh pustaka esensial (`numpy`, `matplotlib`, `pandas`, `jupyter_client`).
+8. **Installing Local Agent Drivers:** Memverifikasi ketersediaan driver `@const/agent`.
+9. **Setting up SQLite Vector Store:** Menyiapkan penyimpanan lokal pencarian semantik dokumen PDF.
+10. **Configuring Sandboxed IPC Bridge:** Mengaktifkan jembatan komunikasi aman antara Electron UI dan agen.
+11. **Adding Const CLI to PATH:** Mendaftarkan alias `const` ke variabel PATH pengguna.
+12. **Writing Configuration Templates:** Menyiapkan konfigurasi awal di `~/.const/config.json`.
+13. **Pre-caching Default Education Skills:** Memuat modul awal Socratic Tutor & Slide Generator.
+14. **Verifying Health & Ping Test:** Uji koneksi ke `router.const.web.id`.
+15. **Finalizing Workspace Cache:** Optimasi penyimpanan temporer.
+16. **Launch Workspace:** Membuka antarmuka kerja 3-kolom.
+
+> [!IMPORTANT]
+> **Strategi Rilis Installer:**
+> Seluruh alur onboarding wizard ini dibangun pada **Fase Akhir (Packaging & Distribution)** menggunakan `electron-builder` setelah seluruh fungsi inti `@const/agent` dan UI Workspace telah selesai diuji dalam mode pengembangan (`pnpm dev`).
+
+---
+
+### D. Model AI Default & Integrasi Const Router
+
+Setiap pengguna Const Learn mendapatkan akses instan ke model AI mutakhir:
+1. **Free Tier (Default):** Mengarah ke `https://router.const.web.id/api/v1` menggunakan model **Google Gemini 2.5 Flash**. Siswa yang login via akun Const otomatis mendapatkan kuota harian gratis tanpa perlu mengisi API key atau kartu kredit.
+2. **Universal BYOK (Bring Your Own Key):** Siswa atau peneliti dapat menyambungkan API key pribadi (OpenAI, Anthropic Claude 3.7 Sonnet, DeepSeek V3) atau model lokal (Ollama `localhost:11434`, LMStudio, vLLM) yang diteruskan langsung tanpa memotong kuota platform.
+
+---
+
+### E. Integrasi Mobile via Composio Cloud Code Interpreter MCP
+
+Karena keterbatasan sandbox OS smartphone (iOS/Android) yang tidak memungkinkan instalasi terminal atau runtime lokal, versi Mobile Companion menggunakan **Composio Remote MCP** yang menyediakan 5 alat utama:
+1. `Create Sandbox`: Menginisialisasi Jupyter/Linux cloud container terisolasi.
+2. `Execute Code`: Menjalankan kode Python dan merender grafik/tabel data.
+3. `Get File`: Mengunduh berkas hasil kompilasi dari `/home/user`.
+4. `Run Terminal Command`: Menjalankan instruksi shell di sandbox cloud.
+5. `Upload File`: Mengirimkan berkas materi/tugas ke sandbox.
+
+---
+
+### F. Autentikasi SSO Terpusat & Deep Linking Handshake
+
+Const Learn terintegrasi penuh dengan **Const Accounts Hub** (`accounts.const.web.id`):
+* **Web:** Menggunakan session cookie otomatis lintas subdomain (`.const.web.id`).
+* **Desktop & Mobile:** Menggunakan skema deep link **`const-learn://callback?token=<SESSION_TOKEN>`**. Pengguna mengklik "Masuk dengan Akun Const", peramban terbuka ke `accounts.const.web.id/signin`, dan setelah login sukses, token sesi langsung dikembalikan ke aplikasi native.
+
+---
+
+## 8. Roadmap Eksekusi Bertahap (ICONFEST 2026 Core)
 
 ```mermaid
 gantt
@@ -715,12 +861,15 @@ gantt
     Implementasi Gateway Engine (/v1 & Combos Fallback) :f2_4, after f2_3, 3d
     Integrasi BYOK & OAuth Provider Flow :f2_5, after f2_4, 3d
     section Fase 3: Const Learn (Karya Utama Lomba)
-    Scaffold apps/learn (Web Platform EduTech) :f3_1, after f2_5, 3d
-    Fitur AI Adaptive Learning Tutor & Code Sandbox :f3_2, after f3_1, 5d
-    Integrasi Client Desktop & Mobile via Deep Link :f3_3, after f3_2, 4d
-    section Fase 4: Finalisasi Lomba (16 Okt 2026)
-    End-to-End Testing, Stabilitas, & Live Deploy :f4_1, after f3_3, 3d
-    Penyusunan Laporan Proposal & Video Demo ICONFEST :f4_2, after f4_1, 3d
+    Refaktor Pi ke packages/agent (Native Const Agent) :f3_1, after f2_5, 3d
+    Scaffold apps/learn (Desktop Vite & Web Next.js) :f3_2, after f3_1, 3d
+    Implementasi 3-Column Workspace & Hyperframe Canvas :f3_3, after f3_2, 4d
+    Integrasi Socratic Tutor & Educational Skills :f3_4, after f3_3, 3d
+    Integrasi Mobile Companion via Composio Cloud MCP :f3_5, after f3_4, 3d
+    section Fase 4: Packaging & Finalisasi Lomba (16 Okt 2026)
+    Hermes-Style Onboarding Wizard & Electron Builder :f4_1, after f3_5, 3d
+    End-to-End Testing, Stabilitas, & Live Deploy :f4_2, after f4_1, 2d
+    Penyusunan Laporan Proposal & Video Demo ICONFEST :f4_3, after f4_2, 3d
 ```
 
 - [x] **Fase 1.1: Local Engine & Network Bridge** (Cloudflare Tunnel `engine.const.web.id` terhubung ke OmniRoute di Arch Linux).
@@ -729,12 +878,12 @@ gantt
 - [x] **Fase 2.1: Const Accounts App** (`accounts.const.web.id` dengan Central SSO Hub, Magic Link, & Google OAuth).
 - [ ] **Fase 2.2: Const Router Backend & Dashboard** (`router.const.web.id` dengan 9 Menu, Combos Builder, BYOK, & OAuth).
 - [ ] **Fase 2.3: Const Router Gateway Engine** (Endpoint OpenAI-compatible `/v1/chat/completions`, SSE Streaming, & Failover Loop).
-- [ ] **Fase 3: Const Learn Development** (`learn.const.web.id` - Platform edukasi adaptif interaktif untuk ICONFEST 2026).
-- [ ] **Fase 4: Finalisasi Dokumen & Video ICONFEST 2026** (Laporan penyisihan, video demo 75% progress, dan live deployment).
+- [ ] **Fase 3: Const Learn Core Development** (`packages/agent`, `apps/learn` desktop/mobile, Socratic Tutor, Hyperframe Canvas).
+- [ ] **Fase 4: Packaging & Finalisasi ICONFEST 2026** (Hermes-style installer wizard, laporan penyisihan, video demo 75%, live deployment).
 
 ---
 
-## 8. Referensi Teknis & Benchmark OmniRoute (v3.8.51)
+## 9. Referensi Teknis & Benchmark OmniRoute (v3.8.51)
 
 Arsitektur Const Router mengambil inspirasi dan mengadopsi pola desain teruji dari repositori **OmniRoute release v3.8.51** (`diegosouzapw/OmniRoute`):
 

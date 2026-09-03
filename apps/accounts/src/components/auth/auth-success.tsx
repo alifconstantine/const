@@ -21,6 +21,11 @@ export function AuthSuccess({ user }: AuthSuccessProps) {
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [targetUrl, setTargetUrl] = useState<string | null>(null);
 
+  const isNativeScheme =
+    targetUrl?.startsWith("const-auth://") ||
+    targetUrl?.startsWith("const-learn://") ||
+    targetUrl?.startsWith("const://");
+
   useEffect(() => {
     if (typeof window === "undefined") return;
 
@@ -42,13 +47,15 @@ export function AuthSuccess({ user }: AuthSuccessProps) {
     const safeTarget = getSafeRedirectUrl(rawTarget, { allowRelative: true });
     let destination = safeTarget || getDefaultRedirectUrl();
 
-    // 3. For native desktop/mobile deep links (const-auth:// or const-learn://), attach token payload
+    // 3. For native desktop/mobile deep links (const-auth:// or const-learn://) or localhost dev targets, attach token payload
     const isNativeScheme =
       destination.startsWith("const-auth://") ||
       destination.startsWith("const-learn://") ||
       destination.startsWith("const://");
+    const isLocalhostTarget =
+      destination.includes("localhost") || destination.includes("127.0.0.1");
 
-    if (isNativeScheme && token) {
+    if ((isNativeScheme || isLocalhostTarget) && token) {
       const separator = destination.includes("?") ? "&" : "?";
       destination = `${destination}${separator}token=${encodeURIComponent(token)}`;
     }
@@ -101,18 +108,34 @@ export function AuthSuccess({ user }: AuthSuccessProps) {
         You have successfully authenticated.
       </h1>
 
-      {/* Subtitle with redirect helper */}
-      <p className="text-sm sm:text-base text-muted-foreground font-sans leading-relaxed mb-10 max-w-xl">
-        You should be redirected back to the product.{" "}
-        <button
-          type="button"
-          onClick={handleManualProceed}
-          className="text-primary underline underline-offset-4 hover:text-foreground font-medium transition-colors cursor-pointer"
-        >
-          Click here
-        </button>{" "}
-        if not working.
-      </p>
+      {/* Prominent Action Button for Native Desktop / Mobile Apps */}
+      {isNativeScheme ? (
+        <div className="my-6 flex flex-col items-center gap-3">
+          <button
+            type="button"
+            onClick={handleManualProceed}
+            className="inline-flex items-center justify-center gap-2.5 rounded-xl bg-primary px-7 py-3.5 text-sm font-semibold text-primary-foreground shadow-md transition-all hover:opacity-90 active:scale-[0.98] cursor-pointer"
+          >
+            <span>Buka Aplikasi Const Learn</span>
+          </button>
+          <p className="text-xs text-muted-foreground max-w-md">
+            Membuka aplikasi desktop... Jika muncul jendela dialog peramban <em>&quot;Buka Const Learn?&quot;</em>, silakan pilih <strong>Buka / Open</strong>.
+          </p>
+        </div>
+      ) : (
+        /* Subtitle with redirect helper for regular web redirects */
+        <p className="text-sm sm:text-base text-muted-foreground font-sans leading-relaxed mb-10 max-w-xl">
+          You should be redirected back to the product.{" "}
+          <button
+            type="button"
+            onClick={handleManualProceed}
+            className="text-primary underline underline-offset-4 hover:text-foreground font-medium transition-colors cursor-pointer"
+          >
+            Click here
+          </button>{" "}
+          if not working.
+        </p>
+      )}
 
       {/* Minimalist Footer */}
       <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground font-sans pt-4 border-t border-border/20">

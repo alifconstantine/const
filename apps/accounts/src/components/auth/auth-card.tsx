@@ -60,7 +60,13 @@ export function AuthCard() {
     setIsLoading(true);
     setError(null);
     try {
-      await signIn("google", { redirectTo: continueUrl });
+      // Ensure redirect returns to Accounts page with continue parameter so AuthenticatedView is displayed
+      const returnTarget =
+        typeof window !== "undefined"
+          ? `${window.location.origin}${window.location.pathname}?continue=${encodeURIComponent(continueUrl)}`
+          : continueUrl;
+
+      await signIn("google", { redirectTo: returnTarget });
     } catch (err: any) {
       console.error(err);
       const msg = err?.message || "Failed to sign in with Google. Please try again.";
@@ -108,10 +114,15 @@ export function AuthCard() {
         return;
       }
 
-      // 2. Perform magic link request
+      // 2. Perform magic link request returning to accounts with continue param
+      const returnTarget =
+        typeof window !== "undefined"
+          ? `${window.location.origin}${window.location.pathname}?continue=${encodeURIComponent(continueUrl)}`
+          : continueUrl;
+
       await signIn("resend", {
         email,
-        redirectTo: continueUrl,
+        redirectTo: returnTarget,
       });
 
       // 3. Trigger Sonner success notification
