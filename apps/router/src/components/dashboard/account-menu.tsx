@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import { useRouterAuth } from "@/components/providers/convex-client-provider";
 import { useQuery } from "convex/react";
 import { api } from "@const/backend/_generated/api";
@@ -14,6 +13,7 @@ import {
   Avatar,
   AvatarFallback,
   AvatarImage,
+  cn,
 } from "@const/ui";
 import {
   ChevronsUpDown,
@@ -21,7 +21,7 @@ import {
   Users,
 } from "lucide-react";
 
-export function AccountMenu() {
+export function AccountMenu({ isCollapsed = false }: { isCollapsed?: boolean }) {
   const { isAuthenticated, isLoading, signIn, signOut } = useRouterAuth();
   const user = useQuery(
     api.auth.queries.currentUser,
@@ -30,12 +30,17 @@ export function AccountMenu() {
 
   if (isLoading || (isAuthenticated && user === undefined)) {
     return (
-      <div className="flex items-center gap-3 p-2 rounded-2xl bg-secondary/30 animate-pulse">
-        <div className="h-9 w-9 rounded-full bg-secondary" />
-        <div className="flex-1 space-y-1.5">
-          <div className="h-3 w-20 rounded bg-secondary" />
-          <div className="h-2.5 w-28 rounded bg-secondary" />
-        </div>
+      <div className={cn(
+        "flex items-center p-2 rounded-2xl bg-secondary/30 animate-pulse",
+        isCollapsed ? "justify-center" : "gap-3"
+      )}>
+        <div className="h-8 w-8 rounded-full bg-secondary shrink-0" />
+        {!isCollapsed && (
+          <div className="flex-1 space-y-1.5">
+            <div className="h-3 w-20 rounded bg-secondary" />
+            <div className="h-2.5 w-28 rounded bg-secondary" />
+          </div>
+        )}
       </div>
     );
   }
@@ -54,10 +59,14 @@ export function AccountMenu() {
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          className="w-full flex items-center justify-between p-2 rounded-2xl hover:bg-secondary/60 transition-colors text-left cursor-pointer group outline-none focus-visible:ring-1 focus-visible:ring-ring"
+          className={cn(
+            "w-full flex items-center p-1.5 rounded-2xl hover:bg-secondary/60 transition-colors cursor-pointer group outline-none focus-visible:ring-1 focus-visible:ring-ring",
+            isCollapsed ? "justify-center" : "justify-between"
+          )}
+          title={displayName}
         >
-          <div className="flex items-center gap-3 min-w-0">
-            <Avatar className="h-9 w-9 rounded-full border border-border/60 shrink-0">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <Avatar className="h-8 w-8 rounded-full border border-border/70 shrink-0">
               {user?.image ? (
                 <AvatarImage src={user.image} alt={displayName} />
               ) : null}
@@ -65,29 +74,33 @@ export function AccountMenu() {
                 {userInitial}
               </AvatarFallback>
             </Avatar>
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-1.5">
-                <p className="text-xs font-medium text-foreground truncate">
-                  {displayName}
+            {!isCollapsed && (
+              <div className="min-w-0 flex-1 text-left">
+                <div className="flex items-center gap-1.5">
+                  <p className="text-xs font-medium text-foreground truncate">
+                    {displayName}
+                  </p>
+                  {user?.role === "admin" && (
+                    <span className="rounded-full bg-foreground text-background px-1.5 py-0.2 text-[9px] uppercase font-mono font-semibold tracking-wider shrink-0">
+                      Admin
+                    </span>
+                  )}
+                </div>
+                <p className="text-[11px] text-muted-foreground truncate font-sans">
+                  {displayEmail}
                 </p>
-                {user?.role === "admin" && (
-                  <span className="rounded-full bg-foreground text-background px-1.5 py-0.2 text-[9px] uppercase font-mono font-semibold tracking-wider shrink-0">
-                    Admin
-                  </span>
-                )}
               </div>
-              <p className="text-[11px] text-muted-foreground truncate font-sans">
-                {displayEmail}
-              </p>
-            </div>
+            )}
           </div>
-          <ChevronsUpDown className="h-4 w-4 text-muted-foreground group-hover:text-foreground shrink-0 transition-colors ml-1" />
+          {!isCollapsed && (
+            <ChevronsUpDown className="h-4 w-4 text-muted-foreground group-hover:text-foreground shrink-0 transition-colors ml-1" />
+          )}
         </button>
       </DropdownMenuTrigger>
 
       <DropdownMenuContent
-        side="top"
-        align="start"
+        side={isCollapsed ? "right" : "top"}
+        align={isCollapsed ? "end" : "start"}
         sideOffset={8}
         className="w-64 rounded-2xl p-1.5 border border-border/70 bg-card text-card-foreground shadow-none"
       >

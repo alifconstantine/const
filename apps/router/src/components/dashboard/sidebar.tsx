@@ -4,11 +4,10 @@ import { useState, useMemo } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { AccountMenu } from "./account-menu";
+import { Button, cn } from "@const/ui";
 import {
   LayoutGrid,
-  TrendingUp,
   ScrollText,
-  Trophy,
   Key,
   Terminal,
   GitFork,
@@ -16,13 +15,12 @@ import {
   Cpu,
   Bot,
   Layers,
-  Activity,
   CreditCard,
   Gift,
   CircleHelp,
-  Ticket,
   Search,
-  ChevronsLeft,
+  PanelLeftClose,
+  PanelLeftOpen,
   X,
 } from "lucide-react";
 
@@ -43,24 +41,14 @@ const navSections: NavSection[] = [
     title: "OVERVIEW",
     items: [
       {
-        title: "Overview",
+        title: "Dashboard",
         href: "/dashboard",
         icon: LayoutGrid,
-      },
-      {
-        title: "Usage",
-        href: "/usage",
-        icon: TrendingUp,
       },
       {
         title: "Request logs",
         href: "/logs",
         icon: ScrollText,
-      },
-      {
-        title: "Leaderboard",
-        href: "/leaderboard",
-        icon: Trophy,
       },
     ],
   },
@@ -102,11 +90,6 @@ const navSections: NavSection[] = [
         href: "/integrations",
         icon: Layers,
       },
-      {
-        title: "Status",
-        href: "/status",
-        icon: Activity,
-      },
     ],
   },
   {
@@ -129,24 +112,21 @@ const navSections: NavSection[] = [
       },
     ],
   },
-  {
-    title: "SUPPORT",
-    items: [
-      {
-        title: "Ticketing",
-        href: "/ticketing",
-        icon: Ticket,
-      },
-    ],
-  },
 ];
 
 interface SidebarProps {
   onNavigate?: () => void;
   className?: string;
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
-export function Sidebar({ onNavigate, className }: SidebarProps) {
+export function Sidebar({
+  onNavigate,
+  className,
+  isCollapsed = false,
+  onToggleCollapse,
+}: SidebarProps) {
   const pathname = usePathname();
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -166,49 +146,81 @@ export function Sidebar({ onNavigate, className }: SidebarProps) {
 
   return (
     <aside
-      className={`w-64 h-full flex flex-col bg-card border-r border-border select-none transition-colors ${
-        className || ""
-      }`}
+      className={cn(
+        "h-full flex flex-col bg-card border-r border-border select-none transition-all duration-300",
+        isCollapsed ? "w-16" : "w-64",
+        className
+      )}
     >
-      {/* Search Bar at the top of the Sidebar */}
-      <div className="px-3 py-3 border-b border-border/70 shrink-0">
-        <div className="relative flex items-center">
-          <Search className="absolute left-2.5 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search"
-            className="w-full h-8 pl-8 pr-7 rounded-lg bg-secondary border border-border text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-[#0066ff] focus:ring-1 focus:ring-[#0066ff] transition-all font-sans"
-          />
-          {searchQuery ? (
-            <button
-              onClick={() => setSearchQuery("")}
-              className="absolute right-2 text-muted-foreground hover:text-foreground cursor-pointer"
-              aria-label="Clear search"
+      {/* Top Header Row of Sidebar: Search on left & Close icon on right */}
+      {isCollapsed ? (
+        <div className="h-14 px-2 flex items-center justify-center border-b border-border/70 shrink-0">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onToggleCollapse}
+            className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground cursor-pointer"
+            title="Expand sidebar"
+            aria-label="Expand sidebar"
+          >
+            <PanelLeftOpen className="h-4 w-4" />
+          </Button>
+        </div>
+      ) : (
+        <div className="flex items-center gap-1.5 px-3 py-3 border-b border-border/70 shrink-0">
+          {/* Search Input positioned on the left */}
+          <div className="relative flex-1 flex items-center">
+            <Search className="absolute left-2.5 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search"
+              className="w-full h-8 pl-8 pr-7 rounded-lg bg-secondary border border-border text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-foreground/40 focus:ring-1 focus:ring-foreground/20 transition-all font-sans"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2 text-muted-foreground hover:text-foreground cursor-pointer"
+                aria-label="Clear search"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            )}
+          </div>
+
+          {/* Sidebar Close Button */}
+          {onToggleCollapse && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onToggleCollapse}
+              className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary cursor-pointer shrink-0"
+              title="Close sidebar"
+              aria-label="Close sidebar"
             >
-              <X className="h-3 w-3" />
-            </button>
-          ) : (
-            <span className="absolute right-2 text-[10px] font-mono text-muted-foreground/50 select-none">
-              <ChevronsLeft className="h-3.5 w-3.5 text-muted-foreground/40" />
-            </span>
+              <PanelLeftClose className="h-4 w-4" />
+            </Button>
           )}
         </div>
-      </div>
+      )}
 
-      {/* Navigation Links */}
-      <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-4 scrollbar-thin">
+      {/* Navigation Menus */}
+      <nav className="flex-1 overflow-y-auto px-2 sm:px-3 py-3 space-y-4 scrollbar-thin">
         {filteredSections.length === 0 ? (
-          <div className="px-3 py-6 text-center text-xs text-muted-foreground">
-            No menus found for &quot;{searchQuery}&quot;
+          <div className="px-2 py-6 text-center text-xs text-muted-foreground">
+            {isCollapsed ? "—" : `No menus found for "${searchQuery}"`}
           </div>
         ) : (
-          filteredSections.map((section) => (
+          filteredSections.map((section, idx) => (
             <div key={section.title} className="space-y-0.5">
-              <h3 className="px-2 py-1 text-[10px] font-mono uppercase tracking-wider text-muted-foreground/70 font-semibold">
-                {section.title}
-              </h3>
+              {isCollapsed ? (
+                idx > 0 && <div className="my-2 border-t border-border/40" />
+              ) : (
+                <h3 className="px-2.5 py-1 text-[10px] font-mono uppercase tracking-wider text-muted-foreground/70 font-semibold">
+                  {section.title}
+                </h3>
+              )}
               <div className="space-y-0.5">
                 {section.items.map((item) => {
                   const Icon = item.icon;
@@ -222,24 +234,30 @@ export function Sidebar({ onNavigate, className }: SidebarProps) {
                       key={item.href}
                       href={item.href}
                       onClick={onNavigate}
-                      className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-sans transition-colors group ${
+                      title={isCollapsed ? item.title : undefined}
+                      className={cn(
+                        "rounded-xl text-xs font-sans transition-colors group flex items-center",
+                        isCollapsed
+                          ? "justify-center p-2"
+                          : "justify-between px-2.5 py-2",
                         isActive
-                          ? "bg-secondary text-foreground font-medium border-l-2 border-[#0066ff] rounded-l-none pl-2"
+                          ? "bg-secondary text-foreground font-medium"
                           : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
-                      }`}
+                      )}
                     >
-                      <div className="flex items-center gap-2.5 min-w-0">
+                      <div className={cn("flex items-center min-w-0", !isCollapsed && "gap-2.5")}>
                         <Icon
-                          className={`h-4 w-4 shrink-0 transition-colors ${
+                          className={cn(
+                            "h-4 w-4 shrink-0 transition-colors",
                             isActive
                               ? "text-foreground stroke-[2]"
                               : "text-muted-foreground group-hover:text-foreground stroke-[1.75]"
-                          }`}
+                          )}
                         />
-                        <span className="truncate">{item.title}</span>
+                        {!isCollapsed && <span className="truncate">{item.title}</span>}
                       </div>
-                      {item.badge && (
-                        <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-secondary text-muted-foreground border border-border">
+                      {!isCollapsed && item.badge && (
+                        <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-secondary text-muted-foreground border border-border">
                           {item.badge}
                         </span>
                       )}
@@ -252,9 +270,9 @@ export function Sidebar({ onNavigate, className }: SidebarProps) {
         )}
       </nav>
 
-      {/* Account Section at the Bottom */}
-      <div className="p-2.5 border-t border-border shrink-0 bg-card">
-        <AccountMenu />
+      {/* Account Profile Card at the Bottom */}
+      <div className="p-2 border-t border-border shrink-0 bg-card">
+        <AccountMenu isCollapsed={isCollapsed} />
       </div>
     </aside>
   );

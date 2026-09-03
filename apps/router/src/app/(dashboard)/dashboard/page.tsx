@@ -7,10 +7,6 @@ import { useQuery } from "convex/react";
 import { api } from "@const/backend/_generated/api";
 import {
   Card,
-  CardHeader,
-  CardTitle,
-  CardDescription,
-  CardContent,
   Button,
   toast,
 } from "@const/ui";
@@ -67,22 +63,22 @@ export default function DashboardOverviewPage() {
   }'`;
 
   return (
-    <div className="space-y-6">
-      {/* Top Greeting Header */}
-      <div className="space-y-1">
-        <h1 className="text-2xl font-semibold tracking-tight text-foreground flex items-center gap-2">
+    <div className="space-y-8">
+      {/* Top Greeting Header (Editorial Lora serif title matching DESIGN.md) */}
+      <div className="space-y-1.5">
+        <h1 className="text-3xl sm:text-4xl font-serif font-normal text-foreground tracking-tight flex items-center gap-2">
           <span>{getGreeting()}, {userName}!</span>
-          <span className="text-2xl">👋</span>
+          <span className="text-3xl">👋</span>
         </h1>
-        <p className="text-xs text-muted-foreground font-normal">
+        <p className="text-sm text-muted-foreground font-light">
           Here&apos;s your API usage overview for today.
         </p>
       </div>
 
-      {/* Row of 4 Metric Cards (Using @const/ui Card with clean monochrome palette) */}
+      {/* Row of 4 Metric Cards (Monochrome tint ladder & iOS 30% squircle icons) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* Tokens Used Today */}
-        <Card className="rounded-2xl border-border/70 bg-card p-4 transition-colors">
+        <Card className="rounded-3xl border-border/70 bg-card p-5 transition-colors">
           <div className="flex items-center gap-2.5 pb-3">
             <div className="h-8 w-8 rounded-xl bg-secondary text-foreground flex items-center justify-center">
               <Coins className="h-4 w-4 stroke-[1.75]" />
@@ -93,14 +89,14 @@ export default function DashboardOverviewPage() {
             <div className="text-2xl font-semibold tracking-tight text-foreground font-mono">
               0 <span className="text-xs text-muted-foreground font-sans font-normal">tokens</span>
             </div>
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-[11px] text-muted-foreground font-light">
               No usage today
             </p>
           </div>
         </Card>
 
         {/* Requests Today */}
-        <Card className="rounded-2xl border-border/70 bg-card p-4 transition-colors">
+        <Card className="rounded-3xl border-border/70 bg-card p-5 transition-colors">
           <div className="flex items-center gap-2.5 pb-3">
             <div className="h-8 w-8 rounded-xl bg-secondary text-foreground flex items-center justify-center">
               <TrendingUp className="h-4 w-4 stroke-[1.75]" />
@@ -111,14 +107,14 @@ export default function DashboardOverviewPage() {
             <div className="text-2xl font-semibold tracking-tight text-foreground font-mono">
               0
             </div>
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-[11px] text-muted-foreground font-light">
               +0 vs yesterday
             </p>
           </div>
         </Card>
 
         {/* Success Rate */}
-        <Card className="rounded-2xl border-border/70 bg-card p-4 transition-colors">
+        <Card className="rounded-3xl border-border/70 bg-card p-5 transition-colors">
           <div className="flex items-center gap-2.5 pb-3">
             <div className="h-8 w-8 rounded-xl bg-secondary text-foreground flex items-center justify-center">
               <ShieldCheck className="h-4 w-4 stroke-[1.75]" />
@@ -129,14 +125,14 @@ export default function DashboardOverviewPage() {
             <div className="text-2xl font-semibold tracking-tight text-foreground font-mono">
               0.0%
             </div>
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-[11px] text-muted-foreground font-light">
               No traffic
             </p>
           </div>
         </Card>
 
         {/* Avg Latency */}
-        <Card className="rounded-2xl border-border/70 bg-card p-4 transition-colors">
+        <Card className="rounded-3xl border-border/70 bg-card p-5 transition-colors">
           <div className="flex items-center gap-2.5 pb-3">
             <div className="h-8 w-8 rounded-xl bg-secondary text-foreground flex items-center justify-center">
               <Clock className="h-4 w-4 stroke-[1.75]" />
@@ -147,7 +143,7 @@ export default function DashboardOverviewPage() {
             <div className="text-2xl font-semibold tracking-tight text-muted-foreground font-mono">
               —
             </div>
-            <p className="text-[11px] text-muted-foreground">
+            <p className="text-[11px] text-muted-foreground font-light">
               No traffic
             </p>
           </div>
@@ -157,13 +153,13 @@ export default function DashboardOverviewPage() {
       {/* Lower Grid: Usage Trend & Quick Start */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left: Usage Trend Chart Area */}
-        <Card className="lg:col-span-2 rounded-2xl border-border/70 bg-card p-5 flex flex-col justify-between transition-colors">
+        <Card className="lg:col-span-2 rounded-3xl border-border/70 bg-card p-6 flex flex-col justify-between transition-colors">
           <div className="flex items-center justify-between pb-4">
             <div className="space-y-0.5">
-              <h3 className="text-sm font-semibold tracking-tight text-foreground">
+              <h3 className="text-base font-semibold tracking-tight text-foreground font-sans">
                 Usage Trend
               </h3>
-              <p className="text-xs text-muted-foreground font-normal">
+              <p className="text-xs text-muted-foreground font-light">
                 Token usage over time
               </p>
             </div>
@@ -172,7 +168,7 @@ export default function DashboardOverviewPage() {
                 <button
                   key={range}
                   onClick={() => setTrendRange(range)}
-                  className={`px-2.5 py-0.5 rounded-full cursor-pointer transition-colors ${
+                  className={`px-3 py-0.5 rounded-full cursor-pointer transition-colors ${
                     trendRange === range
                       ? "bg-card text-foreground font-medium shadow-none"
                       : "text-muted-foreground hover:text-foreground"
@@ -185,7 +181,7 @@ export default function DashboardOverviewPage() {
           </div>
 
           {/* Minimal Empty Monochrome Chart Frame */}
-          <div className="h-60 w-full flex flex-col justify-between py-2">
+          <div className="h-64 w-full flex flex-col justify-between py-2">
             <div className="flex-1 flex flex-col justify-between border-b border-border/60 text-[11px] font-mono text-muted-foreground/60">
               <div className="flex justify-between items-center border-b border-border/30 pb-1">
                 <span>1.0</span>
@@ -219,25 +215,25 @@ export default function DashboardOverviewPage() {
         </Card>
 
         {/* Right: Quick Start Card */}
-        <Card className="rounded-2xl border-border/70 bg-card p-5 space-y-4 transition-colors">
-          <div className="space-y-0.5">
+        <Card className="rounded-3xl border-border/70 bg-card p-6 space-y-5 transition-colors">
+          <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <div className="h-7 w-7 rounded-lg bg-secondary text-foreground flex items-center justify-center">
-                <Terminal className="h-3.5 w-3.5" />
+              <div className="h-8 w-8 rounded-xl bg-secondary text-foreground flex items-center justify-center">
+                <Terminal className="h-4 w-4 stroke-[1.75]" />
               </div>
-              <h3 className="text-sm font-semibold tracking-tight text-foreground">
+              <h3 className="text-base font-semibold tracking-tight text-foreground font-sans">
                 Quick Start
               </h3>
             </div>
-            <p className="text-xs text-muted-foreground font-normal pl-9">
+            <p className="text-xs text-muted-foreground font-light pl-10">
               Start making requests in seconds.
             </p>
           </div>
 
-          <div className="space-y-3 pt-1">
+          <div className="space-y-3.5 pt-1">
             {/* Field 1: API Endpoint */}
             <div className="space-y-1">
-              <label className="text-[11px] text-muted-foreground font-medium">
+              <label className="text-xs text-muted-foreground font-medium">
                 API Endpoint
               </label>
               <div className="flex items-center justify-between p-2.5 rounded-xl bg-secondary border border-border text-xs font-mono">
@@ -258,14 +254,14 @@ export default function DashboardOverviewPage() {
 
             {/* Field 2: API Key */}
             <div className="space-y-1">
-              <label className="text-[11px] text-muted-foreground font-medium">
+              <label className="text-xs text-muted-foreground font-medium">
                 API Key
               </label>
               <div className="flex items-center justify-between p-2.5 rounded-xl bg-secondary border border-border text-xs">
-                <span className="text-muted-foreground italic font-normal">No API key yet</span>
+                <span className="text-muted-foreground italic font-light">No API key yet</span>
                 <Link
                   href="/keys"
-                  className="text-xs font-medium text-[#0066ff] hover:underline shrink-0"
+                  className="text-xs font-medium text-foreground underline underline-offset-4 hover:text-foreground/80 shrink-0"
                 >
                   Create key
                 </Link>
@@ -274,7 +270,7 @@ export default function DashboardOverviewPage() {
 
             {/* Field 3: Model */}
             <div className="space-y-1">
-              <label className="text-[11px] text-muted-foreground font-medium">
+              <label className="text-xs text-muted-foreground font-medium">
                 Model
               </label>
               <div className="flex items-center justify-between p-2.5 rounded-xl bg-secondary border border-border text-xs font-mono">
@@ -294,15 +290,15 @@ export default function DashboardOverviewPage() {
             </div>
           </div>
 
-          {/* Actions */}
-          <div className="flex items-center gap-2 pt-2">
+          {/* Action Buttons (Stadium-pill geometry per DESIGN.md) */}
+          <div className="flex items-center gap-2.5 pt-2">
             <Button
               size="sm"
               onClick={() => copyToClipboard(curlSnippet, setCopiedCurl, "cURL command")}
-              className="flex-1 rounded-full gap-1.5 text-xs font-medium cursor-pointer h-9 bg-[#0066ff] hover:bg-[#0052cc] text-white border-none shadow-none"
+              className="flex-1 rounded-full gap-2 text-xs font-medium cursor-pointer h-10 bg-primary text-primary-foreground hover:bg-primary/90 shadow-none border border-transparent"
             >
               {copiedCurl ? (
-                <Check className="h-3.5 w-3.5 text-white" />
+                <Check className="h-3.5 w-3.5" />
               ) : (
                 <Terminal className="h-3.5 w-3.5" />
               )}
@@ -313,7 +309,7 @@ export default function DashboardOverviewPage() {
               <Button
                 variant="outline"
                 size="sm"
-                className="w-full rounded-full gap-1.5 text-xs font-medium border-border text-foreground hover:bg-secondary cursor-pointer h-9"
+                className="w-full rounded-full gap-2 text-xs font-medium border border-border bg-background hover:bg-secondary text-foreground cursor-pointer h-10 shadow-none"
               >
                 <span>View Docs</span>
                 <ExternalLink className="h-3 w-3 text-muted-foreground" />

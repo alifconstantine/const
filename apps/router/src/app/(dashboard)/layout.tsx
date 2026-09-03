@@ -14,6 +14,7 @@ import {
   Sheet,
   SheetContent,
   SheetTitle,
+  cn,
   toast,
 } from "@const/ui";
 import {
@@ -34,6 +35,7 @@ export default function DashboardLayout({
     isAuthenticated ? {} : "skip"
   );
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [isCollapsed, setIsCollapsed] = useState(false);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -68,7 +70,7 @@ export default function DashboardLayout({
             <ConstLogoIcon size="lg" className="w-12 h-12 text-foreground animate-pulse" />
           </div>
           <div className="space-y-1">
-            <h2 className="text-xl font-medium text-foreground">
+            <h2 className="text-xl font-serif font-normal text-foreground">
               Verifying Const SSO Session
             </h2>
             <p className="text-xs font-mono text-muted-foreground">
@@ -90,7 +92,7 @@ export default function DashboardLayout({
             <ConstLogoIcon size="lg" className="w-12 h-12 text-foreground" />
           </div>
           <div className="space-y-2">
-            <h1 className="text-2xl font-medium text-foreground">Sign in required.</h1>
+            <h1 className="text-2xl font-serif text-foreground">Sign in required.</h1>
             <p className="text-xs text-muted-foreground font-light">
               You need an active Const Platform session to access the Router Dashboard.
             </p>
@@ -108,9 +110,9 @@ export default function DashboardLayout({
 
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground antialiased selection:bg-primary selection:text-primary-foreground">
-      {/* Top Heading Bar (Logo is monochrome text-foreground, NOT blue) */}
-      <header className="h-14 w-full border-b border-border/70 bg-card/80 backdrop-blur-md sticky top-0 z-40 px-4 flex items-center justify-between shrink-0 transition-colors">
-        {/* Left: Monochrome Logo & Brand Title */}
+      {/* Top Header Bar matching apps/learn brand UI & DESIGN.md */}
+      <header className="h-14 w-full border-b border-border/70 bg-background/95 backdrop-blur-md sticky top-0 z-40 px-4 sm:px-6 flex items-center justify-between shrink-0 select-none transition-colors">
+        {/* Left: Const Logo & Product Badge (Matching apps/learn) */}
         <div className="flex items-center gap-3">
           <Button
             variant="ghost"
@@ -125,11 +127,16 @@ export default function DashboardLayout({
           <Link href="/dashboard" className="flex items-center gap-2.5 group">
             <ConstLogoIcon
               size="sm"
-              className="w-6 h-6 text-foreground transition-transform group-hover:scale-105"
+              className="w-6 h-6 text-foreground shrink-0 transition-transform duration-300 group-hover:scale-105"
             />
-            <span className="font-semibold text-sm tracking-tight text-foreground">
-              Const Router
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="font-serif text-lg font-normal tracking-tight text-foreground">
+                Const
+              </span>
+              <span className="text-[10px] font-mono tracking-wider uppercase px-2 py-0.5 rounded-full bg-secondary text-muted-foreground border border-border/50">
+                Router
+              </span>
+            </div>
           </Link>
         </div>
 
@@ -161,10 +168,18 @@ export default function DashboardLayout({
 
       {/* Main Layout: Left Sidebar + Content Area */}
       <div className="flex-1 flex min-w-0">
-        {/* Desktop Left Sidebar (Underneath top heading bar) */}
-        <div className="hidden md:block w-64 shrink-0">
+        {/* Desktop Left Sidebar (Collapsible with smooth transition) */}
+        <div
+          className={cn(
+            "hidden md:block shrink-0 transition-all duration-300",
+            isCollapsed ? "w-16" : "w-64"
+          )}
+        >
           <div className="h-[calc(100vh-3.5rem)] sticky top-14">
-            <Sidebar />
+            <Sidebar
+              isCollapsed={isCollapsed}
+              onToggleCollapse={() => setIsCollapsed(!isCollapsed)}
+            />
           </div>
         </div>
 
@@ -173,13 +188,16 @@ export default function DashboardLayout({
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
             <SheetContent side="left" className="p-0 w-64 border-r border-border/70 bg-card">
               <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
-              <Sidebar onNavigate={() => setMobileOpen(false)} />
+              <Sidebar
+                onNavigate={() => setMobileOpen(false)}
+                onToggleCollapse={() => setMobileOpen(false)}
+              />
             </SheetContent>
           </Sheet>
         </div>
 
         {/* Page Content Viewport */}
-        <main className="flex-1 min-w-0 p-6 md:p-8 max-w-7xl mx-auto w-full">
+        <main className="flex-1 min-w-0 p-6 md:p-8 w-full">
           {children}
         </main>
       </div>
