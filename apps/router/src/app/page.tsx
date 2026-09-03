@@ -200,11 +200,6 @@ export default function HomePage() {
             </span>
           </div>
 
-          <div className="flex flex-wrap items-center justify-center gap-6 font-sans text-xs text-neutral-400">
-            <span className="hover:text-white transition-colors cursor-pointer">router.const.web.id</span>
-            <span className="hover:text-white transition-colors cursor-pointer">accounts.const.web.id</span>
-            <span className="hover:text-white transition-colors cursor-pointer">engine.const.web.id</span>
-          </div>
 
           <p className="text-xs text-neutral-500 font-sans">
             &copy; {new Date().getFullYear()} Const Platform Ecosystem.
