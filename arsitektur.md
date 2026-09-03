@@ -263,30 +263,99 @@ import { defineTable } from "convex/server";
 import { v } from "convex/values";
 
 export const routerTables = {
+  // 1. API Keys milik user untuk memanggil gateway (sk-const-xxx)
   apiKeys: defineTable({
     userId: v.id("users"),
     name: v.string(),
-    keyHash: v.string(),
-    keyPrefix: v.string(), // sk-const-xxxx
-    dailyLimitTokens: v.number(),
+    keyPrefix: v.string(), // "sk-const-xxxx"
+    keyHash: v.string(),   // SHA-256 hash untuk lookup aman
+    dailyLimitTokens: v.optional(v.number()),
     usedTodayTokens: v.number(),
     status: v.union(v.literal("active"), v.literal("revoked")),
     createdAt: v.number(),
+    lastUsedAt: v.optional(v.number()),
   })
     .index("by_user", ["userId"])
     .index("by_key_hash", ["keyHash"]),
 
-  byokConfigs: defineTable({
+  // 2. Kredensial Provider BYOK & OAuth milik user (Terenkripsi AES-256)
+  providerConnections: defineTable({
     userId: v.id("users"),
-    provider: v.union(
-      v.literal("openai"),
-      v.literal("anthropic"),
-      v.literal("google"),
-      v.literal("groq"),
+    name: v.string(),
+    provider: v.string(), // "openai", "anthropic", "google", "groq", "deepseek", "openrouter", "custom"
+    authType: v.union(v.literal("apikey"), v.literal("oauth"), v.literal("bearer")),
+    baseUrl: v.optional(v.string()), // Custom endpoint (Ollama, vLLM, OpenRouter Proxy)
+    encryptedApiKey: v.optional(v.string()), // AES-256-GCM encrypted
+    oauthTokens: v.optional(
+      v.object({
+        accessToken: v.string(),
+        refreshToken: v.optional(v.string()),
+        expiresAt: v.optional(v.number()),
+        email: v.optional(v.string()),
+      })
     ),
-    encryptedKey: v.string(),
-    customEndpoint: v.optional(v.string()),
-  }).index("by_user_provider", ["userId", "provider"]),
+    isActive: v.boolean(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  }).index("by_user", ["userId"]),
+
+  // 3. Konfigurasi Combos (Virtual Fallback Models & Smart Routing)
+  combos: defineTable({
+    userId: v.id("users"),
+    name: v.string(), // e.g. "Smart Coding Combo"
+    slug: v.string(), // Identifier saat dipanggil: "combo/smart-coding"
+    strategy: v.union(
+      v.literal("priority"),
+      v.literal("round-robin"),
+      v.literal("p2c"),
+      v.literal("weighted"),
+      v.literal("least-used"),
+      v.literal("cost-optimized"),
+      v.literal("auto")
+    ),
+    models: v.array(
+      v.object({
+        kind: v.union(v.literal("model"), v.literal("engine-pool")),
+        providerConnectionId: v.optional(v.id("providerConnections")), // null = platform engine pool
+        modelId: v.string(), // e.g. "gemini-2.5-pro", "deepseek-chat"
+        weight: v.optional(v.number()),
+        fallbackOnlyOnQuota: v.optional(v.boolean()),
+      })
+    ),
+    isActive: v.boolean(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_slug", ["userId", "slug"]),
+
+  // 4. Kuota Token Platform (Khusus Inferensi Model Bawaan Engine)
+  tokenQuotas: defineTable({
+    userId: v.id("users"),
+    dailyQuotaTokens: v.number(), // misal 500,000 token/hari
+    usedTodayTokens: v.number(),
+    resetAt: v.number(),          // Timestamp reset harian (epoch ms)
+  }).index("by_user", ["userId"]),
+
+  // 5. Histori Penggunaan & Telemetri Real-time
+  usageLogs: defineTable({
+    userId: v.id("users"),
+    apiKeyId: v.optional(v.id("apiKeys")),
+    modelRequested: v.string(),
+    modelServed: v.string(),
+    provider: v.string(),
+    isBYOK: v.boolean(),
+    promptTokens: v.number(),
+    completionTokens: v.number(),
+    totalTokens: v.number(),
+    latencyMs: v.number(),
+    status: v.union(v.literal("success"), v.literal("fallback"), v.literal("error")),
+    fallbackHops: v.optional(v.number()),
+    errorMessage: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_created_at", ["createdAt"]),
 };
 ```
 
@@ -402,81 +471,285 @@ sequenceDiagram
 
 ## 6. Arsitektur Detail: Const Router (`router.const.web.id`)
 
-### A. Peran & Tanggung Jawab
+### A. Peran, Filosofi Desain, & Visi AI Gateway
 
-`router.const.web.id` bertindak sebagai **Universal AI Gateway** yang mengabstraksi berbagai model AI di belakang satu antarmuka standar OpenAI (`/v1/chat/completions` dan `/v1/models`).
+`router.const.web.id` bertindak sebagai **Universal AI Gateway Terpusat** yang mengabstraksi berbagai model AI di belakang antarmuka standar OpenAI API (`/v1/chat/completions` dan `/v1/models`).
 
-### B. Fitur Unggulan (Core Capabilities):
+Berbeda dengan gateway statis biasa, Const Router mengusung prinsip **Tri-Rail Access Model** yang terinspirasi dari arsitektur produksi **OmniRoute v3.8.51**:
 
-1. **BYOK (Bring Your Own Key) & Custom Providers:**
-   - User dapat memasukkan API Key milik mereka sendiri (OpenAI, Anthropic, Gemini, Groq) di dashboard Router.
-   - Saat memanggil API dengan header `X-Provider: openai` dan `X-API-Key: sk-user-...`, Router akan meneruskan request langsung ke provider terkait tanpa memotong kuota platform.
-2. **Platform Managed Pool (Local OmniRoute via Tunnel):**
-   - Untuk pengguna standar dan platform `Const Learn`, Router meneruskan request ke `engine.const.web.id` (OmniRoute di Arch Linux) yang mengelola _pool_ multi-akun Gemini Pro.
-3. **Token Metering & Quota Enforcement:**
-   - Setiap API Key `sk-const-xxx` memiliki batasan kuota (Harian / Bulanan / Tier).
-   - Middleware Edge Runtime di Router memeriksa sisa kuota ke Convex Backend sebelum melakukan _dispatch_ ke upstream AI.
-4. **Zero-Buffering SSE Streaming:**
-   - Menggunakan `ReadableStream` murni di Next.js Edge Runtime untuk mengalirkan potongan kata (_chunks_) secara _real-time_ ke klien tanpa latensi tambahan.
+1. **Platform Built-in Managed Pool (Out-of-the-box Zero Config):**
+   - Pengguna baru atau siswa di `learn.const.web.id` langsung dapat menggunakan model bawaan platform tanpa perlu memasukkan API key atau kartu kredit.
+   - Menggunakan kuota harian token (`tokenQuotas`) yang dilayani via Cloudflare Tunnel (`engine.const.web.id`) menuju local aggregator tier (pool multi-akun Google Gemini 2.5 Pro & OpenRouter).
+2. **BYOK (Bring Your Own Key) via Custom Base URL & API Key:**
+   - Developer atau *power user* dapat mendaftarkan API Key pribadi (OpenAI, Anthropic, DeepSeek, Groq, Mistral) atau endpoint *self-hosted* (Ollama, vLLM, OpenRouter custom base URL).
+   - Inferensi langsung diteruskan (*direct proxy*) ke penyedia terkait **tanpa memotong kuota token platform**.
+3. **OAuth Provider Connection (Subscription Unlocking):**
+   - Mengadopsi mekanisme otentikasi akun OmniRoute untuk memanfaatkan langganan atau kuota tier yang sudah dimiliki pengguna (seperti GitHub Copilot, Claude Code OAuth, Kimi Code, Google Antigravity, dan OpenAI Codex).
+   - Pengguna tidak perlu membeli saldo API terpisah jika sudah memiliki langganan aktif pada layanan tersebut.
 
-### C. Alur Request Lifecycle Const Router
+---
+
+### B. Arsitektur Navigasi & Informasi UI Dashboard (`apps/router`)
+
+Dashboard Const Router dirancang menggunakan *design system* `@const/ui` (shadcn/ui + Radix + Tailwind CSS) dengan pendekatan antarmuka modern yang fungsional:
+
+```text
+┌─────────────────────────────────────────────────────────────┐
+│  CONST ROUTER DASHBOARD (router.const.web.id)               │
+├──────────────────────┬──────────────────────────────────────┤
+│ 1. OVERVIEW          │ • Dashboard (Quick Stats & Status)   │
+│                      │                                      │
+│ 2. GATEWAY & ACCESS  │ • Endpoints (Quick Connect Guides)   │
+│                      │ • API Keys (sk-const-xxx Manager)    │
+│                      │                                      │
+│ 3. PROVIDERS & BYOK  │ • Providers (Built-in, BYOK & OAuth) │
+│                      │ • Free Tier Hub (Status Kuota Bebas) │
+│                      │                                      │
+│ 4. SMART ROUTING     │ • Combos (Virtual Fallback Chains)   │
+│                      │ • Models Catalog (Tabel Model Aktif) │
+│                      │                                      │
+│ 5. OBSERVABILITY     │ • Usage & Cost (Grafik & Telemetri)  │
+│                      │ • Logs & Traffic Inspector (Traces)  │
+│                      │                                      │
+│ 6. TEST & TOOLS      │ • Playground (Live Streaming Test)   │
+│                      │ • Settings (Rate Limits & Policies)  │
+└──────────────────────┴──────────────────────────────────────┘
+```
+
+#### Spesifikasi Detail 9 Menu Utama:
+
+| # | Menu | Route Path | Fungsi & Nilai Bisnis |
+| :-: | :--- | :--- | :--- |
+| 1 | **Dashboard** | `/dashboard` | Menampilkan metrik utama secara sekilas: Sisa kuota harian token platform, jumlah API Key aktif, status kesehatan *Engine Bridge* (Cloudflare Tunnel), total request 24 jam, dan rata-rata latensi (*p95*). Dilengkapi widget *Quick Connect cURL*. |
+| 2 | **Endpoints** | `/dashboard/endpoints` | Panduan interaktif 1-klik untuk menyambungkan berbagai tool coding agent: **Cursor** (`settings.json`), **Claude Code** (`CLAUDE_BASE_URL`), **Cline / Roo Code**, **Aider**, **Python OpenAI SDK**, dan **LangChain/LlamaIndex**. |
+| 3 | **API Keys** | `/dashboard/keys` | Pengguna mencetak kunci akses gateway berawalan `sk-const-live-xxxx`, mengatur batas kuota token harian per-key (*daily token cap*), membatasi akses model/combo, dan mencabut (*revoke*) key yang dicurigai bocor. |
+| 4 | **Providers & BYOK** | `/dashboard/providers` | Tempat mengelola 3 jenis koneksi: (1) *Const Platform Managed Engine*, (2) *Custom API Key & Base URL* (OpenAI, Anthropic, DeepSeek, Groq, Ollama), dan (3) *OAuth Connected Accounts* (GitHub Copilot, Kimi, Google, Claude). |
+| 5 | **Combos** | `/dashboard/combos` | **Fitur Mahkota:** Visual builder untuk merangkai rantai *failover* model (misal: Gemini 2.5 Pro ➡️ DeepSeek V3 ➡️ Qwen 2.5 Coder 32B Free), memilih strategi routing, dan menguji toleransi *fallback*. |
+| 6 | **Models Catalog** | `/dashboard/models` | Tabel direktori seluruh model yang siap dipanggil: nama model, provider asal, label tipe (`[Default]`, `[BYOK]`, `[OAuth]`, `[Combo]`), konteks jendela token (128k/1M/2M), dan status *health*. |
+| 7 | **Usage & Cost** | `/dashboard/usage` | Visualisasi grafik batang/area histori pemakaian token harian, pemisahan kalkulasi biaya antara model bawaan platform vs model BYOK, serta analisis efisiensi token. |
+| 8 | **Logs & Inspector** | `/dashboard/logs` | Audit trail real-time untuk setiap panggilan API: Request ID, Model yang diminta vs Model yang melayani (*fallback hops*), Latensi (ms), Status HTTP, dan inspeksi header telemetri. |
+| 9 | **Playground** | `/dashboard/playground` | Ruang uji coba chat interaktif untuk menguji respons *prompt*, menguji perilaku failover Combo, dan mengamati kecepatan *zero-buffering SSE streaming* secara langsung di browser. |
+
+---
+
+### C. Cara Kerja Sistem Combos (Virtual Fallback & Smart Routing)
+
+Sistem **Combos** di Const Router mengadopsi prinsip domain *Combo Resolver* dari OmniRoute (`src/domain/comboResolver.ts`):
+
+#### 1. Definisi Model Virtual
+Klien (misalnya Cursor atau Claude Code) memanggil model dengan ID unik combo, contoh: `model: "combo/smart-coding"`. Router tidak langsung memanggil satu model kaku, melainkan mengeksekusi rantai model yang telah dikonfigurasi.
 
 ```mermaid
 flowchart TD
-    ClientReq["Client Request\nPOST /v1/chat/completions\n(Bearer sk-const-xxx atau BYOK)"] --> EdgeMiddleware["Edge Middleware\n(router.const.web.id)"]
+    Client["Client Request\n(Cursor / Claude Code)\nmodel = 'combo/smart-coding'"] --> Gateway["Const Router Gateway API"]
+    Gateway --> Resolver["Combo Resolver Engine"]
 
-    EdgeMiddleware --> ValidateKey{"Validasi API Key\n& Auth Header"}
-    ValidateKey -- "Invalid / Expired" --> Err401["Return 401 Unauthorized"]
+    subgraph CascadeChain["Rantai Eksekusi Cascade Model"]
+        M1["Target 1: Google Gemini 2.5 Pro\n(Const Engine Pool - Prioritas 1)"]
+        M2["Target 2: DeepSeek V3\n(BYOK User API Key - Prioritas 2)"]
+        M3["Target 3: Qwen 2.5 Coder 32B\n(OpenRouter Free Pool - Fallback Akhir)"]
+    end
 
-    ValidateKey -- "Valid" --> CheckMode{"Tipe Request?"}
+    Resolver --> M1
+    M1 -- "HTTP 200 OK (Sukses)" --> SSEPass["Stream SSE ke Client Langsung"]
+    M1 -.->|"HTTP 429 (Rate Limit) / 5xx / Timeout"| Cooldown["Aktifkan Cooldown Target 1 (5 detik)\nCatat Telemetri Fallback Hop = 1"]
+    Cooldown --> M2
+    M2 -- "HTTP 200 OK (Sukses)" --> SSEPass
+    M2 -.->|"Gagal"| M3
+    M3 --> SSEPass
+```
 
-    CheckMode -- "BYOK (Bawa Kunci Sendiri)" --> ForwardBYOK["Forward Langsung ke Upstream\n(OpenAI / Anthropic / Groq)"]
-    ForwardBYOK --> StreamOut
+#### 2. Strategi Routing yang Didukung:
+- **`priority` (Default - High Availability):** Mengeksekusi model sesuai urutan daftar. Selama target pertama sehat, 100% trafik masuk ke sana. Begitu target pertama terkena *rate limit* (429) atau server error (5xx), request otomatis dialihkan ke target berikutnya dalam hitungan milidetik.
+- **`round-robin` (Load Balancing Multi-Akun):** Membagi beban bergantian secara sirkular ($1 \to 2 \to 3 \to 1 \dots$). Sangat krusial untuk *Const Engine* yang menghubungkan pool 6 akun Gemini Pro di Arch Linux agar tidak memicu pembatasan kuota per akun.
+- **`p2c` (Power-of-Two-Choices):** Memilih 2 target secara acak, kemudian mengevaluasi target mana yang memiliki latensi terendah atau antrean terpendek, lalu mengirim request ke target terbaik tersebut. Mencegah fenomena *thundering herd*.
+- **`least-used`:** Memprioritaskan koneksi atau model dengan riwayat konsumsi token terendah pada jendela waktu berjalan.
+- **`cost-optimized`:** Mengarahkan request ke model dengan estimasi biaya per 1 juta token paling murah yang sedang berstatus sehat.
+- **`auto` / `lkgp` (Last-Known-Good Path):** Mengingat koneksi mana yang terakhir kali sukses merespons dengan cepat. Request berikutnya akan tetap terikat (*sticky*) pada rute tersebut sampai terjadi kegagalan.
 
-    CheckMode -- "Platform Key (sk-const-...)" --> CheckQuota{"Cek Kuota Convex\n(domain/router)"}
-    CheckQuota -- "Kuota Habis" --> Err429["Return 429 Limit Exceeded"]
-    CheckQuota -- "Kuota Cukup" --> ForwardTunnel["Forward ke Cloudflare Tunnel\n(https://engine.const.web.id)"]
+#### 3. Tiga Lapis Ketahanan (*Three-Layer Resilience*):
+1. **Model Lockout:** Jika suatu model menghasilkan error fungsional (misal: 400 Bad Request karena fitur *tools/function calling* tidak didukung), hanya model tersebut yang di-lockout sementara; provider utamanya tetap aktif.
+2. **Connection Cooldown Window:** Jika suatu akun/key terkena HTTP 429, key tersebut diberi masa pendinginan sementara (5–30 detik secara eksponensial) dan dilompati, sementara key lain dalam provider pool yang sama tetap melayani request.
+3. **Provider Circuit Breaker:** Jika suatu provider mengalami *outage* total (502/503 berturut-turut melebihi ambang batas), sirkuit dibuka (*OPEN*) selama 60 detik sehingga request berikutnya langsung mem-bypass provider tersebut tanpa menambah *latency penalty*.
 
-    ForwardTunnel --> LocalOmni["Local OmniRoute Engine\n(Arch Linux :20128)"]
-    LocalOmni --> RoundRobinPool["Pilih Akun Gemini Pro / OpenRouter\n(Auto Failover jika 429)"]
-    RoundRobinPool --> UpstreamAI["Upstream Google AI Gemini"]
+> [!IMPORTANT]
+> **Zero-Failure Contract:** Berkat sistem Combos, klien (Cursor / Coding Agent) **tidak pernah melihat error HTTP 429 atau 500**, karena proses failover dan retry terjadi sepenuhnya di dalam siklus eksekusi Gateway sebelum response stream ditutup.
 
-    UpstreamAI -.->|"SSE Chunks"| LocalOmni
-    LocalOmni -.->|"SSE Chunks"| ForwardTunnel
-    ForwardTunnel -.->|"SSE Chunks"| EdgeMiddleware
+---
 
-    EdgeMiddleware -.->|"Streaming Zero Latency"| StreamOut["Client SSE Stream Output"]
-    EdgeMiddleware -.->|"Async Mutation"| DeductQuota["Convex: Potong Kuota Token User\n& Catat Usage Telemetry"]
+### D. Cara Kerja Sistem Providers & Multi-Mode OAuth
+
+Untuk mendukung fitur BYOK dan pemanfaatan akun yang sudah dimiliki pengguna, Const Router mengadopsi 3 mekanisme otentikasi provider dari arsitektur OmniRoute (`src/lib/oauth/`):
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as Pengguna
+    participant UI as Router Dashboard
+    participant Backend as Convex Backend & Gateway
+    participant Provider as AI Provider (GitHub / Kimi / Google)
+
+    alt 1. Device Code Flow (RFC 8628) - GitHub Copilot / Kimi Code / CodeBuddy
+        UI->>Backend: POST /api/oauth/device-code { provider: "github" }
+        Backend->>Provider: Request Device Code Grant
+        Provider-->>Backend: return { user_code: "ABCD-1234", verification_uri: "github.com/login/device" }
+        Backend-->>UI: Kirim user_code & tautan verifikasi
+        UI->>User: Tampilkan dialog: "Buka github.com/login/device & masukkan ABCD-1234"
+        User->>Provider: Buka halaman & approve otorisasi
+        loop Background Polling (Interval 5 detik)
+            Backend->>Provider: Poll Token Endpoint
+            Provider-->>Backend: Status: Pending / Success
+        end
+        Provider-->>Backend: return { access_token, refresh_token, expires_in }
+        Backend->>Backend: Enkripsi AES-256 & Simpan ke providerConnections
+        Backend-->>UI: Status: Berhasil Terhubung!
+    else 2. PKCE Browser Flow (RFC 7636) - OpenAI Codex / xAI Grok
+        UI->>Backend: GET /api/oauth/authorize { provider: "codex" }
+        Backend->>Backend: Generate code_verifier & code_challenge (SHA-256)
+        Backend-->>UI: Redirect ke URL Login Resmi Provider
+        User->>Provider: Login & Izinkan Akses
+        Provider-->>Backend: Callback Redirect dengan ?code=auth_code
+        Backend->>Provider: Tukar auth_code + code_verifier
+        Provider-->>Backend: return { access_token, refresh_token }
+        Backend->>Backend: Enkripsi AES-256 & Simpan ke providerConnections
+    else 3. CLI Session Token Import - Claude Code / Antigravity CLI (agy)
+        User->>UI: Paste Kredensial JSON (~/.claude/.claude.json atau ~/.grok/auth.json)
+        UI->>Backend: Kirim Payload Kredensial
+        Backend->>Backend: Validasi format JWT / API Key, Enkripsi AES-256, & Simpan
+    end
+```
+
+#### 1. Rincian Tiga Moda Otentikasi:
+- **Device Authorization Grant (RFC 8628):** Digunakan untuk layanan berbasis CLI/IDE seperti **GitHub Copilot**, **Kimi Code**, dan **Tencent CodeBuddy**. Pengguna cukup memasukkan kode 8 karakter di web provider tanpa perlu membocorkan password atau API key.
+- **OAuth 2.0 PKCE Flow (RFC 7636):** Digunakan untuk **OpenAI Codex** dan **xAI Grok**. Menggunakan enkripsi kriptografis *challenge-verifier* tanpa *client secret*, menjamin pertukaran token aman dari intersepsi.
+- **Session / Token Import:** Untuk **Claude Code CLI** (`~/.claude/.claude.json`) dan **Antigravity CLI** (`agy`), sistem mengizinkan impor token sesi terotentikasi secara langsung.
+
+#### 2. Token Refresh & Lifecycle Daemon:
+- Setiap kali Gateway menerima request yang mengarah ke provider OAuth, sistem mengecek masa berlaku `expiresAt` dari `accessToken`.
+- Jika sisa waktu aktif kurang dari 5 menit, Gateway secara asinkron memanggil endpoint token refresh milik provider menggunakan `refreshToken` yang tersimpan, memperbarui token baru, dan melanjutkan eksekusi tanpa disrupsi.
+
+#### 3. Keamanan Multi-Tenant (AES-256-GCM Encryption at Rest):
+- Berbeda dengan OmniRoute lokal yang menyimpan token di SQLite single-user, Convex Backend adalah basis data *multi-tenant*.
+- Seluruh `apiKey`, `accessToken`, dan `refreshToken` **wajib dienkripsi menggunakan AES-256-GCM** sebelum disimpan di tabel `providerConnections`.
+- Kunci dekripsi server disimpan eksklusif pada Environment Variables Convex (`CONVEX_ENCRYPTION_KEY`), menjamin kerahasiaan kredensial bahkan dari inspeksi langsung dashboard database.
+
+---
+
+### E. Kebijakan Kuota Token & Zero-Buffering Edge SSE Streaming
+
+#### 1. Perbedaan Perlakuan Kuota (Platform Managed vs BYOK/OAuth):
+- **Model Bawaan Platform (Const Engine Pool):**
+  - Gateway memeriksa sisa kuota harian di tabel `tokenQuotas`.
+  - Jika kuota habis, Gateway mengembalikan respon `429 Daily Quota Exceeded`.
+  - Jika kuota cukup, token input + output yang terkonsumsi akan dipotong secara atomik melalui mutasi Convex.
+- **Model BYOK & OAuth Milik User:**
+  - **Zero Quota Deduction:** Tidak memotong kuota token platform pengguna sama sekali.
+  - Gateway hanya mencatat telemetri latensi, model yang digunakan, dan jumlah token pada tabel `usageLogs` untuk kebutuhan grafik dashboard pengguna.
+
+#### 2. Zero-Buffering SSE Streaming di Edge Runtime:
+- Route handler `/api/v1/chat/completions` berjalan di Vercel Edge Runtime menggunakan `ReadableStream` dan `TransformStream` standar Web API.
+- Potongan data (*chunks*) Server-Sent Events (SSE) dari upstream langsung di-pipe ke klien tanpa *buffering* memori.
+- Setiap respon menyematkan header pelacak khusus:
+  - `X-Const-Served-By`: Menunjukkan model dan provider aktual yang melayani request.
+  - `X-Const-Fallback-Hops`: Jumlah lompatan fallback yang terjadi (0 jika target utama sukses).
+  - `X-Const-Latency-Ms`: Total waktu eksekusi end-to-end.
+
+---
+
+### F. Alur Request Lifecycle Const Router Terpadu
+
+```mermaid
+flowchart TD
+    ClientReq["Client Request: POST /v1/chat/completions\n(Bearer sk-const-xxx | Model: combo/coding atau gpt-4o)"] --> EdgeGateway["Edge Gateway Handler (apps/router)"]
+
+    EdgeGateway --> AuthCheck{"Validasi sk-const-xxx\ndi Convex (domain/router)"}
+    AuthCheck -- "Invalid / Revoked" --> Err401["Return 401 Unauthorized"]
+
+    AuthCheck -- "Valid" --> ResolveModel{"Cek Tipe Target:\nModel Tunggal atau Combo?"}
+
+    ResolveModel -- "Combo" --> ComboResolver["Combo Resolver: Evaluasi Strategi\n(Priority / Round-Robin / Least-Used)"]
+    ResolveModel -- "Direct Model" --> RouteTarget["Pilih Provider Target"]
+
+    ComboResolver --> RouteTarget
+
+    RouteTarget --> CheckProviderType{"Tipe Provider?"}
+
+    CheckProviderType -- "1. Platform Engine Pool" --> CheckQuota{"Cek Kuota Harian\n(tokenQuotas)"}
+    CheckQuota -- "Habis" --> Err429["Return 429 Daily Quota Limit"]
+    CheckQuota -- "Cukup" --> ForwardTunnel["Forward via Cloudflare Tunnel\n(https://engine.const.web.id)"]
+
+    CheckProviderType -- "2. Custom BYOK" --> DirectBYOK["Direct HTTPS ke Upstream\n(api.openai.com / api.anthropic.com)"]
+
+    CheckProviderType -- "3. OAuth Connection" --> OAuthCheck{"Token Expired?"}
+    OAuthCheck -- "Ya" --> RefreshToken["Auto Refresh Token"] --> DirectOAuth["Direct HTTPS dengan Bearer Token"]
+    OAuthCheck -- "Tidak" --> DirectOAuth
+
+    ForwardTunnel & DirectBYOK & DirectOAuth --> ExecuteStream{"Eksekusi Request\n& Cek Status HTTP"}
+
+    ExecuteStream -- "Status 429 / 5xx & Ada Target Cadangan" --> TriggerFallback["Trigger Fallback Loop:\nAktifkan Cooldown & Coba Target Berikutnya"]
+    TriggerFallback --> RouteTarget
+
+    ExecuteStream -- "Status 200 OK" --> StreamPass["Zero-Buffering SSE Stream Passthrough"]
+    StreamPass --> ClientOutput["Client Receives Chunks in Real-time"]
+
+    StreamPass -.->|"Async Mutation (Non-Blocking)"| LogTelemetry["Convex:\n1. Potong Kuota Token (Jika Platform Pool)\n2. Tulis Record ke usageLogs"]
 ```
 
 ---
 
-## 7. Roadmap Eksekusi Bertahap
+## 7. Roadmap Eksekusi Bertahap (ICONFEST 2026 Core)
 
 ```mermaid
 gantt
-    title Roadmap Eksekusi Const Platform (ICONFEST 2026)
+    title Roadmap Eksekusi Const Platform (Target Penyisihan: 16 Okt 2026)
     dateFormat  YYYY-MM-DD
-    section Fase 1: Core Foundation
+    section Fase 1: Foundation
     Inisialisasi Monorepo (pnpm + Turbo) :done, f1_1, 2026-09-02, 1d
     Setup packages/backend (Convex Core) :done, f1_2, after f1_1, 1d
     Setup packages/ui & typescript-config :done, f1_3, after f1_2, 1d
+    Local Engine & Cloudflare Tunnel Bridge :done, f1_4, after f1_3, 1d
     section Fase 2: Auth Hub & AI Router
-    Implementasi apps/accounts (Central SSO Hub & Next.js 16) :f2_1, after f1_3, 3d
-    Implementasi apps/router (Gateway API & Quota) :f2_2, after f2_1, 3d
-    section Fase 3: Const Learn (Karya Utama)
-    Scaffold apps/learn (Web Platform Next.js 16) :f3_1, after f2_2, 4d
-    Fitur AI Adaptive Tutor & Code Sandbox :f3_2, after f3_1, 5d
-    Integrasi Client Desktop & Mobile :f3_3, after f3_2, 4d
+    apps/accounts (Central SSO Hub & Next.js 16) :done, f2_1, 2026-09-03, 1d
+    Implementasi Skema Backend Router di Convex :active, f2_2, 2026-09-04, 2d
+    Scaffold apps/router & UI Dashboard (9 Menu) :f2_3, after f2_2, 3d
+    Implementasi Gateway Engine (/v1 & Combos Fallback) :f2_4, after f2_3, 3d
+    Integrasi BYOK & OAuth Provider Flow :f2_5, after f2_4, 3d
+    section Fase 3: Const Learn (Karya Utama Lomba)
+    Scaffold apps/learn (Web Platform EduTech) :f3_1, after f2_5, 3d
+    Fitur AI Adaptive Learning Tutor & Code Sandbox :f3_2, after f3_1, 5d
+    Integrasi Client Desktop & Mobile via Deep Link :f3_3, after f3_2, 4d
     section Fase 4: Finalisasi Lomba (16 Okt 2026)
-    Testing, Stabilitas, & Live Deployment :f4_1, after f3_3, 3d
-    Penyusunan Laporan & Video Demo ICONFEST :f4_2, after f4_1, 3d
+    End-to-End Testing, Stabilitas, & Live Deploy :f4_1, after f3_3, 3d
+    Penyusunan Laporan Proposal & Video Demo ICONFEST :f4_2, after f4_1, 3d
 ```
 
 - [x] **Fase 1.1: Local Engine & Network Bridge** (Cloudflare Tunnel `engine.const.web.id` terhubung ke OmniRoute di Arch Linux).
 - [x] **Fase 1.2: Inisialisasi Monorepo & Backend Core** (Turborepo + pnpm + Convex Clean Core).
 - [x] **Fase 1.3: Shared Packages** (`@const/ui` dengan 55 komponen shadcn & ThemeProvider, `@const/typescript-config`).
-- [ ] **Fase 2.1: Const Accounts App** (`accounts.const.web.id` dengan Central SSO Hub & Next.js 16).
-- [ ] **Fase 2.2: Const Router Gateway** (`router.const.web.id` dengan BYOK, Quota Tracking di Convex, & SSE Streaming).
-- [ ] **Fase 3: Const Learn Development** (`learn.const.web.id` - Pembuatan platform edukasi interaktif untuk ICONFEST 2026).
-- [ ] **Fase 4: Finalisasi Dokumen & Video ICONFEST 2026** (Laporan penyisihan, video demo 75% progress, dan deployment).
+- [x] **Fase 2.1: Const Accounts App** (`accounts.const.web.id` dengan Central SSO Hub, Magic Link, & Google OAuth).
+- [ ] **Fase 2.2: Const Router Backend & Dashboard** (`router.const.web.id` dengan 9 Menu, Combos Builder, BYOK, & OAuth).
+- [ ] **Fase 2.3: Const Router Gateway Engine** (Endpoint OpenAI-compatible `/v1/chat/completions`, SSE Streaming, & Failover Loop).
+- [ ] **Fase 3: Const Learn Development** (`learn.const.web.id` - Platform edukasi adaptif interaktif untuk ICONFEST 2026).
+- [ ] **Fase 4: Finalisasi Dokumen & Video ICONFEST 2026** (Laporan penyisihan, video demo 75% progress, dan live deployment).
+
+---
+
+## 8. Referensi Teknis & Benchmark OmniRoute (v3.8.51)
+
+Arsitektur Const Router mengambil inspirasi dan mengadopsi pola desain teruji dari repositori **OmniRoute release v3.8.51** (`diegosouzapw/OmniRoute`):
+
+1. **Routing Engine & Combo Resolver (`src/domain/comboResolver.ts`):**
+   - Mengadopsi prinsip pemisahan logika resolusi model dari handler HTTP ke service domain terisolasi.
+   - Mengimplementasikan penghitung *persistent round-robin* dan weighted-random selection untuk distribusi beban multi-target.
+2. **Katalog 19 Strategi Routing (`src/shared/constants/routingStrategies.ts`):**
+   - Menjadikan strategi `priority`, `round-robin`, `p2c`, `least-used`, dan `auto/lkgp` sebagai fondasi seleksi model pintar di Const Platform.
+3. **Mekanisme Otentikasi Provider Terpadu (`src/lib/oauth/`):**
+   - Mengadopsi **RFC 8628 Device Authorization Grant** untuk penyedia berbasis CLI (GitHub Copilot & Kimi) dan **RFC 7636 PKCE** untuk penyedia berbasis browser (OpenAI Codex).
+   - Pola penanganan *token rotation* dan *proactive refresh* sebelum kedaluwarsa.
+4. **Three-Layer Resilience Model (`docs/architecture/RESILIENCE_GUIDE.md`):**
+   - Pembagian isolasi kegagalan menjadi: *Layer 1 Provider Circuit Breaker*, *Layer 2 Connection Cooldown (anti-429)*, dan *Layer 3 Model Lockout*.
+5. **Preset Visibilitas Antarmuka (`src/shared/constants/sidebarVisibility.ts`):**
+   - Mengadopsi prinsip pengelompokan menu *Essentials* dan *Developer* agar antarmuka dashboard tetap bersih, intuitif, dan tidak membingungkan pengguna pemula.
+6. **Eksplorasi Masa Depan: Context Compression:**
+   - Referensi modul `context-rtk` dan `context-caveman` milik OmniRoute yang mampu mengompresi payload teks/kode sebesar 15%–95% sebelum dikirim ke upstream LLM untuk menghemat kuota token secara signifikan di masa mendatang.
+
