@@ -8,10 +8,14 @@
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
-    "convex": "^1.24.0"
+    "@auth/core": "^0.41.3",
+    "@convex-dev/auth": "^0.0.95",
+    "convex": "^1.24.0",
+    "jose": "^6.2.10"
   },
   "devDependencies": {
     "@const/typescript-config": "workspace:*",
+    "@types/node": "^22.13.9",
     "typescript": "^5.8.2"
   },
   "exports": {

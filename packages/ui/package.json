@@ -10,6 +10,7 @@
     "./hooks/*": "./src/hooks/*",
     "./styles/*": "./src/styles/*",
     "./globals.css": "./src/styles/globals.css",
+    "./tailwind.config": "./tailwind.config.ts",
     "./*": "./src/*"
   },
   "scripts": {

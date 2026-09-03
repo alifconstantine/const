@@ -2,6 +2,7 @@ export * from "./lib/utils";
 
 // Theme
 export * from "./components/theme-provider";
+export * from "./components/const-logo";
 
 // Hooks
 export * from "./hooks/use-toast";
@@ -53,6 +54,7 @@ export * from "./components/ui/sidebar";
 export * from "./components/ui/skeleton";
 export * from "./components/ui/slider";
 export { Toaster as SonnerToaster } from "./components/ui/sonner";
+export { toast } from "sonner";
 export * from "./components/ui/spinner";
 export * from "./components/ui/switch";
 export * from "./components/ui/table";

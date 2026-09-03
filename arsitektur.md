@@ -1,22 +1,23 @@
 # Arsitektur Sistem: Const Platform Ecosystem
 
-Dokumen ini merupakan cetak biru (*master blueprint*) arsitektur terpadu, topologi sistem, spesifikasi modular monorepo, arsitektur backend Convex berbasis domain (*Domain-Driven Design*), mekanisme otentikasi terpusat (SSO Multi-Platform), AI Gateway (BYOK & Multi-Provider), serta strategi kompetisi **ICONFEST 2026 (Software Development - Tema Pendidikan)** untuk ekosistem **Const Platform**.
+Dokumen ini merupakan cetak biru (_master blueprint_) arsitektur terpadu, topologi sistem, spesifikasi modular monorepo, arsitektur backend Convex berbasis domain (_Domain-Driven Design_), mekanisme otentikasi terpusat (SSO Multi-Platform), AI Gateway (BYOK & Multi-Provider), serta strategi kompetisi **ICONFEST 2026 (Software Development - Tema Pendidikan)** untuk ekosistem **Const Platform**.
 
 ---
 
 ## 1. Ringkasan Eksekutif & Visi Ekosistem
 
-**Const Platform** adalah ekosistem digital modern terpadu berbasis **Monorepo (Turborepo + pnpm)** yang dirancang dengan prinsip arsitektur tingkat *enterprise* (*Scalable, Maintainable, Type-Safe, & Modular*). 
+**Const Platform** adalah ekosistem digital modern terpadu berbasis **Monorepo (Turborepo + pnpm)** yang dirancang dengan prinsip arsitektur tingkat _enterprise_ (_Scalable, Maintainable, Type-Safe, & Modular_).
 
 Ekosistem ini terdiri dari beberapa pilar utama:
+
 1. **Const Accounts (`accounts.const.web.id`):** Identity Provider & Central Auth Hub terpusat yang melayani Web SSO (Cross-Subdomain Cookie), Desktop App (OAuth2 PKCE / Deep Link), dan Mobile App.
 2. **Const Router (`router.const.web.id`):** AI Gateway independen berperforma tinggi yang kompatibel dengan standar OpenAI API. Mendukung multi-provider, token metering, rate limiting, serta fitur **BYOK (Bring Your Own Key)** dan integrasi ke local engine (OmniRoute).
 3. **Const Engine (`engine.const.web.id`):** Local aggregator tier (OmniRoute di Arch Linux) yang menghubungkan multi-akun AI (6x Google Gemini Pro + OpenRouter) melalui Cloudflare Tunnel berkecepatan tinggi.
 4. **Const Learn (`learn.const.web.id` + Desktop/Mobile):** Platform edukasi adaptif berbasis AI interaktif (**Karya Utama ICONFEST 2026 - Tema Pendidikan**).
 5. **Const Landing (`const.web.id`):** Portal showcase dan navigasi publik ekosistem.
-6. **Const Harness (`harness.const.web.id` + Desktop):** Platform *developer tools* dan *agentic workbench* di masa depan.
+6. **Const Harness (`harness.const.web.id` + Desktop):** Platform _developer tools_ dan _agentic workbench_ di masa depan.
 
-Seluruh data dan logika bisnis dipusatkan pada **Single Unified Modular Backend (Convex)** dengan arsitektur sub-folder modular (*Domain-Driven Architecture*) untuk mencegah tumpukan file (*flat anti-pattern*) serta menjamin sinkronisasi data *real-time* instan dan *end-to-end type-safety*.
+Seluruh data dan logika bisnis dipusatkan pada **Single Unified Modular Backend (Convex)** dengan arsitektur sub-folder modular (_Domain-Driven Architecture_) untuk mencegah tumpukan file (_flat anti-pattern_) serta menjamin sinkronisasi data _real-time_ instan dan _end-to-end type-safety_.
 
 ---
 
@@ -159,10 +160,10 @@ Const/
 │        langsung via `convex/_generated/`, mencegah duplikasi dan over-engineering)
 │
 └── apps/                             # Deployable Applications (Next.js 16 App Router)
-    ├── accounts/                     # accounts.const.web.id (Central Auth & Account Chooser Hub)
+    ├── accounts/                     # accounts.const.web.id (Central Identity Provider & SSO Hub)
     │   ├── package.json
     │   ├── next.config.ts
-    │   └── src/                      # Next.js 16 App Router (Account Chooser, Login, OAuth, SSO Callback)
+    │   └── src/                      # Next.js 16 App Router (Central Login, OAuth, SSO Callback)
     │
     ├── router/                       # router.const.web.id (AI Gateway API & Dashboard)
     │   ├── package.json
@@ -188,13 +189,16 @@ Const/
 ## 4. Perbandingan Desain Backend: Flat Anti-Pattern vs Domain-Driven Subdirectories
 
 ### A. Masalah pada "Flat Structure" (Anti-Pattern):
-Pada implementasi Convex standar yang menaruh seluruh file secara datar (*flat*) di root folder `convex/` (misalnya: `budget.ts`, `chats.ts`, `files.ts`, `knowledge.ts`, `messages.ts`, `notes.ts`, `tasks.ts`, `users.ts`):
-* **Cluttering Ekstrem:** Saat ekosistem berkembang dengan modul Auth, AI Router, Learn, dan Harness, folder `convex/` akan dipenuhi **40–60 file sekaligus** di satu direktori.
-* **Risiko Tabrakan Nama (*Name Collisions*):** Kebingungan fungsi seperti `messages.ts` (apakah untuk AI Router atau forum diskusi di Learn?).
-* **Maintainability Rendah:** Sulit bagi tim atau juri lomba untuk membedakan batas fungsionalitas antar-produk.
+
+Pada implementasi Convex standar yang menaruh seluruh file secara datar (_flat_) di root folder `convex/` (misalnya: `budget.ts`, `chats.ts`, `files.ts`, `knowledge.ts`, `messages.ts`, `notes.ts`, `tasks.ts`, `users.ts`):
+
+- **Cluttering Ekstrem:** Saat ekosistem berkembang dengan modul Auth, AI Router, Learn, dan Harness, folder `convex/` akan dipenuhi **40–60 file sekaligus** di satu direktori.
+- **Risiko Tabrakan Nama (_Name Collisions_):** Kebingungan fungsi seperti `messages.ts` (apakah untuk AI Router atau forum diskusi di Learn?).
+- **Maintainability Rendah:** Sulit bagi tim atau juri lomba untuk membedakan batas fungsionalitas antar-produk.
 
 ### B. Solusi: Arsitektur Sub-Folder Modular di Convex
-Convex secara *native* mendukung pemetaan rute fungsi bertingkat berdasarkan nama sub-folder.
+
+Convex secara _native_ mendukung pemetaan rute fungsi bertingkat berdasarkan nama sub-folder.
 
 ```text
 packages/backend/convex/
@@ -229,6 +233,7 @@ packages/backend/convex/
 ### C. Implementasi Kode Skema Modular
 
 #### 1. File Skema Domain (`convex/schema/auth.ts`):
+
 ```typescript
 import { defineTable } from "convex/server";
 import { v } from "convex/values";
@@ -252,6 +257,7 @@ export const authTables = {
 ```
 
 #### 2. File Skema Domain AI Router (`convex/schema/router.ts`):
+
 ```typescript
 import { defineTable } from "convex/server";
 import { v } from "convex/values";
@@ -266,11 +272,18 @@ export const routerTables = {
     usedTodayTokens: v.number(),
     status: v.union(v.literal("active"), v.literal("revoked")),
     createdAt: v.number(),
-  }).index("by_user", ["userId"]).index("by_key_hash", ["keyHash"]),
+  })
+    .index("by_user", ["userId"])
+    .index("by_key_hash", ["keyHash"]),
 
   byokConfigs: defineTable({
     userId: v.id("users"),
-    provider: v.union(v.literal("openai"), v.literal("anthropic"), v.literal("google"), v.literal("groq")),
+    provider: v.union(
+      v.literal("openai"),
+      v.literal("anthropic"),
+      v.literal("google"),
+      v.literal("groq"),
+    ),
     encryptedKey: v.string(),
     customEndpoint: v.optional(v.string()),
   }).index("by_user_provider", ["userId", "provider"]),
@@ -278,6 +291,7 @@ export const routerTables = {
 ```
 
 #### 3. File Utama Penggabung (`convex/schema.ts`):
+
 ```typescript
 import { defineSchema } from "convex/server";
 import { authTables } from "./schema/auth";
@@ -294,6 +308,7 @@ export default defineSchema({
 ```
 
 #### 4. Pemanggilan di Frontend Client (Type-Safe & Auto-Completed):
+
 ```typescript
 // Di apps/accounts (Auth Hub)
 import { api } from "@const/backend/_generated/api";
@@ -311,15 +326,14 @@ const submitQuiz = useMutation(api.learn.progress.submitQuiz);
 
 ## 5. Arsitektur Detail: Const Accounts (`accounts.const.web.id`)
 
-### A. Peran & Filosofi Desain: "Google / z.ai Account Chooser Pattern"
-`accounts.const.web.id` berfungsi sebagai **Central Identity Provider (IdP)** tunggal bagi seluruh ekosistem Const. 
+### A. Peran & Filosofi Desain: Central Identity & Single Sign-On (SSO) Hub
 
-Berbeda dengan sistem SSO tradisional yang memaksakan *silent/implicit login* (otomatis login diam-diam dengan sesi sebelumnya), Const Accounts mengadopsi model **Account Chooser (seperti Google & z.ai)**:
-1. **Multi-Account Awareness:** Pengguna sering memiliki peran berbeda (misal: akun developer/kantor di `router.const.web.id` dan akun pribadi/pelajar di `learn.const.web.id`). Sistem tidak otomatis memaksakan akun yang sedang aktif di browser jika pengguna membuka aplikasi baru.
-2. **Explicit User Consent & Account Switching:** Saat pengguna mengeklik *"Continue with Const"* di klien mana pun, `accounts.const.web.id` akan memeriksa sesi yang tersimpan di peramban dan menampilkan antarmuka pemilihan akun:
-   * **Pilih Akun Tersimpan:** Menampilkan daftar akun yang sedang aktif (Avatar, Nama, Email) — sekali klik untuk langsung masuk sebagai akun tersebut.
-   * **Use Another Account:** Memberikan opsi untuk login dengan akun baru (Google / GitHub / Email OTP) tanpa harus me-logout akun yang sudah ada.
-3. **Pemisahan Konteks Antar-Aplikasi:** Menghindari insiden salah akun atau tercampurnya kuota API AI dan progres belajar.
+`accounts.const.web.id` berfungsi sebagai **Central Identity Provider (IdP)** tunggal bagi seluruh ekosistem Const.
+
+Sistem menggunakan model **Seamless Single Sign-On (SSO)** yang efisien dan minimalis:
+1. **Single Source of Truth:** Seluruh kredensial pengguna (Google OAuth & Email Magic Link) dan sesi dikelola terpusat di Convex backend (`domain/auth`).
+2. **Seamless Cross-Subdomain SSO:** Begitu pengguna login di `accounts.const.web.id`, sesi secara otomatis berlaku untuk seluruh aplikasi di bawah domain `*.const.web.id` (`learn`, `router`, `landing`) tanpa perlu login berulang kali.
+3. **Multi-Platform Support:** Mendukung Web (Cross-Subdomain Cookie / Callback Redirect), Desktop App (OAuth2 PKCE via deep link `const-auth://callback`), dan Mobile App (Deep Link `const-learn://callback`).
 
 ### B. Multi-Platform Authentication Strategy & Alur Interaksi
 
@@ -331,34 +345,21 @@ sequenceDiagram
     participant AuthHub as accounts.const.web.id
     participant Backend as Convex Backend (domain/auth)
 
-    alt 1. Web Ecosystem (Google / z.ai Account Chooser Flow)
-        User->>Client: Buka learn.const.web.id & Klik "Continue with Const"
+    alt 1. Web Ecosystem (Seamless Single Sign-On Flow)
+        User->>Client: Buka learn.const.web.id & Klik "Masuk"
         Client->>AuthHub: Redirect ke https://accounts.const.web.id/signin?continue=https://learn.const.web.id
-        
-        alt A. Sesi Sudah Ada di Browser (Misal pernah login di Router)
-            AuthHub->>User: Render Layar "Choose an Account":<br/>• [Avatar] Akun A (alif@work.com) - Signed In<br/>• [+] Use another account
-            alt Pengguna Memilih Akun A
-                User->>AuthHub: Klik Akun A
-                AuthHub->>Backend: Generate Otentikasi Akses untuk Client Target
-                Backend-->>AuthHub: Return Authorization Token
-                AuthHub-->>Client: Redirect ke URL parameter `continue`?auth_token=...
-                Client->>Backend: Inisialisasi Sesi Aplikasi Klien
-                Client->>User: Tampilkan Dashboard Belajar (Masuk sebagai Akun A)
-            else Pengguna Memilih "Use another account"
-                User->>AuthHub: Klik "Use another account"
-                AuthHub->>User: Render Form Login (Google / GitHub / Email OTP)
-                User->>AuthHub: Login Berhasil dengan Akun B
-                AuthHub->>Backend: Daftarkan Akun B & Buat Sesi Baru
-                Backend-->>AuthHub: Return Token Akun B
-                AuthHub-->>Client: Redirect ke continue URL?auth_token=...
-                Client->>User: Tampilkan Dashboard Belajar (Masuk sebagai Akun B)
-            end
-        else B. Belum Ada Sesi di Browser
-            AuthHub->>User: Render Form Login Elegan (Google / GitHub / Email OTP)
+
+        alt A. Sesi Sudah Ada di Browser
+            AuthHub->>Backend: Verifikasi Sesi Aktif
+            Backend-->>AuthHub: Sesi Valid
+            AuthHub-->>Client: Redirect instan ke `continue` URL
+            Client->>User: Tampilkan Dashboard Belajar (Status: Masuk)
+        else B. Belum Ada Sesi
+            AuthHub->>User: Render Form Login Minimalis (Google / Email Magic Link)
             User->>AuthHub: Submit Kredensial Valid
-            AuthHub->>Backend: Validasi Kredensial & Buat Sesi
-            Backend-->>AuthHub: Return Sesi Berhasil
-            AuthHub-->>Client: Redirect ke continue URL?auth_token=...
+            AuthHub->>Backend: Validasi & Buat Sesi Baru
+            Backend-->>AuthHub: Sesi Berhasil
+            AuthHub-->>Client: Redirect ke `continue` URL
             Client->>User: Tampilkan Dashboard Belajar
         end
 
@@ -366,7 +367,7 @@ sequenceDiagram
         User->>Client: Klik "Login with Const" di Desktop App
         Client->>Client: Generate PKCE Code Verifier & Challenge
         Client->>AuthHub: Buka Browser Sistem: `https://accounts.const.web.id/signin?continue=const-auth://callback&code_challenge=...`
-        User->>AuthHub: Pilih Akun / Login di Browser
+        User->>AuthHub: Login di Browser
         AuthHub->>Backend: Generate Authorization Code Terikat Challenge
         AuthHub-->>Client: Browser panggil Deep Link: `const-auth://callback?code=xyz123`
         Client->>AuthHub: POST /api/auth/token (Tukar Code + Code Verifier)
@@ -375,72 +376,75 @@ sequenceDiagram
     else 3. Mobile App (Universal Link / Deep Link)
         User->>Client: Klik "Masuk" di Mobile App
         Client->>AuthHub: Buka In-App Browser ke `accounts.const.web.id/signin?continue=const-learn://callback`
-        User->>AuthHub: Pilih Akun / Login
+        User->>AuthHub: Login di In-App Browser
         AuthHub-->>Client: Redirect ke `const-learn://callback?token=...`
         Client->>Client: Simpan Token di Secure Storage (Keychain / Keystore)
     end
 ```
 
 ### C. Keamanan & Proteksi Auth Hub
+
 1. **Open-Redirect Protection (Whitelist Validation):**
-   * Parameter `continue` divalidasi secara ketat di sisi server.
-   * Hanya mengizinkan target URL dengan pattern:
+   - Parameter `continue` divalidasi secara ketat di sisi server.
+   - Hanya mengizinkan target URL dengan pattern:
      - `https://*.const.web.id/*`
      - `http://localhost:*/*` (khusus mode development)
      - `const-auth://*` (Desktop Protocol)
      - `const-learn://*` (Mobile Protocol)
-   * Jika parameter `continue` tidak valid atau mengarah ke domain luar, aplikasi otomatis me-redirect user ke dashboard profil utama `accounts.const.web.id`.
+   - Jika parameter `continue` tidak valid atau mengarah ke domain luar, aplikasi otomatis me-redirect user ke dashboard profil utama `accounts.const.web.id`.
 2. **Session Hijacking & CSRF Defense:**
-   * Cookie session menggunakan flag `HttpOnly`, `Secure`, dan `SameSite=Lax`.
-   * State parameter acak (anti-CSRF) digunakan pada semua flow OAuth eksternal (Google/GitHub).
+   - Cookie session menggunakan flag `HttpOnly`, `Secure`, dan `SameSite=Lax`.
+   - State parameter acak (anti-CSRF) digunakan pada semua flow OAuth eksternal (Google/GitHub).
 3. **Granular Session Invalidation:**
-   * Pengguna dapat me-logout akun tertentu dari peramban tanpa memengaruhi akun lainnya (*Selective Account Sign-out*).
+   - Pengguna dapat me-logout akun tertentu dari peramban tanpa memengaruhi akun lainnya (_Selective Account Sign-out_).
 
 ---
 
 ## 6. Arsitektur Detail: Const Router (`router.const.web.id`)
 
 ### A. Peran & Tanggung Jawab
+
 `router.const.web.id` bertindak sebagai **Universal AI Gateway** yang mengabstraksi berbagai model AI di belakang satu antarmuka standar OpenAI (`/v1/chat/completions` dan `/v1/models`).
 
 ### B. Fitur Unggulan (Core Capabilities):
+
 1. **BYOK (Bring Your Own Key) & Custom Providers:**
-   * User dapat memasukkan API Key milik mereka sendiri (OpenAI, Anthropic, Gemini, Groq) di dashboard Router.
-   * Saat memanggil API dengan header `X-Provider: openai` dan `X-API-Key: sk-user-...`, Router akan meneruskan request langsung ke provider terkait tanpa memotong kuota platform.
+   - User dapat memasukkan API Key milik mereka sendiri (OpenAI, Anthropic, Gemini, Groq) di dashboard Router.
+   - Saat memanggil API dengan header `X-Provider: openai` dan `X-API-Key: sk-user-...`, Router akan meneruskan request langsung ke provider terkait tanpa memotong kuota platform.
 2. **Platform Managed Pool (Local OmniRoute via Tunnel):**
-   * Untuk pengguna standar dan platform `Const Learn`, Router meneruskan request ke `engine.const.web.id` (OmniRoute di Arch Linux) yang mengelola *pool* multi-akun Gemini Pro.
+   - Untuk pengguna standar dan platform `Const Learn`, Router meneruskan request ke `engine.const.web.id` (OmniRoute di Arch Linux) yang mengelola _pool_ multi-akun Gemini Pro.
 3. **Token Metering & Quota Enforcement:**
-   * Setiap API Key `sk-const-xxx` memiliki batasan kuota (Harian / Bulanan / Tier).
-   * Middleware Edge Runtime di Router memeriksa sisa kuota ke Convex Backend sebelum melakukan *dispatch* ke upstream AI.
+   - Setiap API Key `sk-const-xxx` memiliki batasan kuota (Harian / Bulanan / Tier).
+   - Middleware Edge Runtime di Router memeriksa sisa kuota ke Convex Backend sebelum melakukan _dispatch_ ke upstream AI.
 4. **Zero-Buffering SSE Streaming:**
-   * Menggunakan `ReadableStream` murni di Next.js Edge Runtime untuk mengalirkan potongan kata (*chunks*) secara *real-time* ke klien tanpa latensi tambahan.
+   - Menggunakan `ReadableStream` murni di Next.js Edge Runtime untuk mengalirkan potongan kata (_chunks_) secara _real-time_ ke klien tanpa latensi tambahan.
 
 ### C. Alur Request Lifecycle Const Router
 
 ```mermaid
 flowchart TD
     ClientReq["Client Request\nPOST /v1/chat/completions\n(Bearer sk-const-xxx atau BYOK)"] --> EdgeMiddleware["Edge Middleware\n(router.const.web.id)"]
-    
+
     EdgeMiddleware --> ValidateKey{"Validasi API Key\n& Auth Header"}
     ValidateKey -- "Invalid / Expired" --> Err401["Return 401 Unauthorized"]
-    
+
     ValidateKey -- "Valid" --> CheckMode{"Tipe Request?"}
-    
+
     CheckMode -- "BYOK (Bawa Kunci Sendiri)" --> ForwardBYOK["Forward Langsung ke Upstream\n(OpenAI / Anthropic / Groq)"]
     ForwardBYOK --> StreamOut
-    
+
     CheckMode -- "Platform Key (sk-const-...)" --> CheckQuota{"Cek Kuota Convex\n(domain/router)"}
     CheckQuota -- "Kuota Habis" --> Err429["Return 429 Limit Exceeded"]
     CheckQuota -- "Kuota Cukup" --> ForwardTunnel["Forward ke Cloudflare Tunnel\n(https://engine.const.web.id)"]
-    
+
     ForwardTunnel --> LocalOmni["Local OmniRoute Engine\n(Arch Linux :20128)"]
     LocalOmni --> RoundRobinPool["Pilih Akun Gemini Pro / OpenRouter\n(Auto Failover jika 429)"]
     RoundRobinPool --> UpstreamAI["Upstream Google AI Gemini"]
-    
+
     UpstreamAI -.->|"SSE Chunks"| LocalOmni
     LocalOmni -.->|"SSE Chunks"| ForwardTunnel
     ForwardTunnel -.->|"SSE Chunks"| EdgeMiddleware
-    
+
     EdgeMiddleware -.->|"Streaming Zero Latency"| StreamOut["Client SSE Stream Output"]
     EdgeMiddleware -.->|"Async Mutation"| DeductQuota["Convex: Potong Kuota Token User\n& Catat Usage Telemetry"]
 ```
@@ -458,7 +462,7 @@ gantt
     Setup packages/backend (Convex Core) :done, f1_2, after f1_1, 1d
     Setup packages/ui & typescript-config :done, f1_3, after f1_2, 1d
     section Fase 2: Auth Hub & AI Router
-    Implementasi apps/accounts (Account Chooser & Next.js 16) :f2_1, after f1_3, 3d
+    Implementasi apps/accounts (Central SSO Hub & Next.js 16) :f2_1, after f1_3, 3d
     Implementasi apps/router (Gateway API & Quota) :f2_2, after f2_1, 3d
     section Fase 3: Const Learn (Karya Utama)
     Scaffold apps/learn (Web Platform Next.js 16) :f3_1, after f2_2, 4d
@@ -472,7 +476,7 @@ gantt
 - [x] **Fase 1.1: Local Engine & Network Bridge** (Cloudflare Tunnel `engine.const.web.id` terhubung ke OmniRoute di Arch Linux).
 - [x] **Fase 1.2: Inisialisasi Monorepo & Backend Core** (Turborepo + pnpm + Convex Clean Core).
 - [x] **Fase 1.3: Shared Packages** (`@const/ui` dengan 55 komponen shadcn & ThemeProvider, `@const/typescript-config`).
-- [ ] **Fase 2.1: Const Accounts App** (`accounts.const.web.id` dengan Google / z.ai Account Chooser Pattern & Next.js 16).
+- [ ] **Fase 2.1: Const Accounts App** (`accounts.const.web.id` dengan Central SSO Hub & Next.js 16).
 - [ ] **Fase 2.2: Const Router Gateway** (`router.const.web.id` dengan BYOK, Quota Tracking di Convex, & SSE Streaming).
 - [ ] **Fase 3: Const Learn Development** (`learn.const.web.id` - Pembuatan platform edukasi interaktif untuk ICONFEST 2026).
 - [ ] **Fase 4: Finalisasi Dokumen & Video ICONFEST 2026** (Laporan penyisihan, video demo 75% progress, dan deployment).

@@ -8,13 +8,33 @@
  * @module
  */
 
+import type * as auth from "../auth.js";
+import type * as auth_queries from "../auth/queries.js";
+import type * as http from "../http.js";
+import type * as rateLimits from "../rateLimits.js";
+import type * as schema_auth from "../schema/auth.js";
+import type * as schema_shared from "../schema/shared.js";
+import type * as shared_rateLimits from "../shared/rateLimits.js";
+import type * as testing from "../testing.js";
+import type * as users from "../users.js";
+
 import type {
   ApiFromModules,
   FilterApi,
   FunctionReference,
 } from "convex/server";
 
-declare const fullApi: ApiFromModules<{}>;
+declare const fullApi: ApiFromModules<{
+  auth: typeof auth;
+  "auth/queries": typeof auth_queries;
+  http: typeof http;
+  rateLimits: typeof rateLimits;
+  "schema/auth": typeof schema_auth;
+  "schema/shared": typeof schema_shared;
+  "shared/rateLimits": typeof shared_rateLimits;
+  testing: typeof testing;
+  users: typeof users;
+}>;
 
 /**
  * A utility for referencing Convex functions in your app's public API.
