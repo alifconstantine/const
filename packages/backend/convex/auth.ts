@@ -6,7 +6,42 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
   providers: [
     Google,
     Resend({
-      from: process.env.AUTH_EMAIL_FROM ?? "Const <onboarding@resend.dev>",
+      from: process.env.AUTH_EMAIL_FROM,
     }),
   ],
+  callbacks: {
+    async redirect({ redirectTo }) {
+      if (
+        redirectTo.startsWith("/") &&
+        !redirectTo.startsWith("//") &&
+        !redirectTo.startsWith("/\\")
+      ) {
+        return redirectTo;
+      }
+      try {
+        if (
+          redirectTo.startsWith("const-auth://") ||
+          redirectTo.startsWith("const-learn://") ||
+          redirectTo.startsWith("const://")
+        ) {
+          return redirectTo;
+        }
+
+        const parsed = new URL(redirectTo);
+        const hostname = parsed.hostname.toLowerCase();
+
+        const isProd = process.env.CONVEX_DEPLOYMENT?.startsWith("prod:");
+        if (!isProd && (hostname === "localhost" || hostname === "127.0.0.1")) {
+          return redirectTo;
+        }
+
+        if (hostname === "const.web.id" || hostname.endsWith(".const.web.id")) {
+          return redirectTo;
+        }
+      } catch {
+        // Fall through to default fallback
+      }
+      return process.env.SITE_URL ?? "https://accounts.const.web.id";
+    },
+  },
 });

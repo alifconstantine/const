@@ -76,21 +76,12 @@ export default function Error({
         {/* Minimal Footer */}
         <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground font-sans pt-10 mt-6 border-t border-border/20 w-full">
           <a
-            href="https://docs.const.ai"
+            href="https://const.web.id"
             target="_blank"
             rel="noreferrer"
             className="hover:text-foreground transition-colors"
           >
-            Docs
-          </a>
-          <span className="opacity-30">|</span>
-          <a
-            href="https://const.ai/blog"
-            target="_blank"
-            rel="noreferrer"
-            className="hover:text-foreground transition-colors"
-          >
-            Blog
+            Const Home
           </a>
         </div>
       </div>

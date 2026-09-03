@@ -59,24 +59,6 @@ export default function NotFound() {
         {/* Minimal Footer Links */}
         <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground font-sans pt-6 border-t border-border/20 w-full max-w-xs">
           <a
-            href="https://docs.const.ai"
-            target="_blank"
-            rel="noreferrer"
-            className="hover:text-foreground transition-colors"
-          >
-            Docs
-          </a>
-          <span className="opacity-30">|</span>
-          <a
-            href="https://const.ai/blog"
-            target="_blank"
-            rel="noreferrer"
-            className="hover:text-foreground transition-colors"
-          >
-            Blog
-          </a>
-          <span className="opacity-30">|</span>
-          <a
             href="https://const.web.id"
             target="_blank"
             rel="noreferrer"

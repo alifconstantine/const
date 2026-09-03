@@ -1,9 +1,38 @@
 import {
   convexAuthNextjsMiddleware,
 } from "@convex-dev/auth/nextjs/server";
-import { NextResponse } from "next/server";
+import { NextFetchEvent, NextRequest, NextResponse } from "next/server";
 
-const middleware = convexAuthNextjsMiddleware(async (request) => {
+// In-memory sliding window rate-limiter for /api/auth requests per IP
+const authRateLimitMap = new Map<string, { count: number; resetAt: number }>();
+const MAX_AUTH_REQUESTS_PER_MINUTE = 10;
+const WINDOW_MS = 60 * 1000;
+
+function isRateLimited(ip: string): boolean {
+  const now = Date.now();
+  const record = authRateLimitMap.get(ip);
+
+  // Clean up periodically if map grows large
+  if (authRateLimitMap.size > 10000) {
+    for (const [key, val] of authRateLimitMap.entries()) {
+      if (now > val.resetAt) authRateLimitMap.delete(key);
+    }
+  }
+
+  if (!record || now > record.resetAt) {
+    authRateLimitMap.set(ip, { count: 1, resetAt: now + WINDOW_MS });
+    return false;
+  }
+
+  if (record.count >= MAX_AUTH_REQUESTS_PER_MINUTE) {
+    return true;
+  }
+
+  record.count += 1;
+  return false;
+}
+
+const baseMiddleware = convexAuthNextjsMiddleware(async (request) => {
   const url = request.nextUrl;
   const continueParam =
     url.searchParams.get("continue") ||
@@ -24,8 +53,34 @@ const middleware = convexAuthNextjsMiddleware(async (request) => {
   }
 });
 
+export default async function middleware(
+  request: NextRequest,
+  event: NextFetchEvent
+) {
+  const { pathname } = request.nextUrl;
+
+  // Server-side IP rate limiting on sensitive /api/auth endpoints
+  if (pathname.startsWith("/api/auth") && request.method === "POST") {
+    const ip =
+      request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+      request.headers.get("x-real-ip") ||
+      "127.0.0.1";
+
+    if (isRateLimited(ip)) {
+      return NextResponse.json(
+        {
+          error:
+            "Too many authentication attempts. Please wait a minute before trying again.",
+        },
+        { status: 429 }
+      );
+    }
+  }
+
+  return baseMiddleware(request, event);
+}
+
 export const proxy = middleware;
-export default middleware;
 
 export const config = {
   // The following matcher runs on all routes except static assets

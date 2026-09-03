@@ -114,26 +114,8 @@ export function AuthSuccess({ user }: AuthSuccessProps) {
         if not working.
       </p>
 
-      {/* Minimalist Footer Links */}
+      {/* Minimalist Footer */}
       <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground font-sans pt-4 border-t border-border/20">
-        <a
-          href="https://docs.const.ai"
-          target="_blank"
-          rel="noreferrer"
-          className="hover:text-foreground transition-colors"
-        >
-          Docs
-        </a>
-        <span className="opacity-30">|</span>
-        <a
-          href="https://const.ai/blog"
-          target="_blank"
-          rel="noreferrer"
-          className="hover:text-foreground transition-colors"
-        >
-          Blog
-        </a>
-        <span className="opacity-30">|</span>
         <button
           type="button"
           onClick={handleSignOut}

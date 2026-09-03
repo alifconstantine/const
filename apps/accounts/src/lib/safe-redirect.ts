@@ -1,6 +1,6 @@
 /**
  * Validates and sanitizes a redirect URL to prevent Open Redirect vulnerabilities (CWE-601).
- * Only registered ecosystem domains (*.const.web.id, *.const.ai, and native app deep links) are permitted.
+ * Only registered ecosystem domains (*.const.web.id and native app deep links) are permitted.
  * Localhost is strictly restricted to development environments.
  */
 
@@ -85,12 +85,10 @@ export function getSafeRedirectUrl(
       return trimmed;
     }
 
-    // 5. Allow official production and staging domains
+    // 5. Allow official production domains (*.const.web.id)
     if (
       hostname === "const.web.id" ||
-      hostname.endsWith(".const.web.id") ||
-      hostname === "const.ai" ||
-      hostname.endsWith(".const.ai")
+      hostname.endsWith(".const.web.id")
     ) {
       return trimmed;
     }
