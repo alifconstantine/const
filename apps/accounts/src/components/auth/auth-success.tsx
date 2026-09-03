@@ -3,8 +3,7 @@
 import * as React from "react";
 import { useState, useEffect } from "react";
 import { useAuthActions, useAuthToken } from "@convex-dev/auth/react";
-import { ConstLogoIcon, Button, toast } from "@const/ui";
-import { Loader2 } from "lucide-react";
+import { ConstLogoIcon } from "@const/ui";
 import { getSafeRedirectUrl, getDefaultRedirectUrl } from "@/lib/safe-redirect";
 
 interface AuthSuccessProps {
@@ -32,17 +31,11 @@ function getStoredToken(): string | null {
   return null;
 }
 
-export function AuthSuccess({ user }: AuthSuccessProps) {
+export function AuthSuccess({ user: _user }: AuthSuccessProps) {
   const { signOut } = useAuthActions();
   const tokenFromHook = useAuthToken();
   const [activeToken, setActiveToken] = useState<string | null>(() => getStoredToken());
-  const [isSigningOut, setIsSigningOut] = useState(false);
-  const [targetUrl, setTargetUrl] = useState<string | null>(null);
-
-  const isNativeScheme =
-    targetUrl?.startsWith("const-auth://") ||
-    targetUrl?.startsWith("const-learn://") ||
-    targetUrl?.startsWith("const://");
+  const [_targetUrl, setTargetUrl] = useState<string | null>(null);
 
   // Synchronize and discover token
   useEffect(() => {
@@ -123,14 +116,8 @@ export function AuthSuccess({ user }: AuthSuccessProps) {
     return () => clearTimeout(timer);
   }, [activeToken]);
 
-  const handleManualProceed = () => {
-    const destination = targetUrl || getDefaultRedirectUrl();
-    toast.info("Redirecting...", { description: "Opening your application" });
-    window.location.href = destination;
-  };
 
   const handleSignOut = async () => {
-    setIsSigningOut(true);
     try {
       // 1. Clear cross-subdomain SSO cookies on all potential scopes
       const expireCookie = (cookieName: string) => {
@@ -156,6 +143,7 @@ export function AuthSuccess({ user }: AuthSuccessProps) {
       } catch {}
 
       // 3. Invalidate Convex Auth server session
+      setActiveToken(null);
       await signOut();
 
       // Clean prompt param if present
@@ -166,11 +154,7 @@ export function AuthSuccess({ user }: AuthSuccessProps) {
         const newQuery = params.toString() ? `?${params.toString()}` : "";
         window.history.replaceState({}, document.title, `${window.location.pathname}${newQuery}`);
       }
-
-      toast.info("Signed out", { description: "You can now sign in with a different account." });
-    } finally {
-      setIsSigningOut(false);
-    }
+    } catch {}
   };
 
   return (
@@ -187,81 +171,9 @@ export function AuthSuccess({ user }: AuthSuccessProps) {
       </div>
 
       {/* Main Success Heading with Lora Serif & period cadence */}
-      <h1 className="text-3xl sm:text-4xl md:text-[42px] font-serif font-normal tracking-tight text-foreground mb-3 leading-tight">
+      <h1 className="text-3xl sm:text-4xl md:text-[42px] font-serif font-normal tracking-tight text-foreground leading-tight">
         Authenticated successfully.
       </h1>
-
-      {/* Prominent Action Button for Native Desktop / Mobile Apps */}
-      {isNativeScheme ? (
-        <div className="my-6 flex flex-col items-center gap-3">
-          <Button
-            type="button"
-            onClick={handleManualProceed}
-            className="rounded-full px-8 py-3.5 text-sm font-semibold cursor-pointer h-12"
-          >
-            <span>Buka Aplikasi Const Learn</span>
-          </Button>
-          <p className="text-xs text-muted-foreground max-w-md font-light leading-relaxed">
-            Membuka aplikasi desktop... Jika muncul jendela dialog peramban <em>&quot;Buka Const Learn?&quot;</em>, silakan pilih <strong>Buka / Open</strong>.
-          </p>
-        </div>
-      ) : (
-        <p className="text-sm sm:text-base text-muted-foreground font-sans font-light leading-relaxed mb-8 max-w-md">
-          Redirecting you to your destination application.
-        </p>
-      )}
-
-      {/* User Session Stadium Pill */}
-      {user?.email && (
-        <div className="mb-8 inline-flex items-center gap-3 rounded-full bg-secondary/70 border border-border/60 px-4 py-2 text-xs font-sans text-foreground transition-all">
-          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="font-medium">{user.email}</span>
-          {user.role && (
-            <span className="rounded-full bg-foreground text-background px-2.5 py-0.5 text-[10px] uppercase font-semibold tracking-wider">
-              {user.role}
-            </span>
-          )}
-        </div>
-      )}
-
-      {/* Redirect Indicator & Manual Link */}
-      <div className="flex flex-col items-center gap-3">
-        <div className="inline-flex items-center gap-2 text-xs text-muted-foreground font-sans">
-          <Loader2 className="h-3.5 w-3.5 animate-spin text-[#0066ff]" />
-          <span>If redirection doesn't happen automatically,</span>
-          <button
-            type="button"
-            onClick={handleManualProceed}
-            className="text-foreground underline underline-offset-4 hover:text-[#0066ff] font-medium transition-colors cursor-pointer"
-          >
-            click here
-          </button>
-        </div>
-
-        <div className="pt-6 flex items-center justify-center gap-3">
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={handleSignOut}
-            disabled={isSigningOut}
-            className="rounded-full text-xs font-medium border-border/70 text-muted-foreground hover:text-foreground hover:bg-secondary cursor-pointer px-4 h-9"
-          >
-            {isSigningOut ? "Signing out..." : "Use another account"}
-          </Button>
-
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={handleSignOut}
-            disabled={isSigningOut}
-            className="rounded-full text-xs text-muted-foreground hover:text-destructive cursor-pointer h-9 px-3"
-          >
-            Sign out
-          </Button>
-        </div>
-      </div>
     </div>
   );
 }

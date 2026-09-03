@@ -1,11 +1,25 @@
 import { app, BrowserWindow, shell, ipcMain } from "electron";
 import path from "node:path";
 
+// Explicitly set app name and userData so ALL instances share the EXACT SAME lock directory
+app.setName("Const Learn");
+const userDataPath = path.join(app.getPath("appData"), "Const Learn");
+app.setPath("userData", userDataPath);
+
+// Request Single Instance Lock FIRST
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+  // SECOND INSTANCE: Exit IMMEDIATELY so no second window or task is spawned!
+  app.quit();
+  process.exit(0);
+}
+
 // Register custom protocol scheme: const-learn://
 const PROTOCOL_NAME = "const-learn";
 
-if (process.defaultApp) {
-  // In development, register with exact main script path
+if (!app.isPackaged) {
+  // In development, register with exact main script path so Windows launches with same config
   const mainScriptPath = path.resolve(__dirname, "main.js");
   app.setAsDefaultProtocolClient(PROTOCOL_NAME, process.execPath, [
     mainScriptPath,
@@ -13,9 +27,6 @@ if (process.defaultApp) {
 } else {
   app.setAsDefaultProtocolClient(PROTOCOL_NAME);
 }
-
-// Request Single Instance Lock
-const gotTheLock = app.requestSingleInstanceLock();
 
 let win: BrowserWindow | null = null;
 let pendingDeepLink: string | null = null;
@@ -45,30 +56,23 @@ function sendDeepLinkToRenderer(url: string) {
   win.webContents.send("auth:deep-link", { url, token });
 }
 
-if (!gotTheLock) {
-  // SECOND INSTANCE: Exit IMMEDIATELY so no second window or task is spawned!
-  app.quit();
-  process.exit(0);
-} else {
-  // PRIMARY INSTANCE: Listen for second instance launches from deep links
-  app.on("second-instance", (_event, commandLine) => {
-    console.log("[Electron Main] Second instance triggered with args:", commandLine);
-    if (win) {
-      if (win.isMinimized()) win.restore();
-      win.setAlwaysOnTop(true);
-      win.show();
-      win.focus();
-      win.setAlwaysOnTop(false);
-    }
-    const rawArg = commandLine.find((arg) =>
-      arg.includes(`${PROTOCOL_NAME}://`)
-    );
-    if (rawArg) {
-      const match = rawArg.match(/const-learn:\/\/[^\s"']+/);
-      const deepLinkUrl = match ? match[0] : rawArg;
-      sendDeepLinkToRenderer(deepLinkUrl);
-    }
-  });
+// PRIMARY INSTANCE: Listen for second instance launches from deep links
+app.on("second-instance", (_event, commandLine) => {
+  console.log("[Electron Main] Second instance triggered with args:", commandLine);
+  if (win) {
+    if (win.isMinimized()) win.restore();
+    win.show();
+    win.focus();
+  }
+  const rawArg = commandLine.find((arg) =>
+    arg.includes(`${PROTOCOL_NAME}://`)
+  );
+  if (rawArg) {
+    const match = rawArg.match(/const-learn:\/\/[^\s"']+/);
+    const deepLinkUrl = match ? match[0] : rawArg;
+    sendDeepLinkToRenderer(deepLinkUrl);
+  }
+});
 
   // Handle protocol on macOS
   app.on("open-url", (event, url) => {
@@ -137,4 +141,3 @@ if (!gotTheLock) {
       app.quit();
     }
   });
-}

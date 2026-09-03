@@ -7,7 +7,9 @@
     "paths": {
       "@/*": ["./src/*"],
       "@const/ui": ["../../../packages/ui/src/index.ts"],
-      "@const/ui/*": ["../../../packages/ui/src/*"]
+      "@const/ui/*": ["../../../packages/ui/src/*"],
+      "@const/backend/_generated/*": ["../../../packages/backend/convex/_generated/*"],
+      "@const/backend/*": ["../../../packages/backend/convex/*"]
     }
   },
   "include": ["src", "electron"]

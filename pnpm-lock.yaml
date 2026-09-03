@@ -78,9 +78,15 @@ importers:
 
   apps/learn/desktop:
     dependencies:
+      '@const/backend':
+        specifier: workspace:*
+        version: link:../../../packages/backend
       '@const/ui':
         specifier: workspace:*
         version: link:../../../packages/ui
+      convex:
+        specifier: ^1.45.0
+        version: 1.45.0(react@19.2.8)
       lucide-react:
         specifier: ^1.16.0
         version: 1.38.0(react@19.2.8)
@@ -145,9 +151,15 @@ importers:
       '@capacitor/core':
         specifier: ^8.5.1
         version: 8.5.1
+      '@const/backend':
+        specifier: workspace:*
+        version: link:../../../packages/backend
       '@const/ui':
         specifier: workspace:*
         version: link:../../../packages/ui
+      convex:
+        specifier: ^1.45.0
+        version: 1.45.0(react@19.2.8)
       lucide-react:
         specifier: ^1.16.0
         version: 1.38.0(react@19.2.8)
