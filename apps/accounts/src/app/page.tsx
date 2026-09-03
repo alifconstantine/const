@@ -19,6 +19,19 @@ function UnauthenticatedView() {
     if (typeof window === "undefined") return;
     const params = new URLSearchParams(window.location.search);
     const code = params.get("code") || params.get("token");
+    const target = params.get("continue") || params.get("redirect") || params.get("app");
+
+    // If visited directly in production on accounts.const.web.id without continue target:
+    // redirect to the main ecosystem portal (https://const.web.id)
+    const isProduction =
+      window.location.hostname === "accounts.const.web.id" ||
+      (process.env.NODE_ENV === "production" && window.location.hostname !== "localhost");
+
+    if (isProduction && !target && !code) {
+      window.location.href = "https://const.web.id";
+      return;
+    }
+
     if (code) {
       setIsVerifyingCode(true);
       void signIn("resend" as any, { code } as any)
