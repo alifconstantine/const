@@ -289,3 +289,284 @@ export const getLogMetrics = query({
     };
   },
 });
+
+// 4. Comprehensive Dashboard Analytics
+export const getDashboardAnalytics = query({
+  args: {
+    timeRange: v.optional(v.string()), // "today", "7d", "30d", "90d", "all"
+  },
+  handler: async (ctx, args) => {
+    const userId = await getAuthUserId(ctx);
+    if (!userId) {
+      return null;
+    }
+
+    const now = Date.now();
+    let startTime = 0;
+    if (args.timeRange === "today") {
+      const startOfDay = new Date();
+      startOfDay.setHours(0, 0, 0, 0);
+      startTime = startOfDay.getTime();
+    } else if (args.timeRange === "7d") {
+      startTime = now - 7 * 24 * 60 * 60 * 1000;
+    } else if (args.timeRange === "30d") {
+      startTime = now - 30 * 24 * 60 * 60 * 1000;
+    } else if (args.timeRange === "90d") {
+      startTime = now - 90 * 24 * 60 * 60 * 1000;
+    }
+
+    // 1. Fetch filtered logs for the selected timeRange
+    const logsQuery = ctx.db
+      .query("routerLogs")
+      .withIndex("by_user_created", (q) =>
+        startTime > 0 ? q.eq("userId", userId).gte("createdAt", startTime) : q.eq("userId", userId)
+      )
+      .order("desc");
+
+    const logs = await logsQuery.take(1000);
+
+    // 2. Fetch active infrastructure counts
+    const apiKeys = await ctx.db
+      .query("apiKeys")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+    const activeKeysCount = apiKeys.filter((k) => k.status === "active").length;
+
+    const userProviders = await ctx.db
+      .query("userProviders")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+    const activeProvidersCount = userProviders.filter((p) => p.status === "active").length + 1; // +1 for default Google AI
+
+    // 3. Compute KPI metrics
+    let totalTokens = 0;
+    let promptTokens = 0;
+    let completionTokens = 0;
+    let cachedTokens = 0;
+    let successCount = 0;
+    let durationSum = 0;
+    let ttftSum = 0;
+    let ttftCount = 0;
+    let speedSum = 0;
+    let speedCount = 0;
+
+    const modelMap = new Map<string, { requests: number; inputTokens: number; outputTokens: number; totalTokens: number }>();
+    const providerMap = new Map<string, { requests: number; totalTokens: number }>();
+    const keyMap = new Map<string, { keyPrefix?: string; requests: number; totalTokens: number }>();
+
+    logs.forEach((l) => {
+      totalTokens += l.totalTokens;
+      promptTokens += l.promptTokens;
+      completionTokens += l.completionTokens;
+      cachedTokens += l.cachedTokens || 0;
+      durationSum += l.durationMs;
+
+      if (l.status >= 200 && l.status < 300) {
+        successCount++;
+      }
+      if (l.ttftMs) {
+        ttftSum += l.ttftMs;
+        ttftCount++;
+      }
+      if (l.tokensPerSecond) {
+        speedSum += l.tokensPerSecond;
+        speedCount++;
+      }
+
+      // Group by model
+      const m = modelMap.get(l.model) || { requests: 0, inputTokens: 0, outputTokens: 0, totalTokens: 0 };
+      m.requests++;
+      m.inputTokens += l.promptTokens;
+      m.outputTokens += l.completionTokens;
+      m.totalTokens += l.totalTokens;
+      modelMap.set(l.model, m);
+
+      // Group by provider
+      const p = providerMap.get(l.provider) || { requests: 0, totalTokens: 0 };
+      p.requests++;
+      p.totalTokens += l.totalTokens;
+      providerMap.set(l.provider, p);
+
+      // Group by API key
+      const keyLabel = l.keyName || (l.keyPrefix ? `Key ${l.keyPrefix}` : "Playground / Session");
+      const k = keyMap.get(keyLabel) || { keyPrefix: l.keyPrefix, requests: 0, totalTokens: 0 };
+      k.requests++;
+      k.totalTokens += l.totalTokens;
+      keyMap.set(keyLabel, k);
+    });
+
+    const totalRequests = logs.length;
+    const successRate = totalRequests > 0 ? Math.round((successCount / totalRequests) * 100) : 100;
+    const avgDurationMs = totalRequests > 0 ? Math.round(durationSum / totalRequests) : 0;
+    const avgTtftMs = ttftCount > 0 ? Math.round(ttftSum / ttftCount) : 0;
+    const avgSpeed = speedCount > 0 ? parseFloat((speedSum / speedCount).toFixed(1)) : 0;
+    const ioRatio = completionTokens > 0 ? `${(promptTokens / completionTokens).toFixed(1)}x` : "—";
+
+    // Format Model Breakdown
+    const modelBreakdown = Array.from(modelMap.entries())
+      .map(([model, data]) => ({
+        model,
+        requests: data.requests,
+        inputTokens: data.inputTokens,
+        outputTokens: data.outputTokens,
+        totalTokens: data.totalTokens,
+        sharePercent: totalTokens > 0 ? parseFloat(((data.totalTokens / totalTokens) * 100).toFixed(1)) : 0,
+      }))
+      .sort((a, b) => b.totalTokens - a.totalTokens);
+
+    // Format Provider Breakdown
+    const providerBreakdown = Array.from(providerMap.entries())
+      .map(([provider, data]) => ({
+        provider,
+        requests: data.requests,
+        totalTokens: data.totalTokens,
+        sharePercent: totalTokens > 0 ? parseFloat(((data.totalTokens / totalTokens) * 100).toFixed(1)) : 0,
+      }))
+      .sort((a, b) => b.totalTokens - a.totalTokens);
+
+    // Format Key Breakdown
+    const apiKeyBreakdown = Array.from(keyMap.entries())
+      .map(([keyName, data]) => ({
+        keyName,
+        keyPrefix: data.keyPrefix,
+        requests: data.requests,
+        totalTokens: data.totalTokens,
+        sharePercent: totalTokens > 0 ? parseFloat(((data.totalTokens / totalTokens) * 100).toFixed(1)) : 0,
+      }))
+      .sort((a, b) => b.totalTokens - a.totalTokens);
+
+    // 4. Build Timeline Buckets for Usage Trend
+    const timeline: Array<{ label: string; totalTokens: number; promptTokens: number; completionTokens: number; requests: number }> = [];
+    if (args.timeRange === "today") {
+      for (let h = 0; h < 24; h++) {
+        const hourLabel = `${String(h).padStart(2, "0")}:00`;
+        timeline.push({ label: hourLabel, totalTokens: 0, promptTokens: 0, completionTokens: 0, requests: 0 });
+      }
+      logs.forEach((l) => {
+        const hour = new Date(l.createdAt).getHours();
+        if (timeline[hour]) {
+          timeline[hour].totalTokens += l.totalTokens;
+          timeline[hour].promptTokens += l.promptTokens;
+          timeline[hour].completionTokens += l.completionTokens;
+          timeline[hour].requests++;
+        }
+      });
+    } else {
+      const daysCount = args.timeRange === "7d" ? 7 : args.timeRange === "90d" ? 90 : 30;
+      const dayMap = new Map<string, { label: string; totalTokens: number; promptTokens: number; completionTokens: number; requests: number }>();
+      
+      for (let i = daysCount - 1; i >= 0; i--) {
+        const d = new Date(now - i * 24 * 60 * 60 * 1000);
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, "0");
+        const dd = String(d.getDate()).padStart(2, "0");
+        const key = `${yyyy}-${mm}-${dd}`;
+        const label = `${mm}/${dd}`;
+        dayMap.set(key, { label, totalTokens: 0, promptTokens: 0, completionTokens: 0, requests: 0 });
+      }
+
+      logs.forEach((l) => {
+        const d = new Date(l.createdAt);
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, "0");
+        const dd = String(d.getDate()).padStart(2, "0");
+        const key = `${yyyy}-${mm}-${dd}`;
+        const item = dayMap.get(key);
+        if (item) {
+          item.totalTokens += l.totalTokens;
+          item.promptTokens += l.promptTokens;
+          item.completionTokens += l.completionTokens;
+          item.requests++;
+        }
+      });
+
+      dayMap.forEach((v) => timeline.push(v));
+    }
+
+    // 5. Activity Heatmap: Past 365 Days
+    const oneYearAgo = now - 365 * 24 * 60 * 60 * 1000;
+    const yearLogs = await ctx.db
+      .query("routerLogs")
+      .withIndex("by_user_created", (q) => q.eq("userId", userId).gte("createdAt", oneYearAgo))
+      .order("desc")
+      .take(2000);
+
+    const heatmapMap = new Map<string, { count: number; tokens: number }>();
+    let maxDayTokens = 0;
+    let mostActiveDay = { date: "—", tokens: 0, requests: 0 };
+
+    yearLogs.forEach((l) => {
+      const d = new Date(l.createdAt);
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const dd = String(d.getDate()).padStart(2, "0");
+      const dateKey = `${yyyy}-${mm}-${dd}`;
+      const entry = heatmapMap.get(dateKey) || { count: 0, tokens: 0 };
+      entry.count++;
+      entry.tokens += l.totalTokens;
+      heatmapMap.set(dateKey, entry);
+
+      if (entry.tokens > maxDayTokens) {
+        maxDayTokens = entry.tokens;
+        mostActiveDay = { date: dateKey, tokens: entry.tokens, requests: entry.count };
+      }
+    });
+
+    const dailyHeatmap: Array<{ date: string; count: number; tokens: number; level: 0 | 1 | 2 | 3 | 4 }> = [];
+    for (let i = 363; i >= 0; i--) {
+      const d = new Date(now - i * 24 * 60 * 60 * 1000);
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const dd = String(d.getDate()).padStart(2, "0");
+      const dateKey = `${yyyy}-${mm}-${dd}`;
+      const data = heatmapMap.get(dateKey) || { count: 0, tokens: 0 };
+
+      let level: 0 | 1 | 2 | 3 | 4 = 0;
+      if (data.tokens > 0) {
+        if (maxDayTokens > 0) {
+          const ratio = data.tokens / maxDayTokens;
+          if (ratio > 0.75) level = 4;
+          else if (ratio > 0.5) level = 3;
+          else if (ratio > 0.25) level = 2;
+          else level = 1;
+        } else {
+          level = 1;
+        }
+      }
+
+      dailyHeatmap.push({
+        date: dateKey,
+        count: data.count,
+        tokens: data.tokens,
+        level,
+      });
+    }
+
+    return {
+      kpi: {
+        totalTokens,
+        promptTokens,
+        completionTokens,
+        cachedTokens,
+        totalRequests,
+        successRate,
+        avgDurationMs,
+        avgTtftMs,
+        avgSpeed,
+        ioRatio,
+      },
+      infrastructure: {
+        activeProvidersCount,
+        activeKeysCount,
+        activeModelsCount: modelMap.size,
+      },
+      modelBreakdown,
+      providerBreakdown,
+      apiKeyBreakdown,
+      timeline,
+      dailyHeatmap,
+      mostActiveDay,
+    };
+  },
+});
+
