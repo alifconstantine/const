@@ -297,13 +297,13 @@ export default function ModelsPage() {
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
           {/* Left: Search Input */}
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-            <Input
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+            <input
               type="text"
               placeholder="Search model name or capability..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 h-9.5 rounded-xl bg-secondary/50 border-border text-xs text-foreground placeholder:text-muted-foreground font-sans focus-visible:ring-1 focus-visible:ring-foreground/20"
+              className="w-full pl-10 pr-4 h-10 rounded-xl bg-secondary/50 border border-border text-xs text-foreground placeholder:text-muted-foreground font-sans outline-none focus:outline-none focus:border-foreground/40 focus:ring-1 focus:ring-foreground/20 transition-all"
             />
           </div>
 
@@ -319,7 +319,7 @@ export default function ModelsPage() {
                 setSelectedProvider(val);
               }}
             >
-              <SelectTrigger className="h-9.5 min-w-[170px] rounded-xl bg-secondary/50 border-border text-xs font-sans text-foreground">
+              <SelectTrigger className="h-10 min-w-[170px] rounded-xl bg-secondary/50 border-border text-xs font-sans text-foreground">
                 <div className="flex items-center gap-2">
                   <Cpu className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                   <SelectValue placeholder="Select Provider" />
@@ -377,7 +377,7 @@ export default function ModelsPage() {
                 className="rounded-2xl border border-border/80 bg-card overflow-hidden shadow-none transition-all"
               >
                 {/* Provider Header: Const Logo + Provider Name (no internal endpoints or badges) */}
-                <div className="px-5 py-3.5 bg-secondary/40 border-b border-border/70 flex items-center justify-between">
+                <div className="px-6 py-3.5 bg-secondary/40 border-b border-border/70 flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
                     <ConstLogoIcon size="xs" className="w-5 h-5 text-foreground" />
                     <span className="text-sm font-semibold text-foreground font-sans">
@@ -391,19 +391,19 @@ export default function ModelsPage() {
                   <Table>
                     <TableHeader className="bg-secondary/20">
                       <TableRow className="border-border/60 hover:bg-transparent">
-                        <TableHead className="w-[34%] min-w-[200px] text-xs font-mono font-semibold uppercase tracking-wider text-muted-foreground">
+                        <TableHead className="w-[34%] min-w-[200px] pl-6 pr-4 text-xs font-mono font-semibold uppercase tracking-wider text-muted-foreground">
                           Model
                         </TableHead>
-                        <TableHead className="w-[22%] min-w-[150px] text-xs font-mono font-semibold uppercase tracking-wider text-muted-foreground">
+                        <TableHead className="w-[22%] min-w-[150px] px-4 text-xs font-mono font-semibold uppercase tracking-wider text-muted-foreground">
                           Capabilities
                         </TableHead>
-                        <TableHead className="w-[15%] min-w-[110px] text-xs font-mono font-semibold uppercase tracking-wider text-muted-foreground">
+                        <TableHead className="w-[15%] min-w-[110px] px-4 text-xs font-mono font-semibold uppercase tracking-wider text-muted-foreground">
                           Context Window
                         </TableHead>
-                        <TableHead className="w-[15%] min-w-[110px] text-xs font-mono font-semibold uppercase tracking-wider text-muted-foreground">
+                        <TableHead className="w-[15%] min-w-[110px] px-4 text-xs font-mono font-semibold uppercase tracking-wider text-muted-foreground">
                           Max Output Token
                         </TableHead>
-                        <TableHead className="w-[14%] min-w-[100px] text-right text-xs font-mono font-semibold uppercase tracking-wider text-muted-foreground">
+                        <TableHead className="w-[14%] min-w-[100px] pl-4 pr-6 text-right text-xs font-mono font-semibold uppercase tracking-wider text-muted-foreground">
                           Action
                         </TableHead>
                       </TableRow>
@@ -415,7 +415,7 @@ export default function ModelsPage() {
                           className="border-border/50 hover:bg-secondary/20 transition-colors"
                         >
                           {/* 1. Model Name with Copy Button next to it */}
-                          <TableCell className="py-3.5">
+                          <TableCell className="py-4 pl-6 pr-4">
                             <div className="flex items-center gap-2 flex-wrap">
                               <span className="font-medium text-sm text-foreground font-sans">
                                 {model.name}
@@ -453,7 +453,7 @@ export default function ModelsPage() {
                           </TableCell>
 
                           {/* 2. Capabilities: Icon-only with Tooltips */}
-                          <TableCell className="py-3.5">
+                          <TableCell className="py-4 px-4">
                             <div className="flex items-center gap-1.5 flex-wrap">
                               {model.capabilities.map((cap) => {
                                 const IconComp = cap.icon;
@@ -474,21 +474,21 @@ export default function ModelsPage() {
                           </TableCell>
 
                           {/* 3. Context Window: Plain text */}
-                          <TableCell className="py-3.5">
+                          <TableCell className="py-4 px-4">
                             <span className="text-xs font-mono text-foreground font-normal">
                               {model.contextWindow}
                             </span>
                           </TableCell>
 
                           {/* 4. Max Output Token: Plain text (64K) */}
-                          <TableCell className="py-3.5">
+                          <TableCell className="py-4 px-4">
                             <span className="text-xs font-mono text-foreground font-normal">
                               {model.maxOutputTokens}
                             </span>
                           </TableCell>
 
                           {/* 5. Action: Test Model Button */}
-                          <TableCell className="py-3.5 text-right">
+                          <TableCell className="py-4 pl-4 pr-6 text-right">
                             <Button
                               size="sm"
                               onClick={() => handleTestModel(model)}
