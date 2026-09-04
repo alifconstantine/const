@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import { useRouterAuth } from "@/components/providers/convex-client-provider";
 import { useQuery } from "convex/react";
@@ -37,6 +37,7 @@ import {
   Scale,
   ShieldCheck,
   CalendarDays,
+  Activity,
 } from "lucide-react";
 
 function formatTokens(tokens?: number): string {
@@ -47,6 +48,19 @@ function formatTokens(tokens?: number): string {
 }
 
 type TimeRangeOption = "today" | "7d" | "30d" | "90d" | "all";
+
+interface WeeklyBucket {
+  weekIndex: number;
+  tokens: number;
+  count: number;
+  startDate: string;
+  endDate: string;
+}
+
+interface WavePoint {
+  x: number;
+  y: number;
+}
 
 export default function DashboardOverviewPage() {
   const { isAuthenticated } = useRouterAuth();
@@ -70,6 +84,115 @@ export default function DashboardOverviewPage() {
   const [copiedEndpoint, setCopiedEndpoint] = useState(false);
   const [copiedModel, setCopiedModel] = useState(false);
   const [copiedCurl, setCopiedCurl] = useState(false);
+
+  // 52-Week aggregated data for the wave chart
+  const { weeklyWaveData, maxWeeklyTokens, peakWeek } = useMemo<{
+    weeklyWaveData: WeeklyBucket[];
+    maxWeeklyTokens: number;
+    peakWeek: WeeklyBucket | null;
+  }>(() => {
+    if (!analytics?.dailyHeatmap || analytics.dailyHeatmap.length === 0) {
+      return { weeklyWaveData: [], maxWeeklyTokens: 0, peakWeek: null };
+    }
+
+    const weeks: WeeklyBucket[] = [];
+
+    // Group 364 days into 52 weeks (7 days each)
+    for (let i = 0; i < analytics.dailyHeatmap.length; i += 7) {
+      const chunk = analytics.dailyHeatmap.slice(i, i + 7);
+      const tokens = chunk.reduce((sum, d) => sum + d.tokens, 0);
+      const count = chunk.reduce((sum, d) => sum + d.count, 0);
+      weeks.push({
+        weekIndex: Math.floor(i / 7),
+        tokens,
+        count,
+        startDate: chunk[0]?.date || "",
+        endDate: chunk[chunk.length - 1]?.date || "",
+      });
+    }
+
+    let max = 0;
+    let peak: WeeklyBucket | null = null;
+    weeks.forEach((w) => {
+      if (w.tokens > max) {
+        max = w.tokens;
+        peak = w;
+      }
+    });
+
+    return { weeklyWaveData: weeks, maxWeeklyTokens: max, peakWeek: peak };
+  }, [analytics?.dailyHeatmap]);
+
+  const [hoveredWeekIndex, setHoveredWeekIndex] = useState<number | null>(null);
+  const hoveredWeek = hoveredWeekIndex !== null ? weeklyWaveData[hoveredWeekIndex] ?? null : null;
+
+  // Generate smooth SVG wave paths
+  const { waveLinePath, waveAreaPath, points, peakCoords } = useMemo(() => {
+    const width = 520;
+    const height = 80;
+    const baselineY = 68;
+    const minY = 14;
+    const availableH = baselineY - minY;
+
+    if (!weeklyWaveData || weeklyWaveData.length === 0) {
+      return { waveLinePath: "", waveAreaPath: "", points: [], peakCoords: null };
+    }
+
+    const count = weeklyWaveData.length;
+    const pts: WavePoint[] = [];
+
+    if (maxWeeklyTokens === 0) {
+      // Gentle ambient wave when there is no historical traffic yet
+      for (let i = 0; i < count; i++) {
+        const x = (i / (count - 1)) * width;
+        const y = 52 + Math.sin(i * 0.28) * 7 + Math.cos(i * 0.52) * 4;
+        pts.push({ x, y });
+      }
+    } else {
+      for (let i = 0; i < count; i++) {
+        const x = (i / (count - 1)) * width;
+        const week = weeklyWaveData[i];
+        const ratio = week ? week.tokens / maxWeeklyTokens : 0;
+        const y = baselineY - ratio * availableH;
+        pts.push({ x, y });
+      }
+    }
+
+    const firstPt = pts[0];
+    const lastPt = pts[pts.length - 1];
+    if (!firstPt || !lastPt) {
+      return { waveLinePath: "", waveAreaPath: "", points: [], peakCoords: null };
+    }
+
+    // Catmull-Rom cubic bezier smoothing
+    let lineD = `M ${firstPt.x.toFixed(1)},${firstPt.y.toFixed(1)}`;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const p0 = pts[i === 0 ? 0 : i - 1] ?? firstPt;
+      const p1 = pts[i] ?? firstPt;
+      const p2 = pts[i + 1] ?? lastPt;
+      const p3 = pts[i + 2] ?? p2;
+
+      const cp1x = p1.x + (p2.x - p0.x) / 6;
+      const cp1y = p1.y + (p2.y - p0.y) / 6;
+      const cp2x = p2.x - (p3.x - p1.x) / 6;
+      const cp2y = p2.y - (p3.y - p1.y) / 6;
+
+      lineD += ` C ${cp1x.toFixed(1)},${cp1y.toFixed(1)} ${cp2x.toFixed(1)},${cp2y.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`;
+    }
+
+    const areaD = `${lineD} L ${lastPt.x.toFixed(1)},${height} L 0,${height} Z`;
+
+    let peakPoint: WavePoint | null = null;
+    if (peakWeek && maxWeeklyTokens > 0) {
+      const pIdx = peakWeek.weekIndex;
+      const pt = pts[pIdx];
+      if (pt) {
+        peakPoint = pt;
+      }
+    }
+
+    return { waveLinePath: lineD, waveAreaPath: areaD, points: pts, peakCoords: peakPoint };
+  }, [weeklyWaveData, maxWeeklyTokens, peakWeek]);
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -327,276 +450,11 @@ export default function DashboardOverviewPage() {
         </div>
       </Card>
 
-      {/* 4. Visual Analytics: Usage Trend & Provider Distribution (2-Column Grid) */}
+      {/* 4. Upper Grid: Activity Heatmap (with Wave Chart) & Quick Start */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left: Usage Trend Chart */}
-        <Card className="lg:col-span-2 rounded-3xl border-border/70 bg-card p-6 flex flex-col justify-between transition-colors">
-          <div className="flex items-center justify-between pb-4">
-            <div className="space-y-0.5">
-              <div className="flex items-center gap-2">
-                <h3 className="text-base font-semibold tracking-tight text-foreground font-sans">
-                  Usage Trend
-                </h3>
-                <Link
-                  href="/logs"
-                  className="text-xs font-mono text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
-                >
-                  <span>View audit logs</span>
-                  <ExternalLink className="h-3 w-3" />
-                </Link>
-              </div>
-              <p className="text-xs text-muted-foreground font-light">
-                {analytics && analytics.kpi.totalRequests > 0
-                  ? `${analytics.kpi.totalTokens.toLocaleString()} tokens across ${analytics.kpi.totalRequests} requests (${timeRange.toUpperCase()})`
-                  : "No requests in selected window"}
-              </p>
-            </div>
-          </div>
-
-          {/* Activity Bar Chart Visualization */}
-          <div className="h-64 w-full flex flex-col justify-between py-2">
-            {analytics && analytics.timeline.length > 0 && analytics.kpi.totalRequests > 0 ? (
-              <div className="flex-1 flex flex-col justify-end">
-                <div className="h-48 flex items-end gap-1 sm:gap-2 px-1 border-b border-border/60 pb-1">
-                  {analytics.timeline.map((bucket, idx) => {
-                    const heightPercent = Math.max(
-                      4,
-                      Math.round((bucket.totalTokens / timelineMaxTokens) * 100)
-                    );
-                    return (
-                      <TooltipProvider key={idx}>
-                        <Tooltip delayDuration={100}>
-                          <TooltipTrigger asChild>
-                            <div className="flex-1 h-full flex flex-col justify-end group cursor-pointer">
-                              <div
-                                style={{ height: `${heightPercent}%` }}
-                                className={cn(
-                                  "w-full rounded-t-sm transition-all duration-300",
-                                  bucket.totalTokens > 0
-                                    ? "bg-foreground group-hover:bg-foreground/80"
-                                    : "bg-muted/30"
-                                )}
-                              />
-                            </div>
-                          </TooltipTrigger>
-                          <TooltipContent
-                            side="top"
-                            className="text-xs p-2.5 font-sans bg-popover border-border/80 shadow-lg space-y-1"
-                          >
-                            <div className="font-semibold text-foreground">
-                              {bucket.label}
-                            </div>
-                            <div className="text-[11px] font-mono text-muted-foreground space-y-0.5 tabular-nums">
-                              <div>Total: {bucket.totalTokens.toLocaleString()} tok</div>
-                              <div>
-                                {bucket.promptTokens.toLocaleString()} in / {bucket.completionTokens.toLocaleString()} out
-                              </div>
-                              <div className="text-foreground/90 font-medium pt-0.5">
-                                {bucket.requests} requests
-                              </div>
-                            </div>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    );
-                  })}
-                </div>
-                <div className="flex justify-between text-[11px] font-mono text-muted-foreground/60 pt-2 px-1">
-                  <span>Start of {timeRange.toUpperCase()}</span>
-                  <span>Token Traffic Intensity</span>
-                  <span>Now</span>
-                </div>
-              </div>
-            ) : (
-              <div className="flex-1 flex flex-col items-center justify-center text-center space-y-2 border border-dashed border-border/60 rounded-2xl p-6">
-                <Terminal className="h-6 w-6 text-muted-foreground/40" />
-                <div className="space-y-0.5">
-                  <p className="text-xs font-medium text-foreground">
-                    No requests recorded for this period
-                  </p>
-                  <p className="text-[11px] text-muted-foreground font-light">
-                    Send requests via cURL or test in Playground to generate live telemetry.
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
-        </Card>
-
-        {/* Right: Provider Distribution */}
-        <Card className="rounded-3xl border-border/70 bg-card p-6 flex flex-col justify-between transition-colors">
-          <div className="space-y-1 pb-4">
-            <h3 className="text-base font-semibold tracking-tight text-foreground font-sans">
-              Provider Distribution
-            </h3>
-            <p className="text-xs text-muted-foreground font-light">
-              Routing share across active AI providers.
-            </p>
-          </div>
-
-          <div className="flex-1 flex flex-col justify-center space-y-4">
-            {!analytics?.providerBreakdown || analytics.providerBreakdown.length === 0 ? (
-              <div className="py-8 text-center text-xs text-muted-foreground font-light">
-                No provider traffic yet
-              </div>
-            ) : (
-              analytics.providerBreakdown.map((item) => (
-                <div key={item.provider} className="space-y-1.5">
-                  <div className="flex items-center justify-between text-xs font-sans">
-                    <div className="flex items-center gap-2 font-medium text-foreground">
-                      <span className="h-2 w-2 rounded-full bg-foreground" />
-                      <span>{item.provider}</span>
-                    </div>
-                    <div className="flex items-center gap-2 font-mono text-muted-foreground tabular-nums">
-                      <span>{formatTokens(item.totalTokens)}</span>
-                      <span className="font-semibold text-foreground">
-                        {item.sharePercent}%
-                      </span>
-                    </div>
-                  </div>
-                  {/* Progress bar */}
-                  <div className="h-2 w-full rounded-full bg-secondary/80 overflow-hidden">
-                    <div
-                      style={{ width: `${Math.min(100, Math.max(3, item.sharePercent))}%` }}
-                      className="h-full bg-foreground rounded-full transition-all duration-500"
-                    />
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-
-          <div className="pt-4 border-t border-border/50 text-[11px] text-muted-foreground font-sans flex items-center justify-between">
-            <span>Dynamic load balanced</span>
-            <Link
-              href="/providers"
-              className="underline hover:text-foreground font-medium transition-colors"
-            >
-              Manage providers
-            </Link>
-          </div>
-        </Card>
-      </div>
-
-      {/* 5. Model Breakdown Table */}
-      <Card className="rounded-3xl border-border/70 bg-card overflow-hidden transition-colors">
-        <div className="p-6 pb-4 border-b border-border/60 flex items-center justify-between">
-          <div className="space-y-0.5">
-            <h3 className="text-base font-semibold tracking-tight text-foreground font-sans">
-              Model Breakdown
-            </h3>
-            <p className="text-xs text-muted-foreground font-light">
-              Tokens, requests, and workload share per model.
-            </p>
-          </div>
-          <Link
-            href="/models"
-            className="text-xs font-mono text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
-          >
-            <span>Model catalog</span>
-            <ChevronRight className="h-3.5 w-3.5" />
-          </Link>
-        </div>
-
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader className="bg-secondary/20">
-              <TableRow className="border-border/60 hover:bg-transparent">
-                <TableHead className="text-xs font-medium text-muted-foreground pl-6 py-3">
-                  Model
-                </TableHead>
-                <TableHead className="text-xs font-medium text-muted-foreground text-right py-3">
-                  Requests
-                </TableHead>
-                <TableHead className="text-xs font-medium text-muted-foreground text-right py-3">
-                  Input Tokens
-                </TableHead>
-                <TableHead className="text-xs font-medium text-muted-foreground text-right py-3">
-                  Output Tokens
-                </TableHead>
-                <TableHead className="text-xs font-medium text-muted-foreground text-right py-3">
-                  Total Tokens
-                </TableHead>
-                <TableHead className="text-xs font-medium text-muted-foreground pr-6 py-3 w-48 text-right">
-                  Share (%)
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {!analytics?.modelBreakdown || analytics.modelBreakdown.length === 0 ? (
-                <TableRow>
-                  <TableCell
-                    colSpan={6}
-                    className="py-12 text-center text-xs text-muted-foreground font-sans"
-                  >
-                    No model usage logged yet. Run a prompt in Playground or via API.
-                  </TableCell>
-                </TableRow>
-              ) : (
-                analytics.modelBreakdown.map((item) => (
-                  <TableRow
-                    key={item.model}
-                    className="border-border/40 hover:bg-secondary/20 transition-colors"
-                  >
-                    {/* Model */}
-                    <TableCell className="pl-6 py-3.5 whitespace-nowrap">
-                      <div className="flex items-center gap-2">
-                        <span className="h-1.5 w-1.5 rounded-full bg-foreground" />
-                        <span className="font-sans text-xs font-medium text-foreground">
-                          {item.model}
-                        </span>
-                      </div>
-                    </TableCell>
-
-                    {/* Requests */}
-                    <TableCell className="text-right py-3.5 text-xs font-sans text-foreground/90 tabular-nums">
-                      {item.requests.toLocaleString()}
-                    </TableCell>
-
-                    {/* Input Tokens */}
-                    <TableCell className="text-right py-3.5 text-xs font-sans text-muted-foreground tabular-nums">
-                      {formatTokens(item.inputTokens)}
-                    </TableCell>
-
-                    {/* Output Tokens */}
-                    <TableCell className="text-right py-3.5 text-xs font-sans text-muted-foreground tabular-nums">
-                      {formatTokens(item.outputTokens)}
-                    </TableCell>
-
-                    {/* Total Tokens */}
-                    <TableCell className="text-right py-3.5 text-xs font-sans font-semibold text-foreground tabular-nums">
-                      {formatTokens(item.totalTokens)}
-                    </TableCell>
-
-                    {/* Share Bar */}
-                    <TableCell className="pr-6 py-3.5 text-right whitespace-nowrap">
-                      <div className="flex items-center justify-end gap-2.5">
-                        <div className="h-2 w-24 rounded-full bg-secondary/80 overflow-hidden">
-                          <div
-                            style={{
-                              width: `${Math.min(100, Math.max(3, item.sharePercent))}%`,
-                            }}
-                            className="h-full bg-foreground rounded-full"
-                          />
-                        </div>
-                        <span className="text-xs font-mono font-medium text-foreground w-12 text-right tabular-nums">
-                          {item.sharePercent}%
-                        </span>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      </Card>
-
-      {/* 6. Lower Grid: Activity Heatmap (GitHub Style) & Quick Start */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left: Activity Heatmap (52-week calendar grid) */}
-        <Card className="lg:col-span-2 rounded-3xl border-border/70 bg-card p-6 flex flex-col justify-between transition-colors">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4">
+        {/* Left: Activity Heatmap & Momentum Wave (2 cols) */}
+        <Card className="lg:col-span-2 rounded-3xl border-border/70 bg-card p-6 flex flex-col justify-between transition-colors space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-1">
             <div className="space-y-0.5">
               <div className="flex items-center gap-2">
                 <CalendarDays className="h-4 w-4 text-foreground stroke-[1.75]" />
@@ -605,7 +463,7 @@ export default function DashboardOverviewPage() {
                 </h3>
               </div>
               <p className="text-xs text-muted-foreground font-light">
-                Annual token request frequency across 52 weeks.
+                Annual token request frequency and momentum across 52 weeks.
               </p>
             </div>
 
@@ -621,8 +479,144 @@ export default function DashboardOverviewPage() {
             )}
           </div>
 
+          {/* Wave Graph: Fills empty space above 52-week grid */}
+          <div className="space-y-2 pt-1">
+            <div className="flex items-center justify-between text-xs font-sans text-muted-foreground">
+              <div className="flex items-center gap-1.5 font-medium text-foreground">
+                <Activity className="h-3.5 w-3.5 text-foreground stroke-[2]" />
+                <span>Annual Token Momentum Wave</span>
+              </div>
+              <div className="font-mono text-[11px] tabular-nums">
+                {hoveredWeek ? (
+                  <span>
+                    Week {hoveredWeek.weekIndex + 1} ({hoveredWeek.startDate}):{" "}
+                    <strong className="text-foreground font-semibold">
+                      {formatTokens(hoveredWeek.tokens)}
+                    </strong>{" "}
+                    tokens &middot; {hoveredWeek.count} reqs
+                  </span>
+                ) : maxWeeklyTokens > 0 && peakWeek ? (
+                  <span>
+                    Peak Week:{" "}
+                    <strong className="text-foreground font-semibold">
+                      {formatTokens(maxWeeklyTokens)}
+                    </strong>{" "}
+                    tokens ({peakWeek.startDate})
+                  </span>
+                ) : (
+                  <span>52-week baseline ready</span>
+                )}
+              </div>
+            </div>
+
+            {/* Smooth Wave SVG */}
+            <div className="relative w-full h-24 overflow-hidden rounded-2xl bg-secondary/25 border border-border/40 p-1">
+              <svg
+                viewBox="0 0 520 80"
+                preserveAspectRatio="none"
+                className="w-full h-full overflow-visible"
+              >
+                <defs>
+                  <linearGradient id="waveFillGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="currentColor" stopOpacity="0.22" />
+                    <stop offset="60%" stopColor="currentColor" stopOpacity="0.06" />
+                    <stop offset="100%" stopColor="currentColor" stopOpacity="0.0" />
+                  </linearGradient>
+                </defs>
+
+                {/* Subtle baseline */}
+                <line
+                  x1="0"
+                  y1="68"
+                  x2="520"
+                  y2="68"
+                  stroke="currentColor"
+                  strokeDasharray="4 4"
+                  strokeWidth="1"
+                  className="text-border/80"
+                />
+
+                {/* Wave Area Fill */}
+                {waveAreaPath && (
+                  <path
+                    d={waveAreaPath}
+                    fill="url(#waveFillGrad)"
+                    className="text-foreground transition-all duration-300"
+                  />
+                )}
+
+                {/* Wave Stroke Line */}
+                {waveLinePath && (
+                  <path
+                    d={waveLinePath}
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    className="text-foreground transition-all duration-300"
+                  />
+                )}
+
+                {/* Peak Week Indicator Circle */}
+                {peakCoords && (
+                  <g className="transition-all duration-300">
+                    <circle
+                      cx={peakCoords.x}
+                      cy={peakCoords.y}
+                      r="6"
+                      className="fill-foreground/25 animate-ping"
+                    />
+                    <circle
+                      cx={peakCoords.x}
+                      cy={peakCoords.y}
+                      r="3.5"
+                      className="fill-foreground"
+                    />
+                  </g>
+                )}
+
+                {/* Hover Indicator */}
+                {hoveredWeekIndex !== null && points[hoveredWeekIndex] && (
+                  <g>
+                    <line
+                      x1={points[hoveredWeekIndex].x}
+                      y1="0"
+                      x2={points[hoveredWeekIndex].x}
+                      y2="80"
+                      stroke="currentColor"
+                      strokeDasharray="2 2"
+                      strokeWidth="1"
+                      className="text-foreground/50"
+                    />
+                    <circle
+                      cx={points[hoveredWeekIndex].x}
+                      cy={points[hoveredWeekIndex].y}
+                      r="4"
+                      className="fill-foreground stroke-background stroke-2"
+                    />
+                  </g>
+                )}
+              </svg>
+
+              {/* Interactive mouseover slices */}
+              <div
+                className="absolute inset-0 flex"
+                onMouseLeave={() => setHoveredWeekIndex(null)}
+              >
+                {weeklyWaveData.map((w, idx) => (
+                  <div
+                    key={idx}
+                    className="flex-1 h-full cursor-pointer hover:bg-foreground/5 transition-colors"
+                    onMouseEnter={() => setHoveredWeekIndex(idx)}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+
           {/* 52-Week Contribution Grid */}
-          <div className="py-2 overflow-x-auto select-none">
+          <div className="pt-2 overflow-x-auto select-none">
             <div className="inline-block min-w-[640px]">
               <div className="grid grid-rows-7 grid-flow-col gap-1.5 p-1">
                 {analytics?.dailyHeatmap?.map((day) => (
@@ -658,7 +652,7 @@ export default function DashboardOverviewPage() {
 
               {/* Heatmap Legend */}
               <div className="flex items-center justify-between text-[11px] font-sans text-muted-foreground pt-3 px-1">
-                <span className="font-mono">Past 52 Weeks</span>
+                <span className="font-mono">Past 52 Weeks Grid</span>
                 <div className="flex items-center gap-1.5">
                   <span>Less</span>
                   <span className="w-2.5 h-2.5 rounded-[2px] bg-secondary/50 border border-border/30" />
@@ -673,8 +667,8 @@ export default function DashboardOverviewPage() {
           </div>
         </Card>
 
-        {/* Right: Quick Start Card */}
-        <Card className="rounded-3xl border-border/70 bg-card p-6 space-y-5 transition-colors">
+        {/* Right: Quick Start Card (Swapped from Bottom Right) */}
+        <Card className="rounded-3xl border-border/70 bg-card p-6 space-y-5 transition-colors flex flex-col justify-between">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <div className="h-8 w-8 rounded-xl bg-secondary text-foreground flex items-center justify-center border border-border/50">
@@ -791,6 +785,271 @@ export default function DashboardOverviewPage() {
           </div>
         </Card>
       </div>
+
+      {/* 5. Middle Grid: Usage Trend & Provider Distribution */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Left: Usage Trend Chart (Swapped from Top Left) */}
+        <Card className="lg:col-span-2 rounded-3xl border-border/70 bg-card p-6 flex flex-col justify-between transition-colors">
+          <div className="flex items-center justify-between pb-4">
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-semibold tracking-tight text-foreground font-sans">
+                  Usage Trend
+                </h3>
+                <Link
+                  href="/logs"
+                  className="text-xs font-mono text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+                >
+                  <span>View audit logs</span>
+                  <ExternalLink className="h-3 w-3" />
+                </Link>
+              </div>
+              <p className="text-xs text-muted-foreground font-light">
+                {analytics && analytics.kpi.totalRequests > 0
+                  ? `${analytics.kpi.totalTokens.toLocaleString()} tokens across ${analytics.kpi.totalRequests} requests (${timeRange.toUpperCase()})`
+                  : "No requests in selected window"}
+              </p>
+            </div>
+          </div>
+
+          {/* Activity Bar Chart Visualization */}
+          <div className="h-64 w-full flex flex-col justify-between py-2">
+            {analytics && analytics.timeline.length > 0 && analytics.kpi.totalRequests > 0 ? (
+              <div className="flex-1 flex flex-col justify-end">
+                <div className="h-48 flex items-end gap-1 sm:gap-2 px-1 border-b border-border/60 pb-1">
+                  {analytics.timeline.map((bucket, idx) => {
+                    const heightPercent = Math.max(
+                      4,
+                      Math.round((bucket.totalTokens / timelineMaxTokens) * 100)
+                    );
+                    return (
+                      <TooltipProvider key={idx}>
+                        <Tooltip delayDuration={100}>
+                          <TooltipTrigger asChild>
+                            <div className="flex-1 h-full flex flex-col justify-end group cursor-pointer">
+                              <div
+                                style={{ height: `${heightPercent}%` }}
+                                className={cn(
+                                  "w-full rounded-t-sm transition-all duration-300",
+                                  bucket.totalTokens > 0
+                                    ? "bg-foreground group-hover:bg-foreground/80"
+                                    : "bg-muted/30"
+                                )}
+                              />
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent
+                            side="top"
+                            className="text-xs p-2.5 font-sans bg-popover border-border/80 shadow-lg space-y-1"
+                          >
+                            <div className="font-semibold text-foreground">
+                              {bucket.label}
+                            </div>
+                            <div className="text-[11px] font-mono text-muted-foreground space-y-0.5 tabular-nums">
+                              <div>Total: {bucket.totalTokens.toLocaleString()} tok</div>
+                              <div>
+                                {bucket.promptTokens.toLocaleString()} in / {bucket.completionTokens.toLocaleString()} out
+                              </div>
+                              <div className="text-foreground/90 font-medium pt-0.5">
+                                {bucket.requests} requests
+                              </div>
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    );
+                  })}
+                </div>
+                <div className="flex justify-between text-[11px] font-mono text-muted-foreground/60 pt-2 px-1">
+                  <span>Start of {timeRange.toUpperCase()}</span>
+                  <span>Token Traffic Intensity</span>
+                  <span>Now</span>
+                </div>
+              </div>
+            ) : (
+              <div className="flex-1 flex flex-col items-center justify-center text-center space-y-2 border border-dashed border-border/60 rounded-2xl p-6">
+                <Terminal className="h-6 w-6 text-muted-foreground/40" />
+                <div className="space-y-0.5">
+                  <p className="text-xs font-medium text-foreground">
+                    No requests recorded for this period
+                  </p>
+                  <p className="text-[11px] text-muted-foreground font-light">
+                    Send requests via cURL or test in Playground to generate live telemetry.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        </Card>
+
+        {/* Right: Provider Distribution (Swapped from Top Right) */}
+        <Card className="rounded-3xl border-border/70 bg-card p-6 flex flex-col justify-between transition-colors">
+          <div className="space-y-1 pb-4">
+            <h3 className="text-base font-semibold tracking-tight text-foreground font-sans">
+              Provider Distribution
+            </h3>
+            <p className="text-xs text-muted-foreground font-light">
+              Routing share across active AI providers.
+            </p>
+          </div>
+
+          <div className="flex-1 flex flex-col justify-center space-y-4">
+            {!analytics?.providerBreakdown || analytics.providerBreakdown.length === 0 ? (
+              <div className="py-8 text-center text-xs text-muted-foreground font-light">
+                No provider traffic yet
+              </div>
+            ) : (
+              analytics.providerBreakdown.map((item) => (
+                <div key={item.provider} className="space-y-1.5">
+                  <div className="flex items-center justify-between text-xs font-sans">
+                    <div className="flex items-center gap-2 font-medium text-foreground">
+                      <span className="h-2 w-2 rounded-full bg-foreground" />
+                      <span>{item.provider}</span>
+                    </div>
+                    <div className="flex items-center gap-2 font-mono text-muted-foreground tabular-nums">
+                      <span>{formatTokens(item.totalTokens)}</span>
+                      <span className="font-semibold text-foreground">
+                        {item.sharePercent}%
+                      </span>
+                    </div>
+                  </div>
+                  {/* Progress bar */}
+                  <div className="h-2 w-full rounded-full bg-secondary/80 overflow-hidden">
+                    <div
+                      style={{ width: `${Math.min(100, Math.max(3, item.sharePercent))}%` }}
+                      className="h-full bg-foreground rounded-full transition-all duration-500"
+                    />
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          <div className="pt-4 border-t border-border/50 text-[11px] text-muted-foreground font-sans flex items-center justify-between">
+            <span>Dynamic load balanced</span>
+            <Link
+              href="/providers"
+              className="underline hover:text-foreground font-medium transition-colors"
+            >
+              Manage providers
+            </Link>
+          </div>
+        </Card>
+      </div>
+
+      {/* 6. Bottom Section: Model Breakdown Table (Moved to Very Bottom) */}
+      <Card className="rounded-3xl border-border/70 bg-card overflow-hidden transition-colors">
+        <div className="p-6 pb-4 border-b border-border/60 flex items-center justify-between">
+          <div className="space-y-0.5">
+            <h3 className="text-base font-semibold tracking-tight text-foreground font-sans">
+              Model Breakdown
+            </h3>
+            <p className="text-xs text-muted-foreground font-light">
+              Tokens, requests, and workload share per model.
+            </p>
+          </div>
+          <Link
+            href="/models"
+            className="text-xs font-mono text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+          >
+            <span>Model catalog</span>
+            <ChevronRight className="h-3.5 w-3.5" />
+          </Link>
+        </div>
+
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader className="bg-secondary/20">
+              <TableRow className="border-border/60 hover:bg-transparent">
+                <TableHead className="text-xs font-medium text-muted-foreground pl-6 py-3">
+                  Model
+                </TableHead>
+                <TableHead className="text-xs font-medium text-muted-foreground text-right py-3">
+                  Requests
+                </TableHead>
+                <TableHead className="text-xs font-medium text-muted-foreground text-right py-3">
+                  Input Tokens
+                </TableHead>
+                <TableHead className="text-xs font-medium text-muted-foreground text-right py-3">
+                  Output Tokens
+                </TableHead>
+                <TableHead className="text-xs font-medium text-muted-foreground text-right py-3">
+                  Total Tokens
+                </TableHead>
+                <TableHead className="text-xs font-medium text-muted-foreground pr-6 py-3 w-48 text-right">
+                  Share (%)
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {!analytics?.modelBreakdown || analytics.modelBreakdown.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={6}
+                    className="py-12 text-center text-xs text-muted-foreground font-sans"
+                  >
+                    No model usage logged yet. Run a prompt in Playground or via API.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                analytics.modelBreakdown.map((item) => (
+                  <TableRow
+                    key={item.model}
+                    className="border-border/40 hover:bg-secondary/20 transition-colors"
+                  >
+                    {/* Model */}
+                    <TableCell className="pl-6 py-3.5 whitespace-nowrap">
+                      <div className="flex items-center gap-2">
+                        <span className="h-1.5 w-1.5 rounded-full bg-foreground" />
+                        <span className="font-sans text-xs font-medium text-foreground">
+                          {item.model}
+                        </span>
+                      </div>
+                    </TableCell>
+
+                    {/* Requests */}
+                    <TableCell className="text-right py-3.5 text-xs font-sans text-foreground/90 tabular-nums">
+                      {item.requests.toLocaleString()}
+                    </TableCell>
+
+                    {/* Input Tokens */}
+                    <TableCell className="text-right py-3.5 text-xs font-sans text-muted-foreground tabular-nums">
+                      {formatTokens(item.inputTokens)}
+                    </TableCell>
+
+                    {/* Output Tokens */}
+                    <TableCell className="text-right py-3.5 text-xs font-sans text-muted-foreground tabular-nums">
+                      {formatTokens(item.outputTokens)}
+                    </TableCell>
+
+                    {/* Total Tokens */}
+                    <TableCell className="text-right py-3.5 text-xs font-sans font-semibold text-foreground tabular-nums">
+                      {formatTokens(item.totalTokens)}
+                    </TableCell>
+
+                    {/* Share Bar */}
+                    <TableCell className="pr-6 py-3.5 text-right whitespace-nowrap">
+                      <div className="flex items-center justify-end gap-2.5">
+                        <div className="h-2 w-24 rounded-full bg-secondary/80 overflow-hidden">
+                          <div
+                            style={{
+                              width: `${Math.min(100, Math.max(3, item.sharePercent))}%`,
+                            }}
+                            className="h-full bg-foreground rounded-full"
+                          />
+                        </div>
+                        <span className="text-xs font-mono font-medium text-foreground w-12 text-right tabular-nums">
+                          {item.sharePercent}%
+                        </span>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </Card>
     </div>
   );
 }
