@@ -31,6 +31,10 @@ import {
   TooltipTrigger,
   TooltipContent,
   TooltipProvider,
+  Sheet,
+  SheetContent,
+  SheetTitle,
+  SheetDescription,
   toast,
 } from "@const/ui";
 import {
@@ -510,191 +514,189 @@ export default function LogsPage() {
           </div>
         </Card>
 
-        {/* 6. Slide-Over Detail Drawer (Right-Hand Panel) */}
-        {selectedLog && (
-          <>
-            {/* Backdrop */}
-            <div
-              className="fixed inset-0 z-40 bg-background/60 backdrop-blur-sm animate-in fade-in duration-200"
-              onClick={() => setSelectedLog(null)}
-            />
-
-            {/* Slide-Over Content */}
-            <div className="fixed inset-y-0 right-0 z-50 w-full sm:w-[500px] md:w-[580px] bg-card border-l border-border/70 shadow-2xl flex flex-col animate-in slide-in-from-right duration-200 select-none">
-              {/* Drawer Header */}
-              <div className="p-4 sm:p-5 border-b border-border/60 flex items-center justify-between shrink-0">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="h-8 w-8 rounded-xl bg-secondary flex items-center justify-center border border-border/70 text-foreground shrink-0">
-                    <Code2 className="h-4 w-4" />
+        {/* 6. Slide-Over Detail Drawer (Portal Sheet above header) */}
+        <Sheet
+          open={!!selectedLog}
+          onOpenChange={(open) => {
+            if (!open) setSelectedLog(null);
+          }}
+        >
+          <SheetContent
+            side="right"
+            className="w-full sm:max-w-[560px] md:max-w-[620px] p-0 flex flex-col bg-card border-l border-border/70 shadow-2xl z-50 select-none gap-0"
+          >
+            {selectedLog && (
+              <>
+                {/* Drawer Header */}
+                <div className="p-4 sm:p-5 border-b border-border/60 flex items-center justify-between shrink-0 pr-14">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="h-8 w-8 rounded-xl bg-secondary flex items-center justify-center border border-border/70 text-foreground shrink-0">
+                      <Code2 className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <SheetTitle className="font-sans text-base sm:text-lg font-semibold text-foreground truncate text-left">
+                        Request Telemetry
+                      </SheetTitle>
+                      <SheetDescription className="text-xs font-mono text-muted-foreground truncate text-left">
+                        {selectedLog.requestId}
+                      </SheetDescription>
+                    </div>
                   </div>
-                  <div className="min-w-0">
-                    <h2 className="font-sans text-base sm:text-lg font-semibold text-foreground truncate">
-                      Request Telemetry
-                    </h2>
-                    <p className="text-xs font-mono text-muted-foreground truncate">
-                      {selectedLog.requestId}
-                    </p>
-                  </div>
-                </div>
 
-                <div className="flex items-center gap-2">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={handleCopyRawJson}
-                    className="h-8 rounded-full text-xs font-medium gap-1.5 border-border/70 cursor-pointer hover:bg-secondary"
-                  >
-                    {copiedJson ? <Check className="h-3.5 w-3.5 text-foreground" /> : <Copy className="h-3.5 w-3.5" />}
-                    <span>{copiedJson ? "Copied" : "Copy JSON"}</span>
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => setSelectedLog(null)}
-                    className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground cursor-pointer"
-                    aria-label="Close telemetry panel"
-                  >
-                    <X className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-
-              {/* Drawer Scrollable Body */}
-              <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 select-text">
-                {/* Status & Timing Highlight */}
-                <div className="p-4 rounded-2xl bg-secondary/30 border border-border/70 flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    {selectedLog.status >= 200 && selectedLog.status < 300 ? (
-                      <CheckCircle2 className="h-5 w-5 text-foreground stroke-[2]" />
-                    ) : (
-                      <AlertCircle className="h-5 w-5 text-red-500 stroke-[2]" />
-                    )}
-                    <div>
-                      <div className="text-sm font-semibold font-sans text-foreground">
-                        HTTP {selectedLog.status} {selectedLog.status === 200 ? "OK" : "Error"}
-                      </div>
-                      <div className="text-xs text-muted-foreground font-sans">
-                        {new Date(selectedLog.createdAt).toLocaleString()}
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="text-right">
-                    <div className="text-sm font-sans font-semibold text-foreground tabular-nums">
-                      {formatDuration(selectedLog.durationMs)}
-                    </div>
-                    <div className="text-xs font-sans text-muted-foreground">
-                      Duration
-                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleCopyRawJson}
+                      className="h-8 rounded-full text-xs font-medium gap-1.5 border-border/70 cursor-pointer hover:bg-secondary mr-2"
+                    >
+                      {copiedJson ? (
+                        <Check className="h-3.5 w-3.5 text-foreground" />
+                      ) : (
+                        <Copy className="h-3.5 w-3.5" />
+                      )}
+                      <span>{copiedJson ? "Copied" : "Copy JSON"}</span>
+                    </Button>
                   </div>
                 </div>
 
-                {/* Performance Metrics Breakdown */}
-                <div className="space-y-2">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground font-sans">
-                    Performance Breakdown
-                  </span>
-                  <div className="grid grid-cols-3 gap-2.5">
-                    <div className="p-3 rounded-xl bg-secondary/40 border border-border/60">
-                      <div className="text-xs text-muted-foreground font-sans">TTFT</div>
-                      <div className="text-sm font-sans font-semibold text-foreground mt-0.5 tabular-nums">
-                        {formatDuration(selectedLog.ttftMs)}
+                {/* Drawer Scrollable Body */}
+                <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 select-text">
+                  {/* Status & Timing Highlight */}
+                  <div className="p-4 rounded-2xl bg-secondary/30 border border-border/70 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      {selectedLog.status >= 200 && selectedLog.status < 300 ? (
+                        <CheckCircle2 className="h-5 w-5 text-foreground stroke-[2]" />
+                      ) : (
+                        <AlertCircle className="h-5 w-5 text-red-500 stroke-[2]" />
+                      )}
+                      <div>
+                        <div className="text-sm font-semibold font-sans text-foreground">
+                          HTTP {selectedLog.status} {selectedLog.status === 200 ? "OK" : "Error"}
+                        </div>
+                        <div className="text-xs text-muted-foreground font-sans">
+                          {new Date(selectedLog.createdAt).toLocaleString()}
+                        </div>
                       </div>
                     </div>
-                    <div className="p-3 rounded-xl bg-secondary/40 border border-border/60">
-                      <div className="text-xs text-muted-foreground font-sans">Speed</div>
-                      <div className="text-sm font-sans font-semibold text-foreground mt-0.5 tabular-nums">
-                        {selectedLog.tokensPerSecond ? `${selectedLog.tokensPerSecond} tok/s` : "—"}
+
+                    <div className="text-right">
+                      <div className="text-sm font-sans font-semibold text-foreground tabular-nums">
+                        {formatDuration(selectedLog.durationMs)}
                       </div>
-                    </div>
-                    <div className="p-3 rounded-xl bg-secondary/40 border border-border/60">
-                      <div className="text-xs text-muted-foreground font-sans">Total Tokens</div>
-                      <div className="text-sm font-sans font-semibold text-foreground mt-0.5 tabular-nums">
-                        {formatTokens(selectedLog.totalTokens)}
+                      <div className="text-xs font-sans text-muted-foreground">
+                        Duration
                       </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Token Accounting */}
-                <div className="space-y-2">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground font-sans">
-                    Token Accounting
-                  </span>
-                  <div className="p-4 rounded-2xl bg-secondary/20 border border-border/60 space-y-2.5 font-sans text-xs">
-                    <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground">Input / Prompt Tokens</span>
-                      <span className="font-sans font-medium text-foreground tabular-nums">{selectedLog.promptTokens}</span>
+                  {/* Performance Metrics Breakdown */}
+                  <div className="space-y-2">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground font-sans">
+                      Performance Breakdown
+                    </span>
+                    <div className="grid grid-cols-3 gap-2.5">
+                      <div className="p-3 rounded-xl bg-secondary/40 border border-border/60">
+                        <div className="text-xs text-muted-foreground font-sans">TTFT</div>
+                        <div className="text-sm font-sans font-semibold text-foreground mt-0.5 tabular-nums">
+                          {formatDuration(selectedLog.ttftMs)}
+                        </div>
+                      </div>
+                      <div className="p-3 rounded-xl bg-secondary/40 border border-border/60">
+                        <div className="text-xs text-muted-foreground font-sans">Speed</div>
+                        <div className="text-sm font-sans font-semibold text-foreground mt-0.5 tabular-nums">
+                          {selectedLog.tokensPerSecond ? `${selectedLog.tokensPerSecond} tok/s` : "—"}
+                        </div>
+                      </div>
+                      <div className="p-3 rounded-xl bg-secondary/40 border border-border/60">
+                        <div className="text-xs text-muted-foreground font-sans">Total Tokens</div>
+                        <div className="text-sm font-sans font-semibold text-foreground mt-0.5 tabular-nums">
+                          {formatTokens(selectedLog.totalTokens)}
+                        </div>
+                      </div>
                     </div>
-                    {selectedLog.cachedTokens ? (
+                  </div>
+
+                  {/* Token Accounting */}
+                  <div className="space-y-2">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground font-sans">
+                      Token Accounting
+                    </span>
+                    <div className="p-4 rounded-2xl bg-secondary/20 border border-border/60 space-y-2.5 font-sans text-xs">
                       <div className="flex justify-between items-center">
-                        <span className="text-muted-foreground">Prompt Cache Hit</span>
-                        <span className="font-sans font-medium text-foreground tabular-nums">{selectedLog.cachedTokens}</span>
+                        <span className="text-muted-foreground">Input / Prompt Tokens</span>
+                        <span className="font-sans font-medium text-foreground tabular-nums">{selectedLog.promptTokens}</span>
                       </div>
-                    ) : null}
-                    <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground">Output / Completion Tokens</span>
-                      <span className="font-sans font-medium text-foreground tabular-nums">{selectedLog.completionTokens}</span>
-                    </div>
-                    <div className="pt-2 border-t border-border/60 flex justify-between items-center font-semibold">
-                      <span className="text-foreground">Total Tokens</span>
-                      <span className="font-sans font-semibold text-foreground tabular-nums">{selectedLog.totalTokens}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Routing & Identity */}
-                <div className="space-y-2">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground font-sans">
-                    Routing &amp; Client Identity
-                  </span>
-                  <div className="p-4 rounded-2xl bg-secondary/20 border border-border/60 space-y-2.5 font-sans text-xs">
-                    <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground">Model Name</span>
-                      <span className="font-medium text-foreground">{selectedLog.model}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground">Provider</span>
-                      <span className="font-medium text-foreground">{selectedLog.provider}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground">Combo Router</span>
-                      <span className="font-medium text-foreground">{selectedLog.comboName || "Direct (None)"}</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-muted-foreground">API Key Used</span>
-                      <span className="font-medium text-foreground font-mono">{selectedLog.keyName || "Default Key"}</span>
-                    </div>
-                    {selectedLog.ip && (
+                      {selectedLog.cachedTokens ? (
+                        <div className="flex justify-between items-center">
+                          <span className="text-muted-foreground">Prompt Cache Hit</span>
+                          <span className="font-sans font-medium text-foreground tabular-nums">{selectedLog.cachedTokens}</span>
+                        </div>
+                      ) : null}
                       <div className="flex justify-between items-center">
-                        <span className="text-muted-foreground">Client IP</span>
-                        <span className="font-mono text-foreground">{selectedLog.ip}</span>
+                        <span className="text-muted-foreground">Output / Completion Tokens</span>
+                        <span className="font-sans font-medium text-foreground tabular-nums">{selectedLog.completionTokens}</span>
                       </div>
-                    )}
+                      <div className="pt-2 border-t border-border/60 flex justify-between items-center font-semibold">
+                        <span className="text-foreground">Total Tokens</span>
+                        <span className="font-sans font-semibold text-foreground tabular-nums">{selectedLog.totalTokens}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Routing & Identity */}
+                  <div className="space-y-2">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground font-sans">
+                      Routing &amp; Client Identity
+                    </span>
+                    <div className="p-4 rounded-2xl bg-secondary/20 border border-border/60 space-y-2.5 font-sans text-xs">
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground">Model Name</span>
+                        <span className="font-medium text-foreground">{selectedLog.model}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground">Provider</span>
+                        <span className="font-medium text-foreground">{selectedLog.provider}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground">Combo Router</span>
+                        <span className="font-medium text-foreground">{selectedLog.comboName || "Direct (None)"}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground">API Key Used</span>
+                        <span className="font-medium text-foreground font-mono">{selectedLog.keyName || "Default Key"}</span>
+                      </div>
+                      {selectedLog.ip && (
+                        <div className="flex justify-between items-center">
+                          <span className="text-muted-foreground">Client IP</span>
+                          <span className="font-mono text-foreground">{selectedLog.ip}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Error Banner if applicable */}
+                  {selectedLog.errorMessage && (
+                    <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/20 text-xs font-sans space-y-1">
+                      <span className="font-semibold text-red-600 dark:text-red-400">Error Message:</span>
+                      <p className="font-mono text-foreground/90">{selectedLog.errorMessage}</p>
+                    </div>
+                  )}
+
+                  {/* Raw Telemetry JSON */}
+                  <div className="space-y-2">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground font-sans">
+                      Raw Telemetry Payload
+                    </span>
+                    <pre className="p-4 rounded-2xl bg-zinc-950 text-zinc-100 font-mono text-xs overflow-x-auto leading-relaxed border border-border/60">
+                      <code>{JSON.stringify(selectedLog, null, 2)}</code>
+                    </pre>
                   </div>
                 </div>
-
-                {/* Error Banner if applicable */}
-                {selectedLog.errorMessage && (
-                  <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/20 text-xs font-sans space-y-1">
-                    <span className="font-semibold text-red-600 dark:text-red-400">Error Message:</span>
-                    <p className="font-mono text-foreground/90">{selectedLog.errorMessage}</p>
-                  </div>
-                )}
-
-                {/* Raw Telemetry JSON */}
-                <div className="space-y-2">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground font-sans">
-                    Raw Telemetry Payload
-                  </span>
-                  <pre className="p-4 rounded-2xl bg-zinc-950 text-zinc-100 font-mono text-xs overflow-x-auto leading-relaxed border border-border/60">
-                    <code>{JSON.stringify(selectedLog, null, 2)}</code>
-                  </pre>
-                </div>
-              </div>
-            </div>
-          </>
-        )}
+              </>
+            )}
+          </SheetContent>
+        </Sheet>
       </div>
     </TooltipProvider>
   );

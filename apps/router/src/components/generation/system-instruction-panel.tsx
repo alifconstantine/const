@@ -10,9 +10,12 @@ import {
   SelectValue,
   SelectContent,
   SelectItem,
+  Sheet,
+  SheetContent,
+  SheetTitle,
   cn,
 } from "@const/ui";
-import { X, Trash2 } from "lucide-react";
+import { Trash2 } from "lucide-react";
 
 interface SystemInstructionPanelProps {
   open: boolean;
@@ -77,29 +80,17 @@ export function SystemInstructionPanel({
   };
 
   return (
-    <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 z-40 bg-background/60 backdrop-blur-sm animate-in fade-in duration-200"
-        onClick={onClose}
-      />
-
-      <div className="fixed inset-y-0 right-0 z-50 w-full sm:w-[420px] bg-card border-l border-border/70 shadow-2xl flex flex-col animate-in slide-in-from-right duration-200">
+    <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
+      <SheetContent
+        side="right"
+        className="w-full sm:max-w-[420px] p-0 flex flex-col bg-card border-l border-border/70 shadow-2xl z-50 gap-0"
+      >
         {/* Header (No icon, clean typography) */}
-        <div className="p-4 sm:p-5 border-b border-border/70 flex items-center justify-between">
-          <h2 className="font-sans text-base sm:text-lg font-semibold text-foreground">
+        <div className="p-4 sm:p-5 border-b border-border/70 flex items-center justify-between pr-14">
+          <SheetTitle className="font-sans text-base sm:text-lg font-semibold text-foreground">
             System instructions
-          </h2>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onClose}
-          className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground cursor-pointer"
-          aria-label="Close panel"
-        >
-          <X className="h-4 w-4" />
-        </Button>
-      </div>
+          </SheetTitle>
+        </div>
 
       {/* Preset Selector */}
       <div className="p-4 sm:p-5 pb-3 border-b border-border/50 space-y-3">
@@ -168,7 +159,7 @@ export function SystemInstructionPanel({
           Done
         </Button>
       </div>
-    </div>
-  </>
+    </SheetContent>
+  </Sheet>
 );
 }

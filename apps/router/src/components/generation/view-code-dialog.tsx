@@ -7,9 +7,12 @@ import {
   TabsList,
   TabsTrigger,
   TabsContent,
+  Sheet,
+  SheetContent,
+  SheetTitle,
   toast,
 } from "@const/ui";
-import { Copy, Check, Code2, X } from "lucide-react";
+import { Copy, Check, Code2 } from "lucide-react";
 import { type ChatMessage } from "./chat-message-item";
 
 interface ViewCodeDialogProps {
@@ -139,25 +142,21 @@ main().catch(console.error);
   if (!open) return null;
 
   return (
-    <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 z-40 bg-background/60 backdrop-blur-sm animate-in fade-in duration-200"
-        onClick={handleClose}
-      />
-
-      {/* Right Slide-Over Panel */}
-      <div className="fixed inset-y-0 right-0 z-50 w-full sm:w-[520px] md:w-[620px] bg-card border-l border-border/70 shadow-2xl flex flex-col animate-in slide-in-from-right duration-200">
+    <Sheet open={open} onOpenChange={(v) => !v && handleClose()}>
+      <SheetContent
+        side="right"
+        className="w-full sm:max-w-[520px] md:max-w-[620px] p-0 flex flex-col bg-card border-l border-border/70 shadow-2xl z-50 gap-0"
+      >
         {/* Header */}
-        <div className="p-4 sm:p-5 border-b border-border/60 flex items-center justify-between shrink-0">
+        <div className="p-4 sm:p-5 border-b border-border/60 flex items-center justify-between shrink-0 pr-14">
           <div className="flex items-center gap-2.5">
             <div className="h-8 w-8 rounded-xl bg-secondary flex items-center justify-center border border-border/70 text-foreground shrink-0">
               <Code2 className="h-4 w-4" />
             </div>
             <div>
-              <h2 className="font-sans text-base sm:text-lg font-semibold text-foreground">
+              <SheetTitle className="font-sans text-base sm:text-lg font-semibold text-foreground">
                 Get code
-              </h2>
+              </SheetTitle>
               <p className="text-xs text-muted-foreground font-normal">
                 Ready-to-use client snippets with OpenAI SDK compatibility.
               </p>
@@ -169,19 +168,10 @@ main().catch(console.error);
               size="sm"
               variant="outline"
               onClick={handleCopy}
-              className="h-8 rounded-full text-xs font-medium gap-1.5 border-border/70 cursor-pointer hover:bg-secondary"
+              className="h-8 rounded-full text-xs font-medium gap-1.5 border-border/70 cursor-pointer hover:bg-secondary mr-2"
             >
               {copied ? <Check className="h-3.5 w-3.5 text-foreground" /> : <Copy className="h-3.5 w-3.5" />}
               <span>{copied ? "Copied" : "Copy code"}</span>
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleClose}
-              className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground cursor-pointer"
-              aria-label="Close panel"
-            >
-              <X className="h-4 w-4" />
             </Button>
           </div>
         </div>
@@ -231,7 +221,7 @@ main().catch(console.error);
             </TabsContent>
           </div>
         </Tabs>
-      </div>
-    </>
+      </SheetContent>
+    </Sheet>
   );
 }
