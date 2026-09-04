@@ -9,10 +9,11 @@ import {
   TabsContent,
   Sheet,
   SheetContent,
+  SheetClose,
   SheetTitle,
   toast,
 } from "@const/ui";
-import { Copy, Check, Code2 } from "lucide-react";
+import { Copy, Check, Code2, X } from "lucide-react";
 import { type ChatMessage } from "./chat-message-item";
 
 interface ViewCodeDialogProps {
@@ -145,10 +146,11 @@ main().catch(console.error);
     <Sheet open={open} onOpenChange={(v) => !v && handleClose()}>
       <SheetContent
         side="right"
+        showCloseButton={false}
         className="w-full sm:max-w-[520px] md:max-w-[620px] p-0 flex flex-col bg-card border-l border-border/70 shadow-2xl z-50 gap-0"
       >
         {/* Header */}
-        <div className="p-4 sm:p-5 border-b border-border/60 flex items-center justify-between shrink-0 pr-14">
+        <div className="p-4 sm:p-5 border-b border-border/60 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="h-8 w-8 rounded-xl bg-secondary flex items-center justify-center border border-border/70 text-foreground shrink-0">
               <Code2 className="h-4 w-4" />
@@ -163,16 +165,26 @@ main().catch(console.error);
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             <Button
               size="sm"
               variant="outline"
               onClick={handleCopy}
-              className="h-8 rounded-full text-xs font-medium gap-1.5 border-border/70 cursor-pointer hover:bg-secondary mr-2"
+              className="h-8 rounded-full text-xs font-medium gap-1.5 border-border/70 cursor-pointer hover:bg-secondary"
             >
               {copied ? <Check className="h-3.5 w-3.5 text-foreground" /> : <Copy className="h-3.5 w-3.5" />}
               <span>{copied ? "Copied" : "Copy code"}</span>
             </Button>
+            <SheetClose asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer"
+                aria-label="Close code panel"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </SheetClose>
           </div>
         </div>
 

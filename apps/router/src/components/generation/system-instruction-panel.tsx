@@ -12,10 +12,11 @@ import {
   SelectItem,
   Sheet,
   SheetContent,
+  SheetClose,
   SheetTitle,
   cn,
 } from "@const/ui";
-import { Trash2 } from "lucide-react";
+import { Trash2, X } from "lucide-react";
 
 interface SystemInstructionPanelProps {
   open: boolean;
@@ -83,13 +84,24 @@ export function SystemInstructionPanel({
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
       <SheetContent
         side="right"
+        showCloseButton={false}
         className="w-full sm:max-w-[420px] p-0 flex flex-col bg-card border-l border-border/70 shadow-2xl z-50 gap-0"
       >
         {/* Header (No icon, clean typography) */}
-        <div className="p-4 sm:p-5 border-b border-border/70 flex items-center justify-between pr-14">
+        <div className="p-4 sm:p-5 border-b border-border/70 flex items-center justify-between">
           <SheetTitle className="font-sans text-base sm:text-lg font-semibold text-foreground">
             System instructions
           </SheetTitle>
+          <SheetClose asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer"
+              aria-label="Close panel"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </SheetClose>
         </div>
 
       {/* Preset Selector */}

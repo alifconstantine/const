@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { Button, Input, cn, Sheet, SheetContent, SheetTitle } from "@const/ui";
+import { Button, Input, cn, Sheet, SheetContent, SheetClose, SheetTitle } from "@const/ui";
 import { X, Search, History, MessageSquare, Trash2 } from "lucide-react";
 
 export interface ChatSessionMeta {
@@ -87,16 +87,27 @@ export function HistoryPanel({
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
       <SheetContent
         side="right"
+        showCloseButton={false}
         className="w-full sm:max-w-[420px] p-0 flex flex-col bg-card border-l border-border/70 shadow-2xl z-50 gap-0"
       >
         {/* Header */}
-        <div className="p-4 sm:p-5 border-b border-border/60 flex items-center justify-between pr-14">
+        <div className="p-4 sm:p-5 border-b border-border/60 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <History className="h-4 w-4 text-foreground" />
             <SheetTitle className="font-sans text-base sm:text-lg font-semibold text-foreground">
               Chat history
             </SheetTitle>
           </div>
+          <SheetClose asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer"
+              aria-label="Close history panel"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </SheetClose>
         </div>
 
         {/* Search Bar */}
