@@ -12,6 +12,8 @@
     "@const/backend": "workspace:*",
     "@const/ui": "workspace:*",
     "convex": "^1.45.0",
+    "dexie": "^4.4.5",
+    "dexie-react-hooks": "^4.4.0",
     "lucide-react": "^1.16.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"

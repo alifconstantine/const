@@ -4,7 +4,11 @@ import * as React from "react";
 import { ThemeProvider as NextThemesProvider } from "next-themes";
 
 // React 19 + Next.js 16 false-positive warning suppression for next-themes FOUC script
-if (typeof window !== "undefined" && process.env.NODE_ENV === "development") {
+if (
+  typeof window !== "undefined" &&
+  typeof process !== "undefined" &&
+  process.env?.NODE_ENV === "development"
+) {
   const origError = console.error;
   console.error = (...args: unknown[]) => {
     if (

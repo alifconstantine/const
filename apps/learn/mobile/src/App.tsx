@@ -5,6 +5,7 @@ import { useQuery } from "convex/react";
 import { api } from "@const/backend/_generated/api";
 import { ConvexClientProvider } from "./components/convex-provider";
 import { Navbar } from "./components/navbar";
+import { LearnHome } from "./components/home/learn-home";
 
 function AuthenticatedContent({
   onSignOut,
@@ -22,7 +23,7 @@ function AuthenticatedContent({
         onSignOut={onSignOut}
         onSwitchAccount={onSwitchAccount}
       />
-      <main className="flex-1 w-full bg-background" />
+      <LearnHome />
     </div>
   );
 }

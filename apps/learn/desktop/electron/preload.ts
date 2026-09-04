@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from "electron";
 
+// Bridge Electron APIs to the Renderer window
 contextBridge.exposeInMainWorld("electron", {
   platform: process.platform,
   versions: {

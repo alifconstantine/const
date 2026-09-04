@@ -11,9 +11,13 @@
 import type * as auth from "../auth.js";
 import type * as auth_queries from "../auth/queries.js";
 import type * as http from "../http.js";
+import type * as learn_artifacts from "../learn/artifacts.js";
+import type * as learn_collections from "../learn/collections.js";
+import type * as learn_learns from "../learn/learns.js";
 import type * as rateLimits from "../rateLimits.js";
 import type * as router_keys from "../router/keys.js";
 import type * as schema_auth from "../schema/auth.js";
+import type * as schema_learn from "../schema/learn.js";
 import type * as schema_router from "../schema/router.js";
 import type * as schema_shared from "../schema/shared.js";
 import type * as shared_rateLimits from "../shared/rateLimits.js";
@@ -30,9 +34,13 @@ declare const fullApi: ApiFromModules<{
   auth: typeof auth;
   "auth/queries": typeof auth_queries;
   http: typeof http;
+  "learn/artifacts": typeof learn_artifacts;
+  "learn/collections": typeof learn_collections;
+  "learn/learns": typeof learn_learns;
   rateLimits: typeof rateLimits;
   "router/keys": typeof router_keys;
   "schema/auth": typeof schema_auth;
+  "schema/learn": typeof schema_learn;
   "schema/router": typeof schema_router;
   "schema/shared": typeof schema_shared;
   "shared/rateLimits": typeof shared_rateLimits;
