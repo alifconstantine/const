@@ -98,185 +98,205 @@ export async function POST(req: NextRequest) {
     };
 
     // ========================================================
-    // CASE A: Const Engine (Built-in Managed Gemini 3.6 Flash)
+    // COMBO DETECTION & RESOLUTION
     // ========================================================
-    const isConstBuiltin =
-      (model === "gemini-3.6-flash" || model.startsWith("antigravity/")) && !providerDocId;
+    const isCombo =
+      model.startsWith("combo/") ||
+      model === "auto" ||
+      model === "fast" ||
+      model === "coding";
 
-    if (isConstBuiltin) {
-      telemetryMeta.provider = "Google AI";
-
-      const constBaseUrl = (process.env.CONST_ENGINE_BASE_URL?.trim() || "https://engine.const.web.id").replace(/\/+$/, "");
-      const constEngineKey = process.env.CONST_ENGINE_API_KEY?.trim() || "";
-
-      let targetModel = "antigravity/gemini-3.6-flash-medium";
-      if (model === "gemini-3.6-flash") {
-        if (reasoning_effort === "low") {
-          targetModel = "antigravity/gemini-3.6-flash-low";
-        } else if (reasoning_effort === "high") {
-          targetModel = "antigravity/gemini-3.6-flash-high";
-        } else {
-          targetModel = "antigravity/gemini-3.6-flash-medium";
-        }
-      } else {
-        targetModel = model;
+    if (isCombo && convexUrl) {
+      const comboSlug = model.replace(/^combo\//, "");
+      const client = new ConvexHttpClient(convexUrl);
+      if (ssoToken) {
+        client.setAuth(ssoToken);
       }
 
-      const headers: Record<string, string> = {
-        "Content-Type": "application/json",
-      };
-      if (constEngineKey) {
-        headers["Authorization"] = `Bearer ${constEngineKey}`;
-      } else if (providedKey && !providedKey.includes("...")) {
-        headers["Authorization"] = `Bearer ${providedKey}`;
-      }
-
-      const response = await fetch(`${constBaseUrl}/v1/chat/completions`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
-          model: targetModel,
-          messages,
-          temperature,
-          stream,
-        }),
+      const combo = await client.query(api.router.combos.resolveComboForExecution, {
+        slug: comboSlug,
       });
 
-      if (!response.ok) {
-        const errText = await response.text();
-        let errMsg = `Const Engine error (${response.status})`;
-        try {
-          const p = JSON.parse(errText);
-          if (p?.error?.message) errMsg = p.error.message;
-        } catch {}
+      if (combo && combo.models.length > 0) {
+        telemetryMeta.comboId = combo.slug;
+        telemetryMeta.comboName = `combo/${combo.slug}`;
 
-        await recordDirectTelemetry(telemetryMeta, {
-          status: response.status,
-          durationMs: Math.round(performance.now() - reqStartTime),
-          errorMessage: errMsg,
-        });
-
-        return NextResponse.json({ error: { message: errMsg } }, { status: response.status });
-      }
-
-      if (stream) {
-        if (!response.body) {
-          return NextResponse.json({ error: { message: "No response stream." } }, { status: 502 });
+        // Inject combo system message if provided and caller didn't supply one
+        let effectiveMessages = [...messages];
+        if (combo.systemMessage && !effectiveMessages.some((m) => m.role === "system")) {
+          effectiveMessages.unshift({
+            role: "system",
+            content: combo.systemMessage,
+          });
         }
 
-        const { stream: teleStream } = createTelemetryStream(response.body, telemetryMeta);
+        const sortedTargets = [...combo.models].sort((a, b) => a.priority - b.priority);
 
-        return new Response(teleStream, {
-          headers: {
-            "Content-Type": "text/event-stream; charset=utf-8",
-            "Cache-Control": "no-cache, no-transform",
-            Connection: "keep-alive",
-            "X-Const-Request-Id": requestId,
+        let lastErrorResponse: Response | null = null;
+        for (let i = 0; i < sortedTargets.length; i++) {
+          const target = sortedTargets[i];
+          if (!target) continue;
+
+          // Clone telemetry metadata for this specific target attempt
+          const targetTelemetryMeta: TelemetryMetadata = {
+            ...telemetryMeta,
+            model: target.modelId,
+            provider: target.providerName,
+          };
+
+          try {
+            const targetRes = await dispatchSingleModel({
+              targetModel: target.modelId,
+              providerDocId: target.providerId !== "const" && target.providerId.startsWith("k_") ? target.providerId : undefined,
+              messages: effectiveMessages,
+              temperature,
+              stream,
+              reasoning_effort,
+              providedKey,
+              ssoToken,
+              convexUrl,
+              telemetryMeta: targetTelemetryMeta,
+              requestId,
+              reqStartTime,
+            });
+
+            if (targetRes.ok) {
+              return targetRes;
+            }
+
+            // Retry on Rate Limit (429) or Server Outage (5xx)
+            if (targetRes.status === 429 || targetRes.status >= 500) {
+              console.warn(
+                `[Const Router Combo Fallback] Model '${target.modelId}' (${target.providerName}) returned HTTP ${targetRes.status}. Retrying next priority model...`
+              );
+              lastErrorResponse = targetRes;
+              continue;
+            }
+
+            // If it's a client bad request (400), don't retry, return immediately
+            return targetRes;
+          } catch (targetErr) {
+            console.error(`[Const Router Combo Error] Execution for ${target.modelId} threw:`, targetErr);
+            continue;
+          }
+        }
+
+        if (lastErrorResponse) {
+          return lastErrorResponse;
+        }
+
+        return NextResponse.json(
+          {
+            error: {
+              message: `All models in combo '${combo.name}' failed to respond.`,
+              code: "combo_exhausted",
+            },
           },
-        });
-      } else {
-        const data = await response.json();
-        const durationMs = Math.round(performance.now() - reqStartTime);
-
-        await recordDirectTelemetry(telemetryMeta, {
-          status: 200,
-          durationMs,
-          promptTokens: data.usage?.prompt_tokens,
-          completionTokens: data.usage?.completion_tokens,
-          cachedTokens: data.usage?.prompt_tokens_details?.cached_tokens,
-        });
-
-        return NextResponse.json(data, {
-          headers: {
-            "X-Const-Request-Id": requestId,
-          },
-        });
+          { status: 502 }
+        );
       }
     }
 
-    // ========================================================
-    // CASE B: User BYOK Provider (OpenRouter, DeepSeek, Groq, Custom)
-    // ========================================================
-    if (!convexUrl) {
-      return NextResponse.json(
-        { error: { message: "Convex backend not configured." } },
-        { status: 500 }
-      );
-    }
-
-    const client = new ConvexHttpClient(convexUrl);
-    if (ssoToken) {
-      client.setAuth(ssoToken);
-    }
-
-    const creds = await client.query(api.router.providers.getProviderCredentials, {
-      providerDocId: providerDocId ? (providerDocId as Id<"userProviders">) : undefined,
-      modelId: model,
-      rawApiKey: providedKey || undefined,
-    });
-
-    if (!creds) {
-      await recordDirectTelemetry(telemetryMeta, {
-        status: 404,
-        durationMs: Math.round(performance.now() - reqStartTime),
-        errorMessage: `No active provider found for model '${model}'.`,
-      });
-
-      return NextResponse.json(
-        { error: { message: `No active provider found for model '${model}'.` } },
-        { status: 404 }
-      );
-    }
-
-    telemetryMeta.provider = creds.name || creds.providerId;
-
-    const activeKey = creds.apiKey || "";
-    const activeBaseUrl = (creds.baseUrl || "https://api.openai.com").replace(/\/+$/, "");
-
-    let endpoint = activeBaseUrl;
-    if (endpoint.endsWith("/chat/completions")) {
-      // already full endpoint
-    } else if (endpoint.endsWith("/v1")) {
-      endpoint = `${endpoint}/chat/completions`;
-    } else {
-      endpoint = `${endpoint}/v1/chat/completions`;
-    }
-
-    const upstreamHeaders: Record<string, string> = {
-      "Content-Type": "application/json",
-    };
-    if (activeKey && activeKey !== "no-key-required") {
-      upstreamHeaders["Authorization"] = `Bearer ${activeKey}`;
-    }
-    if (creds.providerId === "openrouter" || activeBaseUrl.includes("openrouter.ai")) {
-      upstreamHeaders["HTTP-Referer"] = "https://router.const.web.id";
-      upstreamHeaders["X-Title"] = "Const Router";
-    }
-
-    const payload: Record<string, unknown> = {
-      model,
+    // Standard non-combo model execution
+    return await dispatchSingleModel({
+      targetModel: model,
+      providerDocId,
       messages,
       temperature,
       stream,
-    };
-    if (reasoning_effort && reasoning_effort !== "off") {
-      payload.reasoning_effort = reasoning_effort;
+      reasoning_effort,
+      providedKey,
+      ssoToken,
+      convexUrl,
+      telemetryMeta,
+      requestId,
+      reqStartTime,
+    });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : "Internal server error";
+    return NextResponse.json({ error: { message: msg } }, { status: 500 });
+  }
+}
+
+async function dispatchSingleModel({
+  targetModel,
+  providerDocId,
+  messages,
+  temperature,
+  stream,
+  reasoning_effort,
+  providedKey,
+  ssoToken,
+  convexUrl,
+  telemetryMeta,
+  requestId,
+  reqStartTime,
+}: {
+  targetModel: string;
+  providerDocId?: string;
+  messages: OpenAIMessage[];
+  temperature: number;
+  stream: boolean;
+  reasoning_effort?: "off" | "low" | "medium" | "high";
+  providedKey?: string;
+  ssoToken?: string | null;
+  convexUrl: string;
+  telemetryMeta: TelemetryMetadata;
+  requestId: string;
+  reqStartTime: number;
+}): Promise<Response> {
+  // CASE A: Const Engine (Built-in Managed Gemini 3.6 Flash)
+  const isConstBuiltin =
+    (targetModel === "gemini-3.6-flash" || targetModel.startsWith("antigravity/")) &&
+    !providerDocId;
+
+  if (isConstBuiltin) {
+    telemetryMeta.provider = "Google AI";
+
+    const constBaseUrl = (
+      process.env.CONST_ENGINE_BASE_URL?.trim() || "https://engine.const.web.id"
+    ).replace(/\/+$/, "");
+    const constEngineKey = process.env.CONST_ENGINE_API_KEY?.trim() || "";
+
+    let resolvedModel = "antigravity/gemini-3.6-flash-medium";
+    if (targetModel === "gemini-3.6-flash") {
+      if (reasoning_effort === "low") {
+        resolvedModel = "antigravity/gemini-3.6-flash-low";
+      } else if (reasoning_effort === "high") {
+        resolvedModel = "antigravity/gemini-3.6-flash-high";
+      } else {
+        resolvedModel = "antigravity/gemini-3.6-flash-medium";
+      }
+    } else {
+      resolvedModel = targetModel;
     }
 
-    const response = await fetch(endpoint, {
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (constEngineKey) {
+      headers["Authorization"] = `Bearer ${constEngineKey}`;
+    } else if (providedKey && !providedKey.includes("...")) {
+      headers["Authorization"] = `Bearer ${providedKey}`;
+    }
+
+    const response = await fetch(`${constBaseUrl}/v1/chat/completions`, {
       method: "POST",
-      headers: upstreamHeaders,
-      body: JSON.stringify(payload),
+      headers,
+      body: JSON.stringify({
+        model: resolvedModel,
+        messages,
+        temperature,
+        stream,
+      }),
     });
 
     if (!response.ok) {
       const errText = await response.text();
-      let errMsg = `Provider error (${response.status}): ${response.statusText}`;
+      let errMsg = `Const Engine error (${response.status})`;
       try {
         const p = JSON.parse(errText);
         if (p?.error?.message) errMsg = p.error.message;
-        else if (typeof p?.error === "string") errMsg = p.error;
-        else if (p?.message) errMsg = p.message;
       } catch {}
 
       await recordDirectTelemetry(telemetryMeta, {
@@ -290,7 +310,7 @@ export async function POST(req: NextRequest) {
 
     if (stream) {
       if (!response.body) {
-        return NextResponse.json({ error: { message: "No response stream from provider." } }, { status: 502 });
+        return NextResponse.json({ error: { message: "No response stream." } }, { status: 502 });
       }
 
       const { stream: teleStream } = createTelemetryStream(response.body, telemetryMeta);
@@ -321,8 +341,134 @@ export async function POST(req: NextRequest) {
         },
       });
     }
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : "Internal server error";
-    return NextResponse.json({ error: { message: msg } }, { status: 500 });
+  }
+
+  // CASE B: User BYOK Provider (OpenRouter, DeepSeek, Groq, Custom)
+  if (!convexUrl) {
+    return NextResponse.json(
+      { error: { message: "Convex backend not configured." } },
+      { status: 500 }
+    );
+  }
+
+  const client = new ConvexHttpClient(convexUrl);
+  if (ssoToken) {
+    client.setAuth(ssoToken);
+  }
+
+  const creds = await client.query(api.router.providers.getProviderCredentials, {
+    providerDocId: providerDocId ? (providerDocId as Id<"userProviders">) : undefined,
+    modelId: targetModel,
+    rawApiKey: providedKey || undefined,
+  });
+
+  if (!creds) {
+    await recordDirectTelemetry(telemetryMeta, {
+      status: 404,
+      durationMs: Math.round(performance.now() - reqStartTime),
+      errorMessage: `No active provider found for model '${targetModel}'.`,
+    });
+
+    return NextResponse.json(
+      { error: { message: `No active provider found for model '${targetModel}'.` } },
+      { status: 404 }
+    );
+  }
+
+  telemetryMeta.provider = creds.name || creds.providerId;
+
+  const activeKey = creds.apiKey || "";
+  const activeBaseUrl = (creds.baseUrl || "https://api.openai.com").replace(/\/+$/, "");
+
+  let endpoint = activeBaseUrl;
+  if (endpoint.endsWith("/chat/completions")) {
+    // already full endpoint
+  } else if (endpoint.endsWith("/v1")) {
+    endpoint = `${endpoint}/chat/completions`;
+  } else {
+    endpoint = `${endpoint}/v1/chat/completions`;
+  }
+
+  const upstreamHeaders: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (activeKey && activeKey !== "no-key-required") {
+    upstreamHeaders["Authorization"] = `Bearer ${activeKey}`;
+  }
+  if (creds.providerId === "openrouter" || activeBaseUrl.includes("openrouter.ai")) {
+    upstreamHeaders["HTTP-Referer"] = "https://router.const.web.id";
+    upstreamHeaders["X-Title"] = "Const Router";
+  }
+
+  const payload: Record<string, unknown> = {
+    model: targetModel,
+    messages,
+    temperature,
+    stream,
+  };
+  if (reasoning_effort && reasoning_effort !== "off") {
+    payload.reasoning_effort = reasoning_effort;
+  }
+
+  const response = await fetch(endpoint, {
+    method: "POST",
+    headers: upstreamHeaders,
+    body: JSON.stringify(payload),
+  });
+
+  if (!response.ok) {
+    const errText = await response.text();
+    let errMsg = `Provider error (${response.status}): ${response.statusText}`;
+    try {
+      const p = JSON.parse(errText);
+      if (p?.error?.message) errMsg = p.error.message;
+      else if (typeof p?.error === "string") errMsg = p.error;
+      else if (p?.message) errMsg = p.message;
+    } catch {}
+
+    await recordDirectTelemetry(telemetryMeta, {
+      status: response.status,
+      durationMs: Math.round(performance.now() - reqStartTime),
+      errorMessage: errMsg,
+    });
+
+    return NextResponse.json({ error: { message: errMsg } }, { status: response.status });
+  }
+
+  if (stream) {
+    if (!response.body) {
+      return NextResponse.json(
+        { error: { message: "No response stream from provider." } },
+        { status: 502 }
+      );
+    }
+
+    const { stream: teleStream } = createTelemetryStream(response.body, telemetryMeta);
+
+    return new Response(teleStream, {
+      headers: {
+        "Content-Type": "text/event-stream; charset=utf-8",
+        "Cache-Control": "no-cache, no-transform",
+        Connection: "keep-alive",
+        "X-Const-Request-Id": requestId,
+      },
+    });
+  } else {
+    const data = await response.json();
+    const durationMs = Math.round(performance.now() - reqStartTime);
+
+    await recordDirectTelemetry(telemetryMeta, {
+      status: 200,
+      durationMs,
+      promptTokens: data.usage?.prompt_tokens,
+      completionTokens: data.usage?.completion_tokens,
+      cachedTokens: data.usage?.prompt_tokens_details?.cached_tokens,
+    });
+
+    return NextResponse.json(data, {
+      headers: {
+        "X-Const-Request-Id": requestId,
+      },
+    });
   }
 }

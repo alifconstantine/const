@@ -114,4 +114,34 @@ export const routerTables = {
     .index("by_user_created", ["userId", "createdAt"])
     .index("by_user_model", ["userId", "model"])
     .index("by_request_id", ["requestId"]),
+
+  // 5. Virtual Combos (Model Chains, Dynamic Fallbacks & Load Balancing)
+  routerCombos: defineTable({
+    userId: v.id("users"),
+    name: v.string(), // e.g. "My Coding Combo", callers use "combo/my-coding-combo" or "my-coding-combo"
+    slug: v.string(), // slugified e.g. "my-coding-combo"
+    description: v.optional(v.string()),
+    systemMessage: v.optional(v.string()),
+    contextLength: v.number(), // default 262144 (256K)
+    strategy: v.union(
+      v.literal("priority"),
+      v.literal("round-robin"),
+      v.literal("random")
+    ),
+    models: v.array(
+      v.object({
+        modelId: v.string(),
+        providerId: v.string(),
+        providerName: v.string(),
+        priority: v.number(), // 1 for primary, 2 for fallback, etc.
+        weight: v.optional(v.number()),
+      })
+    ),
+    status: v.union(v.literal("active"), v.literal("disabled")),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_slug", ["userId", "slug"]),
 };
+

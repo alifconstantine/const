@@ -16,6 +16,7 @@ import type * as learn_collections from "../learn/collections.js";
 import type * as learn_learns from "../learn/learns.js";
 import type * as rateLimits from "../rateLimits.js";
 import type * as router_chats from "../router/chats.js";
+import type * as router_combos from "../router/combos.js";
 import type * as router_crypto from "../router/crypto.js";
 import type * as router_keys from "../router/keys.js";
 import type * as router_logs from "../router/logs.js";
@@ -43,6 +44,7 @@ declare const fullApi: ApiFromModules<{
   "learn/learns": typeof learn_learns;
   rateLimits: typeof rateLimits;
   "router/chats": typeof router_chats;
+  "router/combos": typeof router_combos;
   "router/crypto": typeof router_crypto;
   "router/keys": typeof router_keys;
   "router/logs": typeof router_logs;
