@@ -32,7 +32,6 @@ import {
   TooltipTrigger,
   TooltipContent,
   TooltipProvider,
-  ConstLogoIcon,
   toast,
 } from "@const/ui";
 import {
@@ -41,7 +40,6 @@ import {
   Check,
   Zap,
   Box,
-  Cpu,
   Plus,
   Loader2,
   Pencil,
@@ -344,15 +342,12 @@ export default function ModelsPage() {
                 setSelectedProvider(val);
               }}
             >
-              <SelectTrigger className="h-10 min-w-[170px] rounded-xl bg-secondary/50 border-border text-xs font-sans text-foreground">
-                <div className="flex items-center gap-2">
-                  <Cpu className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                  <SelectValue placeholder="Select Provider" />
-                </div>
+              <SelectTrigger className="h-10 min-w-[140px] rounded-xl bg-secondary/50 border-border text-xs font-sans text-foreground">
+                <SelectValue placeholder="Select Provider" />
               </SelectTrigger>
               <SelectContent className="rounded-xl border-border bg-popover text-xs font-sans">
                 <SelectItem value="all" className="cursor-pointer">
-                  All Providers ({allProviders.length})
+                  All
                 </SelectItem>
                 {allProviders.map((p) => (
                   <SelectItem key={p.id} value={p.id} className="cursor-pointer">
@@ -403,10 +398,9 @@ export default function ModelsPage() {
                 key={provider.id}
                 className="rounded-2xl border border-border/80 bg-card overflow-hidden shadow-none transition-all"
               >
-                {/* Provider Header: Const Logo + Provider Name (no internal endpoints or badges) */}
+                {/* Provider Header: Provider Name */}
                 <div className="px-6 py-3.5 bg-secondary/40 border-b border-border/70 flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
-                    <ConstLogoIcon size="xs" className="w-5 h-5 text-foreground" />
                     <span className="text-sm font-semibold text-foreground font-sans">
                       {provider.name}
                     </span>
@@ -502,12 +496,12 @@ export default function ModelsPage() {
                                 </span>
                               )}
                               {model.inputTypes?.includes("image") && (
-                                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-md bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400">
+                                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-md bg-secondary border border-border text-foreground">
                                   Image
                                 </span>
                               )}
                               {model.inputTypes?.includes("video") && (
-                                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-md bg-purple-500/10 border border-purple-500/20 text-purple-600 dark:text-purple-400">
+                                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-md bg-secondary border border-border text-foreground">
                                   Video
                                 </span>
                               )}

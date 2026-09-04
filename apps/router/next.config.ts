@@ -15,6 +15,14 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  async rewrites() {
+    return [
+      {
+        source: "/api/v1/chat/completions",
+        destination: "/v1/chat/completions",
+      },
+    ];
+  },
 };
 
 export default nextConfig;

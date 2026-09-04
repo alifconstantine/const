@@ -50,4 +50,39 @@ export const routerTables = {
   })
     .index("by_user", ["userId"])
     .index("by_user_provider", ["userId", "providerId"]),
+
+  // 3. Playground Generation Chat Sessions & History
+  routerChats: defineTable({
+    userId: v.id("users"),
+    title: v.string(),
+    modelId: v.string(),
+    providerId: v.string(),
+    systemInstruction: v.optional(v.string()),
+    temperature: v.number(),
+    thinkingLevel: v.optional(v.string()),
+    messages: v.array(
+      v.object({
+        id: v.string(),
+        role: v.union(v.literal("user"), v.literal("assistant"), v.literal("system")),
+        content: v.string(),
+        thinkingContent: v.optional(v.string()),
+        attachments: v.optional(
+          v.array(
+            v.object({
+              name: v.string(),
+              type: v.string(),
+              size: v.number(),
+              url: v.optional(v.string()),
+              dataUrl: v.optional(v.string()),
+            })
+          )
+        ),
+        createdAt: v.number(),
+      })
+    ),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_updated", ["userId", "updatedAt"]),
 };

@@ -19,8 +19,8 @@
     --secondary-foreground: 0 0% 8%;
     --muted: 0 0% 94.1%;                 /* Field Tint #f0f0f0 */
     --muted-foreground: 0 0% 43.9%;      /* Text Muted #707070 */
-    --accent: 216 100% 50%;              /* Electric Blue Accent #0066ff */
-    --accent-foreground: 0 0% 100%;
+    --accent: 0 0% 93%;                  /* Soft Neutral Hover Tint */
+    --accent-foreground: 0 0% 8%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
     --border: 0 0% 87.8%;                /* Hairline #e0e0e0 */
@@ -34,7 +34,7 @@
     --sidebar-accent: 0 0% 95.3%;
     --sidebar-accent-foreground: 0 0% 8%;
     --sidebar-border: 0 0% 87.8%;
-    --sidebar-ring: 216 100% 50%;
+    --sidebar-ring: 0 0% 8%;
   }
 
   .dark {
@@ -51,8 +51,8 @@
     --secondary-foreground: 0 0% 98%;
     --muted: 0 0% 13%;                   /* #212121 Field Tint */
     --muted-foreground: 0 0% 64%;        /* #a3a3a3 */
-    --accent: 216 100% 50%;              /* Electric Blue Accent #0066ff */
-    --accent-foreground: 0 0% 100%;
+    --accent: 0 0% 16%;                  /* Soft Neutral Dark Hover Tint */
+    --accent-foreground: 0 0% 98%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
     --border: 0 0% 16.5%;                /* #2a2a2a Hairline */
@@ -60,12 +60,12 @@
     --ring: 0 0% 80%;
     --sidebar-background: 0 0% 8%;
     --sidebar-foreground: 0 0% 98%;
-    --sidebar-primary: 216 100% 50%;
-    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-primary: 0 0% 98%;
+    --sidebar-primary-foreground: 0 0% 8%;
     --sidebar-accent: 0 0% 14.5%;
     --sidebar-accent-foreground: 0 0% 98%;
     --sidebar-border: 0 0% 16.5%;
-    --sidebar-ring: 216 100% 50%;
+    --sidebar-ring: 0 0% 80%;
   }
 }
 

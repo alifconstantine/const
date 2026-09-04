@@ -247,17 +247,68 @@ export const getDecryptedProviderKey = internalQuery({
 // 7. Safe authenticated query for server-side testing & proxy routing
 export const getProviderCredentials = query({
   args: {
-    providerDocId: v.id("userProviders"),
+    providerDocId: v.optional(v.id("userProviders")),
+    modelId: v.optional(v.string()),
+    rawApiKey: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    const userId = await getAuthUserId(ctx);
-    if (!userId) {
-      throw new Error("Unauthorized: Please sign in.");
+    let userId = await getAuthUserId(ctx);
+
+    // If no direct user session, allow authentication via valid Const API key (sk-const-live-xxxx)
+    if (!userId && args.rawApiKey && args.rawApiKey.startsWith("sk-const-live-")) {
+      const encoder = new TextEncoder();
+      const data = encoder.encode(args.rawApiKey.trim());
+      const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+      const keyHash = Array.from(new Uint8Array(hashBuffer))
+        .map((b) => b.toString(16).padStart(2, "0"))
+        .join("");
+
+      const keyDoc = await ctx.db
+        .query("apiKeys")
+        .withIndex("by_key_hash", (q) => q.eq("keyHash", keyHash))
+        .unique();
+
+      if (keyDoc && keyDoc.status === "active") {
+        userId = keyDoc.userId;
+      }
     }
 
-    const provider = await ctx.db.get(args.providerDocId);
+    if (!userId) {
+      throw new Error("Unauthorized: Please sign in or provide a valid API key.");
+    }
+
+    let provider = null;
+    if (args.providerDocId) {
+      provider = await ctx.db.get(args.providerDocId);
+    } else if (args.modelId) {
+      // Find active provider that offers this model
+      const userProviders = await ctx.db
+        .query("userProviders")
+        .withIndex("by_user", (q) => q.eq("userId", userId))
+        .collect();
+
+      for (const p of userProviders) {
+        if (p.status !== "active") continue;
+        const found = p.importedModels?.find(
+          (m) =>
+            m.enabled &&
+            (m.modelId === args.modelId ||
+              `${p.providerId}/${m.modelId}` === args.modelId ||
+              m.name === args.modelId)
+        );
+        if (found) {
+          provider = p;
+          break;
+        }
+      }
+    }
+
     if (!provider || provider.userId !== userId) {
-      throw new Error("Provider not found or unauthorized access.");
+      throw new Error(
+        args.modelId
+          ? `No active provider found for model '${args.modelId}'. Please connect a provider in /providers.`
+          : "Provider not found or unauthorized access."
+      );
     }
 
     if (provider.status !== "active") {

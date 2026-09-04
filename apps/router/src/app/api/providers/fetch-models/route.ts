@@ -5,6 +5,9 @@ import {
   DEFAULT_MAX_OUTPUT,
   DEFAULT_INPUT_TYPES,
   DEFAULT_OUTPUT_TYPES,
+  isReasoningModel,
+  hasFixedThinking,
+  isNonGenerativeModel,
 } from "@/lib/model-specs";
 
 export interface ModelDescriptor {
@@ -14,7 +17,14 @@ export interface ModelDescriptor {
   maxOutputTokens?: string;
   inputTypes?: string[];
   outputTypes?: string[];
+  capabilities?: string[];
   enabled: boolean;
+}
+
+function determineCapabilities(modelId: string, name?: string): string[] {
+  if (isNonGenerativeModel(modelId)) return [];
+  if (hasFixedThinking(modelId, name)) return ["fixed-thinking"];
+  return ["thinking"];
 }
 
 export async function POST(req: NextRequest) {
@@ -73,29 +83,17 @@ export async function POST(req: NextRequest) {
       const data = await res.json();
       const rawList: Array<{ id: string }> = Array.isArray(data?.data) ? data.data : [];
 
-      // Filter relevant text / chat / reasoning models
-      const relevant = rawList
-        .filter(
-          (m) =>
-            m.id.startsWith("gpt-") ||
-            m.id.startsWith("o1") ||
-            m.id.startsWith("o3") ||
-            m.id.startsWith("o4") ||
-            m.id.startsWith("chatgpt-")
-        )
-        .sort((a, b) => {
-          const aPriority = a.id.includes("4o") || a.id.startsWith("o1") || a.id.startsWith("o3") ? 1 : 0;
-          const bPriority = b.id.includes("4o") || b.id.startsWith("o1") || b.id.startsWith("o3") ? 1 : 0;
-          return bPriority - aPriority;
-        });
+      // Filter relevant text / chat / reasoning models (exclude embeddings, audio, moderation)
+      const relevant = rawList.filter((m) => !isNonGenerativeModel(m.id));
 
       models = relevant.map((m) => ({
         modelId: m.id,
         name: m.id,
         contextWindow: DEFAULT_CONTEXT_WINDOW,
         maxOutputTokens: DEFAULT_MAX_OUTPUT,
-        inputTypes: m.id.includes("4o") || m.id.includes("vision") ? ["text", "image"] : ["text"],
+        inputTypes: m.id.includes("vision") || m.id.includes("4o") ? ["text", "image"] : ["text"],
         outputTypes: ["text"],
+        capabilities: determineCapabilities(m.id),
         enabled: true,
       }));
     }
@@ -131,6 +129,7 @@ export async function POST(req: NextRequest) {
         maxOutputTokens: DEFAULT_MAX_OUTPUT,
         inputTypes: m.id.includes("vision") ? ["text", "image"] : ["text"],
         outputTypes: ["text"],
+        capabilities: determineCapabilities(m.id),
         enabled: true,
       }));
     }
@@ -166,6 +165,7 @@ export async function POST(req: NextRequest) {
         maxOutputTokens: DEFAULT_MAX_OUTPUT,
         inputTypes: ["text"],
         outputTypes: ["text"],
+        capabilities: determineCapabilities(m.id),
         enabled: true,
       }));
 
@@ -179,6 +179,7 @@ export async function POST(req: NextRequest) {
             maxOutputTokens: DEFAULT_MAX_OUTPUT,
             inputTypes: ["text"],
             outputTypes: ["text"],
+            capabilities: ["thinking"],
             enabled: true,
           },
           {
@@ -188,6 +189,7 @@ export async function POST(req: NextRequest) {
             maxOutputTokens: DEFAULT_MAX_OUTPUT,
             inputTypes: ["text"],
             outputTypes: ["text"],
+            capabilities: ["thinking"],
             enabled: true,
           },
         ];
@@ -234,6 +236,7 @@ export async function POST(req: NextRequest) {
             maxOutputTokens: m.outputTokenLimit ? String(m.outputTokenLimit) : DEFAULT_MAX_OUTPUT,
             inputTypes: ["text", "image", "video"],
             outputTypes: ["text"],
+            capabilities: determineCapabilities(cleanId, m.displayName),
             enabled: true,
           };
         });
@@ -268,6 +271,7 @@ export async function POST(req: NextRequest) {
               maxOutputTokens: DEFAULT_MAX_OUTPUT,
               inputTypes: ["text", "image"],
               outputTypes: ["text"],
+              capabilities: determineCapabilities(m.id, m.display_name),
               enabled: true,
             }));
           }
@@ -277,10 +281,10 @@ export async function POST(req: NextRequest) {
       if (!verified || models.length === 0) {
         // Direct list if endpoint not accessible
         const fallbacks = [
+          "claude-opus-5",
+          "claude-fable-5.1",
           "claude-3-7-sonnet-latest",
           "claude-3-5-sonnet-latest",
-          "claude-3-5-haiku-latest",
-          "claude-3-opus-latest",
         ];
         models = fallbacks.map((id) => ({
           modelId: id,
@@ -289,6 +293,7 @@ export async function POST(req: NextRequest) {
           maxOutputTokens: DEFAULT_MAX_OUTPUT,
           inputTypes: ["text", "image"],
           outputTypes: ["text"],
+          capabilities: determineCapabilities(id),
           enabled: true,
         }));
       }
@@ -337,6 +342,7 @@ export async function POST(req: NextRequest) {
                   maxOutputTokens: DEFAULT_MAX_OUTPUT,
                   inputTypes: ["text"],
                   outputTypes: ["text"],
+                  capabilities: determineCapabilities(id),
                   enabled: true,
                 };
               });
@@ -355,6 +361,7 @@ export async function POST(req: NextRequest) {
                   maxOutputTokens: DEFAULT_MAX_OUTPUT,
                   inputTypes: ["text"],
                   outputTypes: ["text"],
+                  capabilities: determineCapabilities(id),
                   enabled: true,
                 };
               });

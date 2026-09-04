@@ -56,7 +56,9 @@ import {
   Settings2,
   AlertCircle,
   Pencil,
+  ShieldCheck,
 } from "lucide-react";
+import { LobeProviderIcon } from "@/components/providers/lobe-provider-icon";
 import { ModelConfigDialog, type ModelConfigData } from "@/components/models/model-config-dialog";
 import {
   formatTokenDisplay,
@@ -161,7 +163,7 @@ export default function ProvidersPage() {
   const updateModelsMutation = useMutation(api.router.providers.updateImportedModels);
 
   // 2. Local State
-  const [activeTab, setActiveTab] = useState<"all" | "byok" | "custom">("all");
+  const [activeTab, setActiveTab] = useState<"all" | "byok" | "oauth" | "custom">("all");
   const [searchQuery, setSearchQuery] = useState("");
 
   // Dialog State: Configure Provider (Preset or Custom)
@@ -563,68 +565,29 @@ export default function ProvidersPage() {
           </BreadcrumbList>
         </Breadcrumb>
 
-        {/* 2. Heading (Lora serif, declarative sentence with period per DESIGN.md) */}
-        <div className="space-y-1">
-          <h1 className="text-2xl sm:text-3xl font-serif font-normal text-foreground tracking-tight">
-            Providers &amp; BYOK.
-          </h1>
-          <p className="text-xs sm:text-sm text-muted-foreground font-light">
-            Bring your own API keys, connect private OpenAI-compatible endpoints, and import models into your universal gateway.
-          </p>
+        {/* 2. Heading with Add Custom inline */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <h1 className="text-2xl sm:text-3xl font-sans font-semibold text-foreground tracking-tight">
+              Providers &amp; BYOK.
+            </h1>
+            <p className="text-xs sm:text-sm text-muted-foreground font-light">
+              Bring your own API keys, connect private OpenAI-compatible endpoints, and import models into your universal gateway.
+            </p>
+          </div>
+
+          {isAuthenticated && (
+            <Button
+              onClick={handleOpenNewCustom}
+              className="rounded-full gap-1.5 text-xs font-medium cursor-pointer h-9 px-4 bg-primary text-primary-foreground hover:bg-primary/90 shadow-none shrink-0"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span>Add Custom</span>
+            </Button>
+          )}
         </div>
 
-        {/* 3. Top Status Overview Banner (Monochrome tint ladder per DESIGN.md) */}
-        <Card className="rounded-2xl border border-border/80 bg-card p-5 sm:p-6 space-y-4 shadow-none">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="space-y-1">
-              <span className="text-[10px] font-mono font-semibold uppercase tracking-wider text-muted-foreground">
-                Tri-Rail Gateway Status
-              </span>
-              <h2 className="text-xl sm:text-2xl font-sans font-semibold text-foreground tracking-tight flex items-center gap-2.5">
-                <span>Multi-Provider Connected</span>
-                <span className="relative flex h-2.5 w-2.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#0066ff] opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#0066ff]" />
-                </span>
-              </h2>
-              <p className="text-xs text-muted-foreground font-light">
-                Credentials are encrypted at rest using AES-256-GCM.
-              </p>
-            </div>
-
-            <div className="flex items-center gap-6 sm:gap-8 self-start sm:self-auto">
-              <div className="space-y-0.5 text-left sm:text-right">
-                <div className="text-[10px] font-mono font-semibold uppercase tracking-wider text-muted-foreground">
-                  Active Providers
-                </div>
-                <div className="text-sm sm:text-base font-semibold text-foreground font-mono">
-                  {totalConnected}
-                </div>
-              </div>
-
-              <div className="space-y-0.5 text-left sm:text-right">
-                <div className="text-[10px] font-mono font-semibold uppercase tracking-wider text-muted-foreground">
-                  Imported Models
-                </div>
-                <div className="text-sm sm:text-base font-semibold text-foreground font-mono">
-                  {totalImportedModels}
-                </div>
-              </div>
-
-              {isAuthenticated && (
-                <Button
-                  onClick={handleOpenNewCustom}
-                  className="rounded-full gap-1.5 text-xs font-medium cursor-pointer h-9 px-4 bg-primary text-primary-foreground hover:bg-primary/90 shadow-none shrink-0 ml-2"
-                >
-                  <Plus className="h-3.5 w-3.5" />
-                  <span>Add Custom</span>
-                </Button>
-              )}
-            </div>
-          </div>
-        </Card>
-
-        {/* 4. Controls: Search + Filter Tabs */}
+        {/* 3. Controls: Search + Filter Tabs (All / BYOK / OAuth / Custom) */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
           <div className="relative flex-1">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
@@ -637,25 +600,38 @@ export default function ProvidersPage() {
             />
           </div>
 
-          <div className="flex items-center gap-1 bg-secondary p-1 rounded-full border border-border text-xs font-mono shrink-0">
-            {(["all", "byok", "custom"] as const).map((tab) => (
+          <div className="flex items-center gap-1 bg-secondary/50 p-1 rounded-xl border border-border text-xs font-sans shrink-0 h-10">
+            {(["all", "byok", "oauth", "custom"] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setActiveTab(tab)}
                 className={cn(
-                  "px-3.5 py-1 rounded-full cursor-pointer transition-colors capitalize",
+                  "px-3.5 py-1.5 rounded-lg cursor-pointer transition-colors font-medium text-xs",
                   activeTab === tab
-                    ? "bg-card text-foreground font-medium shadow-none"
+                    ? "bg-card text-foreground shadow-sm"
                     : "text-muted-foreground hover:text-foreground"
                 )}
               >
-                {tab === "all" ? "All Providers" : tab.toUpperCase()}
+                {tab === "all" ? "All" : tab === "oauth" ? "OAuth" : tab.toUpperCase()}
               </button>
             ))}
           </div>
         </div>
 
-        {/* 5. Popular Providers Grid (Mobbin 24px/32px geometry & 30% squircle icons) */}
+        {/* OAuth Tab Empty State */}
+        {activeTab === "oauth" && (
+          <div className="p-12 rounded-2xl border border-dashed border-border/70 bg-card text-center space-y-2">
+            <ShieldCheck className="h-8 w-8 mx-auto text-muted-foreground/60 stroke-[1.5]" />
+            <h3 className="text-sm font-medium text-foreground">
+              No OAuth Providers Connected
+            </h3>
+            <p className="text-xs text-muted-foreground font-light max-w-sm mx-auto">
+              OAuth provider authentication integrations will appear here.
+            </p>
+          </div>
+        )}
+
+        {/* 4. Popular Providers Grid (Official @lobehub/icons vector SVGs) */}
         {(activeTab === "all" || activeTab === "byok") && (
           <div className="space-y-3">
             <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-muted-foreground pl-1">
@@ -681,13 +657,9 @@ export default function ProvidersPage() {
                       {/* Card Header: Icon + Name + Status */}
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex items-center gap-3 min-w-0">
-                          {/* 30% iOS Squircle Icon Frame */}
-                          <div className="h-10 w-10 rounded-2xl border border-border/70 bg-secondary flex items-center justify-center text-foreground font-serif font-bold text-sm shrink-0">
-                            {isConst ? (
-                              <ConstLogoIcon size="sm" className="w-5 h-5 text-foreground" />
-                            ) : (
-                              <span>{provider.iconLetter}</span>
-                            )}
+                          {/* Official @lobehub/icons Brand Logo Tile */}
+                          <div className="h-10 w-10 rounded-2xl border border-border/70 bg-secondary flex items-center justify-center shrink-0 p-2 overflow-hidden">
+                            <LobeProviderIcon providerId={provider.id} size={22} />
                           </div>
                           <div className="min-w-0">
                             <h4 className="text-sm font-semibold text-foreground font-sans truncate">

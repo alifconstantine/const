@@ -3,6 +3,13 @@ import Resend from "@auth/core/providers/resend";
 import { convexAuth } from "@convex-dev/auth/server";
 
 export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
+  jwt: {
+    durationMs: 30 * 24 * 60 * 60 * 1000, // 30 days (avoids 1-hour premature expiration on web & native clients)
+  },
+  session: {
+    totalDurationMs: 30 * 24 * 60 * 60 * 1000, // 30 days
+    inactiveDurationMs: 30 * 24 * 60 * 60 * 1000, // 30 days
+  },
   providers: [
     Google({
       authorization: {

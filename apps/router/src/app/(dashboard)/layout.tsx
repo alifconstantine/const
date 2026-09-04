@@ -10,7 +10,6 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import {
   ConstLogoIcon,
   Button,
-  Card,
   Sheet,
   SheetContent,
   SheetTitle,
@@ -29,81 +28,58 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const { isAuthenticated, isLoading, signIn, signOut } = useRouterAuth();
+  const { isAuthenticated, isLoading, isSigningOut, signIn, signOut, refreshSession } = useRouterAuth();
   const user = useQuery(
     api.auth.queries.currentUser,
     isAuthenticated ? {} : "skip"
   );
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [hasAttemptedRefresh, setHasAttemptedRefresh] = useState(false);
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      toast.info("Authentication Required", {
-        description: "Redirecting to Const Accounts login...",
-      });
-      const timer = setTimeout(() => {
-        signIn("/dashboard");
-      }, 600);
-      return () => clearTimeout(timer);
+    if (!isLoading && !isAuthenticated && !isSigningOut) {
+      signIn("/dashboard");
     }
-  }, [isLoading, isAuthenticated, signIn]);
+  }, [isLoading, isAuthenticated, isSigningOut, signIn]);
 
   useEffect(() => {
-    if (isAuthenticated && user === null) {
-      toast.error("Session Expired", {
-        description: "Your session has expired. Reconnecting...",
-      });
-      const timer = setTimeout(() => {
-        signIn("/dashboard");
-      }, 800);
-      return () => clearTimeout(timer);
+    if (isAuthenticated && user === null && !isSigningOut) {
+      if (!hasAttemptedRefresh) {
+        setHasAttemptedRefresh(true);
+        void refreshSession().then((refreshed) => {
+          if (!refreshed) {
+            toast.error("Session Expired", {
+              description: "Your session has expired. Reconnecting...",
+            });
+            setTimeout(() => {
+              signIn("/dashboard");
+            }, 800);
+          }
+        });
+      } else {
+        toast.error("Session Expired", {
+          description: "Your session has expired. Reconnecting...",
+        });
+        const timer = setTimeout(() => {
+          signIn("/dashboard");
+        }, 800);
+        return () => clearTimeout(timer);
+      }
     }
-  }, [isAuthenticated, user, signIn]);
+  }, [isAuthenticated, user, isSigningOut, hasAttemptedRefresh, refreshSession, signIn]);
 
-  // Loading State
-  if (isLoading || (isAuthenticated && user === undefined)) {
+  // Unauthenticated / Signing Out Fallback
+  if (!isLoading && !isAuthenticated) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-background text-foreground p-4">
-        <div className="flex flex-col items-center gap-4 text-center">
-          <div className="relative">
-            <ConstLogoIcon size="lg" className="w-12 h-12 text-foreground animate-pulse" />
-          </div>
-          <div className="space-y-1">
-            <h2 className="text-xl font-serif font-normal text-foreground">
-              Verifying Const SSO Session
-            </h2>
-            <p className="text-xs font-mono text-muted-foreground">
-              Connecting to Convex Cloud &amp; Accounts Hub...
-            </p>
-          </div>
-          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground mt-2" />
+        <div className="flex flex-col items-center gap-3 text-center">
+          <ConstLogoIcon size="md" className="w-8 h-8 text-foreground animate-pulse" />
+          <p className="text-xs font-mono text-muted-foreground">
+            {isSigningOut ? "Signing out of Const Platform..." : "Connecting to Const Accounts..."}
+          </p>
+          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground mt-1" />
         </div>
-      </div>
-    );
-  }
-
-  // Unauthenticated Fallback
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-background text-foreground p-4">
-        <Card className="max-w-md w-full border-border/70 bg-card text-center p-8 space-y-6 rounded-3xl shadow-none">
-          <div className="flex justify-center">
-            <ConstLogoIcon size="lg" className="w-12 h-12 text-foreground" />
-          </div>
-          <div className="space-y-2">
-            <h1 className="text-2xl font-serif text-foreground">Sign in required.</h1>
-            <p className="text-xs text-muted-foreground font-light">
-              You need an active Const Platform session to access the Router Dashboard.
-            </p>
-          </div>
-          <Button
-            onClick={() => signIn("/dashboard")}
-            className="w-full rounded-full gap-2 cursor-pointer h-11 text-sm font-medium"
-          >
-            <span>Proceed to Const Accounts</span>
-          </Button>
-        </Card>
       </div>
     );
   }

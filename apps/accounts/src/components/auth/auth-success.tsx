@@ -37,6 +37,28 @@ function getStoredToken(): string | null {
   return null;
 }
 
+function isValidConvexRefreshToken(token: unknown): token is string {
+  if (typeof token !== "string" || !token.trim()) return false;
+  const parts = token.split("|");
+  return parts.length === 2 && Boolean(parts[0]?.length) && Boolean(parts[1]?.length);
+}
+
+function getStoredRefreshToken(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const sso = localStorage.getItem("const_sso_refresh_token");
+    if (isValidConvexRefreshToken(sso)) return sso;
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && (k.startsWith("__convexAuthRefreshToken") || k.includes("RefreshToken"))) {
+        const val = localStorage.getItem(k);
+        if (isValidConvexRefreshToken(val)) return val;
+      }
+    }
+  } catch {}
+  return null;
+}
+
 export function AuthSuccess({ user: _user, forceProceed = false }: AuthSuccessProps) {
   const tokenFromHook = useAuthToken();
   const [activeToken, setActiveToken] = useState<string | null>(null);
@@ -95,22 +117,37 @@ export function AuthSuccess({ user: _user, forceProceed = false }: AuthSuccessPr
     if (!activeToken) return;
 
     // 2. Synchronize Cross-Subdomain SSO Cookie on *.const.web.id & localhost
+    const refreshToken = getStoredRefreshToken();
     const hostname = window.location.hostname.toLowerCase();
+    const maxAge = 30 * 24 * 60 * 60;
     if (hostname === "const.web.id" || hostname.endsWith(".const.web.id")) {
-      document.cookie = `const_sso_token=${encodeURIComponent(activeToken)}; Domain=.const.web.id; Path=/; SameSite=Lax; Secure; Max-Age=${30 * 24 * 60 * 60}`;
+      document.cookie = `const_sso_token=${encodeURIComponent(activeToken)}; Domain=.const.web.id; Path=/; SameSite=Lax; Secure; Max-Age=${maxAge}`;
+      if (refreshToken) {
+        document.cookie = `const_sso_refresh_token=${encodeURIComponent(refreshToken)}; Domain=.const.web.id; Path=/; SameSite=Lax; Secure; Max-Age=${maxAge}`;
+      }
     } else if (hostname === "localhost" || hostname === "127.0.0.1") {
-      document.cookie = `const_sso_token=${encodeURIComponent(activeToken)}; Path=/; SameSite=Lax; Max-Age=${30 * 24 * 60 * 60}`;
+      document.cookie = `const_sso_token=${encodeURIComponent(activeToken)}; Path=/; SameSite=Lax; Max-Age=${maxAge}`;
+      if (refreshToken) {
+        document.cookie = `const_sso_refresh_token=${encodeURIComponent(refreshToken)}; Path=/; SameSite=Lax; Max-Age=${maxAge}`;
+      }
     }
 
     try {
       localStorage.setItem("const_sso_token", activeToken);
+      if (refreshToken) {
+        localStorage.setItem("const_sso_refresh_token", refreshToken);
+      }
     } catch {}
 
-    // 3. Construct final destination with token
+    // 3. Construct final destination with token & optional refreshToken
     let destination = safeTarget || getDefaultRedirectUrl();
     if (safeTarget) {
       const separator = destination.includes("?") ? "&" : "?";
-      destination = `${destination}${separator}token=${encodeURIComponent(activeToken)}`;
+      let authParams = `token=${encodeURIComponent(activeToken)}`;
+      if (refreshToken) {
+        authParams += `&refreshToken=${encodeURIComponent(refreshToken)}`;
+      }
+      destination = `${destination}${separator}${authParams}`;
     }
 
     // 4. Perform Redirect based on Target Type

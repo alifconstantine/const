@@ -8,6 +8,7 @@ const AUTH_COOKIE_NAMES = [
   "__convexAuthOAuthVerifier",
   "__Host-__convexAuthOAuthVerifier",
   "const_sso_token",
+  "const_sso_refresh_token",
 ];
 
 function buildExpiredCookieHeaders(): string[] {

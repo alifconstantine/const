@@ -33,6 +33,7 @@ export default function SignOutPage() {
         };
 
         expireCookie("const_sso_token");
+        expireCookie("const_sso_refresh_token");
         expireCookie("__convexAuthJWT");
         expireCookie("__Host-__convexAuthJWT");
         expireCookie("__convexAuthRefreshToken");
@@ -41,6 +42,7 @@ export default function SignOutPage() {
         // 3. Clear LocalStorage session tokens across all namespaces
         try {
           localStorage.removeItem("const_sso_token");
+          localStorage.removeItem("const_sso_refresh_token");
           const keysToRemove: string[] = [];
           for (let i = 0; i < localStorage.length; i++) {
             const key = localStorage.key(i);
