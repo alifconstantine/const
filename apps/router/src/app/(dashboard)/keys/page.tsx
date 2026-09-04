@@ -332,19 +332,19 @@ export default function KeysPage() {
               <Table>
                 <TableHeader className="bg-secondary/20">
                   <TableRow className="border-border/60 hover:bg-transparent">
-                    <TableHead className="w-[28%] min-w-[180px] pl-6 pr-4 text-xs font-mono font-semibold uppercase tracking-wider text-muted-foreground">
+                    <TableHead className="w-[28%] min-w-[180px] pl-6 pr-4 text-xs font-sans font-medium text-muted-foreground">
                       Name
                     </TableHead>
-                    <TableHead className="w-[26%] min-w-[180px] px-4 text-xs font-mono font-semibold uppercase tracking-wider text-muted-foreground">
+                    <TableHead className="w-[26%] min-w-[180px] px-4 text-xs font-sans font-medium text-muted-foreground">
                       Secret Key
                     </TableHead>
-                    <TableHead className="w-[16%] min-w-[110px] px-4 text-xs font-mono font-semibold uppercase tracking-wider text-muted-foreground">
+                    <TableHead className="w-[16%] min-w-[110px] px-4 text-xs font-sans font-medium text-muted-foreground">
                       Created
                     </TableHead>
-                    <TableHead className="w-[14%] min-w-[100px] px-4 text-xs font-mono font-semibold uppercase tracking-wider text-muted-foreground">
+                    <TableHead className="w-[14%] min-w-[100px] px-4 text-xs font-sans font-medium text-muted-foreground">
                       Status
                     </TableHead>
-                    <TableHead className="w-[16%] min-w-[120px] pl-4 pr-6 text-right text-xs font-mono font-semibold uppercase tracking-wider text-muted-foreground">
+                    <TableHead className="w-[16%] min-w-[120px] pl-4 pr-6 text-right text-xs font-sans font-medium text-muted-foreground">
                       Action
                     </TableHead>
                   </TableRow>
@@ -397,18 +397,18 @@ export default function KeysPage() {
                         </TableCell>
 
                         {/* 3. Created Date */}
-                        <TableCell className="py-4 px-4 text-xs text-muted-foreground font-mono">
+                        <TableCell className="py-4 px-4 text-xs text-muted-foreground font-sans tabular-nums">
                           {formatDate(keyItem.createdAt)}
                         </TableCell>
 
                         {/* 4. Status Badge */}
                         <TableCell className="py-4 px-4">
                           {isRevoked ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-secondary text-[10px] font-mono text-muted-foreground border border-border">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-secondary text-[10px] font-sans font-medium text-muted-foreground border border-border">
                               Revoked
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-mono border border-emerald-500/20">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-sans font-medium border border-emerald-500/20">
                               Active
                             </span>
                           )}

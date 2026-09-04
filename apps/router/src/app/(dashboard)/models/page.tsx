@@ -260,7 +260,7 @@ export default function ModelsPage() {
           {/* Top Tier Row */}
           <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
             <div className="space-y-1">
-              <span className="text-[10px] font-mono font-semibold uppercase tracking-wider text-muted-foreground">
+              <span className="text-[10px] font-sans font-medium uppercase tracking-wider text-muted-foreground">
                 Current Plan
               </span>
               <h2 className="text-xl sm:text-2xl font-sans font-semibold text-foreground tracking-tight">
@@ -273,19 +273,19 @@ export default function ModelsPage() {
 
             <div className="flex items-center gap-8 self-start sm:self-auto pt-1 sm:pt-0">
               <div className="space-y-0.5 text-left sm:text-right">
-                <div className="text-[10px] font-mono font-semibold uppercase tracking-wider text-muted-foreground">
+                <div className="text-[10px] font-sans font-medium uppercase tracking-wider text-muted-foreground">
                   Available
                 </div>
-                <div className="text-sm sm:text-base font-semibold text-foreground font-mono">
+                <div className="text-sm sm:text-base font-semibold text-foreground font-sans tabular-nums">
                   {totalAvailableModels} models
                 </div>
               </div>
 
               <div className="space-y-0.5 text-left sm:text-right">
-                <div className="text-[10px] font-mono font-semibold uppercase tracking-wider text-muted-foreground">
+                <div className="text-[10px] font-sans font-medium uppercase tracking-wider text-muted-foreground">
                   Locked
                 </div>
-                <div className="text-sm sm:text-base font-semibold text-foreground font-mono">
+                <div className="text-sm sm:text-base font-semibold text-foreground font-sans tabular-nums">
                   0 models
                 </div>
               </div>
@@ -296,16 +296,16 @@ export default function ModelsPage() {
           <div className="pt-4 border-t border-border/60 space-y-1.5">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div className="flex items-center gap-2">
-                <span className="text-[11px] font-mono font-semibold uppercase tracking-wider text-muted-foreground">
+                <span className="text-[11px] font-sans font-medium uppercase tracking-wider text-muted-foreground">
                   Free for paid usage
                 </span>
-                <span className="text-[9px] font-mono font-medium px-1.5 py-0.2 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 uppercase">
+                <span className="text-[9px] font-sans font-medium px-1.5 py-0.2 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 uppercase">
                   Free
                 </span>
               </div>
 
               {/* Set to 0 since no dummy values are used */}
-              <div className="text-xs font-mono font-medium text-foreground">
+              <div className="text-xs font-sans font-medium text-foreground tabular-nums">
                 0 / 0 Used
               </div>
             </div>
@@ -412,19 +412,19 @@ export default function ModelsPage() {
                   <Table>
                     <TableHeader className="bg-secondary/20">
                       <TableRow className="border-border/60 hover:bg-transparent">
-                        <TableHead className="w-[35%] min-w-[200px] pl-6 pr-4 text-xs font-mono font-semibold uppercase tracking-wider text-muted-foreground">
+                        <TableHead className="w-[35%] min-w-[200px] pl-6 pr-4 text-xs font-sans font-medium text-muted-foreground">
                           Model
                         </TableHead>
-                        <TableHead className="w-[15%] min-w-[100px] px-4 text-xs font-mono font-semibold uppercase tracking-wider text-muted-foreground">
+                        <TableHead className="w-[15%] min-w-[100px] px-4 text-xs font-sans font-medium text-muted-foreground">
                           Context Window
                         </TableHead>
-                        <TableHead className="w-[15%] min-w-[100px] px-4 text-xs font-mono font-semibold uppercase tracking-wider text-muted-foreground">
+                        <TableHead className="w-[15%] min-w-[100px] px-4 text-xs font-sans font-medium text-muted-foreground">
                           Max Output
                         </TableHead>
-                        <TableHead className="w-[15%] min-w-[110px] px-4 text-xs font-mono font-semibold uppercase tracking-wider text-muted-foreground">
+                        <TableHead className="w-[15%] min-w-[110px] px-4 text-xs font-sans font-medium text-muted-foreground">
                           Modality
                         </TableHead>
-                        <TableHead className="w-[20%] min-w-[140px] pl-4 pr-6 text-right text-xs font-mono font-semibold uppercase tracking-wider text-muted-foreground">
+                        <TableHead className="w-[20%] min-w-[140px] pl-4 pr-6 text-right text-xs font-sans font-medium text-muted-foreground">
                           Action
                         </TableHead>
                       </TableRow>
@@ -475,14 +475,14 @@ export default function ModelsPage() {
 
                           {/* 2. Context Window */}
                           <TableCell className="py-4 px-4">
-                            <span className="text-xs font-mono text-foreground font-normal">
+                            <span className="text-xs font-sans text-foreground font-normal tabular-nums">
                               {formatTokenDisplay(model.contextWindow, "1M")}
                             </span>
                           </TableCell>
 
                           {/* 3. Max Output */}
                           <TableCell className="py-4 px-4">
-                            <span className="text-xs font-mono text-foreground font-normal">
+                            <span className="text-xs font-sans text-foreground font-normal tabular-nums">
                               {formatTokenDisplay(model.maxOutputTokens, "128K")}
                             </span>
                           </TableCell>
@@ -491,17 +491,17 @@ export default function ModelsPage() {
                           <TableCell className="py-4 px-4">
                             <div className="flex items-center gap-1.5 flex-wrap">
                               {model.inputTypes?.includes("text") && (
-                                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-md bg-secondary border border-border text-foreground">
+                                <span className="text-[10px] font-sans px-1.5 py-0.5 rounded-md bg-secondary border border-border text-foreground">
                                   Text
                                 </span>
                               )}
                               {model.inputTypes?.includes("image") && (
-                                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-md bg-secondary border border-border text-foreground">
+                                <span className="text-[10px] font-sans px-1.5 py-0.5 rounded-md bg-secondary border border-border text-foreground">
                                   Image
                                 </span>
                               )}
                               {model.inputTypes?.includes("video") && (
-                                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-md bg-secondary border border-border text-foreground">
+                                <span className="text-[10px] font-sans px-1.5 py-0.5 rounded-md bg-secondary border border-border text-foreground">
                                   Video
                                 </span>
                               )}

@@ -107,7 +107,7 @@ export default function DashboardOverviewPage() {
             <span className="text-xs text-muted-foreground font-medium">Tokens Used Today</span>
           </div>
           <div className="space-y-0.5">
-            <div className="text-2xl font-semibold tracking-tight text-foreground font-mono">
+            <div className="text-2xl font-semibold tracking-tight text-foreground font-sans tabular-nums">
               {todayMetrics?.totalTokens ? todayMetrics.totalTokens.toLocaleString() : "0"}{" "}
               <span className="text-xs text-muted-foreground font-sans font-normal">tokens</span>
             </div>
@@ -128,7 +128,7 @@ export default function DashboardOverviewPage() {
             <span className="text-xs text-muted-foreground font-medium">Requests Today</span>
           </div>
           <div className="space-y-0.5">
-            <div className="text-2xl font-semibold tracking-tight text-foreground font-mono">
+            <div className="text-2xl font-semibold tracking-tight text-foreground font-sans tabular-nums">
               {todayMetrics?.totalRequests ? todayMetrics.totalRequests.toLocaleString() : "0"}
             </div>
             <p className="text-[11px] text-muted-foreground font-light">
@@ -148,7 +148,7 @@ export default function DashboardOverviewPage() {
             <span className="text-xs text-muted-foreground font-medium">Success Rate</span>
           </div>
           <div className="space-y-0.5">
-            <div className="text-2xl font-semibold tracking-tight text-foreground font-mono">
+            <div className="text-2xl font-semibold tracking-tight text-foreground font-sans tabular-nums">
               {todayMetrics && todayMetrics.totalRequests > 0
                 ? `${todayMetrics.successRate}%`
                 : "100%"}
@@ -170,7 +170,7 @@ export default function DashboardOverviewPage() {
             <span className="text-xs text-muted-foreground font-medium">Avg Latency</span>
           </div>
           <div className="space-y-0.5">
-            <div className="text-2xl font-semibold tracking-tight text-foreground font-mono">
+            <div className="text-2xl font-semibold tracking-tight text-foreground font-sans tabular-nums">
               {todayMetrics?.avgDurationMs ? `${todayMetrics.avgDurationMs}ms` : "—"}
             </div>
             <p className="text-[11px] text-muted-foreground font-light">

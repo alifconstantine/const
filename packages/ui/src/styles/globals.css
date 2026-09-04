@@ -76,6 +76,8 @@
   }
   * {
     @apply border-border;
+    font-variant-numeric: normal;
+    font-feature-settings: "cv05" 0;
   }
   html,
   body {
