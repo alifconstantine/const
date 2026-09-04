@@ -232,7 +232,7 @@ export function LearnCard({
       </div>
 
       {/* Bottom: Date & Source count */}
-      <div className="text-[11px] font-normal text-muted-foreground flex items-center gap-1.5 pt-1 border-t border-border/40">
+      <div className="text-[11px] font-normal text-muted-foreground flex items-center gap-1.5 pt-1">
         <span>{formattedDate}</span>
         <span>•</span>
         <span>{sourcesText}</span>

@@ -193,7 +193,7 @@ export function LearnHome({ onOpenLearn }: LearnHomeProps) {
       {/* -------------------------------------------------------------
           TOP BAR: Filter Pills on Left, Tools on Right (Ref: Gemini Notebook)
           ------------------------------------------------------------- */}
-      <div className="sticky top-0 z-30 w-full border-b border-border/70 bg-background/95 backdrop-blur-md px-6 py-3 flex items-center justify-between gap-4 select-none">
+      <div className="sticky top-0 z-30 w-full bg-background/95 backdrop-blur-md px-6 py-3 flex items-center justify-between gap-4 select-none">
         {/* Left: Filter Tabs (All, My Learn, Koleksi, Artifact) */}
         <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
           <button
@@ -453,7 +453,7 @@ export function LearnHome({ onOpenLearn }: LearnHomeProps) {
             </section>
 
             {/* Section 2: Koleksi (Manual categorization of learns) */}
-            <section className="space-y-4 pt-4 border-t border-border/50">
+            <section className="space-y-4 pt-4">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
                   <h2 className="font-serif text-xl font-normal text-foreground">
@@ -596,7 +596,7 @@ export function LearnHome({ onOpenLearn }: LearnHomeProps) {
             {activeCollection ? (
               // Drilled-down collection view
               <div className="space-y-6">
-                <div className="flex items-center justify-between border-b border-border/60 pb-4">
+                <div className="flex items-center justify-between pb-3">
                   <div className="flex items-center gap-3">
                     <button
                       type="button"
@@ -811,7 +811,7 @@ export function LearnHome({ onOpenLearn }: LearnHomeProps) {
                       </span>
                     </div>
 
-                    <div className="text-[11px] text-muted-foreground pt-2 border-t border-border/40">
+                    <div className="text-[11px] text-muted-foreground pt-2">
                       {new Intl.DateTimeFormat("id-ID", {
                         day: "numeric",
                         month: "short",

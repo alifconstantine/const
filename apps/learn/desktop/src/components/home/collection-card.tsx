@@ -158,7 +158,7 @@ export function CollectionCard({
       </div>
 
       {/* Bottom */}
-      <div className="text-[11px] font-normal text-muted-foreground flex items-center justify-between pt-1 border-t border-border/40">
+      <div className="text-[11px] font-normal text-muted-foreground flex items-center justify-between pt-1">
         <span>{itemCountText}</span>
         <span className="text-[10px] text-muted-foreground/80 group-hover:text-foreground flex items-center gap-1 transition-colors">
           Buka &rarr;

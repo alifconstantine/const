@@ -18,7 +18,7 @@ import {
   Plus,
   ChevronRight,
   ArrowLeft,
-  Sparkles,
+  Package,
   Folder,
   Trash2,
   X,
@@ -191,7 +191,7 @@ export function LearnHome({ onOpenLearn }: LearnHomeProps) {
       {/* -------------------------------------------------------------
           MOBILE TOP CONTROLS BAR: Slim single row
           ------------------------------------------------------------- */}
-      <div className="sticky top-0 z-30 w-full border-b border-border/70 bg-background/95 backdrop-blur-md px-3.5 py-2.5 flex items-center justify-between gap-2 select-none">
+      <div className="sticky top-0 z-30 w-full bg-background/95 backdrop-blur-md px-3.5 py-2.5 flex items-center justify-between gap-2 select-none">
         {isSearchOpen ? (
           <div className="relative flex items-center flex-1 animate-in fade-in duration-150">
             <Search className="absolute left-2.5 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
@@ -378,7 +378,7 @@ export function LearnHome({ onOpenLearn }: LearnHomeProps) {
             </section>
 
             {/* Section 2: Koleksi */}
-            <section className="space-y-3 pt-3 border-t border-border/50">
+            <section className="space-y-3 pt-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <h2 className="font-serif text-lg font-normal text-foreground">
@@ -503,7 +503,7 @@ export function LearnHome({ onOpenLearn }: LearnHomeProps) {
             {activeCollection ? (
               // Drilled-down collection
               <div className="space-y-4">
-                <div className="flex items-center justify-between border-b border-border/60 pb-3">
+                <div className="flex items-center justify-between pb-2">
                   <div className="flex items-center gap-2.5">
                     <button
                       type="button"
@@ -690,7 +690,7 @@ export function LearnHome({ onOpenLearn }: LearnHomeProps) {
                       </span>
                     </div>
 
-                    <div className="text-[10px] text-muted-foreground pt-1.5 border-t border-border/40">
+                    <div className="text-[10px] text-muted-foreground pt-1.5">
                       {new Intl.DateTimeFormat("id-ID", {
                         day: "numeric",
                         month: "short",
@@ -720,7 +720,7 @@ export function LearnHome({ onOpenLearn }: LearnHomeProps) {
       {/* -------------------------------------------------------------
           MOBILE BOTTOM NAVIGATION BAR WITH CENTER ELEVATED "+ BUAT"
           ------------------------------------------------------------- */}
-      <nav className="fixed bottom-0 inset-x-0 z-40 bg-background/95 backdrop-blur-md border-t border-border/70 safe-area-bottom px-2 py-1.5 flex items-center justify-around shadow-sm">
+      <nav className="fixed bottom-0 inset-x-0 z-40 bg-background/95 backdrop-blur-md safe-area-bottom px-2 py-1.5 flex items-center justify-around shadow-sm">
         {/* All Tab */}
         <button
           type="button"
@@ -754,7 +754,7 @@ export function LearnHome({ onOpenLearn }: LearnHomeProps) {
           <div className="relative">
             <BookOpen className="h-5 w-5" />
             {learns.length > 0 && (
-              <span className="absolute -top-1 -right-2.5 h-3.5 min-w-3.5 px-1 rounded-full bg-secondary text-[9px] font-mono flex items-center justify-center text-muted-foreground border border-border/50">
+              <span className="absolute -top-1 -right-2.5 h-3.5 min-w-3.5 px-1 rounded-full bg-secondary text-[9px] font-mono flex items-center justify-center text-muted-foreground">
                 {learns.length}
               </span>
             )}
@@ -826,7 +826,7 @@ export function LearnHome({ onOpenLearn }: LearnHomeProps) {
           <div className="relative">
             <Folder className="h-5 w-5" />
             {collections.length > 0 && (
-              <span className="absolute -top-1 -right-2.5 h-3.5 min-w-3.5 px-1 rounded-full bg-secondary text-[9px] font-mono flex items-center justify-center text-muted-foreground border border-border/50">
+              <span className="absolute -top-1 -right-2.5 h-3.5 min-w-3.5 px-1 rounded-full bg-secondary text-[9px] font-mono flex items-center justify-center text-muted-foreground">
                 {collections.length}
               </span>
             )}
@@ -848,9 +848,9 @@ export function LearnHome({ onOpenLearn }: LearnHomeProps) {
           }`}
         >
           <div className="relative">
-            <Sparkles className="h-5 w-5" />
+            <Package className="h-5 w-5" />
             {artifacts.length > 0 && (
-              <span className="absolute -top-1 -right-2.5 h-3.5 min-w-3.5 px-1 rounded-full bg-secondary text-[9px] font-mono flex items-center justify-center text-muted-foreground border border-border/50">
+              <span className="absolute -top-1 -right-2.5 h-3.5 min-w-3.5 px-1 rounded-full bg-secondary text-[9px] font-mono flex items-center justify-center text-muted-foreground">
                 {artifacts.length}
               </span>
             )}

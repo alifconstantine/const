@@ -219,7 +219,7 @@ export function LearnCard({
       </div>
 
       {/* Bottom */}
-      <div className="text-[10px] text-muted-foreground truncate pt-1 border-t border-border/40">
+      <div className="text-[10px] text-muted-foreground truncate pt-1">
         <span>{formattedDate}</span>
       </div>
     </div>

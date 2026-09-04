@@ -147,7 +147,7 @@ export function CollectionCard({
       </div>
 
       {/* Bottom */}
-      <div className="text-[10px] text-muted-foreground truncate pt-1 border-t border-border/40 flex items-center justify-between">
+      <div className="text-[10px] text-muted-foreground truncate pt-1 flex items-center justify-between">
         <span>{itemCountText}</span>
         <span className="text-[9px] text-muted-foreground/80">&rarr;</span>
       </div>
