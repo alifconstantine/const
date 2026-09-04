@@ -2,6 +2,9 @@
 
 import { useState, useMemo } from "react";
 import Link from "next/link";
+import { useRouterAuth } from "@/components/providers/convex-client-provider";
+import { useQuery, useMutation } from "convex/react";
+import { api } from "@const/backend/_generated/api";
 import {
   Breadcrumb,
   BreadcrumbList,
@@ -41,28 +44,22 @@ import {
   Cpu,
   Plus,
   Loader2,
-  FileText,
-  Image as ImageIcon,
-  FileCode,
-  Headphones,
-  Video,
-  Wrench,
+  Pencil,
 } from "lucide-react";
-
-interface ModelCapability {
-  id: string;
-  label: string;
-  icon: React.ComponentType<{ className?: string }>;
-}
+import { ModelConfigDialog } from "@/components/models/model-config-dialog";
+import { formatTokenDisplay } from "@/lib/model-specs";
 
 interface ModelItem {
   id: string;
   name: string;
   modelId: string;
-  provider: "const";
+  provider: string;
+  providerDocId?: string;
+  providerId?: string;
   contextWindow: string;
-  maxOutputTokens: string;
-  capabilities: ModelCapability[];
+  maxOutputTokens?: string;
+  inputTypes?: string[];
+  outputTypes?: string[];
   isDefault?: boolean;
 }
 
@@ -72,15 +69,6 @@ interface ProviderGroup {
   type: "builtin" | "byok" | "oauth";
   models: ModelItem[];
 }
-
-const CAPABILITIES = {
-  text: { id: "text", label: "Text", icon: FileText },
-  image: { id: "image", label: "Image (Vision)", icon: ImageIcon },
-  file: { id: "file", label: "File (Documents)", icon: FileCode },
-  audio: { id: "audio", label: "Audio", icon: Headphones },
-  video: { id: "video", label: "Video", icon: Video },
-  tools: { id: "tools", label: "Tool Calling", icon: Wrench },
-};
 
 // Provider Catalog: Const with Gemini 3.6 Flash
 const PROVIDERS_DATA: ProviderGroup[] = [
@@ -94,27 +82,62 @@ const PROVIDERS_DATA: ProviderGroup[] = [
         name: "Gemini 3.6 Flash",
         modelId: "gemini-3.6-flash",
         provider: "const",
-        contextWindow: "1M",
-        maxOutputTokens: "64K", // Upstream: 65,536 tokens
+        contextWindow: "1000000",
+        maxOutputTokens: "128000",
+        inputTypes: ["text", "image", "video"],
+        outputTypes: ["text"],
         isDefault: true,
-        capabilities: [
-          CAPABILITIES.text,
-          CAPABILITIES.image,
-          CAPABILITIES.file,
-          CAPABILITIES.audio,
-          CAPABILITIES.video,
-          CAPABILITIES.tools,
-        ],
       },
     ],
   },
 ];
 
 export default function ModelsPage() {
+  const { isAuthenticated } = useRouterAuth();
+  const userProviders = useQuery(
+    api.router.providers.listUserProviders,
+    isAuthenticated ? {} : "skip"
+  );
+  const updateSingleModelMutation = useMutation(api.router.providers.updateSingleModel);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedProvider, setSelectedProvider] = useState("all");
   const [copiedModelId, setCopiedModelId] = useState<string | null>(null);
   const [testingModelId, setTestingModelId] = useState<string | null>(null);
+  const [editingModel, setEditingModel] = useState<ModelItem | null>(null);
+
+  // Combine built-in Const provider with user's active connected providers
+  const allProviders = useMemo(() => {
+    const list: ProviderGroup[] = [...PROVIDERS_DATA];
+
+    if (userProviders) {
+      for (const up of userProviders) {
+        if (up.status !== "active") continue;
+        const enabledModels = up.importedModels.filter((m: any) => m.enabled);
+        if (enabledModels.length === 0) continue;
+
+        list.push({
+          id: up.providerId,
+          name: up.name,
+          type: "byok",
+          models: enabledModels.map((m: any) => ({
+            id: `${up.providerId}/${m.modelId}`,
+            name: m.name,
+            modelId: m.modelId,
+            provider: up.name,
+            providerDocId: up._id,
+            providerId: up.providerId,
+            contextWindow: m.contextWindow || "1000000",
+            maxOutputTokens: m.maxOutputTokens || "128000",
+            inputTypes: m.inputTypes || ["text"],
+            outputTypes: m.outputTypes || ["text"],
+          })),
+        });
+      }
+    }
+
+    return list;
+  }, [userProviders]);
 
   // Copy model identifier to clipboard
   const handleCopyModel = (modelId: string, displayName: string) => {
@@ -135,14 +158,19 @@ export default function ModelsPage() {
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({ model: model.modelId }),
+        body: JSON.stringify({
+          model: model.modelId,
+          provider: model.provider,
+          providerId: model.providerId || (model.provider === "const" ? "const" : undefined),
+          providerDocId: model.providerDocId,
+        }),
       });
 
       const data = await res.json().catch(() => null);
 
       if (res.ok && data?.success) {
         toast.success(`Model ${model.name} is operational`, {
-          description: `Latency: ${data.latency}ms • Response: "${data.reply}"`,
+          description: `Latency: ${data.latency}ms • Reply: "${data.reply}"`,
         });
       } else {
         const errorMsg =
@@ -164,7 +192,7 @@ export default function ModelsPage() {
   const filteredProviders = useMemo(() => {
     const query = searchQuery.toLowerCase().trim();
 
-    return PROVIDERS_DATA.map((provider) => {
+    return allProviders.map((provider) => {
       // Check provider filter
       if (selectedProvider !== "all" && provider.id !== selectedProvider) {
         return null;
@@ -175,10 +203,7 @@ export default function ModelsPage() {
         if (!query) return true;
         const inName = model.name.toLowerCase().includes(query);
         const inId = model.modelId.toLowerCase().includes(query);
-        const inCapabilities = model.capabilities.some((cap) =>
-          cap.label.toLowerCase().includes(query)
-        );
-        return inName || inId || inCapabilities;
+        return inName || inId;
       });
 
       if (matchedModels.length === 0 && query) {
@@ -190,10 +215,10 @@ export default function ModelsPage() {
         models: matchedModels,
       };
     }).filter(Boolean) as ProviderGroup[];
-  }, [searchQuery, selectedProvider]);
+  }, [allProviders, searchQuery, selectedProvider]);
 
   // Total available models count across filtered
-  const totalAvailableModels = PROVIDERS_DATA.reduce(
+  const totalAvailableModels = allProviders.reduce(
     (acc, prov) => acc + prov.models.length,
     0
   );
@@ -327,11 +352,13 @@ export default function ModelsPage() {
               </SelectTrigger>
               <SelectContent className="rounded-xl border-border bg-popover text-xs font-sans">
                 <SelectItem value="all" className="cursor-pointer">
-                  All Providers
+                  All Providers ({allProviders.length})
                 </SelectItem>
-                <SelectItem value="const" className="cursor-pointer">
-                  Const
-                </SelectItem>
+                {allProviders.map((p) => (
+                  <SelectItem key={p.id} value={p.id} className="cursor-pointer">
+                    {p.name}
+                  </SelectItem>
+                ))}
                 <SelectSeparator />
                 <SelectItem
                   value="add_provider"
@@ -391,19 +418,19 @@ export default function ModelsPage() {
                   <Table>
                     <TableHeader className="bg-secondary/20">
                       <TableRow className="border-border/60 hover:bg-transparent">
-                        <TableHead className="w-[34%] min-w-[200px] pl-6 pr-4 text-xs font-mono font-semibold uppercase tracking-wider text-muted-foreground">
+                        <TableHead className="w-[35%] min-w-[200px] pl-6 pr-4 text-xs font-mono font-semibold uppercase tracking-wider text-muted-foreground">
                           Model
                         </TableHead>
-                        <TableHead className="w-[22%] min-w-[150px] px-4 text-xs font-mono font-semibold uppercase tracking-wider text-muted-foreground">
-                          Capabilities
-                        </TableHead>
-                        <TableHead className="w-[15%] min-w-[110px] px-4 text-xs font-mono font-semibold uppercase tracking-wider text-muted-foreground">
+                        <TableHead className="w-[15%] min-w-[100px] px-4 text-xs font-mono font-semibold uppercase tracking-wider text-muted-foreground">
                           Context Window
                         </TableHead>
-                        <TableHead className="w-[15%] min-w-[110px] px-4 text-xs font-mono font-semibold uppercase tracking-wider text-muted-foreground">
-                          Max Output Token
+                        <TableHead className="w-[15%] min-w-[100px] px-4 text-xs font-mono font-semibold uppercase tracking-wider text-muted-foreground">
+                          Max Output
                         </TableHead>
-                        <TableHead className="w-[14%] min-w-[100px] pl-4 pr-6 text-right text-xs font-mono font-semibold uppercase tracking-wider text-muted-foreground">
+                        <TableHead className="w-[15%] min-w-[110px] px-4 text-xs font-mono font-semibold uppercase tracking-wider text-muted-foreground">
+                          Modality
+                        </TableHead>
+                        <TableHead className="w-[20%] min-w-[140px] pl-4 pr-6 text-right text-xs font-mono font-semibold uppercase tracking-wider text-muted-foreground">
                           Action
                         </TableHead>
                       </TableRow>
@@ -421,7 +448,7 @@ export default function ModelsPage() {
                                 {model.name}
                               </span>
 
-                              {/* Copy model identifier (gemini-3.6-flash) */}
+                              {/* Copy model identifier */}
                               <Tooltip>
                                 <TooltipTrigger asChild>
                                   <button
@@ -452,61 +479,82 @@ export default function ModelsPage() {
                             </div>
                           </TableCell>
 
-                          {/* 2. Capabilities: Icon-only with Tooltips */}
+                          {/* 2. Context Window */}
+                          <TableCell className="py-4 px-4">
+                            <span className="text-xs font-mono text-foreground font-normal">
+                              {formatTokenDisplay(model.contextWindow, "1M")}
+                            </span>
+                          </TableCell>
+
+                          {/* 3. Max Output */}
+                          <TableCell className="py-4 px-4">
+                            <span className="text-xs font-mono text-foreground font-normal">
+                              {formatTokenDisplay(model.maxOutputTokens, "128K")}
+                            </span>
+                          </TableCell>
+
+                          {/* 4. Modality badges */}
                           <TableCell className="py-4 px-4">
                             <div className="flex items-center gap-1.5 flex-wrap">
-                              {model.capabilities.map((cap) => {
-                                const IconComp = cap.icon;
-                                return (
-                                  <Tooltip key={cap.id}>
-                                    <TooltipTrigger asChild>
-                                      <div className="h-7 w-7 rounded-lg bg-secondary/80 border border-border/60 flex items-center justify-center text-foreground hover:bg-secondary transition-colors cursor-help">
-                                        <IconComp className="h-3.5 w-3.5 text-muted-foreground" />
-                                      </div>
-                                    </TooltipTrigger>
-                                    <TooltipContent side="top">
-                                      {cap.label}
-                                    </TooltipContent>
-                                  </Tooltip>
-                                );
-                              })}
+                              {model.inputTypes?.includes("text") && (
+                                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-md bg-secondary border border-border text-foreground">
+                                  Text
+                                </span>
+                              )}
+                              {model.inputTypes?.includes("image") && (
+                                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-md bg-blue-500/10 border border-blue-500/20 text-blue-600 dark:text-blue-400">
+                                  Image
+                                </span>
+                              )}
+                              {model.inputTypes?.includes("video") && (
+                                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded-md bg-purple-500/10 border border-purple-500/20 text-purple-600 dark:text-purple-400">
+                                  Video
+                                </span>
+                              )}
                             </div>
                           </TableCell>
 
-                          {/* 3. Context Window: Plain text */}
-                          <TableCell className="py-4 px-4">
-                            <span className="text-xs font-mono text-foreground font-normal">
-                              {model.contextWindow}
-                            </span>
-                          </TableCell>
-
-                          {/* 4. Max Output Token: Plain text (64K) */}
-                          <TableCell className="py-4 px-4">
-                            <span className="text-xs font-mono text-foreground font-normal">
-                              {model.maxOutputTokens}
-                            </span>
-                          </TableCell>
-
-                          {/* 5. Action: Test Model Button */}
+                          {/* 5. Action: Edit (if BYOK) + Test Model */}
                           <TableCell className="py-4 pl-4 pr-6 text-right">
-                            <Button
-                              size="sm"
-                              onClick={() => handleTestModel(model)}
-                              disabled={testingModelId === model.id}
-                              className="rounded-full gap-1.5 text-xs font-medium cursor-pointer h-8 px-3.5 bg-primary text-primary-foreground hover:bg-primary/90 shadow-none"
-                            >
-                              {testingModelId === model.id ? (
-                                <>
-                                  <Loader2 className="h-3 w-3 animate-spin" />
-                                  <span>Testing...</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Zap className="h-3 w-3 fill-current" />
-                                  <span>Test Model</span>
-                                </>
+                            <div className="flex items-center justify-end gap-1.5">
+                              {model.providerDocId && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <Button
+                                      size="icon"
+                                      variant="ghost"
+                                      onClick={() => setEditingModel(model)}
+                                      className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground cursor-pointer"
+                                      aria-label={`Edit ${model.name}`}
+                                    >
+                                      <Pencil className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top">
+                                    Edit model specs
+                                  </TooltipContent>
+                                </Tooltip>
                               )}
-                            </Button>
+
+                              <Button
+                                size="sm"
+                                onClick={() => handleTestModel(model)}
+                                disabled={testingModelId === model.id}
+                                className="rounded-full gap-1.5 text-xs font-medium cursor-pointer h-8 px-3.5 bg-primary text-primary-foreground hover:bg-primary/90 shadow-none"
+                              >
+                                {testingModelId === model.id ? (
+                                  <>
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                    <span>Testing...</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Zap className="h-3 w-3 fill-current" />
+                                    <span>Test Model</span>
+                                  </>
+                                )}
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -517,6 +565,46 @@ export default function ModelsPage() {
             ))
           )}
         </div>
+
+        {/* Edit Model Configuration Dialog */}
+        <ModelConfigDialog
+          open={!!editingModel}
+          onOpenChange={(open) => !open && setEditingModel(null)}
+          title={`Edit model: ${editingModel?.name || editingModel?.modelId}`}
+          initialData={
+            editingModel
+              ? {
+                  modelId: editingModel.modelId,
+                  name: editingModel.name,
+                  contextWindow: editingModel.contextWindow,
+                  maxOutputTokens: editingModel.maxOutputTokens,
+                  inputTypes: editingModel.inputTypes,
+                  outputTypes: editingModel.outputTypes,
+                }
+              : null
+          }
+          onSave={async (data) => {
+            if (!editingModel?.providerDocId) return;
+            try {
+              await updateSingleModelMutation({
+                providerDocId: editingModel.providerDocId as any,
+                modelId: editingModel.modelId,
+                contextWindow: data.contextWindow,
+                maxOutputTokens: data.maxOutputTokens,
+                inputTypes: data.inputTypes,
+                outputTypes: data.outputTypes,
+              });
+              toast.success("Model updated successfully", {
+                description: `Updated configuration for ${data.modelId}`,
+              });
+              setEditingModel(null);
+            } catch (err: any) {
+              toast.error("Failed to update model", {
+                description: err?.message || "An unexpected error occurred",
+              });
+            }
+          }}
+        />
       </div>
     </TooltipProvider>
   );

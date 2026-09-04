@@ -16,4 +16,38 @@ export const routerTables = {
   })
     .index("by_user", ["userId"])
     .index("by_key_hash", ["keyHash"]),
+
+  // 2. User-configured external AI providers (BYOK & Custom Endpoints)
+  userProviders: defineTable({
+    userId: v.id("users"),
+    providerId: v.string(), // e.g. "openai", "anthropic", "deepseek", "google", "groq", or "custom-xxx"
+    name: v.string(),
+    protocol: v.union(
+      v.literal("openai-compatible"),
+      v.literal("anthropic"),
+      v.literal("google-ai"),
+      v.literal("custom")
+    ),
+    baseUrl: v.optional(v.string()),
+    keyCipher: v.string(), // AES-256-GCM ciphertext in hex
+    keyIv: v.string(),     // 12-byte IV in hex
+    keyPrefix: v.string(), // Masked key for display e.g. "sk-proj-...8a1f"
+    status: v.union(v.literal("active"), v.literal("disabled"), v.literal("error")),
+    importedModels: v.array(
+      v.object({
+        modelId: v.string(),
+        name: v.string(),
+        contextWindow: v.optional(v.string()),
+        maxOutputTokens: v.optional(v.string()),
+        inputTypes: v.optional(v.array(v.string())),
+        outputTypes: v.optional(v.array(v.string())),
+        capabilities: v.optional(v.array(v.string())),
+        enabled: v.boolean(),
+      })
+    ),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_provider", ["userId", "providerId"]),
 };

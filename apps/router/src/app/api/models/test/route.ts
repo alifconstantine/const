@@ -1,8 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
+import { ConvexHttpClient } from "convex/browser";
+import { api } from "@const/backend/_generated/api";
+import type { Id } from "@const/backend/_generated/dataModel";
 
 export async function POST(req: NextRequest) {
   try {
-    // 1. Enforce active session auth (via SSO cookie or Authorization header)
+    // 1. Session verification
     const ssoToken =
       req.cookies.get("const_sso_token")?.value ||
       req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
@@ -17,56 +20,274 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 2. Strict model whitelist
     const body = await req.json().catch(() => ({}));
-    const requestedModel = body?.model || "gemini-3.6-flash";
-    const MODEL_MAPPING: Record<string, string> = {
-      "gemini-3.6-flash": "antigravity/gemini-3.6-flash-medium",
-    };
+    const { model, providerId, providerDocId, protocol, baseUrl, apiKey } = body;
 
-    if (!MODEL_MAPPING[requestedModel]) {
+    if (!model || typeof model !== "string") {
       return NextResponse.json(
         {
           success: false,
-          error: `Model '${requestedModel}' is not permitted for connectivity testing.`,
+          error: "Missing or invalid 'model' parameter.",
         },
         { status: 400 }
       );
     }
 
-    const model = MODEL_MAPPING[requestedModel];
-
-    const baseUrl = process.env.CONST_ENGINE_BASE_URL?.trim();
-    if (!baseUrl) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "CONST_ENGINE_BASE_URL is not configured in .env.local",
-        },
-        { status: 500 }
-      );
-    }
-    const apiKey = process.env.CONST_ENGINE_API_KEY?.trim() || "";
-
     const startTime = Date.now();
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-    };
-    if (apiKey) {
-      headers["Authorization"] = `Bearer ${apiKey}`;
-    }
-
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 12000);
 
-    const res = await fetch(`${baseUrl}/v1/chat/completions`, {
+    // ========================================================
+    // CASE A: Const Engine (Built-in Managed Engine)
+    // ========================================================
+    if (providerId === "const" || (!providerDocId && !baseUrl && !apiKey && !providerId)) {
+      const constBaseUrl = process.env.CONST_ENGINE_BASE_URL?.trim();
+      if (!constBaseUrl) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "CONST_ENGINE_BASE_URL is not configured in environment.",
+          },
+          { status: 500 }
+        );
+      }
+
+      const constApiKey = process.env.CONST_ENGINE_API_KEY?.trim() || "";
+      const mappedModel =
+        model === "gemini-3.6-flash"
+          ? "antigravity/gemini-3.6-flash-medium"
+          : model;
+
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+      if (constApiKey) {
+        headers["Authorization"] = `Bearer ${constApiKey}`;
+      }
+
+      const res = await fetch(`${constBaseUrl}/v1/chat/completions`, {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          model: mappedModel,
+          messages: [{ role: "user", content: "Ping! Please respond with 'OK'." }],
+          max_tokens: 15,
+        }),
+        signal: controller.signal,
+      }).finally(() => clearTimeout(timeoutId));
+
+      const latency = Date.now() - startTime;
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        const errorMsg =
+          data?.error?.message ||
+          data?.message ||
+          `Upstream error (HTTP ${res.status} ${res.statusText})`;
+        return NextResponse.json(
+          { success: false, error: errorMsg, status: res.status, latency },
+          { status: res.status }
+        );
+      }
+
+      const reply = data?.choices?.[0]?.message?.content || "OK";
+      return NextResponse.json({
+        success: true,
+        latency,
+        reply: reply.trim(),
+        model: data?.model || model,
+      });
+    }
+
+    // ========================================================
+    // CASE B: User BYOK or Custom Provider
+    // ========================================================
+    let activeApiKey = apiKey?.trim() || "";
+    let activeBaseUrl = baseUrl?.trim()?.replace(/\/+$/, "") || "";
+    let activeProtocol = protocol || "openai-compatible";
+    let activeProviderId = providerId || "";
+
+    // If providerDocId is given, fetch encrypted credentials safely from Convex
+    if (providerDocId) {
+      const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
+      if (!convexUrl) {
+        return NextResponse.json(
+          { success: false, error: "NEXT_PUBLIC_CONVEX_URL is not configured." },
+          { status: 500 }
+        );
+      }
+
+      const client = new ConvexHttpClient(convexUrl);
+      client.setAuth(ssoToken);
+
+      try {
+        const creds = await client.query(api.router.providers.getProviderCredentials, {
+          providerDocId: providerDocId as Id<"userProviders">,
+        });
+
+        if (creds) {
+          activeApiKey = creds.apiKey || "";
+          activeBaseUrl = creds.baseUrl?.replace(/\/+$/, "") || "";
+          activeProtocol = creds.protocol || activeProtocol;
+          activeProviderId = creds.providerId || activeProviderId;
+        }
+      } catch (convexErr: any) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: convexErr?.message || "Failed to load provider configuration from Convex.",
+          },
+          { status: 403 }
+        );
+      }
+    }
+
+    // Determine target URL and headers based on provider protocol
+    // --------------------------------------------------------
+    // 1. Anthropic Protocol
+    // --------------------------------------------------------
+    if (activeProtocol === "anthropic" || activeProviderId === "anthropic") {
+      if (!activeApiKey) {
+        return NextResponse.json(
+          { success: false, error: "Anthropic API Key is required for testing." },
+          { status: 400 }
+        );
+      }
+
+      const res = await fetch("https://api.anthropic.com/v1/messages", {
+        method: "POST",
+        headers: {
+          "x-api-key": activeApiKey,
+          "anthropic-version": "2023-06-01",
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model,
+          messages: [{ role: "user", content: "Ping! Please respond with 'OK'." }],
+          max_tokens: 15,
+        }),
+        signal: controller.signal,
+      }).finally(() => clearTimeout(timeoutId));
+
+      const latency = Date.now() - startTime;
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        const errorMsg =
+          data?.error?.message || `Anthropic returned HTTP ${res.status}`;
+        return NextResponse.json(
+          { success: false, error: errorMsg, status: res.status, latency },
+          { status: res.status }
+        );
+      }
+
+      const reply = data?.content?.[0]?.text || "OK";
+      return NextResponse.json({
+        success: true,
+        latency,
+        reply: reply.trim(),
+        model: data?.model || model,
+      });
+    }
+
+    // --------------------------------------------------------
+    // 2. Google AI Studio Protocol
+    // --------------------------------------------------------
+    if (activeProtocol === "google-ai" || activeProviderId === "google") {
+      if (!activeApiKey) {
+        return NextResponse.json(
+          { success: false, error: "Google AI API Key is required for testing." },
+          { status: 400 }
+        );
+      }
+
+      const cleanModelId = model.replace(/^models\//, "");
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/${cleanModelId}:generateContent?key=${activeApiKey}`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            contents: [{ role: "user", parts: [{ text: "Ping! Please respond with 'OK'." }] }],
+            generationConfig: { maxOutputTokens: 15 },
+          }),
+          signal: controller.signal,
+        }
+      ).finally(() => clearTimeout(timeoutId));
+
+      const latency = Date.now() - startTime;
+      const data = await res.json().catch(() => null);
+
+      if (!res.ok) {
+        const errorMsg =
+          data?.error?.message || `Google AI returned HTTP ${res.status}`;
+        return NextResponse.json(
+          { success: false, error: errorMsg, status: res.status, latency },
+          { status: res.status }
+        );
+      }
+
+      const reply = data?.candidates?.[0]?.content?.parts?.[0]?.text || "OK";
+      return NextResponse.json({
+        success: true,
+        latency,
+        reply: reply.trim(),
+        model: cleanModelId,
+      });
+    }
+
+    // --------------------------------------------------------
+    // 3. OpenAI & OpenAI-Compatible (DeepSeek, Groq, Custom)
+    // --------------------------------------------------------
+    let targetBaseUrl = activeBaseUrl;
+    if (activeProviderId === "openai") {
+      targetBaseUrl = "https://api.openai.com/v1";
+    } else if (activeProviderId === "deepseek") {
+      targetBaseUrl = "https://api.deepseek.com";
+    } else if (activeProviderId === "groq") {
+      targetBaseUrl = "https://api.groq.com/openai/v1";
+    }
+
+    if (!targetBaseUrl) {
+      return NextResponse.json(
+        { success: false, error: "Provider base URL is missing." },
+        { status: 400 }
+      );
+    }
+
+    // Normalize endpoint URL for chat completions
+    let endpoint = targetBaseUrl;
+    if (endpoint.endsWith("/chat/completions")) {
+      // Already complete
+    } else if (endpoint.endsWith("/v1")) {
+      endpoint = `${endpoint}/chat/completions`;
+    } else {
+      endpoint = `${endpoint}/v1/chat/completions`;
+    }
+
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (activeApiKey && activeApiKey !== "no-key-required") {
+      headers["Authorization"] = `Bearer ${activeApiKey}`;
+    }
+
+    // Handle max_tokens vs max_completion_tokens for reasoning models (e.g. o1/o3)
+    const isReasoning = model.startsWith("o1") || model.startsWith("o3");
+    const payloadBody: Record<string, any> = {
+      model,
+      messages: [{ role: "user", content: "Ping! Please respond with 'OK'." }],
+    };
+    if (isReasoning) {
+      payloadBody.max_completion_tokens = 50;
+    } else {
+      payloadBody.max_tokens = 15;
+    }
+
+    const res = await fetch(endpoint, {
       method: "POST",
       headers,
-      body: JSON.stringify({
-        model,
-        messages: [{ role: "user", content: "Ping! Please respond with 'OK'." }],
-        max_tokens: 15,
-      }),
+      body: JSON.stringify(payloadBody),
       signal: controller.signal,
     }).finally(() => clearTimeout(timeoutId));
 
@@ -76,25 +297,20 @@ export async function POST(req: NextRequest) {
     if (!res.ok) {
       const errorMsg =
         data?.error?.message ||
+        data?.error ||
         data?.message ||
-        `Upstream error (HTTP ${res.status} ${res.statusText})`;
+        `Upstream returned HTTP ${res.status}`;
       return NextResponse.json(
-        {
-          success: false,
-          error: errorMsg,
-          status: res.status,
-          latency,
-        },
+        { success: false, error: errorMsg, status: res.status, latency },
         { status: res.status }
       );
     }
 
     const reply = data?.choices?.[0]?.message?.content || "OK";
-
     return NextResponse.json({
       success: true,
       latency,
-      reply,
+      reply: reply.trim(),
       model: data?.model || model,
     });
   } catch (error: any) {
@@ -104,7 +320,7 @@ export async function POST(req: NextRequest) {
         success: false,
         error: isTimeout
           ? "Request timed out after 12 seconds."
-          : error?.message || "Failed to reach model engine.",
+          : error?.message || "Failed to test model connectivity.",
       },
       { status: 500 }
     );
