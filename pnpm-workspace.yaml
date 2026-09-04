@@ -2,5 +2,9 @@ packages:
   - "apps/*"
   - "apps/learn/*"
   - "packages/*"
+  - "packages/session-backends/*"
 allowBuilds:
+  '@google/genai': true
+  canvas: true
   esbuild: true
+  protobufjs: true

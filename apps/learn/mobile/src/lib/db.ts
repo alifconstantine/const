@@ -7,6 +7,7 @@ export interface LocalLearn {
   emoji: string;
   collectionIds: string[];
   sourcesCount: number;
+  projectPath?: string;
   updatedAt: number;
   createdAt: number;
   isArchived?: boolean;
@@ -28,7 +29,19 @@ export interface LocalArtifact {
   title: string;
   type: string;
   content?: string;
+  fileUrl?: string;
+  isZip?: boolean;
   updatedAt: number;
+  createdAt: number;
+}
+
+export interface LocalMessage {
+  id: string;
+  learnId: string;
+  role: "user" | "assistant" | "tool";
+  content: string;
+  thinking?: string;
+  toolCalls?: any[];
   createdAt: number;
 }
 
@@ -36,12 +49,20 @@ export const db = new Dexie("ConstLearnDatabase") as Dexie & {
   learns: EntityTable<LocalLearn, "id">;
   collections: EntityTable<LocalCollection, "id">;
   artifacts: EntityTable<LocalArtifact, "id">;
+  messages: EntityTable<LocalMessage, "id">;
 };
 
 db.version(1).stores({
   learns: "id, title, updatedAt, createdAt, *collectionIds",
   collections: "id, name, updatedAt, createdAt",
   artifacts: "id, learnId, title, type, updatedAt, createdAt",
+});
+
+db.version(2).stores({
+  learns: "id, title, updatedAt, createdAt, *collectionIds, projectPath",
+  collections: "id, name, updatedAt, createdAt",
+  artifacts: "id, learnId, title, type, updatedAt, createdAt",
+  messages: "id, learnId, role, createdAt",
 });
 
 // Helper functions for CRUD operations
@@ -52,6 +73,7 @@ export const localDb = {
     description?: string;
     emoji?: string;
     collectionId?: string;
+    projectPath?: string;
   }): Promise<string> {
     const id = "learn_" + Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
     const now = Date.now();
@@ -59,9 +81,10 @@ export const localDb = {
       id,
       title: data.title.trim() || "Untitled learn",
       description: data.description?.trim(),
-      emoji: data.emoji || "🚀",
+      emoji: data.emoji || "📘",
       collectionIds: data.collectionId ? [data.collectionId] : [],
       sourcesCount: 0,
+      projectPath: data.projectPath?.trim(),
       updatedAt: now,
       createdAt: now,
       isArchived: false,
@@ -76,6 +99,7 @@ export const localDb = {
       description?: string;
       emoji?: string;
       collectionIds?: string[];
+      projectPath?: string;
     }
   ) {
     const updates: Partial<LocalLearn> = {
@@ -85,19 +109,22 @@ export const localDb = {
     if (data.description !== undefined) updates.description = data.description?.trim();
     if (data.emoji !== undefined) updates.emoji = data.emoji;
     if (data.collectionIds !== undefined) updates.collectionIds = data.collectionIds;
+    if (data.projectPath !== undefined) updates.projectPath = data.projectPath.trim();
 
     await db.learns.update(id, updates);
   },
 
   async deleteLearn(id: string) {
-    // Delete associated artifacts
+    // Delete associated artifacts and messages
     await db.artifacts.where("learnId").equals(id).delete();
+    await db.messages.where("learnId").equals(id).delete();
     await db.learns.delete(id);
   },
 
   async batchDeleteLearns(ids: string[]) {
     for (const id of ids) {
       await db.artifacts.where("learnId").equals(id).delete();
+      await db.messages.where("learnId").equals(id).delete();
     }
     await db.learns.bulkDelete(ids);
   },
@@ -176,6 +203,8 @@ export const localDb = {
     title: string;
     type: string;
     content?: string;
+    fileUrl?: string;
+    isZip?: boolean;
   }): Promise<string> {
     const id = "art_" + Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
     const now = Date.now();
@@ -185,6 +214,8 @@ export const localDb = {
       title: data.title.trim() || "Untitled Artifact",
       type: data.type,
       content: data.content,
+      fileUrl: data.fileUrl,
+      isZip: data.isZip,
       updatedAt: now,
       createdAt: now,
     });
@@ -194,4 +225,23 @@ export const localDb = {
   async deleteArtifact(id: string) {
     await db.artifacts.delete(id);
   },
+
+  // Messages (Chat History persistence)
+  async getMessages(learnId: string): Promise<LocalMessage[]> {
+    return await db.messages.where("learnId").equals(learnId).sortBy("createdAt");
+  },
+
+  async saveMessage(data: Omit<LocalMessage, "createdAt"> & { createdAt?: number }): Promise<string> {
+    const now = data.createdAt || Date.now();
+    await db.messages.put({
+      ...data,
+      createdAt: now,
+    });
+    return data.id;
+  },
+
+  async clearMessages(learnId: string): Promise<void> {
+    await db.messages.where("learnId").equals(learnId).delete();
+  },
 };
+

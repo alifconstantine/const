@@ -148,12 +148,14 @@ export function LearnHome({ onOpenLearn }: LearnHomeProps) {
     description?: string;
     emoji: string;
     collectionId?: string;
+    projectPath?: string;
   }) => {
     if (data.id) {
       await localDb.updateLearn(data.id, {
         title: data.title,
         description: data.description,
         emoji: data.emoji,
+        projectPath: data.projectPath,
       });
     } else {
       await localDb.createLearn({
@@ -161,6 +163,7 @@ export function LearnHome({ onOpenLearn }: LearnHomeProps) {
         description: data.description,
         emoji: data.emoji,
         collectionId: data.collectionId || (activeCollectionId ?? undefined),
+        projectPath: data.projectPath,
       });
     }
   };

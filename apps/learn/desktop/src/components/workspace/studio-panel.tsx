@@ -49,11 +49,11 @@ export function StudioPanel({
 }: StudioPanelProps) {
   if (isCollapsed) {
     return (
-      <div className="w-12 h-full flex flex-col items-center py-4 bg-[#141416] text-muted-foreground">
+      <div className="w-12 h-full flex flex-col items-center py-4 bg-card/40 border-l border-border/60 text-muted-foreground">
         <button
           type="button"
           onClick={onToggleCollapse}
-          className="h-8 w-8 rounded-lg hover:bg-white/5 flex items-center justify-center transition-colors cursor-pointer"
+          className="h-8 w-8 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
           title="Buka Panel Studio"
         >
           <PanelRightClose className="h-4 w-4 rotate-180" />
@@ -66,7 +66,7 @@ export function StudioPanel({
   }
 
   return (
-    <aside className="w-[340px] xl:w-[360px] h-full flex flex-col bg-[#141416] text-foreground p-4 shrink-0 select-none overflow-y-auto">
+    <aside className="w-[340px] xl:w-[360px] h-full flex flex-col bg-card/40 border-l border-border/60 text-foreground p-4 shrink-0 select-none overflow-y-auto">
       {/* Header */}
       <div className="flex items-center justify-between mb-3 px-1">
         <span className="text-sm font-medium text-foreground">Studio</span>
@@ -74,7 +74,7 @@ export function StudioPanel({
           <button
             type="button"
             onClick={onToggleCollapse}
-            className="h-7 w-7 rounded-md hover:bg-white/5 text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
+            className="h-7 w-7 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
             title="Sembunyikan Panel"
           >
             <PanelRightClose className="h-4 w-4" />
@@ -91,7 +91,7 @@ export function StudioPanel({
               key={tool.id}
               type="button"
               onClick={() => onSelectTool?.(tool.id)}
-              className="p-2.5 rounded-xl bg-[#1c1c20] hover:bg-[#25252a] border border-white/5 transition-all flex flex-col justify-between h-20 text-left group cursor-pointer"
+              className="p-2.5 rounded-2xl bg-muted/50 hover:bg-muted border border-border/50 transition-all flex flex-col justify-between h-20 text-left group cursor-pointer"
             >
               <div className="flex items-center justify-between w-full">
                 <Icon className={`h-4 w-4 ${tool.iconColor}`} />
@@ -107,7 +107,7 @@ export function StudioPanel({
 
       {/* Empty State Studio Output (Zero Dummy Data) */}
       <div className="flex-1 flex flex-col items-center justify-center text-center p-4 min-h-[180px]">
-        <div className="h-10 w-10 rounded-xl bg-white/5 flex items-center justify-center text-muted-foreground/60 mb-3">
+        <div className="h-10 w-10 rounded-2xl bg-muted/50 border border-border/40 flex items-center justify-center text-muted-foreground/60 mb-3">
           <PenTool className="h-5 w-5 stroke-[1.5]" />
         </div>
         <h3 className="text-xs font-medium text-foreground mb-1">
@@ -123,7 +123,7 @@ export function StudioPanel({
         <button
           type="button"
           onClick={onAddNote}
-          className="inline-flex items-center gap-1.5 px-5 py-2 rounded-full bg-white hover:bg-white/90 text-black text-xs font-medium transition-all shadow-md active:scale-98 cursor-pointer"
+          className="inline-flex items-center gap-1.5 px-5 py-2 rounded-full bg-foreground hover:bg-foreground/90 text-background text-xs font-medium transition-all shadow-xs active:scale-98 cursor-pointer"
         >
           <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
           <span>Tambahkan catatan</span>

@@ -9,6 +9,7 @@
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
+    "@const/agent": "workspace:*",
     "@const/backend": "workspace:*",
     "@const/ui": "workspace:*",
     "convex": "^1.45.0",

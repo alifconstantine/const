@@ -1,0 +1,19 @@
+﻿{
+	"extends": "../../tsconfig.base.json",
+	"compilerOptions": {
+		"outDir": "./dist",
+		"paths": {
+			"@const/agent": ["../agent/dist/index.d.ts"],
+			"@const/agent/*": ["../agent/dist/*.d.ts"],
+			"@const/ai": ["../ai/dist/index.d.ts"],
+			"@const/ai/*": ["../ai/dist/*.d.ts", "../ai/dist/providers/*.d.ts"],
+			"@const/client": ["../client/dist/index.d.ts"],
+			"@const/protocol": ["../protocol/dist/index.d.ts"],
+			"@const/tui": ["../tui/dist/index.d.ts"],
+			"@const/tui/*": ["../tui/dist/*.d.ts", "../tui/dist/components/*.d.ts"]
+		},
+		"rootDir": "./src"
+	},
+	"include": ["src/**/*.ts", "src/**/*.d.ts"],
+	"exclude": ["node_modules", "dist"]
+}

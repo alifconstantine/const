@@ -8,7 +8,7 @@ import {
   Button,
   Input,
 } from "@const/ui";
-import { BookOpen } from "lucide-react";
+import { BookOpen, Folder, FolderOpen, X } from "lucide-react";
 
 const EMOJI_OPTIONS = [
   "🚀", "🧠", "💡", "🎨", "🏆", "📚", "💻", "🔬",
@@ -25,6 +25,7 @@ interface CreateLearnDialogProps {
     description?: string;
     emoji?: string;
     collectionIds?: string[];
+    projectPath?: string;
   };
   onSubmit: (data: {
     id?: string;
@@ -32,6 +33,7 @@ interface CreateLearnDialogProps {
     description?: string;
     emoji: string;
     collectionId?: string;
+    projectPath?: string;
   }) => Promise<void>;
 }
 
@@ -48,6 +50,7 @@ export function CreateLearnDialog({
   const [selectedCollectionId, setSelectedCollectionId] = useState<string | undefined>(
     initialData?.collectionIds?.[0]
   );
+  const [projectPath, setProjectPath] = useState<string>(initialData?.projectPath ?? "");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   React.useEffect(() => {
@@ -56,8 +59,18 @@ export function CreateLearnDialog({
       setDescription(initialData?.description ?? "");
       setSelectedEmoji(initialData?.emoji ?? "🚀");
       setSelectedCollectionId(initialData?.collectionIds?.[0]);
+      setProjectPath(initialData?.projectPath ?? "");
     }
   }, [open, initialData]);
+
+  const handleSelectFolder = async () => {
+    if (window.electron?.openDirectoryDialog) {
+      const selected = await window.electron.openDirectoryDialog();
+      if (selected) {
+        setProjectPath(selected);
+      }
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,6 +84,7 @@ export function CreateLearnDialog({
         description: description.trim() || undefined,
         emoji: selectedEmoji,
         collectionId: selectedCollectionId,
+        projectPath: projectPath.trim() || undefined,
       });
       onOpenChange(false);
     } catch (err) {
@@ -144,7 +158,57 @@ export function CreateLearnDialog({
             />
           </div>
 
+          {/* Project Folder / Workspace Selection */}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
+                <Folder className="h-3.5 w-3.5 text-primary" />
+                <span>Folder Proyek (Workspace)</span>
+              </label>
+              {projectPath && (
+                <button
+                  type="button"
+                  onClick={() => setProjectPath("")}
+                  className="text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-0.5 cursor-pointer"
+                >
+                  <X className="h-3 w-3" />
+                  <span>Gunakan Global</span>
+                </button>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <div
+                className="flex-1 h-10 px-3 rounded-xl bg-secondary/40 border border-border/70 text-xs text-foreground flex items-center overflow-hidden"
+                title={projectPath || "Di luar proyek (Global Workspace di ~/.const/learn/)"}
+              >
+                <span className="truncate">
+                  {projectPath ? projectPath : "Di luar proyek (Global Workspace)"}
+                </span>
+              </div>
+
+              {window.electron?.openDirectoryDialog && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleSelectFolder}
+                  className="rounded-xl h-10 px-3 text-xs gap-1.5 shrink-0 cursor-pointer"
+                >
+                  <FolderOpen className="h-4 w-4 text-muted-foreground" />
+                  <span>Pilih Folder</span>
+                </Button>
+              )}
+            </div>
+            <p className="text-[11px] text-muted-foreground/70 leading-relaxed">
+              {projectPath
+                ? "Agent dapat membaca, menganalisis, dan mengeksekusi perintah di dalam folder proyek ini."
+                : "Akan disimpan secara global di ~/.const/learn/. Pilih folder jika Anda ingin menganalisis kode/berkas proyek tertentu."}
+            </p>
+          </div>
+
           {/* Collection Assignment */}
+
           {!isEdit && collections.length > 0 && (
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-muted-foreground">

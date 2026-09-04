@@ -8,6 +8,10 @@
       "@/*": ["./src/*"],
       "@const/ui": ["../../../packages/ui/src/index.ts"],
       "@const/ui/*": ["../../../packages/ui/src/*"],
+      "@const/agent": ["../../../packages/agent/src/index.ts"],
+      "@const/agent/models": ["../../../packages/agent/src/const/models.ts"],
+      "@const/agent/types": ["../../../packages/agent/src/const/types.ts"],
+      "@const/agent/*": ["../../../packages/agent/src/*"],
       "@const/backend/_generated/*": ["../../../packages/backend/convex/_generated/*"],
       "@const/backend/*": ["../../../packages/backend/convex/*"]
     }
