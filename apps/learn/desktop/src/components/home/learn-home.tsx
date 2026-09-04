@@ -19,7 +19,6 @@ import {
   Plus,
   ChevronRight,
   ArrowLeft,
-  Sparkles,
   Folder,
   Trash2,
   X,
@@ -46,7 +45,7 @@ const SORT_LABELS: Record<SortOption, string> = {
 };
 
 interface LearnHomeProps {
-  onOpenLearn?: (learn: LearnItem) => void;
+  onOpenLearn?: (learnId: string, openAddSource?: boolean) => void;
 }
 
 export function LearnHome({ onOpenLearn }: LearnHomeProps) {
@@ -64,6 +63,20 @@ export function LearnHome({ onOpenLearn }: LearnHomeProps) {
   const [isCreateCollectionOpen, setIsCreateCollectionOpen] = useState(false);
   const [editingCollection, setEditingCollection] = useState<CollectionItem | null>(null);
   const [managingLearn, setManagingLearn] = useState<LearnItem | null>(null);
+
+  const handleCreateNewLearn = async (collectionId?: string) => {
+    if (onOpenLearn) {
+      const id = await localDb.createLearn({
+        title: "Notebook tanpa judul",
+        emoji: "📘",
+        collectionId: collectionId || activeCollectionId || undefined,
+      });
+      onOpenLearn(id, true);
+    } else {
+      setEditingLearn(null);
+      setIsCreateLearnOpen(true);
+    }
+  };
   const [deleteTarget, setDeleteTarget] = useState<{
     type: "learn" | "collection";
     id?: string;
@@ -353,12 +366,9 @@ export function LearnHome({ onOpenLearn }: LearnHomeProps) {
             <DropdownMenuContent align="end" className="w-48 p-1.5 shadow-md">
               <DropdownMenuItem
                 className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2"
-                onClick={() => {
-                  setEditingLearn(null);
-                  setIsCreateLearnOpen(true);
-                }}
+                onClick={() => handleCreateNewLearn()}
               >
-                <Sparkles className="h-4 w-4 text-primary" />
+                <BookOpen className="h-4 w-4 text-primary" />
                 <span>Buat Learn Baru</span>
               </DropdownMenuItem>
               <DropdownMenuItem
@@ -420,10 +430,7 @@ export function LearnHome({ onOpenLearn }: LearnHomeProps) {
                 {/* First Item: + Buat learn baru card */}
                 <CreateCard
                   type="learn"
-                  onClick={() => {
-                    setEditingLearn(null);
-                    setIsCreateLearnOpen(true);
-                  }}
+                  onClick={() => handleCreateNewLearn()}
                 />
 
                 {/* Real User Learns */}
@@ -432,7 +439,7 @@ export function LearnHome({ onOpenLearn }: LearnHomeProps) {
                     key={learn.id}
                     learn={learn}
                     viewMode={viewMode}
-                    onClick={() => onOpenLearn?.(learn)}
+                    onClick={() => onOpenLearn?.(learn.id, false)}
                     onEdit={(l) => {
                       setEditingLearn(l);
                       setIsCreateLearnOpen(true);
@@ -549,10 +556,7 @@ export function LearnHome({ onOpenLearn }: LearnHomeProps) {
               {/* First Item: + Buat learn baru card */}
               <CreateCard
                 type="learn"
-                onClick={() => {
-                  setEditingLearn(null);
-                  setIsCreateLearnOpen(true);
-                }}
+                onClick={() => handleCreateNewLearn()}
               />
 
               {/* Real User Learns */}
@@ -561,7 +565,7 @@ export function LearnHome({ onOpenLearn }: LearnHomeProps) {
                   key={learn.id}
                   learn={learn}
                   viewMode={viewMode}
-                  onClick={() => onOpenLearn?.(learn)}
+                  onClick={() => onOpenLearn?.(learn.id, false)}
                   onEdit={(l) => {
                     setEditingLearn(l);
                     setIsCreateLearnOpen(true);
@@ -662,10 +666,7 @@ export function LearnHome({ onOpenLearn }: LearnHomeProps) {
                 >
                   <CreateCard
                     type="learn"
-                    onClick={() => {
-                      setEditingLearn(null);
-                      setIsCreateLearnOpen(true);
-                    }}
+                    onClick={() => handleCreateNewLearn(activeCollectionId || undefined)}
                   />
 
                   {collectionLearns.map((learn) => (
@@ -673,7 +674,7 @@ export function LearnHome({ onOpenLearn }: LearnHomeProps) {
                       key={learn.id}
                       learn={learn}
                       viewMode={viewMode}
-                      onClick={() => onOpenLearn?.(learn)}
+                      onClick={() => onOpenLearn?.(learn.id, false)}
                       onEdit={(l) => {
                         setEditingLearn(l);
                         setIsCreateLearnOpen(true);

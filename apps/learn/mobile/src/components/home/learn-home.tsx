@@ -45,7 +45,7 @@ const SORT_LABELS: Record<SortOption, string> = {
 };
 
 interface LearnHomeProps {
-  onOpenLearn?: (learn: LearnItem) => void;
+  onOpenLearn?: (learnId: string, openAddSource?: boolean) => void;
 }
 
 export function LearnHome({ onOpenLearn }: LearnHomeProps) {
@@ -63,6 +63,20 @@ export function LearnHome({ onOpenLearn }: LearnHomeProps) {
   const [isCreateCollectionOpen, setIsCreateCollectionOpen] = useState(false);
   const [editingCollection, setEditingCollection] = useState<CollectionItem | null>(null);
   const [managingLearn, setManagingLearn] = useState<LearnItem | null>(null);
+
+  const handleCreateNewLearn = async (collectionId?: string) => {
+    if (onOpenLearn) {
+      const id = await localDb.createLearn({
+        title: "Notebook tanpa judul",
+        emoji: "📘",
+        collectionId: collectionId || activeCollectionId || undefined,
+      });
+      onOpenLearn(id, true);
+    } else {
+      setEditingLearn(null);
+      setIsCreateLearnOpen(true);
+    }
+  };
   const [deleteTarget, setDeleteTarget] = useState<{
     type: "learn" | "collection";
     id?: string;
@@ -346,10 +360,7 @@ export function LearnHome({ onOpenLearn }: LearnHomeProps) {
               >
                 <CreateCard
                   type="learn"
-                  onClick={() => {
-                    setEditingLearn(null);
-                    setIsCreateLearnOpen(true);
-                  }}
+                  onClick={() => handleCreateNewLearn()}
                 />
 
                 {learns.map((learn) => (
@@ -357,7 +368,7 @@ export function LearnHome({ onOpenLearn }: LearnHomeProps) {
                     key={learn.id}
                     learn={learn}
                     viewMode={viewMode}
-                    onClick={() => onOpenLearn?.(learn)}
+                    onClick={() => onOpenLearn?.(learn.id, false)}
                     onEdit={(l) => {
                       setEditingLearn(l);
                       setIsCreateLearnOpen(true);
@@ -464,10 +475,7 @@ export function LearnHome({ onOpenLearn }: LearnHomeProps) {
             >
               <CreateCard
                 type="learn"
-                onClick={() => {
-                  setEditingLearn(null);
-                  setIsCreateLearnOpen(true);
-                }}
+                onClick={() => handleCreateNewLearn()}
               />
 
               {learns.map((learn) => (
@@ -475,7 +483,7 @@ export function LearnHome({ onOpenLearn }: LearnHomeProps) {
                   key={learn.id}
                   learn={learn}
                   viewMode={viewMode}
-                  onClick={() => onOpenLearn?.(learn)}
+                  onClick={() => onOpenLearn?.(learn.id, false)}
                   onEdit={(l) => {
                     setEditingLearn(l);
                     setIsCreateLearnOpen(true);
@@ -558,10 +566,7 @@ export function LearnHome({ onOpenLearn }: LearnHomeProps) {
                 >
                   <CreateCard
                     type="learn"
-                    onClick={() => {
-                      setEditingLearn(null);
-                      setIsCreateLearnOpen(true);
-                    }}
+                    onClick={() => handleCreateNewLearn(activeCollectionId || undefined)}
                   />
 
                   {collectionLearns.map((learn) => (
@@ -569,7 +574,7 @@ export function LearnHome({ onOpenLearn }: LearnHomeProps) {
                       key={learn.id}
                       learn={learn}
                       viewMode={viewMode}
-                      onClick={() => onOpenLearn?.(learn)}
+                      onClick={() => onOpenLearn?.(learn.id, false)}
                       onEdit={(l) => {
                         setEditingLearn(l);
                         setIsCreateLearnOpen(true);
@@ -776,10 +781,7 @@ export function LearnHome({ onOpenLearn }: LearnHomeProps) {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="center" side="top" className="w-52 p-1.5 shadow-xl mb-2">
               <DropdownMenuItem
-                onClick={() => {
-                  setEditingLearn(null);
-                  setIsCreateLearnOpen(true);
-                }}
+                onClick={() => handleCreateNewLearn()}
                 className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2.5 rounded-lg"
               >
                 <div className="h-7 w-7 rounded-md bg-[#0066ff]/10 text-[#0066ff] flex items-center justify-center shrink-0">

@@ -6,6 +6,8 @@ import { api } from "@const/backend/_generated/api";
 import { ConvexClientProvider } from "./components/convex-provider";
 import { Navbar } from "./components/navbar";
 import { LearnHome } from "./components/home/learn-home";
+import { MobileLearnWorkspace } from "./components/workspace/learn-workspace";
+import { localDb } from "./lib/db";
 
 function AuthenticatedContent({
   onSignOut,
@@ -15,6 +17,37 @@ function AuthenticatedContent({
   onSwitchAccount: () => void;
 }) {
   const user = useQuery(api.auth.queries.currentUser, {});
+  const [activeLearnId, setActiveLearnId] = useState<string | null>(null);
+  const [openAddSourceOnLoad, setOpenAddSourceOnLoad] = useState(false);
+
+  const handleOpenLearn = (learnId: string, openAddSource = false) => {
+    setActiveLearnId(learnId);
+    setOpenAddSourceOnLoad(openAddSource);
+  };
+
+  const handleBackToHome = () => {
+    setActiveLearnId(null);
+    setOpenAddSourceOnLoad(false);
+  };
+
+  if (activeLearnId) {
+    return (
+      <MobileLearnWorkspace
+        learnId={activeLearnId}
+        initialSourceModalOpen={openAddSourceOnLoad}
+        onBack={handleBackToHome}
+        onCreateNew={async () => {
+          const id = await localDb.createLearn({
+            title: "Notebook tanpa judul",
+            emoji: "📘",
+          });
+          setActiveLearnId(id);
+          setOpenAddSourceOnLoad(true);
+        }}
+        user={user}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen w-full flex flex-col bg-background text-foreground">
@@ -23,7 +56,7 @@ function AuthenticatedContent({
         onSignOut={onSignOut}
         onSwitchAccount={onSwitchAccount}
       />
-      <LearnHome />
+      <LearnHome onOpenLearn={handleOpenLearn} />
     </div>
   );
 }

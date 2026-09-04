@@ -8,7 +8,7 @@ import {
   Button,
   Input,
 } from "@const/ui";
-import { Sparkles } from "lucide-react";
+import { BookOpen } from "lucide-react";
 
 const EMOJI_OPTIONS = [
   "🚀", "🧠", "💡", "🎨", "🏆", "📚", "💻", "🔬",
@@ -88,7 +88,7 @@ export function CreateLearnDialog({
         <form onSubmit={handleSubmit} className="space-y-5">
           <DialogHeader>
             <DialogTitle className="font-serif text-xl font-medium tracking-tight text-foreground flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-primary" />
+              <BookOpen className="h-5 w-5 text-primary" />
               {isEdit ? "Ubah Detail Learn" : "Buat Learn Baru"}
             </DialogTitle>
           </DialogHeader>
