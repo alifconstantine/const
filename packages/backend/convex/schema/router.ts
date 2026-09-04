@@ -85,4 +85,33 @@ export const routerTables = {
   })
     .index("by_user", ["userId"])
     .index("by_user_updated", ["userId", "updatedAt"]),
+
+  // 4. Request Logs & Real-Time Telemetry Audit Trails
+  routerLogs: defineTable({
+    userId: v.id("users"),
+    requestId: v.string(), // "req_" + unique id
+    apiKeyId: v.optional(v.id("apiKeys")),
+    keyName: v.optional(v.string()), // e.g. "Production Key", "Default Key", or "Playground"
+    keyPrefix: v.optional(v.string()), // "sk-const-live-...3b63"
+    model: v.string(),
+    provider: v.string(),
+    comboId: v.optional(v.string()), // for future combo engine
+    comboName: v.optional(v.string()),
+    status: v.number(), // HTTP status: 200, 400, 429, 500, etc.
+    errorMessage: v.optional(v.string()),
+    promptTokens: v.number(),
+    cachedTokens: v.optional(v.number()),
+    completionTokens: v.number(),
+    totalTokens: v.number(),
+    ttftMs: v.optional(v.number()), // Time to first token in ms
+    durationMs: v.number(),          // Total execution duration in ms
+    tokensPerSecond: v.optional(v.number()), // Speed in tok/s
+    ip: v.optional(v.string()),
+    userAgent: v.optional(v.string()),
+    createdAt: v.number(),
+  })
+    .index("by_user", ["userId"])
+    .index("by_user_created", ["userId", "createdAt"])
+    .index("by_user_model", ["userId", "model"])
+    .index("by_request_id", ["requestId"]),
 };

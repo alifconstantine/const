@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@const/backend/_generated/api";
 import type { Id } from "@const/backend/_generated/dataModel";
+import {
+  generateRequestId,
+  estimateMessagesTokens,
+  createTelemetryStream,
+  recordDirectTelemetry,
+  type TelemetryMetadata,
+} from "@/lib/telemetry";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,6 +28,10 @@ interface OpenAIChatRequestBody {
 }
 
 export async function POST(req: NextRequest) {
+  const reqStartTime = performance.now();
+  const requestId = generateRequestId();
+  const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL || "";
+
   try {
     const body: OpenAIChatRequestBody = await req.json();
     const {
@@ -69,6 +80,23 @@ export async function POST(req: NextRequest) {
       providedKey = bearerValue;
     }
 
+    const ip = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || undefined;
+    const userAgent = req.headers.get("user-agent") || undefined;
+    const estimatedPromptTokens = estimateMessagesTokens(messages);
+
+    const telemetryMeta: TelemetryMetadata = {
+      requestId,
+      model,
+      provider: "const",
+      rawApiKey: providedKey || undefined,
+      keyName: providedKey ? `Key (${providedKey.slice(0, 16)}...)` : (ssoToken ? "Session Auth" : undefined),
+      estimatedPromptTokens,
+      ip,
+      userAgent,
+      convexUrl,
+      ssoToken,
+    };
+
     // ========================================================
     // CASE A: Const Engine (Built-in Managed Gemini 3.6 Flash)
     // ========================================================
@@ -76,6 +104,8 @@ export async function POST(req: NextRequest) {
       (model === "gemini-3.6-flash" || model.startsWith("antigravity/")) && !providerDocId;
 
     if (isConstBuiltin) {
+      telemetryMeta.provider = "Google AI";
+
       const constBaseUrl = (process.env.CONST_ENGINE_BASE_URL?.trim() || "https://engine.const.web.id").replace(/\/+$/, "");
       const constEngineKey = process.env.CONST_ENGINE_API_KEY?.trim() || "";
 
@@ -119,6 +149,13 @@ export async function POST(req: NextRequest) {
           const p = JSON.parse(errText);
           if (p?.error?.message) errMsg = p.error.message;
         } catch {}
+
+        await recordDirectTelemetry(telemetryMeta, {
+          status: response.status,
+          durationMs: Math.round(performance.now() - reqStartTime),
+          errorMessage: errMsg,
+        });
+
         return NextResponse.json({ error: { message: errMsg } }, { status: response.status });
       }
 
@@ -126,23 +163,40 @@ export async function POST(req: NextRequest) {
         if (!response.body) {
           return NextResponse.json({ error: { message: "No response stream." } }, { status: 502 });
         }
-        return new Response(response.body, {
+
+        const { stream: teleStream } = createTelemetryStream(response.body, telemetryMeta);
+
+        return new Response(teleStream, {
           headers: {
             "Content-Type": "text/event-stream; charset=utf-8",
             "Cache-Control": "no-cache, no-transform",
             Connection: "keep-alive",
+            "X-Const-Request-Id": requestId,
           },
         });
       } else {
         const data = await response.json();
-        return NextResponse.json(data);
+        const durationMs = Math.round(performance.now() - reqStartTime);
+
+        await recordDirectTelemetry(telemetryMeta, {
+          status: 200,
+          durationMs,
+          promptTokens: data.usage?.prompt_tokens,
+          completionTokens: data.usage?.completion_tokens,
+          cachedTokens: data.usage?.prompt_tokens_details?.cached_tokens,
+        });
+
+        return NextResponse.json(data, {
+          headers: {
+            "X-Const-Request-Id": requestId,
+          },
+        });
       }
     }
 
     // ========================================================
     // CASE B: User BYOK Provider (OpenRouter, DeepSeek, Groq, Custom)
     // ========================================================
-    const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL;
     if (!convexUrl) {
       return NextResponse.json(
         { error: { message: "Convex backend not configured." } },
@@ -162,11 +216,19 @@ export async function POST(req: NextRequest) {
     });
 
     if (!creds) {
+      await recordDirectTelemetry(telemetryMeta, {
+        status: 404,
+        durationMs: Math.round(performance.now() - reqStartTime),
+        errorMessage: `No active provider found for model '${model}'.`,
+      });
+
       return NextResponse.json(
         { error: { message: `No active provider found for model '${model}'.` } },
         { status: 404 }
       );
     }
+
+    telemetryMeta.provider = creds.name || creds.providerId;
 
     const activeKey = creds.apiKey || "";
     const activeBaseUrl = (creds.baseUrl || "https://api.openai.com").replace(/\/+$/, "");
@@ -216,6 +278,13 @@ export async function POST(req: NextRequest) {
         else if (typeof p?.error === "string") errMsg = p.error;
         else if (p?.message) errMsg = p.message;
       } catch {}
+
+      await recordDirectTelemetry(telemetryMeta, {
+        status: response.status,
+        durationMs: Math.round(performance.now() - reqStartTime),
+        errorMessage: errMsg,
+      });
+
       return NextResponse.json({ error: { message: errMsg } }, { status: response.status });
     }
 
@@ -223,16 +292,34 @@ export async function POST(req: NextRequest) {
       if (!response.body) {
         return NextResponse.json({ error: { message: "No response stream from provider." } }, { status: 502 });
       }
-      return new Response(response.body, {
+
+      const { stream: teleStream } = createTelemetryStream(response.body, telemetryMeta);
+
+      return new Response(teleStream, {
         headers: {
           "Content-Type": "text/event-stream; charset=utf-8",
           "Cache-Control": "no-cache, no-transform",
           Connection: "keep-alive",
+          "X-Const-Request-Id": requestId,
         },
       });
     } else {
       const data = await response.json();
-      return NextResponse.json(data);
+      const durationMs = Math.round(performance.now() - reqStartTime);
+
+      await recordDirectTelemetry(telemetryMeta, {
+        status: 200,
+        durationMs,
+        promptTokens: data.usage?.prompt_tokens,
+        completionTokens: data.usage?.completion_tokens,
+        cachedTokens: data.usage?.prompt_tokens_details?.cached_tokens,
+      });
+
+      return NextResponse.json(data, {
+        headers: {
+          "X-Const-Request-Id": requestId,
+        },
+      });
     }
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Internal server error";

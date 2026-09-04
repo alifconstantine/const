@@ -34,10 +34,24 @@ export default function DashboardOverviewPage() {
   );
   const activeKey = keys?.find((k) => k.status === "active");
 
+  const [trendRange, setTrendRange] = useState<"7D" | "30D" | "90D">("7D");
+  const metrics = useQuery(
+    api.router.logs.getLogMetrics,
+    isAuthenticated
+      ? {
+          timeRange:
+            trendRange === "7D" ? "7d" : trendRange === "30D" ? "30d" : "all",
+        }
+      : "skip"
+  );
+  const todayMetrics = useQuery(
+    api.router.logs.getLogMetrics,
+    isAuthenticated ? { timeRange: "today" } : "skip"
+  );
+
   const [copiedEndpoint, setCopiedEndpoint] = useState(false);
   const [copiedModel, setCopiedModel] = useState(false);
   const [copiedCurl, setCopiedCurl] = useState(false);
-  const [trendRange, setTrendRange] = useState<"7D" | "30D" | "90D">("7D");
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -48,7 +62,7 @@ export default function DashboardOverviewPage() {
 
   const userName = user?.name ? user.name.split(" ")[0] : "Developer";
 
-  const apiEndpoint = "https://router.const.web.id/api/v1";
+  const apiEndpoint = "https://router.const.web.id/v1/chat/completions";
   const defaultModel = "gemini-3.6-flash";
 
   const copyToClipboard = (text: string, setter: (val: boolean) => void, label: string) => {
@@ -61,7 +75,7 @@ export default function DashboardOverviewPage() {
   };
 
   const curlKey = activeKey ? activeKey.keyPrefix : "YOUR_API_KEY";
-  const curlSnippet = `curl https://router.const.web.id/api/v1/chat/completions \\
+  const curlSnippet = `curl https://router.const.web.id/v1/chat/completions \\
   -H "Content-Type: application/json" \\
   -H "Authorization: Bearer ${curlKey}" \\
   -d '{
@@ -94,10 +108,13 @@ export default function DashboardOverviewPage() {
           </div>
           <div className="space-y-0.5">
             <div className="text-2xl font-semibold tracking-tight text-foreground font-mono">
-              0 <span className="text-xs text-muted-foreground font-sans font-normal">tokens</span>
+              {todayMetrics?.totalTokens ? todayMetrics.totalTokens.toLocaleString() : "0"}{" "}
+              <span className="text-xs text-muted-foreground font-sans font-normal">tokens</span>
             </div>
             <p className="text-[11px] text-muted-foreground font-light">
-              No usage today
+              {todayMetrics && todayMetrics.totalTokens > 0
+                ? `${todayMetrics.promptTokens.toLocaleString()} in / ${todayMetrics.completionTokens.toLocaleString()} out`
+                : "No usage today"}
             </p>
           </div>
         </Card>
@@ -112,10 +129,12 @@ export default function DashboardOverviewPage() {
           </div>
           <div className="space-y-0.5">
             <div className="text-2xl font-semibold tracking-tight text-foreground font-mono">
-              0
+              {todayMetrics?.totalRequests ? todayMetrics.totalRequests.toLocaleString() : "0"}
             </div>
             <p className="text-[11px] text-muted-foreground font-light">
-              +0 vs yesterday
+              {todayMetrics && todayMetrics.totalRequests > 0
+                ? `${todayMetrics.totalRequests} calls logged today`
+                : "No requests today"}
             </p>
           </div>
         </Card>
@@ -130,10 +149,14 @@ export default function DashboardOverviewPage() {
           </div>
           <div className="space-y-0.5">
             <div className="text-2xl font-semibold tracking-tight text-foreground font-mono">
-              0.0%
+              {todayMetrics && todayMetrics.totalRequests > 0
+                ? `${todayMetrics.successRate}%`
+                : "100%"}
             </div>
             <p className="text-[11px] text-muted-foreground font-light">
-              No traffic
+              {todayMetrics && todayMetrics.totalRequests > 0
+                ? "Past 24 hours"
+                : "No errors logged"}
             </p>
           </div>
         </Card>
@@ -147,11 +170,13 @@ export default function DashboardOverviewPage() {
             <span className="text-xs text-muted-foreground font-medium">Avg Latency</span>
           </div>
           <div className="space-y-0.5">
-            <div className="text-2xl font-semibold tracking-tight text-muted-foreground font-mono">
-              —
+            <div className="text-2xl font-semibold tracking-tight text-foreground font-mono">
+              {todayMetrics?.avgDurationMs ? `${todayMetrics.avgDurationMs}ms` : "—"}
             </div>
             <p className="text-[11px] text-muted-foreground font-light">
-              No traffic
+              {todayMetrics?.avgSpeed
+                ? `${todayMetrics.avgSpeed} tok/s avg`
+                : "No traffic"}
             </p>
           </div>
         </Card>
@@ -163,11 +188,22 @@ export default function DashboardOverviewPage() {
         <Card className="lg:col-span-2 rounded-3xl border-border/70 bg-card p-6 flex flex-col justify-between transition-colors">
           <div className="flex items-center justify-between pb-4">
             <div className="space-y-0.5">
-              <h3 className="text-base font-semibold tracking-tight text-foreground font-sans">
-                Usage Trend
-              </h3>
+              <div className="flex items-center gap-2">
+                <h3 className="text-base font-semibold tracking-tight text-foreground font-sans">
+                  Usage Trend
+                </h3>
+                <Link
+                  href="/logs"
+                  className="text-xs font-mono text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+                >
+                  <span>View full logs</span>
+                  <ExternalLink className="h-3 w-3" />
+                </Link>
+              </div>
               <p className="text-xs text-muted-foreground font-light">
-                Token usage over time
+                {metrics?.totalTokens
+                  ? `${metrics.totalTokens.toLocaleString()} tokens across ${metrics.totalRequests} requests`
+                  : "Token volume distribution over timeline"}
               </p>
             </div>
             <div className="flex items-center gap-1 bg-secondary p-1 rounded-full border border-border text-xs font-mono">
@@ -187,37 +223,51 @@ export default function DashboardOverviewPage() {
             </div>
           </div>
 
-          {/* Minimal Empty Monochrome Chart Frame */}
+          {/* Activity Bar Chart Visualization */}
           <div className="h-64 w-full flex flex-col justify-between py-2">
-            <div className="flex-1 flex flex-col justify-between border-b border-border/60 text-[11px] font-mono text-muted-foreground/60">
-              <div className="flex justify-between items-center border-b border-border/30 pb-1">
-                <span>10.0</span>
+            {metrics && metrics.totalRequests > 0 ? (
+              <div className="flex-1 flex flex-col justify-end">
+                <div className="h-44 flex items-end gap-1.5 sm:gap-2 px-1 border-b border-border/60 pb-1">
+                  {metrics.activityBuckets.map((bucket, idx) => (
+                    <div
+                      key={idx}
+                      className="flex-1 h-full flex flex-col justify-end group relative"
+                    >
+                      <div
+                        style={{ height: `${Math.max(6, bucket.heightPercent)}%` }}
+                        className={`w-full rounded-t-sm transition-all duration-300 ${
+                          bucket.count > 0
+                            ? "bg-foreground group-hover:bg-foreground/80"
+                            : "bg-muted/30"
+                        }`}
+                      />
+                      {bucket.count > 0 && (
+                        <div className="absolute -top-7 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded bg-popover border border-border text-[10px] font-mono text-foreground opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap shadow-sm z-10">
+                          {bucket.count} reqs
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <div className="flex justify-between text-[11px] font-mono text-muted-foreground/60 pt-2 px-1">
+                  <span>Past {trendRange}</span>
+                  <span>Activity Frequency</span>
+                  <span>Now</span>
+                </div>
               </div>
-              <div className="flex justify-between items-center border-b border-border/30 pb-1">
-                <span>7.5</span>
+            ) : (
+              <div className="flex-1 flex flex-col items-center justify-center text-center space-y-2 border border-dashed border-border/60 rounded-2xl p-6">
+                <Terminal className="h-6 w-6 text-muted-foreground/40" />
+                <div className="space-y-0.5">
+                  <p className="text-xs font-medium text-foreground">
+                    No requests recorded yet
+                  </p>
+                  <p className="text-[11px] text-muted-foreground font-light">
+                    Send requests via cURL or test in Playground to see live telemetry.
+                  </p>
+                </div>
               </div>
-              <div className="flex justify-between items-center border-b border-border/30 pb-1">
-                <span>5.0</span>
-              </div>
-              <div className="flex justify-between items-center border-b border-border/30 pb-1">
-                <span>2.5</span>
-              </div>
-              <div className="flex justify-between items-center pb-1">
-                <span>0.0</span>
-                <div className="flex-1 border-b border-border/60 mx-2" />
-              </div>
-            </div>
-
-            {/* Date timeline labels */}
-            <div className="flex justify-between text-[11px] font-mono text-muted-foreground/60 pt-2 px-1">
-              <span>Aug 28</span>
-              <span>Aug 29</span>
-              <span>Aug 30</span>
-              <span>Aug 31</span>
-              <span>Sep 1</span>
-              <span>Sep 2</span>
-              <span>Sep 3</span>
-            </div>
+            )}
           </div>
         </Card>
 

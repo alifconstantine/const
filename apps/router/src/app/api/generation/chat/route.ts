@@ -3,6 +3,13 @@ import { ConvexHttpClient } from "convex/browser";
 import { api } from "@const/backend/_generated/api";
 import type { Id } from "@const/backend/_generated/dataModel";
 import { hasFixedThinking } from "@/lib/model-specs";
+import {
+  generateRequestId,
+  estimateMessagesTokens,
+  createTelemetryStream,
+  recordDirectTelemetry,
+  type TelemetryMetadata,
+} from "@/lib/telemetry";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,7 +38,26 @@ interface ChatRequestBody {
   providerDocId?: string;
 }
 
+function wrapWithTelemetry(
+  response: Response,
+  meta: TelemetryMetadata
+): Response {
+  if (!response.body) return response;
+  const { stream } = createTelemetryStream(response.body, meta);
+  return new Response(stream, {
+    headers: {
+      ...Object.fromEntries(response.headers.entries()),
+      "X-Const-Request-Id": meta.requestId,
+    },
+    status: response.status,
+  });
+}
+
 export async function POST(req: NextRequest) {
+  const reqStartTime = performance.now();
+  const requestId = generateRequestId();
+  const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL || "";
+
   try {
     const body: ChatRequestBody = await req.json();
     const {
@@ -117,6 +143,23 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    const ip = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || undefined;
+    const userAgent = req.headers.get("user-agent") || undefined;
+    const estimatedPromptTokens = estimateMessagesTokens(formattedMessages);
+
+    const telemetryMeta: TelemetryMetadata = {
+      requestId,
+      model,
+      provider: "Google AI",
+      rawApiKey: providedKey || undefined,
+      keyName: "Playground",
+      estimatedPromptTokens,
+      ip,
+      userAgent,
+      convexUrl,
+      ssoToken,
+    };
+
     if (formattedMessages.length === 0) {
       return NextResponse.json(
         { error: { message: "No prompt messages provided." } },
@@ -184,13 +227,16 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      return new Response(response.body, {
-        headers: {
-          "Content-Type": "text/event-stream; charset=utf-8",
-          "Cache-Control": "no-cache, no-transform",
-          Connection: "keep-alive",
-        },
-      });
+      return wrapWithTelemetry(
+        new Response(response.body, {
+          headers: {
+            "Content-Type": "text/event-stream; charset=utf-8",
+            "Cache-Control": "no-cache, no-transform",
+            Connection: "keep-alive",
+          },
+        }),
+        telemetryMeta
+      );
     }
 
     // ========================================================
@@ -282,7 +328,8 @@ export async function POST(req: NextRequest) {
               return NextResponse.json({ error: { message: "No stream body from Google AI." } }, { status: 502 });
             }
 
-            return convertGoogleSseToOpenAiSse(response.body);
+            telemetryMeta.provider = "Google AI (BYOK)";
+            return wrapWithTelemetry(convertGoogleSseToOpenAiSse(response.body), telemetryMeta);
           }
 
           // 2. Anthropic BYOK
@@ -375,7 +422,8 @@ export async function POST(req: NextRequest) {
               return NextResponse.json({ error: { message: "No stream body from Anthropic." } }, { status: 502 });
             }
 
-            return convertAnthropicSseToOpenAiSse(response.body);
+            telemetryMeta.provider = "Anthropic (BYOK)";
+            return wrapWithTelemetry(convertAnthropicSseToOpenAiSse(response.body), telemetryMeta);
           }
 
           // 3. OpenAI & OpenAI-Compatible (OpenRouter, DeepSeek, Groq, Custom)
@@ -441,13 +489,17 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: { message: "No response stream from provider." } }, { status: 502 });
           }
 
-          return new Response(response.body, {
-            headers: {
-              "Content-Type": "text/event-stream; charset=utf-8",
-              "Cache-Control": "no-cache, no-transform",
-              Connection: "keep-alive",
-            },
-          });
+          telemetryMeta.provider = creds.name || creds.providerId;
+          return wrapWithTelemetry(
+            new Response(response.body, {
+              headers: {
+                "Content-Type": "text/event-stream; charset=utf-8",
+                "Cache-Control": "no-cache, no-transform",
+                Connection: "keep-alive",
+              },
+            }),
+            telemetryMeta
+          );
         }
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : "Failed to load provider credentials.";
@@ -516,7 +568,8 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: { message: "No stream body from Google AI." } }, { status: 502 });
       }
 
-      return convertGoogleSseToOpenAiSse(response.body);
+      telemetryMeta.provider = "Google AI (Direct Key)";
+      return wrapWithTelemetry(convertGoogleSseToOpenAiSse(response.body), telemetryMeta);
     }
 
     return NextResponse.json(

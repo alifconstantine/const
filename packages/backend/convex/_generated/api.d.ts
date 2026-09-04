@@ -18,6 +18,7 @@ import type * as rateLimits from "../rateLimits.js";
 import type * as router_chats from "../router/chats.js";
 import type * as router_crypto from "../router/crypto.js";
 import type * as router_keys from "../router/keys.js";
+import type * as router_logs from "../router/logs.js";
 import type * as router_providers from "../router/providers.js";
 import type * as schema_auth from "../schema/auth.js";
 import type * as schema_learn from "../schema/learn.js";
@@ -44,6 +45,7 @@ declare const fullApi: ApiFromModules<{
   "router/chats": typeof router_chats;
   "router/crypto": typeof router_crypto;
   "router/keys": typeof router_keys;
+  "router/logs": typeof router_logs;
   "router/providers": typeof router_providers;
   "schema/auth": typeof schema_auth;
   "schema/learn": typeof schema_learn;
