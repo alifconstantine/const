@@ -27,6 +27,7 @@ export const clearAuthData = internalMutation({
       "authVerifiers",
       "authRateLimits",
       "rateLimits",
+      "apiKeys",
     ] as const;
 
     let totalDeleted = 0;

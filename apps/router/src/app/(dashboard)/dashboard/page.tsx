@@ -28,6 +28,12 @@ export default function DashboardOverviewPage() {
     isAuthenticated ? {} : "skip"
   );
 
+  const keys = useQuery(
+    api.router.keys.listKeys,
+    isAuthenticated ? {} : "skip"
+  );
+  const activeKey = keys?.find((k) => k.status === "active");
+
   const [copiedEndpoint, setCopiedEndpoint] = useState(false);
   const [copiedModel, setCopiedModel] = useState(false);
   const [copiedCurl, setCopiedCurl] = useState(false);
@@ -43,7 +49,7 @@ export default function DashboardOverviewPage() {
   const userName = user?.name ? user.name.split(" ")[0] : "Developer";
 
   const apiEndpoint = "https://router.const.web.id/api/v1";
-  const defaultModel = "gemini-2.5-flash";
+  const defaultModel = "gemini-3.6-flash";
 
   const copyToClipboard = (text: string, setter: (val: boolean) => void, label: string) => {
     navigator.clipboard.writeText(text);
@@ -54,9 +60,10 @@ export default function DashboardOverviewPage() {
     setTimeout(() => setter(false), 2000);
   };
 
+  const curlKey = activeKey ? activeKey.keyPrefix : "YOUR_API_KEY";
   const curlSnippet = `curl https://router.const.web.id/api/v1/chat/completions \\
   -H "Content-Type: application/json" \\
-  -H "Authorization: Bearer YOUR_API_KEY" \\
+  -H "Authorization: Bearer ${curlKey}" \\
   -d '{
     "model": "${defaultModel}",
     "messages": [{"role": "user", "content": "Hello!"}]
@@ -184,19 +191,19 @@ export default function DashboardOverviewPage() {
           <div className="h-64 w-full flex flex-col justify-between py-2">
             <div className="flex-1 flex flex-col justify-between border-b border-border/60 text-[11px] font-mono text-muted-foreground/60">
               <div className="flex justify-between items-center border-b border-border/30 pb-1">
-                <span>1.0</span>
+                <span>10.0</span>
               </div>
               <div className="flex justify-between items-center border-b border-border/30 pb-1">
                 <span>7.5</span>
               </div>
               <div className="flex justify-between items-center border-b border-border/30 pb-1">
-                <span>5</span>
+                <span>5.0</span>
               </div>
               <div className="flex justify-between items-center border-b border-border/30 pb-1">
                 <span>2.5</span>
               </div>
               <div className="flex justify-between items-center pb-1">
-                <span>0</span>
+                <span>0.0</span>
                 <div className="flex-1 border-b border-border/60 mx-2" />
               </div>
             </div>
@@ -258,13 +265,27 @@ export default function DashboardOverviewPage() {
                 API Key
               </label>
               <div className="flex items-center justify-between p-2.5 rounded-xl bg-secondary border border-border text-xs">
-                <span className="text-muted-foreground italic font-light">No API key yet</span>
-                <Link
-                  href="/keys"
-                  className="text-xs font-medium text-foreground underline underline-offset-4 hover:text-foreground/80 shrink-0"
-                >
-                  Create key
-                </Link>
+                {activeKey ? (
+                  <>
+                    <span className="text-foreground font-mono font-medium">{activeKey.keyPrefix}</span>
+                    <Link
+                      href="/keys"
+                      className="text-xs font-medium text-foreground underline underline-offset-4 hover:text-foreground/80 shrink-0"
+                    >
+                      Manage keys
+                    </Link>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-muted-foreground italic font-light">No API key yet</span>
+                    <Link
+                      href="/keys"
+                      className="text-xs font-medium text-foreground underline underline-offset-4 hover:text-foreground/80 shrink-0"
+                    >
+                      Create key
+                    </Link>
+                  </>
+                )}
               </div>
             </div>
 

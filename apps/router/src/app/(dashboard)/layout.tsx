@@ -52,14 +52,14 @@ export default function DashboardLayout({
   useEffect(() => {
     if (isAuthenticated && user === null) {
       toast.error("Session Expired", {
-        description: "Your session has expired. Redirecting to login...",
+        description: "Your session has expired. Reconnecting...",
       });
       const timer = setTimeout(() => {
-        signOut();
+        signIn("/dashboard");
       }, 800);
       return () => clearTimeout(timer);
     }
-  }, [isAuthenticated, user, signOut]);
+  }, [isAuthenticated, user, signIn]);
 
   // Loading State
   if (isLoading || (isAuthenticated && user === undefined)) {

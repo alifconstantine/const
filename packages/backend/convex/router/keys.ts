@@ -68,6 +68,21 @@ export const createKey = mutation({
       throw new Error("Key name cannot be empty.");
     }
 
+    if (args.dailyLimitTokens !== undefined) {
+      if (!Number.isInteger(args.dailyLimitTokens) || args.dailyLimitTokens <= 0) {
+        throw new Error("Daily token limit must be a positive integer.");
+      }
+    }
+
+    const existingKeys = await ctx.db
+      .query("apiKeys")
+      .withIndex("by_user", (q) => q.eq("userId", userId))
+      .collect();
+
+    if (existingKeys.length >= 25) {
+      throw new Error("Quota exceeded: You can only have up to 25 API keys. Please delete an unused key first.");
+    }
+
     const { rawKey, keyPrefix } = generateSecureKey();
     const keyHash = await hashKey(rawKey);
 
@@ -135,5 +150,69 @@ export const deleteKey = mutation({
     await ctx.db.delete(args.keyId);
 
     return { success: true };
+  },
+});
+
+// 5. Verify an API key for gateway routing (fast SHA-256 hash lookup)
+export const verifyApiKey = query({
+  args: {
+    rawKey: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const rawKey = args.rawKey.trim();
+    if (!rawKey.startsWith("sk-const-live-")) {
+      return { valid: false, reason: "Invalid key format" as const };
+    }
+
+    const keyHash = await hashKey(rawKey);
+    const keyDoc = await ctx.db
+      .query("apiKeys")
+      .withIndex("by_key_hash", (q) => q.eq("keyHash", keyHash))
+      .unique();
+
+    if (!keyDoc) {
+      return { valid: false, reason: "Key not found" as const };
+    }
+
+    if (keyDoc.status !== "active") {
+      return { valid: false, reason: "Key revoked" as const };
+    }
+
+    if (keyDoc.dailyLimitTokens && keyDoc.usedTodayTokens >= keyDoc.dailyLimitTokens) {
+      return {
+        valid: false,
+        reason: "Daily token limit exceeded" as const,
+        dailyLimitTokens: keyDoc.dailyLimitTokens,
+        usedTodayTokens: keyDoc.usedTodayTokens,
+      };
+    }
+
+    return {
+      valid: true,
+      keyId: keyDoc._id,
+      userId: keyDoc.userId,
+      name: keyDoc.name,
+      keyPrefix: keyDoc.keyPrefix,
+      dailyLimitTokens: keyDoc.dailyLimitTokens,
+      usedTodayTokens: keyDoc.usedTodayTokens,
+    };
+  },
+});
+
+// 6. Record usage after successful gateway request
+export const recordKeyUsage = mutation({
+  args: {
+    keyId: v.id("apiKeys"),
+    tokensConsumed: v.number(),
+  },
+  handler: async (ctx, args) => {
+    if (args.tokensConsumed <= 0) return;
+    const key = await ctx.db.get(args.keyId);
+    if (!key) return;
+
+    await ctx.db.patch(args.keyId, {
+      usedTodayTokens: key.usedTodayTokens + args.tokensConsumed,
+      lastUsedAt: Date.now(),
+    });
   },
 });

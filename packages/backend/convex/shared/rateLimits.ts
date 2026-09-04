@@ -23,6 +23,9 @@ export const checkAndConsumeRateLimit = mutation({
     const now = Date.now();
 
     const normalizedKey = args.key.toLowerCase().trim();
+    if (!normalizedKey || normalizedKey.length > 256) {
+      throw new Error("Invalid rate limit key.");
+    }
 
     const existing = await ctx.db
       .query("rateLimits")

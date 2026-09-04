@@ -50,6 +50,8 @@ import {
   Trash2,
   Ban,
   Lock,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 
 export default function KeysPage() {
@@ -81,6 +83,7 @@ export default function KeysPage() {
     keyPrefix: string;
   } | null>(null);
   const [copiedRevealKey, setCopiedRevealKey] = useState(false);
+  const [showPlainKey, setShowPlainKey] = useState(true);
 
   // State for revoking / deleting loading indicators
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
@@ -562,6 +565,7 @@ export default function KeysPage() {
             if (!open) {
               setRevealKey(null);
               setCopiedRevealKey(false);
+              setShowPlainKey(true);
             }
           }}
         >
@@ -586,38 +590,52 @@ export default function KeysPage() {
                       Secret Key
                     </span>
                   </div>
-                  <div className="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-secondary/80 border border-border text-xs font-mono w-full min-w-0">
+                  <div className="flex items-center justify-between gap-2 p-3 rounded-xl bg-secondary/80 border border-border text-xs font-mono w-full min-w-0">
                     <span
-                      className="text-foreground select-all truncate min-w-0 flex-1 font-mono text-xs font-normal pr-1"
-                      title={revealKey.rawKey}
+                      className="text-foreground select-all break-all min-w-0 flex-1 font-mono text-xs font-normal leading-relaxed pr-1"
                     >
-                      {revealKey.rawKey.length > 28
-                        ? `${revealKey.rawKey.slice(0, 24)}....`
-                        : revealKey.rawKey}
+                      {showPlainKey ? revealKey.rawKey : "•".repeat(Math.min(revealKey.rawKey.length, 36))}
                     </span>
-                    <Button
-                      type="button"
-                      size="sm"
-                      onClick={() => {
-                        navigator.clipboard.writeText(revealKey.rawKey);
-                        setCopiedRevealKey(true);
-                        toast.success("Secret key copied to clipboard");
-                        setTimeout(() => setCopiedRevealKey(false), 2000);
-                      }}
-                      className="rounded-full h-8 px-3.5 text-xs gap-1.5 shrink-0 bg-primary text-primary-foreground hover:bg-primary/90 shadow-none cursor-pointer"
-                    >
-                      {copiedRevealKey ? (
-                        <>
-                          <Check className="h-3.5 w-3.5" />
-                          <span>Copied</span>
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="h-3.5 w-3.5" />
-                          <span>Copy</span>
-                        </>
-                      )}
-                    </Button>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => setShowPlainKey(!showPlainKey)}
+                        className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground cursor-pointer"
+                        title={showPlainKey ? "Hide key" : "Show key"}
+                        aria-label={showPlainKey ? "Hide key" : "Show key"}
+                      >
+                        {showPlainKey ? (
+                          <EyeOff className="h-3.5 w-3.5" />
+                        ) : (
+                          <Eye className="h-3.5 w-3.5" />
+                        )}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => {
+                          navigator.clipboard.writeText(revealKey.rawKey);
+                          setCopiedRevealKey(true);
+                          toast.success("Secret key copied to clipboard");
+                          setTimeout(() => setCopiedRevealKey(false), 2000);
+                        }}
+                        className="rounded-full h-8 px-3.5 text-xs gap-1.5 shrink-0 bg-primary text-primary-foreground hover:bg-primary/90 shadow-none cursor-pointer"
+                      >
+                        {copiedRevealKey ? (
+                          <>
+                            <Check className="h-3.5 w-3.5" />
+                            <span>Copied</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="h-3.5 w-3.5" />
+                            <span>Copy</span>
+                          </>
+                        )}
+                      </Button>
+                    </div>
                   </div>
                 </div>
 
@@ -637,6 +655,7 @@ export default function KeysPage() {
                 onClick={() => {
                   setRevealKey(null);
                   setCopiedRevealKey(false);
+                  setShowPlainKey(true);
                 }}
                 className="w-full rounded-full text-xs h-10 bg-primary text-primary-foreground hover:bg-primary/90 font-medium shadow-none cursor-pointer"
               >
