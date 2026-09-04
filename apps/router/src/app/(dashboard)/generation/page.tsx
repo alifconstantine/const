@@ -70,10 +70,32 @@ export default function GenerationPage() {
     api.router.providers.listUserProviders,
     isAuthenticated ? {} : "skip"
   );
+  const availableCombos = useQuery(
+    api.router.combos.listCombos,
+    {}
+  );
 
   const createChatMutation = useMutation(api.router.chats.createChat);
   const updateChatMutation = useMutation(api.router.chats.updateChat);
   const deleteChatMutation = useMutation(api.router.chats.deleteChat);
+
+  // Map Virtual Combos into ModelSpec list
+  const comboModels = useMemo<ModelSpec[]>(() => {
+    if (!availableCombos) return [];
+    return availableCombos.map((c) => ({
+      id: `combo/${c.slug}`,
+      name: c.name,
+      modelId: `combo/${c.slug}`,
+      provider: "combo" as const,
+      providerName: "Virtual Combo",
+      supportsThinking: false,
+      isCombo: true,
+      comboSlug: c.slug,
+      modelsCount: c.models?.length || 0,
+      description: c.description,
+      contextLength: c.contextLength,
+    }));
+  }, [availableCombos]);
 
   // Map BYOK providers into custom models list
   const customModels = useMemo<ModelSpec[]>(() => {
@@ -267,13 +289,14 @@ export default function GenerationPage() {
         }
       }
       const matched =
+        comboModels.find((m) => m.modelId === activeChatQuery.modelId || m.id === activeChatQuery.modelId) ||
         customModels.find((m) => m.modelId === activeChatQuery.modelId) ||
         BUILTIN_MODELS.find((m) => m.modelId === activeChatQuery.modelId);
       if (matched) {
         setSelectedModel(matched);
       }
     }
-  }, [activeChatQuery, customModels]);
+  }, [activeChatQuery, customModels, comboModels]);
 
   // Check if current model supports dynamic thinking UI
   const supportsThinking = useMemo(() => {
@@ -990,10 +1013,17 @@ export default function GenerationPage() {
                 className="p-3.5 rounded-2xl border border-border/70 bg-card hover:bg-secondary/40 hover:border-border transition-all cursor-pointer group"
               >
                 <div className="flex items-center justify-between">
-                  <span className="font-sans text-sm font-medium text-foreground group-hover:text-foreground">
-                    {selectedModel.name}
-                  </span>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+                  <div className="flex items-center gap-2 min-w-0 pr-2">
+                    <span className="font-sans text-sm font-medium text-foreground group-hover:text-foreground truncate">
+                      {selectedModel.name}
+                    </span>
+                    {selectedModel.isCombo && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-secondary text-muted-foreground font-mono shrink-0">
+                        Combo
+                      </span>
+                    )}
+                  </div>
+                  <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors shrink-0" />
                 </div>
               </div>
             </div>
@@ -1136,13 +1166,14 @@ export default function GenerationPage() {
         </div>
       )}
 
-      {/* Model Selector Slide-Over Panel (No Dummy, Model Names Only) */}
+      {/* Model Selector Slide-Over Panel (Virtual Combos & Standard Models) */}
       <ModelSelectorPanel
         open={isModelSelectorOpen}
         onClose={() => setIsModelSelectorOpen(false)}
         selectedModelId={selectedModel.modelId}
         onSelectModel={(model) => setSelectedModel(model)}
         customModels={customModels}
+        comboModels={comboModels}
       />
 
       {/* History Slide-Over Panel */}

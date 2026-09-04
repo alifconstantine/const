@@ -7,44 +7,36 @@ import { useQuery, useMutation } from "convex/react";
 import { api } from "@const/backend/_generated/api";
 import type { Id } from "@const/backend/_generated/dataModel";
 import {
-  Card,
   Button,
-  Badge,
   Input,
   Textarea,
+  ScrollArea,
   Dialog,
   DialogContent,
-  DialogHeader,
   DialogTitle,
-  DialogDescription,
   DialogFooter,
-  Tooltip,
-  TooltipTrigger,
-  TooltipContent,
-  TooltipProvider,
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
   toast,
   cn,
 } from "@const/ui";
 import {
-  GitFork,
   Plus,
   Search,
   Copy,
   Check,
   Trash2,
-  ChevronRight,
   ChevronDown,
   ChevronUp,
   GripVertical,
-  Terminal,
-  ExternalLink,
-  Sparkles,
   ArrowRight,
-  Layers,
-  Settings2,
-  AlertCircle,
+  ArrowLeft,
   Play,
-  RotateCcw,
+  X,
+  ShieldCheck,
 } from "lucide-react";
 
 interface ComboModelEntry {
@@ -85,15 +77,15 @@ export default function CombosPage() {
   const updateComboMutation = useMutation(api.router.combos.updateCombo);
   const deleteComboMutation = useMutation(api.router.combos.deleteCombo);
 
-  // 2. Local State
+  // 2. Filter & Search State
   const [activeTab, setActiveTab] = useState<"all" | "builtin" | "custom">("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [copiedSlug, setCopiedSlug] = useState<string | null>(null);
 
-  // Wizard / Stepper Dialog State
+  // 3. Wizard Dialog State (4 Strict Stages)
   const [isWizardOpen, setIsWizardOpen] = useState(false);
   const [editingComboId, setEditingComboId] = useState<Id<"routerCombos"> | null>(null);
-  const [step, setStep] = useState<1 | 2 | 3>(1);
+  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
 
   // Form State
   const [comboName, setComboName] = useState("");
@@ -103,10 +95,9 @@ export default function CombosPage() {
   const [systemMessage, setSystemMessage] = useState("");
   const [selectedModels, setSelectedModels] = useState<ComboModelEntry[]>([]);
 
-  // Step 2 Selection State
-  const [activeProviderId, setActiveProviderId] = useState<string>("const");
-  const [modelSearch, setModelSearch] = useState("");
-  const [customModelIdInput, setCustomModelIdInput] = useState("");
+  // Stage 2 Builder State (Provider & Model Selectors)
+  const [builderProviderId, setBuilderProviderId] = useState<string>("const");
+  const [builderModelId, setBuilderModelId] = useState<string>("gemini-3.6-flash");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Delete State
@@ -124,7 +115,7 @@ export default function CombosPage() {
     setTimeout(() => setCopiedSlug(null), 2000);
   };
 
-  // Open Create Wizard
+  // Open Create Wizard (Starts strictly with 0 models!)
   const openCreateWizard = () => {
     if (!isAuthenticated) {
       signIn();
@@ -136,15 +127,9 @@ export default function CombosPage() {
     setComboDescription("");
     setContextLength(262144);
     setSystemMessage("");
-    setSelectedModels([
-      {
-        modelId: "gemini-3.6-flash",
-        providerId: "const",
-        providerName: "Const Gateway",
-        priority: 1,
-      },
-    ]);
-    setActiveProviderId("const");
+    setSelectedModels([]); // Starts with 0 models
+    setBuilderProviderId("const");
+    setBuilderModelId("gemini-3.6-flash");
     setStep(1);
     setIsWizardOpen(true);
   };
@@ -166,7 +151,8 @@ export default function CombosPage() {
         priority: idx + 1,
       }))
     );
-    setActiveProviderId("const");
+    setBuilderProviderId("const");
+    setBuilderModelId("gemini-3.6-flash");
     setStep(1);
     setIsWizardOpen(true);
   };
@@ -185,7 +171,7 @@ export default function CombosPage() {
     }
   };
 
-  // Available Providers in Step 2: Const Gateway + Active User BYOK Providers
+  // Available Providers for Stage 2: Const Gateway + Active User BYOK Providers
   const availableProviders = useMemo(() => {
     const list = [
       {
@@ -200,11 +186,12 @@ export default function CombosPage() {
 
     if (userProviders) {
       userProviders.forEach((p) => {
+        if (p.status !== "active") return;
         const imported = (p.importedModels || [])
           .filter((m) => m.enabled)
-          .map((m) => ({ modelId: m.modelId, name: m.name }));
+          .map((m) => ({ modelId: m.modelId, name: m.name || m.modelId }));
 
-        // Fallbacks for well-known providers if models weren't fetched yet
+        // Safe defaults if importedModels was empty
         const defaultModels =
           imported.length > 0
             ? imported
@@ -231,71 +218,74 @@ export default function CombosPage() {
                       ]
                     : [];
 
-        list.push({
-          providerId: p.providerId,
-          name: p.name,
-          status: p.status,
-          models: defaultModels,
-        });
+        if (defaultModels.length > 0) {
+          list.push({
+            providerId: p.providerId,
+            name: p.name || p.providerId,
+            status: p.status,
+            models: defaultModels,
+          });
+        }
       });
     }
 
     return list;
   }, [userProviders]);
 
-  const defaultConstProvider = {
-    providerId: "const",
-    name: "Const Gateway",
-    status: "active",
-    models: [{ modelId: "gemini-3.6-flash", name: "Gemini 3.6 Flash (Managed)" }],
-  };
-
-  const activeProvider =
-    availableProviders.find((p) => p.providerId === activeProviderId) ??
-    availableProviders[0] ??
-    defaultConstProvider;
-
-  // Toggle model in/out of selectedModels
-  const toggleModel = (modelId: string, providerId: string, providerName: string) => {
-    const existsIndex = selectedModels.findIndex(
-      (m) => m.modelId === modelId && m.providerId === providerId
+  const selectedBuilderProvider = useMemo(() => {
+    return (
+      availableProviders.find((p) => p.providerId === builderProviderId) ??
+      availableProviders[0]!
     );
+  }, [availableProviders, builderProviderId]);
 
-    if (existsIndex >= 0) {
-      // Remove
-      setSelectedModels(selectedModels.filter((_, idx) => idx !== existsIndex));
+  // When provider changes, ensure model select points to a valid model
+  const handleProviderChange = (newProviderId: string) => {
+    setBuilderProviderId(newProviderId);
+    const targetProv = availableProviders.find((p) => p.providerId === newProviderId);
+    if (targetProv && targetProv.models.length > 0) {
+      setBuilderModelId(targetProv.models[0]!.modelId);
     } else {
-      // Add
-      setSelectedModels([
-        ...selectedModels,
-        {
-          modelId,
-          providerId,
-          providerName,
-          priority: selectedModels.length + 1,
-        },
-      ]);
+      setBuilderModelId("");
     }
   };
 
-  const addCustomModel = () => {
-    const trimmed = customModelIdInput.trim();
-    if (!trimmed) return;
-    if (selectedModels.some((m) => m.modelId === trimmed && m.providerId === activeProvider.providerId)) {
-      toast.error("Model already added.");
-      return;
-    }
+  // Live Candidate Step
+  const builderCandidateStep = useMemo(() => {
+    if (!builderModelId || !selectedBuilderProvider) return null;
+    const modelObj = selectedBuilderProvider.models.find(
+      (m) => m.modelId === builderModelId
+    );
+    return {
+      modelId: builderModelId,
+      modelName: modelObj?.name || builderModelId,
+      providerId: selectedBuilderProvider.providerId,
+      providerName: selectedBuilderProvider.name,
+    };
+  }, [builderModelId, selectedBuilderProvider]);
 
-    setSelectedModels([
-      ...selectedModels,
+  // Duplicate Check
+  const builderHasDuplicate = useMemo(() => {
+    if (!builderCandidateStep) return false;
+    return selectedModels.some(
+      (m) =>
+        m.modelId === builderCandidateStep.modelId &&
+        m.providerId === builderCandidateStep.providerId
+    );
+  }, [builderCandidateStep, selectedModels]);
+
+  // Add Step Action
+  const handleAddBuilderStep = () => {
+    if (!builderCandidateStep || builderHasDuplicate) return;
+    setSelectedModels((prev) => [
+      ...prev,
       {
-        modelId: trimmed,
-        providerId: activeProvider.providerId,
-        providerName: activeProvider.name,
-        priority: selectedModels.length + 1,
+        modelId: builderCandidateStep.modelId,
+        providerId: builderCandidateStep.providerId,
+        providerName: builderCandidateStep.providerName,
+        priority: prev.length + 1,
       },
     ]);
-    setCustomModelIdInput("");
   };
 
   // Drag and Drop Reordering Handlers
@@ -337,6 +327,7 @@ export default function CombosPage() {
     setSelectedModels(newModels.map((m, idx) => ({ ...m, priority: idx + 1 })));
   };
 
+  // Remove any model freely (no artificial disabled restriction!)
   const removeModel = (index: number) => {
     const newModels = selectedModels.filter((_, idx) => idx !== index);
     setSelectedModels(newModels.map((m, idx) => ({ ...m, priority: idx + 1 })));
@@ -464,7 +455,7 @@ export default function CombosPage() {
       {/* 2. Filter Bar & Search */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         {/* Filter Pills */}
-        <div className="flex items-center gap-1 bg-secondary/80 p-1 rounded-full border border-border/70 self-start">
+        <div className="flex items-center gap-1 bg-secondary/80 p-1 rounded-full self-start">
           <button
             onClick={() => setActiveTab("all")}
             className={cn(
@@ -507,35 +498,35 @@ export default function CombosPage() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search combos or models..."
-            className="pl-9 h-9 text-xs font-sans bg-secondary/30 rounded-xl border-border/70"
+            className="pl-9 h-9 text-xs font-sans bg-secondary/30 rounded-xl border-none"
           />
         </div>
       </div>
 
-      {/* 3. Combos Grid List */}
+      {/* 3. Combos Grid List — BORDERLESS CONSISTENT CARDS */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredCombos.map((combo) => {
           const modelIdKey = `combo/${combo.slug}`;
           const isCopied = copiedSlug === combo.slug;
 
           return (
-            <Card
+            <div
               key={combo._id}
-              className="rounded-3xl border-border/70 bg-card p-6 flex flex-col justify-between transition-colors space-y-5 hover:border-foreground/30"
+              className="h-[340px] rounded-3xl border-none bg-secondary/35 hover:bg-secondary/50 p-6 flex flex-col justify-between transition-all"
             >
-              <div className="space-y-3.5">
+              <div className="space-y-3">
                 {/* Header Tag + Name */}
                 <div className="flex items-start justify-between gap-2">
                   <div className="space-y-1 flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-mono font-semibold uppercase tracking-wider text-muted-foreground">
+                      <span className="text-[10px] font-mono font-semibold uppercase tracking-wider text-muted-foreground">
                         {combo.isBuiltin ? "SYSTEM DEFAULT" : "CUSTOM ROUTE"}
                       </span>
                       {combo.isBuiltin && (
                         <span className="h-1.5 w-1.5 rounded-full bg-foreground" />
                       )}
                     </div>
-                    <h2 className="text-lg font-semibold font-sans text-foreground tracking-tight truncate">
+                    <h2 className="text-base font-semibold font-sans text-foreground tracking-tight truncate">
                       {combo.name}
                     </h2>
                   </div>
@@ -543,7 +534,7 @@ export default function CombosPage() {
                   {/* Slug Badge with Copy Action */}
                   <button
                     onClick={() => copyToClipboard(modelIdKey, combo.slug, "Model Identifier")}
-                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-secondary border border-border/60 text-xs font-mono text-foreground hover:bg-foreground hover:text-background transition-colors cursor-pointer shrink-0"
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-background/70 text-xs font-mono text-foreground hover:bg-foreground hover:text-background transition-colors cursor-pointer shrink-0"
                     title="Click to copy model identifier"
                   >
                     <span>{modelIdKey}</span>
@@ -561,66 +552,68 @@ export default function CombosPage() {
                 </p>
 
                 {/* Meta Badges */}
-                <div className="flex flex-wrap items-center gap-2 pt-1 text-[11px] font-mono text-muted-foreground">
-                  <span className="px-2 py-0.5 rounded-md bg-secondary/60 border border-border/40">
+                <div className="flex flex-wrap items-center gap-2 text-[11px] font-mono text-muted-foreground">
+                  <span className="px-2 py-0.5 rounded-md bg-background/50 text-foreground">
                     {formatTokens(combo.contextLength)} context
                   </span>
-                  <span className="px-2 py-0.5 rounded-md bg-secondary/60 border border-border/40 uppercase">
+                  <span className="px-2 py-0.5 rounded-md bg-background/50 uppercase">
                     {combo.strategy} fallback
                   </span>
                   {combo.systemMessage && (
-                    <span className="px-2 py-0.5 rounded-md bg-secondary/60 border border-border/40 text-foreground font-sans">
+                    <span className="px-2 py-0.5 rounded-md bg-background/50 text-foreground font-sans">
                       Custom Persona
                     </span>
                   )}
                 </div>
 
-                {/* Fallback Chain Ordered List */}
-                <div className="space-y-2 pt-2 border-t border-border/50">
-                  <div className="text-[11px] font-sans font-medium text-muted-foreground uppercase tracking-wider">
-                    Fallback Chain ({combo.models.length} Models)
+                {/* Fallback Chain Ordered List (Fixed Height with Scroll so Cards Align Perfectly) */}
+                <div className="space-y-1.5 pt-1">
+                  <div className="text-[10px] font-sans font-medium text-muted-foreground uppercase tracking-wider">
+                    Fallback Chain ({combo.models.length} Model{combo.models.length === 1 ? "" : "s"})
                   </div>
 
-                  <div className="space-y-1.5">
-                    {combo.models.map((m, idx) => (
-                      <div
-                        key={idx}
-                        className="flex items-center justify-between p-2 rounded-xl bg-secondary/40 border border-border/30 text-xs font-sans"
-                      >
-                        <div className="flex items-center gap-2 min-w-0">
-                          <span
-                            className={cn(
-                              "w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-mono font-semibold shrink-0",
-                              idx === 0
-                                ? "bg-foreground text-background"
-                                : "bg-muted text-muted-foreground border border-border"
-                            )}
-                          >
-                            {idx + 1}
-                          </span>
-                          <span className="font-medium text-foreground truncate">
-                            {m.modelId}
+                  <ScrollArea className="h-[96px] pr-2">
+                    <div className="space-y-1.5 py-0.5">
+                      {combo.models.map((m, idx) => (
+                        <div
+                          key={idx}
+                          className="flex items-center justify-between p-2 rounded-xl bg-background/50 text-xs font-sans"
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span
+                              className={cn(
+                                "w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-mono font-semibold shrink-0",
+                                idx === 0
+                                  ? "bg-foreground text-background"
+                                  : "bg-muted text-muted-foreground"
+                              )}
+                            >
+                              {idx + 1}
+                            </span>
+                            <span className="font-medium text-foreground truncate">
+                              {m.modelId}
+                            </span>
+                          </div>
+                          <span className="text-[10px] font-mono text-muted-foreground uppercase shrink-0 pl-2">
+                            {m.providerName || m.providerId}
                           </span>
                         </div>
-                        <span className="text-[10px] font-mono text-muted-foreground uppercase shrink-0 pl-2">
-                          {m.providerName || m.providerId}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
                 </div>
               </div>
 
               {/* Action Buttons */}
-              <div className="pt-3 border-t border-border/50 flex items-center justify-between gap-2">
+              <div className="pt-2 flex items-center justify-between gap-2">
                 <Link
                   href={`/generation?model=${encodeURIComponent(modelIdKey)}`}
                   className="flex-1"
                 >
                   <Button
-                    variant="outline"
+                    variant="ghost"
                     size="sm"
-                    className="w-full rounded-full gap-2 text-xs font-sans h-9 border-border bg-background hover:bg-secondary text-foreground cursor-pointer"
+                    className="w-full rounded-full gap-2 text-xs font-sans h-9 bg-background/70 hover:bg-background text-foreground cursor-pointer shadow-none"
                   >
                     <Play className="h-3.5 w-3.5" />
                     <span>Test in Playground</span>
@@ -633,7 +626,7 @@ export default function CombosPage() {
                       variant="ghost"
                       size="sm"
                       onClick={() => openEditWizard(combo)}
-                      className="rounded-full h-9 px-3 text-xs font-sans cursor-pointer hover:bg-secondary"
+                      className="rounded-full h-9 px-3 text-xs font-sans cursor-pointer hover:bg-background/80"
                     >
                       <span>Edit</span>
                     </Button>
@@ -648,517 +641,572 @@ export default function CombosPage() {
                   </div>
                 )}
               </div>
-            </Card>
+            </div>
           );
         })}
       </div>
 
-      {/* 4. Multi-Step Step-by-Step Creation Wizard Modal */}
+      {/* 4. Multi-Step Creation Wizard Modal (OmniRoute 4-Stage Reference) */}
       <Dialog open={isWizardOpen} onOpenChange={setIsWizardOpen}>
-        <DialogContent className="max-w-2xl p-0 overflow-hidden rounded-3xl border-border bg-card">
-          {/* Stepper Top Header */}
-          <div className="flex items-center justify-between border-b border-border/60 px-6 py-4 bg-secondary/20">
-            <div className="flex items-center gap-3">
-              <div className="flex items-center justify-center w-7 h-7 rounded-full bg-foreground text-background text-xs font-mono font-bold">
-                {step}
-              </div>
-              <div className="space-y-0.5">
-                <DialogTitle className="text-base font-semibold font-sans text-foreground">
-                  {step === 1 && (editingComboId ? "Edit Combo: Settings" : "Step 1: Identity & Configuration")}
-                  {step === 2 && "Step 2: Select Models across Providers"}
-                  {step === 3 && "Step 3: Priority & Fallback Order"}
-                </DialogTitle>
-                <DialogDescription className="text-xs text-muted-foreground font-light">
-                  {step === 1 && "Specify the combo name, context limit, and optional system persona."}
-                  {step === 2 && "Pick models across Const Gateway and your connected BYOK providers."}
-                  {step === 3 && "Drag items to determine priority from Primary (Top) to Fallback (Bottom)."}
-                </DialogDescription>
-              </div>
+        <DialogContent className="max-w-xl p-0 overflow-hidden rounded-3xl border-none bg-card shadow-2xl">
+          {/* Top Modal Header: Clean Title + Built-in Close */}
+          <div className="px-6 pt-5 pb-3 bg-secondary/30">
+            <div className="flex items-center justify-between pr-8">
+              <DialogTitle className="text-base font-semibold font-sans text-foreground">
+                {editingComboId ? "Edit Combo" : "Create Combo"}
+              </DialogTitle>
             </div>
 
-            {/* Step Pills Indicator */}
-            <div className="flex items-center gap-1.5 text-xs font-mono">
-              <span
-                className={cn(
-                  "px-2 py-0.5 rounded-full transition-colors",
-                  step === 1 ? "bg-foreground text-background font-semibold" : "text-muted-foreground/60"
-                )}
-              >
-                1
-              </span>
-              <span className="text-muted-foreground/40">&rarr;</span>
-              <span
-                className={cn(
-                  "px-2 py-0.5 rounded-full transition-colors",
-                  step === 2 ? "bg-foreground text-background font-semibold" : "text-muted-foreground/60"
-                )}
-              >
-                2
-              </span>
-              <span className="text-muted-foreground/40">&rarr;</span>
-              <span
-                className={cn(
-                  "px-2 py-0.5 rounded-full transition-colors",
-                  step === 3 ? "bg-foreground text-background font-semibold" : "text-muted-foreground/60"
-                )}
-              >
-                3
-              </span>
+            {/* Stage Indicator Pills */}
+            <div className="grid grid-cols-4 gap-2 pt-3">
+              {[
+                { s: 1, label: "Identity" },
+                { s: 2, label: "Models" },
+                { s: 3, label: "Settings" },
+                { s: 4, label: "Review" },
+              ].map((item) => {
+                const isCompleted = step > item.s;
+                const isCurrent = step === item.s;
+                const isPending = step < item.s;
+
+                return (
+                  <button
+                    key={item.s}
+                    type="button"
+                    onClick={() => {
+                      if (isCompleted) setStep(item.s as any);
+                    }}
+                    disabled={isPending}
+                    className={cn(
+                      "py-2 px-2.5 rounded-xl text-left transition-all",
+                      isCurrent && "bg-background shadow-sm ring-1 ring-primary/40",
+                      isCompleted && "bg-secondary/40 hover:bg-secondary cursor-pointer",
+                      isPending && "bg-secondary/20 opacity-50 cursor-not-allowed"
+                    )}
+                  >
+                    <div className="text-[9px] font-mono uppercase tracking-wider text-muted-foreground truncate">
+                      {isCompleted && "DONE"}
+                      {isCurrent && "CURRENT"}
+                      {isPending && "PENDING"}
+                    </div>
+                    <div className="text-xs font-semibold font-sans text-foreground truncate mt-0.5">
+                      {item.s}. {item.label}
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
 
-          {/* Stepper Body Container (Strictly controlled height so it never stretches down) */}
-          <div className="p-6 max-h-[60vh] overflow-y-auto space-y-6 font-sans">
-            {/* ──── STEP 1: IDENTITY & BASIC SETTINGS ──── */}
-            {step === 1 && (
-              <div className="space-y-5">
-                {/* Field 1: Combo Name */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-foreground">
-                    Combo Name <span className="text-foreground/70">*</span>
-                  </label>
-                  <Input
-                    value={comboName}
-                    onChange={(e) => handleNameChange(e.target.value)}
-                    placeholder="e.g. My Coding Assistant"
-                    className="h-10 text-sm bg-secondary/30 rounded-xl border-border/70 font-sans"
-                    autoFocus
-                  />
-                  <div className="flex items-center gap-1.5 text-xs font-mono text-muted-foreground pt-0.5">
-                    <span>API Model Name:</span>
-                    <span className="font-semibold text-foreground">
-                      combo/{comboSlug || "name"}
-                    </span>
-                  </div>
-                </div>
+          {/* Stepper Body Container (Strictly Bounded Constant Height: 440px) */}
+          <div className="h-[430px] p-6 flex flex-col justify-between overflow-hidden font-sans">
+            <ScrollArea className="flex-1 -mr-3 pr-3">
+              <div className="space-y-4 pr-1 py-1">
+                {/* ──── STAGE 1: NAME & DESCRIPTION ──── */}
+                {step === 1 && (
+                  <div className="space-y-4">
+                    <div className="space-y-0.5">
+                      <h3 className="text-sm font-semibold text-foreground">
+                        Combo Identity
+                      </h3>
+                      <p className="text-xs text-muted-foreground font-light">
+                        Choose a name and route identifier for your combo.
+                      </p>
+                    </div>
 
-                {/* Field 2: Description (Optional) */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">
-                    Description <span className="text-[11px] font-normal">(Optional)</span>
-                  </label>
-                  <Input
-                    value={comboDescription}
-                    onChange={(e) => setComboDescription(e.target.value)}
-                    placeholder="e.g. Fast failover for coding prompts and refactoring"
-                    className="h-10 text-xs bg-secondary/30 rounded-xl border-border/70 font-sans"
-                  />
-                </div>
+                    {/* Combo Name */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-foreground">
+                        Name <span className="text-foreground/70">*</span>
+                      </label>
+                      <Input
+                        value={comboName}
+                        onChange={(e) => handleNameChange(e.target.value)}
+                        placeholder="e.g. Production Fallback Route"
+                        className="h-10 text-sm bg-secondary/30 rounded-xl border border-border/70 hover:border-foreground/30 focus-visible:border-foreground/40 focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-foreground/15 font-sans transition-colors"
+                      />
+                      <div className="flex items-center gap-1.5 text-xs font-mono text-muted-foreground pt-0.5">
+                        <span>API Identifier:</span>
+                        <span className="font-semibold text-foreground">
+                          combo/{comboSlug || "name"}
+                        </span>
+                      </div>
+                    </div>
 
-                {/* Field 3: Context Length Limit (Default 256K) */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-medium text-foreground">
-                      Context Length Limit
-                    </label>
-                    <span className="text-xs font-mono font-medium text-foreground">
-                      {formatTokens(contextLength)} tokens
-                    </span>
+                    {/* Description */}
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-muted-foreground">
+                        Description <span className="text-[11px] font-normal">(Optional)</span>
+                      </label>
+                      <Input
+                        value={comboDescription}
+                        onChange={(e) => setComboDescription(e.target.value)}
+                        placeholder="e.g. High availability route with sub-second failover"
+                        className="h-10 text-xs bg-secondary/30 rounded-xl border border-border/70 hover:border-foreground/30 focus-visible:border-foreground/40 focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-foreground/15 font-sans transition-colors"
+                      />
+                    </div>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    {CONTEXT_LENGTH_PRESETS.map((preset) => (
-                      <button
-                        key={preset.value}
-                        type="button"
-                        onClick={() => setContextLength(preset.value)}
-                        className={cn(
-                          "px-3 py-1.5 rounded-xl text-xs font-sans transition-colors cursor-pointer border",
-                          contextLength === preset.value
-                            ? "bg-foreground text-background font-medium border-foreground shadow-sm"
-                            : "bg-secondary/40 text-muted-foreground border-border/60 hover:text-foreground"
+                )}
+
+              {/* ──── STAGE 2: SELECTION OF PROVIDER & MODEL ──── */}
+              {step === 2 && (
+                <div className="space-y-4">
+                  <div className="space-y-0.5">
+                    <h3 className="text-sm font-semibold text-foreground">
+                      Add Models
+                    </h3>
+                    <p className="text-xs text-muted-foreground font-light">
+                      Select provider and model to append to your execution chain.
+                    </p>
+                  </div>
+
+                  {/* Builder Card with @const/ui Select Dropdowns */}
+                  <div className="p-4 rounded-2xl bg-secondary/30 space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {/* 1. PROVIDER */}
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground block">
+                          1. Provider
+                        </label>
+                        <Select
+                          value={builderProviderId}
+                          onValueChange={handleProviderChange}
+                        >
+                          <SelectTrigger className="h-10 rounded-xl bg-background border border-border/70 hover:border-foreground/30 focus:border-foreground/40 focus:ring-1 focus:ring-inset focus:ring-foreground/15 text-xs font-sans text-foreground transition-colors">
+                            <SelectValue placeholder="Select Provider" />
+                          </SelectTrigger>
+                          <SelectContent className="rounded-xl border-border bg-popover text-xs">
+                            {availableProviders.map((prov) => (
+                              <SelectItem
+                                key={prov.providerId}
+                                value={prov.providerId}
+                                className="cursor-pointer"
+                              >
+                                {prov.name} ({prov.models.length} model{prov.models.length === 1 ? "" : "s"})
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* 2. MODEL */}
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground block">
+                          2. Model
+                        </label>
+                        <Select
+                          value={builderModelId}
+                          onValueChange={setBuilderModelId}
+                        >
+                          <SelectTrigger className="h-10 rounded-xl bg-background border border-border/70 hover:border-foreground/30 focus:border-foreground/40 focus:ring-1 focus:ring-inset focus:ring-foreground/15 text-xs font-sans text-foreground transition-colors">
+                            <SelectValue placeholder="Select Model" />
+                          </SelectTrigger>
+                          <SelectContent className="rounded-xl border-border bg-popover text-xs max-h-56">
+                            {(selectedBuilderProvider?.models || []).map((m) => (
+                              <SelectItem
+                                key={m.modelId}
+                                value={m.modelId}
+                                className="cursor-pointer"
+                              >
+                                {m.name} · <span className="font-mono opacity-70">{m.modelId}</span>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    {/* Preview Box & Add Step Button */}
+                    <div className="flex items-center justify-between gap-2 p-2.5 rounded-xl bg-background/60">
+                      <div className="min-w-0 flex-1">
+                        <div className="text-[10px] font-mono text-muted-foreground uppercase">
+                          Candidate
+                        </div>
+                        <div className="text-xs font-medium text-foreground truncate mt-0.5">
+                          {builderCandidateStep
+                            ? `${builderCandidateStep.providerName} / ${builderCandidateStep.modelId}`
+                            : "Choose a model"}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        {builderHasDuplicate && (
+                          <span className="text-[11px] text-amber-500">
+                            Already added
+                          </span>
                         )}
-                      >
-                        {preset.label}
-                      </button>
-                    ))}
-                  </div>
-                  <p className="text-[11px] text-muted-foreground font-light">
-                    Requests exceeding this window can be automatically truncated or routed to larger models. Default is 256K.
-                  </p>
-                </div>
-
-                {/* Field 4: System Message (Optional) */}
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-medium text-muted-foreground">
-                      System Message / Persona <span className="text-[11px] font-normal">(Optional)</span>
-                    </label>
-                    <span className="text-[11px] text-muted-foreground font-mono">Injected if empty</span>
-                  </div>
-                  <Textarea
-                    value={systemMessage}
-                    onChange={(e) => setSystemMessage(e.target.value)}
-                    placeholder="e.g. You are an expert software engineer. Always return clean, type-safe TypeScript code without fluff."
-                    rows={3}
-                    className="text-xs bg-secondary/30 rounded-xl border-border/70 resize-none font-sans"
-                  />
-                </div>
-              </div>
-            )}
-
-            {/* ──── STEP 2: SELECT MODELS ACROSS PROVIDERS ──── */}
-            {step === 2 && (
-              <div className="space-y-5">
-                {/* Provider Selector Tabs */}
-                <div className="space-y-2">
-                  <label className="text-xs font-medium text-foreground">
-                    1. Select Provider:
-                  </label>
-                  <div className="flex flex-wrap gap-1.5 p-1 rounded-2xl bg-secondary/50 border border-border/60">
-                    {availableProviders.map((prov) => (
-                      <button
-                        key={prov.providerId}
-                        type="button"
-                        onClick={() => {
-                          setActiveProviderId(prov.providerId);
-                          setModelSearch("");
-                        }}
-                        className={cn(
-                          "px-3.5 py-1.5 rounded-xl text-xs font-sans transition-colors cursor-pointer",
-                          activeProviderId === prov.providerId
-                            ? "bg-foreground text-background font-semibold shadow-sm"
-                            : "text-muted-foreground hover:text-foreground"
-                        )}
-                      >
-                        {prov.name}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Model Catalog for Active Provider */}
-                <div className="space-y-2.5 pt-1">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-medium text-foreground">
-                      2. Add models from {activeProvider.name}:
-                    </label>
-                    <span className="text-xs font-mono text-muted-foreground">
-                      {activeProvider.models.length} available
-                    </span>
+                        <Button
+                          type="button"
+                          size="sm"
+                          disabled={!builderCandidateStep || builderHasDuplicate}
+                          onClick={handleAddBuilderStep}
+                          className="rounded-xl px-4 text-xs font-sans font-medium cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-40"
+                        >
+                          <Plus className="h-3.5 w-3.5 mr-1" />
+                          <span>Add Step</span>
+                        </Button>
+                      </div>
+                    </div>
                   </div>
 
-                  {/* Search within provider */}
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
-                    <Input
-                      value={modelSearch}
-                      onChange={(e) => setModelSearch(e.target.value)}
-                      placeholder={`Search models in ${activeProvider.name}...`}
-                      className="pl-9 h-8 text-xs bg-secondary/30 rounded-xl border-border/60"
-                    />
-                  </div>
+                  {/* Execution Order List (Fixed Height with Scroll) */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-semibold text-foreground">
+                        Execution Chain ({selectedModels.length} Model{selectedModels.length === 1 ? "" : "s"})
+                      </span>
+                      <span className="text-[10px] text-muted-foreground font-light">
+                        {selectedModels.length > 0 ? "Step 1 is primary; steps 2+ are failovers" : "Add at least 1 model"}
+                      </span>
+                    </div>
 
-                  {/* Models list */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-1">
-                    {activeProvider.models
-                      .filter((m) =>
-                        m.modelId.toLowerCase().includes(modelSearch.toLowerCase()) ||
-                        m.name.toLowerCase().includes(modelSearch.toLowerCase())
-                      )
-                      .map((m) => {
-                        const isChecked = selectedModels.some(
-                          (sm) => sm.modelId === m.modelId && sm.providerId === activeProvider.providerId
-                        );
-
-                        return (
-                          <div
-                            key={m.modelId}
-                            onClick={() => toggleModel(m.modelId, activeProvider.providerId, activeProvider.name)}
-                            className={cn(
-                              "p-2.5 rounded-xl border cursor-pointer transition-all flex items-center justify-between gap-2",
-                              isChecked
-                                ? "bg-foreground text-background border-foreground font-medium shadow-sm"
-                                : "bg-secondary/20 hover:bg-secondary border-border/50 text-foreground"
-                            )}
-                          >
-                            <div className="min-w-0 space-y-0.5">
-                              <div className="text-xs truncate">{m.name}</div>
-                              <div className={cn("text-[10px] font-mono truncate", isChecked ? "text-background/80" : "text-muted-foreground")}>
-                                {m.modelId}
-                              </div>
-                            </div>
+                    <ScrollArea className="h-[150px] pr-2">
+                      <div className="space-y-1.5 py-0.5">
+                        {selectedModels.length === 0 ? (
+                          <div className="h-full min-h-[140px] flex flex-col items-center justify-center text-center p-4 rounded-2xl bg-secondary/20 text-muted-foreground text-xs font-light">
+                            No models added yet. Select a provider and model above, then click &quot;Add Step&quot;.
+                          </div>
+                        ) : (
+                          selectedModels.map((model, idx) => (
                             <div
+                              key={`${model.providerId}_${model.modelId}_${idx}`}
+                              draggable
+                              onDragStart={() => handleDragStart(idx)}
+                              onDragOver={(e) => handleDragOver(e, idx)}
+                              onDragEnd={handleDragEnd}
                               className={cn(
-                                "w-4 h-4 rounded-full flex items-center justify-center shrink-0 border",
-                                isChecked
-                                  ? "bg-background text-foreground border-background"
-                                  : "border-border/80"
+                                "p-2.5 rounded-2xl flex items-center justify-between gap-3 bg-secondary/30 transition-all",
+                                draggedIndex === idx && "opacity-40"
                               )}
                             >
-                              {isChecked && <Check className="h-2.5 w-2.5 stroke-[3]" />}
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <div className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground">
+                                  <GripVertical className="h-3.5 w-3.5" />
+                                </div>
+
+                                <span className="w-4 text-xs font-mono font-bold text-foreground text-center shrink-0">
+                                  {idx + 1}
+                                </span>
+
+                                <div className="min-w-0">
+                                  <div className="text-xs font-medium font-sans text-foreground truncate">
+                                    {model.providerName} / {model.modelId}
+                                  </div>
+                                  <div className="text-[9px] font-mono text-muted-foreground uppercase">
+                                    {idx === 0 ? "Primary Target" : "Failover Target"}
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-1 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={() => moveUp(idx)}
+                                  disabled={idx === 0}
+                                  className="p-1 rounded-md hover:bg-background/80 text-muted-foreground hover:text-foreground disabled:opacity-20 cursor-pointer"
+                                  title="Move up"
+                                >
+                                  <ChevronUp className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => moveDown(idx)}
+                                  disabled={idx === selectedModels.length - 1}
+                                  className="p-1 rounded-md hover:bg-background/80 text-muted-foreground hover:text-foreground disabled:opacity-20 cursor-pointer"
+                                  title="Move down"
+                                >
+                                  <ChevronDown className="h-3.5 w-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => removeModel(idx)}
+                                  className="p-1 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive cursor-pointer ml-1"
+                                  title="Remove step"
+                                >
+                                  <X className="h-3.5 w-3.5" />
+                                </button>
+                              </div>
                             </div>
-                          </div>
-                        );
-                      })}
-                  </div>
-
-                  {/* Option to Add Custom Model Name Manually */}
-                  <div className="pt-2 border-t border-border/50 flex items-center gap-2">
-                    <Input
-                      value={customModelIdInput}
-                      onChange={(e) => setCustomModelIdInput(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && addCustomModel()}
-                      placeholder={`Custom model identifier for ${activeProvider.name}...`}
-                      className="h-8 text-xs bg-secondary/30 rounded-xl border-border/60"
-                    />
-                    <Button
-                      size="sm"
-                      type="button"
-                      onClick={addCustomModel}
-                      className="rounded-xl h-8 px-3 text-xs font-sans cursor-pointer shrink-0"
-                    >
-                      <Plus className="h-3 w-3 mr-1" />
-                      <span>Add</span>
-                    </Button>
+                          ))
+                        )}
+                      </div>
+                    </ScrollArea>
                   </div>
                 </div>
+              )}
 
-                {/* Selected Models Pool Summary */}
-                <div className="p-3 rounded-2xl bg-secondary/40 border border-border/60 space-y-2">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="font-semibold text-foreground">
-                      Selected Pool ({selectedModels.length} models)
-                    </span>
-                    <span className="text-[11px] text-muted-foreground font-mono">
-                      Click to remove
-                    </span>
+              {/* ──── STAGE 3: SYSTEM PROMPT & CONTEXT WINDOW ──── */}
+              {step === 3 && (
+                <div className="space-y-4">
+                  <div className="space-y-0.5">
+                    <h3 className="text-sm font-semibold text-foreground">
+                      Configuration
+                    </h3>
+                    <p className="text-xs text-muted-foreground font-light">
+                      Set context window limits and optional default persona.
+                    </p>
                   </div>
 
-                  {selectedModels.length === 0 ? (
-                    <div className="text-xs text-muted-foreground font-light py-2 text-center">
-                      No models selected yet. Pick at least one model above.
+                  {/* Context Length Limit */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-medium text-foreground">
+                        Context Limit
+                      </label>
+                      <span className="text-xs font-mono font-medium text-foreground">
+                        {formatTokens(contextLength)} tokens
+                      </span>
                     </div>
-                  ) : (
-                    <div className="flex flex-wrap gap-1.5">
-                      {selectedModels.map((sm, idx) => (
-                        <span
-                          key={`${sm.providerId}_${sm.modelId}`}
-                          onClick={() => removeModel(idx)}
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-foreground text-background text-xs font-sans font-medium cursor-pointer hover:bg-foreground/80 transition-colors"
-                        >
-                          <span className="text-[10px] font-mono uppercase opacity-75">
-                            {sm.providerName}:
-                          </span>
-                          <span>{sm.modelId}</span>
-                          <span className="opacity-60">&times;</span>
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* ──── STEP 3: PRIORITY & FALLBACK DRAG-AND-DROP ──── */}
-            {step === 3 && (
-              <div className="space-y-5">
-                <div className="space-y-1">
-                  <label className="text-xs font-medium text-foreground">
-                    Arrange Priority Order (Top is Primary, Bottom is Fallback):
-                  </label>
-                  <p className="text-[11px] text-muted-foreground font-light">
-                    Drag items or use the up/down arrows to position your primary target and fallback failovers.
-                  </p>
-                </div>
-
-                {/* Reorderable List */}
-                <div className="space-y-2">
-                  {selectedModels.map((model, idx) => (
-                    <div
-                      key={`${model.providerId}_${model.modelId}`}
-                      draggable
-                      onDragStart={() => handleDragStart(idx)}
-                      onDragOver={(e) => handleDragOver(e, idx)}
-                      onDragEnd={handleDragEnd}
-                      className={cn(
-                        "p-3 rounded-2xl border transition-all flex items-center justify-between gap-3 bg-card",
-                        draggedIndex === idx
-                          ? "opacity-40 border-dashed border-foreground"
-                          : "border-border/70 hover:border-foreground/40",
-                        idx === 0 && "ring-1 ring-foreground/20"
-                      )}
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        {/* Drag Handle */}
-                        <div className="cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground">
-                          <GripVertical className="h-4 w-4" />
-                        </div>
-
-                        {/* Priority Rank */}
-                        <span
+                    <div className="flex flex-wrap gap-2">
+                      {CONTEXT_LENGTH_PRESETS.map((preset) => (
+                        <button
+                          key={preset.value}
+                          type="button"
+                          onClick={() => setContextLength(preset.value)}
                           className={cn(
-                            "px-2 py-0.5 rounded-md text-xs font-mono font-semibold shrink-0",
-                            idx === 0
-                              ? "bg-foreground text-background"
-                              : "bg-secondary text-foreground border border-border"
+                            "px-3 py-1.5 rounded-xl text-xs font-sans transition-colors cursor-pointer",
+                            contextLength === preset.value
+                              ? "bg-foreground text-background font-medium shadow-sm"
+                              : "bg-secondary/40 text-muted-foreground hover:text-foreground"
                           )}
                         >
-                          {idx === 0 ? "1 PRIMARY" : `${idx + 1} FALLBACK`}
-                        </span>
+                          {preset.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
 
-                        {/* Model Info */}
-                        <div className="min-w-0">
-                          <div className="text-xs font-medium font-sans text-foreground truncate">
-                            {model.modelId}
-                          </div>
-                          <div className="text-[10px] font-mono text-muted-foreground uppercase">
-                            Provider: {model.providerName}
-                          </div>
+                  {/* System Message */}
+                  <div className="space-y-1.5 pt-1">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-medium text-foreground">
+                        System Prompt <span className="text-[11px] font-normal text-muted-foreground">(Optional)</span>
+                      </label>
+                      <span className="text-[10px] text-muted-foreground font-mono">Injected if empty</span>
+                    </div>
+                    <Textarea
+                      value={systemMessage}
+                      onChange={(e) => setSystemMessage(e.target.value)}
+                      placeholder="e.g. You are an expert engineer. Always return clean, type-safe solutions."
+                      rows={4}
+                      className="text-xs bg-secondary/30 rounded-xl border border-border/70 hover:border-foreground/30 focus-visible:border-foreground/40 focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-foreground/15 resize-none font-sans transition-colors"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* ──── STAGE 4: REVIEW (FINAL VALIDATION) ──── */}
+              {step === 4 && (
+                <div className="space-y-4">
+                  <div className="space-y-0.5">
+                    <h3 className="text-sm font-semibold text-foreground">
+                      Review & Validation
+                    </h3>
+                    <p className="text-xs text-muted-foreground font-light">
+                      Confirm combo setup before activating.
+                    </p>
+                  </div>
+
+                  {/* Summary Box */}
+                  <div className="p-4 rounded-2xl bg-secondary/30 space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-[10px] font-mono font-semibold uppercase tracking-wider text-muted-foreground">
+                          IDENTIFIER
+                        </div>
+                        <div className="text-sm font-bold font-mono text-foreground mt-0.5">
+                          combo/{comboSlug || "name"}
+                        </div>
+                        <div className="text-xs font-sans text-muted-foreground mt-0.5">
+                          {comboName}
                         </div>
                       </div>
 
-                      {/* Ordering Controls & Remove */}
-                      <div className="flex items-center gap-1 shrink-0">
-                        <button
-                          type="button"
-                          onClick={() => moveUp(idx)}
-                          disabled={idx === 0}
-                          className="p-1 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground disabled:opacity-20 cursor-pointer"
-                          title="Move up"
-                        >
-                          <ChevronUp className="h-4 w-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => moveDown(idx)}
-                          disabled={idx === selectedModels.length - 1}
-                          className="p-1 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground disabled:opacity-20 cursor-pointer"
-                          title="Move down"
-                        >
-                          <ChevronDown className="h-4 w-4" />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => removeModel(idx)}
-                          disabled={selectedModels.length <= 1}
-                          className="p-1 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive disabled:opacity-20 cursor-pointer"
-                          title="Remove from combo"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                      <div className="text-right">
+                        <div className="text-[10px] font-mono font-semibold uppercase tracking-wider text-muted-foreground">
+                          CONTEXT LIMIT
+                        </div>
+                        <div className="text-xs font-mono font-semibold text-foreground mt-0.5">
+                          {formatTokens(contextLength)}
+                        </div>
                       </div>
                     </div>
-                  ))}
-                </div>
 
-                {/* Visual Fallback Diagram Preview */}
-                <div className="p-3.5 rounded-2xl bg-secondary/30 border border-border/60 space-y-2">
-                  <div className="text-xs font-semibold font-sans text-foreground flex items-center gap-1.5">
-                    <Sparkles className="h-3.5 w-3.5 text-foreground" />
-                    <span>Dynamic Execution Flow</span>
+                    {/* Fallback Chain Preview */}
+                    <div className="pt-1 space-y-1.5">
+                      <div className="text-xs font-semibold text-foreground">
+                        Execution Sequence ({selectedModels.length} Steps)
+                      </div>
+
+                      <ScrollArea className="max-h-24 pr-2">
+                        <div className="space-y-1 py-0.5">
+                          {selectedModels.map((m, idx) => (
+                            <div
+                              key={idx}
+                              className="flex items-center justify-between p-1.5 px-2.5 rounded-xl bg-background/60 text-xs font-sans"
+                            >
+                              <div className="flex items-center gap-2">
+                                <span
+                                  className={cn(
+                                    "w-4 h-4 rounded-full flex items-center justify-center text-[9px] font-mono font-semibold",
+                                    idx === 0
+                                      ? "bg-foreground text-background"
+                                      : "bg-muted text-muted-foreground"
+                                  )}
+                                >
+                                  {idx + 1}
+                                </span>
+                                <span className="font-medium text-foreground">
+                                  {m.modelId}
+                                </span>
+                              </div>
+                              <span className="text-[10px] font-mono text-muted-foreground uppercase">
+                                {m.providerName}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    </div>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-2 text-xs font-mono pt-1">
-                    {selectedModels.map((m, idx) => (
-                      <span key={idx} className="flex items-center gap-2">
-                        <span className="px-2 py-1 rounded-lg bg-card border border-border text-foreground font-medium">
-                          {idx + 1}. {m.modelId} ({m.providerName})
-                        </span>
-                        {idx < selectedModels.length - 1 && (
-                          <span className="text-muted-foreground">&rarr;</span>
-                        )}
-                      </span>
-                    ))}
+                  {/* Validation Checklist */}
+                  <div className="p-3 rounded-2xl bg-secondary/20 space-y-1.5 text-xs">
+                    <div className="font-semibold text-foreground flex items-center gap-1.5 text-[11px]">
+                      <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
+                      <span>Ready to Deploy</span>
+                    </div>
+                    <div className="space-y-1 font-sans text-muted-foreground text-[11px]">
+                      <div className="flex items-center gap-1.5">
+                        <Check className="h-3 w-3 text-emerald-500" />
+                        <span>Identifier: combo/{comboSlug || "name"}</span>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <Check className="h-3 w-3 text-emerald-500" />
+                        <span>{selectedModels.length} model step(s) in sequence</span>
+                      </div>
+                    </div>
                   </div>
-
-                  <p className="text-[11px] text-muted-foreground font-light pt-1">
-                    If Target #1 encounters HTTP 429 (Rate Limit) or HTTP 5xx (Outage), Const Router automatically retries with Target #2 within milliseconds.
-                  </p>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
+            </ScrollArea>
+
+            {/* Stepper Footer Navigation */}
+            <div className="pt-3 flex items-center justify-between">
+              {step === 1 && (
+                <>
+                  <Button
+                    variant="ghost"
+                    type="button"
+                    onClick={() => setIsWizardOpen(false)}
+                    className="rounded-full text-xs font-sans cursor-pointer"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      if (!comboName.trim()) {
+                        toast.error("Please enter a combo name.");
+                        return;
+                      }
+                      setStep(2);
+                    }}
+                    className="rounded-full text-xs font-sans gap-2 px-5 cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90"
+                  >
+                    <span>Next: Models</span>
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </Button>
+                </>
+              )}
+
+              {step === 2 && (
+                <>
+                  <Button
+                    variant="ghost"
+                    type="button"
+                    onClick={() => setStep(1)}
+                    className="rounded-full text-xs font-sans cursor-pointer gap-1.5"
+                  >
+                    <ArrowLeft className="h-3.5 w-3.5" />
+                    <span>Back</span>
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      if (selectedModels.length === 0) {
+                        toast.error("Please add at least 1 model before proceeding.");
+                        return;
+                      }
+                      setStep(3);
+                    }}
+                    className="rounded-full text-xs font-sans gap-2 px-5 cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90"
+                  >
+                    <span>Next: Settings</span>
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </Button>
+                </>
+              )}
+
+              {step === 3 && (
+                <>
+                  <Button
+                    variant="ghost"
+                    type="button"
+                    onClick={() => setStep(2)}
+                    className="rounded-full text-xs font-sans cursor-pointer gap-1.5"
+                  >
+                    <ArrowLeft className="h-3.5 w-3.5" />
+                    <span>Back</span>
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={() => setStep(4)}
+                    className="rounded-full text-xs font-sans gap-2 px-5 cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90"
+                  >
+                    <span>Next: Review</span>
+                    <ArrowRight className="h-3.5 w-3.5" />
+                  </Button>
+                </>
+              )}
+
+              {step === 4 && (
+                <>
+                  <Button
+                    variant="ghost"
+                    type="button"
+                    onClick={() => setStep(3)}
+                    className="rounded-full text-xs font-sans cursor-pointer gap-1.5"
+                  >
+                    <ArrowLeft className="h-3.5 w-3.5" />
+                    <span>Back</span>
+                  </Button>
+                  <Button
+                    type="button"
+                    disabled={isSubmitting}
+                    onClick={handleSaveCombo}
+                    className="rounded-full text-xs font-sans gap-2 px-6 cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90"
+                  >
+                    {isSubmitting ? (
+                      <span>Saving...</span>
+                    ) : (
+                      <>
+                        <Check className="h-4 w-4" />
+                        <span>{editingComboId ? "Update Combo" : "Create Combo"}</span>
+                      </>
+                    )}
+                  </Button>
+                </>
+              )}
+            </div>
           </div>
-
-          {/* Stepper Footer Navigation */}
-          <DialogFooter className="p-4 px-6 border-t border-border/60 bg-secondary/10 flex flex-row items-center justify-between sm:justify-between">
-            {step === 1 && (
-              <>
-                <Button
-                  variant="ghost"
-                  type="button"
-                  onClick={() => setIsWizardOpen(false)}
-                  className="rounded-full text-xs font-sans cursor-pointer"
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="button"
-                  onClick={() => {
-                    if (!comboName.trim()) {
-                      toast.error("Please enter a combo name.");
-                      return;
-                    }
-                    setStep(2);
-                  }}
-                  className="rounded-full text-xs font-sans gap-2 px-5 cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90"
-                >
-                  <span>Next: Select Models</span>
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </Button>
-              </>
-            )}
-
-            {step === 2 && (
-              <>
-                <Button
-                  variant="ghost"
-                  type="button"
-                  onClick={() => setStep(1)}
-                  className="rounded-full text-xs font-sans cursor-pointer"
-                >
-                  &larr; Back
-                </Button>
-                <Button
-                  type="button"
-                  onClick={() => {
-                    if (selectedModels.length === 0) {
-                      toast.error("Please add at least one model to the combo.");
-                      return;
-                    }
-                    setStep(3);
-                  }}
-                  className="rounded-full text-xs font-sans gap-2 px-5 cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90"
-                >
-                  <span>Next: Priority Order ({selectedModels.length})</span>
-                  <ArrowRight className="h-3.5 w-3.5" />
-                </Button>
-              </>
-            )}
-
-            {step === 3 && (
-              <>
-                <Button
-                  variant="ghost"
-                  type="button"
-                  onClick={() => setStep(2)}
-                  className="rounded-full text-xs font-sans cursor-pointer"
-                >
-                  &larr; Back
-                </Button>
-                <Button
-                  type="button"
-                  disabled={isSubmitting}
-                  onClick={handleSaveCombo}
-                  className="rounded-full text-xs font-sans gap-2 px-6 cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90"
-                >
-                  {isSubmitting ? (
-                    <span>Saving...</span>
-                  ) : (
-                    <>
-                      <Check className="h-4 w-4" />
-                      <span>{editingComboId ? "Update Combo" : "Create Combo"}</span>
-                    </>
-                  )}
-                </Button>
-              </>
-            )}
-          </DialogFooter>
         </DialogContent>
       </Dialog>
 
       {/* 5. Delete Confirmation Dialog */}
       <Dialog open={deletingId !== null} onOpenChange={(open) => !open && setDeletingId(null)}>
-        <DialogContent className="max-w-md rounded-3xl border-border bg-card p-6 space-y-4">
+        <DialogContent className="max-w-md rounded-3xl border-none bg-card p-6 space-y-4">
           <div className="space-y-1.5">
             <h3 className="text-base font-semibold text-foreground font-sans">
               Delete Virtual Combo?
@@ -1173,7 +1221,7 @@ export default function CombosPage() {
               variant="outline"
               size="sm"
               onClick={() => setDeletingId(null)}
-              className="rounded-full text-xs cursor-pointer font-sans"
+              className="rounded-full text-xs cursor-pointer font-sans border-none bg-secondary hover:bg-secondary/80"
             >
               Cancel
             </Button>

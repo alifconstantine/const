@@ -9,12 +9,17 @@ export interface ModelSpec {
   id: string;
   name: string;
   modelId: string;
-  provider: "const" | "google" | "byok";
+  provider: "const" | "google" | "byok" | "combo";
   providerName: string;
   providerDocId?: string;
   supportsThinking: boolean;
   thinkingDefault?: ThinkingLevel;
   isDefault?: boolean;
+  isCombo?: boolean;
+  comboSlug?: string;
+  modelsCount?: number;
+  description?: string;
+  contextLength?: number;
 }
 
 // Built-in models matching exactly what is listed in /models

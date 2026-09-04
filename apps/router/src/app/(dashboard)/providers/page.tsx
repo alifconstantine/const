@@ -17,6 +17,7 @@ import {
   Button,
   Badge,
   Input,
+  ScrollArea,
   Dialog,
   DialogContent,
   DialogHeader,
@@ -1005,97 +1006,98 @@ export default function ProvidersPage() {
               </DialogDescription>
             </DialogHeader>
 
-            <div className="flex-1 overflow-y-auto space-y-4 pr-1 scrollbar-thin">
-              {/* Form Field: Name (For Custom) */}
-              {isCustomMode && (
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-foreground font-sans">
-                    Provider Name
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Local Ollama Workstation"
-                    value={formName}
-                    onChange={(e) => setFormName(e.target.value)}
-                    className="w-full h-10 px-3.5 rounded-xl bg-secondary/60 border border-border text-xs text-foreground placeholder:text-muted-foreground font-sans outline-none focus:border-foreground/40 focus:ring-1 focus:ring-foreground/20 transition-all"
-                  />
-                </div>
-              )}
+            <ScrollArea className="flex-1 -mr-2 pr-3">
+              <div className="space-y-4 pr-1 py-1">
+                {/* Form Field: Name (For Custom) */}
+                {isCustomMode && (
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-foreground font-sans">
+                      Provider Name
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Local Ollama Workstation"
+                      value={formName}
+                      onChange={(e) => setFormName(e.target.value)}
+                      className="w-full h-10 px-3.5 rounded-xl bg-secondary/60 border border-border/80 text-xs text-foreground placeholder:text-muted-foreground font-sans outline-none hover:border-foreground/30 focus:border-foreground/50 focus:ring-1 focus:ring-inset focus:ring-foreground/20 transition-all"
+                    />
+                  </div>
+                )}
 
-              {/* Form Field: Base URL (Required for Custom, Optional for Preset) */}
-              {(isCustomMode || selectedProviderMeta?.defaultBaseUrl) && (
+                {/* Form Field: Base URL (Required for Custom, Optional for Preset) */}
+                {(isCustomMode || selectedProviderMeta?.defaultBaseUrl) && (
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <label className="text-xs font-medium text-foreground font-sans">
+                        Base URL
+                      </label>
+                      <span className="text-[10px] text-muted-foreground font-mono">
+                        {isCustomMode ? "Required" : "Default preset"}
+                      </span>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="e.g. http://localhost:11434 or https://api.together.xyz/v1"
+                      value={formBaseUrl}
+                      onChange={(e) => setFormBaseUrl(e.target.value)}
+                      className="w-full h-10 px-3.5 rounded-xl bg-secondary/60 border border-border/80 text-xs font-mono text-foreground placeholder:text-muted-foreground outline-none hover:border-foreground/30 focus:border-foreground/50 focus:ring-1 focus:ring-inset focus:ring-foreground/20 transition-all"
+                    />
+                  </div>
+                )}
+
+                {/* Form Field: Protocol Select (For Custom) */}
+                {isCustomMode && (
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-foreground font-sans">
+                      Protocol Compatibility
+                    </label>
+                    <Select
+                      value={formProtocol}
+                      onValueChange={(val: any) => setFormProtocol(val)}
+                    >
+                      <SelectTrigger className="h-10 rounded-xl bg-secondary/60 border border-border/80 hover:border-foreground/30 focus:border-foreground/50 focus:ring-1 focus:ring-inset focus:ring-foreground/20 text-xs font-sans text-foreground transition-all">
+                        <SelectValue placeholder="Select Protocol" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl border-border bg-popover text-xs font-sans">
+                        <SelectItem value="openai-compatible" className="cursor-pointer">
+                          OpenAI-Compatible (/v1/chat/completions)
+                        </SelectItem>
+                        <SelectItem value="anthropic" className="cursor-pointer">
+                          Anthropic-Compatible (/v1/messages)
+                        </SelectItem>
+                        <SelectItem value="google-ai" className="cursor-pointer">
+                          Google Gemini API
+                        </SelectItem>
+                        <SelectItem value="custom" className="cursor-pointer">
+                          Custom Passthrough
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {/* Form Field: API Key */}
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
                     <label className="text-xs font-medium text-foreground font-sans">
-                      Base URL
+                      API Key
                     </label>
                     <span className="text-[10px] text-muted-foreground font-mono">
-                      {isCustomMode ? "Required" : "Default preset"}
+                      {isCustomMode ? "Optional" : "Encrypted at rest"}
                     </span>
                   </div>
-                  <input
-                    type="text"
-                    placeholder="e.g. http://localhost:11434 or https://api.together.xyz/v1"
-                    value={formBaseUrl}
-                    onChange={(e) => setFormBaseUrl(e.target.value)}
-                    className="w-full h-10 px-3.5 rounded-xl bg-secondary/60 border border-border text-xs font-mono text-foreground placeholder:text-muted-foreground outline-none focus:border-foreground/40 focus:ring-1 focus:ring-foreground/20 transition-all"
-                  />
-                </div>
-              )}
-
-              {/* Form Field: Protocol Select (For Custom) */}
-              {isCustomMode && (
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-foreground font-sans">
-                    Protocol Compatibility
-                  </label>
-                  <Select
-                    value={formProtocol}
-                    onValueChange={(val: any) => setFormProtocol(val)}
-                  >
-                    <SelectTrigger className="h-10 rounded-xl bg-secondary/60 border-border text-xs font-sans text-foreground">
-                      <SelectValue placeholder="Select Protocol" />
-                    </SelectTrigger>
-                    <SelectContent className="rounded-xl border-border bg-popover text-xs font-sans">
-                      <SelectItem value="openai-compatible" className="cursor-pointer">
-                        OpenAI-Compatible (/v1/chat/completions)
-                      </SelectItem>
-                      <SelectItem value="anthropic" className="cursor-pointer">
-                        Anthropic-Compatible (/v1/messages)
-                      </SelectItem>
-                      <SelectItem value="google-ai" className="cursor-pointer">
-                        Google Gemini API
-                      </SelectItem>
-                      <SelectItem value="custom" className="cursor-pointer">
-                        Custom Passthrough
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-
-              {/* Form Field: API Key */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-xs font-medium text-foreground font-sans">
-                    API Key
-                  </label>
-                  <span className="text-[10px] text-muted-foreground font-mono">
-                    {isCustomMode ? "Optional" : "Encrypted at rest"}
-                  </span>
-                </div>
-                <div className="relative flex items-center">
-                  <input
-                    type={showApiKey ? "text" : "password"}
-                    placeholder={
-                      configuredMap.has(selectedProviderMeta?.id || "")
-                        ? "Enter new key to replace, or keep blank to retain existing key"
-                        : "e.g. sk-..."
-                    }
-                    value={formApiKey}
-                    onChange={(e) => setFormApiKey(e.target.value)}
-                    className="w-full h-10 pl-3.5 pr-10 rounded-xl bg-secondary/60 border border-border text-xs font-mono text-foreground placeholder:text-muted-foreground outline-none focus:border-foreground/40 focus:ring-1 focus:ring-foreground/20 transition-all"
-                  />
+                  <div className="relative flex items-center">
+                    <input
+                      type={showApiKey ? "text" : "password"}
+                      placeholder={
+                        configuredMap.has(selectedProviderMeta?.id || "")
+                          ? "Enter new key to replace, or keep blank to retain existing key"
+                          : "e.g. sk-..."
+                      }
+                      value={formApiKey}
+                      onChange={(e) => setFormApiKey(e.target.value)}
+                      className="w-full h-10 pl-3.5 pr-10 rounded-xl bg-secondary/60 border border-border/80 text-xs font-mono text-foreground placeholder:text-muted-foreground outline-none hover:border-foreground/30 focus:border-foreground/50 focus:ring-1 focus:ring-inset focus:ring-foreground/20 transition-all"
+                    />
                   <button
                     type="button"
                     onClick={() => setShowApiKey(!showApiKey)}
@@ -1196,71 +1198,73 @@ export default function ProvidersPage() {
                   </div>
 
                   {/* Checklist of Models */}
-                  <div className="max-h-56 overflow-y-auto space-y-1.5 p-1 border border-border/70 rounded-xl bg-secondary/20 scrollbar-thin">
-                    {filteredConfigModels.map((model) => (
-                      <div
-                        key={model.modelId}
-                        onClick={() => handleToggleModel(model.modelId)}
-                        className={cn(
-                          "flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors border",
-                          model.enabled
-                            ? "bg-card border-border/80 text-foreground"
-                            : "bg-transparent border-transparent opacity-60 hover:opacity-100"
-                        )}
-                      >
-                        <div className="flex items-center gap-2.5 min-w-0 pr-2">
-                          <div
-                            className={cn(
-                              "h-4 w-4 rounded flex items-center justify-center border transition-colors shrink-0",
-                              model.enabled
-                                ? "bg-primary border-primary text-primary-foreground"
-                                : "border-muted-foreground/40 bg-background"
-                            )}
-                          >
-                            {model.enabled && <Check className="h-3 w-3 stroke-[2.5]" />}
+                  <ScrollArea className="max-h-56 p-1 border border-border/70 rounded-xl bg-secondary/20">
+                    <div className="space-y-1.5 pr-2 py-0.5">
+                      {filteredConfigModels.map((model) => (
+                        <div
+                          key={model.modelId}
+                          onClick={() => handleToggleModel(model.modelId)}
+                          className={cn(
+                            "flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors border",
+                            model.enabled
+                              ? "bg-card border-border/80 text-foreground"
+                              : "bg-transparent border-transparent opacity-60 hover:opacity-100"
+                          )}
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                            <div
+                              className={cn(
+                                "h-4 w-4 rounded flex items-center justify-center border transition-colors shrink-0",
+                                model.enabled
+                                  ? "bg-primary border-primary text-primary-foreground"
+                                  : "border-muted-foreground/40 bg-background"
+                              )}
+                            >
+                              {model.enabled && <Check className="h-3 w-3 stroke-[2.5]" />}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-xs font-medium truncate font-sans">
+                                {model.name}
+                              </p>
+                              <p className="text-[10px] font-mono text-muted-foreground truncate">
+                                {model.modelId}
+                              </p>
+                            </div>
                           </div>
-                          <div className="min-w-0">
-                            <p className="text-xs font-medium truncate font-sans">
-                              {model.name}
-                            </p>
-                            <p className="text-[10px] font-mono text-muted-foreground truncate">
-                              {model.modelId}
-                            </p>
-                          </div>
-                        </div>
 
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          <div className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-secondary border border-border text-muted-foreground">
-                            {formatTokenDisplay(model.contextWindow, "1M")}
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <div className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-secondary border border-border text-muted-foreground">
+                              {formatTokenDisplay(model.contextWindow, "1M")}
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const idx = fetchedModels.findIndex((m) => m.modelId === model.modelId);
+                                setModelConfigTarget("import-list");
+                                setModelConfigInitial({
+                                  modelId: model.modelId,
+                                  name: model.name,
+                                  contextWindow: model.contextWindow || DEFAULT_CONTEXT_WINDOW,
+                                  maxOutputTokens: model.maxOutputTokens || DEFAULT_MAX_OUTPUT,
+                                  inputTypes: model.inputTypes || ["text"],
+                                  outputTypes: model.outputTypes || ["text"],
+                                });
+                                setEditingModelIndex(idx >= 0 ? idx : null);
+                                setModelConfigOpen(true);
+                              }}
+                              className="h-6 w-6 rounded-md text-muted-foreground hover:text-foreground cursor-pointer"
+                              title="Edit model specs"
+                            >
+                              <Pencil className="h-3 w-3" />
+                            </Button>
                           </div>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              const idx = fetchedModels.findIndex((m) => m.modelId === model.modelId);
-                              setModelConfigTarget("import-list");
-                              setModelConfigInitial({
-                                modelId: model.modelId,
-                                name: model.name,
-                                contextWindow: model.contextWindow || DEFAULT_CONTEXT_WINDOW,
-                                maxOutputTokens: model.maxOutputTokens || DEFAULT_MAX_OUTPUT,
-                                inputTypes: model.inputTypes || ["text"],
-                                outputTypes: model.outputTypes || ["text"],
-                              });
-                              setEditingModelIndex(idx >= 0 ? idx : null);
-                              setModelConfigOpen(true);
-                            }}
-                            className="h-6 w-6 rounded-md text-muted-foreground hover:text-foreground cursor-pointer"
-                            title="Edit model specs"
-                          >
-                            <Pencil className="h-3 w-3" />
-                          </Button>
                         </div>
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
                 </div>
               )}
 
@@ -1276,7 +1280,7 @@ export default function ProvidersPage() {
                       placeholder="e.g. qwen2.5-coder:32b or my-fine-tuned-model"
                       value={manualModelId}
                       onChange={(e) => setManualModelId(e.target.value)}
-                      className="flex-1 h-9 px-3 rounded-xl bg-secondary/60 border border-border text-xs font-mono text-foreground placeholder:text-muted-foreground outline-none"
+                      className="flex-1 h-9 px-3 rounded-xl bg-secondary/60 border border-border/80 text-xs font-mono text-foreground placeholder:text-muted-foreground outline-none hover:border-foreground/30 focus:border-foreground/40 focus:ring-1 focus:ring-inset focus:ring-foreground/15 transition-colors"
                     />
                     <Button
                       type="submit"
@@ -1290,7 +1294,8 @@ export default function ProvidersPage() {
                   </form>
                 </div>
               )}
-            </div>
+              </div>
+            </ScrollArea>
 
             {/* Modal Footer */}
             <DialogFooter className="pt-4 border-t border-border/60 flex flex-row items-center justify-end gap-3 sm:space-x-0 mt-auto shrink-0">
@@ -1339,100 +1344,102 @@ export default function ProvidersPage() {
             </DialogHeader>
 
             {manageDoc && (
-              <div className="flex-1 overflow-y-auto space-y-2 pr-1 scrollbar-thin">
-                <div className="flex items-center justify-between pb-1 shrink-0">
-                  <span className="text-xs text-muted-foreground font-sans">
-                    {manageDoc.importedModels.filter((m) => m.enabled).length} / {manageDoc.importedModels.length} models active
-                  </span>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setModelConfigTarget("manage-list");
-                      setModelConfigInitial(null);
-                      setEditingModelIndex(null);
-                      setModelConfigOpen(true);
-                    }}
-                    className="rounded-full text-xs h-7 px-2.5 cursor-pointer gap-1"
-                  >
-                    <Plus className="h-3 w-3" />
-                    <span>Add model</span>
-                  </Button>
-                </div>
-
-                {manageDoc.importedModels.map((model) => (
-                  <div
-                    key={model.modelId}
-                    onClick={() => {
-                      setManageDoc((prev) => {
-                        if (!prev) return null;
-                        return {
-                          ...prev,
-                          importedModels: prev.importedModels.map((m) =>
-                            m.modelId === model.modelId ? { ...m, enabled: !m.enabled } : m
-                          ),
-                        };
-                      });
-                    }}
-                    className={cn(
-                      "flex items-center justify-between p-2.5 rounded-xl cursor-pointer transition-colors border",
-                      model.enabled
-                        ? "bg-card border-border text-foreground"
-                        : "bg-transparent border-transparent opacity-50 hover:opacity-100"
-                    )}
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0 pr-2">
-                      <div
-                        className={cn(
-                          "h-4 w-4 rounded flex items-center justify-center border transition-colors shrink-0",
-                          model.enabled
-                            ? "bg-primary border-primary text-primary-foreground"
-                            : "border-muted-foreground/40 bg-background"
-                        )}
-                      >
-                        {model.enabled && <Check className="h-3 w-3 stroke-[2.5]" />}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-xs font-medium font-sans truncate">{model.name}</p>
-                        <p className="text-[10px] font-mono text-muted-foreground truncate">
-                          {model.modelId}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <div className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-secondary border border-border text-muted-foreground">
-                        {formatTokenDisplay(model.contextWindow, "1M")}
-                      </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const idx = manageDoc.importedModels.findIndex((m) => m.modelId === model.modelId);
-                          setModelConfigTarget("manage-list");
-                          setModelConfigInitial({
-                            modelId: model.modelId,
-                            name: model.name,
-                            contextWindow: model.contextWindow || DEFAULT_CONTEXT_WINDOW,
-                            maxOutputTokens: model.maxOutputTokens || DEFAULT_MAX_OUTPUT,
-                            inputTypes: model.inputTypes || ["text"],
-                            outputTypes: model.outputTypes || ["text"],
-                          });
-                          setEditingModelIndex(idx >= 0 ? idx : null);
-                          setModelConfigOpen(true);
-                        }}
-                        className="h-6 w-6 rounded-md text-muted-foreground hover:text-foreground cursor-pointer"
-                        title="Edit model specs"
-                      >
-                        <Pencil className="h-3 w-3" />
-                      </Button>
-                    </div>
+              <ScrollArea className="flex-1 -mr-2 pr-3">
+                <div className="space-y-2 pr-1 py-1">
+                  <div className="flex items-center justify-between pb-1 shrink-0">
+                    <span className="text-xs text-muted-foreground font-sans">
+                      {manageDoc.importedModels.filter((m) => m.enabled).length} / {manageDoc.importedModels.length} models active
+                    </span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setModelConfigTarget("manage-list");
+                        setModelConfigInitial(null);
+                        setEditingModelIndex(null);
+                        setModelConfigOpen(true);
+                      }}
+                      className="rounded-full text-xs h-7 px-2.5 cursor-pointer gap-1"
+                    >
+                      <Plus className="h-3 w-3" />
+                      <span>Add model</span>
+                    </Button>
                   </div>
-                ))}
-              </div>
+
+                  {manageDoc.importedModels.map((model) => (
+                    <div
+                      key={model.modelId}
+                      onClick={() => {
+                        setManageDoc((prev) => {
+                          if (!prev) return null;
+                          return {
+                            ...prev,
+                            importedModels: prev.importedModels.map((m) =>
+                              m.modelId === model.modelId ? { ...m, enabled: !m.enabled } : m
+                            ),
+                          };
+                        });
+                      }}
+                      className={cn(
+                        "flex items-center justify-between p-2.5 rounded-xl cursor-pointer transition-colors border",
+                        model.enabled
+                          ? "bg-card border-border text-foreground"
+                          : "bg-transparent border-transparent opacity-50 hover:opacity-100"
+                      )}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                        <div
+                          className={cn(
+                            "h-4 w-4 rounded flex items-center justify-center border transition-colors shrink-0",
+                            model.enabled
+                              ? "bg-primary border-primary text-primary-foreground"
+                              : "border-muted-foreground/40 bg-background"
+                          )}
+                        >
+                          {model.enabled && <Check className="h-3 w-3 stroke-[2.5]" />}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-xs font-medium font-sans truncate">{model.name}</p>
+                          <p className="text-[10px] font-mono text-muted-foreground truncate">
+                            {model.modelId}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <div className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-secondary border border-border text-muted-foreground">
+                          {formatTokenDisplay(model.contextWindow, "1M")}
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const idx = manageDoc.importedModels.findIndex((m) => m.modelId === model.modelId);
+                            setModelConfigTarget("manage-list");
+                            setModelConfigInitial({
+                              modelId: model.modelId,
+                              name: model.name,
+                              contextWindow: model.contextWindow || DEFAULT_CONTEXT_WINDOW,
+                              maxOutputTokens: model.maxOutputTokens || DEFAULT_MAX_OUTPUT,
+                              inputTypes: model.inputTypes || ["text"],
+                              outputTypes: model.outputTypes || ["text"],
+                            });
+                            setEditingModelIndex(idx >= 0 ? idx : null);
+                            setModelConfigOpen(true);
+                          }}
+                          className="h-6 w-6 rounded-md text-muted-foreground hover:text-foreground cursor-pointer"
+                          title="Edit model specs"
+                        >
+                          <Pencil className="h-3 w-3" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
             )}
 
             <DialogFooter className="pt-4 border-t border-border/60 flex flex-row items-center justify-end gap-3 shrink-0">

@@ -10,6 +10,11 @@ import {
   recordDirectTelemetry,
   type TelemetryMetadata,
 } from "@/lib/telemetry";
+import { executeComboChat } from "@/lib/combo-executor";
+import {
+  convertGoogleSseToOpenAiSse,
+  convertAnthropicSseToOpenAiSse,
+} from "@/lib/sse-converters";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -165,6 +170,37 @@ export async function POST(req: NextRequest) {
         { error: { message: "No prompt messages provided." } },
         { status: 400 }
       );
+    }
+
+    // ========================================================
+    // CASE 0: Virtual Combo Request (combo/* or auto/fast/coding)
+    // ========================================================
+    const isCombo =
+      providerId === "combo" ||
+      model.startsWith("combo/") ||
+      ["auto", "fast", "coding"].includes(model);
+
+    if (isCombo) {
+      const comboSlug = model.replace(/^combo\//, "");
+      telemetryMeta.model = model.startsWith("combo/") ? model : `combo/${model}`;
+      telemetryMeta.provider = "Virtual Combo";
+
+      const comboResponse = await executeComboChat({
+        comboSlug,
+        messages,
+        systemInstruction,
+        temperature,
+        thinkingLevel: thinkingLevel === "low" || thinkingLevel === "high" ? thinkingLevel : "medium",
+        apiKey: providedKey,
+        ssoToken,
+        convexUrl,
+        requestId,
+        ip,
+        userAgent,
+        signal: req.signal,
+      });
+
+      return wrapWithTelemetry(comboResponse, telemetryMeta);
     }
 
     // ========================================================
@@ -443,7 +479,7 @@ export async function POST(req: NextRequest) {
             headers["Authorization"] = `Bearer ${activeKey}`;
           }
           if (creds.providerId === "openrouter" || activeBaseUrl.includes("openrouter.ai")) {
-            headers["HTTP-Referer"] = "https://router.const.web.id";
+            headers["HTTP-Referer"] = process.env.NEXT_PUBLIC_APP_URL || "https://router.const.web.id";
             headers["X-Title"] = "Const Router";
           }
 
@@ -582,132 +618,3 @@ export async function POST(req: NextRequest) {
   }
 }
 
-/**
- * Transforms Google AI Studio SSE stream to standard OpenAI format
- */
-function convertGoogleSseToOpenAiSse(body: ReadableStream<Uint8Array>): Response {
-  const encoder = new TextEncoder();
-  const reader = body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-
-  const stream = new ReadableStream({
-    async start(controller) {
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split("\n");
-          buffer = lines.pop() || "";
-
-          for (const line of lines) {
-            const trimmed = line.trim();
-            if (!trimmed.startsWith("data: ")) continue;
-            const jsonStr = trimmed.substring(6).trim();
-            if (!jsonStr) continue;
-
-            try {
-              const data = JSON.parse(jsonStr);
-              const candidate = data.candidates?.[0];
-              if (!candidate) continue;
-
-              const parts = candidate.content?.parts || [];
-              for (const part of parts) {
-                if (part.text) {
-                  const isThought = Boolean(part.thought);
-                  const payload = JSON.stringify({
-                    choices: [
-                      {
-                        delta: {
-                          content: isThought ? undefined : part.text,
-                          reasoning_content: isThought ? part.text : undefined,
-                        },
-                      },
-                    ],
-                  });
-                  controller.enqueue(encoder.encode(`data: ${payload}\n\n`));
-                }
-              }
-            } catch {}
-          }
-        }
-        controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-        controller.close();
-      } catch {
-        controller.close();
-      }
-    },
-  });
-
-  return new Response(stream, {
-    headers: {
-      "Content-Type": "text/event-stream; charset=utf-8",
-      "Cache-Control": "no-cache, no-transform",
-      Connection: "keep-alive",
-    },
-  });
-}
-
-/**
- * Transforms Anthropic Messages SSE stream to standard OpenAI format
- */
-function convertAnthropicSseToOpenAiSse(body: ReadableStream<Uint8Array>): Response {
-  const encoder = new TextEncoder();
-  const reader = body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-
-  const stream = new ReadableStream({
-    async start(controller) {
-      try {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split("\n");
-          buffer = lines.pop() || "";
-
-          for (const line of lines) {
-            const trimmed = line.trim();
-            if (!trimmed.startsWith("data: ")) continue;
-            const jsonStr = trimmed.substring(6).trim();
-            if (!jsonStr || jsonStr === "[DONE]") continue;
-
-            try {
-              const data = JSON.parse(jsonStr);
-              if (data.type === "content_block_delta" && data.delta?.text) {
-                const payload = JSON.stringify({
-                  choices: [
-                    {
-                      delta: {
-                        content: data.delta.text,
-                      },
-                    },
-                  ],
-                });
-                controller.enqueue(encoder.encode(`data: ${payload}\n\n`));
-              } else if (data.type === "message_stop") {
-                controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-              }
-            } catch {}
-          }
-        }
-        controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-        controller.close();
-      } catch {
-        controller.close();
-      }
-    },
-  });
-
-  return new Response(stream, {
-    headers: {
-      "Content-Type": "text/event-stream; charset=utf-8",
-      "Cache-Control": "no-cache, no-transform",
-      Connection: "keep-alive",
-    },
-  });
-}

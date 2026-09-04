@@ -118,7 +118,7 @@ export function ModelConfigDialog({
                 setModelId(e.target.value);
                 if (error) setError(null);
               }}
-              className="w-full h-10 px-3 rounded-xl bg-secondary/50 border border-border/80 text-xs font-mono text-foreground placeholder:text-muted-foreground outline-none focus:border-foreground/40 focus:ring-1 focus:ring-foreground/20 transition-all"
+              className="w-full h-10 px-3 rounded-xl bg-secondary/50 border border-border/80 text-xs font-mono text-foreground placeholder:text-muted-foreground outline-none hover:border-foreground/30 focus:border-foreground/40 focus:ring-1 focus:ring-inset focus:ring-foreground/15 transition-colors"
             />
           </div>
 
@@ -131,7 +131,7 @@ export function ModelConfigDialog({
               type="text"
               value={contextWindow}
               onChange={(e) => setContextWindow(e.target.value)}
-              className="w-full h-10 px-3 rounded-xl bg-secondary/50 border border-border/80 text-xs font-mono text-foreground outline-none focus:border-foreground/40 focus:ring-1 focus:ring-foreground/20 transition-all"
+              className="w-full h-10 px-3 rounded-xl bg-secondary/50 border border-border/80 text-xs font-mono text-foreground outline-none hover:border-foreground/30 focus:border-foreground/40 focus:ring-1 focus:ring-inset focus:ring-foreground/15 transition-colors"
             />
           </div>
 
@@ -144,7 +144,7 @@ export function ModelConfigDialog({
               type="text"
               value={maxOutputTokens}
               onChange={(e) => setMaxOutputTokens(e.target.value)}
-              className="w-full h-10 px-3 rounded-xl bg-secondary/50 border border-border/80 text-xs font-mono text-foreground outline-none focus:border-foreground/40 focus:ring-1 focus:ring-foreground/20 transition-all"
+              className="w-full h-10 px-3 rounded-xl bg-secondary/50 border border-border/80 text-xs font-mono text-foreground outline-none hover:border-foreground/30 focus:border-foreground/40 focus:ring-1 focus:ring-inset focus:ring-foreground/15 transition-colors"
             />
           </div>
 

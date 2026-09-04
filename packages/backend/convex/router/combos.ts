@@ -2,13 +2,16 @@ import { query, mutation } from "../_generated/server";
 import { v } from "convex/values";
 import { getAuthUserId } from "@convex-dev/auth/server";
 
-// 3 Standard System Built-in Combos
+// Reserved System Built-in Slugs
+export const SYSTEM_DEFAULT_SLUGS = ["auto", "fast", "coding"] as const;
+
+// Fallback base model definition
 export const SYSTEM_DEFAULT_COMBOS = [
   {
     _id: "builtin_auto",
     name: "Auto (Best Available)",
     slug: "auto",
-    description: "Intelligently balances accuracy, reasoning depth, and latency with multi-provider failover.",
+    description: "Intelligently balances accuracy, reasoning depth, and latency with multi-model failover.",
     systemMessage: undefined,
     contextLength: 262144, // 256K
     strategy: "priority" as const,
@@ -20,18 +23,6 @@ export const SYSTEM_DEFAULT_COMBOS = [
         providerId: "const",
         providerName: "Const Gateway",
         priority: 1,
-      },
-      {
-        modelId: "gemini-2.5-flash",
-        providerId: "google",
-        providerName: "Google AI",
-        priority: 2,
-      },
-      {
-        modelId: "deepseek-chat",
-        providerId: "deepseek",
-        providerName: "DeepSeek",
-        priority: 3,
       },
     ],
     createdAt: 1700000000000,
@@ -54,18 +45,6 @@ export const SYSTEM_DEFAULT_COMBOS = [
         providerName: "Const Gateway",
         priority: 1,
       },
-      {
-        modelId: "glm-5.3-flash",
-        providerId: "openrouter",
-        providerName: "OpenRouter",
-        priority: 2,
-      },
-      {
-        modelId: "llama-3.3-70b-versatile",
-        providerId: "groq",
-        providerName: "Groq",
-        priority: 3,
-      },
     ],
     createdAt: 1700000000000,
     updatedAt: 1700000000000,
@@ -87,23 +66,120 @@ export const SYSTEM_DEFAULT_COMBOS = [
         providerName: "Const Gateway",
         priority: 1,
       },
-      {
-        modelId: "deepseek-reasoner",
-        providerId: "deepseek",
-        providerName: "DeepSeek",
-        priority: 2,
-      },
-      {
-        modelId: "claude-3-7-sonnet",
-        providerId: "anthropic",
-        providerName: "Anthropic",
-        priority: 3,
-      },
     ],
     createdAt: 1700000000000,
     updatedAt: 1700000000000,
   },
 ];
+
+// Dynamically generate default combos based ONLY on real models available to the user
+export async function getDynamicDefaultCombos(ctx: any, userId?: string | null) {
+  // 1. Const Gateway managed model is ALWAYS available
+  const constModel = {
+    modelId: "gemini-3.6-flash",
+    providerId: "const",
+    providerName: "Const Gateway",
+  };
+
+  const availablePool: Array<{
+    modelId: string;
+    providerId: string;
+    providerName: string;
+  }> = [constModel];
+
+  // 2. Fetch active BYOK models configured by this user
+  if (userId) {
+    const userProviders = await ctx.db
+      .query("userProviders")
+      .withIndex("by_user", (q: any) => q.eq("userId", userId))
+      .collect();
+
+    for (const p of userProviders) {
+      if (p.status !== "active") continue;
+      const enabled = (p.importedModels || []).filter((m: any) => m.enabled);
+      for (const m of enabled) {
+        if (!availablePool.some((x) => x.modelId === m.modelId && x.providerId === p.providerId)) {
+          availablePool.push({
+            modelId: m.modelId,
+            providerId: p.providerId,
+            providerName: p.name || p.providerId,
+          });
+        }
+      }
+    }
+  }
+
+  const assignPriorities = (models: Array<{ modelId: string; providerId: string; providerName: string }>) =>
+    models.map((m, idx) => ({ ...m, priority: idx + 1 }));
+
+  // AUTO: All available models in balanced priority order (Const first, then connected BYOKs)
+  const autoModels = assignPriorities(availablePool);
+
+  // FAST: Prioritize fast / flash / low-latency models
+  const fastSorted = [...availablePool].sort((a, b) => {
+    const isFastA = /(?:flash|mini|instant|8b|groq|turbo|haiku|speed|small)/i.test(a.modelId);
+    const isFastB = /(?:flash|mini|instant|8b|groq|turbo|haiku|speed|small)/i.test(b.modelId);
+    if (isFastA && !isFastB) return -1;
+    if (!isFastA && isFastB) return 1;
+    return 0;
+  });
+  const fastModels = assignPriorities(fastSorted);
+
+  // CODING: Prioritize coding / reasoning models
+  const codingSorted = [...availablePool].sort((a, b) => {
+    const isCodeA = /(?:code|coder|deepseek|reasoner|sonnet|opus|claude|gpt-4|pro|qwen)/i.test(a.modelId);
+    const isCodeB = /(?:code|coder|deepseek|reasoner|sonnet|opus|claude|gpt-4|pro|qwen)/i.test(b.modelId);
+    if (isCodeA && !isCodeB) return -1;
+    if (!isCodeA && isCodeB) return 1;
+    return 0;
+  });
+  const codingModels = assignPriorities(codingSorted);
+
+  return [
+    {
+      _id: "builtin_auto",
+      name: "Auto (Best Available)",
+      slug: "auto",
+      description: "Intelligently balances accuracy, reasoning depth, and latency with multi-model failover.",
+      systemMessage: undefined,
+      contextLength: 262144, // 256K
+      strategy: "priority" as const,
+      isBuiltin: true,
+      status: "active" as const,
+      models: autoModels,
+      createdAt: 1700000000000,
+      updatedAt: 1700000000000,
+    },
+    {
+      _id: "builtin_fast",
+      name: "Fast (Low Latency)",
+      slug: "fast",
+      description: "Sub-second time-to-first-token and ultra-high throughput for instant conversational feedback.",
+      systemMessage: undefined,
+      contextLength: 262144, // 256K
+      strategy: "priority" as const,
+      isBuiltin: true,
+      status: "active" as const,
+      models: fastModels,
+      createdAt: 1700000000000,
+      updatedAt: 1700000000000,
+    },
+    {
+      _id: "builtin_coding",
+      name: "Coding & Reasoning",
+      slug: "coding",
+      description: "Specialized models tuned for software architecture, code generation, refactoring, and logical reasoning.",
+      systemMessage: undefined,
+      contextLength: 262144, // 256K
+      strategy: "priority" as const,
+      isBuiltin: true,
+      status: "active" as const,
+      models: codingModels,
+      createdAt: 1700000000000,
+      updatedAt: 1700000000000,
+    },
+  ];
+}
 
 function slugify(name: string): string {
   return name
@@ -114,11 +190,13 @@ function slugify(name: string): string {
     .replace(/^-+|-+$/g, "");
 }
 
-// 1. List All Combos (System Defaults + User Custom Combos)
+// 1. List All Combos (Dynamic Defaults with real available models only + User Custom Combos)
 export const listCombos = query({
   args: {},
   handler: async (ctx) => {
     const userId = await getAuthUserId(ctx);
+
+    const defaultCombos = await getDynamicDefaultCombos(ctx, userId);
 
     const userCombos = userId
       ? await ctx.db
@@ -143,27 +221,50 @@ export const listCombos = query({
       updatedAt: c.updatedAt,
     }));
 
-    // System defaults first, then user combos
-    return [...SYSTEM_DEFAULT_COMBOS, ...formattedUserCombos];
+    // Dynamic system defaults first, then user custom combos
+    return [...defaultCombos, ...formattedUserCombos];
   },
 });
 
-// 2. Get a Specific Combo by ID or Slug
+async function hashApiKey(key: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(key.trim());
+  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+// 2. Get a Specific Combo by ID or Slug (Supports Web Session Auth & API Key Auth)
 export const getCombo = query({
   args: {
     slug: v.optional(v.string()),
     id: v.optional(v.string()),
+    rawApiKey: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const cleanSlug = args.slug ? slugify(args.slug) : "";
+    let userId = await getAuthUserId(ctx);
 
-    // Check system defaults
-    const builtin = SYSTEM_DEFAULT_COMBOS.find(
+    // If no direct session, check rawApiKey for sk-const-live-
+    if (!userId && args.rawApiKey && args.rawApiKey.startsWith("sk-const-live-")) {
+      const keyHash = await hashApiKey(args.rawApiKey);
+      const keyDoc = await ctx.db
+        .query("apiKeys")
+        .withIndex("by_key_hash", (q) => q.eq("keyHash", keyHash))
+        .unique();
+
+      if (keyDoc && keyDoc.status === "active") {
+        userId = keyDoc.userId;
+      }
+    }
+
+    // Check system defaults dynamically (includes user's connected BYOKs if userId resolved)
+    const defaultCombos = await getDynamicDefaultCombos(ctx, userId);
+    const builtin = defaultCombos.find(
       (b) => b.slug === cleanSlug || b._id === args.id
     );
     if (builtin) return builtin;
 
-    const userId = await getAuthUserId(ctx);
     if (!userId) return null;
 
     if (cleanSlug) {
@@ -227,7 +328,7 @@ export const createCombo = mutation({
     }
 
     // Check collision with built-in slugs
-    if (SYSTEM_DEFAULT_COMBOS.some((b) => b.slug === cleanSlug)) {
+    if (SYSTEM_DEFAULT_SLUGS.includes(cleanSlug as any)) {
       throw new Error(`The slug "${cleanSlug}" is reserved by a system default combo.`);
     }
 
@@ -360,25 +461,26 @@ export const resolveComboForExecution = query({
   },
   handler: async (ctx, args) => {
     const cleanSlug = slugify(args.slug);
-
-    // 1. Check system defaults
-    const builtin = SYSTEM_DEFAULT_COMBOS.find((b) => b.slug === cleanSlug);
-    if (builtin) {
-      return {
-        name: builtin.name,
-        slug: builtin.slug,
-        systemMessage: builtin.systemMessage,
-        contextLength: builtin.contextLength,
-        strategy: builtin.strategy,
-        models: builtin.models,
-        isBuiltin: true,
-      };
-    }
-
-    // 2. Check user's custom combos
     let userId = args.userId;
     if (!userId) {
       userId = (await getAuthUserId(ctx)) ?? undefined;
+    }
+
+    // 1. Check dynamic system defaults
+    if (SYSTEM_DEFAULT_SLUGS.includes(cleanSlug as any)) {
+      const defaultCombos = await getDynamicDefaultCombos(ctx, userId);
+      const builtin = defaultCombos.find((b) => b.slug === cleanSlug);
+      if (builtin) {
+        return {
+          name: builtin.name,
+          slug: builtin.slug,
+          systemMessage: builtin.systemMessage,
+          contextLength: builtin.contextLength,
+          strategy: builtin.strategy,
+          models: builtin.models,
+          isBuiltin: true,
+        };
+      }
     }
 
     if (!userId) return null;

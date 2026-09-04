@@ -9,6 +9,7 @@ import {
   recordDirectTelemetry,
   type TelemetryMetadata,
 } from "@/lib/telemetry";
+import { executeComboChat } from "@/lib/combo-executor";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,6 +26,21 @@ interface OpenAIChatRequestBody {
   stream?: boolean;
   reasoning_effort?: "off" | "low" | "medium" | "high";
   providerDocId?: string;
+}
+
+function wrapWithTelemetry(
+  response: Response,
+  meta: TelemetryMetadata
+): Response {
+  if (!response.body) return response;
+  const { stream } = createTelemetryStream(response.body, meta);
+  return new Response(stream, {
+    headers: {
+      ...Object.fromEntries(response.headers.entries()),
+      "X-Const-Request-Id": meta.requestId,
+    },
+    status: response.status,
+  });
 }
 
 export async function POST(req: NextRequest) {
@@ -108,93 +124,24 @@ export async function POST(req: NextRequest) {
 
     if (isCombo && convexUrl) {
       const comboSlug = model.replace(/^combo\//, "");
-      const client = new ConvexHttpClient(convexUrl);
-      if (ssoToken) {
-        client.setAuth(ssoToken);
-      }
+      telemetryMeta.model = model.startsWith("combo/") ? model : `combo/${model}`;
+      telemetryMeta.provider = "Virtual Combo";
 
-      const combo = await client.query(api.router.combos.resolveComboForExecution, {
-        slug: comboSlug,
+      const comboResponse = await executeComboChat({
+        comboSlug,
+        messages,
+        temperature,
+        thinkingLevel: reasoning_effort === "low" || reasoning_effort === "high" ? reasoning_effort : "medium",
+        apiKey: providedKey,
+        ssoToken,
+        convexUrl,
+        requestId,
+        ip,
+        userAgent,
+        signal: req.signal,
       });
 
-      if (combo && combo.models.length > 0) {
-        telemetryMeta.comboId = combo.slug;
-        telemetryMeta.comboName = `combo/${combo.slug}`;
-
-        // Inject combo system message if provided and caller didn't supply one
-        let effectiveMessages = [...messages];
-        if (combo.systemMessage && !effectiveMessages.some((m) => m.role === "system")) {
-          effectiveMessages.unshift({
-            role: "system",
-            content: combo.systemMessage,
-          });
-        }
-
-        const sortedTargets = [...combo.models].sort((a, b) => a.priority - b.priority);
-
-        let lastErrorResponse: Response | null = null;
-        for (let i = 0; i < sortedTargets.length; i++) {
-          const target = sortedTargets[i];
-          if (!target) continue;
-
-          // Clone telemetry metadata for this specific target attempt
-          const targetTelemetryMeta: TelemetryMetadata = {
-            ...telemetryMeta,
-            model: target.modelId,
-            provider: target.providerName,
-          };
-
-          try {
-            const targetRes = await dispatchSingleModel({
-              targetModel: target.modelId,
-              providerDocId: target.providerId !== "const" && target.providerId.startsWith("k_") ? target.providerId : undefined,
-              messages: effectiveMessages,
-              temperature,
-              stream,
-              reasoning_effort,
-              providedKey,
-              ssoToken,
-              convexUrl,
-              telemetryMeta: targetTelemetryMeta,
-              requestId,
-              reqStartTime,
-            });
-
-            if (targetRes.ok) {
-              return targetRes;
-            }
-
-            // Retry on Rate Limit (429) or Server Outage (5xx)
-            if (targetRes.status === 429 || targetRes.status >= 500) {
-              console.warn(
-                `[Const Router Combo Fallback] Model '${target.modelId}' (${target.providerName}) returned HTTP ${targetRes.status}. Retrying next priority model...`
-              );
-              lastErrorResponse = targetRes;
-              continue;
-            }
-
-            // If it's a client bad request (400), don't retry, return immediately
-            return targetRes;
-          } catch (targetErr) {
-            console.error(`[Const Router Combo Error] Execution for ${target.modelId} threw:`, targetErr);
-            continue;
-          }
-        }
-
-        if (lastErrorResponse) {
-          return lastErrorResponse;
-        }
-
-        return NextResponse.json(
-          {
-            error: {
-              message: `All models in combo '${combo.name}' failed to respond.`,
-              code: "combo_exhausted",
-            },
-          },
-          { status: 502 }
-        );
-      }
+      return wrapWithTelemetry(comboResponse, telemetryMeta);
     }
 
     // Standard non-combo model execution
@@ -396,7 +343,7 @@ async function dispatchSingleModel({
     upstreamHeaders["Authorization"] = `Bearer ${activeKey}`;
   }
   if (creds.providerId === "openrouter" || activeBaseUrl.includes("openrouter.ai")) {
-    upstreamHeaders["HTTP-Referer"] = "https://router.const.web.id";
+    upstreamHeaders["HTTP-Referer"] = process.env.NEXT_PUBLIC_APP_URL || "https://router.const.web.id";
     upstreamHeaders["X-Title"] = "Const Router";
   }
 
