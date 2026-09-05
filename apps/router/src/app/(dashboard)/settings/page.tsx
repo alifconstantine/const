@@ -430,7 +430,7 @@ export default function SettingsPage() {
             <p className="text-base font-serif font-bold text-foreground">
               v1
             </p>
-            <p className="text-[10px] text-muted-foreground font-mono">Engine</p>
+            <p className="text-[10px] text-muted-foreground font-mono">Router</p>
           </div>
         </div>
 

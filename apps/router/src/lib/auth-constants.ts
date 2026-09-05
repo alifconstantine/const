@@ -10,7 +10,7 @@ export function getAccountsUrl(): string {
     }
     return "https://accounts.const.web.id";
   }
-  return process.env.NEXT_PUBLIC_ACCOUNTS_URL || "http://localhost:3001";
+  return process.env.NEXT_PUBLIC_ACCOUNTS_URL || "https://accounts.const.web.id";
 }
 
 export function getAppUrl(): string {
@@ -22,7 +22,7 @@ export function getAppUrl(): string {
     if (hostname === "localhost" || hostname === "127.0.0.1") {
       return window.location.origin;
     }
-    return "https://router.const.web.id";
+    return window.location.origin || "https://router.const.web.id";
   }
   return process.env.NEXT_PUBLIC_APP_URL || "https://router.const.web.id";
 }
