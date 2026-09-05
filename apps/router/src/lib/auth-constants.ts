@@ -18,9 +18,13 @@ export function getAppUrl(): string {
     if (process.env.NEXT_PUBLIC_APP_URL) {
       return process.env.NEXT_PUBLIC_APP_URL;
     }
-    return window.location.origin;
+    const hostname = window.location.hostname;
+    if (hostname === "localhost" || hostname === "127.0.0.1") {
+      return window.location.origin;
+    }
+    return "https://router.const.web.id";
   }
-  return process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3002";
+  return process.env.NEXT_PUBLIC_APP_URL || "https://router.const.web.id";
 }
 
 export function getCookie(name: string): string | null {

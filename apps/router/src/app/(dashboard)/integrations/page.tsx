@@ -4,7 +4,6 @@ import { useState, useMemo, useEffect } from "react";
 import { useQuery } from "convex/react";
 import { api } from "@const/backend/_generated/api";
 import { useRouterAuth } from "@/components/providers/convex-client-provider";
-import { getAppUrl } from "@/lib/auth-constants";
 import {
   Button,
   Badge,
@@ -57,7 +56,7 @@ interface IntegrationItem {
 
 export default function IntegrationsPage() {
   const { isAuthenticated } = useRouterAuth();
-  const [appUrl, setAppUrl] = useState("");
+  const baseUrl = "https://router.const.web.id/v1";
   const [selectedCategory, setSelectedCategory] = useState<CategoryId>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [activeIntegration, setActiveIntegration] = useState<IntegrationItem | null>(null);
@@ -73,14 +72,6 @@ export default function IntegrationsPage() {
     api.router.keys.listKeys,
     isAuthenticated ? {} : "skip"
   );
-
-  useEffect(() => {
-    setAppUrl(getAppUrl());
-  }, []);
-
-  const baseUrl = useMemo(() => {
-    return appUrl ? `${appUrl}/v1` : "https://router.const.dev/v1";
-  }, [appUrl]);
 
   // Set default test key if user has one
   useEffect(() => {

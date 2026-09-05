@@ -40,7 +40,6 @@ import {
   Layers,
   X,
 } from "lucide-react";
-import { getAppUrl } from "@/lib/auth-constants";
 
 interface EndpointItem {
   id: string;
@@ -218,21 +217,9 @@ const ENDPOINT_CATEGORIES: EndpointCategory[] = [
 
 export default function EndpointsPage() {
   const [searchQuery, setSearchQuery] = useState("");
-  const [originUrl, setOriginUrl] = useState("https://router.const.web.id");
+  const originUrl = "https://router.const.web.id";
+  const baseUrl = "https://router.const.web.id/v1";
   const [copiedId, setCopiedId] = useState<string | null>(null);
-
-  useEffect(() => {
-    try {
-      const appUrl = getAppUrl();
-      if (appUrl) {
-        setOriginUrl(appUrl.replace(/\/+$/, ""));
-      }
-    } catch {
-      // Keep default
-    }
-  }, []);
-
-  const baseUrl = `${originUrl}/v1`;
 
   // Filter endpoints according to search query
   const filteredCategories = useMemo(() => {
