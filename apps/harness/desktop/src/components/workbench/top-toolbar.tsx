@@ -4,7 +4,7 @@ import {
   PanelRight,
   ArrowLeft,
   ArrowRight,
-  PlusCircle,
+  MessageCirclePlus,
   PanelLeft,
   Minus,
   Square,
@@ -22,7 +22,6 @@ interface TopToolbarProps {
   conversationTitle?: string;
   project?: string;
   diffStats?: { additions: number; deletions: number };
-  onOpenFolder?: () => void;
 }
 
 export function TopToolbar({
@@ -32,7 +31,6 @@ export function TopToolbar({
   conversationTitle,
   project,
   diffStats,
-  onOpenFolder,
 }: TopToolbarProps) {
   const [isMaximized, setIsMaximized] = useState(false);
 
@@ -111,7 +109,7 @@ export function TopToolbar({
               title="New task"
               aria-label="New task"
             >
-              <PlusCircle className="w-4 h-4" />
+              <MessageCirclePlus className="w-4 h-4" />
             </button>
           </>
         )}
@@ -147,16 +145,6 @@ export function TopToolbar({
         className="flex items-center gap-1 text-[#d4d4d4]"
         style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
       >
-        {/* Open Project Folder */}
-        <button
-          type="button"
-          onClick={onOpenFolder}
-          className="p-1.5 rounded-lg text-[#eab308] hover:bg-[#222222] transition-colors cursor-pointer"
-          title="Open project folder"
-          aria-label="Open project folder"
-        >
-          <Folder className="w-4 h-4 fill-[#eab308]/20 text-[#eab308]" />
-        </button>
 
         {/* Changes Badge (+X -Y) */}
         {diffStats && (diffStats.additions > 0 || diffStats.deletions > 0) && (

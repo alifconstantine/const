@@ -92,28 +92,64 @@ export function calculateQuotaState(
   };
 }
 
+// Helper to extract user ID from SSO token payload
+async function resolveUserId(
+  ctx: any,
+  rawApiKey?: string,
+  ssoToken?: string
+): Promise<Id<"users"> | null> {
+  const sessionUserId = await getAuthUserId(ctx);
+  if (sessionUserId) return sessionUserId;
+
+  if (ssoToken) {
+    try {
+      const parts = ssoToken.split(".");
+      const b64Part = parts[1];
+      if (parts.length >= 2 && b64Part) {
+        const base64 = b64Part.replace(/-/g, "+").replace(/_/g, "/");
+        const jsonStr =
+          typeof atob === "function"
+            ? atob(base64)
+            : typeof Buffer !== "undefined"
+            ? Buffer.from(base64, "base64").toString("utf-8")
+            : null;
+        if (jsonStr) {
+          const payload = JSON.parse(jsonStr);
+          const sub = payload.sub || payload.userId;
+          if (typeof sub === "string" && sub) {
+            const [subUserId] = sub.split("|");
+            if (subUserId) {
+              const userDoc = await ctx.db.get(subUserId as Id<"users">);
+              if (userDoc) return userDoc._id;
+            }
+          }
+        }
+      }
+    } catch {}
+  }
+
+  if (rawApiKey) {
+    const keyHash = await hashKey(rawApiKey.trim());
+    const apiKeyDoc = await ctx.db
+      .query("apiKeys")
+      .withIndex("by_key_hash", (q: any) => q.eq("keyHash", keyHash))
+      .first();
+    if (apiKeyDoc && apiKeyDoc.status === "active") {
+      return apiKeyDoc.userId;
+    }
+  }
+
+  return null;
+}
+
 // 1. Get current authenticated user's weekly quota metrics (Reactive Query)
 export const getUserQuota = query({
   args: {
     rawApiKey: v.optional(v.string()),
+    ssoToken: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
-    let targetUserId: Id<"users"> | null = null;
-
-    const sessionUserId = await getAuthUserId(ctx);
-    if (sessionUserId) {
-      targetUserId = sessionUserId;
-    } else if (args.rawApiKey) {
-      const keyHash = await hashKey(args.rawApiKey.trim());
-      const apiKeyDoc = await ctx.db
-        .query("apiKeys")
-        .withIndex("by_key_hash", (q) => q.eq("keyHash", keyHash))
-        .first();
-      if (apiKeyDoc && apiKeyDoc.status === "active") {
-        targetUserId = apiKeyDoc.userId;
-      }
-    }
-
+    const targetUserId = await resolveUserId(ctx, args.rawApiKey, args.ssoToken);
     if (!targetUserId) {
       return null;
     }
@@ -191,6 +227,7 @@ export const deductConstQuota = mutation({
 export const checkGatewayQuota = query({
   args: {
     rawApiKey: v.optional(v.string()),
+    ssoToken: v.optional(v.string()),
     provider: v.string(), // "const", "openai", "anthropic", etc.
   },
   handler: async (ctx, args) => {
@@ -208,20 +245,7 @@ export const checkGatewayQuota = query({
       };
     }
 
-    let targetUserId: Id<"users"> | null = null;
-    const sessionUserId = await getAuthUserId(ctx);
-    if (sessionUserId) {
-      targetUserId = sessionUserId;
-    } else if (args.rawApiKey) {
-      const keyHash = await hashKey(args.rawApiKey.trim());
-      const apiKeyDoc = await ctx.db
-        .query("apiKeys")
-        .withIndex("by_key_hash", (q) => q.eq("keyHash", keyHash))
-        .first();
-      if (apiKeyDoc && apiKeyDoc.status === "active") {
-        targetUserId = apiKeyDoc.userId;
-      }
-    }
+    const targetUserId = await resolveUserId(ctx, args.rawApiKey, args.ssoToken);
 
     if (!targetUserId) {
       return {

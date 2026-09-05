@@ -99,6 +99,7 @@ declare global {
         workspacePath?: string;
         mode?: "ask_before_changes" | "full_access";
         conversationId?: string;
+        authToken?: string;
       }) => Promise<{
         success: boolean;
         messages?: any[];
@@ -115,7 +116,7 @@ declare global {
       getModels: () => Promise<ModelOption[]>;
       getConfig: () => Promise<UserConfig>;
       saveConfig: (config: Partial<UserConfig>) => Promise<UserConfig>;
-      generateTitle: (prompt: string) => Promise<string | null>;
+      generateTitle: (prompt: string, authToken?: string) => Promise<string | null>;
       onAgentEvent: (callback: (event: AgentStreamEvent) => void) => () => void;
     };
   }

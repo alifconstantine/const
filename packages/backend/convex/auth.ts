@@ -35,6 +35,7 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
         if (
           redirectTo.startsWith("const-auth://") ||
           redirectTo.startsWith("const-learn://") ||
+          redirectTo.startsWith("const-harness://") ||
           redirectTo.startsWith("const://")
         ) {
           return redirectTo;

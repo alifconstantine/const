@@ -61,7 +61,10 @@ function wrapWithTelemetry(
 export async function POST(req: NextRequest) {
   const reqStartTime = performance.now();
   const requestId = generateRequestId();
-  const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL || "";
+  const convexUrl =
+    process.env.NEXT_PUBLIC_CONVEX_URL ||
+    process.env.CONVEX_URL ||
+    "https://earnest-hawk-132.convex.cloud";
 
   try {
     const body: ChatRequestBody = await req.json();

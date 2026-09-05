@@ -49,6 +49,27 @@ export function findModelSpec(modelId: string, customModels: ModelSpec[] = []): 
 }
 
 /**
+ * Checks if a model identifier belongs to a built-in Const engine model.
+ */
+export function isBuiltinModel(modelId: string, customModels: ModelSpec[] = []): boolean {
+  if (!modelId) return false;
+  const clean = modelId.toLowerCase().trim();
+  if (clean.startsWith("antigravity/")) return true;
+  if (
+    customModels.some(
+      (m) =>
+        (m.modelId.toLowerCase() === clean || m.id.toLowerCase() === clean) &&
+        m.provider !== "const"
+    )
+  ) {
+    return false;
+  }
+  return BUILTIN_MODELS.some(
+    (m) => m.id.toLowerCase() === clean || m.modelId.toLowerCase() === clean
+  );
+}
+
+/**
  * Checks if a model is non-generative (e.g. embedding, moderation, audio-only, image generation).
  */
 export function isNonGenerativeModel(modelId: string): boolean {

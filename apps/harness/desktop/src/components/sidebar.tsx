@@ -9,18 +9,21 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
-  toast,
+  ScrollArea,
 } from "@const/ui";
 import {
   PanelLeftClose,
   ArrowLeft,
   ArrowRight,
-  PlusCircle,
+  MessageCirclePlus,
   Search,
   CalendarClock,
   Palette,
+  Speech,
+  ChevronDown,
   Hash,
   Folder,
+  FolderOpen,
   ChevronsDownUp,
   SlidersHorizontal,
   Archive,
@@ -30,8 +33,6 @@ import {
   User as UserIcon,
   ChevronsUpDown,
 } from "lucide-react";
-
-import { ScrollArea } from "@const/ui";
 import {
   type ConversationItem,
   formatRelativeTime,
@@ -79,6 +80,13 @@ export function getUserInitials(name?: string | null, email?: string | null): st
   return "U";
 }
 
+export function getProjectDisplayName(projectName: string): string {
+  if (!projectName || projectName === "Outside Project" || projectName === "General") {
+    return projectName || "General";
+  }
+  return projectName.replace(/\\/g, "/").split("/").filter(Boolean).pop() || projectName;
+}
+
 export function Sidebar({
   user,
   onSignOut,
@@ -91,15 +99,24 @@ export function Sidebar({
   onDeleteConversation,
   onOpenSettings,
 }: SidebarProps) {
-  const [activeTab, setActiveTab] = useState<"outside" | "project">("project");
+  const [activeTab, setActiveTab] = useState<"project" | "design" | "outside">("project");
+  const [collapsedFolders, setCollapsedFolders] = useState<Record<string, boolean>>({});
   const initials = getUserInitials(user?.name, user?.email);
 
-  // Group conversations by project or outside
-  const filteredConversations = conversations.filter((c) =>
-    activeTab === "outside"
+  const toggleFolder = (folderName: string) => {
+    setCollapsedFolders((prev) => ({
+      ...prev,
+      [folderName]: !prev[folderName],
+    }));
+  };
+
+  // Group conversations by project, design, or outside
+  const filteredConversations = conversations.filter((c) => {
+    if (activeTab === "design") return false;
+    return activeTab === "outside"
       ? c.project === "Outside Project"
-      : c.project !== "Outside Project"
-  );
+      : c.project !== "Outside Project";
+  });
 
   const grouped = filteredConversations.reduce((acc, c) => {
     const key = c.project || "General";
@@ -160,29 +177,19 @@ export function Sidebar({
           <button
             type="button"
             onClick={onNewChat}
-            className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[#d4d4d4] hover:bg-[#383838] hover:text-white transition-colors cursor-pointer"
+            className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[#d4d4d4] hover:bg-[#383838] hover:text-white transition-colors cursor-pointer"
           >
-            <div className="flex items-center gap-2.5">
-              <PlusCircle className="w-4 h-4 text-[#d4d4d4]" />
-              <span>New task</span>
-            </div>
-            <kbd className="text-[10px] text-[#969696] font-mono bg-[#222222] px-1.5 py-0.5 rounded border border-[#383838]">
-              Ctrl+N
-            </kbd>
+            <MessageCirclePlus className="w-4 h-4 text-[#d4d4d4]" />
+            <span>New task</span>
           </button>
 
           {/* Search */}
           <button
             type="button"
-            className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[#d4d4d4] hover:bg-[#383838] hover:text-white transition-colors cursor-pointer"
+            className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[#d4d4d4] hover:bg-[#383838] hover:text-white transition-colors cursor-pointer"
           >
-            <div className="flex items-center gap-2.5">
-              <Search className="w-4 h-4 text-[#d4d4d4]" />
-              <span>Search</span>
-            </div>
-            <kbd className="text-[10px] text-[#969696] font-mono bg-[#222222] px-1.5 py-0.5 rounded border border-[#383838]">
-              Ctrl+K
-            </kbd>
+            <Search className="w-4 h-4 text-[#d4d4d4]" />
+            <span>Search</span>
           </button>
 
           {/* Automations */}
@@ -202,46 +209,104 @@ export function Sidebar({
             <Palette className="w-4 h-4 text-[#d4d4d4]" />
             <span>Design</span>
           </button>
+
+          {/* Speech */}
+          <button
+            type="button"
+            className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[#d4d4d4] hover:bg-[#383838] hover:text-white transition-colors cursor-pointer"
+          >
+            <Speech className="w-4 h-4 text-[#d4d4d4]" />
+            <span>Speech</span>
+          </button>
         </div>
 
-        {/* Switcher (# Outside vs 📁 Project) & Action Icons without divider lines */}
+        {/* Switcher Dropdown (Project, Design, Outside Project) & Action Icons */}
         <div className="pt-3 pb-1 mt-1">
           <div className="flex items-center justify-between">
-            {/* Left: Switcher Tabs in #222222 track */}
-            <div className="inline-flex items-center gap-1 p-0.5 bg-[#222222] rounded-lg text-xs">
-              <button
-                type="button"
-                onClick={() => setActiveTab("outside")}
-                className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md transition-all cursor-pointer font-medium ${
-                  activeTab === "outside"
-                    ? "bg-[#383838] text-[#d4d4d4] shadow-xs"
-                    : "text-[#969696] hover:text-[#d4d4d4]"
-                }`}
+            {/* Left: Dropdown Switcher */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[#222222] hover:bg-[#383838] text-[#d4d4d4] rounded-lg text-xs font-medium transition-colors cursor-pointer outline-none select-none"
+                >
+                  {activeTab === "project" && (
+                    <>
+                      <Folder className="w-3.5 h-3.5 text-[#d4d4d4]" />
+                      <span>Project</span>
+                    </>
+                  )}
+                  {activeTab === "design" && (
+                    <>
+                      <Palette className="w-3.5 h-3.5 text-[#d4d4d4]" />
+                      <span>Design</span>
+                    </>
+                  )}
+                  {activeTab === "outside" && (
+                    <>
+                      <Hash className="w-3.5 h-3.5 text-[#d4d4d4]" />
+                      <span>Outside Project</span>
+                    </>
+                  )}
+                  <ChevronDown className="w-3 h-3 text-[#969696] ml-0.5" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="start"
+                className="w-44 bg-[#222222] border-[#383838] text-[#d4d4d4] p-1 rounded-xl shadow-xl z-50 text-xs"
               >
-                <Hash className="w-3.5 h-3.5" />
-                <span>Outside</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setActiveTab("project")}
-                className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md transition-all cursor-pointer font-medium ${
-                  activeTab === "project"
-                    ? "bg-[#383838] text-[#d4d4d4] shadow-xs"
-                    : "text-[#969696] hover:text-[#d4d4d4]"
-                }`}
-              >
-                <Folder className="w-3.5 h-3.5" />
-                <span>Project</span>
-              </button>
-            </div>
+                <DropdownMenuItem
+                  onClick={() => setActiveTab("project")}
+                  className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer transition-colors ${
+                    activeTab === "project"
+                      ? "bg-[#383838] text-white font-medium"
+                      : "hover:bg-[#303030] text-[#d4d4d4]"
+                  }`}
+                >
+                  <Folder className="w-3.5 h-3.5 text-[#d4d4d4]" />
+                  <span>Project</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setActiveTab("design")}
+                  className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer transition-colors ${
+                    activeTab === "design"
+                      ? "bg-[#383838] text-white font-medium"
+                      : "hover:bg-[#303030] text-[#d4d4d4]"
+                  }`}
+                >
+                  <Palette className="w-3.5 h-3.5 text-[#d4d4d4]" />
+                  <span>Design</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setActiveTab("outside")}
+                  className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer transition-colors ${
+                    activeTab === "outside"
+                      ? "bg-[#383838] text-white font-medium"
+                      : "hover:bg-[#303030] text-[#d4d4d4]"
+                  }`}
+                >
+                  <Hash className="w-3.5 h-3.5 text-[#d4d4d4]" />
+                  <span>Outside Project</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
 
             {/* Right: Collapse all, Filter/Sort, Archive - default #d4d4d4 */}
             <div className="flex items-center gap-1 text-[#d4d4d4]">
               <button
                 type="button"
+                onClick={() => {
+                  const allKeys = Object.keys(grouped);
+                  const allCollapsed = allKeys.length > 0 && allKeys.every((k) => collapsedFolders[k]);
+                  const next: Record<string, boolean> = {};
+                  for (const k of allKeys) {
+                    next[k] = !allCollapsed;
+                  }
+                  setCollapsedFolders(next);
+                }}
                 className="p-1 rounded-md hover:bg-[#383838] hover:text-white transition-colors cursor-pointer"
-                title="Collapse all"
-                aria-label="Collapse all"
+                title="Collapse or expand all"
+                aria-label="Collapse or expand all"
               >
                 <ChevronsDownUp className="w-3.5 h-3.5" />
               </button>
@@ -266,56 +331,77 @@ export function Sidebar({
         </div>
       </div>
 
-      {/* Middle: Chat History (Image 2 style with ScrollArea) */}
+      {/* Middle: Chat History (Image 1 style with ScrollArea) */}
       <div className="flex-1 overflow-hidden flex flex-col my-1">
         <ScrollArea className="flex-1 w-full">
           <div className="flex flex-col gap-3 py-1 pr-1.5">
             <div className="text-[11px] font-medium text-[#969696] uppercase tracking-wider px-2">
-              {activeTab === "project" ? "Projects" : "Outside Conversations"}
+              {activeTab === "project"
+                ? "Projects"
+                : activeTab === "outside"
+                ? "Outside Conversations"
+                : "Design"}
             </div>
 
-            {Object.keys(grouped).length === 0 ? (
+            {activeTab === "design" ? (
+              <div className="px-2.5 py-6 text-xs text-[#777777] italic text-center">
+                Design workspace
+              </div>
+            ) : Object.keys(grouped).length === 0 ? (
               <div className="px-2.5 py-4 text-xs text-[#777777] italic text-center">
                 No tasks yet
               </div>
             ) : (
-              Object.entries(grouped).map(([projectName, items]) => (
-                <div key={projectName} className="flex flex-col gap-0.5">
-                  {/* Project / Group Header (Image 2) */}
-                  <div className="flex items-center gap-1.5 px-2 py-1 text-xs font-medium text-[#969696] hover:text-[#d4d4d4] transition-colors">
-                    <Folder className="w-3.5 h-3.5 text-[#5d5d5d]" />
-                    <span className="truncate">{projectName}</span>
-                  </div>
+              Object.entries(grouped).map(([projectName, items]) => {
+                const isCollapsed = Boolean(collapsedFolders[projectName]);
+                return (
+                  <div key={projectName} className="flex flex-col gap-1">
+                    {/* Collapsible Project / Group Header (Image 1) */}
+                    <button
+                      type="button"
+                      onClick={() => toggleFolder(projectName)}
+                      className="w-full flex items-center gap-2 px-2.5 py-1 text-[13px] font-medium text-[#d4d4d4] hover:text-white transition-colors cursor-pointer text-left group select-none"
+                      title={projectName}
+                    >
+                      {isCollapsed ? (
+                        <Folder className="w-4 h-4 text-[#777777] group-hover:text-[#d4d4d4] shrink-0" />
+                      ) : (
+                        <FolderOpen className="w-4 h-4 text-[#777777] group-hover:text-[#d4d4d4] shrink-0" />
+                      )}
+                      <span className="truncate">{getProjectDisplayName(projectName)}</span>
+                    </button>
 
-                  {/* Task / Conversation Items (Image 2) */}
-                  <div className="flex flex-col gap-0.5 pl-1">
-                    {items.map((convo) => {
-                      const isActive = convo.id === activeConversationId;
-                      return (
-                        <button
-                          key={convo.id}
-                          type="button"
-                          onClick={() => onSelectConversation?.(convo.id)}
-                          className={`w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-xl text-xs transition-colors cursor-pointer group text-left ${
-                            isActive
-                              ? "bg-[#252528] text-white font-medium shadow-xs"
-                              : "text-[#b0b0b0] hover:text-white hover:bg-white/5"
-                          }`}
-                          title={convo.title}
-                        >
-                          <div className="flex items-center gap-1.5 truncate">
-                            <span className="text-[#ff7a00] text-[10px] leading-none shrink-0">•</span>
-                            <span className="truncate">{convo.title || "Untitled task"}</span>
-                          </div>
-                          <span className="text-[10px] text-[#777777] font-mono shrink-0 ml-1">
-                            {formatRelativeTime(convo.updatedAt || convo.createdAt)}
-                          </span>
-                        </button>
-                      );
-                    })}
+                    {/* Task / Conversation Items (Image 1 style, no orange badge, comfortable sizing) */}
+                    {!isCollapsed && (
+                      <div className="flex flex-col gap-0.5 pl-1">
+                        {items.map((convo) => {
+                          const isActive = convo.id === activeConversationId;
+                          return (
+                            <button
+                              key={convo.id}
+                              type="button"
+                              onClick={() => onSelectConversation?.(convo.id)}
+                              className={`w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg text-[13px] transition-colors cursor-pointer group text-left ${
+                                isActive
+                                  ? "bg-[#383838] text-white font-medium shadow-xs"
+                                  : "text-[#d4d4d4] hover:text-white hover:bg-white/5"
+                              }`}
+                              title={convo.title}
+                            >
+                              <span className="truncate font-normal">
+                                {convo.title || "Untitled task"}
+                              </span>
+                              <span className="text-xs text-[#888888] font-mono shrink-0 ml-1">
+                                {formatRelativeTime(convo.updatedAt || convo.createdAt)}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))
+                );
+              })
             )}
           </div>
         </ScrollArea>

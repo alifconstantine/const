@@ -84,13 +84,18 @@ export function createTelemetryStream(
         ? parseFloat((completionTokens / durationSec).toFixed(1))
         : undefined;
 
-      const client = new ConvexHttpClient(meta.convexUrl);
+      const resolvedConvexUrl =
+        meta.convexUrl ||
+        process.env.NEXT_PUBLIC_CONVEX_URL ||
+        "https://earnest-hawk-132.convex.cloud";
+      const client = new ConvexHttpClient(resolvedConvexUrl);
       if (meta.ssoToken) {
         client.setAuth(meta.ssoToken);
       }
 
       await client.mutation(api.router.logs.recordLog, {
         rawApiKey: meta.rawApiKey,
+        ssoToken: meta.ssoToken || undefined,
         requestId: meta.requestId,
         keyName: meta.keyName,
         keyPrefix: meta.keyPrefix,
@@ -150,9 +155,9 @@ export function createTelemetryStream(
         }
       } catch {}
     },
-    flush() {
-      // Stream finished successfully
-      void recordAsync(200);
+    async flush() {
+      // Stream finished successfully - await telemetry before closing stream
+      await recordAsync(200);
     },
   });
 
@@ -191,13 +196,18 @@ export async function recordDirectTelemetry(
       ? parseFloat((completionTokens / durationSec).toFixed(1))
       : undefined;
 
-    const client = new ConvexHttpClient(meta.convexUrl);
+    const resolvedConvexUrl =
+      meta.convexUrl ||
+      process.env.NEXT_PUBLIC_CONVEX_URL ||
+      "https://earnest-hawk-132.convex.cloud";
+    const client = new ConvexHttpClient(resolvedConvexUrl);
     if (meta.ssoToken) {
       client.setAuth(meta.ssoToken);
     }
 
     await client.mutation(api.router.logs.recordLog, {
       rawApiKey: meta.rawApiKey,
+      ssoToken: meta.ssoToken || undefined,
       requestId: meta.requestId,
       keyName: meta.keyName,
       keyPrefix: meta.keyPrefix,

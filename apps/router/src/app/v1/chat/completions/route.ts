@@ -10,6 +10,7 @@ import {
   type TelemetryMetadata,
 } from "@/lib/telemetry";
 import { executeComboChat } from "@/lib/combo-executor";
+import { isBuiltinModel } from "@/lib/model-specs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -60,7 +61,10 @@ function wrapWithTelemetry(
 export async function POST(req: NextRequest) {
   const reqStartTime = performance.now();
   const requestId = generateRequestId();
-  const convexUrl = process.env.NEXT_PUBLIC_CONVEX_URL || "";
+  const convexUrl =
+    process.env.NEXT_PUBLIC_CONVEX_URL ||
+    process.env.CONVEX_URL ||
+    "https://earnest-hawk-132.convex.cloud";
 
   try {
     const body: OpenAIChatRequestBody = await req.json();
@@ -206,10 +210,8 @@ async function dispatchSingleModel({
   requestId: string;
   reqStartTime: number;
 }): Promise<Response> {
-  // CASE A: Const (Built-in Managed Gemini 3.6 Flash)
-  const isConstBuiltin =
-    (targetModel === "gemini-3.6-flash" || targetModel.startsWith("antigravity/")) &&
-    !providerDocId;
+  // CASE A: Const (Built-in Managed Models, e.g. Gemini 3.6 Flash)
+  const isConstBuiltin = isBuiltinModel(targetModel) && !providerDocId;
 
   if (isConstBuiltin) {
     telemetryMeta.provider = "Google AI";
@@ -221,6 +223,7 @@ async function dispatchSingleModel({
         if (ssoToken) client.setAuth(ssoToken);
         const quotaCheck = await client.query(api.router.quotas.checkGatewayQuota, {
           rawApiKey: providedKey || undefined,
+          ssoToken: ssoToken || undefined,
           provider: "const",
         });
 
@@ -339,16 +342,44 @@ async function dispatchSingleModel({
     );
   }
 
-  const client = new ConvexHttpClient(convexUrl);
-  if (ssoToken) {
-    client.setAuth(ssoToken);
-  }
+  let creds: any = null;
+  try {
+    const client = new ConvexHttpClient(convexUrl);
+    if (ssoToken) {
+      client.setAuth(ssoToken);
+    }
 
-  const creds = await client.query(api.router.providers.getProviderCredentials, {
-    providerDocId: providerDocId ? (providerDocId as Id<"userProviders">) : undefined,
-    modelId: targetModel,
-    rawApiKey: providedKey || undefined,
-  });
+    creds = await client.query(api.router.providers.getProviderCredentials, {
+      providerDocId: providerDocId ? (providerDocId as Id<"userProviders">) : undefined,
+      modelId: targetModel,
+      rawApiKey: providedKey || undefined,
+    });
+  } catch (convexErr: any) {
+    console.error("[completions] Convex auth/query error:", convexErr);
+    const errText = convexErr?.message || String(convexErr);
+    const isAuthErr =
+      errText.includes("NoAuthProvider") ||
+      errText.includes("Unauthorized") ||
+      errText.includes("unauthorized");
+
+    await recordDirectTelemetry(telemetryMeta, {
+      status: isAuthErr ? 401 : 500,
+      durationMs: Math.round(performance.now() - reqStartTime),
+      errorMessage: errText,
+    });
+
+    return NextResponse.json(
+      {
+        error: {
+          message: isAuthErr
+            ? `Authentication failed: Session token is not recognized or has expired. Please sign in again or use a Const API Key.`
+            : `Failed to resolve provider credentials: ${errText}`,
+          code: isAuthErr ? "unauthorized" : "provider_query_error",
+        },
+      },
+      { status: isAuthErr ? 401 : 500 }
+    );
+  }
 
   if (!creds) {
     await recordDirectTelemetry(telemetryMeta, {

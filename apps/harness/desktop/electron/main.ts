@@ -38,12 +38,17 @@ export interface UserConfig {
 }
 
 const defaultUserConfig: UserConfig = {
-  activeModel: "Const",
-  activeProvider: "const-engine",
+  activeModel: "gemini-3.6-flash",
+  activeProvider: "const",
   providers: {
+    const: {
+      name: "Const",
+      baseUrl: process.env.CONST_ROUTER_BASE_URL || "https://router.const.web.id/v1",
+      apiKey: process.env.CONST_ROUTER_API_KEY || "",
+    },
     "const-engine": {
       name: "Const",
-      baseUrl: process.env.CONST_ENGINE_BASE_URL || "https://engine.const.web.id/v1",
+      baseUrl: process.env.CONST_ROUTER_BASE_URL || "https://router.const.web.id/v1",
       apiKey: process.env.CONST_ENGINE_API_KEY || "",
     },
     openai: {
@@ -75,7 +80,7 @@ function loadUserConfig(): UserConfig {
     if (fs.existsSync(constConfigFile)) {
       const raw = fs.readFileSync(constConfigFile, "utf-8");
       const parsed = JSON.parse(raw);
-      return {
+      const merged: UserConfig = {
         ...defaultUserConfig,
         ...parsed,
         providers: {
@@ -83,6 +88,32 @@ function loadUserConfig(): UserConfig {
           ...(parsed.providers || {}),
         },
       };
+
+      // Seamlessly normalize legacy "Const" / "const-engine" to native Const Router
+      if (merged.activeProvider === "const-engine" || !merged.activeProvider) {
+        merged.activeProvider = "const";
+      }
+      if (
+        merged.activeModel === "Const" ||
+        merged.activeModel.includes("(Const Router)") ||
+        merged.activeModel.includes("(Native)") ||
+        !merged.activeModel
+      ) {
+        merged.activeModel = "gemini-3.6-flash";
+      }
+
+      // Ensure native Const provider points to router.const.web.id
+      if (!merged.providers.const) {
+        merged.providers.const = {
+          name: "Const Router",
+          baseUrl: process.env.CONST_ROUTER_BASE_URL || "https://router.const.web.id/v1",
+          apiKey: "",
+        };
+      } else {
+        merged.providers.const.baseUrl = process.env.CONST_ROUTER_BASE_URL || "https://router.const.web.id/v1";
+      }
+
+      return merged;
     }
   } catch (err) {
     console.error("[Electron Main] Failed to read config.json, using default:", err);
@@ -333,25 +364,74 @@ app.whenReady().then(() => {
 
   ipcMain.handle("agent:get-models", async () => {
     const config = loadUserConfig();
+    const provCfg = config.providers["const"] || config.providers["const-engine"];
+    const routerBaseUrl = (provCfg?.baseUrl || "https://router.const.web.id/v1").replace(/\/+$/, "");
+    const apiKey = provCfg?.apiKey || "";
+
+    let remoteModels: any[] = [];
+    try {
+      const endpoint = routerBaseUrl.endsWith("/models")
+        ? routerBaseUrl
+        : `${routerBaseUrl}/models`;
+      const res = await fetch(endpoint, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+        },
+      });
+      if (res.ok) {
+        const json: any = await res.json();
+        if (json && Array.isArray(json.data) && json.data.length > 0) {
+          remoteModels = json.data.map((m: any) => ({
+            id: m.id,
+            displayName: m.display_name || m.name || m.id,
+            provider: m.provider || "const",
+            providerName: m.provider_name || (m.provider === "const" ? "Const" : "Custom"),
+            baseUrl: routerBaseUrl,
+            supportsThinking: Boolean(m.supports_thinking),
+            supportsTools: Boolean(m.supports_tools ?? true),
+          }));
+        }
+      }
+    } catch (err) {
+      console.warn("[Electron Main] Could not fetch remote models from router, using fallback:", err);
+    }
+
+    const baseModels = remoteModels.length > 0 ? remoteModels : DEFAULT_MODELS;
+
     const custom = (config.customModels || []).map((m) => ({
       id: m.id,
       displayName: m.displayName || m.id,
       provider: m.provider || "custom",
+      providerName: config.providers[m.provider]?.name || "Custom",
       baseUrl: m.baseUrl || config.providers[m.provider]?.baseUrl,
       supportsThinking: Boolean(m.supportsThinking),
       supportsTools: m.supportsTools ?? true,
     }));
-    return [...DEFAULT_MODELS, ...custom];
+
+    const seen = new Set<string>();
+    const combined: any[] = [];
+    for (const m of [...baseModels, ...custom]) {
+      if (!seen.has(m.id)) {
+        seen.add(m.id);
+        combined.push(m);
+      }
+    }
+    return combined;
   });
 
   // Dedicated lightweight title generation that never conflicts with activeAgent
-  ipcMain.handle("agent:generate-title", async (_event, prompt: string) => {
+  ipcMain.handle("agent:generate-title", async (_event, prompt: string, authToken?: string) => {
     try {
       const config = loadUserConfig();
-      const activeProv = config.activeProvider || "const-engine";
-      const provCfg = config.providers[activeProv] || config.providers["const-engine"];
-      const baseUrl = provCfg?.baseUrl || "https://engine.const.web.id/v1";
-      const apiKey = provCfg?.apiKey || process.env.CONST_ENGINE_API_KEY || "const-local-dev-key";
+      const activeProv = config.activeProvider || "const";
+      const provCfg = config.providers[activeProv] || config.providers["const"];
+      const baseUrl = provCfg?.baseUrl || "https://router.const.web.id/v1";
+      let apiKey = provCfg?.apiKey || "";
+      if (!apiKey && (activeProv === "const" || activeProv === "const-engine")) {
+        apiKey = authToken || process.env.CONST_ROUTER_API_KEY || process.env.CONST_ENGINE_API_KEY || "";
+      }
       const endpoint = baseUrl.endsWith("/chat/completions")
         ? baseUrl
         : `${baseUrl.replace(/\/+$/, "")}/chat/completions`;
@@ -363,7 +443,7 @@ app.whenReady().then(() => {
           ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
         },
         body: JSON.stringify({
-          model: config.activeModel || "Const",
+          model: config.activeModel || "gemini-3.6-flash",
           messages: [
             {
               role: "user",
@@ -401,23 +481,24 @@ app.whenReady().then(() => {
         workspacePath?: string;
         mode?: "ask_before_changes" | "full_access";
         conversationId?: string;
+        authToken?: string;
       }
     ) => {
       const config = loadUserConfig();
-      const model = payload.model || config.activeModel || "Const";
+      const model = payload.model || config.activeModel || "gemini-3.6-flash";
 
       // Match model to provider
       const allModels = [...DEFAULT_MODELS, ...(config.customModels || [])];
       const modelDef = allModels.find((m) => m.id === model || m.displayName === model);
-      const providerKey = modelDef?.provider || config.activeProvider || "const-engine";
-      const providerCfg = config.providers[providerKey] || config.providers["const-engine"];
+      const providerKey = modelDef?.provider || config.activeProvider || "const";
+      const providerCfg = config.providers[providerKey] || config.providers["const"] || config.providers["const-engine"];
 
-      let baseUrl = modelDef?.baseUrl || providerCfg?.baseUrl || "https://engine.const.web.id/v1";
+      let baseUrl = modelDef?.baseUrl || providerCfg?.baseUrl || "https://router.const.web.id/v1";
       let apiKey = providerCfg?.apiKey || "";
 
-      // Fallback for Const
-      if (!apiKey && providerKey === "const-engine") {
-        apiKey = process.env.CONST_ENGINE_API_KEY || "const-local-dev-key";
+      // Fallback for Const Router: use user's SSO authToken if available
+      if (!apiKey && (providerKey === "const" || providerKey === "const-engine")) {
+        apiKey = payload.authToken || process.env.CONST_ROUTER_API_KEY || process.env.CONST_ENGINE_API_KEY || "const-local-dev-key";
       }
 
       const convoId = payload.conversationId || `session_${Date.now()}`;

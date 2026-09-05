@@ -100,7 +100,8 @@ export function generateFallbackTitle(prompt: string): string {
  */
 export async function generateAiTitle(
   prompt: string,
-  onGenerated?: (title: string) => void
+  onGenerated?: (title: string) => void,
+  authToken?: string
 ): Promise<string> {
   const fallback = generateFallbackTitle(prompt);
 
@@ -108,7 +109,7 @@ export async function generateAiTitle(
   if (typeof window !== "undefined" && window.electron?.generateTitle) {
     try {
       const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 3500));
-      const requestPromise = window.electron.generateTitle(prompt);
+      const requestPromise = window.electron.generateTitle(prompt, authToken);
 
       const title = await Promise.race([requestPromise, timeoutPromise]);
       if (title && typeof title === "string" && title.length > 0 && title.length <= 48) {

@@ -36,7 +36,7 @@ contextBridge.exposeInMainWorld("electron", {
   getModels: () => ipcRenderer.invoke("agent:get-models"),
   getConfig: () => ipcRenderer.invoke("config:get"),
   saveConfig: (config: any) => ipcRenderer.invoke("config:save", config),
-  generateTitle: (prompt: string) => ipcRenderer.invoke("agent:generate-title", prompt),
+  generateTitle: (prompt: string, authToken?: string) => ipcRenderer.invoke("agent:generate-title", prompt, authToken),
   onAgentEvent: (callback: (event: any) => void) => {
     const handler = (_event: any, data: any) => callback(data);
     ipcRenderer.on("agent:stream-event", handler);

@@ -1,13 +1,4 @@
 export function getAccountsUrl(): string {
-  if (typeof window !== "undefined") {
-    const hostname = window.location.hostname;
-    // On local development machine
-    if (hostname === "localhost" || hostname === "127.0.0.1") {
-      return process.env.NEXT_PUBLIC_ACCOUNTS_URL || "http://localhost:3001";
-    }
-    // On production deployment (*.const.web.id, Vercel, or custom domains)
-    return process.env.NEXT_PUBLIC_ACCOUNTS_URL || "https://accounts.const.web.id";
-  }
   return process.env.NEXT_PUBLIC_ACCOUNTS_URL || "https://accounts.const.web.id";
 }
 

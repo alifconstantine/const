@@ -16,6 +16,7 @@ async function hashKey(key: string): Promise<string> {
 export const recordLog = mutation({
   args: {
     rawApiKey: v.optional(v.string()), // Used if called via external sk-const-live- key
+    ssoToken: v.optional(v.string()),  // SSO JWT token from Accounts / Harness / Web
     requestId: v.string(),
     keyName: v.optional(v.string()),
     keyPrefix: v.optional(v.string()),
@@ -48,7 +49,38 @@ export const recordLog = mutation({
       if (!resolvedKeyName) resolvedKeyName = "Playground / Session";
     }
 
-    // B. Or resolve via raw API key
+    // B. Or resolve via SSO JWT token (from Harness Desktop / Web Accounts)
+    if (!resolvedUserId && args.ssoToken) {
+      try {
+        const parts = args.ssoToken.split(".");
+        const b64Part = parts[1];
+        if (parts.length >= 2 && b64Part) {
+          const base64 = b64Part.replace(/-/g, "+").replace(/_/g, "/");
+          const jsonStr =
+            typeof atob === "function"
+              ? atob(base64)
+              : typeof Buffer !== "undefined"
+              ? Buffer.from(base64, "base64").toString("utf-8")
+              : null;
+          if (jsonStr) {
+            const payload = JSON.parse(jsonStr);
+            const sub = payload.sub || payload.userId;
+            if (typeof sub === "string" && sub) {
+              const [subUserId] = sub.split("|");
+              if (subUserId) {
+                const userDoc = await ctx.db.get(subUserId as Id<"users">);
+                if (userDoc) {
+                  resolvedUserId = userDoc._id;
+                  if (!resolvedKeyName) resolvedKeyName = "Const SSO Session";
+                }
+              }
+            }
+          }
+        }
+      } catch {}
+    }
+
+    // C. Or resolve via raw API key
     if (args.rawApiKey) {
       const keyHash = await hashKey(args.rawApiKey.trim());
       const apiKeyDoc = await ctx.db
@@ -70,7 +102,7 @@ export const recordLog = mutation({
       }
     }
 
-    // If neither session nor valid API key found, abort write
+    // If neither session, SSO token, nor valid API key found, abort write
     if (!resolvedUserId) {
       return { success: false, reason: "Unauthorized" };
     }

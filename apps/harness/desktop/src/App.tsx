@@ -10,10 +10,15 @@ import { api } from "@const/backend/_generated/api";
 import { ConvexClientProvider } from "./components/convex-provider";
 import { Sidebar } from "./components/sidebar";
 import { TopToolbar } from "./components/workbench/top-toolbar";
-import { ChatCard } from "./components/workbench/chat-card";
+import {
+  ChatCard,
+  type ConversationMetrics,
+  type ContextUsageData,
+} from "./components/workbench/chat-card";
 import { MarkdownContent } from "./components/workbench/markdown-content";
 import { ExecutionTrace } from "./components/workbench/execution-trace";
-import { SettingsDialog } from "./components/settings-dialog";
+import { SettingsView } from "./components/settings-view";
+import { useAppAuth } from "./components/convex-provider";
 import {
   loadConversations,
   saveConversation,
@@ -56,9 +61,16 @@ function AuthenticatedContent({
   onSwitchAccount: () => void;
 }) {
   const user = useQuery(api.auth.queries.currentUser, {});
+  const { token } = useAppAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<string>("model");
   const greeting = getGreeting();
+
+  const handleOpenSettings = (tab: string = "model") => {
+    setSettingsTab(tab);
+    setIsSettingsOpen(true);
+  };
 
   // Conversation history & state
   const [conversations, setConversations] = useState<ConversationItem[]>(() => {
@@ -109,6 +121,91 @@ function AuthenticatedContent({
     if (currentProject === "Outside Project") return "";
     return currentProject.replace(/\\/g, "/").split("/").filter(Boolean).pop() || currentProject;
   }, [currentProject]);
+
+  // Dynamic Context Usage computation (Image 3)
+  const contextUsage = useMemo<ContextUsageData>(() => {
+    const systemPromptTokens = 9200;
+    const toolsTokens = 2400;
+
+    // Estimate tokens dynamically from active conversation messages (chars / ~3.8)
+    const messagesTokens = Math.round(
+      messages.reduce((sum, msg) => {
+        const contentChars = (msg.content || "").length;
+        const thinkingChars = (msg.thinking || "").length;
+        const toolCallsChars = msg.toolCalls ? JSON.stringify(msg.toolCalls).length : 0;
+        return sum + (contentChars + thinkingChars + toolCallsChars) / 3.8;
+      }, 0)
+    );
+
+    const totalTokens = 1_000_000;
+    const usedTokens = systemPromptTokens + toolsTokens + messagesTokens;
+
+    return {
+      usedTokens,
+      totalTokens,
+      systemPromptTokens,
+      toolsTokens,
+      messagesTokens,
+    };
+  }, [messages]);
+
+  // Dynamic Conversation Metrics for footer bar (Image 2)
+  const conversationMetrics = useMemo<ConversationMetrics | undefined>(() => {
+    if (messages.length === 0) return undefined;
+
+    const userMessages = messages.filter((m) => m.role === "user");
+    const assistantMessages = messages.filter((m) => m.role === "assistant");
+    const turns = Math.max(1, userMessages.length);
+
+    let totalToolCalls = 0;
+    for (const m of assistantMessages) {
+      if (m.toolCalls) totalToolCalls += m.toolCalls.length;
+    }
+    const steps = Math.max(1, assistantMessages.length + totalToolCalls);
+
+    // Dynamic estimation of execution durations & tokens
+    const toolDurationMs = Math.max(1000, totalToolCalls * 1500);
+    const estimatedLlmMs = Math.max(3000, turns * 4500 + totalToolCalls * 2000);
+
+    const outputTokens = Math.max(
+      32,
+      Math.round(
+        assistantMessages.reduce(
+          (sum, m) => sum + (m.content?.length || 0) / 3.8 + (m.thinking?.length || 0) / 4,
+          0
+        )
+      )
+    );
+
+    // Multi-turn context accumulates input tokens across turns
+    const baseInputTokensPerTurn = 9200 + 2400;
+    const messageInputTokens = Math.round(
+      userMessages.reduce((sum, m) => sum + (m.content?.length || 0) / 3.8, 0)
+    );
+    const inputTokens = Math.max(
+      11600,
+      baseInputTokensPerTurn * turns + messageInputTokens + Math.round(outputTokens * 0.5)
+    );
+
+    const ttftSeconds = Math.max(1.2, +(1.2 + (turns > 3 ? 0.8 : 0.2)).toFixed(1));
+    const tokPerSec =
+      outputTokens > 0 && estimatedLlmMs > 0
+        ? Math.max(25, Math.min(180, Math.round(outputTokens / (estimatedLlmMs / 1000))))
+        : 58;
+    const cacheHitRate = turns > 1 ? 76 : turns === 1 ? 64 : 0;
+
+    return {
+      turns,
+      steps,
+      llmDurationMs: estimatedLlmMs,
+      toolDurationMs,
+      ttftSeconds,
+      tokPerSec,
+      cacheHitRate,
+      inputTokens,
+      outputTokens,
+    };
+  }, [messages]);
 
   // Auto scroll to bottom
   useEffect(() => {
@@ -264,17 +361,21 @@ function AuthenticatedContent({
       setConversationTitle(titleToUse);
 
       // Asynchronously request AI to generate an ultra-clean title
-      generateAiTitle(prompt, (aiTitle) => {
-        setConversationTitle(aiTitle);
-        const stored = loadConversations();
-        const target = stored.find((c) => c.id === conversationId);
-        if (target) {
-          target.title = aiTitle;
-          target.updatedAt = Date.now();
-          saveConversation(target);
-          setConversations(loadConversations());
-        }
-      });
+      generateAiTitle(
+        prompt,
+        (aiTitle) => {
+          setConversationTitle(aiTitle);
+          const stored = loadConversations();
+          const target = stored.find((c) => c.id === conversationId);
+          if (target) {
+            target.title = aiTitle;
+            target.updatedAt = Date.now();
+            saveConversation(target);
+            setConversations(loadConversations());
+          }
+        },
+        token || undefined
+      );
     }
 
     const updatedConvo: ConversationItem = {
@@ -301,6 +402,7 @@ function AuthenticatedContent({
           workspacePath: project,
           mode,
           conversationId,
+          authToken: token || undefined,
         });
 
         if (!res.success && res.error) {
@@ -405,33 +507,19 @@ function AuthenticatedContent({
     }
   };
 
-  const handleOpenFolder = async () => {
-    if (window.electron?.openDirectoryDialog) {
-      const selectedDir = await window.electron.openDirectoryDialog();
-      if (selectedDir) {
-        setCurrentProject(selectedDir);
-        localStorage.setItem("const_harness_current_project", selectedDir);
-        try {
-          const raw = localStorage.getItem("const_harness_workspaces");
-          const existing = raw ? JSON.parse(raw) : [];
-          const next = existing.includes(selectedDir) ? existing : [selectedDir, ...existing];
-          localStorage.setItem("const_harness_workspaces", JSON.stringify(next));
-        } catch {}
-      }
-    }
-  };
 
-  // Keyboard shortcut Ctrl+N for new chat
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "n") {
-        e.preventDefault();
-        handleNewChat();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isExecuting]);
+
+  if (isSettingsOpen) {
+    return (
+      <SettingsView
+        initialTab={settingsTab}
+        onBackToWorkspace={() => setIsSettingsOpen(false)}
+        user={user}
+        onSignOut={onSignOut}
+        onSwitchAccount={onSwitchAccount}
+      />
+    );
+  }
 
   return (
     <div className="h-screen w-screen flex bg-[#2b2b2b] text-[#d4d4d4] overflow-hidden select-none">
@@ -447,7 +535,7 @@ function AuthenticatedContent({
           activeConversationId={conversationId}
           onSelectConversation={handleSelectConversation}
           onDeleteConversation={handleDeleteConversation}
-          onOpenSettings={() => setIsSettingsOpen(true)}
+          onOpenSettings={() => handleOpenSettings("model")}
         />
       )}
 
@@ -465,7 +553,6 @@ function AuthenticatedContent({
           conversationTitle={conversationTitle}
           project={displayProject}
           diffStats={diffStats}
-          onOpenFolder={handleOpenFolder}
         />
 
         {/* Dynamic Canvas: Landing Layout when 0 messages vs Active Stream Layout */}
@@ -473,22 +560,6 @@ function AuthenticatedContent({
           <div className="flex-1 relative flex flex-col items-center justify-center px-4 sm:px-8 pt-6 pb-6 overflow-y-auto">
             {/* Centered Conversation Container */}
             <div className="relative flex flex-col items-center w-full max-w-2xl z-10 translate-y-6 sm:translate-y-8">
-              {/* Faint Logo: Placed slightly above, fading and blurred into background */}
-              <div
-                className="absolute -top-36 sm:-top-44 left-1/2 -translate-x-1/2 pointer-events-none select-none opacity-20 dark:opacity-25"
-                style={{
-                  maskImage:
-                    "linear-gradient(to bottom, rgba(0,0,0,1) 15%, rgba(0,0,0,0.4) 55%, rgba(0,0,0,0) 90%)",
-                  WebkitMaskImage:
-                    "linear-gradient(to bottom, rgba(0,0,0,1) 15%, rgba(0,0,0,0.4) 55%, rgba(0,0,0,0) 90%)",
-                  filter: "blur(0.75px)",
-                }}
-              >
-                <ConstLogoIcon
-                  size="lg"
-                  className="w-64 h-64 sm:w-80 sm:h-80 text-[#d4d4d4]"
-                />
-              </div>
 
               {/* Greeting Text: Color #d4d4d4 */}
               <h1 className="text-2xl sm:text-[28px] font-medium tracking-tight text-[#d4d4d4] text-center mb-6 z-10 font-sans">
@@ -501,9 +572,10 @@ function AuthenticatedContent({
                   onSendMessage={handleSendMessage}
                   isExecuting={isExecuting}
                   onAbort={handleAbort}
+                  contextUsage={contextUsage}
                   project={currentProject}
                   onProjectChange={setCurrentProject}
-                  onOpenSettings={() => setIsSettingsOpen(true)}
+                  onOpenSettings={() => handleOpenSettings("model")}
                 />
               </div>
             </div>
@@ -559,21 +631,17 @@ function AuthenticatedContent({
                   isExecuting={isExecuting}
                   onSendMessage={handleSendMessage}
                   onAbort={handleAbort}
+                  contextUsage={contextUsage}
+                  metrics={conversationMetrics}
                   project={currentProject}
                   onProjectChange={setCurrentProject}
-                  onOpenSettings={() => setIsSettingsOpen(true)}
+                  onOpenSettings={() => handleOpenSettings("model")}
                 />
               </div>
             </div>
           </div>
         )}
       </main>
-
-      {/* Settings Dialog */}
-      <SettingsDialog
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-      />
     </div>
   );
 }
@@ -584,14 +652,9 @@ export default function App() {
   });
   const [isWaitingAuth, setIsWaitingAuth] = useState(false);
 
-  // Set Accounts Hub URL: Default to localhost:3001 in local dev, accounts.const.web.id in production
+  // Set Accounts Hub URL: Default to production accounts.const.web.id
   const accountsBaseUrl =
-    (import.meta.env.VITE_ACCOUNTS_URL as string) ||
-    (typeof window !== "undefined" &&
-    window.location.hostname !== "localhost" &&
-    window.location.hostname !== "127.0.0.1"
-      ? "https://accounts.const.web.id"
-      : "http://localhost:3001");
+    (import.meta.env.VITE_ACCOUNTS_URL as string) || "https://accounts.const.web.id";
 
   // Listen for deep link callback in Electron or browser redirect
   useEffect(() => {

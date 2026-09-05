@@ -24,7 +24,7 @@ export interface AgentMessage {
 export interface ModelConfig {
   id: string;
   displayName: string;
-  provider: "const-engine" | "openai" | "google" | "custom";
+  provider: "const" | "const-engine" | "openai" | "google" | "custom";
   baseUrl?: string;
   apiKey?: string;
   supportsThinking?: boolean;
