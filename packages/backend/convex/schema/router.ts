@@ -8,6 +8,7 @@ export const routerTables = {
     name: v.string(),
     keyPrefix: v.string(), // e.g. "sk-const-live-...d2e4"
     keyHash: v.string(),   // SHA-256 hash for safe, high-speed lookup
+    rawKey: v.optional(v.string()), // Full secret key for user copying and viewing
     dailyLimitTokens: v.optional(v.number()),
     usedTodayTokens: v.number(),
     status: v.union(v.literal("active"), v.literal("revoked")),

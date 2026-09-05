@@ -42,6 +42,7 @@ export const listKeys = query({
       _id: key._id,
       name: key.name,
       keyPrefix: key.keyPrefix,
+      rawKey: key.rawKey,
       status: key.status,
       dailyLimitTokens: key.dailyLimitTokens,
       usedTodayTokens: key.usedTodayTokens,
@@ -51,7 +52,7 @@ export const listKeys = query({
   },
 });
 
-// 2. Create a new API key (returns rawKey ONCE for one-time reveal)
+// 2. Create a new API key (returns rawKey ONCE for one-time reveal, and stores for user management)
 export const createKey = mutation({
   args: {
     name: v.string(),
@@ -92,6 +93,7 @@ export const createKey = mutation({
       name: trimmedName,
       keyPrefix,
       keyHash,
+      rawKey,
       dailyLimitTokens: args.dailyLimitTokens,
       usedTodayTokens: 0,
       status: "active",

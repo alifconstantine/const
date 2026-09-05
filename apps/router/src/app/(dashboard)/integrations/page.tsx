@@ -76,13 +76,13 @@ export default function IntegrationsPage() {
   // Set default test key if user has one
   useEffect(() => {
     if (apiKeys && apiKeys.length > 0 && !testKey) {
-      setTestKey(apiKeys[0]?.keyPrefix || "sk-const-live-demo");
+      setTestKey(apiKeys[0]?.rawKey || apiKeys[0]?.keyPrefix || "sk-const-live-demo");
     }
   }, [apiKeys, testKey]);
 
   const activeApiKey = useMemo(() => {
     if (apiKeys && apiKeys.length > 0) {
-      return apiKeys[0]?.keyPrefix || "sk-const-live-yourkey";
+      return apiKeys[0]?.rawKey || apiKeys[0]?.keyPrefix || "sk-const-live-yourkey";
     }
     return "sk-const-live-yourkey";
   }, [apiKeys]);

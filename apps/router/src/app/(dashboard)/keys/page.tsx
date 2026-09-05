@@ -70,6 +70,8 @@ export default function KeysPage() {
   // 2. Local State
   const [searchQuery, setSearchQuery] = useState("");
   const [copiedKeyText, setCopiedKeyText] = useState<string | null>(null);
+  const [revealedKeyIds, setRevealedKeyIds] = useState<Record<string, boolean>>({});
+  const [copiedKeyId, setCopiedKeyId] = useState<string | null>(null);
 
   // Dialog State: Create Key
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -101,7 +103,30 @@ export default function KeysPage() {
     );
   }, [keys, searchQuery]);
 
-  // Copy helper
+  // Copy key helper (copies full rawKey if available, otherwise keyPrefix)
+  const handleCopyKey = (keyItem: {
+    _id: string;
+    name: string;
+    rawKey?: string;
+    keyPrefix: string;
+  }) => {
+    const textToCopy = keyItem.rawKey || keyItem.keyPrefix;
+    navigator.clipboard.writeText(textToCopy);
+    setCopiedKeyId(keyItem._id);
+    if (keyItem.rawKey) {
+      toast.success("API key copied to clipboard", {
+        description: `Secret key for "${keyItem.name}"`,
+      });
+    } else {
+      toast.warning("Key prefix copied", {
+        description:
+          "This key was created before secret key retention was enabled. Please create a new key to copy the full API key.",
+      });
+    }
+    setTimeout(() => setCopiedKeyId(null), 2000);
+  };
+
+  // Generic copy helper
   const handleCopy = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
     setCopiedKeyText(text);
@@ -379,25 +404,55 @@ export default function KeysPage() {
                           {keyItem.name}
                         </TableCell>
 
-                        {/* 2. Key Prefix with Copy button */}
+                        {/* 2. Secret Key with Show/Hide and Copy button */}
                         <TableCell className="py-4 px-4">
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-xs font-mono text-muted-foreground select-all">
-                              {keyItem.keyPrefix}
+                          <div className="flex items-center gap-1.5 max-w-[320px]">
+                            <span className="text-xs font-mono text-muted-foreground truncate select-all">
+                              {revealedKeyIds[keyItem._id] && keyItem.rawKey
+                                ? keyItem.rawKey
+                                : keyItem.keyPrefix}
                             </span>
+                            {keyItem.rawKey && (
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setRevealedKeyIds((prev) => ({
+                                        ...prev,
+                                        [keyItem._id]: !prev[keyItem._id],
+                                      }))
+                                    }
+                                    className="h-6 w-6 rounded-md flex items-center justify-center hover:bg-secondary text-muted-foreground hover:text-foreground cursor-pointer transition-colors shrink-0"
+                                    aria-label={
+                                      revealedKeyIds[keyItem._id]
+                                        ? "Hide secret key"
+                                        : "Reveal secret key"
+                                    }
+                                  >
+                                    {revealedKeyIds[keyItem._id] ? (
+                                      <EyeOff className="h-3.5 w-3.5" />
+                                    ) : (
+                                      <Eye className="h-3.5 w-3.5" />
+                                    )}
+                                  </button>
+                                </TooltipTrigger>
+                                <TooltipContent side="top">
+                                  {revealedKeyIds[keyItem._id]
+                                    ? "Hide secret key"
+                                    : "Reveal secret key"}
+                                </TooltipContent>
+                              </Tooltip>
+                            )}
                             <Tooltip>
                               <TooltipTrigger asChild>
                                 <button
-                                  onClick={() =>
-                                    handleCopy(
-                                      keyItem.keyPrefix,
-                                      `Key Prefix (${keyItem.keyPrefix})`
-                                    )
-                                  }
-                                  className="h-6 w-6 rounded-md flex items-center justify-center hover:bg-secondary text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
-                                  aria-label="Copy key prefix"
+                                  type="button"
+                                  onClick={() => handleCopyKey(keyItem)}
+                                  className="h-6 w-6 rounded-md flex items-center justify-center hover:bg-secondary text-muted-foreground hover:text-foreground cursor-pointer transition-colors shrink-0"
+                                  aria-label="Copy secret API key"
                                 >
-                                  {copiedKeyText === keyItem.keyPrefix ? (
+                                  {copiedKeyId === keyItem._id ? (
                                     <Check className="h-3.5 w-3.5 text-foreground" />
                                   ) : (
                                     <Copy className="h-3.5 w-3.5" />
@@ -405,7 +460,7 @@ export default function KeysPage() {
                                 </button>
                               </TooltipTrigger>
                               <TooltipContent side="top">
-                                Copy prefix identifier
+                                Copy secret API key
                               </TooltipContent>
                             </Tooltip>
                           </div>
