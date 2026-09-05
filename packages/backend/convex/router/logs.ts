@@ -99,6 +99,60 @@ export const recordLog = mutation({
       createdAt: Date.now(),
     });
 
+    // Deduct tokens from user's weekly quota for Const-managed models
+    const isConstModel =
+      args.provider === "const" ||
+      args.provider === "Google AI" ||
+      args.provider.toLowerCase().includes("const");
+
+    if (isConstModel && args.status === 200 && args.totalTokens > 0) {
+      const now = Date.now();
+      const WEEKLY_LIMIT = 7_000_000;
+      const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+      const quotaDoc = await ctx.db
+        .query("userQuotas")
+        .withIndex("by_user", (q) => q.eq("userId", resolvedUserId!))
+        .first();
+
+      if (!quotaDoc) {
+        await ctx.db.insert("userQuotas", {
+          userId: resolvedUserId,
+          weeklyLimitTokens: WEEKLY_LIMIT,
+          usedTokens: Math.min(WEEKLY_LIMIT, args.totalTokens),
+          periodStartAt: now,
+          periodEndAt: now + WEEK_MS,
+          lastDeductedAt: now,
+          createdAt: now,
+          updatedAt: now,
+        });
+      } else {
+        let currentUsed = quotaDoc.usedTokens;
+        let periodStartAt = quotaDoc.periodStartAt;
+        let periodEndAt = quotaDoc.periodEndAt;
+
+        if (now >= periodEndAt) {
+          const cyclesElapsed = Math.floor((now - periodStartAt) / WEEK_MS);
+          periodStartAt = periodStartAt + cyclesElapsed * WEEK_MS;
+          periodEndAt = periodStartAt + WEEK_MS;
+          currentUsed = 0;
+        }
+
+        const newUsed = Math.min(
+          quotaDoc.weeklyLimitTokens || WEEKLY_LIMIT,
+          currentUsed + args.totalTokens
+        );
+
+        await ctx.db.patch(quotaDoc._id, {
+          usedTokens: newUsed,
+          periodStartAt,
+          periodEndAt,
+          lastDeductedAt: now,
+          updatedAt: now,
+        });
+      }
+    }
+
     return { success: true, logId };
   },
 });

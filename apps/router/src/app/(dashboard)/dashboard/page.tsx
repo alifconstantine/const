@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouterAuth } from "@/components/providers/convex-client-provider";
 import { useQuery } from "convex/react";
 import { api } from "@const/backend/_generated/api";
+import { CliQuotaCard } from "@/components/dashboard/cli-quota-card";
 import {
   Card,
   Button,
@@ -271,6 +272,9 @@ export default function DashboardOverviewPage() {
           ))}
         </div>
       </div>
+
+      {/* Weekly Const Quota CLI Telemetry Card */}
+      <CliQuotaCard />
 
       {/* 2. Top KPI Cards (4 Cards - Pure Token & Performance Accounting) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

@@ -143,5 +143,19 @@ export const routerTables = {
   })
     .index("by_user", ["userId"])
     .index("by_user_slug", ["userId", "slug"]),
+
+  // 6. User Weekly Free Token Quotas (7M tokens/week for Const-managed models)
+  userQuotas: defineTable({
+    userId: v.id("users"),
+    weeklyLimitTokens: v.number(),  // Default 7_000_000 (7M)
+    usedTokens: v.number(),         // Accumulated input + output tokens this cycle
+    periodStartAt: v.number(),      // Cycle start timestamp (ms)
+    periodEndAt: v.number(),        // Cycle reset timestamp (ms) (periodStartAt + 7 * 24 * 60 * 60 * 1000)
+    lastDeductedAt: v.optional(v.number()),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_user", ["userId"]),
 };
+
 

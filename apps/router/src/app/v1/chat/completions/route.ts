@@ -200,6 +200,33 @@ async function dispatchSingleModel({
   if (isConstBuiltin) {
     telemetryMeta.provider = "Google AI";
 
+    // Enforce 7M Weekly Free Token Quota for Const-managed engine
+    if (convexUrl && (providedKey || ssoToken)) {
+      try {
+        const client = new ConvexHttpClient(convexUrl);
+        if (ssoToken) client.setAuth(ssoToken);
+        const quotaCheck = await client.query(api.router.quotas.checkGatewayQuota, {
+          rawApiKey: providedKey || undefined,
+          provider: "const",
+        });
+
+        if (quotaCheck && !quotaCheck.allowed && quotaCheck.reason === "weekly_quota_exceeded") {
+          return NextResponse.json(
+            {
+              error: {
+                message: `Const weekly free token quota exceeded (7,000,000 tokens/week). Resets in ${quotaCheck.resetsInText || "this week"}. Configure your own provider key (BYOK) in Providers for unlimited access.`,
+                type: "quota_exceeded",
+                code: "weekly_quota_exceeded",
+              },
+            },
+            { status: 429 }
+          );
+        }
+      } catch (quotaErr) {
+        console.warn("Non-fatal quota check error:", quotaErr);
+      }
+    }
+
     const constBaseUrl = (
       process.env.CONST_ENGINE_BASE_URL?.trim() || "https://engine.const.web.id"
     ).replace(/\/+$/, "");

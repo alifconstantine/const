@@ -3,6 +3,9 @@
 import { useState, useMemo } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useQuery } from "convex/react";
+import { api } from "@const/backend/_generated/api";
+import { useRouterAuth } from "@/components/providers/convex-client-provider";
 import { AccountMenu } from "./account-menu";
 import { Button, cn } from "@const/ui";
 import {
@@ -129,6 +132,19 @@ export function Sidebar({
 }: SidebarProps) {
   const pathname = usePathname();
   const [searchQuery, setSearchQuery] = useState("");
+  const { isAuthenticated } = useRouterAuth();
+  const quota = useQuery(
+    api.router.quotas.getUserQuota,
+    isAuthenticated ? {} : "skip"
+  );
+
+  const sidebarAsciiBar = useMemo(() => {
+    const percent = quota?.percentUsed ?? 0;
+    const clamped = Math.max(0, Math.min(100, percent));
+    const filled = Math.round((clamped / 100) * 12);
+    const unfilled = Math.max(0, 12 - filled);
+    return `${"█".repeat(filled)}${"░".repeat(unfilled)}`;
+  }, [quota?.percentUsed]);
 
   const filteredSections = useMemo(() => {
     if (!searchQuery.trim()) return navSections;
@@ -269,6 +285,40 @@ export function Sidebar({
           ))
         )}
       </nav>
+
+      {/* Mini CLI Quota Indicator in Sidebar */}
+      {!isCollapsed && isAuthenticated && (
+        <div className="px-2 pt-2 border-t border-border/50">
+          <Link
+            href="/dashboard"
+            onClick={onNavigate}
+            className="block p-2.5 rounded-xl bg-secondary/50 hover:bg-secondary/80 border border-border/50 transition-all font-mono group"
+          >
+            <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-1">
+              <span className="font-semibold uppercase text-foreground/80 flex items-center gap-1">
+                <Terminal className="h-3 w-3 text-muted-foreground" />
+                FREE QUOTA
+              </span>
+              <span className="tabular-nums font-semibold text-foreground">
+                {quota ? `${quota.percentUsed.toFixed(0)}%` : "..."}
+              </span>
+            </div>
+            <div className="text-[11px] text-emerald-400 font-bold tracking-tight select-none truncate">
+              [{sidebarAsciiBar}]
+            </div>
+            <div className="flex items-center justify-between text-[9px] text-muted-foreground/80 mt-1">
+              <span>
+                {quota
+                  ? `${(quota.usedTokens / 1_000_000).toFixed(1)}M / 7M`
+                  : "0 / 7M"}
+              </span>
+              <span className="uppercase">
+                {quota?.resetsInText ? `reset in ${quota.resetsInText}` : ""}
+              </span>
+            </div>
+          </Link>
+        </div>
+      )}
 
       {/* Account Profile Card at the Bottom */}
       <div className="p-2 border-t border-border shrink-0 bg-card">
