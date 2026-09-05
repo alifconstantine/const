@@ -45,6 +45,7 @@ export function calculateQuotaState(
       usedTokens: 0,
       remainingTokens: WEEKLY_QUOTA_TOKENS,
       percentUsed: 0,
+      percentRemaining: 100,
       periodStartAt: now,
       periodEndAt: now + WEEK_MS,
       resetsInMs: WEEK_MS,
@@ -71,6 +72,10 @@ export function calculateQuotaState(
     100,
     parseFloat(((usedTokens / weeklyLimit) * 100).toFixed(1))
   );
+  const percentRemaining = Math.max(
+    0,
+    parseFloat(((remainingTokens / weeklyLimit) * 100).toFixed(1))
+  );
   const resetsInMs = Math.max(0, periodEndAt - now);
 
   return {
@@ -78,6 +83,7 @@ export function calculateQuotaState(
     usedTokens,
     remainingTokens,
     percentUsed,
+    percentRemaining,
     periodStartAt,
     periodEndAt,
     resetsInMs,
