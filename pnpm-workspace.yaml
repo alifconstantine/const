@@ -1,6 +1,7 @@
 packages:
   - "apps/*"
   - "apps/learn/*"
+  - "apps/harness/*"
   - "packages/*"
   - "packages/session-backends/*"
 allowBuilds:

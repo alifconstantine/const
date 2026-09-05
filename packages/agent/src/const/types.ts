@@ -31,11 +31,14 @@ export interface ModelConfig {
   supportsTools?: boolean;
 }
 
+import type { FileMutationRecord } from "./mutation-ledger.js";
+
 export interface AgentEventMap {
   token: { token: string };
   thinking: { thinking: string };
   tool_call: { toolCallId: string; toolName: string; args: any };
   tool_result: { toolCallId: string; toolName: string; result: any; isError?: boolean };
+  file_mutation: { record: FileMutationRecord };
   status: { status: "idle" | "thinking" | "calling_tool" | "streaming" | "done" | "error"; message?: string };
   done: { fullContent: string; messages: AgentMessage[] };
   error: { error: string };
@@ -52,4 +55,5 @@ export interface AgentConfig {
   systemPrompt?: string;
   workspacePath?: string;
   maxTurns?: number;
+  mode?: "ask_before_changes" | "full_access";
 }

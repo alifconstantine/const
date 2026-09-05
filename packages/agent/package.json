@@ -18,6 +18,10 @@
 			"types": "./src/const/types.ts",
 			"import": "./src/const/types.ts"
 		},
+		"./mutation-ledger": {
+			"types": "./src/const/mutation-ledger.ts",
+			"import": "./src/const/mutation-ledger.ts"
+		},
 		"./node": {
 			"types": "./src/node.ts",
 			"import": "./src/node.ts"
@@ -32,7 +36,7 @@
 		"clean": "shx rm -rf dist",
 		"generate-telemetry-docs": "node scripts/generate-telemetry-docs.ts",
 		"check:telemetry-docs": "node scripts/generate-telemetry-docs.ts --check",
-		"build": "tsgo -p tsconfig.build.json",
+		"build": "tsc -p tsconfig.build.json",
 		"test": "vitest --run",
 		"test:harness": "vitest --run --config vitest.harness.config.ts",
 		"coverage:harness": "vitest --run --config vitest.harness.config.ts --coverage",
@@ -55,11 +59,11 @@
 		"transport",
 		"state-management"
 	],
-	"author": "Mario Zechner",
+	"author": "Const",
 	"license": "MIT",
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/earendil-works/pi.git",
+		"url": "git+https://github.com/alifconstantine/const.git",
 		"directory": "packages/agent"
 	},
 	"engines": {

@@ -116,7 +116,7 @@ export class ConstAgent {
 
     const conversationHistory: AgentMessage[] = [...messages];
     let currentTurn = 0;
-    const maxTurns = this.config.maxTurns || 10;
+    const maxTurns = this.config.maxTurns || 25;
     const workspacePath = this.config.workspacePath || process.cwd();
 
     const endpoint = this.config.baseUrl.endsWith("/chat/completions")
@@ -160,7 +160,7 @@ export class ConstAgent {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${this.config.apiKey}`,
+            ...(this.config.apiKey ? { Authorization: `Bearer ${this.config.apiKey}` } : {}),
           },
           body: JSON.stringify({
             model: this.config.model,
@@ -301,7 +301,13 @@ export class ConstAgent {
             tc.function.name,
             parsedArgs,
             workspacePath,
-            signal
+            {
+              signal,
+              stepIndex: currentTurn,
+              onFileMutation: (record) => {
+                onEvent({ type: "file_mutation", record });
+              },
+            }
           );
 
           onEvent({

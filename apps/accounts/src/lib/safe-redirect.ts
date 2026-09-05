@@ -28,6 +28,7 @@ export function isNativeRedirectUrl(target: string | null | undefined): boolean 
   if (!target || typeof target !== "string") return false;
   const trimmed = target.trim();
   return (
+    trimmed.startsWith("const-harness://") ||
     trimmed.startsWith("const-learn://") ||
     trimmed.startsWith("const-auth://") ||
     trimmed.startsWith("const://")
@@ -41,6 +42,7 @@ export function getAppNameFromUrl(target: string | null | undefined): string {
   if (!target || typeof target !== "string") return "Const";
   const trimmed = target.trim();
 
+  if (trimmed.startsWith("const-harness://")) return "Const Harness";
   if (trimmed.startsWith("const-learn://")) return "Const Learn";
   if (trimmed.startsWith("const-auth://") || trimmed.startsWith("const://")) return "Const";
 
@@ -49,6 +51,9 @@ export function getAppNameFromUrl(target: string | null | undefined): string {
     const hostname = parsed.hostname.toLowerCase();
     const port = parsed.port;
 
+    if (hostname === "harness.const.web.id" || hostname.startsWith("harness.")) {
+      return "Const Harness";
+    }
     if (hostname === "router.const.web.id" || hostname.startsWith("router.") || port === "3002") {
       return "Const Router";
     }
@@ -78,15 +83,16 @@ export function getSafeRedirectUrl(
 
   try {
     // 1. Check for Const desktop & mobile native app deep-link schemes
-    // arsitektur.md: const-auth:// (desktop), const-learn:// (mobile), const:// (generic)
+    // arsitektur.md: const-auth:// (desktop), const-learn:// (mobile), const-harness:// (desktop), const:// (generic)
     const isNativeScheme =
+      trimmed.startsWith("const-harness://") ||
       trimmed.startsWith("const-auth://") ||
       trimmed.startsWith("const-learn://") ||
       trimmed.startsWith("const://");
 
     if (isNativeScheme) {
       // Validate deep-link format: prevent newlines, null bytes, or dangerous chars
-      if (/^const(-auth|-learn)?:\/\/[a-zA-Z0-9_\-\.\/]+(\?.*)?$/i.test(trimmed)) {
+      if (/^const(-auth|-learn|-harness)?:\/\/[a-zA-Z0-9_\-\.\/]+(\?.*)?$/i.test(trimmed)) {
         return trimmed;
       }
       console.warn(`[Security] Malformed native deep-link blocked: ${trimmed}`);

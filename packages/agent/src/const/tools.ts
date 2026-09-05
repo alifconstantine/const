@@ -3,6 +3,13 @@ import fsSync from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { spawn } from "node:child_process";
+import type { FileMutationRecord } from "./mutation-ledger.js";
+
+export interface ExecuteToolOptions {
+  signal?: AbortSignal;
+  stepIndex?: number;
+  onFileMutation?: (record: FileMutationRecord) => void;
+}
 
 // ---------------------------------------------------------------------------
 // Shell Configuration & Discovery (aligned with Pi Windows architecture)
@@ -389,9 +396,15 @@ export async function executeNativeTool(
   toolName: string,
   args: Record<string, any>,
   workspacePath: string,
-  signal?: AbortSignal
+  optionsOrSignal?: AbortSignal | ExecuteToolOptions
 ): Promise<{ result: any; isError: boolean }> {
   try {
+    const options: ExecuteToolOptions =
+      optionsOrSignal instanceof AbortSignal
+        ? { signal: optionsOrSignal }
+        : optionsOrSignal || {};
+    const signal = options.signal;
+
     if (signal?.aborted) {
       return { result: "Action cancelled", isError: true };
     }
@@ -525,11 +538,37 @@ export async function executeNativeTool(
 
       // Auto-create parent directories (Pi standard)
       await fs.mkdir(path.dirname(filePath), { recursive: true });
+
+      // Pre-flight snapshot check for rollback
+      let previousContent: string | null = null;
+      let operation: "create" | "modify" = "create";
+      if (fsSync.existsSync(filePath)) {
+        try {
+          previousContent = await fs.readFile(filePath, "utf-8");
+          operation = "modify";
+        } catch {
+          // ignore
+        }
+      }
+
       await fs.writeFile(filePath, content, "utf-8");
 
       const displayPath = path.isAbsolute(rawPath)
         ? filePath
         : path.relative(workspacePath, filePath);
+
+      // Record file mutation for rollback ledger
+      options.onFileMutation?.({
+        id: `mut_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        stepIndex: options.stepIndex ?? 0,
+        operation,
+        absolutePath: filePath,
+        filePath: filePath,
+        targetFile: displayPath || filePath,
+        previousContent,
+        newContent: content,
+        timestamp: Date.now(),
+      });
 
       return {
         result: `File written successfully: ${displayPath} (${content.length} characters)`,
@@ -579,10 +618,27 @@ export async function executeNativeTool(
 
       const fileText = await fs.readFile(filePath, "utf-8");
 
+      const editDisplayPath = path.isAbsolute(rawPath)
+        ? filePath
+        : path.relative(workspacePath, filePath);
+
       // 1. Direct match
       if (fileText.includes(oldContent)) {
         const updated = fileText.replace(oldContent, newContent);
         await fs.writeFile(filePath, updated, "utf-8");
+
+        options.onFileMutation?.({
+          id: `mut_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+          stepIndex: options.stepIndex ?? 0,
+          operation: "modify",
+          absolutePath: filePath,
+          filePath: filePath,
+          targetFile: editDisplayPath || filePath,
+          previousContent: fileText,
+          newContent: updated,
+          timestamp: Date.now(),
+        });
+
         return {
           result: `Successfully edited '${path.basename(filePath)}'. Replaced ${oldContent.length} characters with ${newContent.length} characters.`,
           isError: false,
@@ -596,6 +652,19 @@ export async function executeNativeTool(
       if (normalizedFileText.includes(normalizedOld)) {
         const updated = normalizedFileText.replace(normalizedOld, newContent.replace(/\r\n/g, "\n"));
         await fs.writeFile(filePath, updated, "utf-8");
+
+        options.onFileMutation?.({
+          id: `mut_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+          stepIndex: options.stepIndex ?? 0,
+          operation: "modify",
+          absolutePath: filePath,
+          filePath: filePath,
+          targetFile: editDisplayPath || filePath,
+          previousContent: fileText,
+          newContent: updated,
+          timestamp: Date.now(),
+        });
+
         return {
           result: `Successfully edited '${path.basename(filePath)}' (line-endings normalized).`,
           isError: false,

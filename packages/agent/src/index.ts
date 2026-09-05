@@ -14,4 +14,7 @@ export {
   DEFAULT_MODEL_ID,
   DEFAULT_MODEL_DISPLAY_NAME,
   type NativeToolDefinition,
+  rollbackFileMutation,
+  rollbackMultipleMutations,
+  type FileMutationRecord,
 } from "./const/index.js";
