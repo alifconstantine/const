@@ -168,7 +168,7 @@ export function Sidebar({
   return (
     <aside
       className={cn(
-        "h-full flex flex-col bg-card select-none transition-all duration-300",
+        "h-full flex flex-col bg-[#2b2b2b] text-[#d4d4d4] select-none transition-all duration-300",
         isCollapsed ? "w-16" : "w-64",
         className
       )}
@@ -180,7 +180,7 @@ export function Sidebar({
             variant="ghost"
             size="icon"
             onClick={onToggleCollapse}
-            className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground cursor-pointer"
+            className="h-8 w-8 rounded-lg text-[#969696] hover:text-white cursor-pointer"
             title="Expand sidebar"
             aria-label="Expand sidebar"
           >
@@ -191,18 +191,18 @@ export function Sidebar({
         <div className="flex items-center gap-1.5 px-3 py-3 shrink-0">
           {/* Search Input positioned on the left */}
           <div className="relative flex-1 flex items-center">
-            <Search className="absolute left-2.5 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+            <Search className="absolute left-2.5 h-3.5 w-3.5 text-[#5d5d5d] pointer-events-none" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search"
-              className="w-full h-8 pl-8 pr-7 rounded-lg bg-secondary text-xs text-foreground placeholder:text-muted-foreground outline-none focus:ring-1 focus:ring-foreground/20 transition-all font-sans"
+              className="w-full h-8 pl-8 pr-7 rounded-lg bg-[#1b1b1b] text-xs text-[#d4d4d4] placeholder:text-[#5d5d5d] outline-none border border-[#2e2e2e] focus:border-[#383838] transition-all font-sans"
             />
             {searchQuery && (
               <button
                 onClick={() => setSearchQuery("")}
-                className="absolute right-2 text-muted-foreground hover:text-foreground cursor-pointer"
+                className="absolute right-2 text-[#969696] hover:text-white cursor-pointer"
                 aria-label="Clear search"
               >
                 <X className="h-3 w-3" />
@@ -216,7 +216,7 @@ export function Sidebar({
               variant="ghost"
               size="icon"
               onClick={onToggleCollapse}
-              className="h-8 w-8 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary cursor-pointer shrink-0"
+              className="h-8 w-8 rounded-lg text-[#969696] hover:text-white hover:bg-[#383838] cursor-pointer shrink-0"
               title="Close sidebar"
               aria-label="Close sidebar"
             >
@@ -229,7 +229,7 @@ export function Sidebar({
       {/* Navigation Menus */}
       <nav className="flex-1 overflow-y-auto px-2 sm:px-3 py-3 space-y-4 scrollbar-thin">
         {filteredSections.length === 0 ? (
-          <div className="px-2 py-6 text-center text-xs text-muted-foreground">
+          <div className="px-2 py-6 text-center text-xs text-[#969696]">
             {isCollapsed ? "—" : `No menus found for "${searchQuery}"`}
           </div>
         ) : (
@@ -238,7 +238,7 @@ export function Sidebar({
               {isCollapsed ? (
                 idx > 0 && <div className="my-2" />
               ) : (
-                <h3 className="px-2.5 py-1 text-[10px] font-mono uppercase tracking-wider text-muted-foreground/70 font-semibold">
+                <h3 className="px-2.5 py-1 text-[10px] font-mono uppercase tracking-wider text-[#969696] font-semibold">
                   {section.title}
                 </h3>
               )}
@@ -262,8 +262,8 @@ export function Sidebar({
                           ? "justify-center p-2"
                           : "justify-between px-2.5 py-2",
                         isActive
-                          ? "bg-secondary text-foreground font-medium"
-                          : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
+                          ? "bg-[#383838] text-white font-medium"
+                          : "text-[#d4d4d4] hover:text-white hover:bg-[#383838]/80"
                       )}
                     >
                       <div className={cn("flex items-center min-w-0", !isCollapsed && "gap-2.5")}>
@@ -271,14 +271,14 @@ export function Sidebar({
                           className={cn(
                             "h-4 w-4 shrink-0 transition-colors",
                             isActive
-                              ? "text-foreground stroke-[2]"
-                              : "text-muted-foreground group-hover:text-foreground stroke-[1.75]"
+                              ? "text-white stroke-[2]"
+                              : "text-[#d4d4d4] group-hover:text-white stroke-[1.75]"
                           )}
                         />
                         {!isCollapsed && <span className="truncate">{item.title}</span>}
                       </div>
                       {!isCollapsed && item.badge && (
-                        <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-secondary text-muted-foreground border border-border">
+                        <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-[#1b1b1b] text-[#969696] border border-[#2e2e2e]">
                           {item.badge}
                         </span>
                       )}
@@ -297,10 +297,10 @@ export function Sidebar({
           <Link
             href="/dashboard"
             onClick={onNavigate}
-            className="block p-2.5 rounded-xl bg-secondary/40 hover:bg-secondary/70 transition-all font-mono group"
+            className="block p-2.5 rounded-xl bg-[#1b1b1b] hover:bg-[#222222] border border-[#2e2e2e]/60 transition-all font-mono group"
           >
-            <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-1">
-              <span className="font-semibold uppercase text-foreground/80">
+            <div className="flex items-center justify-between text-[10px] text-[#969696] mb-1">
+              <span className="font-semibold uppercase text-[#d4d4d4]">
                 FREE QUOTA
               </span>
               <span className={cn("tabular-nums font-semibold", sidebarColorClass)}>
@@ -310,13 +310,13 @@ export function Sidebar({
             <div className={cn("text-[11px] font-bold tracking-tight select-none truncate", sidebarColorClass)}>
               [{sidebarAsciiBar}]
             </div>
-            <div className="flex items-center justify-between text-[9px] text-muted-foreground/80 mt-1">
+            <div className="flex items-center justify-between text-[9px] text-[#969696] mt-1">
               <span className="tabular-nums">
                 {quota
                   ? `${(quota.remainingTokens / 1_000_000).toFixed(1)}M / 7M left`
                   : "7.0M / 7M left"}
               </span>
-              <span className="uppercase">
+              <span className="uppercase text-[#5d5d5d]">
                 {quota?.resetsInText ? `reset in ${quota.resetsInText}` : ""}
               </span>
             </div>
@@ -325,7 +325,7 @@ export function Sidebar({
       )}
 
       {/* Account Profile Card at the Bottom */}
-      <div className="p-2 shrink-0 bg-card">
+      <div className="p-2 shrink-0 bg-[#2b2b2b]">
         <AccountMenu isCollapsed={isCollapsed} />
       </div>
     </aside>
