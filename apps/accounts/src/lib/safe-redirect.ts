@@ -54,7 +54,7 @@ export function getAppNameFromUrl(target: string | null | undefined): string {
     if (hostname === "harness.const.web.id" || hostname.startsWith("harness.")) {
       return "Const Harness";
     }
-    if (hostname === "router.const.web.id" || hostname.startsWith("router.") || port === "3002") {
+    if (hostname === "router.const.web.id" || hostname.startsWith("router.") || hostname.includes("router") || port === "3002") {
       return "Const Router";
     }
     if (hostname === "learn.const.web.id" || hostname.startsWith("learn.") || port === "5173") {
@@ -137,10 +137,11 @@ export function getSafeRedirectUrl(
       return trimmed;
     }
 
-    // 5. Allow official production domains (*.const.web.id)
+    // 5. Allow official production domains (*.const.web.id and *.vercel.app deployments)
     if (
       hostname === "const.web.id" ||
-      hostname.endsWith(".const.web.id")
+      hostname.endsWith(".const.web.id") ||
+      hostname.endsWith(".vercel.app")
     ) {
       return trimmed;
     }

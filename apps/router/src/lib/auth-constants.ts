@@ -1,14 +1,12 @@
 export function getAccountsUrl(): string {
   if (typeof window !== "undefined") {
-    // Check if custom env is provided
-    if (process.env.NEXT_PUBLIC_ACCOUNTS_URL) {
-      return process.env.NEXT_PUBLIC_ACCOUNTS_URL;
-    }
     const hostname = window.location.hostname;
+    // On local development machine
     if (hostname === "localhost" || hostname === "127.0.0.1") {
-      return "http://localhost:3001";
+      return process.env.NEXT_PUBLIC_ACCOUNTS_URL || "http://localhost:3001";
     }
-    return "https://accounts.const.web.id";
+    // On production deployment (*.const.web.id, Vercel, or custom domains)
+    return process.env.NEXT_PUBLIC_ACCOUNTS_URL || "https://accounts.const.web.id";
   }
   return process.env.NEXT_PUBLIC_ACCOUNTS_URL || "https://accounts.const.web.id";
 }
