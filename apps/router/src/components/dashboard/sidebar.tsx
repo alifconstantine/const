@@ -185,7 +185,7 @@ export function Sidebar({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search"
-              className="w-full h-8 pl-8 pr-7 rounded-lg bg-[#1e1e1e] text-xs text-[#d4d4d4] placeholder:text-[#5d5d5d] outline-none border-none focus:ring-1 focus:ring-white/15 transition-all font-sans"
+              className="w-full h-8 pl-8 pr-7 rounded-lg bg-[#1b1b1b] text-xs text-[#d4d4d4] placeholder:text-[#5d5d5d] outline-none border border-[#2e2e2e] focus:border-[#383838] transition-all font-sans"
             />
             {searchQuery && (
               <button
@@ -266,7 +266,7 @@ export function Sidebar({
                         {!isCollapsed && <span className="truncate">{item.title}</span>}
                       </div>
                       {!isCollapsed && item.badge && (
-                        <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-[#1e1e1e] text-[#969696]">
+                        <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-[#1b1b1b] text-[#969696] border border-[#2e2e2e]">
                           {item.badge}
                         </span>
                       )}
@@ -285,7 +285,7 @@ export function Sidebar({
           <Link
             href="/dashboard"
             onClick={onNavigate}
-            className="block p-2.5 rounded-xl bg-[#222222] hover:bg-[#1e1e1e] border-none transition-all font-mono group"
+            className="block p-2.5 rounded-xl bg-[#1b1b1b] hover:bg-[#222222] border border-[#2e2e2e]/60 transition-all font-mono group"
           >
             <div className="flex items-center justify-between text-[10px] text-[#969696] mb-1">
               <span className="font-semibold uppercase text-[#d4d4d4]">

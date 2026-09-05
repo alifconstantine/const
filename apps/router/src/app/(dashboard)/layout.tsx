@@ -109,8 +109,8 @@ export default function DashboardLayout({
     <>
       <title>{`${currentTitle} - Const Router`}</title>
       <div className="min-h-screen flex flex-col bg-[#2b2b2b] text-[#d4d4d4] antialiased selection:bg-white selection:text-[#161616]">
-      {/* Top Header Bar matching Const Sidebar #2b2b2b */}
-      <header className="h-14 w-full bg-[#2b2b2b] sticky top-0 z-40 px-4 sm:px-6 flex items-center justify-between shrink-0 select-none transition-colors">
+      {/* Top Header Bar matching Const Harness #222222 header-strip */}
+      <header className="h-14 w-full border-b border-[#383838]/60 bg-[#222222] sticky top-0 z-40 px-4 sm:px-6 flex items-center justify-between shrink-0 select-none transition-colors">
         {/* Left: Const Logo & Product Badge */}
         <div className="flex items-center gap-3">
           <Button
@@ -132,7 +132,7 @@ export default function DashboardLayout({
               <span className="font-serif text-lg font-normal tracking-tight text-[#d4d4d4] group-hover:text-white">
                 Const
               </span>
-              <span className="text-[10px] font-mono tracking-wider uppercase px-2 py-0.5 rounded-full bg-[#1e1e1e] text-[#969696]">
+              <span className="text-[10px] font-mono tracking-wider uppercase px-2 py-0.5 rounded-full bg-[#1b1b1b] text-[#969696] border border-[#2e2e2e]">
                 Router
               </span>
             </div>
@@ -154,9 +154,9 @@ export default function DashboardLayout({
 
           <Link href="/docs">
             <Button
-              variant="ghost"
+              variant="outline"
               size="sm"
-              className="h-8 rounded-full text-xs font-medium px-4 bg-[#1e1e1e] text-[#d4d4d4] hover:text-white hover:bg-[#383838] cursor-pointer gap-1.5 border-none"
+              className="h-8 rounded-full text-xs font-medium px-4 border-[#383838] bg-[#1b1b1b] text-[#d4d4d4] hover:text-white hover:bg-[#383838] cursor-pointer gap-1.5"
             >
               <BookOpen className="h-3.5 w-3.5" />
               <span>Docs</span>
@@ -195,8 +195,8 @@ export default function DashboardLayout({
           </Sheet>
         </div>
 
-        {/* Page Content Viewport - Studio Canvas #161616 with seamless curved left seam */}
-        <main className="flex-1 min-w-0 p-6 md:p-8 w-full bg-[#161616] text-[#d4d4d4] rounded-tl-2xl sm:rounded-tl-3xl overflow-y-auto">
+        {/* Page Content Viewport - Studio Canvas #161616 */}
+        <main className="flex-1 min-w-0 p-6 md:p-8 w-full bg-[#161616] text-[#d4d4d4] border-t border-l border-[#383838]/40 overflow-y-auto">
           {children}
         </main>
       </div>
