@@ -22,8 +22,6 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   X,
-  BookOpen,
-  Settings,
 } from "lucide-react";
 
 interface NavItem {
@@ -91,16 +89,6 @@ const navSections: NavSection[] = [
         title: "Integrations",
         href: "/integrations",
         icon: Layers,
-      },
-      {
-        title: "Documentation",
-        href: "/docs",
-        icon: BookOpen,
-      },
-      {
-        title: "Settings",
-        href: "/settings",
-        icon: Settings,
       },
     ],
   },
