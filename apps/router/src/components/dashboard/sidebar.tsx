@@ -115,28 +115,10 @@ export function Sidebar({
     isAuthenticated ? {} : "skip"
   );
 
-  const { sidebarAsciiBar, sidebarColorClass, sidebarPercentRemaining } = useMemo(() => {
+  const sidebarPercentRemaining = useMemo(() => {
     const limit = quota?.weeklyLimitTokens || 7_000_000;
     const remaining = quota?.remainingTokens ?? limit;
-    const percent = Math.max(0, Math.min(100, (remaining / limit) * 100));
-    let filled = Math.round((percent / 100) * 12);
-    if (percent > 0 && filled === 0) filled = 1;
-    if (percent < 100 && filled === 12) filled = 11;
-    const unfilled = Math.max(0, 12 - filled);
-    const bar = `${"█".repeat(filled)}${"░".repeat(unfilled)}`;
-
-    let color = "text-foreground";
-    if (percent <= 10) {
-      color = "text-rose-500";
-    } else if (percent <= 30) {
-      color = "text-amber-400";
-    }
-
-    return {
-      sidebarAsciiBar: bar,
-      sidebarColorClass: color,
-      sidebarPercentRemaining: percent,
-    };
+    return Math.max(0, Math.min(100, (remaining / limit) * 100));
   }, [quota?.remainingTokens, quota?.weeklyLimitTokens]);
 
   const filteredSections = useMemo(() => {
@@ -279,32 +261,38 @@ export function Sidebar({
         )}
       </nav>
 
-      {/* Mini CLI Quota Indicator in Sidebar */}
+      {/* Mini Quota Indicator in Sidebar */}
       {!isCollapsed && isAuthenticated && (
         <div className="px-2 pt-2">
           <Link
             href="/dashboard"
             onClick={onNavigate}
-            className="block p-2.5 rounded-xl bg-[#1b1b1b] hover:bg-[#222222] border border-[#2e2e2e]/60 transition-all font-mono group"
+            className="block p-3 rounded-xl bg-[#1b1b1b] hover:bg-[#222222] border border-[#2e2e2e] transition-all font-mono group"
           >
-            <div className="flex items-center justify-between text-[10px] text-[#969696] mb-1">
-              <span className="font-semibold uppercase text-[#d4d4d4]">
+            <div className="flex items-center justify-between text-xs text-white mb-2">
+              <span className="font-semibold uppercase tracking-wider text-white">
                 FREE QUOTA
               </span>
-              <span className={cn("tabular-nums font-semibold", sidebarColorClass)}>
+              <span className="tabular-nums font-bold text-white">
                 {quota ? `${sidebarPercentRemaining.toFixed(0)}%` : "..."}
               </span>
             </div>
-            <div className={cn("text-[11px] font-bold tracking-tight select-none truncate", sidebarColorClass)}>
-              [{sidebarAsciiBar}]
+
+            {/* Full-width Graphical Progress Bar */}
+            <div className="w-full h-2.5 rounded-full bg-[#2a2a2a] overflow-hidden mb-2">
+              <div
+                className="h-full bg-white rounded-full transition-all duration-500 ease-out"
+                style={{ width: `${sidebarPercentRemaining}%` }}
+              />
             </div>
-            <div className="flex items-center justify-between text-[9px] text-[#969696] mt-1">
-              <span className="tabular-nums">
+
+            <div className="flex items-center justify-between text-[11px] text-white">
+              <span className="tabular-nums font-medium text-white">
                 {quota
                   ? `${(quota.remainingTokens / 1_000_000).toFixed(1)}M / 7M left`
                   : "7.0M / 7M left"}
               </span>
-              <span className="uppercase text-[#5d5d5d]">
+              <span className="uppercase text-white">
                 {quota?.resetsInText ? `reset in ${quota.resetsInText}` : ""}
               </span>
             </div>
