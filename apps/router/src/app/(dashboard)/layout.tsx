@@ -49,22 +49,15 @@ export default function DashboardLayout({
         setHasAttemptedRefresh(true);
         void refreshSession().then((refreshed) => {
           if (!refreshed) {
-            toast.error("Session Expired", {
-              description: "Your session has expired. Reconnecting...",
+            toast.error("Session Reconnect Needed", {
+              description: "Could not restore session. Please sign in again.",
+              action: {
+                label: "Sign In",
+                onClick: () => signIn("/dashboard"),
+              },
             });
-            setTimeout(() => {
-              signIn("/dashboard");
-            }, 800);
           }
         });
-      } else {
-        toast.error("Session Expired", {
-          description: "Your session has expired. Reconnecting...",
-        });
-        const timer = setTimeout(() => {
-          signIn("/dashboard");
-        }, 800);
-        return () => clearTimeout(timer);
       }
     }
   }, [isAuthenticated, user, isSigningOut, hasAttemptedRefresh, refreshSession, signIn]);
