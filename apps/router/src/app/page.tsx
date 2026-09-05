@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouterAuth } from "@/components/providers/convex-client-provider";
@@ -28,8 +29,14 @@ export default function HomePage() {
     isAuthenticated ? {} : "skip"
   );
 
+  useEffect(() => {
+    document.title = "Const Router - Universal AI Gateway";
+  }, []);
+
   return (
-    <div className="min-h-screen flex flex-col bg-background text-foreground selection:bg-primary selection:text-primary-foreground">
+    <>
+      <title>Const Router - Universal AI Gateway</title>
+      <div className="min-h-screen flex flex-col bg-background text-foreground selection:bg-primary selection:text-primary-foreground">
       {/* Floating Stadium Navigation Pill (Mobbin nav-pill pattern) */}
       <div className="fixed top-5 inset-x-4 z-50 flex justify-center pointer-events-none">
         <header className="pointer-events-auto w-full max-w-4xl h-14 rounded-full bg-card/85 border border-border/70 backdrop-blur-xl px-5 sm:px-6 flex items-center justify-between shadow-none transition-all">
@@ -207,5 +214,6 @@ export default function HomePage() {
         </div>
       </footer>
     </div>
-  );
+  </>
+);
 }

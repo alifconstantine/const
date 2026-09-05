@@ -114,10 +114,16 @@ export default function DocsPage() {
     }
   };
 
+  useEffect(() => {
+    document.title = "Documentation - Const Router";
+  }, []);
+
   return (
-    <div className="min-h-screen bg-[#161616] text-[#d4d4d4] antialiased selection:bg-white selection:text-[#161616] font-sans">
-      {/* Top Navbar matching Const Harness studio header (#222222) and logo structure */}
-      <header className="h-14 sticky top-0 z-50 bg-[#222222] border-b border-[#383838]/60 px-4 sm:px-8 flex items-center justify-between select-none">
+    <>
+      <title>Documentation - Const Router</title>
+      <div className="min-h-screen bg-[#161616] text-[#d4d4d4] antialiased selection:bg-white selection:text-[#161616] font-sans">
+        {/* Top Navbar matching Const Harness studio header (#222222) and logo structure */}
+        <header className="h-14 sticky top-0 z-50 bg-[#222222] border-b border-[#383838]/60 px-4 sm:px-8 flex items-center justify-between select-none">
         {/* Left: Brand Logo + Home */}
         <div className="flex items-center gap-6">
           <Link href="/dashboard" className="flex items-center gap-2.5 group">
@@ -1166,5 +1172,6 @@ data: [DONE]`}</pre>
         </div>
       </div>
     </div>
-  );
+  </>
+);
 }

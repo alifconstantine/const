@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useRouterAuth } from "@/components/providers/convex-client-provider";
 import { useQuery } from "convex/react";
 import { api } from "@const/backend/_generated/api";
@@ -23,11 +24,25 @@ import {
   BookOpen,
 } from "lucide-react";
 
+const ROUTE_TITLES: Record<string, string> = {
+  "/dashboard": "Dashboard",
+  "/logs": "Request Logs",
+  "/keys": "API Keys",
+  "/endpoints": "Endpoints",
+  "/combos": "Combos",
+  "/models": "Models",
+  "/providers": "Providers",
+  "/generation": "Playground",
+  "/integrations": "Integrations",
+  "/settings": "Settings",
+};
+
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const pathname = usePathname();
   const { isAuthenticated, isLoading, isSigningOut, signIn, signOut, refreshSession } = useRouterAuth();
   const user = useQuery(
     api.auth.queries.currentUser,
@@ -36,6 +51,19 @@ export default function DashboardLayout({
   const [mobileOpen, setMobileOpen] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [hasAttemptedRefresh, setHasAttemptedRefresh] = useState(false);
+
+  const currentTitle = useMemo(() => {
+    if (!pathname) return "Dashboard";
+    if (ROUTE_TITLES[pathname]) return ROUTE_TITLES[pathname];
+    for (const [route, title] of Object.entries(ROUTE_TITLES)) {
+      if (pathname.startsWith(`${route}/`)) return title;
+    }
+    return "Dashboard";
+  }, [pathname]);
+
+  useEffect(() => {
+    document.title = `${currentTitle} - Const Router`;
+  }, [currentTitle]);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated && !isSigningOut) {
@@ -78,7 +106,9 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#2b2b2b] text-[#d4d4d4] antialiased selection:bg-white selection:text-[#161616]">
+    <>
+      <title>{`${currentTitle} - Const Router`}</title>
+      <div className="min-h-screen flex flex-col bg-[#2b2b2b] text-[#d4d4d4] antialiased selection:bg-white selection:text-[#161616]">
       {/* Top Header Bar matching Const Harness #222222 header-strip */}
       <header className="h-14 w-full border-b border-[#383838]/60 bg-[#222222] sticky top-0 z-40 px-4 sm:px-6 flex items-center justify-between shrink-0 select-none transition-colors">
         {/* Left: Const Logo & Product Badge */}
@@ -171,5 +201,6 @@ export default function DashboardLayout({
         </main>
       </div>
     </div>
-  );
+  </>
+);
 }

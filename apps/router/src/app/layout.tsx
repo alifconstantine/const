@@ -17,9 +17,20 @@ const lora = Lora({
 });
 
 export const metadata: Metadata = {
-  title: "Const Router - Universal AI Gateway",
+  title: {
+    template: "%s - Const Router",
+    default: "Const Router",
+  },
   description:
     "Universal AI Gateway, Smart Routing & Multi-Provider Engine for the Const Platform Ecosystem.",
+  icons: {
+    icon: [
+      { url: "/favicon.svg", type: "image/svg+xml" },
+      { url: "/logo.svg", type: "image/svg+xml" },
+    ],
+    shortcut: "/favicon.svg",
+    apple: "/favicon.svg",
+  },
 };
 
 export default function RootLayout({
@@ -33,6 +44,10 @@ export default function RootLayout({
       className={`${inter.variable} ${lora.variable}`}
       suppressHydrationWarning
     >
+      <head>
+        <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+        <link rel="apple-touch-icon" href="/favicon.svg" />
+      </head>
       <body className="min-h-screen bg-background font-sans antialiased text-foreground selection:bg-primary selection:text-primary-foreground">
         <ThemeProvider
           attribute="class"
