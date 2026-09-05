@@ -23,7 +23,7 @@ function generateRemainingAsciiBar(
   const unfilled = Math.max(0, totalLength - filled);
   const bar = `${"█".repeat(filled)}${"░".repeat(unfilled)}`;
 
-  let colorClass = "text-emerald-400";
+  let colorClass = "text-foreground";
   if (clamped <= 10) {
     colorClass = "text-rose-500";
   } else if (clamped <= 30) {

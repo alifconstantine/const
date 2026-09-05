@@ -150,7 +150,7 @@ main().catch(console.error);
         className="w-full sm:max-w-[520px] md:max-w-[620px] p-0 flex flex-col bg-card border-l border-border/70 shadow-2xl z-50 gap-0"
       >
         {/* Header */}
-        <div className="p-4 sm:p-5 border-b border-border/60 flex items-center justify-between shrink-0">
+        <div className="p-4 sm:p-5 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="h-8 w-8 rounded-xl bg-secondary flex items-center justify-center border border-border/70 text-foreground shrink-0">
               <Code2 className="h-4 w-4" />
@@ -190,7 +190,7 @@ main().catch(console.error);
 
         {/* Tabs & Code Viewport */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
-          <div className="px-4 sm:px-6 pt-3 pb-3 border-b border-border/60 bg-secondary/20 shrink-0">
+          <div className="px-4 sm:px-6 pt-3 pb-3 bg-secondary/20 shrink-0">
             <TabsList className="bg-secondary/60 rounded-full h-8 p-0.5 border border-border/40">
               <TabsTrigger
                 value="curl"

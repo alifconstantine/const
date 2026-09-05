@@ -148,7 +148,7 @@ export function Sidebar({
     const unfilled = Math.max(0, 12 - filled);
     const bar = `${"█".repeat(filled)}${"░".repeat(unfilled)}`;
 
-    let color = "text-emerald-400";
+    let color = "text-foreground";
     if (percent <= 10) {
       color = "text-rose-500";
     } else if (percent <= 30) {
@@ -179,14 +179,14 @@ export function Sidebar({
   return (
     <aside
       className={cn(
-        "h-full flex flex-col bg-card border-r border-border select-none transition-all duration-300",
+        "h-full flex flex-col bg-card select-none transition-all duration-300",
         isCollapsed ? "w-16" : "w-64",
         className
       )}
     >
       {/* Top Header Row of Sidebar: Search on left & Close icon on right */}
       {isCollapsed ? (
-        <div className="h-14 px-2 flex items-center justify-center border-b border-border/70 shrink-0">
+        <div className="h-14 px-2 flex items-center justify-center shrink-0">
           <Button
             variant="ghost"
             size="icon"
@@ -199,7 +199,7 @@ export function Sidebar({
           </Button>
         </div>
       ) : (
-        <div className="flex items-center gap-1.5 px-3 py-3 border-b border-border/70 shrink-0">
+        <div className="flex items-center gap-1.5 px-3 py-3 shrink-0">
           {/* Search Input positioned on the left */}
           <div className="relative flex-1 flex items-center">
             <Search className="absolute left-2.5 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
@@ -208,7 +208,7 @@ export function Sidebar({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search"
-              className="w-full h-8 pl-8 pr-7 rounded-lg bg-secondary border border-border text-xs text-foreground placeholder:text-muted-foreground outline-none focus:border-foreground/40 focus:ring-1 focus:ring-foreground/20 transition-all font-sans"
+              className="w-full h-8 pl-8 pr-7 rounded-lg bg-secondary text-xs text-foreground placeholder:text-muted-foreground outline-none focus:ring-1 focus:ring-foreground/20 transition-all font-sans"
             />
             {searchQuery && (
               <button
@@ -247,7 +247,7 @@ export function Sidebar({
           filteredSections.map((section, idx) => (
             <div key={section.title} className="space-y-0.5">
               {isCollapsed ? (
-                idx > 0 && <div className="my-2 border-t border-border/40" />
+                idx > 0 && <div className="my-2" />
               ) : (
                 <h3 className="px-2.5 py-1 text-[10px] font-mono uppercase tracking-wider text-muted-foreground/70 font-semibold">
                   {section.title}
@@ -304,11 +304,11 @@ export function Sidebar({
 
       {/* Mini CLI Quota Indicator in Sidebar */}
       {!isCollapsed && isAuthenticated && (
-        <div className="px-2 pt-2 border-t border-border/50">
+        <div className="px-2 pt-2">
           <Link
             href="/dashboard"
             onClick={onNavigate}
-            className="block p-2.5 rounded-xl bg-secondary/50 hover:bg-secondary/80 border border-border/50 transition-all font-mono group"
+            className="block p-2.5 rounded-xl bg-secondary/40 hover:bg-secondary/70 transition-all font-mono group"
           >
             <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-1">
               <span className="font-semibold uppercase text-foreground/80">
@@ -336,7 +336,7 @@ export function Sidebar({
       )}
 
       {/* Account Profile Card at the Bottom */}
-      <div className="p-2 border-t border-border shrink-0 bg-card">
+      <div className="p-2 shrink-0 bg-card">
         <AccountMenu isCollapsed={isCollapsed} />
       </div>
     </aside>

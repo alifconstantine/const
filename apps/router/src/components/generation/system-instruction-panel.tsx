@@ -88,7 +88,7 @@ export function SystemInstructionPanel({
         className="w-full sm:max-w-[420px] p-0 flex flex-col bg-card border-l border-border/70 shadow-2xl z-50 gap-0"
       >
         {/* Header (No icon, clean typography) */}
-        <div className="p-4 sm:p-5 border-b border-border/70 flex items-center justify-between">
+        <div className="p-4 sm:p-5 flex items-center justify-between">
           <SheetTitle className="font-sans text-base sm:text-lg font-semibold text-foreground">
             System instructions
           </SheetTitle>
@@ -105,7 +105,7 @@ export function SystemInstructionPanel({
         </div>
 
       {/* Preset Selector */}
-      <div className="p-4 sm:p-5 pb-3 border-b border-border/50 space-y-3">
+      <div className="p-4 sm:p-5 pb-3 space-y-3">
         <Select onValueChange={handleSelectPreset}>
           <SelectTrigger className="w-full h-10 rounded-xl text-sm font-sans border-border/80 bg-secondary/50 text-foreground">
             <SelectValue placeholder="+ Create or choose instruction preset" />
@@ -159,7 +159,7 @@ export function SystemInstructionPanel({
       </div>
 
       {/* Footer */}
-      <div className="p-4 px-5 border-t border-border/70 bg-secondary/30 flex items-center justify-between text-xs text-muted-foreground">
+      <div className="p-4 px-5 bg-secondary/30 flex items-center justify-between text-xs text-muted-foreground">
         <span className="font-sans text-xs text-muted-foreground">
           Instructions are saved with this chat.
         </span>

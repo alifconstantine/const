@@ -162,7 +162,7 @@ export default function DashboardLayout({
         {/* Mobile Slide-out Drawer */}
         <div className="md:hidden">
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-            <SheetContent side="left" className="p-0 w-64 border-r border-border/70 bg-card">
+            <SheetContent side="left" className="p-0 w-64 border-none bg-card">
               <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
               <Sidebar
                 onNavigate={() => setMobileOpen(false)}

@@ -598,7 +598,7 @@ export default function GenerationPage() {
       {/* Main Center Canvas: Full Width */}
       <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden bg-background">
         {/* Top Chat Title Bar (Editable, Default "Untitled Chat") */}
-        <div className="h-14 px-6 border-b border-border/60 flex items-center justify-between shrink-0 bg-background/95 backdrop-blur">
+        <div className="h-14 px-6 flex items-center justify-between shrink-0 bg-background/95 backdrop-blur">
           <div className="flex items-center gap-2 max-w-lg">
             {isEditingTitle ? (
               <input
@@ -957,7 +957,7 @@ export default function GenerationPage() {
       ) : (
         <div className="w-80 shrink-0 border-l border-border/70 bg-card/40 flex flex-col h-full overflow-y-auto select-none transition-all">
           {/* Header Bar */}
-          <div className="p-4 border-b border-border/60 flex items-center justify-between">
+          <div className="p-4 flex items-center justify-between">
             <h2 className="font-sans text-base font-semibold text-foreground">
               Run settings
             </h2>
@@ -1130,7 +1130,7 @@ export default function GenerationPage() {
 
             {/* 5. Thinking Level (Conditional: Only visible if model supports thinking) */}
             {supportsThinking && (
-              <div className="space-y-2.5 pt-3 border-t border-border/50">
+              <div className="space-y-2.5 pt-3">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-medium text-foreground">Thinking level</span>
                   <Badge variant="secondary" className="text-xs px-2 py-0.5 font-sans text-foreground font-medium">

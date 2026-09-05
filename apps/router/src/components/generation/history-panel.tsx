@@ -91,7 +91,7 @@ export function HistoryPanel({
         className="w-full sm:max-w-[420px] p-0 flex flex-col bg-card border-l border-border/70 shadow-2xl z-50 gap-0"
       >
         {/* Header */}
-        <div className="p-4 sm:p-5 border-b border-border/60 flex items-center justify-between">
+        <div className="p-4 sm:p-5 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <History className="h-4 w-4 text-foreground" />
             <SheetTitle className="font-sans text-base sm:text-lg font-semibold text-foreground">
@@ -111,7 +111,7 @@ export function HistoryPanel({
         </div>
 
         {/* Search Bar */}
-        <div className="p-4 sm:p-5 pb-3 border-b border-border/40">
+        <div className="p-4 sm:p-5 pb-3">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <Input
@@ -182,7 +182,7 @@ export function HistoryPanel({
         </div>
 
         {/* Footer */}
-        <div className="p-3 px-5 border-t border-border/60 bg-secondary/30 flex items-center justify-between text-xs text-muted-foreground">
+        <div className="p-3 px-5 bg-secondary/30 flex items-center justify-between text-xs text-muted-foreground">
           <span className="font-mono text-[11px] text-muted-foreground/80">
             {filteredSessions.length} chats saved
           </span>
