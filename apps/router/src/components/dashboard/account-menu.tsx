@@ -15,10 +15,12 @@ import {
   AvatarImage,
   cn,
 } from "@const/ui";
+import Link from "next/link";
 import {
   ChevronsUpDown,
   LogOut,
   Users,
+  Settings,
 } from "lucide-react";
 
 export function AccountMenu({ isCollapsed = false }: { isCollapsed?: boolean }) {
@@ -128,6 +130,16 @@ export function AccountMenu({ isCollapsed = false }: { isCollapsed?: boolean }) 
         </DropdownMenuLabel>
 
         <DropdownMenuSeparator className="bg-border/60" />
+
+        <DropdownMenuItem
+          asChild
+          className="rounded-xl cursor-pointer py-2 px-2.5 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+        >
+          <Link href="/settings" className="flex items-center w-full">
+            <Settings className="h-3.5 w-3.5 mr-2" />
+            <span>Settings</span>
+          </Link>
+        </DropdownMenuItem>
 
         <DropdownMenuItem
           onClick={() => signIn("/dashboard", { switchAccount: true })}

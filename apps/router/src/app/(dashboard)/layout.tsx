@@ -129,7 +129,7 @@ export default function DashboardLayout({
 
           <ThemeToggle />
 
-          <Link href="/endpoints">
+          <Link href="/docs">
             <Button
               variant="outline"
               size="sm"
