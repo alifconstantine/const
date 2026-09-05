@@ -635,11 +635,7 @@ export default function ProvidersPage() {
 
         {/* 4. Popular Providers Grid (Official @lobehub/icons vector SVGs) */}
         {(activeTab === "all" || activeTab === "byok") && (
-          <div className="space-y-3">
-            <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-muted-foreground pl-1">
-              Popular AI Providers
-            </h3>
-
+          <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {PRESET_PROVIDERS.map((provider) => {
                 const isConst = provider.id === "const";
@@ -667,9 +663,6 @@ export default function ProvidersPage() {
                             <h4 className="text-sm font-semibold text-foreground font-sans truncate">
                               {provider.name}
                             </h4>
-                            <span className="text-[10px] font-mono text-muted-foreground uppercase">
-                              {provider.protocol}
-                            </span>
                           </div>
                         </div>
 
@@ -844,23 +837,20 @@ export default function ProvidersPage() {
 
         {/* 6. Custom Endpoints Section (Ollama / vLLM / Local) */}
         {(activeTab === "all" || activeTab === "custom") && (
-          <div className="space-y-3 pt-2">
-            <div className="flex items-center justify-between pl-1">
-              <h3 className="text-xs font-mono font-semibold uppercase tracking-wider text-muted-foreground">
-                Custom &amp; Private OpenAI-Compatible Endpoints
-              </h3>
-              {isAuthenticated && (
+          <div className="space-y-4 pt-2">
+            {isAuthenticated && customProviders.length > 0 && (
+              <div className="flex items-center justify-end pl-1">
                 <Button
                   size="sm"
                   variant="outline"
                   onClick={handleOpenNewCustom}
-                  className="rounded-full text-xs h-7 px-3 border-border hover:bg-secondary cursor-pointer gap-1"
+                  className="rounded-full text-xs h-7 px-3 border-none bg-secondary hover:bg-secondary/80 cursor-pointer gap-1"
                 >
                   <Plus className="h-3 w-3" />
                   <span>Add Provider</span>
                 </Button>
-              )}
-            </div>
+              </div>
+            )}
 
             {userProviders === undefined ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -869,9 +859,8 @@ export default function ProvidersPage() {
                     <div className="flex justify-between items-start">
                       <div className="flex items-center gap-3">
                         <Skeleton className="h-10 w-10 rounded-2xl" />
-                        <div className="space-y-1.5">
+                        <div className="space-y-1">
                           <Skeleton className="h-4 w-28 rounded" />
-                          <Skeleton className="h-3 w-16 rounded" />
                         </div>
                       </div>
                       <Skeleton className="h-5 w-14 rounded-full" />
@@ -897,7 +886,7 @@ export default function ProvidersPage() {
                   <Button
                     onClick={handleOpenNewCustom}
                     size="sm"
-                    className="rounded-full text-xs h-8 px-4 mt-1"
+                    className="rounded-full text-xs h-8 px-4 mt-1 border-none"
                   >
                     <Plus className="h-3.5 w-3.5 mr-1" />
                     <span>Connect Custom Provider</span>
@@ -906,7 +895,7 @@ export default function ProvidersPage() {
                   <Button
                     onClick={() => signIn("/providers")}
                     size="sm"
-                    className="rounded-full text-xs h-8 px-4 mt-1"
+                    className="rounded-full text-xs h-8 px-4 mt-1 border-none"
                   >
                     <span>Sign In to Connect</span>
                   </Button>
@@ -933,9 +922,6 @@ export default function ProvidersPage() {
                               <h4 className="text-sm font-semibold text-foreground font-sans truncate">
                                 {cp.name}
                               </h4>
-                              <span className="text-[10px] font-mono text-muted-foreground uppercase">
-                                {cp.protocol}
-                              </span>
                             </div>
                           </div>
 
@@ -1024,11 +1010,11 @@ export default function ProvidersPage() {
         {/* MODAL 1: CONFIGURE PROVIDER & DISCOVER/IMPORT MODELS      */}
         {/* ========================================================= */}
         <Dialog open={isConfigOpen} onOpenChange={setIsConfigOpen}>
-          <DialogContent className="rounded-2xl border border-border/80 bg-card max-w-xl p-6 sm:p-7 space-y-4 shadow-xl max-h-[90vh] flex flex-col overflow-hidden">
+          <DialogContent className="rounded-2xl border-none bg-card max-w-xl p-6 sm:p-7 space-y-4 shadow-xl max-h-[90vh] flex flex-col overflow-hidden">
             <DialogHeader className="space-y-1.5 text-left shrink-0">
               <DialogTitle className="text-lg font-sans font-medium text-foreground tracking-tight flex items-center gap-2">
                 <span>Configure {isCustomMode ? "Custom Provider" : selectedProviderMeta?.name}</span>
-                <Badge className="rounded-full text-[10px] font-mono py-0 px-2 bg-secondary text-muted-foreground border-border">
+                <Badge className="rounded-full text-[10px] font-mono py-0 px-2 bg-secondary text-muted-foreground border-none">
                   {formProtocol}
                 </Badge>
               </DialogTitle>
@@ -1050,7 +1036,7 @@ export default function ProvidersPage() {
                       placeholder="e.g. Local Ollama Workstation"
                       value={formName}
                       onChange={(e) => setFormName(e.target.value)}
-                      className="w-full h-10 px-3.5 rounded-xl bg-secondary/60 border border-border/80 text-xs text-foreground placeholder:text-muted-foreground font-sans outline-none hover:border-foreground/30 focus:border-foreground/50 focus:ring-1 focus:ring-inset focus:ring-foreground/20 transition-all"
+                      className="w-full h-10 px-3.5 rounded-xl bg-secondary/60 border-none text-xs text-foreground placeholder:text-muted-foreground font-sans outline-none focus:ring-1 focus:ring-inset focus:ring-foreground/20 transition-all"
                     />
                   </div>
                 )}
@@ -1071,7 +1057,7 @@ export default function ProvidersPage() {
                       placeholder="e.g. http://localhost:11434 or https://api.together.xyz/v1"
                       value={formBaseUrl}
                       onChange={(e) => setFormBaseUrl(e.target.value)}
-                      className="w-full h-10 px-3.5 rounded-xl bg-secondary/60 border border-border/80 text-xs font-mono text-foreground placeholder:text-muted-foreground outline-none hover:border-foreground/30 focus:border-foreground/50 focus:ring-1 focus:ring-inset focus:ring-foreground/20 transition-all"
+                      className="w-full h-10 px-3.5 rounded-xl bg-secondary/60 border-none text-xs font-mono text-foreground placeholder:text-muted-foreground outline-none focus:ring-1 focus:ring-inset focus:ring-foreground/20 transition-all"
                     />
                   </div>
                 )}
@@ -1086,10 +1072,10 @@ export default function ProvidersPage() {
                       value={formProtocol}
                       onValueChange={(val: any) => setFormProtocol(val)}
                     >
-                      <SelectTrigger className="h-10 rounded-xl bg-secondary/60 border border-border/80 hover:border-foreground/30 focus:border-foreground/50 focus:ring-1 focus:ring-inset focus:ring-foreground/20 text-xs font-sans text-foreground transition-all">
+                      <SelectTrigger className="h-10 rounded-xl bg-secondary/60 border-none focus:ring-1 focus:ring-inset focus:ring-foreground/20 text-xs font-sans text-foreground transition-all">
                         <SelectValue placeholder="Select Protocol" />
                       </SelectTrigger>
-                      <SelectContent className="rounded-xl border-border bg-popover text-xs font-sans">
+                      <SelectContent className="rounded-xl border-none bg-popover text-xs font-sans shadow-lg">
                         <SelectItem value="openai-compatible" className="cursor-pointer">
                           OpenAI-Compatible (/v1/chat/completions)
                         </SelectItem>
@@ -1127,7 +1113,7 @@ export default function ProvidersPage() {
                       }
                       value={formApiKey}
                       onChange={(e) => setFormApiKey(e.target.value)}
-                      className="w-full h-10 pl-3.5 pr-10 rounded-xl bg-secondary/60 border border-border/80 text-xs font-mono text-foreground placeholder:text-muted-foreground outline-none hover:border-foreground/30 focus:border-foreground/50 focus:ring-1 focus:ring-inset focus:ring-foreground/20 transition-all"
+                      className="w-full h-10 pl-3.5 pr-10 rounded-xl bg-secondary/60 border-none text-xs font-mono text-foreground placeholder:text-muted-foreground outline-none focus:ring-1 focus:ring-inset focus:ring-foreground/20 transition-all"
                     />
                   <button
                     type="button"
@@ -1146,7 +1132,7 @@ export default function ProvidersPage() {
                   type="button"
                   onClick={handleFetchModels}
                   disabled={isFetchingModels}
-                  className="w-full rounded-full gap-2 text-xs font-medium cursor-pointer h-10 bg-secondary hover:bg-secondary/80 text-foreground border border-border shadow-none"
+                  className="w-full rounded-full gap-2 text-xs font-medium cursor-pointer h-10 bg-secondary hover:bg-secondary/80 text-foreground border-none shadow-none"
                 >
                   {isFetchingModels ? (
                     <>
@@ -1164,7 +1150,7 @@ export default function ProvidersPage() {
 
               {/* Model Discovery Results Section */}
               {fetchedModels.length > 0 && (
-                <div className="pt-3 space-y-3 border-t border-border/60">
+                <div className="pt-3 space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="space-y-0.5">
                       <div className="text-xs font-medium text-foreground flex items-center gap-2">
@@ -1329,14 +1315,14 @@ export default function ProvidersPage() {
             </ScrollArea>
 
             {/* Modal Footer */}
-            <DialogFooter className="pt-4 border-t border-border/60 flex flex-row items-center justify-end gap-3 sm:space-x-0 mt-auto shrink-0">
+            <DialogFooter className="pt-4 flex flex-row items-center justify-end gap-3 sm:space-x-0 mt-auto shrink-0">
               <Button
                 type="button"
                 variant="outline"
                 size="sm"
                 onClick={() => setIsConfigOpen(false)}
                 disabled={isSaving}
-                className="rounded-full text-xs h-9 px-4 border-border bg-secondary/40 hover:bg-secondary text-muted-foreground hover:text-foreground cursor-pointer shadow-none"
+                className="rounded-full text-xs h-9 px-4 border-none bg-secondary/60 hover:bg-secondary text-muted-foreground hover:text-foreground cursor-pointer shadow-none"
               >
                 Cancel
               </Button>
@@ -1345,7 +1331,7 @@ export default function ProvidersPage() {
                 size="sm"
                 onClick={handleSaveProvider}
                 disabled={isSaving || selectedCount === 0}
-                className="rounded-full text-xs h-9 px-5 bg-primary text-primary-foreground hover:bg-primary/90 font-medium shadow-none gap-1.5 cursor-pointer transition-all"
+                className="rounded-full text-xs h-9 px-5 bg-primary text-primary-foreground hover:bg-primary/90 font-medium shadow-none gap-1.5 cursor-pointer transition-all border-none"
               >
                 {isSaving ? (
                   <>
@@ -1364,7 +1350,7 @@ export default function ProvidersPage() {
         {/* MODAL 2: MANAGE IMPORTED MODELS FOR CONNECTED PROVIDER    */}
         {/* ========================================================= */}
         <Dialog open={!!manageDoc} onOpenChange={(open) => !open && setManageDoc(null)}>
-          <DialogContent className="rounded-2xl border border-border/80 bg-card max-w-lg p-6 sm:p-7 space-y-4 shadow-xl max-h-[85vh] flex flex-col overflow-hidden">
+          <DialogContent className="rounded-2xl border-none bg-card max-w-lg p-6 sm:p-7 space-y-4 shadow-xl max-h-[85vh] flex flex-col overflow-hidden">
             <DialogHeader className="space-y-1.5 text-left shrink-0">
               <DialogTitle className="text-lg font-sans font-medium text-foreground tracking-tight">
                 Manage Models: {manageDoc?.name}
@@ -1391,7 +1377,7 @@ export default function ProvidersPage() {
                         setEditingModelIndex(null);
                         setModelConfigOpen(true);
                       }}
-                      className="rounded-full text-xs h-7 px-2.5 cursor-pointer gap-1"
+                      className="rounded-full text-xs h-7 px-2.5 cursor-pointer gap-1 border-none bg-secondary hover:bg-secondary/80"
                     >
                       <Plus className="h-3 w-3" />
                       <span>Add model</span>
@@ -1413,10 +1399,10 @@ export default function ProvidersPage() {
                         });
                       }}
                       className={cn(
-                        "flex items-center justify-between p-2.5 rounded-xl cursor-pointer transition-colors border",
+                        "flex items-center justify-between p-2.5 rounded-xl cursor-pointer transition-colors",
                         model.enabled
-                          ? "bg-card border-border text-foreground"
-                          : "bg-transparent border-transparent opacity-50 hover:opacity-100"
+                          ? "bg-secondary text-foreground"
+                          : "bg-transparent opacity-50 hover:opacity-100"
                       )}
                     >
                       <div className="flex items-center gap-2.5 min-w-0 pr-2">
@@ -1439,7 +1425,7 @@ export default function ProvidersPage() {
                       </div>
 
                       <div className="flex items-center gap-1.5 shrink-0">
-                        <div className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-secondary border border-border text-muted-foreground">
+                        <div className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-secondary/80 border-none text-muted-foreground">
                           {formatTokenDisplay(model.contextWindow, "1M")}
                         </div>
                         <Button
@@ -1473,19 +1459,19 @@ export default function ProvidersPage() {
               </ScrollArea>
             )}
 
-            <DialogFooter className="pt-4 border-t border-border/60 flex flex-row items-center justify-end gap-3 shrink-0">
+            <DialogFooter className="pt-4 flex flex-row items-center justify-end gap-3 shrink-0">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setManageDoc(null)}
-                className="rounded-full text-xs h-9 px-4 cursor-pointer"
+                className="rounded-full text-xs h-9 px-4 cursor-pointer border-none bg-secondary/60 hover:bg-secondary text-muted-foreground hover:text-foreground"
               >
                 Cancel
               </Button>
               <Button
                 size="sm"
                 onClick={handleSaveManagedModels}
-                className="rounded-full text-xs h-9 px-5 bg-primary text-primary-foreground hover:bg-primary/90 font-medium cursor-pointer"
+                className="rounded-full text-xs h-9 px-5 bg-primary text-primary-foreground hover:bg-primary/90 font-medium cursor-pointer border-none"
               >
                 Save Changes
               </Button>

@@ -90,13 +90,31 @@ const PROVIDERS_DATA: ProviderGroup[] = [
   },
 ];
 
+function formatTokenAmount(tokens: number): string {
+  if (tokens < 1000) return `${tokens}`;
+  if (tokens < 1_000_000) return `${(tokens / 1000).toFixed(1)}k`;
+  return `${(tokens / 1_000_000).toFixed(1)}M`;
+}
+
 export default function ModelsPage() {
   const { isAuthenticated } = useRouterAuth();
   const userProviders = useQuery(
     api.router.providers.listUserProviders,
     isAuthenticated ? {} : "skip"
   );
+  const quota = useQuery(
+    api.router.quotas.getUserQuota,
+    isAuthenticated ? {} : "skip"
+  );
   const updateSingleModelMutation = useMutation(api.router.providers.updateSingleModel);
+
+  const weeklyLimit = quota?.weeklyLimitTokens ?? 7_000_000;
+  const usedTokens = quota?.usedTokens ?? 0;
+  const percentRemaining = useMemo(() => {
+    if (!quota) return 100;
+    return Math.max(0, Math.min(100, quota.percentRemaining));
+  }, [quota]);
+  const resetsInText = quota?.resetsInText ?? "7d";
 
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedProvider, setSelectedProvider] = useState("all");
@@ -255,8 +273,8 @@ export default function ModelsPage() {
           </p>
         </div>
 
-        {/* 3. Plan & Quota Banner Card (Replicating exact layout from reference) */}
-        <Card className="rounded-2xl border border-border/80 bg-card p-5 sm:p-6 space-y-4 shadow-none">
+        {/* 3. Plan & Quota Banner Card (Real Quota UI without lines) */}
+        <Card className="rounded-2xl border-none bg-card p-5 sm:p-6 space-y-4 shadow-none">
           {/* Top Tier Row */}
           <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
             <div className="space-y-1">
@@ -267,7 +285,7 @@ export default function ModelsPage() {
                 Free
               </h2>
               <p className="text-xs text-muted-foreground font-light">
-                Base models are included. Upgrade to unlock higher tiers.
+                Base models are included with 7M weekly token quota.
               </p>
             </div>
 
@@ -292,26 +310,38 @@ export default function ModelsPage() {
             </div>
           </div>
 
-          {/* Bottom Allowance Row */}
-          <div className="pt-4 border-t border-border/60 space-y-1.5">
+          {/* Bottom Allowance Row (Real Quota Meter) */}
+          <div className="pt-2 space-y-2">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <span className="text-[11px] font-sans font-medium uppercase tracking-wider text-muted-foreground">
-                  Free for paid usage
+                  Weekly Token Quota
                 </span>
-                <span className="text-[9px] font-sans font-medium px-1.5 py-0.2 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 uppercase">
+                <span className="text-[9px] font-sans font-medium px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-none uppercase">
                   Free
                 </span>
               </div>
 
-              {/* Set to 0 since no dummy values are used */}
-              <div className="text-xs font-sans font-medium text-foreground tabular-nums">
-                0 / 0 Used
+              <div className="flex items-center gap-2 text-xs font-mono tabular-nums">
+                <span className="font-semibold text-foreground">
+                  {formatTokenAmount(usedTokens)} / {formatTokenAmount(weeklyLimit)} Used
+                </span>
+                <span className="text-muted-foreground">
+                  ({percentRemaining}% left)
+                </span>
               </div>
             </div>
 
+            {/* Minimal borderless progress bar counting down from 100 to 0 */}
+            <div className="w-full h-1.5 rounded-full bg-secondary overflow-hidden">
+              <div
+                className="h-full bg-foreground rounded-full transition-all duration-300"
+                style={{ width: `${percentRemaining}%` }}
+              />
+            </div>
+
             <p className="text-[11px] text-muted-foreground font-light">
-              Shared daily allowance across all free-for-paid models. Resets daily.
+              Shared 7M weekly token quota across all Const models. Resets in {resetsInText}.
             </p>
           </div>
         </Card>
@@ -326,7 +356,7 @@ export default function ModelsPage() {
               placeholder="Search model name or capability..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 h-10 rounded-xl bg-secondary/50 border border-border text-xs text-foreground placeholder:text-muted-foreground font-sans outline-none focus:outline-none focus:border-foreground/40 focus:ring-1 focus:ring-foreground/20 transition-all"
+              className="w-full pl-10 pr-4 h-10 rounded-xl bg-secondary/50 border-none text-xs text-foreground placeholder:text-muted-foreground font-sans outline-none focus:outline-none focus:ring-1 focus:ring-foreground/20 transition-all"
             />
           </div>
 
@@ -342,10 +372,10 @@ export default function ModelsPage() {
                 setSelectedProvider(val);
               }}
             >
-              <SelectTrigger className="h-10 min-w-[140px] rounded-xl bg-secondary/50 border-border text-xs font-sans text-foreground">
+              <SelectTrigger className="h-10 min-w-[140px] rounded-xl bg-secondary/50 border-none text-xs font-sans text-foreground">
                 <SelectValue placeholder="Select Provider" />
               </SelectTrigger>
-              <SelectContent className="rounded-xl border-border bg-popover text-xs font-sans">
+              <SelectContent className="rounded-xl border-none bg-popover text-xs font-sans shadow-lg">
                 <SelectItem value="all" className="cursor-pointer">
                   All
                 </SelectItem>
@@ -387,7 +417,7 @@ export default function ModelsPage() {
                   setSearchQuery("");
                   setSelectedProvider("all");
                 }}
-                className="mt-2 rounded-full text-xs h-8"
+                className="mt-2 rounded-full text-xs h-8 border-none bg-secondary hover:bg-secondary/80"
               >
                 Clear filters
               </Button>
@@ -396,10 +426,10 @@ export default function ModelsPage() {
             filteredProviders.map((provider) => (
               <Card
                 key={provider.id}
-                className="rounded-2xl border border-border/80 bg-card overflow-hidden shadow-none transition-all"
+                className="rounded-2xl border-none bg-card overflow-hidden shadow-none transition-all"
               >
                 {/* Provider Header: Provider Name */}
-                <div className="px-6 py-3.5 bg-secondary/40 border-b border-border/70 flex items-center justify-between">
+                <div className="px-6 py-3.5 bg-secondary/40 border-none flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
                     <span className="text-sm font-semibold text-foreground font-sans">
                       {provider.name}
@@ -411,7 +441,7 @@ export default function ModelsPage() {
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader className="bg-secondary/20">
-                      <TableRow className="border-border/60 hover:bg-transparent">
+                      <TableRow className="border-none hover:bg-transparent">
                         <TableHead className="w-[35%] min-w-[200px] pl-6 pr-4 text-xs font-sans font-medium text-muted-foreground">
                           Model
                         </TableHead>
@@ -433,7 +463,7 @@ export default function ModelsPage() {
                       {provider.models.map((model) => (
                         <TableRow
                           key={model.id}
-                          className="border-border/50 hover:bg-secondary/20 transition-colors"
+                          className="border-none hover:bg-secondary/20 transition-colors"
                         >
                           {/* 1. Model Name with Copy Button next to it */}
                           <TableCell className="py-4 pl-6 pr-4">

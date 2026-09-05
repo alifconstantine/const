@@ -492,7 +492,7 @@ export default function KeysPage() {
         {/* DIALOG 1: CREATE NEW SECRET KEY MODAL                     */}
         {/* ========================================================= */}
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-          <DialogContent className="rounded-2xl border border-border/80 bg-card max-w-md p-6 sm:p-7 space-y-4 shadow-xl overflow-hidden">
+          <DialogContent className="rounded-2xl border-none bg-card max-w-md p-6 sm:p-7 space-y-4 shadow-xl overflow-hidden">
             <DialogHeader className="space-y-1.5 text-left">
               <DialogTitle className="text-lg font-sans font-medium text-foreground tracking-tight">
                 Create new secret key
@@ -514,7 +514,7 @@ export default function KeysPage() {
                   onChange={(e) => setNewKeyName(e.target.value)}
                   autoFocus
                   required
-                  className="w-full h-10 px-3.5 rounded-xl bg-secondary/60 border border-border/80 text-xs text-foreground placeholder:text-muted-foreground font-sans outline-none focus:outline-none focus:border-foreground/40 focus:ring-1 focus:ring-foreground/20 transition-all"
+                  className="w-full h-10 px-3.5 rounded-xl bg-secondary/60 border-none text-xs text-foreground placeholder:text-muted-foreground font-sans outline-none focus:outline-none focus:ring-1 focus:ring-foreground/20 transition-all"
                 />
               </div>
 
@@ -533,21 +533,21 @@ export default function KeysPage() {
                   value={newKeyDailyLimit}
                   onChange={(e) => setNewKeyDailyLimit(e.target.value)}
                   min={1}
-                  className="w-full h-10 px-3.5 rounded-xl bg-secondary/60 border border-border/80 text-xs text-foreground placeholder:text-muted-foreground font-sans outline-none focus:outline-none focus:border-foreground/40 focus:ring-1 focus:ring-foreground/20 transition-all"
+                  className="w-full h-10 px-3.5 rounded-xl bg-secondary/60 border-none text-xs text-foreground placeholder:text-muted-foreground font-sans outline-none focus:outline-none focus:ring-1 focus:ring-foreground/20 transition-all"
                 />
                 <p className="text-[11px] text-muted-foreground font-light">
                   Optionally limit total tokens consumed per day through this key.
                 </p>
               </div>
 
-              <DialogFooter className="pt-4 border-t border-border/60 flex flex-row items-center justify-end gap-3 sm:space-x-0 mt-5">
+              <DialogFooter className="pt-4 flex flex-row items-center justify-end gap-3 sm:space-x-0 mt-5">
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
                   onClick={() => setIsCreateOpen(false)}
                   disabled={isSubmitting}
-                  className="rounded-full text-xs h-9 px-4 border-border bg-secondary/40 hover:bg-secondary text-muted-foreground hover:text-foreground cursor-pointer transition-colors shadow-none"
+                  className="rounded-full text-xs h-9 px-4 border-none bg-secondary/40 hover:bg-secondary text-muted-foreground hover:text-foreground cursor-pointer transition-colors shadow-none"
                 >
                   Cancel
                 </Button>
@@ -584,7 +584,7 @@ export default function KeysPage() {
             }
           }}
         >
-          <DialogContent className="rounded-2xl border border-border/80 bg-card max-w-lg p-6 sm:p-7 space-y-4 shadow-xl overflow-hidden">
+          <DialogContent className="rounded-2xl border-none bg-card max-w-lg p-6 sm:p-7 space-y-4 shadow-xl overflow-hidden">
             <DialogHeader className="space-y-1.5 text-left">
               <DialogTitle className="text-lg font-sans font-medium text-foreground tracking-tight">
                 Save your secret key
@@ -605,7 +605,7 @@ export default function KeysPage() {
                       Secret Key
                     </span>
                   </div>
-                  <div className="flex items-center justify-between gap-2 p-3 rounded-xl bg-secondary/80 border border-border text-xs font-mono w-full min-w-0">
+                  <div className="flex items-center justify-between gap-2 p-3 rounded-xl bg-secondary/80 border-none text-xs font-mono w-full min-w-0">
                     <span
                       className="text-foreground select-all break-all min-w-0 flex-1 font-mono text-xs font-normal leading-relaxed pr-1"
                     >
@@ -636,7 +636,7 @@ export default function KeysPage() {
                           toast.success("Secret key copied to clipboard");
                           setTimeout(() => setCopiedRevealKey(false), 2000);
                         }}
-                        className="rounded-full h-8 px-3.5 text-xs gap-1.5 shrink-0 bg-primary text-primary-foreground hover:bg-primary/90 shadow-none cursor-pointer"
+                        className="rounded-full h-8 px-3.5 text-xs gap-1.5 shrink-0 bg-primary text-primary-foreground hover:bg-primary/90 shadow-none cursor-pointer border-none"
                       >
                         {copiedRevealKey ? (
                           <>
@@ -655,7 +655,7 @@ export default function KeysPage() {
                 </div>
 
                 {/* Warning callout */}
-                <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400 flex items-start gap-2.5 text-xs w-full min-w-0">
+                <div className="p-3.5 rounded-xl bg-amber-500/10 border-none text-amber-600 dark:text-amber-400 flex items-start gap-2.5 text-xs w-full min-w-0">
                   <ShieldAlert className="h-4 w-4 shrink-0 mt-0.5" />
                   <p className="font-light leading-relaxed">
                     Store this key securely in your password manager or <code className="font-mono bg-amber-500/15 px-1 py-0.5 rounded">.env</code> file. Do not commit it to public git repositories.
@@ -664,7 +664,7 @@ export default function KeysPage() {
               </div>
             )}
 
-            <div className="pt-4 border-t border-border/60 mt-4 w-full">
+            <div className="pt-4 mt-4 w-full">
               <Button
                 type="button"
                 onClick={() => {

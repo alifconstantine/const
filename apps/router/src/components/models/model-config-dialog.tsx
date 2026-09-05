@@ -97,7 +97,7 @@ export function ModelConfigDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[460px] p-6 rounded-2xl bg-card border-border/80 shadow-2xl text-foreground font-sans">
+      <DialogContent className="sm:max-w-[460px] p-6 rounded-2xl bg-card border-none shadow-2xl text-foreground font-sans">
         <DialogHeader className="pb-2">
           <DialogTitle className="text-base font-semibold text-foreground">
             {title}
@@ -118,7 +118,7 @@ export function ModelConfigDialog({
                 setModelId(e.target.value);
                 if (error) setError(null);
               }}
-              className="w-full h-10 px-3 rounded-xl bg-secondary/50 border border-border/80 text-xs font-mono text-foreground placeholder:text-muted-foreground outline-none hover:border-foreground/30 focus:border-foreground/40 focus:ring-1 focus:ring-inset focus:ring-foreground/15 transition-colors"
+              className="w-full h-10 px-3 rounded-xl bg-secondary/50 border-none text-xs font-mono text-foreground placeholder:text-muted-foreground outline-none focus:ring-1 focus:ring-inset focus:ring-foreground/15 transition-colors"
             />
           </div>
 
@@ -131,7 +131,7 @@ export function ModelConfigDialog({
               type="text"
               value={contextWindow}
               onChange={(e) => setContextWindow(e.target.value)}
-              className="w-full h-10 px-3 rounded-xl bg-secondary/50 border border-border/80 text-xs font-mono text-foreground outline-none hover:border-foreground/30 focus:border-foreground/40 focus:ring-1 focus:ring-inset focus:ring-foreground/15 transition-colors"
+              className="w-full h-10 px-3 rounded-xl bg-secondary/50 border-none text-xs font-mono text-foreground outline-none focus:ring-1 focus:ring-inset focus:ring-foreground/15 transition-colors"
             />
           </div>
 
@@ -144,7 +144,7 @@ export function ModelConfigDialog({
               type="text"
               value={maxOutputTokens}
               onChange={(e) => setMaxOutputTokens(e.target.value)}
-              className="w-full h-10 px-3 rounded-xl bg-secondary/50 border border-border/80 text-xs font-mono text-foreground outline-none hover:border-foreground/30 focus:border-foreground/40 focus:ring-1 focus:ring-inset focus:ring-foreground/15 transition-colors"
+              className="w-full h-10 px-3 rounded-xl bg-secondary/50 border-none text-xs font-mono text-foreground outline-none focus:ring-1 focus:ring-inset focus:ring-foreground/15 transition-colors"
             />
           </div>
 
@@ -155,7 +155,7 @@ export function ModelConfigDialog({
             </label>
             <div className="flex items-center gap-2 flex-wrap">
               {/* Text (Locked) */}
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border/80 bg-secondary/40 text-xs font-sans text-foreground opacity-90 cursor-not-allowed select-none">
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border-none bg-secondary/40 text-xs font-sans text-foreground opacity-90 cursor-not-allowed select-none">
                 <div className="h-4 w-4 rounded bg-primary text-primary-foreground flex items-center justify-center shrink-0">
                   <Check className="h-3 w-3 stroke-[3]" />
                 </div>
@@ -168,18 +168,18 @@ export function ModelConfigDialog({
                 type="button"
                 onClick={() => toggleInputType("image")}
                 className={cn(
-                  "flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-sans cursor-pointer transition-colors select-none",
+                  "flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-sans cursor-pointer transition-colors select-none border-none",
                   inputTypes.includes("image")
-                    ? "border-foreground/30 bg-secondary/70 text-foreground"
-                    : "border-border/60 bg-transparent text-muted-foreground hover:bg-secondary/30"
+                    ? "bg-secondary/70 text-foreground"
+                    : "bg-secondary/30 text-muted-foreground hover:bg-secondary/50"
                 )}
               >
                 <div
                   className={cn(
-                    "h-4 w-4 rounded border flex items-center justify-center shrink-0 transition-colors",
+                    "h-4 w-4 rounded flex items-center justify-center shrink-0 transition-colors",
                     inputTypes.includes("image")
-                      ? "bg-primary border-primary text-primary-foreground"
-                      : "border-muted-foreground/40 bg-background"
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-background/80"
                   )}
                 >
                   {inputTypes.includes("image") && <Check className="h-3 w-3 stroke-[3]" />}
@@ -192,18 +192,18 @@ export function ModelConfigDialog({
                 type="button"
                 onClick={() => toggleInputType("video")}
                 className={cn(
-                  "flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-sans cursor-pointer transition-colors select-none",
+                  "flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-sans cursor-pointer transition-colors select-none border-none",
                   inputTypes.includes("video")
-                    ? "border-foreground/30 bg-secondary/70 text-foreground"
-                    : "border-border/60 bg-transparent text-muted-foreground hover:bg-secondary/30"
+                    ? "bg-secondary/70 text-foreground"
+                    : "bg-secondary/30 text-muted-foreground hover:bg-secondary/50"
                 )}
               >
                 <div
                   className={cn(
-                    "h-4 w-4 rounded border flex items-center justify-center shrink-0 transition-colors",
+                    "h-4 w-4 rounded flex items-center justify-center shrink-0 transition-colors",
                     inputTypes.includes("video")
-                      ? "bg-primary border-primary text-primary-foreground"
-                      : "border-muted-foreground/40 bg-background"
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-background/80"
                   )}
                 >
                   {inputTypes.includes("video") && <Check className="h-3 w-3 stroke-[3]" />}
@@ -220,7 +220,7 @@ export function ModelConfigDialog({
             </label>
             <div className="flex items-center gap-2">
               {/* Text (Locked) */}
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border/80 bg-secondary/40 text-xs font-sans text-foreground opacity-90 cursor-not-allowed select-none">
+              <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border-none bg-secondary/40 text-xs font-sans text-foreground opacity-90 cursor-not-allowed select-none">
                 <div className="h-4 w-4 rounded bg-primary text-primary-foreground flex items-center justify-center shrink-0">
                   <Check className="h-3 w-3 stroke-[3]" />
                 </div>
@@ -236,14 +236,14 @@ export function ModelConfigDialog({
             </p>
           )}
 
-          <DialogFooter className="pt-4 border-t border-border/60 flex flex-row items-center justify-end gap-2.5 sm:space-x-0">
+          <DialogFooter className="pt-4 flex flex-row items-center justify-end gap-2.5 sm:space-x-0">
             <Button
               type="button"
               variant="outline"
               size="sm"
               onClick={() => onOpenChange(false)}
               disabled={isSaving}
-              className="rounded-lg text-xs h-9 px-4 border-border bg-secondary/30 hover:bg-secondary text-foreground cursor-pointer shadow-none"
+              className="rounded-lg text-xs h-9 px-4 border-none bg-secondary/30 hover:bg-secondary text-foreground cursor-pointer shadow-none"
             >
               Cancel
             </Button>
@@ -251,7 +251,7 @@ export function ModelConfigDialog({
               type="submit"
               size="sm"
               disabled={isSaving}
-              className="rounded-lg text-xs h-9 px-5 bg-foreground text-background hover:bg-foreground/90 font-medium cursor-pointer shadow-none"
+              className="rounded-lg text-xs h-9 px-5 bg-foreground text-background hover:bg-foreground/90 font-medium cursor-pointer shadow-none border-none"
             >
               {isSaving ? "Saving..." : "Save"}
             </Button>
