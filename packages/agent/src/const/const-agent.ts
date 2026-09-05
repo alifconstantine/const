@@ -173,11 +173,11 @@ export class ConstAgent {
 
         if (!response.ok) {
           const err = await response.text().catch(() => "Unknown error");
-          throw new Error(`Const Engine error (${response.status}): ${err}`);
+          throw new Error(`Const error (${response.status}): ${err}`);
         }
 
         if (!response.body) {
-          throw new Error("No response body from engine");
+          throw new Error("No response body from Const");
         }
 
         const reader = response.body.getReader();

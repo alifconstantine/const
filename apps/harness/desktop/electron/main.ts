@@ -42,7 +42,7 @@ const defaultUserConfig: UserConfig = {
   activeProvider: "const-engine",
   providers: {
     "const-engine": {
-      name: "Const Engine",
+      name: "Const",
       baseUrl: process.env.CONST_ENGINE_BASE_URL || "https://engine.const.web.id/v1",
       apiKey: process.env.CONST_ENGINE_API_KEY || "",
     },
@@ -415,7 +415,7 @@ app.whenReady().then(() => {
       let baseUrl = modelDef?.baseUrl || providerCfg?.baseUrl || "https://engine.const.web.id/v1";
       let apiKey = providerCfg?.apiKey || "";
 
-      // Fallback for Const Engine
+      // Fallback for Const
       if (!apiKey && providerKey === "const-engine") {
         apiKey = process.env.CONST_ENGINE_API_KEY || "const-local-dev-key";
       }

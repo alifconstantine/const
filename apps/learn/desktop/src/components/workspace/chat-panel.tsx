@@ -261,7 +261,7 @@ export function ChatPanel({
 
     const electron = (window as any).electron;
 
-    // 4. Build high-fidelity multi-turn message payload matching OpenAPI / Const Engine specification
+    // 4. Build high-fidelity multi-turn message payload matching OpenAPI / Const specification
     const formattedMessages: any[] = [];
     for (const m of nextMessages) {
       if (m.role === "user") {
@@ -482,7 +482,7 @@ export function ChatPanel({
           });
         }
       } catch (err: any) {
-        const errorText = `Gagal memanggil Const Engine: ${err.message}`;
+        const errorText = `Gagal memanggil Const: ${err.message}`;
         setMessages((prev) =>
           prev.map((msg) =>
             msg.id === assistantMsgId

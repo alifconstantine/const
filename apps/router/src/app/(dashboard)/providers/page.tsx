@@ -92,10 +92,10 @@ interface ProviderDefinition {
 const PRESET_PROVIDERS: ProviderDefinition[] = [
   {
     id: "const",
-    name: "Const Engine",
+    name: "Const",
     category: "managed",
     protocol: "openai-compatible",
-    description: "Platform Managed High-Speed Engine with default Gemini 3.6 Flash pool.",
+    description: "Platform Managed High-Speed infrastructure with default Gemini 3.6 Flash pool.",
     docUrl: "/endpoints",
     iconLetter: "C",
   },
@@ -448,7 +448,7 @@ export default function ProvidersPage() {
 
     if (!finalProviderId) return;
 
-    const trimmedName = (formName || selectedProviderMeta?.name || "Custom Engine").trim();
+    const trimmedName = (formName || selectedProviderMeta?.name || "Custom Provider").trim();
     if (!trimmedName) {
       toast.error("Please enter a name for the provider.");
       return;
@@ -598,11 +598,11 @@ export default function ProvidersPage() {
               placeholder="Search providers by name or model..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 h-10 rounded-xl bg-secondary/50 border border-border text-xs text-foreground placeholder:text-muted-foreground font-sans outline-none focus:outline-none focus:border-foreground/40 focus:ring-1 focus:ring-foreground/20 transition-all"
+              className="w-full pl-10 pr-4 h-10 rounded-xl bg-secondary/50 text-xs text-foreground placeholder:text-muted-foreground font-sans outline-none focus:ring-1 focus:ring-foreground/20 transition-all"
             />
           </div>
 
-          <div className="flex items-center gap-1 bg-secondary/50 p-1 rounded-xl border border-border text-xs font-sans shrink-0 h-10">
+          <div className="flex items-center gap-1 bg-secondary/50 p-1 rounded-xl text-xs font-sans shrink-0 h-10">
             {(["all", "byok", "oauth", "custom"] as const).map((tab) => (
               <button
                 key={tab}
@@ -653,14 +653,14 @@ export default function ProvidersPage() {
                 return (
                   <Card
                     key={provider.id}
-                    className="rounded-2xl border border-border/80 bg-card p-5 space-y-4 shadow-none flex flex-col justify-between transition-all hover:border-border"
+                    className="rounded-2xl border-none bg-card p-5 space-y-4 shadow-none flex flex-col justify-between transition-all"
                   >
                     <div className="space-y-3">
                       {/* Card Header: Icon + Name + Status */}
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex items-center gap-3 min-w-0">
                           {/* Official @lobehub/icons Brand Logo Tile */}
-                          <div className="h-10 w-10 rounded-2xl border border-border/70 bg-secondary flex items-center justify-center shrink-0 p-2 overflow-hidden">
+                          <div className="h-10 w-10 rounded-2xl bg-secondary flex items-center justify-center shrink-0 p-2 overflow-hidden">
                             <LobeProviderIcon providerId={provider.id} size={22} />
                           </div>
                           <div className="min-w-0">
@@ -675,23 +675,23 @@ export default function ProvidersPage() {
 
                         {/* Status Badge */}
                         {isConst ? (
-                          <Badge className="rounded-full text-[10px] font-mono py-0.5 px-2 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0">
+                          <Badge className="rounded-full text-[10px] font-mono py-0.5 px-2 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-none shrink-0">
                             Built-in
                           </Badge>
                         ) : userProviders === undefined ? (
                           <Skeleton className="h-5 w-20 rounded-full shrink-0" />
                         ) : isConnected ? (
                           isActive ? (
-                            <Badge className="rounded-full text-[10px] font-mono py-0.5 px-2 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0">
+                            <Badge className="rounded-full text-[10px] font-mono py-0.5 px-2 bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-none shrink-0">
                               Active
                             </Badge>
                           ) : (
-                            <Badge className="rounded-full text-[10px] font-mono py-0.5 px-2 bg-secondary text-muted-foreground border border-border shrink-0">
+                            <Badge className="rounded-full text-[10px] font-mono py-0.5 px-2 bg-secondary text-muted-foreground border-none shrink-0">
                               Disabled
                             </Badge>
                           )
                         ) : (
-                          <Badge className="rounded-full text-[10px] font-mono py-0.5 px-2 bg-secondary/60 text-muted-foreground/70 border border-border/60 shrink-0">
+                          <Badge className="rounded-full text-[10px] font-mono py-0.5 px-2 bg-secondary/60 text-muted-foreground/70 border-none shrink-0">
                             Not configured
                           </Badge>
                         )}
@@ -704,7 +704,7 @@ export default function ProvidersPage() {
 
                       {/* Connection Details if Connected */}
                       {userConfig && (
-                        <div className="p-2.5 rounded-xl bg-secondary/50 border border-border/70 text-[11px] font-mono space-y-1">
+                        <div className="p-2.5 rounded-xl bg-secondary/50 text-[11px] font-mono space-y-1">
                           <div className="flex items-center justify-between text-muted-foreground">
                             <span>Key:</span>
                             <span className="text-foreground">{userConfig.keyPrefix}</span>
@@ -720,17 +720,18 @@ export default function ProvidersPage() {
                     </div>
 
                     {/* Footer Actions (Stadium Pills per DESIGN.md) */}
-                    <div className="pt-2 border-t border-border/60 flex items-center justify-between gap-2">
+                    <div className="pt-2 flex items-center justify-between gap-2">
                       {isConst ? (
-                        <Link href="/models" className="w-full">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="w-full rounded-full text-xs h-8 border-border hover:bg-secondary cursor-pointer"
-                          >
-                            <span>View Model in Catalog</span>
-                          </Button>
-                        </Link>
+                        <div className="flex items-center justify-end w-full">
+                          <Link href="/models">
+                            <Button
+                              size="sm"
+                              className="rounded-full text-xs h-8 px-4 bg-primary text-primary-foreground hover:bg-primary/90 shadow-none cursor-pointer"
+                            >
+                              <span>View</span>
+                            </Button>
+                          </Link>
+                        </div>
                       ) : userProviders === undefined ? (
                         <div className="flex items-center justify-between w-full">
                           <Skeleton className="h-4 w-16 rounded" />
@@ -856,7 +857,7 @@ export default function ProvidersPage() {
                   className="rounded-full text-xs h-7 px-3 border-border hover:bg-secondary cursor-pointer gap-1"
                 >
                   <Plus className="h-3 w-3" />
-                  <span>Add Engine</span>
+                  <span>Add Provider</span>
                 </Button>
               )}
             </div>
@@ -864,7 +865,7 @@ export default function ProvidersPage() {
             {userProviders === undefined ? (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 {[1, 2].map((i) => (
-                  <Card key={i} className="rounded-2xl border border-border/80 bg-card p-5 space-y-4">
+                  <Card key={i} className="rounded-2xl border-none bg-card p-5 space-y-4">
                     <div className="flex justify-between items-start">
                       <div className="flex items-center gap-3">
                         <Skeleton className="h-10 w-10 rounded-2xl" />
@@ -876,7 +877,7 @@ export default function ProvidersPage() {
                       <Skeleton className="h-5 w-14 rounded-full" />
                     </div>
                     <Skeleton className="h-12 w-full rounded-xl" />
-                    <div className="flex justify-between pt-2 border-t border-border/60">
+                    <div className="flex justify-between pt-2">
                       <Skeleton className="h-7 w-20 rounded-full" />
                       <Skeleton className="h-7 w-16 rounded-full" />
                     </div>
@@ -884,7 +885,7 @@ export default function ProvidersPage() {
                 ))}
               </div>
             ) : customProviders.length === 0 ? (
-              <div className="p-8 sm:p-10 rounded-2xl border border-dashed border-border/70 bg-card text-center space-y-3">
+              <div className="p-8 sm:p-10 rounded-2xl border-none bg-card text-center space-y-3">
                 <Server className="h-8 w-8 mx-auto text-muted-foreground/60 stroke-[1.5]" />
                 <h4 className="text-sm font-medium text-foreground">
                   No Custom Endpoints Connected
@@ -899,7 +900,7 @@ export default function ProvidersPage() {
                     className="rounded-full text-xs h-8 px-4 mt-1"
                   >
                     <Plus className="h-3.5 w-3.5 mr-1" />
-                    <span>Connect Custom Engine</span>
+                    <span>Connect Custom Provider</span>
                   </Button>
                 ) : (
                   <Button
@@ -920,12 +921,12 @@ export default function ProvidersPage() {
                   return (
                     <Card
                       key={cp._id}
-                      className="rounded-2xl border border-border/80 bg-card p-5 space-y-4 shadow-none flex flex-col justify-between transition-all"
+                      className="rounded-2xl border-none bg-card p-5 space-y-4 shadow-none flex flex-col justify-between transition-all"
                     >
                       <div className="space-y-3">
                         <div className="flex items-start justify-between gap-3">
                           <div className="flex items-center gap-3 min-w-0">
-                            <div className="h-10 w-10 rounded-2xl border border-border/70 bg-secondary flex items-center justify-center text-foreground font-mono text-xs font-semibold shrink-0">
+                            <div className="h-10 w-10 rounded-2xl bg-secondary flex items-center justify-center text-foreground font-mono text-xs font-semibold shrink-0">
                               <Server className="h-4 w-4" />
                             </div>
                             <div className="min-w-0">
@@ -940,10 +941,10 @@ export default function ProvidersPage() {
 
                           <Badge
                             className={cn(
-                              "rounded-full text-[10px] font-mono py-0.5 px-2 shrink-0",
+                              "rounded-full text-[10px] font-mono py-0.5 px-2 border-none shrink-0",
                               isActive
-                                ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
-                                : "bg-secondary text-muted-foreground border border-border"
+                                ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+                                : "bg-secondary text-muted-foreground"
                             )}
                           >
                             {isActive ? "Active" : "Disabled"}
@@ -951,7 +952,7 @@ export default function ProvidersPage() {
                         </div>
 
                         {cp.baseUrl && (
-                          <div className="p-2 rounded-xl bg-secondary/50 border border-border text-[11px] font-mono truncate text-muted-foreground">
+                          <div className="p-2 rounded-xl bg-secondary/50 text-[11px] font-mono truncate text-muted-foreground">
                             {cp.baseUrl}
                           </div>
                         )}
@@ -962,7 +963,7 @@ export default function ProvidersPage() {
                         </div>
                       </div>
 
-                      <div className="pt-3 border-t border-border/60 flex items-center justify-between">
+                      <div className="pt-3 flex items-center justify-between">
                         <Button
                           size="sm"
                           variant="outline"
@@ -1026,7 +1027,7 @@ export default function ProvidersPage() {
           <DialogContent className="rounded-2xl border border-border/80 bg-card max-w-xl p-6 sm:p-7 space-y-4 shadow-xl max-h-[90vh] flex flex-col overflow-hidden">
             <DialogHeader className="space-y-1.5 text-left shrink-0">
               <DialogTitle className="text-lg font-sans font-medium text-foreground tracking-tight flex items-center gap-2">
-                <span>Configure {isCustomMode ? "Custom Engine" : selectedProviderMeta?.name}</span>
+                <span>Configure {isCustomMode ? "Custom Provider" : selectedProviderMeta?.name}</span>
                 <Badge className="rounded-full text-[10px] font-mono py-0 px-2 bg-secondary text-muted-foreground border-border">
                   {formProtocol}
                 </Badge>

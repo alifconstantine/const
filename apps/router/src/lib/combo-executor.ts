@@ -208,7 +208,7 @@ export async function executeComboChat(
         target.providerId === "const" || target.modelId === "gemini-3.6-flash";
 
       if (isConstEngine) {
-        // Dispatch to Const Engine Managed Model
+        // Dispatch to Const Managed Model
         const constBaseUrl = (
           process.env.CONST_ENGINE_BASE_URL?.trim() || "https://engine.const.web.id"
         ).replace(/\/+$/, "");

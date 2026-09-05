@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
     const timeoutId = setTimeout(() => controller.abort(), 12000);
 
     // ========================================================
-    // CASE A: Const Engine (Built-in Managed Engine)
+    // CASE A: Const (Built-in Managed)
     // ========================================================
     if (providerId === "const" || (!providerDocId && !baseUrl && !apiKey && !providerId)) {
       const constBaseUrl = process.env.CONST_ENGINE_BASE_URL?.trim();

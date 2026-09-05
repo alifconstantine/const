@@ -192,7 +192,7 @@ async function dispatchSingleModel({
   requestId: string;
   reqStartTime: number;
 }): Promise<Response> {
-  // CASE A: Const Engine (Built-in Managed Gemini 3.6 Flash)
+  // CASE A: Const (Built-in Managed Gemini 3.6 Flash)
   const isConstBuiltin =
     (targetModel === "gemini-3.6-flash" || targetModel.startsWith("antigravity/")) &&
     !providerDocId;
@@ -267,7 +267,7 @@ async function dispatchSingleModel({
 
     if (!response.ok) {
       const errText = await response.text();
-      let errMsg = `Const Engine error (${response.status})`;
+      let errMsg = `Const error (${response.status})`;
       try {
         const p = JSON.parse(errText);
         if (p?.error?.message) errMsg = p.error.message;

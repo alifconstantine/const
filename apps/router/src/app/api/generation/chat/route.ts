@@ -204,7 +204,7 @@ export async function POST(req: NextRequest) {
     }
 
     // ========================================================
-    // CASE A: Const Engine (Built-in Managed Gemini 3.6 Flash)
+    // CASE A: Const (Built-in Managed Gemini 3.6 Flash)
     // ========================================================
     const isConstBuiltin =
       (providerId === "const" || model === "gemini-3.6-flash") && !providerDocId;
@@ -275,7 +275,7 @@ export async function POST(req: NextRequest) {
 
       if (!response.ok) {
         const errText = await response.text();
-        let errMsg = `Const Engine error (HTTP ${response.status}): ${response.statusText}`;
+        let errMsg = `Const error (HTTP ${response.status}): ${response.statusText}`;
         try {
           const parsed = JSON.parse(errText);
           if (parsed?.error?.message) errMsg = parsed.error.message;
@@ -285,7 +285,7 @@ export async function POST(req: NextRequest) {
 
       if (!response.body) {
         return NextResponse.json(
-          { error: { message: "No response body from Const Engine." } },
+          { error: { message: "No response body from Const." } },
           { status: 502 }
         );
       }

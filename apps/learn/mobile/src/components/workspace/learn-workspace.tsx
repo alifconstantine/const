@@ -228,7 +228,7 @@ export function MobileLearnWorkspace({
     setIsStreaming(true);
     activeAssistantRef.current = newAssistantMsg;
 
-    // Build payload for Const Engine
+    // Build payload for Const
     const formattedMessages: any[] = [];
     for (const m of nextMessages) {
       if (m.role === "user") {
@@ -360,7 +360,7 @@ export function MobileLearnWorkspace({
         });
       }
     } catch (err: any) {
-      const errorText = `Gagal memanggil Const Engine: ${err.message}`;
+      const errorText = `Gagal memanggil Const: ${err.message}`;
       setMessages((prev) =>
         prev.map((msg) =>
           msg.id === assistantMsgId

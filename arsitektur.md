@@ -12,7 +12,7 @@ Ekosistem ini terdiri dari beberapa pilar utama:
 
 1. **Const Accounts (`accounts.const.web.id`):** Identity Provider & Central Auth Hub terpusat yang melayani Web SSO (Cross-Subdomain Cookie), Desktop App (OAuth2 PKCE / Deep Link), dan Mobile App.
 2. **Const Router (`router.const.web.id`):** AI Gateway independen berperforma tinggi yang kompatibel dengan standar OpenAI API. Mendukung multi-provider, token metering, rate limiting, serta fitur **BYOK (Bring Your Own Key)** dan integrasi ke local engine (OmniRoute).
-3. **Const Engine (`engine.const.web.id`):** Local aggregator tier (OmniRoute di Arch Linux) yang menghubungkan multi-akun AI (6x Google Gemini Pro + OpenRouter) melalui Cloudflare Tunnel berkecepatan tinggi.
+3. **Const (`engine.const.web.id`):** Local aggregator tier (OmniRoute di Arch Linux) yang menghubungkan multi-akun AI (6x Google Gemini Pro + OpenRouter) melalui Cloudflare Tunnel berkecepatan tinggi.
 4. **Const Learn (`learn.const.web.id` + Desktop/Mobile):** Platform edukasi adaptif berbasis AI interaktif (**Karya Utama ICONFEST 2026 - Tema Pendidikan**).
 5. **Const Landing (`const.web.id`):** Portal showcase dan navigasi publik ekosistem.
 6. **Const Harness (`harness.const.web.id` + Desktop):** Platform _developer tools_ dan _agentic workbench_ di masa depan.
@@ -556,7 +556,7 @@ flowchart TD
     Gateway --> Resolver["Combo Resolver Engine"]
 
     subgraph CascadeChain["Rantai Eksekusi Cascade Model"]
-        M1["Target 1: Google Gemini 2.5 Pro\n(Const Engine Pool - Prioritas 1)"]
+        M1["Target 1: Google Gemini 2.5 Pro\n(Const Pool - Prioritas 1)"]
         M2["Target 2: DeepSeek V3\n(BYOK User API Key - Prioritas 2)"]
         M3["Target 3: Qwen 2.5 Coder 32B\n(OpenRouter Free Pool - Fallback Akhir)"]
     end
@@ -572,7 +572,7 @@ flowchart TD
 
 #### 2. Strategi Routing yang Didukung:
 - **`priority` (Default - High Availability):** Mengeksekusi model sesuai urutan daftar. Selama target pertama sehat, 100% trafik masuk ke sana. Begitu target pertama terkena *rate limit* (429) atau server error (5xx), request otomatis dialihkan ke target berikutnya dalam hitungan milidetik.
-- **`round-robin` (Load Balancing Multi-Akun):** Membagi beban bergantian secara sirkular ($1 \to 2 \to 3 \to 1 \dots$). Sangat krusial untuk *Const Engine* yang menghubungkan pool 6 akun Gemini Pro di Arch Linux agar tidak memicu pembatasan kuota per akun.
+- **`round-robin` (Load Balancing Multi-Akun):** Membagi beban bergantian secara sirkular ($1 \to 2 \to 3 \to 1 \dots$). Sangat krusial untuk *Const* yang menghubungkan pool 6 akun Gemini Pro di Arch Linux agar tidak memicu pembatasan kuota per akun.
 - **`p2c` (Power-of-Two-Choices):** Memilih 2 target secara acak, kemudian mengevaluasi target mana yang memiliki latensi terendah atau antrean terpendek, lalu mengirim request ke target terbaik tersebut. Mencegah fenomena *thundering herd*.
 - **`least-used`:** Memprioritaskan koneksi atau model dengan riwayat konsumsi token terendah pada jendela waktu berjalan.
 - **`cost-optimized`:** Mengarahkan request ke model dengan estimasi biaya per 1 juta token paling murah yang sedang berstatus sehat.
@@ -649,7 +649,7 @@ sequenceDiagram
 ### E. Kebijakan Kuota Token & Zero-Buffering Edge SSE Streaming
 
 #### 1. Perbedaan Perlakuan Kuota (Platform Managed vs BYOK/OAuth):
-- **Model Bawaan Platform (Const Engine Pool):**
+- **Model Bawaan Platform (Const Pool):**
   - Gateway memeriksa sisa kuota harian di tabel `tokenQuotas`.
   - Jika kuota habis, Gateway mengembalikan respon `429 Daily Quota Exceeded`.
   - Jika kuota cukup, token input + output yang terkonsumsi akan dipotong secara atomik melalui mutasi Convex.

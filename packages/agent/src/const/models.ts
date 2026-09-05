@@ -3,7 +3,7 @@ import type { ModelConfig } from "./types.js";
 export const DEFAULT_MODELS: ModelConfig[] = [
   {
     id: "Const",
-    displayName: "Gemini 3.6 Flash (Const Engine)",
+    displayName: "Gemini 3.6 Flash (Const)",
     provider: "const-engine",
     baseUrl: "https://engine.const.web.id/v1",
     supportsThinking: true,
