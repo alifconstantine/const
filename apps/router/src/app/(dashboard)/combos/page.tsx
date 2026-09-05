@@ -20,6 +20,7 @@ import {
   SelectValue,
   SelectContent,
   SelectItem,
+  Skeleton,
   toast,
   cn,
 } from "@const/ui";
@@ -505,7 +506,46 @@ export default function CombosPage() {
 
       {/* 3. Combos Grid List — BORDERLESS CONSISTENT CARDS */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredCombos.map((combo) => {
+        {combos === undefined ? (
+          Array.from({ length: 3 }).map((_, i) => (
+            <div
+              key={i}
+              className="h-[340px] rounded-3xl border-none bg-secondary/35 p-6 flex flex-col justify-between"
+            >
+              <div className="space-y-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="space-y-2 flex-1">
+                    <Skeleton className="h-3 w-24 rounded" />
+                    <Skeleton className="h-5 w-40 rounded-md" />
+                  </div>
+                  <Skeleton className="h-6 w-24 rounded-lg" />
+                </div>
+                <Skeleton className="h-8 w-full rounded-md" />
+                <div className="flex gap-2">
+                  <Skeleton className="h-5 w-24 rounded-md" />
+                  <Skeleton className="h-5 w-20 rounded-md" />
+                </div>
+                <div className="space-y-2 pt-2">
+                  <Skeleton className="h-10 w-full rounded-xl" />
+                  <Skeleton className="h-10 w-full rounded-xl" />
+                </div>
+              </div>
+              <div className="pt-2">
+                <Skeleton className="h-9 w-full rounded-full" />
+              </div>
+            </div>
+          ))
+        ) : filteredCombos.length === 0 ? (
+          <div className="col-span-full text-center py-16 bg-secondary/20 rounded-3xl p-8 space-y-3">
+            <p className="text-sm font-medium text-foreground">No virtual combos found</p>
+            <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+              {searchQuery
+                ? `No combos match "${searchQuery}". Try a different search term.`
+                : "Create your first virtual combo to set up resilient multi-model failover chains."}
+            </p>
+          </div>
+        ) : (
+          filteredCombos.map((combo) => {
           const modelIdKey = `combo/${combo.slug}`;
           const isCopied = copiedSlug === combo.slug;
 
@@ -643,7 +683,8 @@ export default function CombosPage() {
               </div>
             </div>
           );
-        })}
+        })
+      )}
       </div>
 
       {/* 4. Multi-Step Creation Wizard Modal (OmniRoute 4-Stage Reference) */}

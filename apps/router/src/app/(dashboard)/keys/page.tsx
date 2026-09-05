@@ -37,6 +37,7 @@ import {
   EmptyMedia,
   EmptyTitle,
   EmptyDescription,
+  Skeleton,
   toast,
 } from "@const/ui";
 import {
@@ -288,11 +289,25 @@ export default function KeysPage() {
             </div>
           ) : keys === undefined ? (
             /* Loading Skeleton */
-            <div className="p-12 text-center flex flex-col items-center justify-center space-y-2">
-              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              <span className="text-xs text-muted-foreground font-light">
-                Loading secret keys...
-              </span>
+            <div className="p-4 space-y-3">
+              {[1, 2, 3].map((i) => (
+                <div
+                  key={i}
+                  className="flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-2xl bg-secondary/30 border border-border/50 gap-4"
+                >
+                  <div className="flex items-center gap-3">
+                    <Skeleton className="h-10 w-10 rounded-2xl shrink-0" />
+                    <div className="space-y-1.5">
+                      <Skeleton className="h-4 w-32 rounded" />
+                      <Skeleton className="h-3 w-48 rounded" />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 self-end sm:self-center">
+                    <Skeleton className="h-7 w-24 rounded-full" />
+                    <Skeleton className="h-8 w-8 rounded-xl" />
+                  </div>
+                </div>
+              ))}
             </div>
           ) : filteredKeys.length === 0 ? (
             /* Empty State */

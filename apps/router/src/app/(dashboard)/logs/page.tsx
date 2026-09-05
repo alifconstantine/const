@@ -36,6 +36,7 @@ import {
   SheetClose,
   SheetTitle,
   SheetDescription,
+  Skeleton,
   toast,
 } from "@const/ui";
 import {
@@ -379,11 +380,46 @@ export default function LogsPage() {
 
               <TableBody>
                 {isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={12} className="py-16 text-center text-xs text-muted-foreground font-sans">
-                      Loading request telemetry...
-                    </TableCell>
-                  </TableRow>
+                  Array.from({ length: 6 }).map((_, i) => (
+                    <TableRow key={i} className="border-border/50 hover:bg-transparent">
+                      <TableCell className="py-3 pl-5 pr-3">
+                        <Skeleton className="h-4 w-20 rounded font-mono" />
+                      </TableCell>
+                      <TableCell className="px-3">
+                        <Skeleton className="h-4 w-20 rounded font-mono" />
+                      </TableCell>
+                      <TableCell className="px-3">
+                        <Skeleton className="h-4 w-28 rounded" />
+                      </TableCell>
+                      <TableCell className="px-3">
+                        <Skeleton className="h-4 w-20 rounded" />
+                      </TableCell>
+                      <TableCell className="px-3 text-right">
+                        <Skeleton className="h-4 w-12 rounded ml-auto" />
+                      </TableCell>
+                      <TableCell className="px-3 text-right">
+                        <Skeleton className="h-4 w-12 rounded ml-auto" />
+                      </TableCell>
+                      <TableCell className="px-3 text-right">
+                        <Skeleton className="h-4 w-14 rounded ml-auto" />
+                      </TableCell>
+                      <TableCell className="px-3 text-right">
+                        <Skeleton className="h-4 w-14 rounded ml-auto" />
+                      </TableCell>
+                      <TableCell className="px-3 text-right">
+                        <Skeleton className="h-4 w-12 rounded ml-auto" />
+                      </TableCell>
+                      <TableCell className="px-3 text-right">
+                        <Skeleton className="h-4 w-14 rounded ml-auto" />
+                      </TableCell>
+                      <TableCell className="px-3">
+                        <Skeleton className="h-4 w-20 rounded font-mono" />
+                      </TableCell>
+                      <TableCell className="pl-3 pr-5 text-right">
+                        <Skeleton className="h-5 w-14 rounded-full ml-auto" />
+                      </TableCell>
+                    </TableRow>
+                  ))
                 ) : !logs || logs.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={12} className="py-16 text-center">

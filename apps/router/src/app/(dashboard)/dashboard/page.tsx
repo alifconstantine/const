@@ -18,6 +18,7 @@ import {
   TooltipTrigger,
   TooltipContent,
   TooltipProvider,
+  Skeleton,
   cn,
   toast,
 } from "@const/ui";
@@ -201,7 +202,7 @@ export default function DashboardOverviewPage() {
     return "Good evening";
   };
 
-  const userName = user?.name ? user.name.split(" ")[0] : "Developer";
+  const userName = user?.name ? user.name.split(" ")[0] : null;
 
   const apiEndpoint = "https://router.const.web.id/v1/chat/completions";
   const defaultModel = "gemini-3.6-flash";
@@ -236,7 +237,7 @@ export default function DashboardOverviewPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="space-y-1">
           <h1 className="text-3xl sm:text-4xl font-serif font-normal text-foreground tracking-tight flex items-center gap-2">
-            <span>{getGreeting()}, {userName}!</span>
+            <span>{getGreeting()}{userName ? `, ${userName}` : ""}!</span>
             <span className="text-3xl">👋</span>
           </h1>
           <p className="text-sm text-muted-foreground font-light">
@@ -284,15 +285,23 @@ export default function DashboardOverviewPage() {
             </div>
           </div>
           <div className="space-y-1">
-            <div className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground font-sans tabular-nums">
-              {analytics ? formatTokens(analytics.kpi.totalTokens) : "0"}
-            </div>
-            <p className="text-xs text-muted-foreground font-light flex items-center gap-1 font-sans">
-              <span className="tabular-nums font-normal text-foreground/80">
-                {analytics?.kpi.totalRequests.toLocaleString() || "0"}
-              </span>{" "}
-              requests logged
-            </p>
+            {analytics ? (
+              <div className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground font-sans tabular-nums">
+                {formatTokens(analytics.kpi.totalTokens)}
+              </div>
+            ) : (
+              <Skeleton className="h-8 w-28 rounded-lg my-0.5" />
+            )}
+            {analytics ? (
+              <p className="text-xs text-muted-foreground font-light flex items-center gap-1 font-sans">
+                <span className="tabular-nums font-normal text-foreground/80">
+                  {analytics.kpi.totalRequests.toLocaleString()}
+                </span>{" "}
+                requests logged
+              </p>
+            ) : (
+              <Skeleton className="h-4 w-32 rounded mt-1" />
+            )}
           </div>
         </Card>
 
@@ -307,22 +316,30 @@ export default function DashboardOverviewPage() {
             </div>
           </div>
           <div className="space-y-1">
-            <div className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground font-sans tabular-nums">
-              {analytics ? formatTokens(analytics.kpi.promptTokens) : "0"}
-            </div>
-            <p className="text-xs text-muted-foreground font-light font-sans">
-              {analytics?.kpi.cachedTokens ? (
-                <span>
-                  incl.{" "}
-                  <strong className="font-medium text-foreground">
-                    {formatTokens(analytics.kpi.cachedTokens)}
-                  </strong>{" "}
-                  cached
-                </span>
-              ) : (
-                "Prompt context payload"
-              )}
-            </p>
+            {analytics ? (
+              <div className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground font-sans tabular-nums">
+                {formatTokens(analytics.kpi.promptTokens)}
+              </div>
+            ) : (
+              <Skeleton className="h-8 w-28 rounded-lg my-0.5" />
+            )}
+            {analytics ? (
+              <p className="text-xs text-muted-foreground font-light font-sans">
+                {analytics.kpi.cachedTokens ? (
+                  <span>
+                    incl.{" "}
+                    <strong className="font-medium text-foreground">
+                      {formatTokens(analytics.kpi.cachedTokens)}
+                    </strong>{" "}
+                    cached
+                  </span>
+                ) : (
+                  "Prompt context payload"
+                )}
+              </p>
+            ) : (
+              <Skeleton className="h-4 w-36 rounded mt-1" />
+            )}
           </div>
         </Card>
 
@@ -337,12 +354,20 @@ export default function DashboardOverviewPage() {
             </div>
           </div>
           <div className="space-y-1">
-            <div className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground font-sans tabular-nums">
-              {analytics ? formatTokens(analytics.kpi.completionTokens) : "0"}
-            </div>
-            <p className="text-xs text-muted-foreground font-light font-sans">
-              Generated response tokens
-            </p>
+            {analytics ? (
+              <div className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground font-sans tabular-nums">
+                {formatTokens(analytics.kpi.completionTokens)}
+              </div>
+            ) : (
+              <Skeleton className="h-8 w-28 rounded-lg my-0.5" />
+            )}
+            {analytics ? (
+              <p className="text-xs text-muted-foreground font-light font-sans">
+                Generated response tokens
+              </p>
+            ) : (
+              <Skeleton className="h-4 w-36 rounded mt-1" />
+            )}
           </div>
         </Card>
 
@@ -357,30 +382,38 @@ export default function DashboardOverviewPage() {
             </div>
           </div>
           <div className="space-y-1">
-            <div className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground font-sans tabular-nums">
-              {analytics?.kpi.avgSpeed ? (
-                <>
-                  {analytics.kpi.avgSpeed}{" "}
-                  <span className="text-xs font-normal text-muted-foreground">
-                    tok/s
-                  </span>
-                </>
-              ) : (
-                "—"
-              )}
-            </div>
-            <p className="text-xs text-muted-foreground font-light font-sans tabular-nums">
-              {analytics?.kpi.avgTtftMs ? (
-                <>
-                  <span className="text-foreground/80 font-normal">
-                    {analytics.kpi.avgTtftMs}ms
-                  </span>{" "}
-                  TTFT &middot; {analytics.kpi.avgDurationMs}ms total
-                </>
-              ) : (
-                "No latency recorded"
-              )}
-            </p>
+            {analytics ? (
+              <div className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground font-sans tabular-nums">
+                {analytics.kpi.avgSpeed ? (
+                  <>
+                    {analytics.kpi.avgSpeed}{" "}
+                    <span className="text-xs font-normal text-muted-foreground">
+                      tok/s
+                    </span>
+                  </>
+                ) : (
+                  "—"
+                )}
+              </div>
+            ) : (
+              <Skeleton className="h-8 w-24 rounded-lg my-0.5" />
+            )}
+            {analytics ? (
+              <p className="text-xs text-muted-foreground font-light font-sans tabular-nums">
+                {analytics.kpi.avgTtftMs ? (
+                  <>
+                    <span className="text-foreground/80 font-normal">
+                      {analytics.kpi.avgTtftMs}ms
+                    </span>{" "}
+                    TTFT &middot; {analytics.kpi.avgDurationMs}ms total
+                  </>
+                ) : (
+                  "No latency recorded"
+                )}
+              </p>
+            ) : (
+              <Skeleton className="h-4 w-40 rounded mt-1" />
+            )}
           </div>
         </Card>
       </div>
@@ -395,7 +428,11 @@ export default function DashboardOverviewPage() {
                 Providers
               </div>
               <div className="text-base font-semibold font-sans text-foreground tabular-nums">
-                {analytics?.infrastructure.activeProvidersCount || 1} Active
+                {analytics ? (
+                  `${analytics.infrastructure.activeProvidersCount || 1} Active`
+                ) : (
+                  <Skeleton className="h-5 w-16 rounded mt-0.5" />
+                )}
               </div>
             </div>
           </div>
@@ -407,7 +444,11 @@ export default function DashboardOverviewPage() {
                 API Keys
               </div>
               <div className="text-base font-semibold font-sans text-foreground tabular-nums">
-                {analytics?.infrastructure.activeKeysCount || 0} Configured
+                {analytics ? (
+                  `${analytics.infrastructure.activeKeysCount || 0} Configured`
+                ) : (
+                  <Skeleton className="h-5 w-20 rounded mt-0.5" />
+                )}
               </div>
             </div>
           </div>
@@ -419,7 +460,11 @@ export default function DashboardOverviewPage() {
                 Models
               </div>
               <div className="text-base font-semibold font-sans text-foreground tabular-nums">
-                {analytics?.infrastructure.activeModelsCount || 0} Invoked
+                {analytics ? (
+                  `${analytics.infrastructure.activeModelsCount || 0} Invoked`
+                ) : (
+                  <Skeleton className="h-5 w-18 rounded mt-0.5" />
+                )}
               </div>
             </div>
           </div>
@@ -431,7 +476,11 @@ export default function DashboardOverviewPage() {
                 I/O Ratio
               </div>
               <div className="text-base font-semibold font-sans text-foreground tabular-nums">
-                {analytics?.kpi.ioRatio || "—"}
+                {analytics ? (
+                  analytics.kpi.ioRatio || "—"
+                ) : (
+                  <Skeleton className="h-5 w-12 rounded mt-0.5" />
+                )}
               </div>
             </div>
           </div>
@@ -443,7 +492,11 @@ export default function DashboardOverviewPage() {
                 Success Rate
               </div>
               <div className="text-base font-semibold font-sans text-foreground tabular-nums">
-                {analytics?.kpi.successRate ?? 100}%
+                {analytics ? (
+                  `${analytics.kpi.successRate ?? 100}%`
+                ) : (
+                  <Skeleton className="h-5 w-14 rounded mt-0.5" />
+                )}
               </div>
             </div>
           </div>
@@ -480,8 +533,21 @@ export default function DashboardOverviewPage() {
           </div>
 
           {/* Wave Graph: Fills empty space above 52-week grid */}
-          <div className="space-y-2 pt-1">
-            <div className="flex items-center justify-between text-xs font-sans text-muted-foreground">
+          {!analytics ? (
+            <div className="space-y-4 py-2">
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <Skeleton className="h-4 w-44 rounded" />
+                  <Skeleton className="h-4 w-28 rounded" />
+                </div>
+                <Skeleton className="h-24 w-full rounded-2xl" />
+              </div>
+              <Skeleton className="h-28 w-full rounded-2xl" />
+            </div>
+          ) : (
+            <>
+              <div className="space-y-2 pt-1">
+                <div className="flex items-center justify-between text-xs font-sans text-muted-foreground">
               <div className="flex items-center gap-1.5 font-medium text-foreground">
                 <Activity className="h-3.5 w-3.5 text-foreground stroke-[2]" />
                 <span>Annual Token Momentum Wave</span>
@@ -665,7 +731,9 @@ export default function DashboardOverviewPage() {
               </div>
             </div>
           </div>
-        </Card>
+        </>
+      )}
+    </Card>
 
         {/* Right: Quick Start Card (Swapped from Bottom Right) */}
         <Card className="rounded-3xl border-border/70 bg-card p-6 space-y-5 transition-colors flex flex-col justify-between">
@@ -814,7 +882,11 @@ export default function DashboardOverviewPage() {
 
           {/* Activity Bar Chart Visualization */}
           <div className="h-64 w-full flex flex-col justify-between py-2">
-            {analytics && analytics.timeline.length > 0 && analytics.kpi.totalRequests > 0 ? (
+            {!analytics ? (
+              <div className="flex-1 flex flex-col justify-end p-2">
+                <Skeleton className="h-48 w-full rounded-2xl" />
+              </div>
+            ) : analytics && analytics.timeline.length > 0 && analytics.kpi.totalRequests > 0 ? (
               <div className="flex-1 flex flex-col justify-end">
                 <div className="h-48 flex items-end gap-1 sm:gap-2 px-1 border-b border-border/60 pb-1">
                   {analytics.timeline.map((bucket, idx) => {
@@ -894,7 +966,19 @@ export default function DashboardOverviewPage() {
           </div>
 
           <div className="flex-1 flex flex-col justify-center space-y-4">
-            {!analytics?.providerBreakdown || analytics.providerBreakdown.length === 0 ? (
+            {!analytics ? (
+              <div className="space-y-4 py-2">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="space-y-1.5">
+                    <div className="flex justify-between">
+                      <Skeleton className="h-4 w-24 rounded" />
+                      <Skeleton className="h-4 w-12 rounded" />
+                    </div>
+                    <Skeleton className="h-2 w-full rounded-full" />
+                  </div>
+                ))}
+              </div>
+            ) : !analytics?.providerBreakdown || analytics.providerBreakdown.length === 0 ? (
               <div className="py-8 text-center text-xs text-muted-foreground font-light">
                 No provider traffic yet
               </div>
@@ -982,7 +1066,18 @@ export default function DashboardOverviewPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {!analytics?.modelBreakdown || analytics.modelBreakdown.length === 0 ? (
+              {!analytics ? (
+                Array.from({ length: 4 }).map((_, i) => (
+                  <TableRow key={i} className="border-border/40 hover:bg-transparent">
+                    <TableCell className="pl-6 py-3.5"><Skeleton className="h-4 w-36 rounded" /></TableCell>
+                    <TableCell className="text-right py-3.5"><Skeleton className="h-4 w-12 rounded ml-auto" /></TableCell>
+                    <TableCell className="text-right py-3.5"><Skeleton className="h-4 w-14 rounded ml-auto" /></TableCell>
+                    <TableCell className="text-right py-3.5"><Skeleton className="h-4 w-14 rounded ml-auto" /></TableCell>
+                    <TableCell className="text-right py-3.5"><Skeleton className="h-4 w-16 rounded ml-auto" /></TableCell>
+                    <TableCell className="pr-6 py-3.5 text-right"><Skeleton className="h-2.5 w-24 rounded-full ml-auto" /></TableCell>
+                  </TableRow>
+                ))
+              ) : !analytics?.modelBreakdown || analytics.modelBreakdown.length === 0 ? (
                 <TableRow>
                   <TableCell
                     colSpan={6}
