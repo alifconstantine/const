@@ -18,9 +18,6 @@ import {
   Cpu,
   Bot,
   Layers,
-  CreditCard,
-  Gift,
-  CircleHelp,
   Search,
   PanelLeftClose,
   PanelLeftOpen,
@@ -92,26 +89,6 @@ const navSections: NavSection[] = [
         title: "Integrations",
         href: "/integrations",
         icon: Layers,
-      },
-    ],
-  },
-  {
-    title: "SUBSCRIPTION",
-    items: [
-      {
-        title: "Billing",
-        href: "/billing",
-        icon: CreditCard,
-      },
-      {
-        title: "Referral",
-        href: "/referral",
-        icon: Gift,
-      },
-      {
-        title: "Help",
-        href: "/help",
-        icon: CircleHelp,
       },
     ],
   },

@@ -28,6 +28,19 @@ interface OpenAIChatRequestBody {
   providerDocId?: string;
 }
 
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Const-SSO-Token, X-Title, HTTP-Referer, User-Agent",
+};
+
+export async function OPTIONS() {
+  return new Response(null, {
+    status: 204,
+    headers: CORS_HEADERS,
+  });
+}
+
 function wrapWithTelemetry(
   response: Response,
   meta: TelemetryMetadata
@@ -37,6 +50,7 @@ function wrapWithTelemetry(
   return new Response(stream, {
     headers: {
       ...Object.fromEntries(response.headers.entries()),
+      ...CORS_HEADERS,
       "X-Const-Request-Id": meta.requestId,
     },
     status: response.status,
