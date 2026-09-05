@@ -1,53 +1,51 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;450;500;600;700&family=Lora:ital,wght@0,400..700;1,400..700&family=Newsreader:ital,opsz,wght@0,6..72,400..700;1,6..72,400..700&display=swap');
 @import "@const/ui/globals.css";
 
-@layer base {
-  /* Const Harness Design System Studio Monochrome Palette (from apps/harness/desktop/DESIGN.md) */
-  :root,
-  .dark {
-    /* Level 0: Canvas Base (#161616) */
-    --background: 0 0% 8.6%;
-    /* Primary Ink (#d4d4d4) */
-    --foreground: 0 0% 83.1%;
+/* Const Harness Design System Studio Monochrome Palette (from apps/harness/desktop/DESIGN.md) */
+:root,
+.dark {
+  /* Level 0: Canvas Base (#161616) */
+  --background: 0 0% 8.6%;
+  /* Primary Ink (#d4d4d4) */
+  --foreground: 0 0% 83.1%;
 
-    /* Level 1: Header Well / Card Surface (#222222) */
-    --card: 0 0% 13.3%;
-    --card-foreground: 0 0% 83.1%;
-    --popover: 0 0% 13.3%;
-    --popover-foreground: 0 0% 83.1%;
+  /* Level 1: Header Well / Card Surface (#222222) */
+  --card: 0 0% 13.3%;
+  --card-foreground: 0 0% 83.1%;
+  --popover: 0 0% 13.3%;
+  --popover-foreground: 0 0% 83.1%;
 
-    /* Primary Buttons & Bright Highlights (#ffffff with #161616 text) */
-    --primary: 0 0% 100%;
-    --primary-foreground: 0 0% 8.6%;
+  /* Primary Buttons & Bright Highlights (#ffffff with #161616 text) */
+  --primary: 0 0% 100%;
+  --primary-foreground: 0 0% 8.6%;
 
-    /* Level 2: Sidebar & Tactile Field Fill (#2b2b2b) */
-    --secondary: 0 0% 16.9%;
-    --secondary-foreground: 0 0% 83.1%;
+  /* Level 2: Sidebar & Tactile Field Fill (#2b2b2b) */
+  --secondary: 0 0% 16.9%;
+  --secondary-foreground: 0 0% 83.1%;
 
-    /* Level 3: Field Hover & Control Tracks (#383838) */
-    --muted: 0 0% 22%;
-    /* Utility Ink (#969696) */
-    --muted-foreground: 0 0% 58.8%;
+  /* Level 3: Field Hover & Control Tracks (#383838) */
+  --muted: 0 0% 22%;
+  /* Utility Ink (#969696) */
+  --muted-foreground: 0 0% 58.8%;
 
-    --accent: 0 0% 22%;
-    --accent-foreground: 0 0% 100%;
+  --accent: 0 0% 22%;
+  --accent-foreground: 0 0% 100%;
 
-    --destructive: 0 62.8% 40%;
-    --destructive-foreground: 0 0% 98%;
+  --destructive: 0 62.8% 40%;
+  --destructive-foreground: 0 0% 98%;
 
-    /* Hairlines (#383838) */
-    --border: 0 0% 22%;
-    --input: 0 0% 16.9%;
-    --ring: 0 0% 22%;
+  /* Hairlines (#383838) */
+  --border: 0 0% 22%;
+  --input: 0 0% 16.9%;
+  --ring: 0 0% 22%;
 
-    /* Sidebar tokens matching Harness (#2b2b2b) */
-    --sidebar-background: 0 0% 16.9%;
-    --sidebar-foreground: 0 0% 83.1%;
-    --sidebar-primary: 0 0% 100%;
-    --sidebar-primary-foreground: 0 0% 8.6%;
-    --sidebar-accent: 0 0% 22%;
-    --sidebar-accent-foreground: 0 0% 100%;
-    --sidebar-border: 0 0% 20%;
-    --sidebar-ring: 0 0% 22%;
-  }
+  /* Sidebar tokens matching Harness (#2b2b2b) */
+  --sidebar-background: 0 0% 16.9%;
+  --sidebar-foreground: 0 0% 83.1%;
+  --sidebar-primary: 0 0% 100%;
+  --sidebar-primary-foreground: 0 0% 8.6%;
+  --sidebar-accent: 0 0% 22%;
+  --sidebar-accent-foreground: 0 0% 100%;
+  --sidebar-border: 0 0% 20%;
+  --sidebar-ring: 0 0% 22%;
 }
