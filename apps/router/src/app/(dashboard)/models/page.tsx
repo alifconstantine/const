@@ -43,9 +43,10 @@ import {
   Plus,
   Loader2,
   Pencil,
+  Brain,
 } from "lucide-react";
 import { ModelConfigDialog } from "@/components/models/model-config-dialog";
-import { formatTokenDisplay } from "@/lib/model-specs";
+import { formatTokenDisplay, isReasoningModel } from "@/lib/model-specs";
 
 interface ModelItem {
   id: string;
@@ -59,6 +60,7 @@ interface ModelItem {
   inputTypes?: string[];
   outputTypes?: string[];
   isDefault?: boolean;
+  supportsThinking?: boolean;
 }
 
 interface ProviderGroup {
@@ -85,6 +87,7 @@ const PROVIDERS_DATA: ProviderGroup[] = [
         inputTypes: ["text", "image", "video"],
         outputTypes: ["text"],
         isDefault: true,
+        supportsThinking: true,
       },
       {
         id: "gemini-3.7-flash",
@@ -95,6 +98,7 @@ const PROVIDERS_DATA: ProviderGroup[] = [
         maxOutputTokens: "128000",
         inputTypes: ["text", "image", "video"],
         outputTypes: ["text"],
+        supportsThinking: true,
       },
       {
         id: "gemini-3.8-flash",
@@ -105,6 +109,7 @@ const PROVIDERS_DATA: ProviderGroup[] = [
         maxOutputTokens: "128000",
         inputTypes: ["text", "image", "video"],
         outputTypes: ["text"],
+        supportsThinking: true,
       },
     ],
   },
@@ -167,6 +172,7 @@ export default function ModelsPage() {
             maxOutputTokens: m.maxOutputTokens || "128000",
             inputTypes: m.inputTypes || ["text"],
             outputTypes: m.outputTypes || ["text"],
+            supportsThinking: isReasoningModel(m.modelId, m.capabilities, m.name),
           })),
         });
       }
@@ -554,6 +560,19 @@ export default function ModelsPage() {
                                 <span className="text-[10px] font-sans px-1.5 py-0.5 rounded-md bg-secondary border border-border text-foreground">
                                   Video
                                 </span>
+                              )}
+                              {model.supportsThinking && (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="text-[10px] font-sans px-1.5 py-0.5 rounded-md bg-secondary border border-border text-foreground font-medium flex items-center gap-1 cursor-default">
+                                      <Brain className="h-2.5 w-2.5 text-muted-foreground" />
+                                      Reasoning
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top">
+                                    Supports dynamic thinking effort (low, medium, high)
+                                  </TooltipContent>
+                                </Tooltip>
                               )}
                             </div>
                           </TableCell>

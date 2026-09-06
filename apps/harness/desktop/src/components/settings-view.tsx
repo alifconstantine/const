@@ -68,6 +68,22 @@ export const BUILTIN_CONST_MODELS = [
     isDefault: true,
     desc: "Frontier multimodal reasoning & code generation. Included in your 7M weekly tokens quota.",
   },
+  {
+    id: "gemini-3.7-flash",
+    name: "Gemini 3.7 Flash",
+    contextWindow: "1M Context",
+    maxOutput: "128K Output",
+    supportsThinking: true,
+    desc: "Hybrid frontier reasoning model with dynamic thinking effort. Included in your 7M weekly tokens quota.",
+  },
+  {
+    id: "gemini-3.8-flash",
+    name: "Gemini 3.8 Flash",
+    contextWindow: "1M Context",
+    maxOutput: "128K Output",
+    supportsThinking: true,
+    desc: "Advanced frontier thinking and deep analytical reasoning. Included in your 7M weekly tokens quota.",
+  },
 ];
 
 function formatTokenDisplay(tokens: number): string {
