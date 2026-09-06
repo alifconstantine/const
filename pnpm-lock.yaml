@@ -96,6 +96,9 @@ importers:
       '@const/ui':
         specifier: workspace:*
         version: link:../../../packages/ui
+      '@iconify/react':
+        specifier: ^6.0.2
+        version: 6.0.2(react@19.2.8)
       '@types/marked':
         specifier: ^6.0.0
         version: 6.0.0
@@ -118,6 +121,9 @@ importers:
       '@const/typescript-config':
         specifier: workspace:*
         version: link:../../../packages/typescript-config
+      '@iconify-json/vscode-icons':
+        specifier: ^1.2.76
+        version: 1.2.76
       '@types/node':
         specifier: ^22.13.9
         version: 22.20.1
@@ -1727,6 +1733,17 @@ packages:
         optional: true
       zod:
         optional: true
+
+  '@iconify-json/vscode-icons@1.2.76':
+    resolution: {integrity: sha512-gSu20bZiegbMFLSPHHtmliUJoOPhovTT77RNkMfr6u9ns5uC2bVZ4K5T7wUlywRAzQk4qgG7t4AULaucSsta4w==}
+
+  '@iconify/react@6.0.2':
+    resolution: {integrity: sha512-SMmC2sactfpJD427WJEDN6PMyznTFMhByK9yLW0gOTtnjzzbsi/Ke/XqsumsavFPwNiXs8jSiYeZTmLCLwO+Fg==}
+    peerDependencies:
+      react: '>=16'
+
+  '@iconify/types@2.0.0':
+    resolution: {integrity: sha512-+wluvCrRhXrhyOmRDJ3q8mux9JkKy5SJ/v8ol2tu4FVjyYvtEzkc/3pK15ET6RKg4b4w4BmTk1+gsCUhf21Ykg==}
 
   '@img/colour@1.1.0':
     resolution: {integrity: sha512-Td76q7j57o/tLVdgS746cYARfSyxk8iEfRxewL9h4OMzYhbW4TAcppl0mT4eyqXddh6L/jwoM75mo7ixa/pCeQ==}
@@ -7313,6 +7330,17 @@ snapshots:
     optionalDependencies:
       '@standard-schema/spec': 1.1.0
       zod: 4.5.4
+
+  '@iconify-json/vscode-icons@1.2.76':
+    dependencies:
+      '@iconify/types': 2.0.0
+
+  '@iconify/react@6.0.2(react@19.2.8)':
+    dependencies:
+      '@iconify/types': 2.0.0
+      react: 19.2.8
+
+  '@iconify/types@2.0.0': {}
 
   '@img/colour@1.1.0':
     optional: true

@@ -30,6 +30,8 @@ interface OpenAIChatRequestBody {
   providerDocId?: string;
   max_tokens?: number;
   max_completion_tokens?: number;
+  tools?: any[];
+  tool_choice?: any;
 }
 
 const CORS_HEADERS = {
@@ -79,6 +81,8 @@ export async function POST(req: NextRequest) {
       providerDocId,
       max_tokens,
       max_completion_tokens,
+      tools,
+      tool_choice,
     } = body;
 
     const rawReasoning = body.reasoning;
@@ -219,6 +223,8 @@ export async function POST(req: NextRequest) {
       reasoning_effort,
       max_tokens,
       max_completion_tokens,
+      tools,
+      tool_choice,
       providedKey,
       ssoToken,
       convexUrl,
@@ -241,6 +247,8 @@ async function dispatchSingleModel({
   reasoning_effort,
   max_tokens,
   max_completion_tokens,
+  tools,
+  tool_choice,
   providedKey,
   ssoToken,
   convexUrl,
@@ -256,6 +264,8 @@ async function dispatchSingleModel({
   reasoning_effort?: string;
   max_tokens?: number;
   max_completion_tokens?: number;
+  tools?: any[];
+  tool_choice?: any;
   providedKey?: string;
   ssoToken?: string | null;
   convexUrl: string;
@@ -328,6 +338,12 @@ async function dispatchSingleModel({
     }
     if (max_completion_tokens !== undefined) {
       constPayload.max_completion_tokens = max_completion_tokens;
+    }
+    if (tools && tools.length > 0) {
+      constPayload.tools = tools;
+    }
+    if (tool_choice) {
+      constPayload.tool_choice = tool_choice;
     }
 
     const response = await fetch(`${constBaseUrl}/v1/chat/completions`, {
@@ -496,6 +512,12 @@ async function dispatchSingleModel({
   }
   if (max_completion_tokens !== undefined) {
     payload.max_completion_tokens = max_completion_tokens;
+  }
+  if (tools && tools.length > 0) {
+    payload.tools = tools;
+  }
+  if (tool_choice) {
+    payload.tool_choice = tool_choice;
   }
 
   const response = await fetch(endpoint, {

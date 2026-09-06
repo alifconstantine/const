@@ -12,6 +12,7 @@
     "@const/agent": "workspace:*",
     "@const/backend": "workspace:*",
     "@const/ui": "workspace:*",
+    "@iconify/react": "^6.0.2",
     "@types/marked": "^6.0.0",
     "convex": "^1.45.0",
     "lucide-react": "^1.16.0",
@@ -21,6 +22,7 @@
   },
   "devDependencies": {
     "@const/typescript-config": "workspace:*",
+    "@iconify-json/vscode-icons": "^1.2.76",
     "@types/node": "^22.13.9",
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.0.4",

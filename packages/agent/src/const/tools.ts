@@ -671,8 +671,36 @@ export async function executeNativeTool(
         };
       }
 
+      // 3. Trim trailing whitespace tolerant matching (Pi standard)
+      const trimTrailing = (s: string) => s.split("\n").map((l) => l.trimEnd()).join("\n");
+      const trimmedFileText = trimTrailing(normalizedFileText);
+      const trimmedOld = trimTrailing(normalizedOld);
+
+      if (trimmedFileText.includes(trimmedOld)) {
+        const updated = trimmedFileText.replace(trimmedOld, trimTrailing(newContent.replace(/\r\n/g, "\n")));
+        await fs.writeFile(filePath, updated, "utf-8");
+
+        options.onFileMutation?.({
+          id: `mut_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+          stepIndex: options.stepIndex ?? 0,
+          operation: "modify",
+          absolutePath: filePath,
+          filePath: filePath,
+          targetFile: editDisplayPath || filePath,
+          previousContent: fileText,
+          newContent: updated,
+          timestamp: Date.now(),
+        });
+
+        return {
+          result: `Successfully edited '${path.basename(filePath)}' (whitespace-tolerant matching).`,
+          isError: false,
+        };
+      }
+
+      const totalLines = fileText.split(/\r?\n/).length;
       return {
-        result: `Error: 'old_content' not found in '${path.basename(filePath)}'. Verify exact match including whitespace and indentation.`,
+        result: `[EDIT FAILED]: 'old_content' not found in '${path.basename(filePath)}' (file has ${totalLines} lines).\nReason: Exact match failed. The target content may have different indentation, whitespace, or may have already been modified.\nAction Required: Use the 'read' tool to inspect the latest file contents around your target area before attempting another edit. Do NOT repeat the exact same edit arguments without verifying the file.`,
         isError: true,
       };
     }
@@ -717,18 +745,20 @@ export async function executeNativeTool(
       if (stdout) output += stdout;
       if (stderr) output += (output ? "\n" : "") + stderr;
 
-      // Pi Standard: Non-zero exit code is reported clearly, NOT thrown as fatal error
-      if (exitCode !== 0 && exitCode !== null) {
-        output += `\n\n[Command exited with code ${exitCode}]`;
+      const isFailed = exitCode !== 0 && exitCode !== null;
+      if (isFailed) {
+        output = `[Command failed with exit code ${exitCode}]\nExit code: ${exitCode}\n${output}`.trim();
       }
 
       if (!output.trim()) {
-        output = "(Command completed with no output)";
+        output = isFailed
+          ? `[Command exited with error code ${exitCode} and produced no output]`
+          : "(Command completed with no output)";
       }
 
       return {
         result: output.trim(),
-        isError: false,
+        isError: isFailed,
       };
     }
 

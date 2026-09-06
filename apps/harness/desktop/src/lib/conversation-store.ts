@@ -327,5 +327,5 @@ export function formatRelativeTime(timestamp: number): string {
   if (days >= 1) return `${days}d`;
   if (hours >= 1) return `${hours}h`;
   if (minutes >= 1) return `${minutes}m`;
-  return "just now";
+  return "now";
 }

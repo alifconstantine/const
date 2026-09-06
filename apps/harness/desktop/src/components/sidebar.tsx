@@ -734,94 +734,105 @@ export function Sidebar({
                                     return (
                                       <div
                                         key={convo.id}
-                                        onClick={() => onSelectConversation?.(convo.id)}
-                                        className={`relative w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[13px] transition-colors cursor-pointer group/chat text-left overflow-hidden ${
+                                        onClick={(e) => {
+                                          if ((e.target as HTMLElement).closest("[data-no-select]")) return;
+                                          onSelectConversation?.(convo.id);
+                                        }}
+                                        className={`relative w-full h-8 flex items-center rounded-lg px-2.5 text-[13px] transition-colors cursor-pointer group/chat text-left ${
                                           isActive
                                             ? "bg-[#383838] text-white font-medium shadow-xs"
                                             : "text-[#d4d4d4] hover:text-white hover:bg-white/5"
                                         }`}
                                       >
-                                        <span className="truncate font-normal flex-1 pr-14" title={convo.title}>
+                                        <span className="truncate flex-1 min-w-0 pr-14 font-normal" title={convo.title}>
                                           {convo.title || "Untitled task"}
                                         </span>
 
-                                        <span
-                                          className={`absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-[#888888] font-mono pointer-events-none transition-opacity duration-150 ${
-                                            isMenuOpen ? "opacity-0" : "group-hover/chat:opacity-0"
-                                          }`}
-                                        >
-                                          {formatRelativeTime(convo.updatedAt || convo.createdAt)}
-                                        </span>
-
                                         <div
-                                          className={`absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5 pl-1.5 py-0.5 rounded-md transition-opacity duration-150 z-10 ${
-                                            isMenuOpen
-                                              ? "opacity-100 pointer-events-auto bg-[#383838]"
-                                              : "opacity-0 pointer-events-none group-hover/chat:opacity-100 group-hover/chat:pointer-events-auto"
-                                          }`}
+                                          data-no-select="true"
+                                          onPointerDown={(e) => e.stopPropagation()}
+                                          className="absolute right-2 inset-y-0 flex items-center justify-end"
                                         >
-                                          <button
-                                            type="button"
-                                            onClick={(e) => {
-                                              e.stopPropagation();
-                                              onArchiveConversation?.(convo.id);
-                                            }}
-                                            className="p-1 rounded hover:bg-[#484848] text-[#969696] hover:text-white transition-colors cursor-pointer"
-                                            title="Archive task"
-                                            aria-label="Archive task"
+                                          {/* Relative time when NOT hovering */}
+                                          <span
+                                            className={`text-[11px] text-[#888888] font-mono whitespace-nowrap select-none transition-opacity duration-150 ${
+                                              isMenuOpen ? "hidden" : "group-hover/chat:hidden"
+                                            }`}
                                           >
-                                            <Archive className="w-3.5 h-3.5" />
-                                          </button>
+                                            {formatRelativeTime(convo.updatedAt || convo.createdAt)}
+                                          </span>
 
-                                          <DropdownMenu
-                                            open={isMenuOpen}
-                                            onOpenChange={(open) => setOpenMenuConvoId(open ? convo.id : null)}
+                                          {/* Actions on hover or when dropdown menu is open */}
+                                          <div
+                                            className={`items-center gap-0.5 ${
+                                              isMenuOpen
+                                                ? "flex"
+                                                : "hidden group-hover/chat:flex"
+                                            }`}
                                           >
-                                            <DropdownMenuTrigger asChild>
-                                              <button
-                                                type="button"
-                                                onClick={(e) => e.stopPropagation()}
-                                                className={`p-1 rounded transition-colors cursor-pointer outline-none ${
-                                                  isMenuOpen
-                                                    ? "bg-[#484848] text-white"
-                                                    : "hover:bg-[#484848] text-[#969696] hover:text-white"
-                                                }`}
-                                                title="More actions"
-                                                aria-label="More actions"
-                                              >
-                                                <MoreHorizontal className="w-3.5 h-3.5" />
-                                              </button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent
-                                              side="bottom"
-                                              align="end"
-                                              sideOffset={4}
-                                              className="w-36 bg-[#222222] border-[#383838] text-[#d4d4d4] p-1 rounded-xl shadow-xl z-50 text-xs"
+                                            <button
+                                              type="button"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                onArchiveConversation?.(convo.id);
+                                              }}
+                                              className="p-1 rounded hover:bg-[#484848] text-[#969696] hover:text-white transition-colors cursor-pointer"
+                                              title="Archive task"
+                                              aria-label="Archive task"
                                             >
-                                              <DropdownMenuItem
-                                                onClick={(e) => {
-                                                  e.stopPropagation();
-                                                  setOpenMenuConvoId(null);
-                                                  handleOpenRename(convo);
-                                                }}
-                                                className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer hover:bg-[#303030] text-[#d4d4d4] hover:text-white"
+                                              <Archive className="w-3.5 h-3.5" />
+                                            </button>
+
+                                            <DropdownMenu
+                                              open={isMenuOpen}
+                                              onOpenChange={(open) => setOpenMenuConvoId(open ? convo.id : null)}
+                                            >
+                                              <DropdownMenuTrigger asChild>
+                                                <button
+                                                  type="button"
+                                                  onClick={(e) => e.stopPropagation()}
+                                                  className={`p-1 rounded transition-colors cursor-pointer outline-none ${
+                                                    isMenuOpen
+                                                      ? "bg-[#484848] text-white"
+                                                      : "hover:bg-[#484848] text-[#969696] hover:text-white"
+                                                  }`}
+                                                  title="More actions"
+                                                  aria-label="More actions"
+                                                >
+                                                  <MoreHorizontal className="w-3.5 h-3.5" />
+                                                </button>
+                                              </DropdownMenuTrigger>
+                                              <DropdownMenuContent
+                                                side="bottom"
+                                                align="end"
+                                                sideOffset={4}
+                                                className="w-36 bg-[#222222] border-[#383838] text-[#d4d4d4] p-1 rounded-xl shadow-xl z-50 text-xs"
                                               >
-                                                <Pencil className="w-3.5 h-3.5" />
-                                                <span>Rename</span>
-                                              </DropdownMenuItem>
-                                              <DropdownMenuItem
-                                                onClick={(e) => {
-                                                  e.stopPropagation();
-                                                  setOpenMenuConvoId(null);
-                                                  handleOpenDelete(convo);
-                                                }}
-                                                className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer hover:bg-red-500/10 text-red-400 hover:text-red-300"
-                                              >
-                                                <Trash2 className="w-3.5 h-3.5" />
-                                                <span>Delete</span>
-                                              </DropdownMenuItem>
-                                            </DropdownMenuContent>
-                                          </DropdownMenu>
+                                                <DropdownMenuItem
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setOpenMenuConvoId(null);
+                                                    handleOpenRename(convo);
+                                                  }}
+                                                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer hover:bg-[#303030] text-[#d4d4d4] hover:text-white"
+                                                >
+                                                  <Pencil className="w-3.5 h-3.5" />
+                                                  <span>Rename</span>
+                                                </DropdownMenuItem>
+                                                <DropdownMenuItem
+                                                  onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    setOpenMenuConvoId(null);
+                                                    handleOpenDelete(convo);
+                                                  }}
+                                                  className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer hover:bg-red-500/10 text-red-400 hover:text-red-300"
+                                                >
+                                                  <Trash2 className="w-3.5 h-3.5" />
+                                                  <span>Delete</span>
+                                                </DropdownMenuItem>
+                                              </DropdownMenuContent>
+                                            </DropdownMenu>
+                                          </div>
                                         </div>
                                       </div>
                                     );
@@ -891,94 +902,105 @@ export function Sidebar({
                             return (
                               <div
                                 key={convo.id}
-                                onClick={() => onSelectConversation?.(convo.id)}
-                                className={`relative w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[13px] transition-colors cursor-pointer group/chat text-left overflow-hidden ${
+                                onClick={(e) => {
+                                  if ((e.target as HTMLElement).closest("[data-no-select]")) return;
+                                  onSelectConversation?.(convo.id);
+                                }}
+                                className={`relative w-full h-8 flex items-center rounded-lg px-2.5 text-[13px] transition-colors cursor-pointer group/chat text-left ${
                                   isActive
                                     ? "bg-[#383838] text-white font-medium shadow-xs"
                                     : "text-[#d4d4d4] hover:text-white hover:bg-white/5"
                                 }`}
                               >
-                                <span className="truncate font-normal flex-1 pr-14" title={convo.title}>
+                                <span className="truncate flex-1 min-w-0 pr-14 font-normal" title={convo.title}>
                                   {convo.title || "Untitled task"}
                                 </span>
 
-                                <span
-                                  className={`absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-[#888888] font-mono pointer-events-none transition-opacity duration-150 ${
-                                    isMenuOpen ? "opacity-0" : "group-hover/chat:opacity-0"
-                                  }`}
-                                >
-                                  {formatRelativeTime(convo.updatedAt || convo.createdAt)}
-                                </span>
-
                                 <div
-                                  className={`absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5 pl-1.5 py-0.5 rounded-md transition-opacity duration-150 z-10 ${
-                                    isMenuOpen
-                                      ? "opacity-100 pointer-events-auto bg-[#383838]"
-                                      : "opacity-0 pointer-events-none group-hover/chat:opacity-100 group-hover/chat:pointer-events-auto"
-                                  }`}
+                                  data-no-select="true"
+                                  onPointerDown={(e) => e.stopPropagation()}
+                                  className="absolute right-2 inset-y-0 flex items-center justify-end"
                                 >
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      onArchiveConversation?.(convo.id);
-                                    }}
-                                    className="p-1 rounded hover:bg-[#484848] text-[#969696] hover:text-white transition-colors cursor-pointer"
-                                    title="Archive task"
-                                    aria-label="Archive task"
+                                  {/* Relative time when NOT hovering */}
+                                  <span
+                                    className={`text-[11px] text-[#888888] font-mono whitespace-nowrap select-none transition-opacity duration-150 ${
+                                      isMenuOpen ? "hidden" : "group-hover/chat:hidden"
+                                    }`}
                                   >
-                                    <Archive className="w-3.5 h-3.5" />
-                                  </button>
+                                    {formatRelativeTime(convo.updatedAt || convo.createdAt)}
+                                  </span>
 
-                                  <DropdownMenu
-                                    open={isMenuOpen}
-                                    onOpenChange={(open) => setOpenMenuConvoId(open ? convo.id : null)}
+                                  {/* Actions on hover or when dropdown menu is open */}
+                                  <div
+                                    className={`items-center gap-0.5 ${
+                                      isMenuOpen
+                                        ? "flex"
+                                        : "hidden group-hover/chat:flex"
+                                    }`}
                                   >
-                                    <DropdownMenuTrigger asChild>
-                                      <button
-                                        type="button"
-                                        onClick={(e) => e.stopPropagation()}
-                                        className={`p-1 rounded transition-colors cursor-pointer outline-none ${
-                                          isMenuOpen
-                                            ? "bg-[#484848] text-white"
-                                            : "hover:bg-[#484848] text-[#969696] hover:text-white"
-                                        }`}
-                                        title="More actions"
-                                        aria-label="More actions"
-                                      >
-                                        <MoreHorizontal className="w-3.5 h-3.5" />
-                                      </button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent
-                                      side="bottom"
-                                      align="end"
-                                      sideOffset={4}
-                                      className="w-36 bg-[#222222] border-[#383838] text-[#d4d4d4] p-1 rounded-xl shadow-xl z-50 text-xs"
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        onArchiveConversation?.(convo.id);
+                                      }}
+                                      className="p-1 rounded hover:bg-[#484848] text-[#969696] hover:text-white transition-colors cursor-pointer"
+                                      title="Archive task"
+                                      aria-label="Archive task"
                                     >
-                                      <DropdownMenuItem
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setOpenMenuConvoId(null);
-                                          handleOpenRename(convo);
-                                        }}
-                                        className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer hover:bg-[#303030] text-[#d4d4d4] hover:text-white"
+                                      <Archive className="w-3.5 h-3.5" />
+                                    </button>
+
+                                    <DropdownMenu
+                                      open={isMenuOpen}
+                                      onOpenChange={(open) => setOpenMenuConvoId(open ? convo.id : null)}
+                                    >
+                                      <DropdownMenuTrigger asChild>
+                                        <button
+                                          type="button"
+                                          onClick={(e) => e.stopPropagation()}
+                                          className={`p-1 rounded transition-colors cursor-pointer outline-none ${
+                                            isMenuOpen
+                                              ? "bg-[#484848] text-white"
+                                              : "hover:bg-[#484848] text-[#969696] hover:text-white"
+                                          }`}
+                                          title="More actions"
+                                          aria-label="More actions"
+                                        >
+                                          <MoreHorizontal className="w-3.5 h-3.5" />
+                                        </button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent
+                                        side="bottom"
+                                        align="end"
+                                        sideOffset={4}
+                                        className="w-36 bg-[#222222] border-[#383838] text-[#d4d4d4] p-1 rounded-xl shadow-xl z-50 text-xs"
                                       >
-                                        <Pencil className="w-3.5 h-3.5" />
-                                        <span>Rename</span>
-                                      </DropdownMenuItem>
-                                      <DropdownMenuItem
-                                        onClick={(e) => {
-                                          e.stopPropagation();
-                                          setOpenMenuConvoId(null);
-                                          handleOpenDelete(convo);
-                                        }}
-                                        className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer hover:bg-red-500/10 text-red-400 hover:text-red-300"
-                                      >
-                                        <Trash2 className="w-3.5 h-3.5" />
-                                        <span>Delete</span>
-                                      </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                  </DropdownMenu>
+                                        <DropdownMenuItem
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setOpenMenuConvoId(null);
+                                            handleOpenRename(convo);
+                                          }}
+                                          className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer hover:bg-[#303030] text-[#d4d4d4] hover:text-white"
+                                        >
+                                          <Pencil className="w-3.5 h-3.5" />
+                                          <span>Rename</span>
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setOpenMenuConvoId(null);
+                                            handleOpenDelete(convo);
+                                          }}
+                                          className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer hover:bg-red-500/10 text-red-400 hover:text-red-300"
+                                        >
+                                          <Trash2 className="w-3.5 h-3.5" />
+                                          <span>Delete</span>
+                                        </DropdownMenuItem>
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
+                                  </div>
                                 </div>
                               </div>
                             );

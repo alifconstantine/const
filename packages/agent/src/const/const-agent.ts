@@ -78,7 +78,15 @@ GENERAL WORKFLOW & TOOL GUIDELINES:
 - Use 'write' for creating new files or complete rewrites.
 - Use 'bash' only when execution is truly needed (e.g. running tests, starting dev servers, or inspecting runtime errors).
 - Prefer native tools ('read', 'write', 'edit') over shell commands for file operations.
-- Be concise and direct in your responses. After tool operations are complete, provide a brief summary of what was accomplished.${projectContext ? `\n\n<project_context>${projectContext}</project_context>` : ""}`;
+- Be concise and direct in your responses. After tool operations are complete, provide a brief summary of what was accomplished.
+
+CRITICAL LOOP PREVENTION & ERROR RECOVERY PROTOCOL:
+- Pay close attention to all tool outputs and exit codes.
+- If a tool call fails or returns an error:
+  1. DO NOT repeat the exact same tool call with the same arguments.
+  2. If 'edit' fails because 'old_content' was not found, call 'read' immediately to inspect the latest file content and exact lines before attempting another edit.
+  3. If 'bash' fails with exit code != 0, examine stderr/stdout carefully to understand why it failed before trying an alternative fix.
+  4. If an operation is blocked or impossible, explain the blocker clearly to the user rather than repeating failing tool calls.${projectContext ? `\n\n<project_context>${projectContext}</project_context>` : ""}`;
 }
 
 export class ConstAgent {
@@ -118,6 +126,8 @@ export class ConstAgent {
     let currentTurn = 0;
     const maxTurns = this.config.maxTurns || 25;
     const workspacePath = this.config.workspacePath || process.cwd();
+    const toolCallHistory: Array<{ name: string; argsHash: string; isError: boolean }> = [];
+    const DOOM_LOOP_THRESHOLD = 3;
 
     const endpoint = this.config.baseUrl.endsWith("/chat/completions")
       ? this.config.baseUrl
@@ -167,6 +177,7 @@ export class ConstAgent {
             messages: formattedMessages,
             tools: CONST_DEFAULT_TOOLS,
             stream: true,
+            max_tokens: 16384,
             ...(this.config.thinkingLevel && this.config.thinkingLevel !== "off"
               ? {
                   reasoning: this.config.thinkingLevel,
@@ -234,12 +245,17 @@ export class ConstAgent {
                 turnFinishReason = choice.finish_reason;
               }
 
-              const delta = choice?.delta;
+              const delta = choice?.delta || choice?.message;
               if (!delta) continue;
 
-              if (delta.reasoning_content) {
-                turnThinking += delta.reasoning_content;
-                onEvent({ type: "thinking", thinking: delta.reasoning_content });
+              const reasoningDelta =
+                delta.reasoning_content ||
+                delta.reasoning ||
+                delta.thought ||
+                (typeof delta.thinking === "string" ? delta.thinking : "");
+              if (reasoningDelta) {
+                turnThinking += reasoningDelta;
+                onEvent({ type: "thinking", thinking: reasoningDelta });
               }
 
               if (delta.content) {
@@ -270,20 +286,49 @@ export class ConstAgent {
           }
         }
 
-        const toolCalls: ToolCall[] = Array.from(toolCallsMap.values()).map((tc) => ({
-          id: tc.id,
-          type: "function",
-          function: { name: tc.name, arguments: tc.arguments },
-        }));
+        const toolCalls: ToolCall[] = Array.from(toolCallsMap.values())
+          .filter((tc) => tc.name && tc.name.trim().length > 0)
+          .map((tc) => ({
+            id: tc.id,
+            type: "function",
+            function: { name: tc.name, arguments: tc.arguments },
+          }));
 
-        // Guard against token exhaustion truncation or silent completion
+        // Handle case where model paused after thinking without emitting tool calls or content
         if (toolCalls.length === 0 && !turnContent) {
+          if (turnThinking && currentTurn < maxTurns) {
+            // Model generated internal reasoning but paused before calling tools or outputting text.
+            // Prompt it to proceed directly to execution.
+            const thinkingStepMsg: AgentMessage = {
+              role: "assistant",
+              content: `[Thinking Analysis]\n${turnThinking}`,
+              thinking: turnThinking,
+              timestamp: Date.now(),
+            };
+            conversationHistory.push(thinkingStepMsg);
+            conversationHistory.push({
+              role: "user",
+              content:
+                "Continue. Please proceed immediately to call the necessary tools (such as 'write' or 'edit') or provide the final response to complete the task.",
+            });
+            onEvent({
+              type: "status",
+              status: "thinking",
+              message: "Continuing execution from thinking analysis...",
+            });
+            continue;
+          }
+
           if (turnFinishReason === "length") {
             turnContent =
               "The response reached the model token limit during reasoning. Please ask to continue or specify a more targeted request.";
+          } else if (turnThinking) {
+            turnContent = `Completed thinking analysis:\n\n${turnThinking.slice(0, 500)}...\n\nPlease confirm if you would like me to proceed with creating the requested files.`;
           } else {
-            turnContent = "Completed executing all requested actions.";
+            turnContent =
+              "No response was generated by the model. Please check provider status or retry your request.";
           }
+          onEvent({ type: "token", token: turnContent });
         }
 
         const assistantMsg: AgentMessage = {
@@ -314,6 +359,49 @@ export class ConstAgent {
 
         for (const tc of toolCalls) {
           const parsedArgs = parseToolArguments(tc.function.arguments);
+          const argsHash = JSON.stringify(parsedArgs);
+
+          // Doom Loop & Anti-Loop Detection (OpenCode & Pi alignment)
+          const previousCalls = toolCallHistory.filter(
+            (entry) => entry.name === tc.function.name && entry.argsHash === argsHash
+          );
+          const lastCallFailed = previousCalls.length > 0 && Boolean(previousCalls[previousCalls.length - 1]?.isError);
+          const isDoomLoop = previousCalls.length >= DOOM_LOOP_THRESHOLD || (previousCalls.length >= 2 && lastCallFailed);
+
+          if (isDoomLoop) {
+            const loopWarning = `[DOOM LOOP INTERCEPTED]: You have called '${tc.function.name}' with identical arguments multiple times without progress or after failing. Execution of this identical call is blocked. You MUST stop repeating this call. Analyze what failed, use 'read' to inspect files if editing failed, or explain the issue clearly to the user.`;
+
+            onEvent({
+              type: "tool_call",
+              toolCallId: tc.id,
+              toolName: tc.function.name,
+              args: parsedArgs,
+            });
+
+            onEvent({
+              type: "tool_result",
+              toolCallId: tc.id,
+              toolName: tc.function.name,
+              result: loopWarning,
+              isError: true,
+            });
+
+            conversationHistory.push({
+              role: "tool",
+              tool_call_id: tc.id,
+              name: tc.function.name,
+              content: `[TOOL ERROR - DOOM LOOP BLOCKED]:\n${loopWarning}`,
+              timestamp: Date.now(),
+            });
+
+            toolCallHistory.push({
+              name: tc.function.name,
+              argsHash,
+              isError: true,
+            });
+
+            continue;
+          }
 
           onEvent({
             type: "tool_call",
@@ -343,12 +431,23 @@ export class ConstAgent {
             isError,
           });
 
+          const rawResultText = typeof result === "string" ? result : JSON.stringify(result, null, 2);
+          const toolContent = isError
+            ? `[TOOL ERROR - ACTION FAILED]:\n${rawResultText}\n\n(The action failed. Please inspect the error above and adapt your approach. Do NOT repeat the exact same call).`
+            : rawResultText;
+
           conversationHistory.push({
             role: "tool",
             tool_call_id: tc.id,
             name: tc.function.name,
-            content: typeof result === "string" ? result : JSON.stringify(result, null, 2),
+            content: toolContent,
             timestamp: Date.now(),
+          });
+
+          toolCallHistory.push({
+            name: tc.function.name,
+            argsHash,
+            isError: Boolean(isError),
           });
         }
       }

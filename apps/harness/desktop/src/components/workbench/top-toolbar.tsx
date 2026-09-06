@@ -150,8 +150,8 @@ export function TopToolbar({
         {diffStats && (diffStats.additions > 0 || diffStats.deletions > 0) && (
           <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-[#222222] border border-[#333333] text-xs font-mono text-[#a0a0a0]">
             <span>Changes</span>
-            <span className="text-[#4ade80]">+{diffStats.additions}</span>
-            <span className="text-[#f87171]">-{diffStats.deletions}</span>
+            <span className="text-[#409D62]">+{diffStats.additions}</span>
+            <span className="text-[#ff5c5c]">-{diffStats.deletions}</span>
           </div>
         )}
 

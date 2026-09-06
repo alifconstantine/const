@@ -27,7 +27,8 @@ import {
 import { ChatIndicator } from "./components/workbench/chat-indicator";
 import { ImageLightbox } from "./components/workbench/image-lightbox";
 import { MarkdownContent } from "./components/workbench/markdown-content";
-import { ExecutionTrace } from "./components/workbench/execution-trace";
+import { ExecutionTrace, MutationsSummaryCard } from "./components/workbench/execution-trace";
+import { ReviewDialog } from "./components/workbench/review-dialog";
 import { SettingsView } from "./components/settings-view";
 import { useAppAuth } from "./components/convex-provider";
 import {
@@ -79,6 +80,7 @@ interface ChatMessage {
   }>;
   mutations?: FileMutationRecord[];
   timestamp: number;
+  durationMs?: number;
   attachments?: AttachedFile[];
 }
 
@@ -122,14 +124,39 @@ function AuthenticatedContent({
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isExecuting, setIsExecuting] = useState(false);
+  const executionStartTimeRef = React.useRef<number | null>(null);
+  const [liveDurationMs, setLiveDurationMs] = useState<number>(0);
+
+  useEffect(() => {
+    if (!isExecuting) {
+      setLiveDurationMs(0);
+      return;
+    }
+    const interval = setInterval(() => {
+      if (executionStartTimeRef.current) {
+        setLiveDurationMs(Date.now() - executionStartTimeRef.current);
+      }
+    }, 500);
+    return () => clearInterval(interval);
+  }, [isExecuting]);
+
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
   const chatScrollRef = React.useRef<HTMLDivElement>(null);
   const [previewMedia, setPreviewMedia] = useState<AttachedFile | null>(null);
+  const [reviewingMutations, setReviewingMutations] = useState<FileMutationRecord[] | null>(null);
 
   // Message hover actions state
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [feedbackMap, setFeedbackMap] = useState<Record<string, "good" | "bad">>({});
   const [editingPrompt, setEditingPrompt] = useState<string>("");
+  const [expandedUserMessages, setExpandedUserMessages] = useState<Record<string, boolean>>({});
+
+  const toggleUserMessageExpand = (msgId: string) => {
+    setExpandedUserMessages((prev) => ({
+      ...prev,
+      [msgId]: !prev[msgId],
+    }));
+  };
 
   const handleCopyMessage = async (id: string, text: string) => {
     try {
@@ -424,19 +451,38 @@ function AuthenticatedContent({
         });
       } else if (event.type === "done") {
         setIsExecuting(false);
+        const finalDuration = executionStartTimeRef.current
+          ? Date.now() - executionStartTimeRef.current
+          : undefined;
+        executionStartTimeRef.current = null;
+
         setMessages((latest) => {
+          const updatedLatest = [...latest];
+          if (updatedLatest.length > 0) {
+            const lastIdx = updatedLatest.length - 1;
+            if (updatedLatest[lastIdx]?.role === "assistant") {
+              const curContent = updatedLatest[lastIdx].content;
+              updatedLatest[lastIdx] = {
+                ...updatedLatest[lastIdx],
+                content: curContent || event.fullContent || "",
+                durationMs: finalDuration,
+              };
+            }
+          }
+
           const stored = loadConversations();
           const target = stored.find((c) => c.id === conversationId);
           if (target) {
-            target.messages = latest;
+            target.messages = updatedLatest;
             target.updatedAt = Date.now();
             saveConversation(target);
             setConversations(loadConversations());
           }
-          return latest;
+          return updatedLatest;
         });
       } else if (event.type === "error") {
         setIsExecuting(false);
+        executionStartTimeRef.current = null;
         toast.error(event.error || "Agent execution error");
       }
     });
@@ -486,6 +532,8 @@ function AuthenticatedContent({
     const currentStreamMessages = [...messages, userMsg];
     setMessages([...currentStreamMessages, assistantPlaceholder]);
     setIsExecuting(true);
+    executionStartTimeRef.current = Date.now();
+    setLiveDurationMs(0);
 
     const isFirstMessage = messages.length === 0;
     let titleToUse = conversationTitle;
@@ -603,6 +651,49 @@ function AuthenticatedContent({
       }
     } catch (err: any) {
       toast.error(err.message || "Rollback error");
+    }
+  };
+
+  const handleRollbackAll = async (records: FileMutationRecord[]) => {
+    if (!window.electron?.rollbackFile) {
+      toast.error("Rollback is only available in the desktop application");
+      return;
+    }
+    const unrolled = records.filter((r) => !r.rolledBack);
+    if (unrolled.length === 0) {
+      toast.info("All changes have already been reverted");
+      return;
+    }
+    let successCount = 0;
+    const revertedIds = new Set<string>();
+    for (const record of [...unrolled].reverse()) {
+      try {
+        const res = await window.electron.rollbackFile(record);
+        if (res.success) {
+          successCount++;
+          revertedIds.add(record.id);
+        }
+      } catch {}
+    }
+    if (successCount > 0) {
+      toast.success(`Reverted ${successCount} file(s)`);
+      setMessages((prev) => {
+        const next = prev.map((msg) => ({
+          ...msg,
+          mutations: msg.mutations?.map((m) =>
+            revertedIds.has(m.id) ? { ...m, rolledBack: true } : m
+          ),
+        }));
+        const stored = loadConversations();
+        const target = stored.find((c) => c.id === conversationId);
+        if (target) {
+          target.messages = next;
+          target.updatedAt = Date.now();
+          saveConversation(target);
+          setConversations(loadConversations());
+        }
+        return next;
+      });
     }
   };
 
@@ -781,8 +872,19 @@ function AuthenticatedContent({
                           </div>
                         )}
                         {/* User message bubble */}
-                        <div className="max-w-2xl rounded-2xl bg-[#222222] border border-[#383838] px-4 py-3 text-[14px] text-[#ececec] select-text leading-relaxed whitespace-pre-wrap shadow-sm">
-                          {msg.content}
+                        <div className="max-w-2xl w-full rounded-2xl bg-[#222222] border border-[#383838] px-4 py-3 text-[14px] text-[#ececec] select-text leading-relaxed whitespace-pre-wrap break-words [overflow-wrap:anywhere] [word-break:break-word] shadow-sm overflow-hidden">
+                          <div className={!expandedUserMessages[msg.id] && msg.content.length > 500 ? "max-h-72 overflow-y-auto pr-1" : ""}>
+                            {msg.content}
+                          </div>
+                          {msg.content.length > 500 && (
+                            <button
+                              type="button"
+                              onClick={() => toggleUserMessageExpand(msg.id)}
+                              className="mt-2 text-xs text-[#ff7a00] hover:text-[#ff9433] hover:underline cursor-pointer flex items-center gap-1 select-none font-medium"
+                            >
+                              <span>{expandedUserMessages[msg.id] ? "Show less" : `Show full prompt (${msg.content.length.toLocaleString()} characters)`}</span>
+                            </button>
+                          )}
                         </div>
                         {/* User hover action bar: Timestamp (e.g. 8/16 01.00 AM), Copy, Edit */}
                         <div className="flex items-center gap-2 pt-1.5 opacity-0 group-hover:opacity-100 transition-opacity text-xs text-[#888888] select-none">
@@ -813,13 +915,18 @@ function AuthenticatedContent({
                       </div>
                     ) : (
                       <div className="w-full flex flex-col gap-2.5 max-w-3xl group">
-                        {/* Execution Trace (Worked for, Thinking, Tool calls, File diffs +X -Y) */}
                         <ExecutionTrace
                           thinking={msg.thinking}
                           toolCalls={msg.toolCalls}
                           mutations={msg.mutations}
                           isExecuting={isExecuting && idx === messages.length - 1}
+                          durationMs={
+                            isExecuting && idx === messages.length - 1
+                              ? liveDurationMs
+                              : msg.durationMs
+                          }
                           onRollback={handleRollback}
+                          onRollbackAll={handleRollbackAll}
                         />
 
                         {/* Formatted Markdown Content */}
@@ -827,12 +934,17 @@ function AuthenticatedContent({
                           <div className="px-0.5">
                             <MarkdownContent content={msg.content} />
                           </div>
-                        ) : isExecuting && idx === messages.length - 1 ? (
-                          <div className="flex items-center gap-2 text-xs text-[#888888] px-1 py-1">
-                            <Loader2 className="w-3.5 h-3.5 animate-spin text-[#ff7a00]" />
-                            <span>Working on task...</span>
-                          </div>
                         ) : null}
+
+                        {/* Requirement 3: Changed Files Summary Card at the bottom of the chat message */}
+                        {msg.mutations && msg.mutations.length > 0 && (
+                          <MutationsSummaryCard
+                            mutations={msg.mutations}
+                            onRollback={handleRollback}
+                            onRollbackAll={handleRollbackAll}
+                            onOpenReview={() => setReviewingMutations(msg.mutations || null)}
+                          />
+                        )}
 
                         {/* Assistant hover action bar: Copy, Good, Bad, and Timestamp directly to the right of Bad response */}
                         {!isExecuting && msg.content && (
@@ -919,6 +1031,17 @@ function AuthenticatedContent({
           onClose={() => setPreviewMedia(null)}
         />
       )}
+
+      {/* Review Changes Modal Dialog */}
+      <ReviewDialog
+        open={Boolean(reviewingMutations && reviewingMutations.length > 0)}
+        onOpenChange={(open: boolean) => {
+          if (!open) setReviewingMutations(null);
+        }}
+        mutations={reviewingMutations || []}
+        onRollbackFile={handleRollback}
+        onRollbackAll={handleRollbackAll}
+      />
     </div>
   );
 }

@@ -49,7 +49,53 @@ export function convertGoogleSseToOpenAiSse(body: ReadableStream<Uint8Array>): R
                     ],
                   });
                   controller.enqueue(encoder.encode(`data: ${payload}\n\n`));
+                } else if (part.functionCall) {
+                  const callId = `call_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+                  const payload = JSON.stringify({
+                    choices: [
+                      {
+                        delta: {
+                          tool_calls: [
+                            {
+                              index: 0,
+                              id: callId,
+                              type: "function",
+                              function: {
+                                name: part.functionCall.name,
+                                arguments:
+                                  typeof part.functionCall.args === "string"
+                                    ? part.functionCall.args
+                                    : JSON.stringify(part.functionCall.args || {}),
+                              },
+                            },
+                          ],
+                        },
+                      },
+                    ],
+                  });
+                  controller.enqueue(encoder.encode(`data: ${payload}\n\n`));
                 }
+              }
+
+              if (candidate.finishReason) {
+                const finishReasonMap: Record<string, string> = {
+                  STOP: "stop",
+                  MAX_TOKENS: "length",
+                  SAFETY: "content_filter",
+                  RECITATION: "content_filter",
+                };
+                const mappedReason =
+                  finishReasonMap[candidate.finishReason] ||
+                  candidate.finishReason.toLowerCase();
+                const payload = JSON.stringify({
+                  choices: [
+                    {
+                      delta: {},
+                      finish_reason: mappedReason,
+                    },
+                  ],
+                });
+                controller.enqueue(encoder.encode(`data: ${payload}\n\n`));
               }
             } catch {}
           }
