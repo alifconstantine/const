@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   ConstLogoIcon,
   Avatar,
@@ -21,6 +21,9 @@ import {
   Palette,
   Speech,
   ChevronDown,
+  ChevronRight,
+  GripVertical,
+  MessageSquare,
   Hash,
   Folder,
   FolderOpen,
@@ -32,6 +35,7 @@ import {
   ArrowLeftRight,
   User as UserIcon,
   ChevronsUpDown,
+  Plus,
 } from "lucide-react";
 import {
   type ConversationItem,
@@ -51,6 +55,7 @@ interface SidebarProps {
   onSwitchAccount?: () => void;
   onCollapse: () => void;
   onNewChat?: () => void;
+  onNewChatOutside?: () => void;
   conversations?: ConversationItem[];
   activeConversationId?: string;
   onSelectConversation?: (id: string) => void;
@@ -93,6 +98,7 @@ export function Sidebar({
   onSwitchAccount,
   onCollapse,
   onNewChat,
+  onNewChatOutside,
   conversations = [],
   activeConversationId,
   onSelectConversation,
@@ -101,6 +107,26 @@ export function Sidebar({
 }: SidebarProps) {
   const [activeTab, setActiveTab] = useState<"project" | "design" | "outside">("project");
   const [collapsedFolders, setCollapsedFolders] = useState<Record<string, boolean>>({});
+  const [isProjectsSectionCollapsed, setIsProjectsSectionCollapsed] = useState<boolean>(() => {
+    return localStorage.getItem("const_harness_projects_section_collapsed") === "true";
+  });
+  const [isConversationsCollapsed, setIsConversationsCollapsed] = useState<boolean>(() => {
+    return localStorage.getItem("const_harness_conversations_collapsed") === "true";
+  });
+
+  // Project reordering state with localStorage persistence
+  const [projectOrder, setProjectOrder] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem("const_harness_project_order");
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [draggedProjectIndex, setDraggedProjectIndex] = useState<number | null>(null);
+  const [dragOverProjectIndex, setDragOverProjectIndex] = useState<number | null>(null);
+
   const initials = getUserInitials(user?.name, user?.email);
 
   const toggleFolder = (folderName: string) => {
@@ -110,20 +136,116 @@ export function Sidebar({
     }));
   };
 
-  // Group conversations by project, design, or outside
-  const filteredConversations = conversations.filter((c) => {
-    if (activeTab === "design") return false;
-    return activeTab === "outside"
-      ? c.project === "Outside Project"
-      : c.project !== "Outside Project";
-  });
+  const toggleProjectsSection = () => {
+    setIsProjectsSectionCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem("const_harness_projects_section_collapsed", String(next));
+      return next;
+    });
+  };
 
-  const grouped = filteredConversations.reduce((acc, c) => {
-    const key = c.project || "General";
-    if (!acc[key]) acc[key] = [];
-    acc[key].push(c);
-    return acc;
-  }, {} as Record<string, ConversationItem[]>);
+  const toggleConversationsCollapsed = () => {
+    setIsConversationsCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem("const_harness_conversations_collapsed", String(next));
+      return next;
+    });
+  };
+
+  // Separate into Projects vs Outside/Conversations
+  const { projectMap, outsideConversations, sortedProjectKeys } = useMemo(() => {
+    const pMap: Record<string, ConversationItem[]> = {};
+    const outside: ConversationItem[] = [];
+
+    for (const c of conversations) {
+      if (!c.project || c.project === "Outside Project") {
+        outside.push(c);
+      } else {
+        const list = pMap[c.project] || [];
+        list.push(c);
+        pMap[c.project] = list;
+      }
+    }
+
+    const rawKeys = Object.keys(pMap);
+
+    // Apply projectOrder
+    const ordered: string[] = [];
+    for (const key of projectOrder) {
+      if (rawKeys.includes(key)) {
+        ordered.push(key);
+      }
+    }
+    for (const key of rawKeys) {
+      if (!ordered.includes(key)) {
+        ordered.push(key);
+      }
+    }
+
+    return {
+      projectMap: pMap,
+      outsideConversations: outside,
+      sortedProjectKeys: ordered,
+    };
+  }, [conversations, projectOrder]);
+
+  const toggleCollapseAllProjects = () => {
+    setIsProjectsSectionCollapsed((prev) => {
+      const next = !prev;
+      localStorage.setItem("const_harness_projects_section_collapsed", String(next));
+      if (!next) {
+        // When opening projects section, also ensure inner project folders are open
+        const nextFolders: Record<string, boolean> = {};
+        for (const k of sortedProjectKeys) {
+          nextFolders[k] = false;
+        }
+        setCollapsedFolders(nextFolders);
+      }
+      return next;
+    });
+  };
+
+  // Drag and drop handlers for projects
+  const handleDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedProjectIndex(index);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", sortedProjectKeys[index] || "");
+  };
+
+  const handleDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedProjectIndex === null || draggedProjectIndex === index) return;
+    setDragOverProjectIndex(index);
+    e.dataTransfer.dropEffect = "move";
+  };
+
+  const handleDragLeave = () => {
+    setDragOverProjectIndex(null);
+  };
+
+  const handleDrop = (e: React.DragEvent, targetIndex: number) => {
+    e.preventDefault();
+    if (draggedProjectIndex === null || draggedProjectIndex === targetIndex) {
+      setDraggedProjectIndex(null);
+      setDragOverProjectIndex(null);
+      return;
+    }
+
+    const nextOrder = [...sortedProjectKeys];
+    const [moved] = nextOrder.splice(draggedProjectIndex, 1);
+    if (moved) {
+      nextOrder.splice(targetIndex, 0, moved);
+      setProjectOrder(nextOrder);
+      localStorage.setItem("const_harness_project_order", JSON.stringify(nextOrder));
+    }
+    setDraggedProjectIndex(null);
+    setDragOverProjectIndex(null);
+  };
+
+  const handleDragEnd = () => {
+    setDraggedProjectIndex(null);
+    setDragOverProjectIndex(null);
+  };
 
   return (
     <aside className="w-64 h-full flex flex-col justify-between shrink-0 select-none bg-[#2b2b2b] text-[#d4d4d4] p-3">
@@ -244,8 +366,8 @@ export function Sidebar({
                   )}
                   {activeTab === "outside" && (
                     <>
-                      <Hash className="w-3.5 h-3.5 text-[#d4d4d4]" />
-                      <span>Outside Project</span>
+                      <MessageSquare className="w-3.5 h-3.5 text-[#d4d4d4]" />
+                      <span>Conversation</span>
                     </>
                   )}
                   <ChevronDown className="w-3 h-3 text-[#969696] ml-0.5" />
@@ -285,8 +407,8 @@ export function Sidebar({
                       : "hover:bg-[#303030] text-[#d4d4d4]"
                   }`}
                 >
-                  <Hash className="w-3.5 h-3.5 text-[#d4d4d4]" />
-                  <span>Outside Project</span>
+                  <MessageSquare className="w-3.5 h-3.5 text-[#d4d4d4]" />
+                  <span>Conversation</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -295,20 +417,18 @@ export function Sidebar({
             <div className="flex items-center gap-1 text-[#d4d4d4]">
               <button
                 type="button"
-                onClick={() => {
-                  const allKeys = Object.keys(grouped);
-                  const allCollapsed = allKeys.length > 0 && allKeys.every((k) => collapsedFolders[k]);
-                  const next: Record<string, boolean> = {};
-                  for (const k of allKeys) {
-                    next[k] = !allCollapsed;
-                  }
-                  setCollapsedFolders(next);
-                }}
-                className="p-1 rounded-md hover:bg-[#383838] hover:text-white transition-colors cursor-pointer"
-                title="Collapse or expand all"
-                aria-label="Collapse or expand all"
+                onClick={toggleCollapseAllProjects}
+                className="p-1 rounded-md hover:bg-[#383838] hover:text-white transition-colors cursor-pointer group"
+                title={isProjectsSectionCollapsed ? "Expand all projects" : "Collapse all projects"}
+                aria-label={isProjectsSectionCollapsed ? "Expand all projects" : "Collapse all projects"}
               >
-                <ChevronsDownUp className="w-3.5 h-3.5" />
+                <div className="transition-transform duration-200 flex items-center justify-center">
+                  {isProjectsSectionCollapsed ? (
+                    <ChevronsUpDown className="w-3.5 h-3.5 text-[#d4d4d4] group-hover:text-white transition-all duration-200 scale-105" />
+                  ) : (
+                    <ChevronsDownUp className="w-3.5 h-3.5 text-[#d4d4d4] group-hover:text-white transition-all duration-200" />
+                  )}
+                </div>
               </button>
               <button
                 type="button"
@@ -331,77 +451,223 @@ export function Sidebar({
         </div>
       </div>
 
-      {/* Middle: Chat History (Image 1 style with ScrollArea) */}
+      {/* Middle: Chat History (Image 1, 2, 3 style with ScrollArea) */}
       <div className="flex-1 overflow-hidden flex flex-col my-1">
         <ScrollArea className="flex-1 w-full">
-          <div className="flex flex-col gap-3 py-1 pr-1.5">
-            <div className="text-[11px] font-medium text-[#969696] uppercase tracking-wider px-2">
-              {activeTab === "project"
-                ? "Projects"
-                : activeTab === "outside"
-                ? "Outside Conversations"
-                : "Design"}
-            </div>
-
+          <div className="flex flex-col gap-2 py-1 pr-1.5">
             {activeTab === "design" ? (
               <div className="px-2.5 py-6 text-xs text-[#777777] italic text-center">
                 Design workspace
               </div>
-            ) : Object.keys(grouped).length === 0 ? (
+            ) : sortedProjectKeys.length === 0 && outsideConversations.length === 0 ? (
               <div className="px-2.5 py-4 text-xs text-[#777777] italic text-center">
                 No tasks yet
               </div>
             ) : (
-              Object.entries(grouped).map(([projectName, items]) => {
-                const isCollapsed = Boolean(collapsedFolders[projectName]);
-                return (
-                  <div key={projectName} className="flex flex-col gap-1">
-                    {/* Collapsible Project / Group Header (Image 1) */}
-                    <button
-                      type="button"
-                      onClick={() => toggleFolder(projectName)}
-                      className="w-full flex items-center gap-2 px-2.5 py-1 text-[13px] font-medium text-[#d4d4d4] hover:text-white transition-colors cursor-pointer text-left group select-none"
-                      title={projectName}
-                    >
-                      {isCollapsed ? (
-                        <Folder className="w-4 h-4 text-[#777777] group-hover:text-[#d4d4d4] shrink-0" />
-                      ) : (
-                        <FolderOpen className="w-4 h-4 text-[#777777] group-hover:text-[#d4d4d4] shrink-0" />
-                      )}
-                      <span className="truncate">{getProjectDisplayName(projectName)}</span>
-                    </button>
+              <>
+                {/* 1. Projects Section (Visible in Project view) */}
+                {activeTab === "project" && (
+                  <div className="flex flex-col gap-1">
+                    {/* Header: Projects with Chevron and Action Icons (Image 1, 2, 3) */}
+                    <div className="w-full flex items-center justify-between px-2.5 py-1 text-[13px] text-[#969696] hover:text-[#d4d4d4] transition-colors select-none group">
+                      <button
+                        type="button"
+                        onClick={toggleProjectsSection}
+                        className="flex items-center gap-1.5 font-medium cursor-pointer text-left text-[#969696] hover:text-[#d4d4d4]"
+                      >
+                        <span>Projects</span>
+                        {isProjectsSectionCollapsed ? (
+                          <ChevronRight className="w-3.5 h-3.5 text-[#777777] transition-transform" />
+                        ) : (
+                          <ChevronDown className="w-3.5 h-3.5 text-[#777777] transition-transform" />
+                        )}
+                      </button>
 
-                    {/* Task / Conversation Items (Image 1 style, no orange badge, comfortable sizing) */}
-                    {!isCollapsed && (
-                      <div className="flex flex-col gap-0.5 pl-1">
-                        {items.map((convo) => {
-                          const isActive = convo.id === activeConversationId;
+                      <div className="flex items-center gap-1 text-[#777777]">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            // Toggle all project folders inside
+                            const allFoldersCollapsed =
+                              sortedProjectKeys.length > 0 &&
+                              sortedProjectKeys.every((k) => collapsedFolders[k]);
+                            const next: Record<string, boolean> = {};
+                            for (const k of sortedProjectKeys) {
+                              next[k] = !allFoldersCollapsed;
+                            }
+                            setCollapsedFolders(next);
+                          }}
+                          className="p-1 rounded hover:bg-[#383838] hover:text-[#d4d4d4] transition-colors cursor-pointer"
+                          title="Toggle all project folders"
+                        >
+                          <GripVertical className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onNewChat?.()}
+                          className="p-1 rounded hover:bg-[#383838] hover:text-white transition-colors cursor-pointer"
+                          title="New task in project"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Project Folders List (when Projects section is not collapsed) */}
+                    {!isProjectsSectionCollapsed && (
+                      <div className="flex flex-col gap-1">
+                        {sortedProjectKeys.map((projectName, index) => {
+                          const items = projectMap[projectName] || [];
+                          const isCollapsed = Boolean(collapsedFolders[projectName]);
+                          const isDragging = draggedProjectIndex === index;
+                          const isDragOver = dragOverProjectIndex === index;
+
                           return (
-                            <button
-                              key={convo.id}
-                              type="button"
-                              onClick={() => onSelectConversation?.(convo.id)}
-                              className={`w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg text-[13px] transition-colors cursor-pointer group text-left ${
-                                isActive
-                                  ? "bg-[#383838] text-white font-medium shadow-xs"
-                                  : "text-[#d4d4d4] hover:text-white hover:bg-white/5"
+                            <div
+                              key={projectName}
+                              draggable
+                              onDragStart={(e) => handleDragStart(e, index)}
+                              onDragOver={(e) => handleDragOver(e, index)}
+                              onDragLeave={handleDragLeave}
+                              onDrop={(e) => handleDrop(e, index)}
+                              onDragEnd={handleDragEnd}
+                              className={`flex flex-col gap-1 rounded-lg transition-all ${
+                                isDragging ? "opacity-40 scale-[0.98]" : ""
+                              } ${
+                                isDragOver
+                                  ? "bg-white/5 ring-1 ring-white/20"
+                                  : ""
                               }`}
-                              title={convo.title}
                             >
-                              <span className="truncate font-normal">
-                                {convo.title || "Untitled task"}
-                              </span>
-                              <span className="text-xs text-[#888888] font-mono shrink-0 ml-1">
-                                {formatRelativeTime(convo.updatedAt || convo.createdAt)}
-                              </span>
-                            </button>
+                              {/* Collapsible Project / Group Header */}
+                              <button
+                                type="button"
+                                onClick={() => toggleFolder(projectName)}
+                                className="w-full flex items-center gap-2 px-2.5 py-1 text-[13px] font-medium text-[#d4d4d4] hover:text-white transition-colors cursor-grab active:cursor-grabbing text-left group select-none"
+                                title={`Drag to reorder • ${projectName}`}
+                              >
+                                {isCollapsed ? (
+                                  <Folder className="w-4 h-4 text-[#777777] group-hover:text-[#d4d4d4] shrink-0" />
+                                ) : (
+                                  <FolderOpen className="w-4 h-4 text-[#777777] group-hover:text-[#d4d4d4] shrink-0" />
+                                )}
+                                <span className="truncate">{getProjectDisplayName(projectName)}</span>
+                              </button>
+
+                              {/* Task / Conversation Items inside Project */}
+                              {!isCollapsed && (
+                                <div className="flex flex-col gap-0.5 pl-1">
+                                  {items.map((convo) => {
+                                    const isActive = convo.id === activeConversationId;
+                                    return (
+                                      <button
+                                        key={convo.id}
+                                        type="button"
+                                        onClick={() => onSelectConversation?.(convo.id)}
+                                        className={`w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg text-[13px] transition-colors cursor-pointer group text-left ${
+                                          isActive
+                                            ? "bg-[#383838] text-white font-medium shadow-xs"
+                                            : "text-[#d4d4d4] hover:text-white hover:bg-white/5"
+                                        }`}
+                                        title={convo.title}
+                                      >
+                                        <span className="truncate font-normal">
+                                          {convo.title || "Untitled task"}
+                                        </span>
+                                        <span className="text-xs text-[#888888] font-mono shrink-0 ml-1">
+                                          {formatRelativeTime(convo.updatedAt || convo.createdAt)}
+                                        </span>
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
                           );
                         })}
                       </div>
                     )}
                   </div>
-                );
-              })
+                )}
+
+                {/* 2. Conversation Section (Fixed at bottom, Image 1, 2, 3) */}
+                {(activeTab === "project" || activeTab === "outside") && (
+                  <div className="flex flex-col gap-1 mt-1">
+                    {/* Header: Conversation with Chevron, Grip, and Plus */}
+                    <div className="w-full flex items-center justify-between px-2.5 py-1 text-[13px] text-[#969696] hover:text-[#d4d4d4] transition-colors select-none group">
+                      <button
+                        type="button"
+                        onClick={toggleConversationsCollapsed}
+                        className="flex items-center gap-1.5 font-medium cursor-pointer text-left text-[#969696] hover:text-[#d4d4d4]"
+                      >
+                        <span>Conversation</span>
+                        {isConversationsCollapsed ? (
+                          <ChevronRight className="w-3.5 h-3.5 text-[#777777] transition-transform" />
+                        ) : (
+                          <ChevronDown className="w-3.5 h-3.5 text-[#777777] transition-transform" />
+                        )}
+                      </button>
+
+                      <div className="flex items-center gap-1 text-[#777777]">
+                        <div className="p-1 text-[#666666]">
+                          <GripVertical className="w-3.5 h-3.5 opacity-60" />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (onNewChatOutside) {
+                              onNewChatOutside();
+                            } else {
+                              onNewChat?.();
+                            }
+                          }}
+                          className="p-1 rounded hover:bg-[#383838] hover:text-white transition-colors cursor-pointer"
+                          title="New conversation"
+                          aria-label="New conversation"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Conversations List: NO folder icons, comfortable sizing */}
+                    {!isConversationsCollapsed && (
+                      <div className="flex flex-col gap-0.5 pl-1">
+                        {outsideConversations.length === 0 ? (
+                          <div className="px-2.5 py-2 text-xs text-[#777777] italic">
+                            No conversations
+                          </div>
+                        ) : (
+                          outsideConversations.map((convo) => {
+                            const isActive = convo.id === activeConversationId;
+                            return (
+                              <button
+                                key={convo.id}
+                                type="button"
+                                onClick={() => onSelectConversation?.(convo.id)}
+                                className={`w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg text-[13px] transition-colors cursor-pointer group text-left ${
+                                  isActive
+                                    ? "bg-[#383838] text-white font-medium shadow-xs"
+                                    : "text-[#d4d4d4] hover:text-white hover:bg-white/5"
+                                }`}
+                                title={convo.title}
+                              >
+                                <span className="truncate font-normal">
+                                  {convo.title || "Untitled task"}
+                                </span>
+                                <span className="text-xs text-[#888888] font-mono shrink-0 ml-1">
+                                  {formatRelativeTime(convo.updatedAt || convo.createdAt)}
+                                </span>
+                              </button>
+                            );
+                          })
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
             )}
           </div>
         </ScrollArea>

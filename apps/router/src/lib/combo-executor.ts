@@ -39,9 +39,15 @@ async function extractErrorMessage(response: Response): Promise<string> {
       if (typeof parsed?.error === "string") return parsed.error;
       if (parsed?.message) return parsed.message;
     } catch {
+      if (text.includes("<!DOCTYPE") || text.includes("<html") || response.status === 502) {
+        return "Const Engine server is offline or unreachable (502 Bad Gateway).";
+      }
       if (text.trim()) return text.slice(0, 300);
     }
   } catch {}
+  if (response.status === 502) {
+    return "Const Engine server is offline or unreachable (502 Bad Gateway).";
+  }
   return `HTTP ${response.status} (${response.statusText || "Upstream Failure"})`;
 }
 

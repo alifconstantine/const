@@ -172,8 +172,27 @@ export class ConstAgent {
         });
 
         if (!response.ok) {
-          const err = await response.text().catch(() => "Unknown error");
-          throw new Error(`Const error (${response.status}): ${err}`);
+          const rawErr = await response.text().catch(() => "Unknown error");
+          let cleanMessage = rawErr;
+          try {
+            const parsed = JSON.parse(rawErr);
+            if (parsed?.error?.message) {
+              cleanMessage = parsed.error.message;
+            } else if (parsed?.message) {
+              cleanMessage = parsed.message;
+            }
+          } catch {}
+
+          if (
+            cleanMessage.includes("<!DOCTYPE") ||
+            cleanMessage.includes("<html") ||
+            response.status === 502
+          ) {
+            cleanMessage =
+              "Const Engine server is offline or unreachable (502 Bad Gateway).";
+          }
+
+          throw new Error(`Const error (${response.status}): ${cleanMessage}`);
         }
 
         if (!response.body) {

@@ -288,7 +288,15 @@ async function dispatchSingleModel({
       try {
         const p = JSON.parse(errText);
         if (p?.error?.message) errMsg = p.error.message;
-      } catch {}
+      } catch {
+        if (errText.includes("<!DOCTYPE") || errText.includes("<html") || response.status === 502) {
+          errMsg = "Const Engine server is offline or unreachable (502 Bad Gateway).";
+        }
+      }
+
+      if (response.status === 502 && (errMsg.includes("<!DOCTYPE") || errMsg.includes("<html") || errMsg === "Const error (502)")) {
+        errMsg = "Const Engine server is offline or unreachable (502 Bad Gateway).";
+      }
 
       await recordDirectTelemetry(telemetryMeta, {
         status: response.status,

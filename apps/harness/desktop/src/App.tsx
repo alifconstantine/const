@@ -599,7 +599,7 @@ function AuthenticatedContent({
     setIsExecuting(false);
   };
 
-  const handleNewChat = () => {
+  const handleNewChat = (targetProject?: string) => {
     if (isExecuting) {
       handleAbort();
     }
@@ -608,6 +608,10 @@ function AuthenticatedContent({
     setConversationId(`session_${Date.now()}`);
     setEditingPrompt("");
     setIsExecuting(false);
+    if (targetProject) {
+      setCurrentProject(targetProject);
+      localStorage.setItem("const_harness_current_project", targetProject);
+    }
   };
 
   const handleSelectConversation = (id: string) => {
@@ -658,6 +662,7 @@ function AuthenticatedContent({
           onSwitchAccount={onSwitchAccount}
           onCollapse={() => setIsSidebarOpen(false)}
           onNewChat={handleNewChat}
+          onNewChatOutside={() => handleNewChat("Outside Project")}
           conversations={conversations}
           activeConversationId={conversationId}
           onSelectConversation={handleSelectConversation}
