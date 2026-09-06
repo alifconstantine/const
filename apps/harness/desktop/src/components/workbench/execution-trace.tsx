@@ -488,14 +488,16 @@ function FileMutationToolItem({
     targetArg.replace(/\\/g, "/").split("/").filter(Boolean).pop() || targetArg || "file";
 
   // Match with mutations to find line diff stats
-  const matched = mutations.find((m) => {
-    const mName = m.targetFile.replace(/\\/g, "/").split("/").filter(Boolean).pop();
-    return (
-      m.targetFile === targetArg ||
-      m.filePath === targetArg ||
-      mName === fileName
-    );
-  });
+  const matched =
+    (tool as any).mutation ||
+    mutations.find((m) => {
+      const mName = m.targetFile.replace(/\\/g, "/").split("/").filter(Boolean).pop();
+      return (
+        m.targetFile === targetArg ||
+        m.filePath === targetArg ||
+        mName === fileName
+      );
+    });
 
   const diffStats = matched ? getMutationDiffStats(matched) : null;
 
@@ -658,16 +660,6 @@ function ExplorationItem({
   const fileName =
     targetArg.replace(/\\/g, "/").split("/").filter(Boolean).pop() || targetArg;
 
-  // Check if this file was mutated
-  const matched = mutations.find((m) => {
-    const mName = m.targetFile.replace(/\\/g, "/").split("/").filter(Boolean).pop();
-    return (
-      m.targetFile === targetArg ||
-      m.filePath === targetArg ||
-      mName === fileName
-    );
-  });
-  const diffStats = matched ? getMutationDiffStats(matched) : null;
   const hasResult = Boolean(tool.result);
 
   return (
@@ -686,12 +678,6 @@ function ExplorationItem({
           )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          {diffStats && (diffStats.added > 0 || diffStats.removed > 0) && (
-            <div className="flex items-center gap-1.5 font-mono text-xs">
-              <span className="text-[#409D62]">+{diffStats.added}</span>
-              <span className="text-[#ff5c5c]">-{diffStats.removed}</span>
-            </div>
-          )}
           {hasResult && (
             <ChevronDown
               className="w-3 h-3 text-[#666666] transition-transform duration-200 ease-out"

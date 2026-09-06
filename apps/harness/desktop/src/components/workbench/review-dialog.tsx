@@ -22,41 +22,58 @@ export interface DiffStats {
   removed: number;
 }
 
-export function getMutationDiffStats(m: FileMutationRecord): DiffStats {
-  let added = 0;
-  let removed = 0;
-  if (m.operation === "create") {
-    added = m.newContent ? m.newContent.split("\n").length : 1;
-  } else if (m.operation === "modify") {
-    const p = m.previousContent ? m.previousContent.split("\n").length : 0;
-    const n = m.newContent ? m.newContent.split("\n").length : 0;
-    if (n >= p) {
-      added = n - p + 1;
-    } else {
-      added = 1;
-      removed = p - n;
-    }
-  } else if (m.operation === "delete") {
-    removed = m.previousContent ? m.previousContent.split("\n").length : 1;
-  }
-  return { added, removed };
-}
-
-// ---------------------------------------------------------------------------
-// Compute simple line-based diff for preview
-// ---------------------------------------------------------------------------
-interface DiffLine {
+export interface DiffLine {
   type: "added" | "removed" | "context";
   content: string;
   oldNum?: number;
   newNum?: number;
 }
 
-function computeDiff(prev: string | null, next: string | null): DiffLine[] {
-  const prevLines = prev !== null ? prev.split(/\r?\n/) : [];
-  const nextLines = next !== null ? next.split(/\r?\n/) : [];
+const diffStatsCache = new WeakMap<FileMutationRecord, DiffStats>();
 
-  if (prev === null) {
+export function getMutationDiffStats(m: FileMutationRecord): DiffStats {
+  if (diffStatsCache.has(m)) {
+    return diffStatsCache.get(m)!;
+  }
+
+  let stats: DiffStats;
+  const prev = m.previousContent;
+  const next = m.newContent;
+
+  if (m.operation === "create" || prev === null || prev === undefined) {
+    const lines = next !== null && next !== undefined ? next.split(/\r?\n/).length : 0;
+    stats = { added: Math.max(1, lines), removed: 0 };
+  } else if (m.operation === "delete" || next === null || next === undefined) {
+    const lines = prev !== null && prev !== undefined ? prev.split(/\r?\n/).length : 0;
+    stats = { added: 0, removed: Math.max(1, lines) };
+  } else if (prev === next) {
+    stats = { added: 0, removed: 0 };
+  } else {
+    const diff = computeDiff(prev, next);
+    let added = 0;
+    let removed = 0;
+    for (const line of diff) {
+      if (line.type === "added") added++;
+      else if (line.type === "removed") removed++;
+    }
+    stats = { added, removed };
+  }
+
+  diffStatsCache.set(m, stats);
+  return stats;
+}
+
+// ---------------------------------------------------------------------------
+// Compute accurate line-based diff using prefix/suffix trimming + LCS
+// ---------------------------------------------------------------------------
+export function computeDiff(
+  prev: string | null | undefined,
+  next: string | null | undefined
+): DiffLine[] {
+  const prevLines = prev !== null && prev !== undefined ? prev.split(/\r?\n/) : [];
+  const nextLines = next !== null && next !== undefined ? next.split(/\r?\n/) : [];
+
+  if (prev === null || prev === undefined) {
     return nextLines.map((line, idx) => ({
       type: "added",
       content: line,
@@ -64,7 +81,7 @@ function computeDiff(prev: string | null, next: string | null): DiffLine[] {
     }));
   }
 
-  if (next === null) {
+  if (next === null || next === undefined) {
     return prevLines.map((line, idx) => ({
       type: "removed",
       content: line,
@@ -72,61 +89,141 @@ function computeDiff(prev: string | null, next: string | null): DiffLine[] {
     }));
   }
 
-  const diff: DiffLine[] = [];
-  let i = 0;
-  let j = 0;
+  if (prev === next) {
+    return prevLines.map((line, idx) => ({
+      type: "context",
+      content: line,
+      oldNum: idx + 1,
+      newNum: idx + 1,
+    }));
+  }
 
-  while (i < prevLines.length || j < nextLines.length) {
-    const prevLine = prevLines[i];
-    const nextLine = nextLines[j];
+  // 1. Common prefix trimming
+  let prefix = 0;
+  while (
+    prefix < prevLines.length &&
+    prefix < nextLines.length &&
+    prevLines[prefix] === nextLines[prefix]
+  ) {
+    prefix++;
+  }
 
-    if (i < prevLines.length && j < nextLines.length && prevLine === nextLine) {
-      diff.push({
-        type: "context",
-        content: prevLine ?? "",
-        oldNum: i + 1,
-        newNum: j + 1,
-      });
-      i++;
-      j++;
-    } else {
-      // Lookahead match
-      let matchInNext = -1;
-      for (let k = j; k < Math.min(j + 5, nextLines.length); k++) {
-        if (prevLine !== undefined && prevLine === nextLines[k]) {
-          matchInNext = k;
-          break;
-        }
-      }
+  // 2. Common suffix trimming
+  let suffixOld = prevLines.length - 1;
+  let suffixNew = nextLines.length - 1;
+  while (
+    suffixOld >= prefix &&
+    suffixNew >= prefix &&
+    prevLines[suffixOld] === nextLines[suffixNew]
+  ) {
+    suffixOld--;
+    suffixNew--;
+  }
 
-      if (matchInNext !== -1) {
-        while (j < matchInNext) {
-          diff.push({
-            type: "added",
-            content: nextLines[j] ?? "",
-            newNum: j + 1,
-          });
-          j++;
-        }
-      } else if (i < prevLines.length) {
-        diff.push({
-          type: "removed",
-          content: prevLines[i] ?? "",
-          oldNum: i + 1,
-        });
-        i++;
-      } else if (j < nextLines.length) {
-        diff.push({
-          type: "added",
-          content: nextLines[j] ?? "",
-          newNum: j + 1,
-        });
-        j++;
+  const prefixLines: DiffLine[] = [];
+  for (let i = 0; i < prefix; i++) {
+    prefixLines.push({
+      type: "context",
+      content: prevLines[i] ?? "",
+      oldNum: i + 1,
+      newNum: i + 1,
+    });
+  }
+
+  const suffixLines: DiffLine[] = [];
+  const oldSuffixStart = suffixOld + 1;
+  const newSuffixStart = suffixNew + 1;
+  for (let i = 0; i < prevLines.length - oldSuffixStart; i++) {
+    suffixLines.push({
+      type: "context",
+      content: prevLines[oldSuffixStart + i] ?? "",
+      oldNum: oldSuffixStart + i + 1,
+      newNum: newSuffixStart + i + 1,
+    });
+  }
+
+  const midOld = prevLines.slice(prefix, suffixOld + 1);
+  const midNew = nextLines.slice(prefix, suffixNew + 1);
+
+  const midDiff = computeLcsDiff(midOld, midNew, prefix);
+  return [...prefixLines, ...midDiff, ...suffixLines];
+}
+
+function computeLcsDiff(oldLines: string[], newLines: string[], offset: number): DiffLine[] {
+  const N = oldLines.length;
+  const M = newLines.length;
+
+  if (N === 0) {
+    return newLines.map((content, idx) => ({
+      type: "added",
+      content,
+      newNum: offset + idx + 1,
+    }));
+  }
+
+  if (M === 0) {
+    return oldLines.map((content, idx) => ({
+      type: "removed",
+      content,
+      oldNum: offset + idx + 1,
+    }));
+  }
+
+  // Fallback for massive disjoint blocks to prevent excessive memory/time
+  if (N * M > 2500000) {
+    const res: DiffLine[] = [];
+    for (let i = 0; i < N; i++) {
+      res.push({ type: "removed", content: oldLines[i] ?? "", oldNum: offset + i + 1 });
+    }
+    for (let j = 0; j < M; j++) {
+      res.push({ type: "added", content: newLines[j] ?? "", newNum: offset + j + 1 });
+    }
+    return res;
+  }
+
+  const dp: number[][] = Array.from({ length: N + 1 }, () => new Array(M + 1).fill(0));
+  for (let i = 0; i < N; i++) {
+    for (let j = 0; j < M; j++) {
+      if (oldLines[i] === newLines[j]) {
+        dp[i + 1]![j + 1] = dp[i]![j]! + 1;
+      } else {
+        dp[i + 1]![j + 1] = Math.max(dp[i + 1]![j]!, dp[i]![j + 1]!);
       }
     }
   }
 
-  return diff;
+  const result: DiffLine[] = [];
+  let i = N;
+  let j = M;
+
+  while (i > 0 || j > 0) {
+    if (i > 0 && j > 0 && oldLines[i - 1] === newLines[j - 1]) {
+      result.push({
+        type: "context",
+        content: oldLines[i - 1] ?? "",
+        oldNum: offset + i,
+        newNum: offset + j,
+      });
+      i--;
+      j--;
+    } else if (j > 0 && (i === 0 || dp[i]![j - 1]! >= dp[i - 1]![j]!)) {
+      result.push({
+        type: "added",
+        content: newLines[j - 1] ?? "",
+        newNum: offset + j,
+      });
+      j--;
+    } else if (i > 0 && (j === 0 || dp[i]![j - 1]! < dp[i - 1]![j]!)) {
+      result.push({
+        type: "removed",
+        content: oldLines[i - 1] ?? "",
+        oldNum: offset + i,
+      });
+      i--;
+    }
+  }
+
+  return result.reverse();
 }
 
 export function ReviewDialog({
@@ -144,20 +241,9 @@ export function ReviewDialog({
     let added = 0;
     let removed = 0;
     for (const m of mutations) {
-      if (m.operation === "create") {
-        added += m.newContent ? m.newContent.split("\n").length : 1;
-      } else if (m.operation === "modify") {
-        const p = m.previousContent ? m.previousContent.split("\n").length : 0;
-        const n = m.newContent ? m.newContent.split("\n").length : 0;
-        if (n >= p) {
-          added += n - p + 1;
-        } else {
-          added += 1;
-          removed += p - n;
-        }
-      } else if (m.operation === "delete") {
-        removed += m.previousContent ? m.previousContent.split("\n").length : 1;
-      }
+      const s = getMutationDiffStats(m);
+      added += s.added;
+      removed += s.removed;
     }
     return { added, removed };
   }, [mutations]);
