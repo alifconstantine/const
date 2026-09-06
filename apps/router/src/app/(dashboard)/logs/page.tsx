@@ -561,7 +561,7 @@ export default function LogsPage() {
           <SheetContent
             side="right"
             showCloseButton={false}
-            className="w-full sm:max-w-[560px] md:max-w-[620px] p-0 flex flex-col bg-card border-l border-border/70 shadow-2xl z-50 select-none gap-0"
+            className="w-full sm:max-w-[560px] md:max-w-[620px] p-0 flex flex-col bg-card border-l border-border/70 shadow-2xl z-50 gap-0"
           >
             {selectedLog && (
               <>

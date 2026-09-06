@@ -955,7 +955,7 @@ export default function GenerationPage() {
           </Button>
         </div>
       ) : (
-        <div className="w-80 shrink-0 border-l border-border/70 bg-card/40 flex flex-col h-full overflow-y-auto select-none transition-all">
+        <div className="w-80 shrink-0 border-l border-border/70 bg-card/40 flex flex-col h-full overflow-y-auto transition-all">
           {/* Header Bar */}
           <div className="p-4 flex items-center justify-between">
             <h2 className="font-sans text-base font-semibold text-foreground">

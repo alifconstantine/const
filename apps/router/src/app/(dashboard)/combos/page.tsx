@@ -432,7 +432,7 @@ export default function CombosPage() {
   }, [combos, activeTab, searchQuery]);
 
   return (
-    <div className="space-y-8 select-none">
+    <div className="space-y-8">
       {/* 1. Header with Editorial Title & Create Action */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="space-y-1">
