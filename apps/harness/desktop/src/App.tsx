@@ -941,21 +941,41 @@ function AuthenticatedContent({
                             {msg.attachments.map((att) => renderMessageAttachment(att))}
                           </div>
                         )}
-                        {/* User message bubble */}
-                        <div className="max-w-2xl w-full rounded-2xl bg-[#222222] border border-[#383838] px-4 py-3 text-[14px] text-[#ececec] select-text leading-relaxed whitespace-pre-wrap break-words [overflow-wrap:anywhere] [word-break:break-word] shadow-sm overflow-hidden">
-                          <div className={!expandedUserMessages[msg.id] && msg.content.length > 500 ? "max-h-72 overflow-y-auto pr-1" : ""}>
-                            {msg.content}
-                          </div>
-                          {msg.content.length > 500 && (
-                            <button
-                              type="button"
-                              onClick={() => toggleUserMessageExpand(msg.id)}
-                              className="mt-2 text-xs text-[#ff7a00] hover:text-[#ff9433] hover:underline cursor-pointer flex items-center gap-1 select-none font-medium"
+                        {/* User message bubble (Image 2 collapsed, Image 3 expanded on click, ScrollArea without buttons) */}
+                        {(() => {
+                          const isLongPrompt = msg.content.length > 250 || msg.content.split("\n").length > 4;
+                          const isExpanded = Boolean(expandedUserMessages[msg.id]);
+
+                          return (
+                            <div
+                              onClick={() => {
+                                const sel = window.getSelection();
+                                if (sel && sel.toString().trim().length > 0) return;
+                                if (isLongPrompt) {
+                                  toggleUserMessageExpand(msg.id);
+                                }
+                              }}
+                              className={cn(
+                                "max-w-2xl w-full rounded-2xl bg-[#222222] border border-[#383838] px-4 py-3 text-[14px] text-[#ececec] select-text leading-relaxed whitespace-pre-wrap break-words [overflow-wrap:anywhere] [word-break:break-word] shadow-sm overflow-hidden transition-all duration-200",
+                                isLongPrompt && "cursor-pointer hover:border-[#484848]"
+                              )}
                             >
-                              <span>{expandedUserMessages[msg.id] ? "Show less" : `Show full prompt (${msg.content.length.toLocaleString()} characters)`}</span>
-                            </button>
-                          )}
-                        </div>
+                              {isLongPrompt ? (
+                                <ScrollArea
+                                  className={cn(
+                                    "w-full transition-[max-height] duration-200 ease-in-out",
+                                    isExpanded ? "max-h-[380px]" : "max-h-24"
+                                  )}
+                                  viewportClassName="[&>div[style]]:!block"
+                                >
+                                  <div className="pr-2">{msg.content}</div>
+                                </ScrollArea>
+                              ) : (
+                                <div>{msg.content}</div>
+                              )}
+                            </div>
+                          );
+                        })()}
                         {/* User hover action bar: Timestamp (e.g. 8/16 01.00 AM), Copy, Edit */}
                         <div className="flex items-center gap-2 pt-1.5 opacity-0 group-hover:opacity-100 transition-opacity text-xs text-[#888888] select-none">
                           <span className="text-[11px] font-mono text-[#777777]">

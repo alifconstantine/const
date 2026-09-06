@@ -580,9 +580,9 @@ export function Sidebar({
       </div>
 
       {/* Middle: Chat History (Image 1, 2, 3 style with ScrollArea) */}
-      <div className="flex-1 overflow-hidden flex flex-col my-1">
-        <ScrollArea className="flex-1 w-full">
-          <div className="flex flex-col gap-2 py-1 pr-1.5">
+      <div className="flex-1 overflow-hidden flex flex-col my-1 w-full max-w-full">
+        <ScrollArea className="flex-1 w-full [&>div>div[style]]:!block" viewportClassName="[&>div[style]]:!block">
+          <div className="flex flex-col gap-2 py-1 pr-1.5 w-full max-w-full">
             {activeTab === "design" ? (
               <div className="px-2.5 py-6 text-xs text-[#777777] italic text-center">
                 Design workspace
@@ -669,7 +669,7 @@ export function Sidebar({
                             >
                               {/* Collapsible Project / Group Header */}
                               <div
-                                className="relative w-full flex items-center justify-between px-2 py-1 rounded-lg text-[13px] font-medium text-[#d4d4d4] hover:text-white transition-colors group/folder select-none hover:bg-white/5"
+                                className="relative w-full max-w-full overflow-hidden flex items-center justify-between px-2 py-1 rounded-lg text-[13px] font-medium text-[#d4d4d4] hover:text-white transition-colors group/folder select-none hover:bg-white/5"
                                 title={`Drag to reorder • ${projectName}`}
                               >
                                 <button
@@ -727,7 +727,7 @@ export function Sidebar({
 
                               {/* Task / Conversation Items inside Project */}
                               {!isCollapsed && (
-                                <div className="flex flex-col gap-0.5 pl-1">
+                                <div className="flex flex-col gap-0.5 pl-1 w-full max-w-full">
                                   {items.map((convo) => {
                                     const isActive = convo.id === activeConversationId;
                                     const isMenuOpen = openMenuConvoId === convo.id;
@@ -738,20 +738,24 @@ export function Sidebar({
                                           if ((e.target as HTMLElement).closest("[data-no-select]")) return;
                                           onSelectConversation?.(convo.id);
                                         }}
-                                        className={`relative w-full h-8 flex items-center rounded-lg px-2.5 text-[13px] transition-colors cursor-pointer group/chat text-left ${
+                                        className={`relative w-full max-w-full h-8 flex items-center rounded-lg px-2 text-[13px] transition-colors cursor-pointer group/chat text-left overflow-hidden ${
                                           isActive
                                             ? "bg-[#383838] text-white font-medium shadow-xs"
                                             : "text-[#d4d4d4] hover:text-white hover:bg-white/5"
                                         }`}
                                       >
-                                        <span className="truncate flex-1 min-w-0 pr-14 font-normal" title={convo.title}>
+                                        <span className="truncate flex-1 min-w-0 pr-16 font-normal" title={convo.title}>
                                           {convo.title || "Untitled task"}
                                         </span>
 
                                         <div
                                           data-no-select="true"
                                           onPointerDown={(e) => e.stopPropagation()}
-                                          className="absolute right-2 inset-y-0 flex items-center justify-end"
+                                          className={`absolute right-1.5 inset-y-0 flex items-center justify-end pl-2 z-10 ${
+                                            isActive
+                                              ? "bg-[#383838]"
+                                              : "bg-transparent group-hover/chat:bg-[#333333]"
+                                          }`}
                                         >
                                           {/* Relative time when NOT hovering */}
                                           <span
@@ -890,7 +894,7 @@ export function Sidebar({
 
                     {/* Conversations List: NO folder icons, comfortable sizing */}
                     {!isConversationsCollapsed && (
-                      <div className="flex flex-col gap-0.5 pl-1">
+                      <div className="flex flex-col gap-0.5 pl-1 w-full max-w-full">
                         {outsideConversations.length === 0 ? (
                           <div className="px-2.5 py-2 text-xs text-[#777777] italic">
                             No conversations
@@ -906,20 +910,24 @@ export function Sidebar({
                                   if ((e.target as HTMLElement).closest("[data-no-select]")) return;
                                   onSelectConversation?.(convo.id);
                                 }}
-                                className={`relative w-full h-8 flex items-center rounded-lg px-2.5 text-[13px] transition-colors cursor-pointer group/chat text-left ${
+                                className={`relative w-full max-w-full h-8 flex items-center rounded-lg px-2 text-[13px] transition-colors cursor-pointer group/chat text-left overflow-hidden ${
                                   isActive
                                     ? "bg-[#383838] text-white font-medium shadow-xs"
                                     : "text-[#d4d4d4] hover:text-white hover:bg-white/5"
                                 }`}
                               >
-                                <span className="truncate flex-1 min-w-0 pr-14 font-normal" title={convo.title}>
+                                <span className="truncate flex-1 min-w-0 pr-16 font-normal" title={convo.title}>
                                   {convo.title || "Untitled task"}
                                 </span>
 
                                 <div
                                   data-no-select="true"
                                   onPointerDown={(e) => e.stopPropagation()}
-                                  className="absolute right-2 inset-y-0 flex items-center justify-end"
+                                  className={`absolute right-1.5 inset-y-0 flex items-center justify-end pl-2 z-10 ${
+                                    isActive
+                                      ? "bg-[#383838]"
+                                      : "bg-transparent group-hover/chat:bg-[#333333]"
+                                  }`}
                                 >
                                   {/* Relative time when NOT hovering */}
                                   <span
