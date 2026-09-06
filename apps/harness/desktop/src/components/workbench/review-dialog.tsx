@@ -257,15 +257,15 @@ export function ReviewDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4 animate-in fade-in-0 duration-150">
-      <div className="relative w-full max-w-5xl h-[85vh] flex flex-col rounded-2xl bg-[#161616] border border-[#2b2b2b] shadow-2xl overflow-hidden font-sans">
+      <div className="relative w-full max-w-5xl h-[85vh] flex flex-col rounded-2xl bg-white dark:bg-[#161616] border border-[#e2e2e4] dark:border-[#2b2b2b] shadow-2xl overflow-hidden font-sans">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-3.5 border-b border-[#2b2b2b] bg-[#1a1a1a]/80 shrink-0">
+        <div className="flex items-center justify-between px-5 py-3.5 border-b border-[#e2e2e4] dark:border-[#2b2b2b] bg-[#f8f8f8] dark:bg-[#1a1a1a]/80 shrink-0">
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
-              <Layers className="w-4 h-4 text-[#ff7a00]" />
-              <h2 className="text-sm font-medium text-[#e5e5e5]">Review Changes</h2>
+              <Layers className="w-4 h-4 text-[#e79737] dark:text-[#ff7a00]" />
+              <h2 className="text-sm font-medium text-[#161616] dark:text-[#e5e5e5]">Review Changes</h2>
             </div>
-            <div className="flex items-center gap-1.5 font-mono text-xs text-[#888888]">
+            <div className="flex items-center gap-1.5 font-mono text-xs text-[#a9a9a9] dark:text-[#888888]">
               <span>({mutations.length} file{mutations.length > 1 ? "s" : ""})</span>
               <span className="text-[#409D62]">+{totalStats.added}</span>
               <span className="text-[#ff5c5c]">-{totalStats.removed}</span>
@@ -276,15 +276,15 @@ export function ReviewDialog({
             <button
               type="button"
               onClick={() => onRollbackAll(mutations)}
-              className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#242424] hover:bg-[#2e2e2e] border border-[#383838] hover:border-[#484848] text-xs text-[#d4d4d4] transition-all cursor-pointer font-medium"
+              className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#f4f4f6] hover:bg-[#eaeaea] dark:bg-[#242424] dark:hover:bg-[#2e2e2e] border border-[#e2e2e4] dark:border-[#383838] hover:border-[#d5d5d9] dark:hover:border-[#484848] text-xs text-[#262626] dark:text-[#d4d4d4] transition-all cursor-pointer font-medium"
             >
-              <RotateCcw className="w-3 h-3 text-[#ff7a00]" />
+              <RotateCcw className="w-3 h-3 text-[#e79737] dark:text-[#ff7a00]" />
               <span>Undo all</span>
             </button>
             <button
               type="button"
               onClick={() => onOpenChange(false)}
-              className="p-1 rounded-lg hover:bg-white/10 text-[#888888] hover:text-white transition-colors cursor-pointer"
+              className="p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-[#a9a9a9] dark:text-[#888888] hover:text-[#262626] dark:hover:text-white transition-colors cursor-pointer"
               title="Close review"
             >
               <X className="w-4 h-4" />
@@ -295,7 +295,7 @@ export function ReviewDialog({
         {/* Content Pane: Left File List + Right Diff Viewer */}
         <div className="flex-1 flex min-h-0 overflow-hidden">
           {/* Left Sidebar: File List */}
-          <div className="w-72 shrink-0 border-r border-[#2b2b2b] bg-[#141414] flex flex-col h-full overflow-hidden">
+          <div className="w-72 shrink-0 border-r border-[#e2e2e4] dark:border-[#2b2b2b] bg-[#f4f4f6] dark:bg-[#141414] flex flex-col h-full overflow-hidden">
             <ScrollArea className="flex-1 h-full w-full">
               <div className="p-2 flex flex-col gap-1">
                 {mutations.map((mut, idx) => {
@@ -313,8 +313,8 @@ export function ReviewDialog({
                       onClick={() => setSelectedIndex(idx)}
                       className={`flex items-center justify-between px-3 py-2 rounded-xl text-xs cursor-pointer transition-colors group ${
                         isSelected
-                          ? "bg-[#242424] text-white border border-[#383838]"
-                          : "text-[#999999] hover:bg-white/5 hover:text-[#d4d4d4]"
+                          ? "bg-white dark:bg-[#242424] text-black dark:text-white border border-[#e2e2e4] dark:border-[#383838] shadow-xs"
+                          : "text-[#262626] dark:text-[#999999] hover:bg-black/5 dark:hover:bg-white/5 hover:text-black dark:hover:text-[#d4d4d4]"
                       }`}
                     >
                       <div className="flex items-center gap-2 min-w-0 pr-2">
@@ -322,13 +322,13 @@ export function ReviewDialog({
                         <div className="flex flex-col min-w-0">
                           <span
                             className={`font-medium truncate ${
-                              mut.rolledBack ? "line-through text-[#666666]" : ""
+                              mut.rolledBack ? "line-through text-[#a9a9a9] dark:text-[#666666]" : ""
                             }`}
                           >
                             {fileName}
                           </span>
                           {dirPath && (
-                            <span className="text-[10px] text-[#666666] truncate">
+                            <span className="text-[10px] text-[#a9a9a9] dark:text-[#666666] truncate">
                               {dirPath}
                             </span>
                           )}
@@ -352,10 +352,10 @@ export function ReviewDialog({
                               e.stopPropagation();
                               onRollbackFile(mut);
                             }}
-                            className="opacity-0 group-hover:opacity-100 flex items-center gap-1 px-1.5 py-0.5 rounded bg-[#1e1e1e] hover:bg-[#333333] border border-[#333333] text-[10px] text-[#cccccc] transition-all cursor-pointer"
+                            className="opacity-0 group-hover:opacity-100 flex items-center gap-1 px-1.5 py-0.5 rounded bg-white hover:bg-[#eaeaea] dark:bg-[#1e1e1e] dark:hover:bg-[#333333] border border-[#e2e2e4] dark:border-[#333333] text-[10px] text-[#262626] dark:text-[#cccccc] transition-all cursor-pointer"
                             title="Undo only this file"
                           >
-                            <RotateCcw className="w-2.5 h-2.5 text-[#ff7a00]" />
+                            <RotateCcw className="w-2.5 h-2.5 text-[#e79737] dark:text-[#ff7a00]" />
                             <span>Undo</span>
                           </button>
                         )}
@@ -368,11 +368,11 @@ export function ReviewDialog({
           </div>
 
           {/* Right Area: Diff Viewer */}
-          <div className="flex-1 flex flex-col min-w-0 bg-[#121212] overflow-hidden">
+          <div className="flex-1 flex flex-col min-w-0 bg-white dark:bg-[#121212] overflow-hidden">
             {activeMutation ? (
               <>
                 {/* File Sub-header */}
-                <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#252525] bg-[#161616]/50 shrink-0 text-xs">
+                <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#e2e2e4] dark:border-[#252525] bg-[#f8f8f8] dark:bg-[#161616]/50 shrink-0 text-xs">
                   <div className="flex items-center gap-2 min-w-0">
                     <FileIcon
                       filename={
@@ -383,10 +383,10 @@ export function ReviewDialog({
                           .pop() || ""
                       }
                     />
-                    <span className="font-mono text-[#e5e5e5] truncate">
+                    <span className="font-mono text-[#161616] dark:text-[#e5e5e5] truncate">
                       {activeMutation.targetFile}
                     </span>
-                    <span className="text-[#666666] uppercase text-[10px] px-1.5 py-0.5 rounded bg-white/5">
+                    <span className="text-[#a9a9a9] dark:text-[#666666] uppercase text-[10px] px-1.5 py-0.5 rounded bg-black/5 dark:bg-white/5">
                       {activeMutation.operation}
                     </span>
                   </div>
@@ -401,9 +401,9 @@ export function ReviewDialog({
                       <button
                         type="button"
                         onClick={() => onRollbackFile(activeMutation)}
-                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#222222] hover:bg-[#2c2c2c] border border-[#383838] text-xs text-[#d4d4d4] transition-all cursor-pointer font-medium"
+                        className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#f4f4f6] hover:bg-[#eaeaea] dark:bg-[#222222] dark:hover:bg-[#2c2c2c] border border-[#e2e2e4] dark:border-[#383838] text-xs text-[#262626] dark:text-[#d4d4d4] transition-all cursor-pointer font-medium"
                       >
-                        <RotateCcw className="w-3 h-3 text-[#ff7a00]" />
+                        <RotateCcw className="w-3 h-3 text-[#e79737] dark:text-[#ff7a00]" />
                         <span>Undo this file</span>
                       </button>
                     )}
@@ -413,12 +413,12 @@ export function ReviewDialog({
                 {/* Diff Lines Table */}
                 <ScrollArea className="flex-1 h-full w-full font-mono text-[12px] leading-relaxed p-2 select-text">
                   {diffLines.length === 0 ? (
-                    <div className="flex items-center justify-center h-48 text-xs text-[#666666]">
+                    <div className="flex items-center justify-center h-48 text-xs text-[#a9a9a9] dark:text-[#666666]">
                       No line changes detected
                     </div>
                   ) : (
                     diffLines.map((line, idx) => {
-                      let rowStyle = "text-[#888888] hover:bg-white/[0.02]";
+                      let rowStyle = "text-[#262626] dark:text-[#888888] hover:bg-black/[0.02] dark:hover:bg-white/[0.02]";
                       let sign = " ";
                       if (line.type === "added") {
                         rowStyle = "bg-[#409D62]/10 text-[#409D62]";
@@ -433,10 +433,10 @@ export function ReviewDialog({
                           key={idx}
                           className={`flex items-start px-2 py-0.5 rounded-xs ${rowStyle}`}
                         >
-                          <span className="w-8 shrink-0 text-right pr-2 text-[#555555] select-none text-[11px]">
+                          <span className="w-8 shrink-0 text-right pr-2 text-[#a9a9a9] dark:text-[#555555] select-none text-[11px]">
                             {line.oldNum || ""}
                           </span>
-                          <span className="w-8 shrink-0 text-right pr-2 text-[#555555] select-none text-[11px]">
+                          <span className="w-8 shrink-0 text-right pr-2 text-[#a9a9a9] dark:text-[#555555] select-none text-[11px]">
                             {line.newNum || ""}
                           </span>
                           <span className="w-4 shrink-0 text-center font-bold select-none">
@@ -452,7 +452,7 @@ export function ReviewDialog({
                 </ScrollArea>
               </>
             ) : (
-              <div className="flex items-center justify-center h-full text-xs text-[#666666]">
+              <div className="flex items-center justify-center h-full text-xs text-[#a9a9a9] dark:text-[#666666]">
                 Select a file to review changes
               </div>
             )}

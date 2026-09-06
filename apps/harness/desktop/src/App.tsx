@@ -31,6 +31,7 @@ import { ExecutionTrace, MutationsSummaryCard } from "./components/workbench/exe
 import { ReviewDialog } from "./components/workbench/review-dialog";
 import { SettingsView } from "./components/settings-view";
 import { useAppAuth } from "./components/convex-provider";
+import { useConversationWidth } from "./lib/theme";
 import {
   loadConversations,
   saveConversation,
@@ -201,7 +202,7 @@ function AuthenticatedContent({
         <div
           key={att.id}
           onClick={() => setPreviewMedia(att)}
-          className="group relative rounded-xl overflow-hidden border border-[#383838] hover:border-white/30 bg-black/40 max-w-sm max-h-72 shadow-md cursor-pointer transition-all"
+          className="group relative rounded-xl overflow-hidden border border-[#e2e2e4] dark:border-[#383838] hover:border-black/30 dark:hover:border-white/30 bg-[#f4f4f6] dark:bg-black/40 max-w-sm max-h-72 shadow-md cursor-pointer transition-all"
         >
           <img
             src={att.url}
@@ -222,7 +223,7 @@ function AuthenticatedContent({
         <div
           key={att.id}
           onClick={() => setPreviewMedia(att)}
-          className="group relative rounded-xl overflow-hidden border border-[#383838] hover:border-white/30 bg-black max-w-sm max-h-72 shadow-md cursor-pointer transition-all"
+          className="group relative rounded-xl overflow-hidden border border-[#e2e2e4] dark:border-[#383838] hover:border-black/30 dark:hover:border-white/30 bg-black max-w-sm max-h-72 shadow-md cursor-pointer transition-all"
         >
           <video
             src={att.url}
@@ -240,14 +241,14 @@ function AuthenticatedContent({
       <div
         key={att.id}
         onClick={() => setPreviewMedia(att)}
-        className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-[#1e1e1e] hover:bg-[#252525] border border-[#383838] hover:border-white/20 text-xs text-[#d4d4d4] shadow-sm cursor-pointer transition-all"
+        className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-white dark:bg-[#1e1e1e] hover:bg-[#f4f4f6] dark:hover:bg-[#252525] border border-[#e2e2e4] dark:border-[#383838] hover:border-black/20 dark:hover:border-white/20 text-xs text-[#262626] dark:text-[#d4d4d4] shadow-sm cursor-pointer transition-all"
       >
-        <FileText className="w-4 h-4 text-[#ff7a00] shrink-0" />
+        <FileText className="w-4 h-4 text-[#e79737] dark:text-[#ff7a00] shrink-0" />
         <div className="flex flex-col min-w-0">
           <span className="font-medium truncate max-w-[200px]" title={att.name}>
             {att.name}
           </span>
-          <span className="text-[10px] text-[#777777] font-mono">
+          <span className="text-[10px] text-[#a9a9a9] dark:text-[#777777] font-mono">
             {formatFileSize(att.size)}
           </span>
         </div>
@@ -260,6 +261,27 @@ function AuthenticatedContent({
     if (currentProject === "Outside Project") return "";
     return currentProject.replace(/\\/g, "/").split("/").filter(Boolean).pop() || currentProject;
   }, [currentProject]);
+
+  // Dynamic Conversation Width classes (Default: 3xl/768px, Narrow: slightly wider at 640px, Wide: slightly narrower at 4xl/896px)
+  const [conversationWidth] = useConversationWidth();
+
+  const landingWidthClass = useMemo(() => {
+    if (conversationWidth === "narrow") return "max-w-xl";
+    if (conversationWidth === "wide") return "max-w-3xl";
+    return "max-w-2xl";
+  }, [conversationWidth]);
+
+  const streamWidthClass = useMemo(() => {
+    if (conversationWidth === "narrow") return "max-w-[640px]";
+    if (conversationWidth === "wide") return "max-w-4xl";
+    return "max-w-3xl";
+  }, [conversationWidth]);
+
+  const userBubbleWidthClass = useMemo(() => {
+    if (conversationWidth === "narrow") return "max-w-xl";
+    if (conversationWidth === "wide") return "max-w-3xl";
+    return "max-w-2xl";
+  }, [conversationWidth]);
 
   // Dynamic Context Usage computation (Image 3)
   const contextUsage = useMemo<ContextUsageData>(() => {
@@ -839,7 +861,7 @@ function AuthenticatedContent({
   }
 
   return (
-    <div className="h-screen w-screen flex bg-[#2b2b2b] text-[#d4d4d4] overflow-hidden select-none">
+    <div className="h-screen w-screen flex bg-[#ececee] dark:bg-[#2b2b2b] text-[#262626] dark:text-[#d4d4d4] overflow-hidden select-none">
       {/* Left Sidebar (Only visible when isSidebarOpen = true) */}
       {isSidebarOpen && (
         <Sidebar
@@ -860,10 +882,10 @@ function AuthenticatedContent({
         />
       )}
 
-      {/* Main Content Area: Background #161616, text #d4d4d4, rounded only on left */}
+      {/* Main Content Area: Background #f8f8f8 (light) / #161616 (dark), text #262626 / #d4d4d4 */}
       <main
-        className={`flex-1 h-full bg-[#161616] text-[#d4d4d4] overflow-hidden flex flex-col relative transition-[border-radius] duration-200 ${
-          isSidebarOpen ? "rounded-l-2xl sm:rounded-l-3xl border-l border-[#333333]/40" : ""
+        className={`flex-1 h-full bg-[#f8f8f8] dark:bg-[#161616] text-[#262626] dark:text-[#d4d4d4] overflow-hidden flex flex-col relative transition-[border-radius] duration-200 ${
+          isSidebarOpen ? "rounded-l-2xl sm:rounded-l-3xl border-l border-[#dedee2] dark:border-[#333333]/40" : ""
         }`}
       >
         {/* Top Window Toolbar */}
@@ -879,10 +901,10 @@ function AuthenticatedContent({
         {messages.length === 0 ? (
           <div className="flex-1 relative flex flex-col items-center justify-center px-4 sm:px-8 pt-6 pb-6 overflow-y-auto">
             {/* Centered Conversation Container */}
-            <div className="relative flex flex-col items-center w-full max-w-2xl z-10 translate-y-6 sm:translate-y-8">
+            <div className={cn("relative flex flex-col items-center w-full z-10 translate-y-6 sm:translate-y-8", landingWidthClass)}>
 
-              {/* Greeting Text: Color #d4d4d4 */}
-              <h1 className="text-2xl sm:text-[28px] font-medium tracking-tight text-[#d4d4d4] text-center mb-6 z-10 font-sans">
+              {/* Greeting Text */}
+              <h1 className="text-2xl sm:text-[28px] font-medium tracking-tight text-[#262626] dark:text-[#d4d4d4] text-center mb-6 z-10 font-sans">
                 {greeting}
               </h1>
 
@@ -916,14 +938,14 @@ function AuthenticatedContent({
               data-chat-viewport="true"
               className="flex-1 w-full h-full [&>div>div[style]]:!block"
             >
-              <div className="w-full max-w-3xl mx-auto px-4 sm:px-8 py-6 flex flex-col gap-6">
+              <div className={cn("w-full mx-auto px-4 sm:px-8 py-6 flex flex-col gap-6", streamWidthClass)}>
                 {messages.map((msg, idx) => (
                   <div key={msg.id} data-chat-anchor-key={msg.id} className="w-full flex flex-col">
                     {msg.role === "user" ? (
                       <div className="w-full flex flex-col items-end group">
                         {/* Attached Files (if any) */}
                         {msg.attachments && msg.attachments.length > 0 && (
-                          <div className="flex flex-wrap gap-2 mb-2 justify-end max-w-2xl">
+                          <div className={cn("flex flex-wrap gap-2 mb-2 justify-end", userBubbleWidthClass)}>
                             {msg.attachments.map((att) => renderMessageAttachment(att))}
                           </div>
                         )}
@@ -944,8 +966,9 @@ function AuthenticatedContent({
                                 }
                               }}
                               className={cn(
-                                "max-w-2xl w-full rounded-2xl bg-[#222222] border border-[#383838] px-4 py-3 text-[14px] text-[#ececec] select-text leading-relaxed whitespace-pre-wrap break-words [overflow-wrap:anywhere] [word-break:break-word] shadow-sm overflow-hidden transition-all duration-200",
-                                isLongPrompt && !isExpanded && "cursor-pointer hover:border-[#484848]"
+                                "w-full rounded-2xl bg-[#f0f0f0] dark:bg-[#222222] border border-[#e2e2e4] dark:border-[#383838] px-4 py-3 text-[14px] text-[#262626] dark:text-[#ececec] select-text leading-relaxed whitespace-pre-wrap break-words [overflow-wrap:anywhere] [word-break:break-word] shadow-xs overflow-hidden transition-all duration-200",
+                                userBubbleWidthClass,
+                                isLongPrompt && !isExpanded && "cursor-pointer hover:border-[#b0b0b0] dark:hover:border-[#484848]"
                               )}
                             >
                               {isLongPrompt ? (
@@ -964,15 +987,15 @@ function AuthenticatedContent({
                             </div>
                           );
                         })()}
-                        {/* User hover action bar: Timestamp (e.g. 8/16 01.00 AM), Copy, Edit */}
-                        <div className="flex items-center gap-2 pt-1.5 opacity-0 group-hover:opacity-100 transition-opacity text-xs text-[#888888] select-none">
-                          <span className="text-[11px] font-mono text-[#777777]">
+                        {/* User hover action bar: Timestamp, Copy, Edit */}
+                        <div className="flex items-center gap-2 pt-1.5 opacity-0 group-hover:opacity-100 transition-opacity text-xs text-[#a9a9a9] dark:text-[#888888] select-none">
+                          <span className="text-[11px] font-mono text-[#a9a9a9] dark:text-[#777777]">
                             {formatMessageTimestamp(msg.timestamp)}
                           </span>
                           <button
                             type="button"
                             onClick={() => handleCopyMessage(msg.id, msg.content)}
-                            className="p-1 rounded hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
+                            className="p-1 rounded hover:bg-black/5 dark:hover:bg-white/10 hover:text-[#262626] dark:hover:text-white transition-colors cursor-pointer"
                             title="Copy message"
                           >
                             {copiedId === msg.id ? (
@@ -984,7 +1007,7 @@ function AuthenticatedContent({
                           <button
                             type="button"
                             onClick={() => handleEditMessage(msg.content)}
-                            className="p-1 rounded hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
+                            className="p-1 rounded hover:bg-black/5 dark:hover:bg-white/10 hover:text-[#262626] dark:hover:text-white transition-colors cursor-pointer"
                             title="Edit message"
                           >
                             <Pencil className="w-3.5 h-3.5" />
@@ -992,7 +1015,7 @@ function AuthenticatedContent({
                         </div>
                       </div>
                     ) : (
-                      <div className="w-full flex flex-col gap-2.5 max-w-3xl group">
+                      <div className={cn("w-full flex flex-col gap-2.5 group", streamWidthClass)}>
                         <ExecutionTrace
                           thinking={msg.thinking}
                           toolCalls={msg.toolCalls}
@@ -1026,13 +1049,13 @@ function AuthenticatedContent({
                           />
                         )}
 
-                        {/* Assistant hover action bar: Copy, Good, Bad, and Timestamp directly to the right of Bad response */}
+                        {/* Assistant hover action bar: Copy, Good, Bad, and Timestamp */}
                         {!isExecuting && msg.content && (
-                          <div className="flex items-center gap-1.5 pt-1 opacity-0 group-hover:opacity-100 transition-opacity text-xs text-[#888888] select-none">
+                          <div className="flex items-center gap-1.5 pt-1 opacity-0 group-hover:opacity-100 transition-opacity text-xs text-[#a9a9a9] dark:text-[#888888] select-none">
                             <button
                               type="button"
                               onClick={() => handleCopyMessage(msg.id, msg.content)}
-                              className="p-1 rounded hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
+                              className="p-1 rounded hover:bg-black/5 dark:hover:bg-white/10 hover:text-[#262626] dark:hover:text-white transition-colors cursor-pointer"
                               title="Copy response"
                             >
                               {copiedId === msg.id ? (
@@ -1045,10 +1068,10 @@ function AuthenticatedContent({
                               type="button"
                               onClick={() => handleFeedback(msg.id, "good")}
                               className={cn(
-                                "p-1 rounded hover:bg-white/10 transition-colors cursor-pointer",
+                                "p-1 rounded hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer",
                                 feedbackMap[msg.id] === "good"
                                   ? "text-[#4ade80]"
-                                  : "text-[#888888] hover:text-[#d4d4d4]"
+                                  : "text-[#a9a9a9] dark:text-[#888888] hover:text-[#262626] dark:hover:text-[#d4d4d4]"
                               )}
                               title="Good response"
                             >
@@ -1058,16 +1081,16 @@ function AuthenticatedContent({
                               type="button"
                               onClick={() => handleFeedback(msg.id, "bad")}
                               className={cn(
-                                "p-1 rounded hover:bg-white/10 transition-colors cursor-pointer",
+                                "p-1 rounded hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer",
                                 feedbackMap[msg.id] === "bad"
                                   ? "text-[#ef4444]"
-                                  : "text-[#888888] hover:text-[#d4d4d4]"
+                                  : "text-[#a9a9a9] dark:text-[#888888] hover:text-[#262626] dark:hover:text-[#d4d4d4]"
                               )}
                               title="Bad response"
                             >
                               <ThumbsDown className="w-3.5 h-3.5" />
                             </button>
-                            <span className="text-[11px] font-mono text-[#777777] ml-1.5">
+                            <span className="text-[11px] font-mono text-[#a9a9a9] dark:text-[#777777] ml-1.5">
                               {formatMessageTimestamp(msg.timestamp)}
                             </span>
                           </div>
@@ -1081,8 +1104,8 @@ function AuthenticatedContent({
             </ScrollArea>
 
             {/* Anchored Bottom Chat Input (No dividing line!) */}
-            <div className="w-full px-4 sm:px-8 pb-4 pt-2 flex justify-center bg-[#161616] shrink-0">
-              <div className="w-full max-w-3xl">
+            <div className="w-full px-4 sm:px-8 pb-4 pt-2 flex justify-center bg-[#f8f8f8] dark:bg-[#161616] shrink-0">
+              <div className={cn("w-full", streamWidthClass)}>
                 <ChatCard
                   compact
                   isExecuting={isExecuting}

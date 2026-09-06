@@ -19,7 +19,7 @@ export function MarkdownContent({ content, className = "" }: MarkdownContentProp
   const tokens = marked.lexer(content);
 
   return (
-    <div className={`space-y-3 text-[14px] leading-relaxed text-[#d4d4d4] select-text font-sans ${className}`}>
+    <div className={`space-y-3 text-[14px] leading-relaxed text-[#262626] dark:text-[#d4d4d4] select-text font-sans ${className}`}>
       {tokens.map((token, index) => (
         <TokenRenderer key={index} token={token} />
       ))}
@@ -34,10 +34,10 @@ function TokenRenderer({ token }: { token: Token }) {
       const Tag = `h${Math.min(heading.depth, 6)}` as keyof React.JSX.IntrinsicElements;
       const sizeClasses =
         heading.depth === 1
-          ? "text-xl font-semibold text-white mt-4 mb-2"
+          ? "text-xl font-semibold text-[#161616] dark:text-white mt-4 mb-2"
           : heading.depth === 2
-          ? "text-lg font-semibold text-white mt-3 mb-1.5"
-          : "text-base font-medium text-[#d4d4d4] mt-2 mb-1";
+          ? "text-lg font-semibold text-[#161616] dark:text-white mt-3 mb-1.5"
+          : "text-base font-medium text-[#262626] dark:text-[#d4d4d4] mt-2 mb-1";
       return (
         <Tag className={`${sizeClasses} tracking-tight font-sans`}>
           <InlineRenderer text={heading.text} />
@@ -48,7 +48,7 @@ function TokenRenderer({ token }: { token: Token }) {
     case "paragraph": {
       const paragraph = token as Tokens.Paragraph;
       return (
-        <p className="leading-relaxed text-[#d4d4d4] my-1.5">
+        <p className="leading-relaxed text-[#262626] dark:text-[#d4d4d4] my-1.5">
           <InlineRenderer text={paragraph.text} />
         </p>
       );
@@ -63,7 +63,7 @@ function TokenRenderer({ token }: { token: Token }) {
       const list = token as Tokens.List;
       if (list.ordered) {
         return (
-          <ol className="list-decimal pl-5 space-y-1.5 my-2 text-[#d4d4d4]" start={list.start || 1}>
+          <ol className="list-decimal pl-5 space-y-1.5 my-2 text-[#262626] dark:text-[#d4d4d4]" start={list.start || 1}>
             {list.items.map((item: Tokens.ListItem, idx: number) => (
               <li key={idx} className="leading-relaxed pl-1">
                 <InlineRenderer text={item.text} />
@@ -73,7 +73,7 @@ function TokenRenderer({ token }: { token: Token }) {
         );
       }
       return (
-        <ul className="list-disc pl-5 space-y-1.5 my-2 text-[#d4d4d4]">
+        <ul className="list-disc pl-5 space-y-1.5 my-2 text-[#262626] dark:text-[#d4d4d4]">
           {list.items.map((item: Tokens.ListItem, idx: number) => (
             <li key={idx} className="leading-relaxed pl-1">
               <InlineRenderer text={item.text} />
@@ -86,14 +86,14 @@ function TokenRenderer({ token }: { token: Token }) {
     case "blockquote": {
       const bq = token as Tokens.Blockquote;
       return (
-        <blockquote className="border-l-2 border-[#ff7a00]/70 pl-3.5 py-1 my-2.5 text-[#a3a3a3] bg-white/[0.02] rounded-r-lg italic">
+        <blockquote className="border-l-2 border-[#e79737] dark:border-[#ff7a00]/70 pl-3.5 py-1 my-2.5 text-[#262626] dark:text-[#a3a3a3] bg-black/[0.03] dark:bg-white/[0.02] rounded-r-lg italic">
           <InlineRenderer text={bq.text} />
         </blockquote>
       );
     }
 
     case "hr":
-      return <div className="h-[1px] bg-[#333333]/80 my-4" />;
+      return <div className="h-[1px] bg-[#e2e2e4] dark:bg-[#333333]/80 my-4" />;
 
     case "space":
       return null;
@@ -101,7 +101,7 @@ function TokenRenderer({ token }: { token: Token }) {
     default: {
       if ("text" in token && typeof (token as any).text === "string") {
         return (
-          <p className="leading-relaxed text-[#d4d4d4] my-1">
+          <p className="leading-relaxed text-[#262626] dark:text-[#d4d4d4] my-1">
             <InlineRenderer text={(token as any).text} />
           </p>
         );
@@ -125,20 +125,20 @@ function CodeBlock({ code, language }: { code: string; language: string }) {
   };
 
   return (
-    <div className="rounded-xl overflow-hidden bg-[#181818] border border-[#2e2e2e] my-3 select-none">
+    <div className="rounded-xl overflow-hidden bg-[#f4f4f6] dark:bg-[#181818] border border-[#e2e2e4] dark:border-[#2e2e2e] my-3 select-none">
       {/* Code Header Strip */}
-      <div className="flex items-center justify-between px-3.5 py-1.5 bg-[#202020] border-b border-[#2e2e2e] text-xs">
-        <span className="font-mono text-[11px] text-[#888888] lowercase">{language}</span>
+      <div className="flex items-center justify-between px-3.5 py-1.5 bg-[#eaeaea] dark:bg-[#202020] border-b border-[#e2e2e4] dark:border-[#2e2e2e] text-xs">
+        <span className="font-mono text-[11px] text-[#a9a9a9] dark:text-[#888888] lowercase">{language}</span>
         <button
           type="button"
           onClick={handleCopy}
-          className="flex items-center gap-1 text-[11px] text-[#888888] hover:text-[#d4d4d4] transition-colors cursor-pointer py-0.5 px-1.5 rounded hover:bg-white/5"
+          className="flex items-center gap-1 text-[11px] text-[#a9a9a9] dark:text-[#888888] hover:text-[#262626] dark:hover:text-[#d4d4d4] transition-colors cursor-pointer py-0.5 px-1.5 rounded hover:bg-black/5 dark:hover:bg-white/5"
           title="Copy code"
         >
           {copied ? (
             <>
-              <Check className="w-3 h-3 text-[#4ade80]" />
-              <span className="text-[#4ade80]">Copied</span>
+              <Check className="w-3 h-3 text-[#16a34a] dark:text-[#4ade80]" />
+              <span className="text-[#16a34a] dark:text-[#4ade80]">Copied</span>
             </>
           ) : (
             <>
@@ -150,7 +150,7 @@ function CodeBlock({ code, language }: { code: string; language: string }) {
       </div>
 
       {/* Code Body */}
-      <pre className="p-3.5 overflow-x-auto text-[13px] leading-5 font-mono text-[#d4d4d4] select-text">
+      <pre className="p-3.5 overflow-x-auto text-[13px] leading-5 font-mono text-[#262626] dark:text-[#d4d4d4] select-text">
         <code>{code}</code>
       </pre>
     </div>
@@ -164,7 +164,7 @@ function InlineRenderer({ text }: { text: string }) {
     return (
       <span
         dangerouslySetInnerHTML={{ __html: html }}
-        className="[&>code]:bg-[#242424] [&>code]:text-[#e0e0e0] [&>code]:font-mono [&>code]:text-[12px] [&>code]:px-1.5 [&>code]:py-0.5 [&>code]:rounded [&>code]:border [&>code]:border-[#383838] [&>strong]:font-semibold [&>strong]:text-white [&>a]:text-[#ff7a00] [&>a]:hover:underline"
+        className="[&>code]:bg-[#eaeaea] dark:[&>code]:bg-[#242424] [&>code]:text-[#161616] dark:[&>code]:text-[#e0e0e0] [&>code]:font-mono [&>code]:text-[12px] [&>code]:px-1.5 [&>code]:py-0.5 [&>code]:rounded [&>code]:border [&>code]:border-[#e2e2e4] dark:[&>code]:border-[#383838] [&>strong]:font-semibold [&>strong]:text-[#161616] dark:[&>strong]:text-white [&>a]:text-[#e79737] dark:[&>a]:text-[#ff7a00] [&>a]:hover:underline"
       />
     );
   }

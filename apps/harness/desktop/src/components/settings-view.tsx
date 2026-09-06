@@ -41,12 +41,15 @@ import {
   Square,
   Copy,
   X,
+  Sun,
+  Moon,
 } from "lucide-react";
 import { useQuery } from "convex/react";
 import { api } from "@const/backend/_generated/api";
 import type { UserProfile } from "./sidebar";
 import { getUserInitials } from "./sidebar";
 import type { UserConfig } from "../vite-env";
+import { useTheme, useConversationWidth, type Theme, type ConversationWidth } from "../lib/theme";
 
 interface SettingsViewProps {
   onBackToWorkspace: () => void;
@@ -149,6 +152,10 @@ export function SettingsView({
 }: SettingsViewProps) {
   // Navigation active tab
   const [activeTab, setActiveTab] = useState<string>(initialTab);
+
+  // Appearance & Theme settings
+  const [theme, setTheme] = useTheme();
+  const [conversationWidth, setConversationWidth] = useConversationWidth();
 
   // Model settings sub-selection: "const" or custom provider ID or "add-provider"
   const [selectedProviderId, setSelectedProviderId] = useState<string>("const");
@@ -399,11 +406,11 @@ export function SettingsView({
   const initials = getUserInitials(user?.name, user?.email);
 
   return (
-    <div className="w-screen h-screen overflow-hidden flex bg-[#161616] text-[#d4d4d4] select-none font-sans">
+    <div className="w-screen h-screen overflow-hidden flex bg-[#f8f8f8] dark:bg-[#161616] text-[#262626] dark:text-[#d4d4d4] select-none font-sans">
       {/* ------------------------------------------------------------- */}
       {/* Left Sidebar (Full height, 260px, following DESIGN.md) */}
       {/* ------------------------------------------------------------- */}
-      <aside className="w-[260px] h-full flex flex-col justify-between shrink-0 bg-[#2b2b2b] text-[#d4d4d4] border-r border-[#383838]/40 p-3 select-none">
+      <aside className="w-[260px] h-full flex flex-col justify-between shrink-0 bg-[#ececee] dark:bg-[#2b2b2b] text-[#262626] dark:text-[#d4d4d4] border-r border-[#dedee2] dark:border-[#383838]/40 p-3 select-none">
         {/* Top: Const Logo and Back to workspace button */}
         <div className="flex flex-col gap-3">
           {/* Frameless top drag handle with Const Logo */}
@@ -415,7 +422,7 @@ export function SettingsView({
               style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
               className="flex items-center gap-2"
             >
-              <ConstLogoIcon size="sm" className="w-5 h-5 text-white" />
+              <ConstLogoIcon size="sm" className="w-5 h-5 text-[#262626] dark:text-white" />
             </div>
           </div>
 
@@ -423,9 +430,9 @@ export function SettingsView({
           <button
             type="button"
             onClick={onBackToWorkspace}
-            className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-[#d4d4d4] hover:text-white hover:bg-[#383838] transition-colors cursor-pointer"
+            className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-[#dedee2] dark:hover:bg-[#383838] transition-colors cursor-pointer"
           >
-            <ArrowLeft className="w-4 h-4 text-[#969696]" />
+            <ArrowLeft className="w-4 h-4 text-[#8a8a8a] dark:text-[#969696]" />
             <span>Back to workspace</span>
           </button>
 
@@ -434,7 +441,7 @@ export function SettingsView({
             <div className="flex flex-col gap-4 pt-1">
               {navCategories.map((cat) => (
                 <div key={cat.label} className="flex flex-col gap-1">
-                  <span className="text-[11px] font-medium text-[#737373] px-2.5 tracking-tight">
+                  <span className="text-[11px] font-medium text-[#a9a9a9] dark:text-[#737373] px-2.5 tracking-tight">
                     {cat.label}
                   </span>
                   <div className="flex flex-col gap-0.5">
@@ -449,14 +456,14 @@ export function SettingsView({
                           className={cn(
                             "w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer",
                             isActive
-                              ? "bg-[#383838] text-white"
-                              : "text-[#d4d4d4] hover:text-white hover:bg-[#383838]/60"
+                              ? "bg-[#dedee2] dark:bg-[#383838] text-[#262626] dark:text-white font-medium"
+                              : "text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-[#dedee2]/60 dark:hover:bg-[#383838]/60"
                           )}
                         >
                           <Icon
                             className={cn(
                               "w-4 h-4 shrink-0",
-                              isActive ? "text-white" : "text-[#969696]"
+                              isActive ? "text-[#262626] dark:text-white" : "text-[#8a8a8a] dark:text-[#969696]"
                             )}
                           />
                           <span className="truncate">{item.label}</span>
@@ -471,25 +478,25 @@ export function SettingsView({
         </div>
 
         {/* Bottom Section: Onboard & User Profile */}
-        <div className="flex flex-col gap-2 pt-2 border-t border-[#383838]/40">
+        <div className="flex flex-col gap-2 pt-2 border-t border-[#dedee2] dark:border-[#383838]/40">
           <button
             type="button"
             onClick={() => setActiveTab("onboard")}
             className={cn(
               "w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer",
               activeTab === "onboard"
-                ? "bg-[#383838] text-white"
-                : "text-[#d4d4d4] hover:text-white hover:bg-[#383838]/60"
+                ? "bg-[#dedee2] dark:bg-[#383838] text-[#262626] dark:text-white font-medium"
+                : "text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-[#dedee2]/60 dark:hover:bg-[#383838]/60"
             )}
           >
-            <Rocket className="w-4 h-4 text-[#969696] shrink-0" />
+            <Rocket className="w-4 h-4 text-[#8a8a8a] dark:text-[#969696] shrink-0" />
             <span>Onboard</span>
           </button>
 
           {/* User Profile bar */}
-          <div className="flex items-center justify-between px-2 py-1.5 rounded-xl hover:bg-[#383838]/50 transition-colors">
+          <div className="flex items-center justify-between px-2 py-1.5 rounded-xl hover:bg-[#dedee2]/60 dark:hover:bg-[#383838]/50 transition-colors">
             <div className="flex items-center gap-2 min-w-0">
-              <Avatar className="h-7 w-7 rounded-full bg-[#1e1e1e] border border-[#383838] shrink-0">
+              <Avatar className="h-7 w-7 rounded-full bg-[#ffffff] dark:bg-[#1e1e1e] border border-[#dedee2] dark:border-[#383838] shrink-0">
                 {user?.image ? (
                   <AvatarImage
                     src={user.image}
@@ -497,16 +504,16 @@ export function SettingsView({
                     className="object-cover"
                   />
                 ) : (
-                  <AvatarFallback className="text-[11px] font-semibold text-white bg-[#383838]">
+                  <AvatarFallback className="text-[11px] font-semibold text-[#262626] dark:text-white bg-[#dedee2] dark:bg-[#383838]">
                     {initials}
                   </AvatarFallback>
                 )}
               </Avatar>
               <div className="min-w-0 flex-1">
-                <p className="text-xs font-medium text-white truncate">
+                <p className="text-xs font-medium text-[#262626] dark:text-white truncate">
                   {user?.name || "Alif Constantine"}
                 </p>
-                <p className="text-[10px] text-[#888888] truncate">
+                <p className="text-[10px] text-[#a9a9a9] dark:text-[#888888] truncate">
                   {user?.email || "Workspace"}
                 </p>
               </div>
@@ -514,7 +521,7 @@ export function SettingsView({
             <button
               type="button"
               onClick={() => setActiveTab("general")}
-              className="p-1 rounded-md text-[#969696] hover:text-white transition-colors cursor-pointer"
+              className="p-1 rounded-md text-[#8a8a8a] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white transition-colors cursor-pointer"
               title="Settings"
             >
               <Settings className="w-3.5 h-3.5" />
@@ -526,7 +533,7 @@ export function SettingsView({
       {/* ------------------------------------------------------------- */}
       {/* Right Main Content Area */}
       {/* ------------------------------------------------------------- */}
-      <main className="flex-1 h-full flex flex-col bg-[#161616] overflow-hidden">
+      <main className="flex-1 h-full flex flex-col bg-[#f8f8f8] dark:bg-[#161616] overflow-hidden">
         {/* Top Header Region (Frameless Draggable Window Strip) */}
         <div
           className="h-10 w-full flex items-center justify-end px-3 shrink-0 select-none z-30"
@@ -534,13 +541,13 @@ export function SettingsView({
         >
           {/* Window Controls */}
           <div
-            className="flex items-center gap-0.5 text-[#d4d4d4]"
+            className="flex items-center gap-0.5 text-[#262626] dark:text-[#d4d4d4]"
             style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
           >
             <button
               type="button"
               onClick={() => window.electron?.minimize?.()}
-              className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-white/10 text-[#d4d4d4] hover:text-white transition-colors cursor-pointer"
+              className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-black/5 dark:hover:bg-white/10 text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white transition-colors cursor-pointer"
               title="Minimize"
             >
               <Minus className="w-3.5 h-3.5" />
@@ -548,7 +555,7 @@ export function SettingsView({
             <button
               type="button"
               onClick={() => window.electron?.maximize?.()}
-              className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-white/10 text-[#d4d4d4] hover:text-white transition-colors cursor-pointer"
+              className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-black/5 dark:hover:bg-white/10 text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white transition-colors cursor-pointer"
               title={isMaximized ? "Restore" : "Maximize"}
             >
               {isMaximized ? (
@@ -560,7 +567,7 @@ export function SettingsView({
             <button
               type="button"
               onClick={() => window.electron?.close?.()}
-              className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[#e81123] text-[#d4d4d4] hover:text-white transition-colors cursor-pointer"
+              className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[#e81123] hover:text-white text-[#262626] dark:text-[#d4d4d4] transition-colors cursor-pointer"
               title="Close"
             >
               <X className="w-3.5 h-3.5" />
@@ -570,13 +577,129 @@ export function SettingsView({
 
         {/* Dynamic Section Content */}
         <div className="flex-1 overflow-y-auto px-8 py-4 max-w-6xl w-full mx-auto">
-          {activeTab !== "model-settings" ? (
+          {activeTab === "appearance" ? (
+            /* ----------------------------------------------------------- */
+            /* Appearance Settings Tab (1:1 with Image 1 reference) */
+            /* ----------------------------------------------------------- */
+            <div className="flex flex-col gap-6 max-w-4xl">
+              {/* Header */}
+              <div>
+                <h1 className="text-2xl font-medium text-[#262626] dark:text-white">Appearance</h1>
+                <p className="mt-1 text-xs text-[#a9a9a9] dark:text-[#888888]">
+                  Configure conversation layout width and visual appearance.
+                </p>
+              </div>
+
+              {/* Chat Settings Section (Image 1) */}
+              <div className="flex flex-col gap-2">
+                <span className="text-xs font-semibold text-[#262626] dark:text-[#d4d4d4] tracking-tight">
+                  Chat Settings
+                </span>
+                <div className="rounded-2xl border border-[#dedee2] dark:border-[#2e2e2e] bg-[#ffffff] dark:bg-[#1a1a1a] p-4 sm:p-5 shadow-xs flex flex-col gap-4">
+                  {/* Conversation Width row */}
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex flex-col">
+                      <span className="text-sm font-medium text-[#262626] dark:text-white">
+                        Conversation Width
+                      </span>
+                      <span className="text-xs text-[#a9a9a9] dark:text-[#888888] mt-0.5">
+                        Configure the maximum width of the conversation panel.
+                      </span>
+                    </div>
+
+                    {/* Segmented Control: [Default] [Narrow] [Wide] */}
+                    <div className="inline-flex p-1 rounded-xl bg-[#ececee] dark:bg-[#252525] border border-[#dedee2] dark:border-[#333333] items-center gap-1 shrink-0">
+                      {(["default", "narrow", "wide"] as const).map((w) => {
+                        const isSelected = conversationWidth === w;
+                        const label = w === "default" ? "Default" : w === "narrow" ? "Narrow" : "Wide";
+                        return (
+                          <button
+                            key={w}
+                            type="button"
+                            onClick={() => setConversationWidth(w)}
+                            className={cn(
+                              "px-3.5 py-1 text-xs rounded-lg transition-all cursor-pointer",
+                              isSelected
+                                ? "bg-[#ffffff] dark:bg-[#383838] text-[#262626] dark:text-white shadow-xs font-medium"
+                                : "text-[#a9a9a9] dark:text-[#888888] hover:text-[#262626] dark:hover:text-white font-normal"
+                            )}
+                          >
+                            {label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Appearance Section (Image 1) */}
+              <div className="flex flex-col gap-2">
+                <span className="text-xs font-semibold text-[#262626] dark:text-[#d4d4d4] tracking-tight">
+                  Appearance
+                </span>
+                <div className="rounded-2xl border border-[#dedee2] dark:border-[#2e2e2e] bg-[#ffffff] dark:bg-[#1a1a1a] p-4 sm:p-5 shadow-xs flex flex-col gap-4">
+                  {/* Theme row */}
+                  <div className="flex items-center justify-between gap-4">
+                    <div className="flex flex-col">
+                      <span className="text-sm font-medium text-[#262626] dark:text-white">
+                        Theme
+                      </span>
+                    </div>
+
+                    {/* Segmented Icon Control: [Monitor] [Sun] [Moon] */}
+                    <div className="inline-flex p-1 rounded-xl bg-[#ececee] dark:bg-[#252525] border border-[#dedee2] dark:border-[#333333] items-center gap-0.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setTheme("system")}
+                        className={cn(
+                          "p-1.5 rounded-lg transition-all cursor-pointer",
+                          theme === "system"
+                            ? "bg-[#ffffff] dark:bg-[#383838] text-[#262626] dark:text-white shadow-xs"
+                            : "text-[#a9a9a9] dark:text-[#888888] hover:text-[#262626] dark:hover:text-white"
+                        )}
+                        title="System"
+                      >
+                        <Monitor className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setTheme("light")}
+                        className={cn(
+                          "p-1.5 rounded-lg transition-all cursor-pointer",
+                          theme === "light"
+                            ? "bg-[#ffffff] dark:bg-[#383838] text-[#262626] dark:text-white shadow-xs"
+                            : "text-[#a9a9a9] dark:text-[#888888] hover:text-[#262626] dark:hover:text-white"
+                        )}
+                        title="Light"
+                      >
+                        <Sun className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setTheme("dark")}
+                        className={cn(
+                          "p-1.5 rounded-lg transition-all cursor-pointer",
+                          theme === "dark"
+                            ? "bg-[#ffffff] dark:bg-[#383838] text-[#262626] dark:text-white shadow-xs"
+                            : "text-[#a9a9a9] dark:text-[#888888] hover:text-[#262626] dark:hover:text-white"
+                        )}
+                        title="Dark"
+                      >
+                        <Moon className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : activeTab !== "model-settings" ? (
             /* Clean placeholder for other tabs as requested */
             <div className="flex flex-col gap-2 pt-6">
-              <h1 className="text-2xl font-medium text-white capitalize">
+              <h1 className="text-2xl font-medium text-[#262626] dark:text-white capitalize">
                 {activeTab.replace(/-/g, " ")}
               </h1>
-              <p className="text-sm text-[#888888]">
+              <p className="text-sm text-[#a9a9a9] dark:text-[#888888]">
                 This section is currently being configured and will be available in an upcoming update.
               </p>
             </div>
@@ -588,15 +711,15 @@ export function SettingsView({
               {/* Header Title & Subtitle + Refresh Button */}
               <div className="flex items-start justify-between">
                 <div>
-                  <h1 className="text-2xl font-medium text-white">Model settings</h1>
-                  <p className="mt-1 text-xs text-[#888888]">
+                  <h1 className="text-2xl font-medium text-[#262626] dark:text-white">Model settings</h1>
+                  <p className="mt-1 text-xs text-[#a9a9a9] dark:text-[#888888]">
                     Manage custom model providers. Once configured, they can be selected during chat.
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={handleRefresh}
-                  className="p-2 rounded-lg hover:bg-[#282828] text-[#888888] hover:text-white transition-colors cursor-pointer"
+                  className="p-2 rounded-lg hover:bg-black/5 dark:hover:bg-[#282828] text-[#8a8a8a] dark:text-[#888888] hover:text-[#262626] dark:hover:text-white transition-colors cursor-pointer"
                   title="Refresh settings and models"
                 >
                   <RotateCw className="w-4 h-4" />
@@ -604,13 +727,13 @@ export function SettingsView({
               </div>
 
               {/* Two-Column Card Container (Hairline border, shadow-free, DESIGN.md) */}
-              <div className="border border-[#383838] bg-[#1e1e1e] rounded-2xl flex overflow-hidden min-h-[580px]">
+              <div className="border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#1e1e1e] rounded-2xl flex overflow-hidden min-h-[580px]">
                 {/* Left Column: Providers & Custom Providers */}
-                <div className="w-64 border-r border-[#383838]/60 p-4 shrink-0 flex flex-col justify-between bg-[#242424]/40">
+                <div className="w-64 border-r border-[#dedee2] dark:border-[#383838]/60 p-4 shrink-0 flex flex-col justify-between bg-[#f4f4f6] dark:bg-[#242424]/40">
                   <div className="flex flex-col gap-4">
                     {/* Native Main Provider */}
                     <div className="flex flex-col gap-1.5">
-                      <span className="text-[11px] font-medium text-[#737373] tracking-wide">
+                      <span className="text-[11px] font-medium text-[#a9a9a9] dark:text-[#737373] tracking-wide">
                         Providers
                       </span>
                       <button
@@ -619,12 +742,12 @@ export function SettingsView({
                         className={cn(
                           "w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all cursor-pointer",
                           selectedProviderId === "const"
-                            ? "bg-[#333333] text-white"
-                            : "text-[#d4d4d4] hover:bg-[#2b2b2b] hover:text-white"
+                            ? "bg-[#dedee2] dark:bg-[#333333] text-[#262626] dark:text-white"
+                            : "text-[#262626] dark:text-[#d4d4d4] hover:bg-[#e4e4e8] dark:hover:bg-[#2b2b2b] hover:text-black dark:hover:text-white"
                         )}
                       >
                         <div className="flex items-center gap-2 min-w-0">
-                          <ConstLogoIcon size="xs" className="w-4 h-4 text-white shrink-0" />
+                          <ConstLogoIcon size="xs" className="w-4 h-4 text-[#262626] dark:text-white shrink-0" />
                           <span className="truncate">Const</span>
                         </div>
                         {/* Status dot: green active */}
@@ -634,7 +757,7 @@ export function SettingsView({
 
                     {/* Custom Providers */}
                     <div className="flex flex-col gap-1.5">
-                      <span className="text-[11px] font-medium text-[#737373] tracking-wide">
+                      <span className="text-[11px] font-medium text-[#a9a9a9] dark:text-[#737373] tracking-wide">
                         Custom providers
                       </span>
 
@@ -646,13 +769,13 @@ export function SettingsView({
                             className={cn(
                               "w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all cursor-pointer group",
                               selectedProviderId === cp.id
-                                ? "bg-[#333333] text-white"
-                                : "text-[#d4d4d4] hover:bg-[#2b2b2b] hover:text-white"
+                                ? "bg-[#dedee2] dark:bg-[#333333] text-[#262626] dark:text-white"
+                                : "text-[#262626] dark:text-[#d4d4d4] hover:bg-[#e4e4e8] dark:hover:bg-[#2b2b2b] hover:text-black dark:hover:text-white"
                             )}
                             onClick={() => setSelectedProviderId(cp.id)}
                           >
                             <div className="flex items-center gap-2 min-w-0">
-                              <BoxIcon className="w-3.5 h-3.5 text-[#969696] shrink-0" />
+                              <BoxIcon className="w-3.5 h-3.5 text-[#8a8a8a] dark:text-[#969696] shrink-0" />
                               <span className="truncate">{cp.name}</span>
                             </div>
                             <div className="flex items-center gap-1.5">
@@ -679,8 +802,8 @@ export function SettingsView({
                           className={cn(
                             "w-full flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-all cursor-pointer text-left",
                             selectedProviderId === "add-provider"
-                              ? "bg-[#333333] text-white"
-                              : "text-[#888888] hover:bg-[#2b2b2b] hover:text-white"
+                              ? "bg-[#dedee2] dark:bg-[#333333] text-[#262626] dark:text-white"
+                              : "text-[#8a8a8a] dark:text-[#888888] hover:bg-[#e4e4e8] dark:hover:bg-[#2b2b2b] hover:text-[#262626] dark:hover:text-white"
                           )}
                         >
                           <Plus className="w-3.5 h-3.5" />
@@ -692,7 +815,7 @@ export function SettingsView({
                 </div>
 
                 {/* Right Column: Provider Configuration or Const Native Details */}
-                <div className="flex-1 p-6 overflow-y-auto bg-[#1a1a1a]/60 flex flex-col justify-between">
+                <div className="flex-1 p-6 overflow-y-auto bg-[#ffffff] dark:bg-[#1a1a1a]/60 flex flex-col justify-between">
                   {selectedProviderId === "const" ? (
                     /* --------------------------------------------------------- */
                     /* Const Native Provider (router.const.web.id) */
@@ -702,24 +825,24 @@ export function SettingsView({
                       <div className="flex items-start justify-between">
                         <div>
                           <div className="flex items-center gap-2">
-                            <ConstLogoIcon size="sm" className="w-5 h-5 text-white" />
-                            <h2 className="text-base font-medium text-white">
+                            <ConstLogoIcon size="sm" className="w-5 h-5 text-[#262626] dark:text-white" />
+                            <h2 className="text-base font-medium text-[#262626] dark:text-white">
                               Const
                             </h2>
-                            <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-md bg-[#22c55e]/15 text-[#4ade80] border border-[#22c55e]/30">
+                            <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-md bg-[#22c55e]/15 text-[#16a34a] dark:text-[#4ade80] border border-[#22c55e]/30">
                               Native Provider
                             </span>
                           </div>
-                          <p className="mt-1 text-xs text-[#888888]">
-                            Connected directly to <code className="text-[#d4d4d4] font-mono">router.const.web.id</code> via your Const Account SSO. No manual API keys required.
+                          <p className="mt-1 text-xs text-[#a9a9a9] dark:text-[#888888]">
+                            Connected directly to <code className="text-[#262626] dark:text-[#d4d4d4] font-mono">router.const.web.id</code> via your Const Account SSO. No manual API keys required.
                           </p>
                         </div>
                       </div>
 
                       {/* Free Weekly Quota Card (7M Tokens/Week) */}
-                      <div className="border border-[#383838] bg-[#222222] rounded-xl p-4 font-mono">
-                        <div className="flex items-center justify-between text-xs text-[#888888] mb-2">
-                          <span className="font-semibold tracking-wider text-[#d4d4d4]">
+                      <div className="border border-[#dedee2] dark:border-[#383838] bg-[#f8f8f8] dark:bg-[#222222] rounded-xl p-4 font-mono">
+                        <div className="flex items-center justify-between text-xs text-[#a9a9a9] dark:text-[#888888] mb-2">
+                          <span className="font-semibold tracking-wider text-[#262626] dark:text-[#d4d4d4]">
                             FREE WEEKLY QUOTA
                           </span>
                           <span className="tabular-nums text-[11px]">
@@ -759,10 +882,10 @@ export function SettingsView({
                       {/* Available Models List */}
                       <div className="flex flex-col gap-3">
                         <div className="flex items-center justify-between">
-                          <Label className="text-xs font-medium text-[#d4d4d4]">
+                          <Label className="text-xs font-medium text-[#262626] dark:text-[#d4d4d4]">
                             Available Models on Const Router
                           </Label>
-                          <span className="text-[11px] text-[#888888]">
+                          <span className="text-[11px] text-[#a9a9a9] dark:text-[#888888]">
                             Synchronized automatically with chat
                           </span>
                         </div>
@@ -776,38 +899,38 @@ export function SettingsView({
                                 className={cn(
                                   "border rounded-xl p-3.5 flex flex-col gap-2 transition-all cursor-pointer",
                                   isCurrent
-                                    ? "border-[#ff7a00]/60 bg-[#242424]"
-                                    : "border-[#383838] bg-[#222222] hover:border-[#4a4a4a]"
+                                    ? "border-[#ff7a00]/60 bg-[#fff9f4] dark:bg-[#242424]"
+                                    : "border-[#dedee2] dark:border-[#383838] bg-[#f8f8f8] dark:bg-[#222222] hover:border-[#b0b0b0] dark:hover:border-[#4a4a4a]"
                                 )}
                                 onClick={() => handleSelectActiveModel(m.id)}
                               >
                                 <div className="flex items-center justify-between">
                                   <div className="flex items-center gap-2">
-                                    <span className="text-xs font-semibold text-white">
+                                    <span className="text-xs font-semibold text-[#262626] dark:text-white">
                                       {m.name}
                                     </span>
-                                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#333333] text-[#a0a0a0] font-mono">
+                                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#e8e8ea] dark:bg-[#333333] text-[#666666] dark:text-[#a0a0a0] font-mono">
                                       {m.id}
                                     </span>
                                     {isCurrent && (
-                                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#ff7a00]/20 text-[#ff9838] border border-[#ff7a00]/30 font-medium flex items-center gap-1">
+                                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#ff7a00]/20 text-[#e79737] dark:text-[#ff9838] border border-[#ff7a00]/30 font-medium flex items-center gap-1">
                                         <Check className="w-3 h-3" />
                                         Active in Chat
                                       </span>
                                     )}
                                     {m.supportsThinking && (
-                                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#ff7a00]/10 text-[#ff9838] border border-[#ff7a00]/25 font-mono">
+                                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#ff7a00]/10 text-[#e79737] dark:text-[#ff9838] border border-[#ff7a00]/25 font-mono">
                                         Thinking: {m.thinkingLevels?.join(", ") || "low, medium, high"}
                                       </span>
                                     )}
                                   </div>
-                                  <div className="flex items-center gap-1.5 text-[11px] text-[#888888]">
+                                  <div className="flex items-center gap-1.5 text-[11px] text-[#a9a9a9] dark:text-[#888888]">
                                     <span>{m.contextWindow}</span>
                                     <span>•</span>
                                     <span>{m.maxOutput}</span>
                                   </div>
                                 </div>
-                                <p className="text-[11px] text-[#999999] leading-relaxed">
+                                <p className="text-[11px] text-[#666666] dark:text-[#999999] leading-relaxed">
                                   {m.desc}
                                 </p>
                               </div>
@@ -817,16 +940,16 @@ export function SettingsView({
                       </div>
 
                       {/* Gateway Connection Details */}
-                      <div className="border border-[#383838]/80 bg-[#222222]/40 rounded-xl p-3 text-xs flex flex-col gap-1.5">
-                        <div className="flex items-center justify-between text-[#888888]">
+                      <div className="border border-[#dedee2] dark:border-[#383838]/80 bg-[#f8f8f8] dark:bg-[#222222]/40 rounded-xl p-3 text-xs flex flex-col gap-1.5">
+                        <div className="flex items-center justify-between text-[#a9a9a9] dark:text-[#888888]">
                           <span>Gateway Endpoint:</span>
-                          <span className="font-mono text-[#d4d4d4]">
+                          <span className="font-mono text-[#262626] dark:text-[#d4d4d4]">
                             {CONST_ROUTER_DEFAULT_URL}
                           </span>
                         </div>
-                        <div className="flex items-center justify-between text-[#888888]">
+                        <div className="flex items-center justify-between text-[#a9a9a9] dark:text-[#888888]">
                           <span>Authentication:</span>
-                          <span className="text-[#4ade80] flex items-center gap-1">
+                          <span className="text-[#16a34a] dark:text-[#4ade80] flex items-center gap-1">
                             <ShieldCheck className="w-3.5 h-3.5" />
                             Account SSO Linked
                           </span>
@@ -839,10 +962,10 @@ export function SettingsView({
                     /* --------------------------------------------------------- */
                     <div className="flex flex-col gap-5">
                       <div>
-                        <h2 className="text-base font-medium text-white">
+                        <h2 className="text-base font-medium text-[#262626] dark:text-white">
                           Add model provider
                         </h2>
-                        <p className="text-xs text-[#888888] mt-0.5">
+                        <p className="text-xs text-[#a9a9a9] dark:text-[#888888] mt-0.5">
                           Configure a custom API endpoint and initial model.
                         </p>
                       </div>
@@ -850,43 +973,43 @@ export function SettingsView({
                       <div className="space-y-4">
                         {/* Name Field */}
                         <div className="space-y-1.5">
-                          <Label className="text-xs text-[#a0a0a0]">Name</Label>
+                          <Label className="text-xs text-[#8a8a8a] dark:text-[#a0a0a0]">Name</Label>
                           <Input
                             type="text"
                             value={newProviderName}
                             onChange={(e) => setNewProviderName(e.target.value)}
                             placeholder="e.g. DeepSeek"
-                            className="bg-[#242424] border-[#383838] focus:border-[#d4d4d4] text-xs text-white rounded-xl h-9 font-sans"
+                            className="bg-[#f8f8f8] dark:bg-[#242424] border-[#dedee2] dark:border-[#383838] focus:border-[#262626] dark:focus:border-[#d4d4d4] text-xs text-[#262626] dark:text-white rounded-xl h-9 font-sans"
                           />
                         </div>
 
                         {/* Base URL Field */}
                         <div className="space-y-1.5">
-                          <Label className="text-xs text-[#a0a0a0]">Base URL</Label>
+                          <Label className="text-xs text-[#8a8a8a] dark:text-[#a0a0a0]">Base URL</Label>
                           <Input
                             type="text"
                             value={newProviderBaseUrl}
                             onChange={(e) => setNewProviderBaseUrl(e.target.value)}
                             placeholder="https://api.example.com/v1"
-                            className="bg-[#242424] border-[#383838] focus:border-[#d4d4d4] text-xs text-white rounded-xl h-9 font-mono"
+                            className="bg-[#f8f8f8] dark:bg-[#242424] border-[#dedee2] dark:border-[#383838] focus:border-[#262626] dark:focus:border-[#d4d4d4] text-xs text-[#262626] dark:text-white rounded-xl h-9 font-mono"
                           />
                         </div>
 
                         {/* API Key Field */}
                         <div className="space-y-1.5">
-                          <Label className="text-xs text-[#a0a0a0]">API key</Label>
+                          <Label className="text-xs text-[#8a8a8a] dark:text-[#a0a0a0]">API key</Label>
                           <div className="relative">
                             <Input
                               type={showApiKey ? "text" : "password"}
                               value={newProviderApiKey}
                               onChange={(e) => setNewProviderApiKey(e.target.value)}
                               placeholder="Enter API key"
-                              className="bg-[#242424] border-[#383838] focus:border-[#d4d4d4] text-xs text-white rounded-xl h-9 pr-9 font-mono"
+                              className="bg-[#f8f8f8] dark:bg-[#242424] border-[#dedee2] dark:border-[#383838] focus:border-[#262626] dark:focus:border-[#d4d4d4] text-xs text-[#262626] dark:text-white rounded-xl h-9 pr-9 font-mono"
                             />
                             <button
                               type="button"
                               onClick={() => setShowApiKey(!showApiKey)}
-                              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#777777] hover:text-white transition-colors"
+                              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#8a8a8a] dark:text-[#777777] hover:text-[#262626] dark:hover:text-white transition-colors"
                             >
                               {showApiKey ? (
                                 <EyeOff className="w-4 h-4" />
@@ -899,11 +1022,11 @@ export function SettingsView({
 
                         {/* API Format Dropdown */}
                         <div className="space-y-1.5">
-                          <Label className="text-xs text-[#a0a0a0]">API format</Label>
+                          <Label className="text-xs text-[#8a8a8a] dark:text-[#a0a0a0]">API format</Label>
                           <select
                             value={newProviderFormat}
                             onChange={(e) => setNewProviderFormat(e.target.value)}
-                            className="w-full bg-[#242424] border border-[#383838] hover:border-[#4a4a4a] text-xs text-white rounded-xl px-3 py-2 outline-none transition-colors"
+                            className="w-full bg-[#f8f8f8] dark:bg-[#242424] border border-[#dedee2] dark:border-[#383838] hover:border-[#b0b0b0] dark:hover:border-[#4a4a4a] text-xs text-[#262626] dark:text-white rounded-xl px-3 py-2 outline-none transition-colors"
                           >
                             <option value="Anthropic: messages (/v1/messages)">
                               Anthropic: messages (/v1/messages)
@@ -933,18 +1056,18 @@ export function SettingsView({
                               {newProviderModels.map((m, idx) => (
                                 <div
                                   key={m.id}
-                                  className="border border-[#383838] bg-[#242424] rounded-lg px-3 py-2 flex items-center justify-between text-xs"
+                                  className="border border-[#dedee2] dark:border-[#383838] bg-[#f8f8f8] dark:bg-[#242424] rounded-lg px-3 py-2 flex items-center justify-between text-xs"
                                 >
                                   <div className="flex items-center gap-2">
-                                    <span className="font-medium text-white">{m.name}</span>
-                                    <span className="font-mono text-[#888888] text-[11px]">
+                                    <span className="font-medium text-[#262626] dark:text-white">{m.name}</span>
+                                    <span className="font-mono text-[#8a8a8a] dark:text-[#888888] text-[11px]">
                                       ({m.id})
                                     </span>
                                   </div>
                                   <button
                                     type="button"
                                     onClick={() => handleRemoveModelFromNewProvider(idx)}
-                                    className="text-[#888888] hover:text-rose-400 p-1"
+                                    className="text-[#8a8a8a] dark:text-[#888888] hover:text-rose-500 p-1"
                                     title="Remove model"
                                   >
                                     <Trash2 className="w-3.5 h-3.5" />
@@ -956,24 +1079,24 @@ export function SettingsView({
 
                           {/* Add Model Inline Popover or Trigger */}
                           {isAddingModel ? (
-                            <div className="border border-[#383838] bg-[#222222] rounded-xl p-3 flex flex-col gap-2.5">
+                            <div className="border border-[#dedee2] dark:border-[#383838] bg-[#f8f8f8] dark:bg-[#222222] rounded-xl p-3 flex flex-col gap-2.5">
                               <div className="grid grid-cols-2 gap-2">
                                 <div>
-                                  <Label className="text-[11px] text-[#888888]">Model ID</Label>
+                                  <Label className="text-[11px] text-[#8a8a8a] dark:text-[#888888]">Model ID</Label>
                                   <Input
                                     value={tempModelId}
                                     onChange={(e) => setTempModelId(e.target.value)}
                                     placeholder="e.g. deepseek-chat"
-                                    className="bg-[#282828] border-[#383838] text-xs text-white rounded-lg h-8 mt-1 font-mono"
+                                    className="bg-[#ffffff] dark:bg-[#282828] border-[#dedee2] dark:border-[#383838] text-xs text-[#262626] dark:text-white rounded-lg h-8 mt-1 font-mono"
                                   />
                                 </div>
                                 <div>
-                                  <Label className="text-[11px] text-[#888888]">Display Name</Label>
+                                  <Label className="text-[11px] text-[#8a8a8a] dark:text-[#888888]">Display Name</Label>
                                   <Input
                                     value={tempModelName}
                                     onChange={(e) => setTempModelName(e.target.value)}
                                     placeholder="e.g. DeepSeek V3"
-                                    className="bg-[#282828] border-[#383838] text-xs text-white rounded-lg h-8 mt-1"
+                                    className="bg-[#ffffff] dark:bg-[#282828] border-[#dedee2] dark:border-[#383838] text-xs text-[#262626] dark:text-white rounded-lg h-8 mt-1"
                                   />
                                 </div>
                               </div>
@@ -982,14 +1105,14 @@ export function SettingsView({
                                   variant="outline"
                                   size="sm"
                                   onClick={() => setIsAddingModel(false)}
-                                  className="h-7 text-xs rounded-lg border-[#383838]"
+                                  className="h-7 text-xs rounded-lg border-[#dedee2] dark:border-[#383838] text-[#262626] dark:text-[#d4d4d4]"
                                 >
                                   Cancel
                                 </Button>
                                 <Button
                                   size="sm"
                                   onClick={handleAddModelToNewProvider}
-                                  className="h-7 text-xs rounded-lg bg-[#ffffff] text-black hover:bg-[#e0e0e0]"
+                                  className="h-7 text-xs rounded-lg bg-[#262626] text-white hover:bg-black dark:bg-[#ffffff] dark:text-black dark:hover:bg-[#e0e0e0]"
                                 >
                                   Add
                                 </Button>
@@ -999,7 +1122,7 @@ export function SettingsView({
                             <button
                               type="button"
                               onClick={() => setIsAddingModel(true)}
-                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#383838] text-xs text-[#d4d4d4] hover:bg-[#282828] hover:text-white transition-colors cursor-pointer"
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#dedee2] dark:border-[#383838] text-xs text-[#262626] dark:text-[#d4d4d4] hover:bg-[#dedee2]/60 dark:hover:bg-[#282828] hover:text-black dark:hover:text-white transition-colors cursor-pointer"
                             >
                               <Plus className="w-3.5 h-3.5" />
                               <span>Add model</span>
@@ -1009,11 +1132,11 @@ export function SettingsView({
                       </div>
 
                       {/* Footer Row matching screenshot */}
-                      <div className="pt-4 border-t border-[#383838]/60 flex items-center justify-between mt-auto">
-                        <div className="flex items-center gap-1.5 text-xs text-[#888888]">
+                      <div className="pt-4 border-t border-[#dedee2] dark:border-[#383838]/60 flex items-center justify-between mt-auto">
+                        <div className="flex items-center gap-1.5 text-xs text-[#8a8a8a] dark:text-[#888888]">
                           {newProviderModels.length === 0 && (
                             <>
-                              <Info className="w-3.5 h-3.5 text-[#777777]" />
+                              <Info className="w-3.5 h-3.5 text-[#8a8a8a] dark:text-[#777777]" />
                               <span>Add at least one model before adding the provider.</span>
                             </>
                           )}
@@ -1022,7 +1145,7 @@ export function SettingsView({
                         <Button
                           disabled={newProviderModels.length === 0 || !newProviderName.trim()}
                           onClick={handleSaveNewProvider}
-                          className="bg-[#383838] hover:bg-[#444444] text-white rounded-xl text-xs h-9 px-5 transition-all disabled:opacity-40"
+                          className="bg-[#262626] hover:bg-black dark:bg-[#383838] dark:hover:bg-[#444444] text-white rounded-xl text-xs h-9 px-5 transition-all disabled:opacity-40"
                         >
                           Add provider
                         </Button>

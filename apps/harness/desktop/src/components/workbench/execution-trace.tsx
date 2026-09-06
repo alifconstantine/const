@@ -160,12 +160,12 @@ export function ExecutionTrace({
       <button
         type="button"
         onClick={() => setIsMainOpen((prev) => !prev)}
-        className="inline-flex items-center gap-1.5 text-[13px] text-[#969696] hover:text-[#e0e0e0] transition-colors cursor-pointer py-0.5 w-fit select-none"
+        className="inline-flex items-center gap-1.5 text-[13px] text-[#a9a9a9] dark:text-[#969696] hover:text-[#262626] dark:hover:text-[#e0e0e0] transition-colors cursor-pointer py-0.5 w-fit select-none"
       >
         <span>{formatDuration()}</span>
         <ChevronRight
           className={cn(
-            "w-3.5 h-3.5 text-[#777777] transition-transform duration-200 ease-out",
+            "w-3.5 h-3.5 text-[#a9a9a9] dark:text-[#777777] transition-transform duration-200 ease-out",
             isMainOpen && "rotate-90"
           )}
         />
@@ -173,7 +173,7 @@ export function ExecutionTrace({
 
       {/* Trace Body with Smooth Collapse */}
       <SmoothCollapse isOpen={isMainOpen}>
-        <div className="flex flex-col gap-1.5 pl-3 ml-1 border-l border-[#2e2e2e]/70 text-[13px] text-[#888888] pt-1">
+        <div className="flex flex-col gap-1.5 pl-3 ml-1 border-l border-[#e2e2e4] dark:border-[#2e2e2e]/70 text-[13px] text-[#a9a9a9] dark:text-[#888888] pt-1">
           {steps.map((step, idx) => {
             if (step.type === "thought") {
               return (
@@ -256,8 +256,8 @@ export function ExecutionTrace({
 
           {/* Active executing spinner */}
           {isExecuting && (
-            <div className="flex items-center gap-2 text-xs text-[#777777] py-1">
-              <Loader2 className="w-3 h-3 animate-spin text-[#ff7a00]" />
+            <div className="flex items-center gap-2 text-xs text-[#a9a9a9] dark:text-[#777777] py-1">
+              <Loader2 className="w-3 h-3 animate-spin text-[#e79737] dark:text-[#ff7a00]" />
               <span>Working...</span>
             </div>
           )}
@@ -767,22 +767,22 @@ export function MutationsSummaryCard({
   }
 
   return (
-    <div className="w-full rounded-xl bg-[#141414] border border-[#2b2b2b] my-2 select-none font-sans overflow-hidden transition-all shadow-xs animate-in fade-in-0 duration-200">
+    <div className="w-full rounded-xl bg-white dark:bg-[#141414] border border-[#e2e2e4] dark:border-[#2b2b2b] my-2 select-none font-sans overflow-hidden transition-all shadow-xs animate-in fade-in-0 duration-200">
       {/* Header matching reference image: 1 file changed +27 -13 >  |  [Undo all] [Review] */}
-      <div className={cn("flex items-center justify-between px-3.5 py-2 transition-all", isOpen && "border-b border-[#242424]")}>
+      <div className={cn("flex items-center justify-between px-3.5 py-2 transition-all", isOpen && "border-b border-[#e2e2e4] dark:border-[#242424]")}>
         <button
           type="button"
           onClick={() => setIsOpen((prev) => !prev)}
-          className="inline-flex items-center gap-2 text-[13px] text-[#cccccc] hover:text-white transition-colors cursor-pointer group/card"
+          className="inline-flex items-center gap-2 text-[13px] text-[#262626] dark:text-[#cccccc] hover:text-black dark:hover:text-white transition-colors cursor-pointer group/card"
         >
-          <span className="font-normal text-[#d4d4d4]">
+          <span className="font-normal text-[#262626] dark:text-[#d4d4d4]">
             {mutations.length} file{mutations.length > 1 ? "s" : ""} changed
           </span>
           <span className="font-mono text-xs text-[#409D62] font-medium">+{totalAdded}</span>
           <span className="font-mono text-xs text-[#ff5c5c] font-medium">-{totalRemoved}</span>
           <ChevronRight
             className={cn(
-              "w-3.5 h-3.5 text-[#777777] group-hover/card:text-[#cccccc] transition-transform duration-200 ease-out",
+              "w-3.5 h-3.5 text-[#a9a9a9] dark:text-[#777777] group-hover/card:text-[#262626] dark:group-hover/card:text-[#cccccc] transition-transform duration-200 ease-out",
               isOpen && "rotate-90"
             )}
           />
@@ -793,10 +793,10 @@ export function MutationsSummaryCard({
             <button
               type="button"
               onClick={() => onRollbackAll(mutations)}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#1e1e1e] hover:bg-[#282828] border border-[#333333] hover:border-[#444444] text-[11.5px] text-[#d4d4d4] hover:text-white transition-all cursor-pointer font-medium shadow-xs"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#f4f4f6] hover:bg-[#eaeaea] dark:bg-[#1e1e1e] dark:hover:bg-[#282828] border border-[#e2e2e4] hover:border-[#d5d5d9] dark:border-[#333333] dark:hover:border-[#444444] text-[11.5px] text-[#262626] hover:text-black dark:text-[#d4d4d4] dark:hover:text-white transition-all cursor-pointer font-medium shadow-xs"
               title="Undo all changes in this turn"
             >
-              <RotateCcw className="w-3 h-3 text-[#d4d4d4]" />
+              <RotateCcw className="w-3 h-3 text-[#262626] dark:text-[#d4d4d4]" />
               <span>Undo all</span>
             </button>
           )}
@@ -805,10 +805,10 @@ export function MutationsSummaryCard({
             <button
               type="button"
               onClick={onOpenReview}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#1e1e1e] hover:bg-[#282828] border border-[#333333] hover:border-[#444444] text-[11.5px] text-[#e0e0e0] hover:text-white transition-all cursor-pointer font-medium shadow-xs"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#f4f4f6] hover:bg-[#eaeaea] dark:bg-[#1e1e1e] dark:hover:bg-[#282828] border border-[#e2e2e4] hover:border-[#d5d5d9] dark:border-[#333333] dark:hover:border-[#444444] text-[11.5px] text-[#262626] hover:text-black dark:text-[#e0e0e0] dark:hover:text-white transition-all cursor-pointer font-medium shadow-xs"
               title="Review line by line diffs"
             >
-              <FileSearch className="w-3.5 h-3.5 text-[#9e9e9e]" />
+              <FileSearch className="w-3.5 h-3.5 text-[#a9a9a9] dark:text-[#9e9e9e]" />
               <span>Review</span>
             </button>
           )}
@@ -854,18 +854,18 @@ function MutationRowItem({
   const fileStats = getMutationDiffStats(mut);
 
   return (
-    <div className="flex items-center justify-between group py-1.5 px-2 rounded-lg hover:bg-white/[0.04] transition-colors">
+    <div className="flex items-center justify-between group py-1.5 px-2 rounded-lg hover:bg-black/[0.04] dark:hover:bg-white/[0.04] transition-colors">
       <div className="flex items-center gap-2 min-w-0 pr-2">
         <FileIcon filename={fileName} />
         <span
           className={`text-[13px] truncate font-sans ${
-            mut.rolledBack ? "line-through text-[#666666]" : "text-[#d4d4d4]"
+            mut.rolledBack ? "line-through text-[#888888] dark:text-[#666666]" : "text-[#262626] dark:text-[#d4d4d4]"
           }`}
         >
           {fileName}
         </span>
         {dirPath && (
-          <span className="text-[11px] text-[#555555] font-mono truncate max-w-[240px]">
+          <span className="text-[11px] text-[#a9a9a9] dark:text-[#555555] font-mono truncate max-w-[240px]">
             /{dirPath}
           </span>
         )}
@@ -887,10 +887,10 @@ function MutationRowItem({
           <button
             type="button"
             onClick={() => onRollback(mut)}
-            className="opacity-0 group-hover:opacity-100 flex items-center gap-1 px-2 py-0.5 rounded bg-[#202020] hover:bg-[#2e2e2e] border border-[#333333] text-[10px] text-[#d4d4d4] hover:text-white transition-all cursor-pointer shadow-xs"
+            className="opacity-0 group-hover:opacity-100 flex items-center gap-1 px-2 py-0.5 rounded bg-[#f4f4f6] hover:bg-[#eaeaea] dark:bg-[#202020] dark:hover:bg-[#2e2e2e] border border-[#e2e2e4] dark:border-[#333333] text-[10px] text-[#262626] hover:text-black dark:text-[#d4d4d4] dark:hover:text-white transition-all cursor-pointer shadow-xs"
             title="Undo changes to this file"
           >
-            <RotateCcw className="w-2.5 h-2.5 text-[#d4d4d4]" />
+            <RotateCcw className="w-2.5 h-2.5 text-[#262626] dark:text-[#d4d4d4]" />
             <span>Undo</span>
           </button>
         ) : null}

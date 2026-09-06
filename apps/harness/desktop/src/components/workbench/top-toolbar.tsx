@@ -73,18 +73,18 @@ export function TopToolbar({
             <button
               type="button"
               onClick={onToggleSidebar}
-              className="p-1.5 rounded-lg hover:bg-[#222222] text-[#d4d4d4] transition-colors cursor-pointer group flex items-center justify-center"
+              className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-[#222222] text-[#262626] dark:text-[#d4d4d4] transition-colors cursor-pointer group flex items-center justify-center"
               title="Open sidebar"
               aria-label="Open sidebar"
             >
               <ConstLogoIcon size="sm" className="w-5 h-5 group-hover:hidden" />
-              <PanelLeft className="w-5 h-5 hidden group-hover:block text-[#d4d4d4]" />
+              <PanelLeft className="w-5 h-5 hidden group-hover:block text-[#262626] dark:text-[#d4d4d4]" />
             </button>
 
-            <div className="flex items-center gap-0.5 text-[#d4d4d4]">
+            <div className="flex items-center gap-0.5 text-[#262626] dark:text-[#d4d4d4]">
               <button
                 type="button"
-                className="p-1.5 rounded-md hover:bg-[#222222] hover:text-white transition-colors disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
+                className="p-1.5 rounded-md hover:bg-black/5 dark:hover:bg-[#222222] hover:text-black dark:hover:text-white transition-colors disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
                 title="Go back"
                 aria-label="Go back"
               >
@@ -92,7 +92,7 @@ export function TopToolbar({
               </button>
               <button
                 type="button"
-                className="p-1.5 rounded-md hover:bg-[#222222] hover:text-white transition-colors disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
+                className="p-1.5 rounded-md hover:bg-black/5 dark:hover:bg-[#222222] hover:text-black dark:hover:text-white transition-colors disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
                 title="Go forward"
                 aria-label="Go forward"
               >
@@ -103,7 +103,7 @@ export function TopToolbar({
             <button
               type="button"
               onClick={onNewChat}
-              className="p-1.5 ml-1 rounded-md text-[#d4d4d4] hover:text-white hover:bg-[#222222] transition-colors cursor-pointer"
+              className="p-1.5 ml-1 rounded-md text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-[#222222] transition-colors cursor-pointer"
               title="New task"
               aria-label="New task"
             >
@@ -115,20 +115,20 @@ export function TopToolbar({
         {/* Conversation Title & Project Pill */}
         {conversationTitle && (
           <div className="flex items-center gap-2 min-w-0 pl-1">
-            <span className="text-sm font-medium text-[#ececec] truncate max-w-[280px]">
+            <span className="text-sm font-medium text-[#161616] dark:text-[#ececec] truncate max-w-[280px]">
               {conversationTitle}
             </span>
 
             {project && (
-              <div className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-[#222222] border border-[#333333] text-xs text-[#a0a0a0] shrink-0">
-                <Folder className="w-3 h-3 text-[#999999]" />
+              <div className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-white dark:bg-[#222222] border border-[#e2e2e4] dark:border-[#333333] text-xs text-[#262626] dark:text-[#a0a0a0] shrink-0">
+                <Folder className="w-3 h-3 text-[#a9a9a9] dark:text-[#999999]" />
                 <span className="truncate max-w-[140px]">{project}</span>
               </div>
             )}
 
             <button
               type="button"
-              className="p-1 rounded hover:bg-[#222222] text-[#888888] hover:text-[#d4d4d4] transition-colors cursor-pointer"
+              className="p-1 rounded hover:bg-black/5 dark:hover:bg-[#222222] text-[#a9a9a9] dark:text-[#888888] hover:text-[#262626] dark:hover:text-[#d4d4d4] transition-colors cursor-pointer"
               title="More options"
               aria-label="More options"
             >
@@ -140,13 +140,13 @@ export function TopToolbar({
 
       {/* Right section: Terminal, Right Panel, and Window Controls */}
       <div
-        className="flex items-center gap-1 text-[#d4d4d4]"
+        className="flex items-center gap-1 text-[#262626] dark:text-[#d4d4d4]"
         style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
       >
 
         <button
           type="button"
-          className="p-1.5 rounded-lg text-[#d4d4d4] hover:text-white hover:bg-[#222222] transition-colors cursor-pointer"
+          className="p-1.5 rounded-lg text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-[#222222] transition-colors cursor-pointer"
           title="Open terminal"
           aria-label="Open terminal"
         >
@@ -155,7 +155,7 @@ export function TopToolbar({
 
         <button
           type="button"
-          className="p-1.5 rounded-lg text-[#d4d4d4] hover:text-white hover:bg-[#222222] transition-colors cursor-pointer"
+          className="p-1.5 rounded-lg text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-[#222222] transition-colors cursor-pointer"
           title="Toggle right sidebar"
           aria-label="Toggle right sidebar"
         >
@@ -163,14 +163,14 @@ export function TopToolbar({
         </button>
 
         {/* Hairline Divider */}
-        <div className="w-[1px] h-3.5 bg-[#383838]/70 mx-1" />
+        <div className="w-[1px] h-3.5 bg-[#e2e2e4] dark:bg-[#383838]/70 mx-1" />
 
         {/* Window Controls (Minimize, Maximize/Restore, Close) */}
         <div className="flex items-center gap-0.5">
           <button
             type="button"
             onClick={handleMinimize}
-            className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-white/10 text-[#d4d4d4] hover:text-white transition-colors cursor-pointer"
+            className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-black/5 dark:hover:bg-white/10 text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white transition-colors cursor-pointer"
             title="Minimize"
             aria-label="Minimize"
           >
@@ -180,7 +180,7 @@ export function TopToolbar({
           <button
             type="button"
             onClick={handleMaximize}
-            className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-white/10 text-[#d4d4d4] hover:text-white transition-colors cursor-pointer"
+            className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-black/5 dark:hover:bg-white/10 text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white transition-colors cursor-pointer"
             title={isMaximized ? "Restore" : "Maximize"}
             aria-label={isMaximized ? "Restore" : "Maximize"}
           >
@@ -194,7 +194,7 @@ export function TopToolbar({
           <button
             type="button"
             onClick={handleClose}
-            className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[#e81123] text-[#d4d4d4] hover:text-white transition-colors cursor-pointer"
+            className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[#e81123] text-[#262626] dark:text-[#d4d4d4] hover:text-white transition-colors cursor-pointer"
             title="Close"
             aria-label="Close"
           >
