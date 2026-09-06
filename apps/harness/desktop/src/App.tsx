@@ -150,14 +150,26 @@ function AuthenticatedContent({
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [feedbackMap, setFeedbackMap] = useState<Record<string, "good" | "bad">>({});
   const [editingPrompt, setEditingPrompt] = useState<string>("");
-  const [expandedUserMessages, setExpandedUserMessages] = useState<Record<string, boolean>>({});
+  const [expandedUserMessageId, setExpandedUserMessageId] = useState<string | null>(null);
 
-  const toggleUserMessageExpand = (msgId: string) => {
-    setExpandedUserMessages((prev) => ({
-      ...prev,
-      [msgId]: !prev[msgId],
-    }));
-  };
+  // Close expanded user prompt when clicking outside
+  useEffect(() => {
+    if (!expandedUserMessageId) return;
+
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (!target) return;
+      if (target.closest(`[data-expanded-prompt="${expandedUserMessageId}"]`)) {
+        return;
+      }
+      setExpandedUserMessageId(null);
+    };
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [expandedUserMessageId]);
 
   const handleCopyMessage = async (id: string, text: string) => {
     try {
@@ -941,23 +953,25 @@ function AuthenticatedContent({
                             {msg.attachments.map((att) => renderMessageAttachment(att))}
                           </div>
                         )}
-                        {/* User message bubble (Image 2 collapsed, Image 3 expanded on click, ScrollArea without buttons) */}
+                        {/* User message bubble (Image 2 collapsed, Image 3 expanded on click, closes on click outside) */}
                         {(() => {
                           const isLongPrompt = msg.content.length > 250 || msg.content.split("\n").length > 4;
-                          const isExpanded = Boolean(expandedUserMessages[msg.id]);
+                          const isExpanded = expandedUserMessageId === msg.id;
 
                           return (
                             <div
+                              data-expanded-prompt={msg.id}
                               onClick={() => {
                                 const sel = window.getSelection();
                                 if (sel && sel.toString().trim().length > 0) return;
-                                if (isLongPrompt) {
-                                  toggleUserMessageExpand(msg.id);
+                                // Only expand if currently collapsed; closing is handled by clicking outside
+                                if (isLongPrompt && !isExpanded) {
+                                  setExpandedUserMessageId(msg.id);
                                 }
                               }}
                               className={cn(
                                 "max-w-2xl w-full rounded-2xl bg-[#222222] border border-[#383838] px-4 py-3 text-[14px] text-[#ececec] select-text leading-relaxed whitespace-pre-wrap break-words [overflow-wrap:anywhere] [word-break:break-word] shadow-sm overflow-hidden transition-all duration-200",
-                                isLongPrompt && "cursor-pointer hover:border-[#484848]"
+                                isLongPrompt && !isExpanded && "cursor-pointer hover:border-[#484848]"
                               )}
                             >
                               {isLongPrompt ? (
