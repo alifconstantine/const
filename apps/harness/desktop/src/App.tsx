@@ -3,8 +3,15 @@ import {
   LogIn,
   Loader2,
   Globe,
+  Copy,
+  Check,
+  Pencil,
+  ThumbsUp,
+  ThumbsDown,
+  Play,
+  FileText,
 } from "lucide-react";
-import { ConstLogoIcon, Button, toast, ScrollArea } from "@const/ui";
+import { ConstLogoIcon, Button, toast, ScrollArea, cn } from "@const/ui";
 import { useQuery } from "convex/react";
 import { api } from "@const/backend/_generated/api";
 import { ConvexClientProvider } from "./components/convex-provider";
@@ -14,7 +21,11 @@ import {
   ChatCard,
   type ConversationMetrics,
   type ContextUsageData,
+  type AttachedFile,
+  formatFileSize,
 } from "./components/workbench/chat-card";
+import { ChatIndicator } from "./components/workbench/chat-indicator";
+import { ImageLightbox } from "./components/workbench/image-lightbox";
 import { MarkdownContent } from "./components/workbench/markdown-content";
 import { ExecutionTrace } from "./components/workbench/execution-trace";
 import { SettingsView } from "./components/settings-view";
@@ -37,6 +48,19 @@ function getGreeting(): string {
   return "Evening, how can I help?";
 }
 
+function formatMessageTimestamp(ts: number): string {
+  const d = new Date(ts);
+  const month = d.getMonth() + 1;
+  const day = d.getDate();
+  let hours = d.getHours();
+  const minutes = d.getMinutes().toString().padStart(2, "0");
+  const ampm = hours >= 12 ? "PM" : "AM";
+  hours = hours % 12;
+  if (hours === 0) hours = 12;
+  const hoursStr = hours.toString().padStart(2, "0");
+  return `${month}/${day} ${hoursStr}.${minutes} ${ampm}`;
+}
+
 interface ChatMessage {
   id: string;
   role: "user" | "assistant" | "system";
@@ -51,6 +75,7 @@ interface ChatMessage {
   }>;
   mutations?: FileMutationRecord[];
   timestamp: number;
+  attachments?: AttachedFile[];
 }
 
 function AuthenticatedContent({
@@ -87,6 +112,97 @@ function AuthenticatedContent({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isExecuting, setIsExecuting] = useState(false);
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
+  const chatScrollRef = React.useRef<HTMLDivElement>(null);
+  const [previewMedia, setPreviewMedia] = useState<AttachedFile | null>(null);
+
+  // Message hover actions state
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [feedbackMap, setFeedbackMap] = useState<Record<string, "good" | "bad">>({});
+  const [editingPrompt, setEditingPrompt] = useState<string>("");
+
+  const handleCopyMessage = async (id: string, text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedId(id);
+      toast.success("Copied to clipboard");
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch {
+      toast.error("Failed to copy");
+    }
+  };
+
+  const handleFeedback = (id: string, type: "good" | "bad") => {
+    setFeedbackMap((prev) => ({
+      ...prev,
+      [id]: prev[id] === type ? undefined! : type,
+    }));
+    toast.success(type === "good" ? "Response marked as helpful" : "Feedback recorded");
+  };
+
+  const handleEditMessage = (content: string) => {
+    setEditingPrompt(content);
+    toast.info("Message loaded into prompt for editing");
+  };
+
+  const renderMessageAttachment = (att: AttachedFile) => {
+    if (att.type === "image" && att.url) {
+      return (
+        <div
+          key={att.id}
+          onClick={() => setPreviewMedia(att)}
+          className="group relative rounded-xl overflow-hidden border border-[#383838] hover:border-white/30 bg-black/40 max-w-sm max-h-72 shadow-md cursor-pointer transition-all"
+        >
+          <img
+            src={att.url}
+            alt={att.name}
+            className="w-full h-full object-contain max-h-72"
+          />
+          <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent p-2 opacity-0 group-hover:opacity-100 transition-opacity text-xs text-white">
+            <p className="truncate font-medium">{att.name}</p>
+            <span className="text-[10px] text-[#a0a0a0] font-mono">
+              {formatFileSize(att.size)}
+            </span>
+          </div>
+        </div>
+      );
+    }
+    if (att.type === "video" && att.url) {
+      return (
+        <div
+          key={att.id}
+          onClick={() => setPreviewMedia(att)}
+          className="group relative rounded-xl overflow-hidden border border-[#383838] hover:border-white/30 bg-black max-w-sm max-h-72 shadow-md cursor-pointer transition-all"
+        >
+          <video
+            src={att.url}
+            className="w-full h-full max-h-72 rounded-xl pointer-events-none"
+          />
+          <div className="absolute inset-0 bg-black/25 flex items-center justify-center">
+            <div className="w-10 h-10 rounded-full bg-black/60 border border-white/20 flex items-center justify-center text-white">
+              <Play className="w-5 h-5 fill-white ml-0.5" />
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div
+        key={att.id}
+        onClick={() => setPreviewMedia(att)}
+        className="flex items-center gap-2.5 px-3 py-2 rounded-xl bg-[#1e1e1e] hover:bg-[#252525] border border-[#383838] hover:border-white/20 text-xs text-[#d4d4d4] shadow-sm cursor-pointer transition-all"
+      >
+        <FileText className="w-4 h-4 text-[#ff7a00] shrink-0" />
+        <div className="flex flex-col min-w-0">
+          <span className="font-medium truncate max-w-[200px]" title={att.name}>
+            {att.name}
+          </span>
+          <span className="text-[10px] text-[#777777] font-mono">
+            {formatFileSize(att.size)}
+          </span>
+        </div>
+      </div>
+    );
+  };
 
   // Compute accumulated diff stats across assistant messages in this conversation
   const diffStats = useMemo(() => {
@@ -324,19 +440,24 @@ function AuthenticatedContent({
     project,
     mode,
     model,
+    attachments,
   }: {
     prompt: string;
     project: string;
     mode: "ask_before_changes" | "full_access";
     model?: string;
+    attachments?: AttachedFile[];
   }) => {
-    if (!prompt.trim() || isExecuting) return;
+    if ((!prompt.trim() && (!attachments || attachments.length === 0)) || isExecuting) return;
+
+    setEditingPrompt("");
 
     const userMsg: ChatMessage = {
       id: `msg_${Date.now()}_user`,
       role: "user",
       content: prompt,
       timestamp: Date.now(),
+      attachments,
     };
 
     const assistantPlaceholder: ChatMessage = {
@@ -357,12 +478,16 @@ function AuthenticatedContent({
     let titleToUse = conversationTitle;
 
     if (isFirstMessage) {
-      titleToUse = generateFallbackTitle(prompt);
+      titleToUse = prompt.trim()
+        ? generateFallbackTitle(prompt)
+        : attachments && attachments[0]
+        ? `Attachment: ${attachments[0].name}`
+        : "New task";
       setConversationTitle(titleToUse);
 
       // Asynchronously request AI to generate an ultra-clean title
       generateAiTitle(
-        prompt,
+        prompt || (attachments && attachments[0]?.name) || "New task",
         (aiTitle) => {
           setConversationTitle(aiTitle);
           const stored = loadConversations();
@@ -481,6 +606,7 @@ function AuthenticatedContent({
     setMessages([]);
     setConversationTitle("");
     setConversationId(`session_${Date.now()}`);
+    setEditingPrompt("");
     setIsExecuting(false);
   };
 
@@ -494,6 +620,7 @@ function AuthenticatedContent({
       setConversationTitle(target.title);
       setCurrentProject(target.project || "Outside Project");
       setMessages(target.messages || []);
+      setEditingPrompt("");
       setIsExecuting(false);
     }
   };
@@ -576,25 +703,70 @@ function AuthenticatedContent({
                   project={currentProject}
                   onProjectChange={setCurrentProject}
                   onOpenSettings={() => handleOpenSettings("model")}
+                  initialPrompt={editingPrompt}
                 />
               </div>
             </div>
           </div>
         ) : (
           <div className="flex-1 overflow-hidden flex flex-col relative">
+            {/* Left Vertical Mini-Timeline Navigator (TurnTimelineNav matching const-harness) */}
+            <ChatIndicator
+              messages={messages}
+              isExecuting={isExecuting}
+              scrollContainerRef={chatScrollRef}
+            />
+
             {/* Scrollable Message Stream with @const/ui ScrollArea */}
-            <ScrollArea className="flex-1 w-full h-full [&>div>div[style]]:!block">
+            <ScrollArea
+              ref={chatScrollRef}
+              data-chat-viewport="true"
+              className="flex-1 w-full h-full [&>div>div[style]]:!block"
+            >
               <div className="w-full max-w-3xl mx-auto px-4 sm:px-8 py-6 flex flex-col gap-6">
                 {messages.map((msg, idx) => (
-                  <div key={msg.id} className="w-full flex flex-col">
+                  <div key={msg.id} data-chat-anchor-key={msg.id} className="w-full flex flex-col">
                     {msg.role === "user" ? (
-                      <div className="w-full flex justify-end">
+                      <div className="w-full flex flex-col items-end group">
+                        {/* Attached Files (if any) */}
+                        {msg.attachments && msg.attachments.length > 0 && (
+                          <div className="flex flex-wrap gap-2 mb-2 justify-end max-w-2xl">
+                            {msg.attachments.map((att) => renderMessageAttachment(att))}
+                          </div>
+                        )}
+                        {/* User message bubble */}
                         <div className="max-w-2xl rounded-2xl bg-[#222222] border border-[#383838] px-4 py-3 text-[14px] text-[#ececec] select-text leading-relaxed whitespace-pre-wrap shadow-sm">
                           {msg.content}
                         </div>
+                        {/* User hover action bar: Timestamp (e.g. 8/16 01.00 AM), Copy, Edit */}
+                        <div className="flex items-center gap-2 pt-1.5 opacity-0 group-hover:opacity-100 transition-opacity text-xs text-[#888888] select-none">
+                          <span className="text-[11px] font-mono text-[#777777]">
+                            {formatMessageTimestamp(msg.timestamp)}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => handleCopyMessage(msg.id, msg.content)}
+                            className="p-1 rounded hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
+                            title="Copy message"
+                          >
+                            {copiedId === msg.id ? (
+                              <Check className="w-3.5 h-3.5 text-[#4ade80]" />
+                            ) : (
+                              <Copy className="w-3.5 h-3.5" />
+                            )}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleEditMessage(msg.content)}
+                            className="p-1 rounded hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
+                            title="Edit message"
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
                     ) : (
-                      <div className="w-full flex flex-col gap-2.5 max-w-3xl">
+                      <div className="w-full flex flex-col gap-2.5 max-w-3xl group">
                         {/* Execution Trace (Worked for, Thinking, Tool calls, File diffs +X -Y) */}
                         <ExecutionTrace
                           thinking={msg.thinking}
@@ -615,6 +787,53 @@ function AuthenticatedContent({
                             <span>Working on task...</span>
                           </div>
                         ) : null}
+
+                        {/* Assistant hover action bar: Copy, Good, Bad, and Timestamp directly to the right of Bad response */}
+                        {!isExecuting && msg.content && (
+                          <div className="flex items-center gap-1.5 pt-1 opacity-0 group-hover:opacity-100 transition-opacity text-xs text-[#888888] select-none">
+                            <button
+                              type="button"
+                              onClick={() => handleCopyMessage(msg.id, msg.content)}
+                              className="p-1 rounded hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
+                              title="Copy response"
+                            >
+                              {copiedId === msg.id ? (
+                                <Check className="w-3.5 h-3.5 text-[#4ade80]" />
+                              ) : (
+                                <Copy className="w-3.5 h-3.5" />
+                              )}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleFeedback(msg.id, "good")}
+                              className={cn(
+                                "p-1 rounded hover:bg-white/10 transition-colors cursor-pointer",
+                                feedbackMap[msg.id] === "good"
+                                  ? "text-[#4ade80]"
+                                  : "text-[#888888] hover:text-[#d4d4d4]"
+                              )}
+                              title="Good response"
+                            >
+                              <ThumbsUp className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleFeedback(msg.id, "bad")}
+                              className={cn(
+                                "p-1 rounded hover:bg-white/10 transition-colors cursor-pointer",
+                                feedbackMap[msg.id] === "bad"
+                                  ? "text-[#ef4444]"
+                                  : "text-[#888888] hover:text-[#d4d4d4]"
+                              )}
+                              title="Bad response"
+                            >
+                              <ThumbsDown className="w-3.5 h-3.5" />
+                            </button>
+                            <span className="text-[11px] font-mono text-[#777777] ml-1.5">
+                              {formatMessageTimestamp(msg.timestamp)}
+                            </span>
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -636,12 +855,24 @@ function AuthenticatedContent({
                   project={currentProject}
                   onProjectChange={setCurrentProject}
                   onOpenSettings={() => handleOpenSettings("model")}
+                  initialPrompt={editingPrompt}
                 />
               </div>
             </div>
           </div>
         )}
       </main>
+
+      {/* Media Lightbox Preview Modal */}
+      {previewMedia && (
+        <ImageLightbox
+          src={previewMedia.url || ""}
+          alt={previewMedia.name}
+          type={previewMedia.type}
+          fileSize={previewMedia.size}
+          onClose={() => setPreviewMedia(null)}
+        />
+      )}
     </div>
   );
 }

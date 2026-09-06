@@ -14,10 +14,18 @@ import {
   Cpu,
   Square,
   Settings,
+  Image as ImageIcon,
+  AtSign,
+  SquarePen,
+  Globe,
+  Play,
+  FileText,
+  X,
 } from "lucide-react";
 import { ScrollArea, cn } from "@const/ui";
 import { useQuery } from "convex/react";
 import { api } from "@const/backend/_generated/api";
+import { ImageLightbox } from "./image-lightbox";
 
 function formatTokenDisplay(tokens: number): string {
   if (tokens < 1000) return `${tokens}`;
@@ -32,6 +40,21 @@ function formatDurationDisplay(ms: number): string {
   const min = Math.floor(sec / 60);
   const remSec = sec % 60;
   return `${min}m${remSec > 0 ? ` ${remSec}s` : ""}`;
+}
+
+export function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+export interface AttachedFile {
+  id: string;
+  name: string;
+  size: number;
+  type: "image" | "video" | "pdf" | "markdown" | "code" | "document" | "other";
+  url?: string;
+  path?: string;
 }
 
 export interface ConversationMetrics {
@@ -60,6 +83,7 @@ interface ChatCardProps {
     project: string;
     mode: "ask_before_changes" | "full_access";
     model?: string;
+    attachments?: AttachedFile[];
   }) => void;
   isExecuting?: boolean;
   onAbort?: () => void;
@@ -69,6 +93,7 @@ interface ChatCardProps {
   project?: string;
   onProjectChange?: (project: string) => void;
   onOpenSettings?: () => void;
+  initialPrompt?: string;
 }
 
 export function ChatCard({
@@ -81,11 +106,69 @@ export function ChatCard({
   project: initialProject,
   onProjectChange,
   onOpenSettings,
+  initialPrompt,
 }: ChatCardProps) {
   const [prompt, setPrompt] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [isContextOpen, setIsContextOpen] = useState(false);
   const contextMenuRef = useRef<HTMLDivElement>(null);
+
+  // Attachments & Plus Menu State
+  const [attachments, setAttachments] = useState<AttachedFile[]>([]);
+  const [previewItem, setPreviewItem] = useState<AttachedFile | null>(null);
+  const [isPlusOpen, setIsPlusOpen] = useState(false);
+  const plusMenuRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (initialPrompt !== undefined && initialPrompt !== "") {
+      setPrompt(initialPrompt);
+      textareaRef.current?.focus();
+    }
+  }, [initialPrompt]);
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+    const newAttached: AttachedFile[] = [];
+    Array.from(files).forEach((file) => {
+      const ext = file.name.split(".").pop()?.toLowerCase() || "";
+      let type: AttachedFile["type"] = "other";
+      if (["jpg", "jpeg", "png", "gif", "webp", "svg", "bmp"].includes(ext)) {
+        type = "image";
+      } else if (["mp4", "webm", "mov", "mkv"].includes(ext)) {
+        type = "video";
+      } else if (ext === "pdf") {
+        type = "pdf";
+      } else if (["md", "markdown"].includes(ext)) {
+        type = "markdown";
+      } else if (
+        ["ts", "tsx", "js", "jsx", "json", "py", "rs", "go", "cpp", "c", "h", "css", "html"].includes(ext)
+      ) {
+        type = "code";
+      } else if (["txt", "doc", "docx", "xls", "xlsx", "csv"].includes(ext)) {
+        type = "document";
+      }
+
+      const url = URL.createObjectURL(file);
+      newAttached.push({
+        id: `file_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        name: file.name,
+        size: file.size,
+        type,
+        url,
+        path: (file as any).path,
+      });
+    });
+
+    setAttachments((prev) => [...prev, ...newAttached]);
+    setIsPlusOpen(false);
+    if (e.target) e.target.value = "";
+  };
+
+  const removeAttachment = (id: string) => {
+    setAttachments((prev) => prev.filter((a) => a.id !== id));
+  };
 
   // 1. Workspace / Project Selector State (Clean, zero dummy projects)
   const [currentProject, setCurrentProject] = useState<string>(() => {
@@ -241,6 +324,9 @@ export function ChatCard({
       if (contextMenuRef.current && !contextMenuRef.current.contains(target)) {
         setIsContextOpen(false);
       }
+      if (plusMenuRef.current && !plusMenuRef.current.contains(target)) {
+        setIsPlusOpen(false);
+      }
     };
 
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -249,6 +335,7 @@ export function ChatCard({
         setIsModeOpen(false);
         setIsModelOpen(false);
         setIsContextOpen(false);
+        setIsPlusOpen(false);
       }
     };
 
@@ -309,9 +396,11 @@ export function ChatCard({
   };
 
   const handleSend = () => {
-    if (!prompt.trim() || isExecuting) return;
+    if ((!prompt.trim() && attachments.length === 0) || isExecuting) return;
     const text = prompt.trim();
+    const currentAttachments = [...attachments];
     setPrompt("");
+    setAttachments([]);
     if (textareaRef.current) {
       textareaRef.current.style.height = "24px";
     }
@@ -321,6 +410,7 @@ export function ChatCard({
       project: currentProject,
       mode,
       model: matchedModel?.id || "gemini-3.6-flash",
+      attachments: currentAttachments.length > 0 ? currentAttachments : undefined,
     });
   };
 
@@ -461,6 +551,97 @@ export function ChatCard({
             compact ? "" : "border-t border-[#383838]"
           } px-3.5 pt-2.5 pb-2.5 flex flex-col justify-between transition-colors focus-within:border-[#555555]`}
         >
+          {/* Attachments Shelf (Full Previews for Images, Videos, PDFs, Docs) */}
+          {attachments.length > 0 && (
+            <div className="w-full flex items-center gap-2.5 pb-2.5 overflow-x-auto select-none">
+              {attachments.map((file) => {
+                const isMedia = file.type === "image" || file.type === "video";
+                if (isMedia) {
+                  return (
+                    <div
+                      key={file.id}
+                      onClick={() => setPreviewItem(file)}
+                      className="group relative w-16 h-16 rounded-xl overflow-hidden border border-[#383838] hover:border-white/40 bg-black/40 shrink-0 cursor-pointer transition-all shadow-sm"
+                    >
+                      {file.type === "image" && file.url ? (
+                        <img
+                          src={file.url}
+                          alt={file.name}
+                          className="w-full h-full object-cover block"
+                        />
+                      ) : (
+                        <div className="w-full h-full relative bg-[#1c1c1c] flex items-center justify-center">
+                          {file.url && (
+                            <video
+                              src={file.url}
+                              className="w-full h-full object-cover block pointer-events-none"
+                            />
+                          )}
+                          <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
+                            <Play className="w-4 h-4 text-white fill-white/80" />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Tooltip overlay on hover */}
+                      <div className="absolute inset-0 bg-black/75 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between p-1.5 text-[10px] text-white pointer-events-none">
+                        <span className="truncate font-medium" title={file.name}>
+                          {file.name}
+                        </span>
+                        <span className="text-[#a0a0a0] font-mono">
+                          {formatFileSize(file.size)}
+                        </span>
+                      </div>
+
+                      {/* Close button */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeAttachment(file.id);
+                        }}
+                        className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/70 hover:bg-[#e11d48] text-white flex items-center justify-center border border-white/20 shadow-md transition-colors cursor-pointer z-20"
+                        title="Remove attachment"
+                      >
+                        <X className="w-3 h-3 stroke-[2.5]" />
+                      </button>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div
+                    key={file.id}
+                    onClick={() => setPreviewItem(file)}
+                    className="group relative flex items-center gap-2 bg-[#1b1b1b] hover:bg-[#222222] border border-[#383838] rounded-xl px-2.5 py-1.5 shrink-0 transition-colors cursor-pointer"
+                  >
+                    <FileText className="w-5 h-5 text-[#ff7a00] shrink-0" />
+                    <div className="flex flex-col min-w-0 max-w-[180px]">
+                      <span className="text-[12px] text-[#d4d4d4] font-medium truncate" title={file.name}>
+                        {file.name}
+                      </span>
+                      <span className="text-[10px] text-[#777777] font-mono">
+                        {formatFileSize(file.size)}
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeAttachment(file.id);
+                      }}
+                      className="ml-1 p-0.5 rounded-full hover:bg-white/10 text-[#777777] hover:text-[#e11d48] transition-colors cursor-pointer"
+                      title="Remove attachment"
+                    >
+                      <X className="w-3.5 h-3.5 stroke-[2]" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
           {/* Auto-growing Textarea with ScrollArea */}
           <ScrollArea className="w-full max-h-52 [&>div>div[style]]:!block pr-1.5">
             <textarea
@@ -486,18 +667,107 @@ export function ChatCard({
             />
           </ScrollArea>
 
-          {/* Bottom Actions Row: Plus, Hand/Shield, Model Selector, Send Button */}
+          {/* Bottom Actions Row: Plus, Hand/Shield, Context Window, Model Selector, Send Button */}
           <div className="flex items-center justify-between pt-2.5 text-xs relative">
             {/* Left Actions: Plus and Mode Selector */}
             <div className="flex items-center gap-2 sm:gap-3">
-              <button
-                type="button"
-                className="w-6 h-6 flex items-center justify-center rounded-md text-[#5d5d5d] hover:text-[#d4d4d4] hover:bg-white/5 transition-colors cursor-pointer"
-                title="Add context"
-                aria-label="Add context"
-              >
-                <Plus className="w-4 h-4 stroke-[1.75]" />
-              </button>
+              {/* Plus Button & Add Context Dropdown */}
+              <div className="relative" ref={plusMenuRef}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsPlusOpen((prev) => !prev);
+                    setIsProjectOpen(false);
+                    setIsModeOpen(false);
+                    setIsModelOpen(false);
+                    setIsContextOpen(false);
+                  }}
+                  className={cn(
+                    "w-6 h-6 flex items-center justify-center rounded-md transition-colors cursor-pointer",
+                    isPlusOpen
+                      ? "text-white bg-white/10"
+                      : "text-[#5d5d5d] hover:text-[#d4d4d4] hover:bg-white/5"
+                  )}
+                  title="Add context"
+                  aria-label="Add context"
+                >
+                  <Plus className="w-4 h-4 stroke-[1.75]" />
+                </button>
+
+                {/* Hidden File Input for Media */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  multiple
+                  className="hidden"
+                  onChange={handleFileChange}
+                  accept="image/*,video/*,audio/*,.pdf,.md,.markdown,.txt,.json,.js,.jsx,.ts,.tsx,.py,.rs,.go,.cpp,.c,.h,.css,.html,.csv,.doc,.docx"
+                />
+
+                {/* Add Context Popover Menu (Image 2) */}
+                {isPlusOpen && (
+                  <div className="absolute bottom-full mb-2 left-0 w-44 bg-[#1e1e1e] border border-[#383838] rounded-2xl shadow-2xl p-1.5 z-50 flex flex-col text-left select-none animate-in fade-in zoom-in-95 duration-100">
+                    <div className="px-2.5 py-1 text-[11px] font-medium text-[#777777]">
+                      Add Context
+                    </div>
+
+                    {/* 1. Media */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsPlusOpen(false);
+                        fileInputRef.current?.click();
+                      }}
+                      className="w-full px-2.5 py-2 flex items-center gap-2.5 rounded-xl hover:bg-white/5 text-[#d4d4d4] hover:text-white text-xs transition-colors cursor-pointer group"
+                    >
+                      <ImageIcon className="w-4 h-4 text-[#888888] group-hover:text-white shrink-0" />
+                      <span className="text-[13px]">Media</span>
+                    </button>
+
+                    {/* 2. Mentions */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsPlusOpen(false);
+                        setPrompt((prev) => (prev ? `${prev} @` : "@"));
+                        textareaRef.current?.focus();
+                      }}
+                      className="w-full px-2.5 py-2 flex items-center gap-2.5 rounded-xl hover:bg-white/5 text-[#d4d4d4] hover:text-white text-xs transition-colors cursor-pointer group"
+                    >
+                      <AtSign className="w-4 h-4 text-[#888888] group-hover:text-white shrink-0" />
+                      <span className="text-[13px]">Mentions</span>
+                    </button>
+
+                    {/* 3. Actions */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsPlusOpen(false);
+                        setPrompt((prev) => (prev ? `${prev} /` : "/"));
+                        textareaRef.current?.focus();
+                      }}
+                      className="w-full px-2.5 py-2 flex items-center gap-2.5 rounded-xl hover:bg-white/5 text-[#d4d4d4] hover:text-white text-xs transition-colors cursor-pointer group"
+                    >
+                      <SquarePen className="w-4 h-4 text-[#888888] group-hover:text-white shrink-0" />
+                      <span className="text-[13px]">Actions</span>
+                    </button>
+
+                    {/* 4. Browser */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsPlusOpen(false);
+                        setPrompt((prev) => (prev ? `${prev} @browser ` : "@browser "));
+                        textareaRef.current?.focus();
+                      }}
+                      className="w-full px-2.5 py-2 flex items-center gap-2.5 rounded-xl hover:bg-white/5 text-[#d4d4d4] hover:text-white text-xs transition-colors cursor-pointer group"
+                    >
+                      <Globe className="w-4 h-4 text-[#888888] group-hover:text-white shrink-0" />
+                      <span className="text-[13px]">Browser</span>
+                    </button>
+                  </div>
+                )}
+              </div>
 
               {/* Mode Selector Dropdown */}
               <div className="relative" ref={modeMenuRef}>
@@ -582,9 +852,128 @@ export function ChatCard({
               </div>
             </div>
 
-            {/* Right Actions: Model Selector (1st), Context Window (2nd), Send Button (3rd) */}
+            {/* Right Actions: Context Window (1st, only if compact), Model Selector (2nd), Send Button (3rd) */}
             <div className="flex items-center gap-2 sm:gap-2.5">
-              {/* 1. Model Selector Dropdown (Const ∨) */}
+              {/* 1. Context Windows Indicator & Detailed Popover (Image 3 - Only visible when conversation is active) */}
+              {compact && (
+                <div className="relative" ref={contextMenuRef}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsContextOpen((prev) => !prev);
+                      setIsModelOpen(false);
+                      setIsModeOpen(false);
+                      setIsProjectOpen(false);
+                      setIsPlusOpen(false);
+                    }}
+                    className="w-6 h-6 flex items-center justify-center rounded-md text-[#777777] hover:text-[#d4d4d4] hover:bg-white/5 transition-colors cursor-pointer"
+                    title="Context window usage"
+                    aria-label="Context window usage"
+                  >
+                    <svg
+                      className="w-3.5 h-3.5 transform -rotate-90 text-[#777777] hover:text-[#d4d4d4]"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        cx="12"
+                        cy="12"
+                        r="9"
+                        fill="none"
+                        stroke="#383838"
+                        strokeWidth="2.5"
+                      />
+                      <circle
+                        cx="12"
+                        cy="12"
+                        r="9"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        strokeDasharray={56.5}
+                        strokeDashoffset={
+                          56.5 - (56.5 * Math.min(100, Math.max(3, percentUsed))) / 100
+                        }
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                  </button>
+
+                  {/* Context Window Popover (Image 3) */}
+                  {isContextOpen && (
+                    <div className="absolute bottom-full mb-2 right-0 w-80 bg-[#1e1e1e] border border-[#383838] rounded-2xl shadow-2xl p-4 z-50 flex flex-col gap-3 text-left select-none animate-in fade-in zoom-in-95 duration-100">
+                      {/* Header: % of context used and tokens */}
+                      <div className="flex items-center justify-between text-[13px]">
+                        <span className="text-white font-medium">
+                          {percentUsed}% of context used
+                        </span>
+                        <span className="font-mono text-[12px] text-[#a0a0a0]">
+                          ~{formatTokenDisplay(usedTokens)} / {totalTokens >= 1_000_000 ? `${(totalTokens / 1_000_000).toFixed(0)}M` : `${(totalTokens / 1000).toFixed(0)}K`}
+                        </span>
+                      </div>
+
+                      {/* Multi-segment Horizontal Progress Bar (Image 3) */}
+                      <div className="w-full h-2 bg-[#2d2d2d] rounded-full overflow-hidden flex gap-0.5">
+                        <div
+                          className="bg-[#71717a] h-full rounded-l-full transition-all"
+                          style={{
+                            width: `${Math.max(1, (systemPromptTokens / totalTokens) * 100)}%`,
+                          }}
+                          title={`System prompt: ~${formatTokenDisplay(systemPromptTokens)}`}
+                        />
+                        <div
+                          className="bg-[#a855f7] h-full transition-all"
+                          style={{
+                            width: `${Math.max(1, (toolsTokens / totalTokens) * 100)}%`,
+                          }}
+                          title={`Tools: ~${formatTokenDisplay(toolsTokens)}`}
+                        />
+                        <div
+                          className="bg-[#3b82f6] h-full rounded-r-full transition-all"
+                          style={{
+                            width: `${Math.max(1, (messagesTokens / totalTokens) * 100)}%`,
+                          }}
+                          title={`Messages: ~${formatTokenDisplay(messagesTokens)}`}
+                        />
+                      </div>
+
+                      {/* Legend / Breakdown List (Image 3) */}
+                      <div className="flex flex-col gap-2 pt-1">
+                        <div className="flex items-center justify-between text-[12px]">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2.5 h-2.5 rounded-xs bg-[#71717a] shrink-0" />
+                            <span className="text-[#d4d4d4]">System prompt</span>
+                          </div>
+                          <span className="font-mono text-[#d4d4d4]">
+                            ~{formatTokenDisplay(systemPromptTokens)}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between text-[12px]">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2.5 h-2.5 rounded-xs bg-[#a855f7] shrink-0" />
+                            <span className="text-[#d4d4d4]">Tools</span>
+                          </div>
+                          <span className="font-mono text-[#d4d4d4]">
+                            ~{formatTokenDisplay(toolsTokens)}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center justify-between text-[12px]">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2.5 h-2.5 rounded-xs bg-[#3b82f6] shrink-0" />
+                            <span className="text-[#d4d4d4]">Messages</span>
+                          </div>
+                          <span className="font-mono text-[#d4d4d4]">
+                            ~{formatTokenDisplay(messagesTokens)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* 2. Model Selector Dropdown (Const ∨) */}
               <div className="relative" ref={modelMenuRef}>
                 <button
                   type="button"
@@ -593,6 +982,7 @@ export function ChatCard({
                     setIsProjectOpen(false);
                     setIsModeOpen(false);
                     setIsContextOpen(false);
+                    setIsPlusOpen(false);
                   }}
                   className="inline-flex items-center gap-1 px-1.5 py-1 rounded-md text-[#d4d4d4] hover:text-white hover:bg-white/5 text-[13px] font-normal transition-colors cursor-pointer"
                 >
@@ -729,122 +1119,6 @@ export function ChatCard({
                 )}
               </div>
 
-              {/* 2. Context Windows Indicator & Detailed Popover (Image 3) */}
-              <div className="relative" ref={contextMenuRef}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsContextOpen((prev) => !prev);
-                    setIsModelOpen(false);
-                    setIsModeOpen(false);
-                    setIsProjectOpen(false);
-                  }}
-                  className="w-6 h-6 flex items-center justify-center rounded-md text-[#777777] hover:text-[#d4d4d4] hover:bg-white/5 transition-colors cursor-pointer"
-                  title="Context window usage"
-                  aria-label="Context window usage"
-                >
-                  <svg
-                    className="w-3.5 h-3.5 transform -rotate-90 text-[#777777] hover:text-[#d4d4d4]"
-                    viewBox="0 0 24 24"
-                  >
-                    <circle
-                      cx="12"
-                      cy="12"
-                      r="9"
-                      fill="none"
-                      stroke="#383838"
-                      strokeWidth="2.5"
-                    />
-                    <circle
-                      cx="12"
-                      cy="12"
-                      r="9"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.5"
-                      strokeDasharray={56.5}
-                      strokeDashoffset={
-                        56.5 - (56.5 * Math.min(100, Math.max(3, percentUsed))) / 100
-                      }
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                </button>
-
-                {/* Context Window Popover (Image 3) */}
-                {isContextOpen && (
-                  <div className="absolute bottom-full mb-2 right-0 w-80 bg-[#1e1e1e] border border-[#383838] rounded-2xl shadow-2xl p-4 z-50 flex flex-col gap-3 text-left select-none animate-in fade-in zoom-in-95 duration-100">
-                    {/* Header: % of context used and tokens */}
-                    <div className="flex items-center justify-between text-[13px]">
-                      <span className="text-white font-medium">
-                        {percentUsed}% of context used
-                      </span>
-                      <span className="font-mono text-[12px] text-[#a0a0a0]">
-                        ~{formatTokenDisplay(usedTokens)} / {totalTokens >= 1_000_000 ? `${(totalTokens / 1_000_000).toFixed(0)}M` : `${(totalTokens / 1000).toFixed(0)}K`}
-                      </span>
-                    </div>
-
-                    {/* Multi-segment Horizontal Progress Bar (Image 3) */}
-                    <div className="w-full h-2 bg-[#2d2d2d] rounded-full overflow-hidden flex gap-0.5">
-                      <div
-                        className="bg-[#71717a] h-full rounded-l-full transition-all"
-                        style={{
-                          width: `${Math.max(1, (systemPromptTokens / totalTokens) * 100)}%`,
-                        }}
-                        title={`System prompt: ~${formatTokenDisplay(systemPromptTokens)}`}
-                      />
-                      <div
-                        className="bg-[#a855f7] h-full transition-all"
-                        style={{
-                          width: `${Math.max(1, (toolsTokens / totalTokens) * 100)}%`,
-                        }}
-                        title={`Tools: ~${formatTokenDisplay(toolsTokens)}`}
-                      />
-                      <div
-                        className="bg-[#3b82f6] h-full rounded-r-full transition-all"
-                        style={{
-                          width: `${Math.max(1, (messagesTokens / totalTokens) * 100)}%`,
-                        }}
-                        title={`Messages: ~${formatTokenDisplay(messagesTokens)}`}
-                      />
-                    </div>
-
-                    {/* Legend / Breakdown List (Image 3) */}
-                    <div className="flex flex-col gap-2 pt-1">
-                      <div className="flex items-center justify-between text-[12px]">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2.5 h-2.5 rounded-xs bg-[#71717a] shrink-0" />
-                          <span className="text-[#d4d4d4]">System prompt</span>
-                        </div>
-                        <span className="font-mono text-[#d4d4d4]">
-                          ~{formatTokenDisplay(systemPromptTokens)}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center justify-between text-[12px]">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2.5 h-2.5 rounded-xs bg-[#a855f7] shrink-0" />
-                          <span className="text-[#d4d4d4]">Tools</span>
-                        </div>
-                        <span className="font-mono text-[#d4d4d4]">
-                          ~{formatTokenDisplay(toolsTokens)}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center justify-between text-[12px]">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2.5 h-2.5 rounded-xs bg-[#3b82f6] shrink-0" />
-                          <span className="text-[#d4d4d4]">Messages</span>
-                        </div>
-                        <span className="font-mono text-[#d4d4d4]">
-                          ~{formatTokenDisplay(messagesTokens)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-
               {/* 3. Send or Stop Generation Button */}
               {isExecuting ? (
                 <button
@@ -860,9 +1134,9 @@ export function ChatCard({
                 <button
                   type="button"
                   onClick={handleSend}
-                  disabled={!prompt.trim()}
+                  disabled={!prompt.trim() && attachments.length === 0}
                   className={`w-7 h-7 rounded-lg flex items-center justify-center select-none transition-all ${
-                    prompt.trim()
+                    prompt.trim() || attachments.length > 0
                       ? "bg-[#d4d4d4] text-[#161616] hover:bg-white cursor-pointer shadow-sm active:scale-95"
                       : "bg-[#48484e]/60 text-[#888888] cursor-not-allowed"
                   }`}
@@ -900,6 +1174,17 @@ export function ChatCard({
             Input {formatTokenDisplay(metrics.inputTokens)} tok · Output {formatTokenDisplay(metrics.outputTokens)} tok
           </span>
         </div>
+      )}
+
+      {/* Media Lightbox Preview Modal */}
+      {previewItem && (
+        <ImageLightbox
+          src={previewItem.url || ""}
+          alt={previewItem.name}
+          type={previewItem.type}
+          fileSize={previewItem.size}
+          onClose={() => setPreviewItem(null)}
+        />
       )}
     </div>
   );
