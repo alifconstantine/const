@@ -27,9 +27,12 @@ contextBridge.exposeInMainWorld("electron", {
   sendMessage: (payload: {
     messages: any[];
     model?: string;
+    thinkingLevel?: string;
     workspacePath?: string;
     mode?: string;
     conversationId?: string;
+    authToken?: string;
+    maxOutputTokens?: number;
   }) => ipcRenderer.invoke("agent:send-message", payload),
   abortAgent: () => ipcRenderer.invoke("agent:abort"),
   rollbackFile: (record: any) => ipcRenderer.invoke("agent:rollback-file", { record }),

@@ -10,6 +10,7 @@ export const DEFAULT_MODELS: ModelConfig[] = [
     supportsTools: true,
     thinkingLevels: ["low", "medium", "high"],
     defaultThinkingLevel: "medium",
+    maxOutputTokens: 128000,
   },
   {
     id: "gemini-3.7-flash",
@@ -20,6 +21,7 @@ export const DEFAULT_MODELS: ModelConfig[] = [
     supportsTools: true,
     thinkingLevels: ["low", "medium", "high"],
     defaultThinkingLevel: "medium",
+    maxOutputTokens: 128000,
   },
   {
     id: "gemini-3.8-flash",
@@ -30,6 +32,7 @@ export const DEFAULT_MODELS: ModelConfig[] = [
     supportsTools: true,
     thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
     defaultThinkingLevel: "medium",
+    maxOutputTokens: 128000,
   },
   {
     id: "combo/auto",
@@ -40,6 +43,7 @@ export const DEFAULT_MODELS: ModelConfig[] = [
     supportsTools: true,
     thinkingLevels: ["low", "medium", "high"],
     defaultThinkingLevel: "medium",
+    maxOutputTokens: 128000,
   },
   {
     id: "combo/fast",
@@ -48,6 +52,7 @@ export const DEFAULT_MODELS: ModelConfig[] = [
     baseUrl: "https://router.const.web.id/v1",
     supportsThinking: false,
     supportsTools: true,
+    maxOutputTokens: 128000,
   },
   {
     id: "combo/coding",
@@ -58,6 +63,7 @@ export const DEFAULT_MODELS: ModelConfig[] = [
     supportsTools: true,
     thinkingLevels: ["low", "medium", "high"],
     defaultThinkingLevel: "high",
+    maxOutputTokens: 128000,
   },
 ];
 

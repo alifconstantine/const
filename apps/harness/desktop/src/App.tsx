@@ -580,6 +580,7 @@ function AuthenticatedContent({
     model,
     thinkingLevel,
     attachments,
+    maxOutputTokens,
   }: {
     prompt: string;
     project: string;
@@ -587,6 +588,7 @@ function AuthenticatedContent({
     model?: string;
     thinkingLevel?: string;
     attachments?: AttachedFile[];
+    maxOutputTokens?: number;
   }) => {
     if ((!prompt.trim() && (!attachments || attachments.length === 0)) || isExecuting) return;
 
@@ -672,6 +674,7 @@ function AuthenticatedContent({
           mode,
           conversationId,
           authToken: token || undefined,
+          maxOutputTokens,
         });
 
         if (!res.success && res.error) {

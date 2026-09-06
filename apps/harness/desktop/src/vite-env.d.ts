@@ -118,6 +118,7 @@ declare global {
         mode?: "ask_before_changes" | "full_access";
         conversationId?: string;
         authToken?: string;
+        maxOutputTokens?: number;
       }) => Promise<{
         success: boolean;
         messages?: any[];

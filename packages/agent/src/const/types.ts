@@ -31,6 +31,7 @@ export interface ModelConfig {
   supportsTools?: boolean;
   thinkingLevels?: string[];
   defaultThinkingLevel?: string;
+  maxOutputTokens?: number;
 }
 
 import type { FileMutationRecord } from "./mutation-ledger.js";
@@ -59,4 +60,6 @@ export interface AgentConfig {
   maxTurns?: number;
   mode?: "ask_before_changes" | "full_access";
   thinkingLevel?: ThinkingLevel | string;
+  maxTokens?: number;
+  maxOutputTokens?: number;
 }

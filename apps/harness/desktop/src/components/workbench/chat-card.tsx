@@ -107,6 +107,7 @@ interface ChatCardProps {
     model?: string;
     thinkingLevel?: string;
     attachments?: AttachedFile[];
+    maxOutputTokens?: number;
   }) => void;
   isExecuting?: boolean;
   onAbort?: () => void;
@@ -231,6 +232,7 @@ export function ChatCard({
     supportsThinking?: boolean;
     thinkingLevels?: string[];
     defaultThinkingLevel?: string;
+    maxOutputTokens?: number;
   }
   const isConstProvider = (p?: string) => {
     if (!p) return true;
@@ -255,6 +257,7 @@ export function ChatCard({
       supportsThinking: true,
       thinkingLevels: ["low", "medium", "high"],
       defaultThinkingLevel: "medium",
+      maxOutputTokens: 128000,
     },
     {
       id: "gemini-3.7-flash",
@@ -265,6 +268,7 @@ export function ChatCard({
       supportsThinking: true,
       thinkingLevels: ["low", "medium", "high"],
       defaultThinkingLevel: "medium",
+      maxOutputTokens: 128000,
     },
     {
       id: "gemini-3.8-flash",
@@ -275,6 +279,7 @@ export function ChatCard({
       supportsThinking: true,
       thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
       defaultThinkingLevel: "medium",
+      maxOutputTokens: 128000,
     },
     {
       id: "combo/auto",
@@ -285,6 +290,7 @@ export function ChatCard({
       supportsThinking: true,
       thinkingLevels: ["low", "medium", "high"],
       defaultThinkingLevel: "medium",
+      maxOutputTokens: 128000,
     },
     {
       id: "combo/fast",
@@ -293,6 +299,7 @@ export function ChatCard({
       provider: "const",
       providerName: "Const",
       supportsThinking: false,
+      maxOutputTokens: 128000,
     },
     {
       id: "combo/coding",
@@ -303,6 +310,7 @@ export function ChatCard({
       supportsThinking: true,
       thinkingLevels: ["low", "medium", "high"],
       defaultThinkingLevel: "high",
+      maxOutputTokens: 128000,
     },
   ]);
   const [expandedProviders, setExpandedProviders] = useState<Record<string, boolean>>({});
@@ -447,6 +455,7 @@ export function ChatCard({
                     ? ["low", "medium", "high"]
                     : undefined),
                 defaultThinkingLevel,
+                maxOutputTokens: m.maxOutputTokens ?? m.max_output_tokens ?? (isConst ? 128000 : 65536),
               };
             });
 
@@ -601,6 +610,7 @@ export function ChatCard({
       model: matchedModel?.id || "gemini-3.6-flash",
       thinkingLevel: isThinkingSupported ? thinkingLevel : undefined,
       attachments: currentAttachments.length > 0 ? currentAttachments : undefined,
+      maxOutputTokens: matchedModel?.maxOutputTokens,
     });
   };
 

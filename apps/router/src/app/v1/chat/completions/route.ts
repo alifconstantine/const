@@ -250,6 +250,7 @@ export async function POST(req: NextRequest) {
       telemetryMeta,
       requestId,
       reqStartTime,
+      signal: req.signal,
     });
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : "Internal server error";
@@ -274,6 +275,7 @@ async function dispatchSingleModel({
   telemetryMeta,
   requestId,
   reqStartTime,
+  signal,
 }: {
   targetModel: string;
   providerDocId?: string;
@@ -291,6 +293,7 @@ async function dispatchSingleModel({
   telemetryMeta: TelemetryMetadata;
   requestId: string;
   reqStartTime: number;
+  signal?: AbortSignal;
 }): Promise<Response> {
   // CASE A: Const (Built-in Managed Models, e.g. Gemini 3.6 / 3.7 / 3.8 Flash)
   const isConstBuiltin = isBuiltinModel(targetModel) && !providerDocId;
@@ -369,6 +372,7 @@ async function dispatchSingleModel({
       method: "POST",
       headers,
       body: JSON.stringify(constPayload),
+      signal,
     });
 
     if (!response.ok) {
@@ -408,6 +412,7 @@ async function dispatchSingleModel({
           "Content-Type": "text/event-stream; charset=utf-8",
           "Cache-Control": "no-cache, no-transform",
           Connection: "keep-alive",
+          "X-Accel-Buffering": "no",
           "X-Const-Request-Id": requestId,
         },
       });
@@ -543,6 +548,7 @@ async function dispatchSingleModel({
     method: "POST",
     headers: upstreamHeaders,
     body: JSON.stringify(payload),
+    signal,
   });
 
   if (!response.ok) {
@@ -579,6 +585,7 @@ async function dispatchSingleModel({
         "Content-Type": "text/event-stream; charset=utf-8",
         "Cache-Control": "no-cache, no-transform",
         Connection: "keep-alive",
+        "X-Accel-Buffering": "no",
         "X-Const-Request-Id": requestId,
       },
     });

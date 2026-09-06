@@ -410,6 +410,7 @@ app.whenReady().then(() => {
               supportsTools: Boolean(m.supports_tools ?? true),
               thinkingLevels: m.thinking_levels || m.thinkingLevels || (supportsThinking ? ["low", "medium", "high"] : undefined),
               defaultThinkingLevel: m.default_thinking_level || m.defaultThinkingLevel || "medium",
+              maxOutputTokens: m.max_output_tokens || m.maxOutputTokens || 128000,
             };
           });
         }
@@ -432,6 +433,7 @@ app.whenReady().then(() => {
         supportsTools: m.supportsTools ?? true,
         thinkingLevels: (m as any).thinkingLevels || (supportsThinking ? ["low", "medium", "high"] : undefined),
         defaultThinkingLevel: (m as any).defaultThinkingLevel || "medium",
+        maxOutputTokens: (m as any).maxOutputTokens || 65536,
       };
     });
 
@@ -546,6 +548,7 @@ app.whenReady().then(() => {
         mode?: "ask_before_changes" | "full_access";
         conversationId?: string;
         authToken?: string;
+        maxOutputTokens?: number;
       }
     ) => {
       const config = loadUserConfig();
@@ -591,6 +594,7 @@ app.whenReady().then(() => {
         workspacePath: targetWorkspace,
         mode: payload.mode || "ask_before_changes",
         thinkingLevel: payload.thinkingLevel as any,
+        maxOutputTokens: payload.maxOutputTokens ?? (modelDef as any)?.maxOutputTokens,
       });
 
       try {

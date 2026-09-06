@@ -166,6 +166,20 @@ export class ConstAgent {
           }),
         ];
 
+        // Dynamic Max Output Tokens:
+        // - Built-in Gemini / Const models have 128K max output (128,000)
+        // - Custom endpoints or unspecified models default to 64K (65,536)
+        const DEFAULT_MAX_OUTPUT_TOKENS = 65536; // 64K
+        const modelLower = (this.config.model || "").toLowerCase();
+        const is128kModel =
+          modelLower.includes("gemini") ||
+          modelLower.startsWith("const") ||
+          modelLower.includes("combo/");
+        const resolvedMaxTokens =
+          this.config.maxOutputTokens ??
+          this.config.maxTokens ??
+          (is128kModel ? 128000 : DEFAULT_MAX_OUTPUT_TOKENS);
+
         const response = await fetch(endpoint, {
           method: "POST",
           headers: {
@@ -177,7 +191,8 @@ export class ConstAgent {
             messages: formattedMessages,
             tools: CONST_DEFAULT_TOOLS,
             stream: true,
-            max_tokens: 16384,
+            max_tokens: resolvedMaxTokens,
+            max_completion_tokens: resolvedMaxTokens,
             ...(this.config.thinkingLevel && this.config.thinkingLevel !== "off"
               ? {
                   reasoning: this.config.thinkingLevel,
@@ -286,6 +301,43 @@ export class ConstAgent {
           }
         }
 
+        // Process any trailing data remaining in buffer
+        if (buffer.trim().startsWith("data:")) {
+          const trimmed = buffer.trim();
+          const dataStr = trimmed.slice(5).trim();
+          if (dataStr && dataStr !== "[DONE]") {
+            try {
+              const json = JSON.parse(dataStr);
+              const choice = json.choices?.[0];
+              if (choice?.finish_reason) turnFinishReason = choice.finish_reason;
+              const delta = choice?.delta || choice?.message;
+              if (delta) {
+                if (delta.content) {
+                  turnContent += delta.content;
+                  onEvent({ type: "token", token: delta.content });
+                }
+                if (delta.tool_calls && Array.isArray(delta.tool_calls)) {
+                  for (const tc of delta.tool_calls) {
+                    const idx = tc.index ?? 0;
+                    if (!toolCallsMap.has(idx)) {
+                      toolCallsMap.set(idx, {
+                        id: tc.id || `call_${Date.now()}_${idx}`,
+                        name: tc.function?.name || "",
+                        arguments: tc.function?.arguments || "",
+                      });
+                    } else {
+                      const c = toolCallsMap.get(idx)!;
+                      if (tc.id) c.id = tc.id;
+                      if (tc.function?.name) c.name += tc.function.name;
+                      if (tc.function?.arguments) c.arguments += tc.function.arguments;
+                    }
+                  }
+                }
+              }
+            } catch {}
+          }
+        }
+
         const toolCalls: ToolCall[] = Array.from(toolCallsMap.values())
           .filter((tc) => tc.name && tc.name.trim().length > 0)
           .map((tc) => ({
@@ -298,10 +350,14 @@ export class ConstAgent {
         if (toolCalls.length === 0 && !turnContent) {
           if (turnThinking && currentTurn < maxTurns) {
             // Model generated internal reasoning but paused before calling tools or outputting text.
-            // Prompt it to proceed directly to execution.
+            // Prompt it to proceed directly to execution without bloating the context with thousands of raw thinking tokens.
+            const compactThinkingSummary =
+              turnThinking.length > 800
+                ? `${turnThinking.slice(0, 400)}...\n[Analysis concluded]\n...${turnThinking.slice(-400)}`
+                : turnThinking;
             const thinkingStepMsg: AgentMessage = {
               role: "assistant",
-              content: `[Thinking Analysis]\n${turnThinking}`,
+              content: `[Thinking Analysis]\n${compactThinkingSummary}`,
               thinking: turnThinking,
               timestamp: Date.now(),
             };
@@ -309,7 +365,7 @@ export class ConstAgent {
             conversationHistory.push({
               role: "user",
               content:
-                "Continue. Please proceed immediately to call the necessary tools (such as 'write' or 'edit') or provide the final response to complete the task.",
+                "Continue. Please proceed immediately to call the necessary tools (such as 'write' or 'edit') or provide the final code output to complete the task.",
             });
             onEvent({
               type: "status",
@@ -321,12 +377,12 @@ export class ConstAgent {
 
           if (turnFinishReason === "length") {
             turnContent =
-              "The response reached the model token limit during reasoning. Please ask to continue or specify a more targeted request.";
+              "The response reached the model token limit. Please ask to continue or break down the request into smaller parts.";
           } else if (turnThinking) {
             turnContent = `Completed thinking analysis:\n\n${turnThinking.slice(0, 500)}...\n\nPlease confirm if you would like me to proceed with creating the requested files.`;
           } else {
             turnContent =
-              "No response was generated by the model. Please check provider status or retry your request.";
+              "No response was generated by the model. Please verify provider connectivity or retry your request.";
           }
           onEvent({ type: "token", token: turnContent });
         }
