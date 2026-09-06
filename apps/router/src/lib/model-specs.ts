@@ -34,18 +34,74 @@ export const BUILTIN_MODELS: ModelSpec[] = [
     thinkingDefault: "medium",
     isDefault: true,
   },
+  {
+    id: "gemini-3.7-flash",
+    name: "Gemini 3.7 Flash",
+    modelId: "gemini-3.7-flash",
+    provider: "const",
+    providerName: "Const",
+    supportsThinking: true,
+    thinkingDefault: "medium",
+  },
+  {
+    id: "gemini-3.8-flash",
+    name: "Gemini 3.8 Flash",
+    modelId: "gemini-3.8-flash",
+    provider: "const",
+    providerName: "Const",
+    supportsThinking: true,
+    thinkingDefault: "medium",
+  },
 ];
 
 /**
  * Find model specification by modelId, checking built-in models first, then any custom/BYOK models.
  */
 export function findModelSpec(modelId: string, customModels: ModelSpec[] = []): ModelSpec {
+  const clean = modelId.toLowerCase().trim();
   const matched =
-    customModels.find((m) => m.modelId === modelId || m.id === modelId) ||
-    BUILTIN_MODELS.find((m) => m.modelId === modelId || m.id === modelId);
+    customModels.find((m) => m.modelId.toLowerCase() === clean || m.id.toLowerCase() === clean || m.name.toLowerCase() === clean) ||
+    BUILTIN_MODELS.find((m) => m.modelId.toLowerCase() === clean || m.id.toLowerCase() === clean || m.name.toLowerCase() === clean);
 
   if (matched) return matched;
   return BUILTIN_MODELS[0]!;
+}
+
+/**
+ * Normalizes any variation of Const managed model IDs to the exact OmniRoute combo model title.
+ * - "gemini-3.6-flash", "gemini 3.6 flash", "Gemini 3.6 Flash" -> "Gemini 3.6 Flash"
+ * - "gemini-3.7-flash", "gemini 3.7 flash", "Gemini 3.7 Flash" -> "Gemini 3.7 Flash"
+ * - "gemini-3.8-flash", "gemini 3.8 flash", "Gemini 3.8 Flash" -> "Gemini 3.8 Flash"
+ */
+export function normalizeConstModelName(modelId: string): string {
+  if (!modelId) return modelId;
+  const clean = modelId.toLowerCase().trim();
+  if (
+    clean === "const" ||
+    clean === "gemini-3.6-flash" ||
+    clean === "gemini 3.6 flash" ||
+    clean.startsWith("antigravity/gemini-3.6") ||
+    clean.startsWith("gemini-3.6")
+  ) {
+    return "Gemini 3.6 Flash";
+  }
+  if (
+    clean === "gemini-3.7-flash" ||
+    clean === "gemini 3.7 flash" ||
+    clean.startsWith("antigravity/gemini-3.7") ||
+    clean.startsWith("gemini-3.7")
+  ) {
+    return "Gemini 3.7 Flash";
+  }
+  if (
+    clean === "gemini-3.8-flash" ||
+    clean === "gemini 3.8 flash" ||
+    clean.startsWith("antigravity/gemini-3.8") ||
+    clean.startsWith("gemini-3.8")
+  ) {
+    return "Gemini 3.8 Flash";
+  }
+  return modelId;
 }
 
 /**
@@ -56,6 +112,15 @@ export function isBuiltinModel(modelId: string, customModels: ModelSpec[] = []):
   const clean = modelId.toLowerCase().trim();
   if (clean.startsWith("antigravity/")) return true;
   if (
+    clean === "const" ||
+    clean === "gemini-3.6-flash" || clean === "gemini 3.6 flash" ||
+    clean === "gemini-3.7-flash" || clean === "gemini 3.7 flash" ||
+    clean === "gemini-3.8-flash" || clean === "gemini 3.8 flash" ||
+    clean.startsWith("gemini-3.")
+  ) {
+    return true;
+  }
+  if (
     customModels.some(
       (m) =>
         (m.modelId.toLowerCase() === clean || m.id.toLowerCase() === clean) &&
@@ -65,7 +130,7 @@ export function isBuiltinModel(modelId: string, customModels: ModelSpec[] = []):
     return false;
   }
   return BUILTIN_MODELS.some(
-    (m) => m.id.toLowerCase() === clean || m.modelId.toLowerCase() === clean
+    (m) => m.id.toLowerCase() === clean || m.modelId.toLowerCase() === clean || m.name.toLowerCase() === clean
   );
 }
 

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@const/backend/_generated/api";
 import type { Id } from "@const/backend/_generated/dataModel";
+import { isBuiltinModel, normalizeConstModelName } from "@/lib/model-specs";
 
 export async function POST(req: NextRequest) {
   try {
@@ -40,7 +41,7 @@ export async function POST(req: NextRequest) {
     // ========================================================
     // CASE A: Const (Built-in Managed)
     // ========================================================
-    if (providerId === "const" || (!providerDocId && !baseUrl && !apiKey && !providerId)) {
+    if (providerId === "const" || isBuiltinModel(model) || (!providerDocId && !baseUrl && !apiKey && !providerId)) {
       const constBaseUrl = process.env.CONST_ENGINE_BASE_URL?.trim();
       if (!constBaseUrl) {
         return NextResponse.json(
@@ -53,10 +54,7 @@ export async function POST(req: NextRequest) {
       }
 
       const constApiKey = process.env.CONST_ENGINE_API_KEY?.trim() || "";
-      const mappedModel =
-        model === "gemini-3.6-flash"
-          ? "antigravity/gemini-3.6-flash-medium"
-          : model;
+      const mappedModel = normalizeConstModelName(model);
 
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
@@ -72,6 +70,7 @@ export async function POST(req: NextRequest) {
           model: mappedModel,
           messages: [{ role: "user", content: "Ping! Please respond with 'OK'." }],
           max_tokens: 15,
+          reasoning: "low",
         }),
         signal: controller.signal,
       }).finally(() => clearTimeout(timeoutId));

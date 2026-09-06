@@ -10,7 +10,7 @@ import {
   type TelemetryMetadata,
 } from "@/lib/telemetry";
 import { executeComboChat } from "@/lib/combo-executor";
-import { isBuiltinModel } from "@/lib/model-specs";
+import { isBuiltinModel, normalizeConstModelName } from "@/lib/model-specs";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,7 +26,10 @@ interface OpenAIChatRequestBody {
   temperature?: number;
   stream?: boolean;
   reasoning_effort?: "off" | "low" | "medium" | "high";
+  reasoning?: "off" | "low" | "medium" | "high" | { effort?: "off" | "low" | "medium" | "high" };
   providerDocId?: string;
+  max_tokens?: number;
+  max_completion_tokens?: number;
 }
 
 const CORS_HEADERS = {
@@ -73,9 +76,22 @@ export async function POST(req: NextRequest) {
       messages = [],
       temperature = 0.7,
       stream = false,
-      reasoning_effort,
       providerDocId,
+      max_tokens,
+      max_completion_tokens,
     } = body;
+
+    const rawReasoning = body.reasoning;
+    const rawReasoningEffort =
+      body.reasoning_effort ||
+      (typeof rawReasoning === "string" ? rawReasoning : rawReasoning?.effort);
+    const reasoning_effort =
+      rawReasoningEffort === "low" ||
+      rawReasoningEffort === "medium" ||
+      rawReasoningEffort === "high" ||
+      rawReasoningEffort === "off"
+        ? rawReasoningEffort
+        : undefined;
 
     if (!model) {
       return NextResponse.json(
@@ -170,6 +186,8 @@ export async function POST(req: NextRequest) {
       temperature,
       stream,
       reasoning_effort,
+      max_tokens,
+      max_completion_tokens,
       providedKey,
       ssoToken,
       convexUrl,
@@ -190,6 +208,8 @@ async function dispatchSingleModel({
   temperature,
   stream,
   reasoning_effort,
+  max_tokens,
+  max_completion_tokens,
   providedKey,
   ssoToken,
   convexUrl,
@@ -203,6 +223,8 @@ async function dispatchSingleModel({
   temperature: number;
   stream: boolean;
   reasoning_effort?: "off" | "low" | "medium" | "high";
+  max_tokens?: number;
+  max_completion_tokens?: number;
   providedKey?: string;
   ssoToken?: string | null;
   convexUrl: string;
@@ -210,7 +232,7 @@ async function dispatchSingleModel({
   requestId: string;
   reqStartTime: number;
 }): Promise<Response> {
-  // CASE A: Const (Built-in Managed Models, e.g. Gemini 3.6 Flash)
+  // CASE A: Const (Built-in Managed Models, e.g. Gemini 3.6 / 3.7 / 3.8 Flash)
   const isConstBuiltin = isBuiltinModel(targetModel) && !providerDocId;
 
   if (isConstBuiltin) {
@@ -249,18 +271,7 @@ async function dispatchSingleModel({
     ).replace(/\/+$/, "");
     const constEngineKey = process.env.CONST_ENGINE_API_KEY?.trim() || "";
 
-    let resolvedModel = "antigravity/gemini-3.6-flash-medium";
-    if (targetModel === "gemini-3.6-flash") {
-      if (reasoning_effort === "low") {
-        resolvedModel = "antigravity/gemini-3.6-flash-low";
-      } else if (reasoning_effort === "high") {
-        resolvedModel = "antigravity/gemini-3.6-flash-high";
-      } else {
-        resolvedModel = "antigravity/gemini-3.6-flash-medium";
-      }
-    } else {
-      resolvedModel = targetModel;
-    }
+    const resolvedModel = normalizeConstModelName(targetModel);
 
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
@@ -271,15 +282,27 @@ async function dispatchSingleModel({
       headers["Authorization"] = `Bearer ${providedKey}`;
     }
 
+    const constPayload: Record<string, unknown> = {
+      model: resolvedModel,
+      messages,
+      temperature,
+      stream,
+    };
+    if (reasoning_effort && reasoning_effort !== "off") {
+      constPayload.reasoning = reasoning_effort;
+      constPayload.reasoning_effort = reasoning_effort;
+    }
+    if (max_tokens !== undefined) {
+      constPayload.max_tokens = max_tokens;
+    }
+    if (max_completion_tokens !== undefined) {
+      constPayload.max_completion_tokens = max_completion_tokens;
+    }
+
     const response = await fetch(`${constBaseUrl}/v1/chat/completions`, {
       method: "POST",
       headers,
-      body: JSON.stringify({
-        model: resolvedModel,
-        messages,
-        temperature,
-        stream,
-      }),
+      body: JSON.stringify(constPayload),
     });
 
     if (!response.ok) {
@@ -435,6 +458,13 @@ async function dispatchSingleModel({
   };
   if (reasoning_effort && reasoning_effort !== "off") {
     payload.reasoning_effort = reasoning_effort;
+    payload.reasoning = reasoning_effort;
+  }
+  if (max_tokens !== undefined) {
+    payload.max_tokens = max_tokens;
+  }
+  if (max_completion_tokens !== undefined) {
+    payload.max_completion_tokens = max_completion_tokens;
   }
 
   const response = await fetch(endpoint, {

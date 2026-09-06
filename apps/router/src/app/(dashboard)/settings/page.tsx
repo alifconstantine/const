@@ -199,6 +199,8 @@ export default function SettingsPage() {
               </SelectTrigger>
               <SelectContent className="rounded-xl bg-card border-none text-foreground">
                 <SelectItem value="gemini-3.6-flash">gemini-3.6-flash (Recommended)</SelectItem>
+                <SelectItem value="gemini-3.7-flash">gemini-3.7-flash</SelectItem>
+                <SelectItem value="gemini-3.8-flash">gemini-3.8-flash</SelectItem>
                 <SelectItem value="combo/coding">combo/coding (Coding Chain)</SelectItem>
                 <SelectItem value="combo/fast">combo/fast (Low-Latency)</SelectItem>
                 <SelectItem value="combo/auto">combo/auto (Auto-Router)</SelectItem>

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@const/backend/_generated/api";
 import type { Id } from "@const/backend/_generated/dataModel";
-import { hasFixedThinking } from "@/lib/model-specs";
+import { hasFixedThinking, isBuiltinModel, normalizeConstModelName } from "@/lib/model-specs";
 import {
   generateRequestId,
   estimateMessagesTokens,
@@ -207,10 +207,10 @@ export async function POST(req: NextRequest) {
     }
 
     // ========================================================
-    // CASE A: Const (Built-in Managed Gemini 3.6 Flash)
+    // CASE A: Const (Built-in Managed Gemini 3.6 / 3.7 / 3.8 Flash)
     // ========================================================
     const isConstBuiltin =
-      (providerId === "const" || model === "gemini-3.6-flash") && !providerDocId;
+      (providerId === "const" || isBuiltinModel(model)) && !providerDocId;
 
     if (isConstBuiltin) {
       // Enforce 7M Weekly Free Token Quota for Const-managed engine
@@ -243,18 +243,7 @@ export async function POST(req: NextRequest) {
       const constBaseUrl = (process.env.CONST_ENGINE_BASE_URL?.trim() || "https://engine.const.web.id").replace(/\/+$/, "");
       const constEngineKey = process.env.CONST_ENGINE_API_KEY?.trim() || "";
 
-      // Map thinking level for Gemini 3.6 / 3.8 Flash
-      let targetModel = model;
-      if (model.startsWith("gemini-3.")) {
-        if (hasFixedThinking(model)) {
-          targetModel = model.startsWith("antigravity/") ? model : `antigravity/${model}`;
-        } else {
-          const tier = thinkingLevel === "low" ? "low" : thinkingLevel === "high" ? "high" : "medium";
-          targetModel = `antigravity/${model}-${tier}`;
-        }
-      } else {
-        targetModel = model;
-      }
+      const targetModel = normalizeConstModelName(model);
 
       const headers: Record<string, string> = {
         "Content-Type": "application/json",
@@ -265,15 +254,21 @@ export async function POST(req: NextRequest) {
         headers["Authorization"] = `Bearer ${providedKey}`;
       }
 
+      const constPayload: Record<string, unknown> = {
+        model: targetModel,
+        messages: formattedMessages,
+        temperature,
+        stream: true,
+      };
+      if (thinkingLevel) {
+        constPayload.reasoning = thinkingLevel;
+        constPayload.reasoning_effort = thinkingLevel;
+      }
+
       const response = await fetch(`${constBaseUrl}/v1/chat/completions`, {
         method: "POST",
         headers,
-        body: JSON.stringify({
-          model: targetModel,
-          messages: formattedMessages,
-          temperature,
-          stream: true,
-        }),
+        body: JSON.stringify(constPayload),
       });
 
       if (!response.ok) {

@@ -67,7 +67,7 @@ export function ViewCodeDialog({
       model: modelId,
       messages: payloadMessages,
       temperature,
-      ...(thinkingLevel ? { reasoning_effort: thinkingLevel } : {}),
+      ...(thinkingLevel ? { reasoning: thinkingLevel } : {}),
       stream: true,
     },
     null,

@@ -31,6 +31,36 @@ export async function GET(req: NextRequest) {
       owned_by: "const",
     },
     {
+      id: "Gemini 3.6 Flash",
+      object: "model",
+      created: 1700000000,
+      owned_by: "const",
+    },
+    {
+      id: "gemini-3.7-flash",
+      object: "model",
+      created: 1700000000,
+      owned_by: "const",
+    },
+    {
+      id: "Gemini 3.7 Flash",
+      object: "model",
+      created: 1700000000,
+      owned_by: "const",
+    },
+    {
+      id: "gemini-3.8-flash",
+      object: "model",
+      created: 1700000000,
+      owned_by: "const",
+    },
+    {
+      id: "Gemini 3.8 Flash",
+      object: "model",
+      created: 1700000000,
+      owned_by: "const",
+    },
+    {
       id: "combo/auto",
       object: "model",
       created: 1700000000,

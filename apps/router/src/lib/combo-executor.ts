@@ -1,6 +1,6 @@
 import { ConvexHttpClient } from "convex/browser";
 import { api } from "@const/backend/_generated/api";
-import { hasFixedThinking } from "@/lib/model-specs";
+import { hasFixedThinking, isBuiltinModel, normalizeConstModelName } from "@/lib/model-specs";
 import {
   convertGoogleSseToOpenAiSse,
   convertAnthropicSseToOpenAiSse,
@@ -211,7 +211,7 @@ export async function executeComboChat(
 
     try {
       const isConstEngine =
-        target.providerId === "const" || target.modelId === "gemini-3.6-flash";
+        target.providerId === "const" || isBuiltinModel(target.modelId);
 
       if (isConstEngine) {
         // Dispatch to Const Managed Model
@@ -220,22 +220,7 @@ export async function executeComboChat(
         ).replace(/\/+$/, "");
         const constEngineKey = process.env.CONST_ENGINE_API_KEY?.trim() || "";
 
-        let targetModel = target.modelId;
-        if (targetModel.startsWith("gemini-3.")) {
-          if (hasFixedThinking(targetModel)) {
-            targetModel = targetModel.startsWith("antigravity/")
-              ? targetModel
-              : `antigravity/${targetModel}`;
-          } else {
-            const tier =
-              thinkingLevel === "low"
-                ? "low"
-                : thinkingLevel === "high"
-                  ? "high"
-                  : "medium";
-            targetModel = `antigravity/${targetModel}-${tier}`;
-          }
-        }
+        const targetModel = normalizeConstModelName(target.modelId);
 
         const headers: Record<string, string> = {
           "Content-Type": "application/json",
@@ -246,15 +231,21 @@ export async function executeComboChat(
           headers["Authorization"] = `Bearer ${apiKey}`;
         }
 
+        const constPayload: Record<string, unknown> = {
+          model: targetModel,
+          messages: formattedMessages,
+          temperature,
+          stream: true,
+        };
+        if (thinkingLevel && thinkingLevel !== "off") {
+          constPayload.reasoning = thinkingLevel;
+          constPayload.reasoning_effort = thinkingLevel;
+        }
+
         const response = await fetch(`${constBaseUrl}/v1/chat/completions`, {
           method: "POST",
           headers,
-          body: JSON.stringify({
-            model: targetModel,
-            messages: formattedMessages,
-            temperature,
-            stream: true,
-          }),
+          body: JSON.stringify(constPayload),
           signal,
         });
 

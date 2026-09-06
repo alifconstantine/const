@@ -68,7 +68,7 @@ interface ProviderGroup {
   models: ModelItem[];
 }
 
-// Provider Catalog: Const with Gemini 3.6 Flash
+// Provider Catalog: Const Managed Models (OmniRoute Combos)
 const PROVIDERS_DATA: ProviderGroup[] = [
   {
     id: "const",
@@ -85,6 +85,26 @@ const PROVIDERS_DATA: ProviderGroup[] = [
         inputTypes: ["text", "image", "video"],
         outputTypes: ["text"],
         isDefault: true,
+      },
+      {
+        id: "gemini-3.7-flash",
+        name: "Gemini 3.7 Flash",
+        modelId: "gemini-3.7-flash",
+        provider: "const",
+        contextWindow: "1000000",
+        maxOutputTokens: "128000",
+        inputTypes: ["text", "image", "video"],
+        outputTypes: ["text"],
+      },
+      {
+        id: "gemini-3.8-flash",
+        name: "Gemini 3.8 Flash",
+        modelId: "gemini-3.8-flash",
+        provider: "const",
+        contextWindow: "1000000",
+        maxOutputTokens: "128000",
+        inputTypes: ["text", "image", "video"],
+        outputTypes: ["text"],
       },
     ],
   },
