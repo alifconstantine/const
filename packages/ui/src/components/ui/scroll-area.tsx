@@ -18,11 +18,11 @@ const ScrollArea = React.forwardRef<
 >(({ className, children, scrollBarClassName, thumbClassName, viewportClassName, ...props }, ref) => (
   <ScrollAreaPrimitive.Root
     ref={ref}
-    className={cn("relative overflow-hidden", className)}
+    className={cn("relative overflow-hidden flex flex-col", className)}
     {...props}
   >
     <ScrollAreaPrimitive.Viewport
-      className={cn("h-full w-full rounded-[inherit] max-h-[inherit] [&>div[style]]:!block", viewportClassName)}
+      className={cn("h-full w-full rounded-[inherit] max-h-[inherit] [&>div]:!block", viewportClassName)}
     >
       {children}
     </ScrollAreaPrimitive.Viewport>
@@ -45,7 +45,7 @@ const ScrollBar = React.forwardRef<
     ref={ref}
     orientation={orientation}
     className={cn(
-      "flex touch-none select-none transition-colors",
+      "flex touch-none select-none transition-colors z-10",
       orientation === "vertical" &&
         "h-full w-2.5 border-l border-l-transparent p-[1px]",
       orientation === "horizontal" &&
@@ -56,7 +56,7 @@ const ScrollBar = React.forwardRef<
   >
     <ScrollAreaPrimitive.ScrollAreaThumb
       className={cn(
-        "relative flex-1 rounded-full bg-border dark:bg-[#48484e] hover:bg-muted-foreground/40 dark:hover:bg-[#5d5d5d] transition-colors",
+        "relative flex-1 rounded-full bg-zinc-400/60 hover:bg-zinc-400 dark:bg-zinc-600 dark:hover:bg-zinc-500 transition-colors",
         thumbClassName,
       )}
     />

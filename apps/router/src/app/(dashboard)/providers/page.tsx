@@ -186,6 +186,7 @@ export default function ProvidersPage() {
   const [modelSearch, setModelSearch] = useState("");
   const [manualModelId, setManualModelId] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [isSettingsExpanded, setIsSettingsExpanded] = useState(false);
 
   // Dialog State: Manage Existing Models
   const [manageDoc, setManageDoc] = useState<{
@@ -193,6 +194,7 @@ export default function ProvidersPage() {
     name: string;
     importedModels: ModelItem[];
   } | null>(null);
+  const [manageSearch, setManageSearch] = useState("");
 
   // Dialog State: Add / Edit Model Dialog
   const [modelConfigOpen, setModelConfigOpen] = useState(false);
@@ -225,6 +227,43 @@ export default function ProvidersPage() {
     return userProviders.filter((p) => p.providerId.startsWith("custom-"));
   }, [userProviders]);
 
+  // Filtered fetched models in config modal
+  const filteredConfigModels = useMemo(() => {
+    if (!modelSearch.trim()) return fetchedModels;
+    const q = modelSearch.toLowerCase().trim();
+    return fetchedModels.filter(
+      (m) => m.name.toLowerCase().includes(q) || m.modelId.toLowerCase().includes(q)
+    );
+  }, [fetchedModels, modelSearch]);
+
+  const selectedCount = fetchedModels.filter((m) => m.enabled).length;
+
+  // Filtered managed models in manage dialog
+  const filteredManagedModels = useMemo(() => {
+    if (!manageDoc) return [];
+    if (!manageSearch.trim()) return manageDoc.importedModels;
+    const q = manageSearch.toLowerCase().trim();
+    return manageDoc.importedModels.filter(
+      (m) => m.name.toLowerCase().includes(q) || m.modelId.toLowerCase().includes(q)
+    );
+  }, [manageDoc, manageSearch]);
+
+  const activeManagedCount = manageDoc?.importedModels.filter((m) => m.enabled).length || 0;
+
+  // Toggle all filtered models in manage dialog
+  const handleToggleAllManaged = (enable: boolean) => {
+    setManageDoc((prev) => {
+      if (!prev) return null;
+      const targetIds = new Set(filteredManagedModels.map((m) => m.modelId));
+      return {
+        ...prev,
+        importedModels: prev.importedModels.map((m) =>
+          targetIds.has(m.modelId) ? { ...m, enabled: enable } : m
+        ),
+      };
+    });
+  };
+
   // Open configuration for preset provider
   const handleOpenPreset = (provider: ProviderDefinition) => {
     const existing = configuredMap.get(provider.id);
@@ -234,9 +273,11 @@ export default function ProvidersPage() {
     setFormApiKey("");
     setFormBaseUrl(existing?.baseUrl || provider.defaultBaseUrl || "");
     setFormProtocol(provider.protocol);
-    setFetchedModels(existing?.importedModels ? [...existing.importedModels] : []);
+    const existingModels = existing?.importedModels ? [...existing.importedModels] : [];
+    setFetchedModels(existingModels);
     setShowApiKey(false);
     setModelSearch("");
+    setIsSettingsExpanded(existingModels.length === 0);
     setIsConfigOpen(true);
   };
 
@@ -252,6 +293,7 @@ export default function ProvidersPage() {
     setShowApiKey(false);
     setModelSearch("");
     setManualModelId("");
+    setIsSettingsExpanded(true);
     setIsConfigOpen(true);
   };
 
@@ -293,6 +335,7 @@ export default function ProvidersPage() {
             enabled: true,
           }));
           setFetchedModels(normalized);
+          setIsSettingsExpanded(false);
           toast.success(`Discovered ${normalized.length} models`, {
             description: "All models are selected by default. You can customize the selection before importing.",
           });
@@ -324,7 +367,14 @@ export default function ProvidersPage() {
 
   // Select all or deselect all
   const handleToggleSelectAll = (select: boolean) => {
-    setFetchedModels((prev) => prev.map((m) => ({ ...m, enabled: select })));
+    if (!modelSearch.trim()) {
+      setFetchedModels((prev) => prev.map((m) => ({ ...m, enabled: select })));
+    } else {
+      const targetIds = new Set(filteredConfigModels.map((m) => m.modelId));
+      setFetchedModels((prev) =>
+        prev.map((m) => (targetIds.has(m.modelId) ? { ...m, enabled: select } : m))
+      );
+    }
   };
 
   // Add manual model for custom provider
@@ -528,21 +578,11 @@ export default function ProvidersPage() {
         description: `Model selection for ${manageDoc.name} has been updated.`,
       });
       setManageDoc(null);
+      setManageSearch("");
     } catch (err: any) {
       toast.error("Failed to update models", { description: err?.message });
     }
   };
-
-  // Filtered fetched models in config modal
-  const filteredConfigModels = useMemo(() => {
-    if (!modelSearch.trim()) return fetchedModels;
-    const q = modelSearch.toLowerCase().trim();
-    return fetchedModels.filter(
-      (m) => m.name.toLowerCase().includes(q) || m.modelId.toLowerCase().includes(q)
-    );
-  }, [fetchedModels, modelSearch]);
-
-  const selectedCount = fetchedModels.filter((m) => m.enabled).length;
 
   return (
     <TooltipProvider delayDuration={150}>
@@ -735,13 +775,14 @@ export default function ProvidersPage() {
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() =>
+                            onClick={() => {
+                              setManageSearch("");
                               setManageDoc({
                                 _id: userConfig._id,
                                 name: provider.name,
                                 importedModels: [...userConfig.importedModels],
-                              })
-                            }
+                              });
+                            }}
                             className="rounded-full text-xs h-8 px-3 border-border hover:bg-secondary cursor-pointer"
                           >
                             <Settings2 className="h-3 w-3 mr-1" />
@@ -953,13 +994,14 @@ export default function ProvidersPage() {
                         <Button
                           size="sm"
                           variant="outline"
-                          onClick={() =>
+                          onClick={() => {
+                            setManageSearch("");
                             setManageDoc({
                               _id: cp._id,
                               name: cp.name,
                               importedModels: [...cp.importedModels],
-                            })
-                          }
+                            });
+                          }}
                           className="rounded-full text-xs h-8 px-3 border-border hover:bg-secondary cursor-pointer"
                         >
                           <Settings2 className="h-3 w-3 mr-1" />
@@ -1010,7 +1052,7 @@ export default function ProvidersPage() {
         {/* MODAL 1: CONFIGURE PROVIDER & DISCOVER/IMPORT MODELS      */}
         {/* ========================================================= */}
         <Dialog open={isConfigOpen} onOpenChange={setIsConfigOpen}>
-          <DialogContent className="rounded-2xl border-none bg-card max-w-xl p-6 sm:p-7 space-y-4 shadow-xl max-h-[90vh] flex flex-col overflow-hidden">
+          <DialogContent className="rounded-2xl border-none bg-card max-w-xl sm:max-w-2xl p-6 sm:p-7 shadow-xl h-[88vh] max-h-[92vh] flex flex-col gap-3.5 overflow-hidden">
             <DialogHeader className="space-y-1.5 text-left shrink-0">
               <DialogTitle className="text-lg font-sans font-medium text-foreground tracking-tight flex items-center gap-2">
                 <span>Configure {isCustomMode ? "Custom Provider" : selectedProviderMeta?.name}</span>
@@ -1023,145 +1065,264 @@ export default function ProvidersPage() {
               </DialogDescription>
             </DialogHeader>
 
-            <ScrollArea className="flex-1 -mr-2 pr-3">
-              <div className="space-y-4 pr-1 py-1">
-                {/* Form Field: Name (For Custom) */}
-                {isCustomMode && (
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-foreground font-sans">
-                      Provider Name
-                    </label>
-                    <input
-                      type="text"
-                      placeholder="e.g. Local Ollama Workstation"
-                      value={formName}
-                      onChange={(e) => setFormName(e.target.value)}
-                      className="w-full h-10 px-3.5 rounded-xl bg-secondary/60 border-none text-xs text-foreground placeholder:text-muted-foreground font-sans outline-none focus:ring-1 focus:ring-inset focus:ring-foreground/20 transition-all"
-                    />
-                  </div>
-                )}
+            {fetchedModels.length === 0 ? (
+              <ScrollArea type="always" className="flex-1 min-h-0">
+                <div className="space-y-4 pr-2.5 py-1">
+                  {/* Form Field: Name (For Custom) */}
+                  {isCustomMode && (
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-foreground font-sans">
+                        Provider Name
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="e.g. Local Ollama Workstation"
+                        value={formName}
+                        onChange={(e) => setFormName(e.target.value)}
+                        className="w-full h-10 px-3.5 rounded-xl bg-secondary/60 border-none text-xs text-foreground placeholder:text-muted-foreground font-sans outline-none focus:ring-1 focus:ring-inset focus:ring-foreground/20 transition-all"
+                      />
+                    </div>
+                  )}
 
-                {/* Form Field: Base URL (Required for Custom, Optional for Preset) */}
-                {(isCustomMode || selectedProviderMeta?.defaultBaseUrl) && (
+                  {/* Form Field: Base URL (Required for Custom, Optional for Preset) */}
+                  {(isCustomMode || selectedProviderMeta?.defaultBaseUrl) && (
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-medium text-foreground font-sans">
+                          Base URL
+                        </label>
+                        <span className="text-[10px] text-muted-foreground font-mono">
+                          {isCustomMode ? "Required" : "Default preset"}
+                        </span>
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="e.g. http://localhost:11434 or https://api.together.xyz/v1"
+                        value={formBaseUrl}
+                        onChange={(e) => setFormBaseUrl(e.target.value)}
+                        className="w-full h-10 px-3.5 rounded-xl bg-secondary/60 border-none text-xs font-mono text-foreground placeholder:text-muted-foreground outline-none focus:ring-1 focus:ring-inset focus:ring-foreground/20 transition-all"
+                      />
+                    </div>
+                  )}
+
+                  {/* Form Field: Protocol Select (For Custom) */}
+                  {isCustomMode && (
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-medium text-foreground font-sans">
+                        Protocol Compatibility
+                      </label>
+                      <Select
+                        value={formProtocol}
+                        onValueChange={(val: any) => setFormProtocol(val)}
+                      >
+                        <SelectTrigger className="h-10 rounded-xl bg-secondary/60 border-none focus:ring-1 focus:ring-inset focus:ring-foreground/20 text-xs font-sans text-foreground transition-all">
+                          <SelectValue placeholder="Select Protocol" />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-xl border-none bg-popover text-xs font-sans shadow-lg">
+                          <SelectItem value="openai-compatible" className="cursor-pointer">
+                            OpenAI-Compatible (/v1/chat/completions)
+                          </SelectItem>
+                          <SelectItem value="anthropic" className="cursor-pointer">
+                            Anthropic-Compatible (/v1/messages)
+                          </SelectItem>
+                          <SelectItem value="google-ai" className="cursor-pointer">
+                            Google Gemini API
+                          </SelectItem>
+                          <SelectItem value="custom" className="cursor-pointer">
+                            Custom Passthrough
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+
+                  {/* Form Field: API Key */}
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between">
                       <label className="text-xs font-medium text-foreground font-sans">
-                        Base URL
+                        API Key
                       </label>
                       <span className="text-[10px] text-muted-foreground font-mono">
-                        {isCustomMode ? "Required" : "Default preset"}
+                        {isCustomMode ? "Optional" : "Encrypted at rest"}
                       </span>
                     </div>
-                    <input
-                      type="text"
-                      placeholder="e.g. http://localhost:11434 or https://api.together.xyz/v1"
-                      value={formBaseUrl}
-                      onChange={(e) => setFormBaseUrl(e.target.value)}
-                      className="w-full h-10 px-3.5 rounded-xl bg-secondary/60 border-none text-xs font-mono text-foreground placeholder:text-muted-foreground outline-none focus:ring-1 focus:ring-inset focus:ring-foreground/20 transition-all"
-                    />
+                    <div className="relative flex items-center">
+                      <input
+                        type={showApiKey ? "text" : "password"}
+                        placeholder={
+                          configuredMap.has(selectedProviderMeta?.id || "")
+                            ? "Enter new key to replace, or keep blank to retain existing key"
+                            : "e.g. sk-..."
+                        }
+                        value={formApiKey}
+                        onChange={(e) => setFormApiKey(e.target.value)}
+                        className="w-full h-10 pl-3.5 pr-10 rounded-xl bg-secondary/60 border-none text-xs font-mono text-foreground placeholder:text-muted-foreground outline-none focus:ring-1 focus:ring-inset focus:ring-foreground/20 transition-all"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowApiKey(!showApiKey)}
+                        className="absolute right-3 text-muted-foreground hover:text-foreground cursor-pointer"
+                        aria-label={showApiKey ? "Hide key" : "Show key"}
+                      >
+                        {showApiKey ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                      </button>
+                    </div>
                   </div>
-                )}
 
-                {/* Form Field: Protocol Select (For Custom) */}
-                {isCustomMode && (
-                  <div className="space-y-1.5">
-                    <label className="text-xs font-medium text-foreground font-sans">
-                      Protocol Compatibility
-                    </label>
-                    <Select
-                      value={formProtocol}
-                      onValueChange={(val: any) => setFormProtocol(val)}
+                  {/* Fetch Action Button */}
+                  <div className="pt-1">
+                    <Button
+                      type="button"
+                      onClick={handleFetchModels}
+                      disabled={isFetchingModels}
+                      className="w-full rounded-full gap-2 text-xs font-medium cursor-pointer h-10 bg-secondary hover:bg-secondary/80 text-foreground border-none shadow-none"
                     >
-                      <SelectTrigger className="h-10 rounded-xl bg-secondary/60 border-none focus:ring-1 focus:ring-inset focus:ring-foreground/20 text-xs font-sans text-foreground transition-all">
-                        <SelectValue placeholder="Select Protocol" />
-                      </SelectTrigger>
-                      <SelectContent className="rounded-xl border-none bg-popover text-xs font-sans shadow-lg">
-                        <SelectItem value="openai-compatible" className="cursor-pointer">
-                          OpenAI-Compatible (/v1/chat/completions)
-                        </SelectItem>
-                        <SelectItem value="anthropic" className="cursor-pointer">
-                          Anthropic-Compatible (/v1/messages)
-                        </SelectItem>
-                        <SelectItem value="google-ai" className="cursor-pointer">
-                          Google Gemini API
-                        </SelectItem>
-                        <SelectItem value="custom" className="cursor-pointer">
-                          Custom Passthrough
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
+                      {isFetchingModels ? (
+                        <>
+                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                          <span>Connecting &amp; Fetching Models...</span>
+                        </>
+                      ) : (
+                        <>
+                          <RefreshCw className="h-3.5 w-3.5" />
+                          <span>Test Connection &amp; Fetch Models</span>
+                        </>
+                      )}
+                    </Button>
                   </div>
-                )}
 
-                {/* Form Field: API Key */}
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-medium text-foreground font-sans">
-                      API Key
-                    </label>
-                    <span className="text-[10px] text-muted-foreground font-mono">
-                      {isCustomMode ? "Optional" : "Encrypted at rest"}
-                    </span>
-                  </div>
-                  <div className="relative flex items-center">
-                    <input
-                      type={showApiKey ? "text" : "password"}
-                      placeholder={
-                        configuredMap.has(selectedProviderMeta?.id || "")
-                          ? "Enter new key to replace, or keep blank to retain existing key"
-                          : "e.g. sk-..."
-                      }
-                      value={formApiKey}
-                      onChange={(e) => setFormApiKey(e.target.value)}
-                      className="w-full h-10 pl-3.5 pr-10 rounded-xl bg-secondary/60 border-none text-xs font-mono text-foreground placeholder:text-muted-foreground outline-none focus:ring-1 focus:ring-inset focus:ring-foreground/20 transition-all"
-                    />
-                  <button
-                    type="button"
-                    onClick={() => setShowApiKey(!showApiKey)}
-                    className="absolute right-3 text-muted-foreground hover:text-foreground cursor-pointer"
-                    aria-label={showApiKey ? "Hide key" : "Show key"}
-                  >
-                    {showApiKey ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-                  </button>
-                </div>
-              </div>
-
-              {/* Fetch Action Button */}
-              <div className="pt-1">
-                <Button
-                  type="button"
-                  onClick={handleFetchModels}
-                  disabled={isFetchingModels}
-                  className="w-full rounded-full gap-2 text-xs font-medium cursor-pointer h-10 bg-secondary hover:bg-secondary/80 text-foreground border-none shadow-none"
-                >
-                  {isFetchingModels ? (
-                    <>
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                      <span>Connecting &amp; Fetching Models...</span>
-                    </>
-                  ) : (
-                    <>
-                      <RefreshCw className="h-3.5 w-3.5" />
-                      <span>Test Connection &amp; Fetch Models</span>
-                    </>
+                  {/* Manual Model Adder (For Custom Provider) */}
+                  {isCustomMode && (
+                    <div className="pt-3 space-y-2 border-t border-border/60">
+                      <label className="text-xs font-medium text-foreground font-sans">
+                        Can&apos;t find your model? Add manually:
+                      </label>
+                      <form onSubmit={handleAddManualModel} className="flex gap-2">
+                        <input
+                          type="text"
+                          placeholder="e.g. qwen2.5-coder:32b or my-fine-tuned-model"
+                          value={manualModelId}
+                          onChange={(e) => setManualModelId(e.target.value)}
+                          className="flex-1 h-9 px-3 rounded-xl bg-secondary/60 border border-border/80 text-xs font-mono text-foreground placeholder:text-muted-foreground outline-none hover:border-foreground/30 focus:border-foreground/40 focus:ring-1 focus:ring-inset focus:ring-foreground/15 transition-colors"
+                        />
+                        <Button
+                          type="submit"
+                          size="sm"
+                          variant="outline"
+                          className="rounded-full text-xs h-9 px-3 cursor-pointer shrink-0"
+                        >
+                          <Plus className="h-3.5 w-3.5 mr-1" />
+                          <span>Add</span>
+                        </Button>
+                      </form>
+                    </div>
                   )}
-                </Button>
-              </div>
-
-              {/* Model Discovery Results Section */}
-              {fetchedModels.length > 0 && (
-                <div className="pt-3 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <div className="text-xs font-medium text-foreground flex items-center gap-2">
-                        <span>Select Models to Import</span>
-                        <Badge className="rounded-full text-[10px] font-mono py-0 px-2 bg-primary text-primary-foreground">
-                          {selectedCount} / {fetchedModels.length} selected
-                        </Badge>
+                </div>
+              </ScrollArea>
+            ) : (
+              <div className="flex-1 min-h-0 flex flex-col gap-3 overflow-hidden">
+                {/* Connection Settings Card (Compact with Edit/Hide toggle) */}
+                <div className="rounded-xl border border-border/70 bg-secondary/25 p-3 shrink-0">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="h-8 w-8 rounded-lg bg-secondary flex items-center justify-center text-foreground shrink-0 font-mono text-xs">
+                        {isCustomMode ? (
+                          <Server className="h-4 w-4 text-muted-foreground" />
+                        ) : (
+                          <LobeProviderIcon providerId={selectedProviderMeta?.id || ""} className="h-4 w-4" />
+                        )}
                       </div>
-                      <p className="text-[11px] text-muted-foreground font-light">
-                        All models are checked by default. Uncheck any model you don&apos;t need.
-                      </p>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-medium text-foreground truncate font-sans">
+                            {formName || selectedProviderMeta?.name || "Custom Provider"}
+                          </span>
+                          <Badge className="rounded-full text-[10px] font-mono py-0 px-1.5 bg-secondary text-muted-foreground border-none">
+                            {formProtocol}
+                          </Badge>
+                        </div>
+                        <p className="text-[10px] font-mono text-muted-foreground truncate">
+                          {formBaseUrl || selectedProviderMeta?.defaultBaseUrl || "Default preset endpoint"}
+                        </p>
+                      </div>
+                    </div>
+
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setIsSettingsExpanded(!isSettingsExpanded)}
+                      className="text-xs h-7 px-2.5 text-muted-foreground hover:text-foreground cursor-pointer shrink-0 gap-1"
+                    >
+                      <Settings2 className="h-3 w-3" />
+                      <span>{isSettingsExpanded ? "Hide Settings" : "Edit Settings"}</span>
+                    </Button>
+                  </div>
+
+                  {/* Expandable Settings */}
+                  {isSettingsExpanded && (
+                    <ScrollArea className="mt-3 pt-3 border-t border-border/50 max-h-36 pr-2">
+                      <div className="space-y-2.5 pr-1 py-0.5">
+                        {isCustomMode && (
+                          <div className="space-y-1">
+                            <label className="text-[11px] font-medium text-foreground font-sans">Provider Name</label>
+                            <input
+                              type="text"
+                              value={formName}
+                              onChange={(e) => setFormName(e.target.value)}
+                              className="w-full h-8 px-3 rounded-lg bg-secondary/60 border border-border text-xs text-foreground outline-none"
+                            />
+                          </div>
+                        )}
+
+                        {(isCustomMode || selectedProviderMeta?.defaultBaseUrl) && (
+                          <div className="space-y-1">
+                            <label className="text-[11px] font-medium text-foreground font-sans">Base URL</label>
+                            <input
+                              type="text"
+                              value={formBaseUrl}
+                              onChange={(e) => setFormBaseUrl(e.target.value)}
+                              className="w-full h-8 px-3 rounded-lg bg-secondary/60 border border-border text-xs font-mono text-foreground outline-none"
+                            />
+                          </div>
+                        )}
+
+                        <div className="space-y-1">
+                          <label className="text-[11px] font-medium text-foreground font-sans">API Key</label>
+                          <input
+                            type={showApiKey ? "text" : "password"}
+                            placeholder={configuredMap.has(selectedProviderMeta?.id || "") ? "Keep blank to retain key" : "e.g. sk-..."}
+                            value={formApiKey}
+                            onChange={(e) => setFormApiKey(e.target.value)}
+                            className="w-full h-8 px-3 rounded-lg bg-secondary/60 border border-border text-xs font-mono text-foreground outline-none"
+                          />
+                        </div>
+
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={handleFetchModels}
+                          disabled={isFetchingModels}
+                          className="w-full rounded-lg text-xs h-8 bg-secondary hover:bg-secondary/80 text-foreground border-none gap-1.5 cursor-pointer"
+                        >
+                          {isFetchingModels ? <Loader2 className="h-3 w-3 animate-spin" /> : <RefreshCw className="h-3 w-3" />}
+                          <span>Re-test Connection &amp; Refresh Models</span>
+                        </Button>
+                      </div>
+                    </ScrollArea>
+                  )}
+                </div>
+
+                {/* Models Section */}
+                <div className="flex-1 min-h-0 flex flex-col gap-2.5">
+                  <div className="flex items-center justify-between gap-2 shrink-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-medium text-foreground font-sans">
+                        Select Models to Import
+                      </span>
+                      <Badge className="rounded-full text-[10px] font-mono py-0 px-2 bg-primary text-primary-foreground">
+                        {selectedCount} / {fetchedModels.length} selected
+                      </Badge>
                     </div>
 
                     <div className="flex items-center gap-1.5 shrink-0">
@@ -1202,120 +1363,129 @@ export default function ProvidersPage() {
                     </div>
                   </div>
 
-                  {/* Search inside model list */}
-                  <div className="relative">
+                  {/* Filter search */}
+                  <div className="relative shrink-0">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
                     <input
                       type="text"
                       placeholder="Filter models list..."
                       value={modelSearch}
                       onChange={(e) => setModelSearch(e.target.value)}
-                      className="w-full h-8 pl-8 pr-3 rounded-lg bg-secondary/40 border border-border text-xs text-foreground placeholder:text-muted-foreground outline-none font-sans"
+                      className="w-full h-8 pl-8 pr-8 rounded-lg bg-secondary/40 border border-border text-xs text-foreground placeholder:text-muted-foreground outline-none font-sans focus:border-foreground/40 focus:ring-1 focus:ring-foreground/20 transition-all"
                     />
+                    {modelSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setModelSearch("")}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground text-xs p-0.5 rounded"
+                      >
+                        ✕
+                      </button>
+                    )}
                   </div>
 
-                  {/* Checklist of Models */}
-                  <ScrollArea className="max-h-56 p-1 border border-border/70 rounded-xl bg-secondary/20">
+                  {/* Models ScrollArea */}
+                  <ScrollArea type="always" className="flex-1 min-h-0 w-full p-1.5 border border-border/70 rounded-xl bg-secondary/20">
                     <div className="space-y-1.5 pr-2 py-0.5">
-                      {filteredConfigModels.map((model) => (
-                        <div
-                          key={model.modelId}
-                          onClick={() => handleToggleModel(model.modelId)}
-                          className={cn(
-                            "flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors border",
-                            model.enabled
-                              ? "bg-card border-border/80 text-foreground"
-                              : "bg-transparent border-transparent opacity-60 hover:opacity-100"
-                          )}
-                        >
-                          <div className="flex items-center gap-2.5 min-w-0 pr-2">
-                            <div
-                              className={cn(
-                                "h-4 w-4 rounded flex items-center justify-center border transition-colors shrink-0",
-                                model.enabled
-                                  ? "bg-primary border-primary text-primary-foreground"
-                                  : "border-muted-foreground/40 bg-background"
-                              )}
-                            >
-                              {model.enabled && <Check className="h-3 w-3 stroke-[2.5]" />}
-                            </div>
-                            <div className="min-w-0">
-                              <p className="text-xs font-medium truncate font-sans">
-                                {model.name}
-                              </p>
-                              <p className="text-[10px] font-mono text-muted-foreground truncate">
-                                {model.modelId}
-                              </p>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-1.5 shrink-0">
-                            <div className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-secondary border border-border text-muted-foreground">
-                              {formatTokenDisplay(model.contextWindow, "1M")}
-                            </div>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                const idx = fetchedModels.findIndex((m) => m.modelId === model.modelId);
-                                setModelConfigTarget("import-list");
-                                setModelConfigInitial({
-                                  modelId: model.modelId,
-                                  name: model.name,
-                                  contextWindow: model.contextWindow || DEFAULT_CONTEXT_WINDOW,
-                                  maxOutputTokens: model.maxOutputTokens || DEFAULT_MAX_OUTPUT,
-                                  inputTypes: model.inputTypes || ["text"],
-                                  outputTypes: model.outputTypes || ["text"],
-                                });
-                                setEditingModelIndex(idx >= 0 ? idx : null);
-                                setModelConfigOpen(true);
-                              }}
-                              className="h-6 w-6 rounded-md text-muted-foreground hover:text-foreground cursor-pointer"
-                              title="Edit model specs"
-                            >
-                              <Pencil className="h-3 w-3" />
-                            </Button>
-                          </div>
+                      {filteredConfigModels.length === 0 ? (
+                        <div className="py-8 text-center text-xs text-muted-foreground">
+                          No models found matching &quot;{modelSearch}&quot;
                         </div>
-                      ))}
+                      ) : (
+                        filteredConfigModels.map((model) => (
+                          <div
+                            key={model.modelId}
+                            onClick={() => handleToggleModel(model.modelId)}
+                            className={cn(
+                              "flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors border",
+                              model.enabled
+                                ? "bg-card border-border/80 text-foreground"
+                                : "bg-transparent border-transparent opacity-60 hover:opacity-100"
+                            )}
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                              <div
+                                className={cn(
+                                  "h-4 w-4 rounded flex items-center justify-center border transition-colors shrink-0",
+                                  model.enabled
+                                    ? "bg-primary border-primary text-primary-foreground"
+                                    : "border-muted-foreground/40 bg-background"
+                                )}
+                              >
+                                {model.enabled && <Check className="h-3 w-3 stroke-[2.5]" />}
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-xs font-medium truncate font-sans">
+                                  {model.name}
+                                </p>
+                                <p className="text-[10px] font-mono text-muted-foreground truncate">
+                                  {model.modelId}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <div className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-secondary border border-border text-muted-foreground">
+                                {formatTokenDisplay(model.contextWindow, "1M")}
+                              </div>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  const idx = fetchedModels.findIndex((m) => m.modelId === model.modelId);
+                                  setModelConfigTarget("import-list");
+                                  setModelConfigInitial({
+                                    modelId: model.modelId,
+                                    name: model.name,
+                                    contextWindow: model.contextWindow || DEFAULT_CONTEXT_WINDOW,
+                                    maxOutputTokens: model.maxOutputTokens || DEFAULT_MAX_OUTPUT,
+                                    inputTypes: model.inputTypes || ["text"],
+                                    outputTypes: model.outputTypes || ["text"],
+                                  });
+                                  setEditingModelIndex(idx >= 0 ? idx : null);
+                                  setModelConfigOpen(true);
+                                }}
+                                className="h-6 w-6 rounded-md text-muted-foreground hover:text-foreground cursor-pointer"
+                                title="Edit model specs"
+                              >
+                                <Pencil className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))
+                      )}
                     </div>
                   </ScrollArea>
-                </div>
-              )}
 
-              {/* Manual Model Adder (For Custom Provider) */}
-              {isCustomMode && (
-                <div className="pt-2 space-y-2 border-t border-border/60">
-                  <label className="text-xs font-medium text-foreground font-sans">
-                    Can&apos;t find your model? Add manually:
-                  </label>
-                  <form onSubmit={handleAddManualModel} className="flex gap-2">
-                    <input
-                      type="text"
-                      placeholder="e.g. qwen2.5-coder:32b or my-fine-tuned-model"
-                      value={manualModelId}
-                      onChange={(e) => setManualModelId(e.target.value)}
-                      className="flex-1 h-9 px-3 rounded-xl bg-secondary/60 border border-border/80 text-xs font-mono text-foreground placeholder:text-muted-foreground outline-none hover:border-foreground/30 focus:border-foreground/40 focus:ring-1 focus:ring-inset focus:ring-foreground/15 transition-colors"
-                    />
-                    <Button
-                      type="submit"
-                      size="sm"
-                      variant="outline"
-                      className="rounded-full text-xs h-9 px-3 cursor-pointer shrink-0"
-                    >
-                      <Plus className="h-3.5 w-3.5 mr-1" />
-                      <span>Add</span>
-                    </Button>
-                  </form>
+                  {/* Manual Model Adder (For Custom Provider) */}
+                  {isCustomMode && (
+                    <form onSubmit={handleAddManualModel} className="flex gap-2 shrink-0 pt-1">
+                      <input
+                        type="text"
+                        placeholder="Add model manually (e.g. qwen2.5-coder:32b)..."
+                        value={manualModelId}
+                        onChange={(e) => setManualModelId(e.target.value)}
+                        className="flex-1 h-8 px-3 rounded-lg bg-secondary/50 border border-border/80 text-xs font-mono text-foreground placeholder:text-muted-foreground outline-none hover:border-foreground/30 focus:border-foreground/40 focus:ring-1 focus:ring-inset focus:ring-foreground/15 transition-colors"
+                      />
+                      <Button
+                        type="submit"
+                        size="sm"
+                        variant="outline"
+                        className="rounded-lg text-xs h-8 px-3 cursor-pointer shrink-0"
+                      >
+                        <Plus className="h-3.5 w-3.5 mr-1" />
+                        <span>Add</span>
+                      </Button>
+                    </form>
+                  )}
                 </div>
-              )}
               </div>
-            </ScrollArea>
+            )}
 
             {/* Modal Footer */}
-            <DialogFooter className="pt-4 flex flex-row items-center justify-end gap-3 sm:space-x-0 mt-auto shrink-0">
+            <DialogFooter className="pt-2 flex flex-row items-center justify-end gap-3 sm:space-x-0 shrink-0">
               <Button
                 type="button"
                 variant="outline"
@@ -1349,8 +1519,16 @@ export default function ProvidersPage() {
         {/* ========================================================= */}
         {/* MODAL 2: MANAGE IMPORTED MODELS FOR CONNECTED PROVIDER    */}
         {/* ========================================================= */}
-        <Dialog open={!!manageDoc} onOpenChange={(open) => !open && setManageDoc(null)}>
-          <DialogContent className="rounded-2xl border-none bg-card max-w-lg p-6 sm:p-7 space-y-4 shadow-xl max-h-[85vh] flex flex-col overflow-hidden">
+        <Dialog
+          open={!!manageDoc}
+          onOpenChange={(open) => {
+            if (!open) {
+              setManageDoc(null);
+              setManageSearch("");
+            }
+          }}
+        >
+          <DialogContent className="rounded-2xl border-none bg-card max-w-lg sm:max-w-xl p-6 sm:p-7 shadow-xl h-[85vh] max-h-[85vh] flex flex-col gap-3.5 overflow-hidden">
             <DialogHeader className="space-y-1.5 text-left shrink-0">
               <DialogTitle className="text-lg font-sans font-medium text-foreground tracking-tight">
                 Manage Models: {manageDoc?.name}
@@ -1361,117 +1539,174 @@ export default function ProvidersPage() {
             </DialogHeader>
 
             {manageDoc && (
-              <ScrollArea className="flex-1 -mr-2 pr-3">
-                <div className="space-y-2 pr-1 py-1">
-                  <div className="flex items-center justify-between pb-1 shrink-0">
+              <>
+                {/* Controls row: Active Count + Select All/None + Add Model */}
+                <div className="flex items-center justify-between gap-2 shrink-0 pt-0.5">
+                  <div className="flex items-center gap-2">
                     <span className="text-xs text-muted-foreground font-sans">
-                      {manageDoc.importedModels.filter((m) => m.enabled).length} / {manageDoc.importedModels.length} models active
+                      {activeManagedCount} / {manageDoc.importedModels.length} active
                     </span>
-                    <Button
+                    <span className="text-border">|</span>
+                    <button
                       type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setModelConfigTarget("manage-list");
-                        setModelConfigInitial(null);
-                        setEditingModelIndex(null);
-                        setModelConfigOpen(true);
-                      }}
-                      className="rounded-full text-xs h-7 px-2.5 cursor-pointer gap-1 border-none bg-secondary hover:bg-secondary/80"
+                      onClick={() => handleToggleAllManaged(true)}
+                      className="text-xs text-muted-foreground hover:text-foreground cursor-pointer font-medium transition-colors"
                     >
-                      <Plus className="h-3 w-3" />
-                      <span>Add model</span>
-                    </Button>
+                      All
+                    </button>
+                    <span className="text-border">·</span>
+                    <button
+                      type="button"
+                      onClick={() => handleToggleAllManaged(false)}
+                      className="text-xs text-muted-foreground hover:text-foreground cursor-pointer font-medium transition-colors"
+                    >
+                      None
+                    </button>
                   </div>
 
-                  {manageDoc.importedModels.map((model) => (
-                    <div
-                      key={model.modelId}
-                      onClick={() => {
-                        setManageDoc((prev) => {
-                          if (!prev) return null;
-                          return {
-                            ...prev,
-                            importedModels: prev.importedModels.map((m) =>
-                              m.modelId === model.modelId ? { ...m, enabled: !m.enabled } : m
-                            ),
-                          };
-                        });
-                      }}
-                      className={cn(
-                        "flex items-center justify-between p-2.5 rounded-xl cursor-pointer transition-colors",
-                        model.enabled
-                          ? "bg-secondary text-foreground"
-                          : "bg-transparent opacity-50 hover:opacity-100"
-                      )}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setModelConfigTarget("manage-list");
+                      setModelConfigInitial(null);
+                      setEditingModelIndex(null);
+                      setModelConfigOpen(true);
+                    }}
+                    className="rounded-full text-xs h-7 px-2.5 cursor-pointer gap-1 border-none bg-secondary hover:bg-secondary/80 text-foreground"
+                  >
+                    <Plus className="h-3 w-3" />
+                    <span>Add model</span>
+                  </Button>
+                </div>
+
+                {/* Search input */}
+                <div className="relative shrink-0">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+                  <input
+                    type="text"
+                    placeholder="Search models by name or ID..."
+                    value={manageSearch}
+                    onChange={(e) => setManageSearch(e.target.value)}
+                    className="w-full h-8 pl-8 pr-8 rounded-lg bg-secondary/40 border border-border text-xs text-foreground placeholder:text-muted-foreground outline-none font-sans focus:border-foreground/40 focus:ring-1 focus:ring-foreground/20 transition-all"
+                  />
+                  {manageSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setManageSearch("")}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground text-xs p-0.5 rounded"
                     >
-                      <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                      ✕
+                    </button>
+                  )}
+                </div>
+
+                {/* Scrollable Model List */}
+                <ScrollArea type="always" className="flex-1 min-h-0 w-full">
+                  <div className="space-y-1.5 pr-2.5 py-1">
+                    {filteredManagedModels.length === 0 ? (
+                      <div className="py-8 text-center text-xs text-muted-foreground">
+                        {manageSearch ? (
+                          <>No models found matching &quot;{manageSearch}&quot;</>
+                        ) : (
+                          <>No models available. Click &quot;Add model&quot; to add one.</>
+                        )}
+                      </div>
+                    ) : (
+                      filteredManagedModels.map((model) => (
                         <div
+                          key={model.modelId}
+                          onClick={() => {
+                            setManageDoc((prev) => {
+                              if (!prev) return null;
+                              return {
+                                ...prev,
+                                importedModels: prev.importedModels.map((m) =>
+                                  m.modelId === model.modelId ? { ...m, enabled: !m.enabled } : m
+                                ),
+                              };
+                            });
+                          }}
                           className={cn(
-                            "h-4 w-4 rounded flex items-center justify-center border transition-colors shrink-0",
+                            "flex items-center justify-between p-2.5 rounded-xl cursor-pointer transition-colors border",
                             model.enabled
-                              ? "bg-primary border-primary text-primary-foreground"
-                              : "border-muted-foreground/40 bg-background"
+                              ? "bg-secondary/70 border-border/60 text-foreground"
+                              : "bg-transparent border-transparent opacity-50 hover:opacity-100"
                           )}
                         >
-                          {model.enabled && <Check className="h-3 w-3 stroke-[2.5]" />}
-                        </div>
-                        <div className="min-w-0">
-                          <p className="text-xs font-medium font-sans truncate">{model.name}</p>
-                          <p className="text-[10px] font-mono text-muted-foreground truncate">
-                            {model.modelId}
-                          </p>
-                        </div>
-                      </div>
+                          <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                            <div
+                              className={cn(
+                                "h-4 w-4 rounded flex items-center justify-center border transition-colors shrink-0",
+                                model.enabled
+                                  ? "bg-primary border-primary text-primary-foreground"
+                                  : "border-muted-foreground/40 bg-background"
+                              )}
+                            >
+                              {model.enabled && <Check className="h-3 w-3 stroke-[2.5]" />}
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-xs font-medium font-sans truncate">{model.name}</p>
+                              <p className="text-[10px] font-mono text-muted-foreground truncate">
+                                {model.modelId}
+                              </p>
+                            </div>
+                          </div>
 
-                      <div className="flex items-center gap-1.5 shrink-0">
-                        <div className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-secondary/80 border-none text-muted-foreground">
-                          {formatTokenDisplay(model.contextWindow, "1M")}
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <div className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-secondary border border-border/50 text-muted-foreground">
+                              {formatTokenDisplay(model.contextWindow, "1M")}
+                            </div>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const idx = manageDoc.importedModels.findIndex((m) => m.modelId === model.modelId);
+                                setModelConfigTarget("manage-list");
+                                setModelConfigInitial({
+                                  modelId: model.modelId,
+                                  name: model.name,
+                                  contextWindow: model.contextWindow || DEFAULT_CONTEXT_WINDOW,
+                                  maxOutputTokens: model.maxOutputTokens || DEFAULT_MAX_OUTPUT,
+                                  inputTypes: model.inputTypes || ["text"],
+                                  outputTypes: model.outputTypes || ["text"],
+                                });
+                                setEditingModelIndex(idx >= 0 ? idx : null);
+                                setModelConfigOpen(true);
+                              }}
+                              className="h-6 w-6 rounded-md text-muted-foreground hover:text-foreground cursor-pointer"
+                              title="Edit model specs"
+                            >
+                              <Pencil className="h-3 w-3" />
+                            </Button>
+                          </div>
                         </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const idx = manageDoc.importedModels.findIndex((m) => m.modelId === model.modelId);
-                            setModelConfigTarget("manage-list");
-                            setModelConfigInitial({
-                              modelId: model.modelId,
-                              name: model.name,
-                              contextWindow: model.contextWindow || DEFAULT_CONTEXT_WINDOW,
-                              maxOutputTokens: model.maxOutputTokens || DEFAULT_MAX_OUTPUT,
-                              inputTypes: model.inputTypes || ["text"],
-                              outputTypes: model.outputTypes || ["text"],
-                            });
-                            setEditingModelIndex(idx >= 0 ? idx : null);
-                            setModelConfigOpen(true);
-                          }}
-                          className="h-6 w-6 rounded-md text-muted-foreground hover:text-foreground cursor-pointer"
-                          title="Edit model specs"
-                        >
-                          <Pencil className="h-3 w-3" />
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </ScrollArea>
+                      ))
+                    )}
+                  </div>
+                </ScrollArea>
+              </>
             )}
 
-            <DialogFooter className="pt-4 flex flex-row items-center justify-end gap-3 shrink-0">
+            <DialogFooter className="pt-2 flex flex-row items-center justify-end gap-3 shrink-0">
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setManageDoc(null)}
-                className="rounded-full text-xs h-9 px-4 cursor-pointer border-none bg-secondary/60 hover:bg-secondary text-muted-foreground hover:text-foreground"
+                onClick={() => {
+                  setManageDoc(null);
+                  setManageSearch("");
+                }}
+                className="rounded-full text-xs h-9 px-4 cursor-pointer border-none bg-secondary/60 hover:bg-secondary text-muted-foreground hover:text-foreground shadow-none"
               >
                 Cancel
               </Button>
               <Button
                 size="sm"
                 onClick={handleSaveManagedModels}
-                className="rounded-full text-xs h-9 px-5 bg-primary text-primary-foreground hover:bg-primary/90 font-medium cursor-pointer border-none"
+                className="rounded-full text-xs h-9 px-5 bg-primary text-primary-foreground hover:bg-primary/90 font-medium cursor-pointer border-none shadow-none"
               >
                 Save Changes
               </Button>
