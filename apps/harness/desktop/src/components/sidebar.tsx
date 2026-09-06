@@ -1085,7 +1085,7 @@ export function Sidebar({
 
       {/* 1. Archived Sessions Modal (matching const-harness) */}
       <Dialog open={isArchiveModalOpen} onOpenChange={setIsArchiveModalOpen}>
-        <DialogContent className="max-w-md bg-[#1e1e1e] border border-[#383838] text-[#d4d4d4] p-0 rounded-2xl shadow-2xl overflow-hidden duration-0 data-[state=open]:animate-none data-[state=closed]:animate-none">
+        <DialogContent className="max-w-md bg-[#1e1e1e] border border-[#383838] text-[#d4d4d4] p-0 rounded-2xl shadow-2xl overflow-hidden">
           <DialogHeader className="px-5 pt-4 pb-3 border-b border-[#333333]">
             <DialogTitle className="text-sm font-semibold flex items-center gap-2 text-white">
               <Archive className="w-4 h-4 text-[#888888]" />
@@ -1204,7 +1204,7 @@ export function Sidebar({
 
       {/* 2. Rename Task Dialog */}
       <Dialog open={renameTarget !== null} onOpenChange={(open) => !open && setRenameTarget(null)}>
-        <DialogContent className="max-w-sm bg-[#1e1e1e] border border-[#383838] text-[#d4d4d4] p-5 rounded-2xl shadow-2xl duration-0 data-[state=open]:animate-none data-[state=closed]:animate-none">
+        <DialogContent className="max-w-sm bg-[#1e1e1e] border border-[#383838] text-[#d4d4d4] p-5 rounded-2xl shadow-2xl">
           <DialogHeader>
             <DialogTitle className="text-sm font-semibold text-white">Rename Task</DialogTitle>
             <DialogDescription className="text-xs text-[#777777]">
@@ -1253,7 +1253,7 @@ export function Sidebar({
 
       {/* 3. Delete Confirmation Dialog */}
       <Dialog open={deleteTarget !== null} onOpenChange={(open) => !open && setDeleteTarget(null)}>
-        <DialogContent className="max-w-sm bg-[#1e1e1e] border border-[#383838] text-[#d4d4d4] p-5 rounded-2xl shadow-2xl duration-0 data-[state=open]:animate-none data-[state=closed]:animate-none">
+        <DialogContent className="max-w-sm bg-[#1e1e1e] border border-[#383838] text-[#d4d4d4] p-5 rounded-2xl shadow-2xl">
           <DialogHeader>
             <DialogTitle className="text-sm font-semibold text-white">Delete Task</DialogTitle>
             <DialogDescription className="text-xs text-[#999999] pt-1">
