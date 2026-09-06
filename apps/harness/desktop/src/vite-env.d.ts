@@ -22,6 +22,20 @@ export interface FileMutationRecord {
   rolledBack?: boolean;
 }
 
+export interface TraceStep {
+  id: string;
+  type: "thought" | "tool";
+  content?: string;
+  startTime?: number;
+  durationMs?: number;
+  toolCallId?: string;
+  name?: string;
+  args?: any;
+  result?: any;
+  isError?: boolean;
+  mutation?: FileMutationRecord;
+}
+
 export interface AgentStreamEvent {
   type:
     | "token"

@@ -1,7 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   ChevronDown,
-  ChevronRight,
   RotateCcw,
   Check,
   Terminal as TerminalIcon,
@@ -11,7 +10,7 @@ import {
   Eye,
 } from "lucide-react";
 import { ScrollArea } from "@const/ui";
-import type { FileMutationRecord } from "../../vite-env";
+import type { FileMutationRecord, TraceStep } from "../../vite-env";
 import { FileIcon } from "./file-icon";
 import { MarkdownContent } from "./markdown-content";
 import { getMutationDiffStats } from "./review-dialog";
@@ -25,9 +24,10 @@ export interface TraceToolCall {
   lineRange?: string;
 }
 
-interface ExecutionTraceProps {
+export interface ExecutionTraceProps {
   thinking?: string;
   toolCalls?: TraceToolCall[];
+  traceSteps?: TraceStep[];
   mutations?: FileMutationRecord[];
   isExecuting?: boolean;
   durationMs?: number;
@@ -37,9 +37,39 @@ interface ExecutionTraceProps {
   onOpenReview?: () => void;
 }
 
+// ---------------------------------------------------------------------------
+// SmoothCollapse: Hardware-accelerated CSS grid accordion for premium feel
+// ---------------------------------------------------------------------------
+export function SmoothCollapse({
+  isOpen,
+  children,
+  className = "",
+}: {
+  isOpen: boolean;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateRows: isOpen ? "1fr" : "0fr",
+        opacity: isOpen ? 1 : 0,
+        transition:
+          "grid-template-rows 220ms cubic-bezier(0.16, 1, 0.3, 1), opacity 180ms ease-out",
+        pointerEvents: isOpen ? "auto" : "none",
+      }}
+      className={className}
+    >
+      <div className="overflow-hidden min-h-0">{children}</div>
+    </div>
+  );
+}
+
 export function ExecutionTrace({
   thinking,
   toolCalls = [],
+  traceSteps = [],
   mutations = [],
   isExecuting = false,
   durationMs,
@@ -50,19 +80,50 @@ export function ExecutionTrace({
 }: ExecutionTraceProps) {
   const [isMainOpen, setIsMainOpen] = useState(true);
 
-  // Filter out internal / malformed tool calls from display
-  const validToolCalls = toolCalls.filter((tc) => {
-    if (!tc.name) return false;
-    const lower = tc.name.toLowerCase();
-    return !lower.includes("malformed") && lower !== "tool";
-  });
+  // Normalize chronological steps (supports live traceSteps and fallback history)
+  const steps: TraceStep[] = useMemo(() => {
+    if (traceSteps && traceSteps.length > 0) {
+      return traceSteps.filter((st) => {
+        if (st.type === "thought") {
+          return Boolean(st.content && st.content.trim().length > 0);
+        }
+        if (st.type === "tool") {
+          if (!st.name) return false;
+          const lower = st.name.toLowerCase();
+          return !lower.includes("malformed") && lower !== "tool";
+        }
+        return true;
+      });
+    }
 
-  const hasContent =
-    Boolean(thinking) ||
-    validToolCalls.length > 0 ||
-    mutations.length > 0 ||
-    isExecuting;
+    // Fallback for previous messages that only have thinking + toolCalls
+    const result: TraceStep[] = [];
+    if (thinking && thinking.trim().length > 0) {
+      result.push({
+        id: "thought_fallback",
+        type: "thought",
+        content: thinking,
+        durationMs,
+      });
+    }
+    for (const tc of toolCalls) {
+      if (!tc.name) continue;
+      const lower = tc.name.toLowerCase();
+      if (lower.includes("malformed") || lower === "tool") continue;
+      result.push({
+        id: tc.id,
+        type: "tool",
+        toolCallId: tc.id,
+        name: tc.name,
+        args: tc.args,
+        result: tc.result,
+        isError: tc.isError,
+      });
+    }
+    return result;
+  }, [traceSteps, thinking, toolCalls, durationMs]);
 
+  const hasContent = steps.length > 0 || mutations.length > 0 || isExecuting;
   if (!hasContent) return null;
 
   // Format execution duration e.g. "Worked for 5m", "Worked for 22s", or "Working for 12s..."
@@ -79,112 +140,113 @@ export function ExecutionTrace({
     return `Worked for ${m}m`;
   };
 
-  // 1. Terminal / Shell command tools
-  const commandTools = validToolCalls.filter((tc) => {
-    const norm = tc.name.toLowerCase().replace(/[-_]/g, "");
-    return (
-      norm === "bash" ||
-      norm === "terminal" ||
-      norm === "runcommand" ||
-      norm === "sh" ||
-      norm === "exec"
-    );
-  });
-
-  // 2. File modification / mutation tools (write, edit, replace)
-  const fileMutationTools = validToolCalls.filter((tc) => {
-    const norm = tc.name.toLowerCase().replace(/[-_]/g, "");
-    return (
-      norm.includes("write") ||
-      norm.includes("edit") ||
-      norm.includes("replace") ||
-      norm.includes("createfile") ||
-      norm.includes("modify") ||
-      norm.includes("patch")
-    );
-  });
-
-  // 3. Search and Read tools
-  const explorationTools = validToolCalls.filter((tc) => {
-    const norm = tc.name.toLowerCase().replace(/[-_]/g, "");
-    return (
-      norm === "read" ||
-      norm === "readfile" ||
-      norm === "cat" ||
-      norm === "viewfile" ||
-      norm === "listdir" ||
-      norm === "ls" ||
-      norm === "find" ||
-      norm === "findbyname" ||
-      norm === "grep" ||
-      norm === "grepsearch" ||
-      norm === "search"
-    );
-  });
-
-  // 4. Other tools
-  const otherTools = validToolCalls.filter(
-    (tc) =>
-      !commandTools.includes(tc) &&
-      !fileMutationTools.includes(tc) &&
-      !explorationTools.includes(tc)
-  );
-
   return (
     <div className="w-full flex flex-col gap-1.5 select-none my-1 font-sans">
-      {/* Root Summary Header: e.g. Worked for 5m ⌵ */}
+      {/* Root Summary Header: e.g. Worked for 22s ⌄ */}
       <button
         type="button"
         onClick={() => setIsMainOpen((prev) => !prev)}
         className="inline-flex items-center gap-1.5 text-[13px] text-[#969696] hover:text-[#e0e0e0] transition-colors cursor-pointer py-0.5 w-fit"
       >
         <span>{formatDuration()}</span>
-        {isMainOpen ? (
-          <ChevronDown className="w-3.5 h-3.5 ml-0.5" />
-        ) : (
-          <ChevronRight className="w-3.5 h-3.5 ml-0.5" />
-        )}
+        <ChevronDown
+          className="w-3.5 h-3.5 text-[#777777] transition-transform duration-200 ease-out"
+          style={{ transform: isMainOpen ? "rotate(0deg)" : "rotate(-90deg)" }}
+        />
       </button>
 
-      {/* Trace Body when expanded */}
-      {isMainOpen && (
-        <div className="flex flex-col gap-2 pl-3 ml-1 border-l border-[#2e2e2e]/70 text-[13px] text-[#888888]">
-          {/* 1. Thought Process */}
-          {thinking && (
-            <ThoughtItem
-              thinking={thinking}
-              isExecuting={isExecuting}
-              durationMs={durationMs}
-            />
-          )}
+      {/* Trace Body with Smooth Collapse */}
+      <SmoothCollapse isOpen={isMainOpen}>
+        <div className="flex flex-col gap-1.5 pl-3 ml-1 border-l border-[#2e2e2e]/70 text-[13px] text-[#888888] pt-1">
+          {steps.map((step, idx) => {
+            if (step.type === "thought") {
+              return (
+                <ThoughtItem
+                  key={step.id || `thought_${idx}`}
+                  thinking={step.content || ""}
+                  durationMs={step.durationMs}
+                  isExecuting={isExecuting && idx === steps.length - 1}
+                />
+              );
+            }
 
-          {/* 2. Commands Group */}
-          {commandTools.length > 0 && <CommandsGroup tools={commandTools} />}
+            if (step.type === "tool") {
+              const norm = (step.name || "").toLowerCase().replace(/[-_]/g, "");
 
-          {/* 3. File Mutations from tool calls */}
-          {fileMutationTools.length > 0 && (
-            <FileMutationToolGroup tools={fileMutationTools} mutations={mutations} />
-          )}
+              // 1. Terminal / Shell command (bash, run_command, terminal, exec)
+              if (
+                norm === "bash" ||
+                norm === "terminal" ||
+                norm === "runcommand" ||
+                norm === "sh" ||
+                norm === "exec"
+              ) {
+                return (
+                  <TerminalCard
+                    key={step.id || `cmd_${idx}`}
+                    tool={step}
+                    isDefaultOpen={Boolean(step.isError)}
+                  />
+                );
+              }
 
-          {/* 4. Explorations & Searches */}
-          {explorationTools.length > 0 && (
-            <ExplorationGroup tools={explorationTools} mutations={mutations} />
-          )}
+              // 2. File Mutation (write, edit, replace)
+              if (
+                norm.includes("write") ||
+                norm.includes("edit") ||
+                norm.includes("replace") ||
+                norm.includes("createfile") ||
+                norm.includes("modify") ||
+                norm.includes("patch")
+              ) {
+                return (
+                  <FileMutationToolItem
+                    key={step.id || `mut_${idx}`}
+                    tool={step}
+                    mutations={mutations}
+                  />
+                );
+              }
 
-          {/* 5. Other Tools */}
-          {otherTools.map((tc) => (
-            <GenericToolItem key={tc.id} tool={tc} />
-          ))}
+              // 3. Exploration & Search (read, grep, search, find, listdir)
+              if (
+                norm === "read" ||
+                norm === "readfile" ||
+                norm === "cat" ||
+                norm === "viewfile" ||
+                norm === "listdir" ||
+                norm === "ls" ||
+                norm === "find" ||
+                norm === "findbyname" ||
+                norm === "grep" ||
+                norm === "grepsearch" ||
+                norm === "search"
+              ) {
+                return (
+                  <ExplorationItem
+                    key={step.id || `exp_${idx}`}
+                    tool={step}
+                    mutations={mutations}
+                  />
+                );
+              }
 
-          {/* 6. Active executing spinner */}
+              // 4. Other tools
+              return <GenericToolItem key={step.id || `other_${idx}`} tool={step} />;
+            }
+
+            return null;
+          })}
+
+          {/* Active executing spinner */}
           {isExecuting && (
             <div className="flex items-center gap-2 text-xs text-[#777777] py-1">
               <Loader2 className="w-3 h-3 animate-spin text-[#ff7a00]" />
-              <span>Analyzing workspace and tools...</span>
+              <span>Working...</span>
             </div>
           )}
         </div>
-      )}
+      </SmoothCollapse>
 
       {/* 7. Changed Files Summary Card (only if explicit showMutationsSummary = true) */}
       {showMutationsSummary && mutations.length > 0 && (
@@ -200,7 +262,9 @@ export function ExecutionTrace({
 }
 
 // ---------------------------------------------------------------------------
-// Thought Item: Clean text "Thought for 4s", normal standard font, clean colors
+// Thought Item: Clean minimalist layout exactly matching user reference image
+// Header: "Thought for 7s ⌄"
+// Body: Bold title + muted text (#888888), NO cards, NO borders, NO extra boxes
 // ---------------------------------------------------------------------------
 function ThoughtItem({
   thinking,
@@ -211,7 +275,7 @@ function ThoughtItem({
   isExecuting?: boolean;
   durationMs?: number;
 }) {
-  const [isOpen, setIsOpen] = useState(isExecuting);
+  const [isOpen, setIsOpen] = useState(isExecuting ?? true);
 
   useEffect(() => {
     if (isExecuting) {
@@ -232,97 +296,30 @@ function ThoughtItem({
     return "Thought for a few seconds";
   };
 
+  if (!thinking && !isExecuting) return null;
+
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col w-full min-w-0">
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
-        className="inline-flex items-center gap-1.5 text-[13px] text-[#888888] hover:text-[#d4d4d4] transition-colors cursor-pointer w-fit py-0.5"
+        className="inline-flex items-center gap-1.5 text-[13px] text-[#888888] hover:text-[#d4d4d4] transition-colors cursor-pointer w-fit py-0.5 select-none"
       >
         <span>{thoughtLabel()}</span>
-        {isOpen ? (
-          <ChevronDown className="w-3 h-3 text-[#666666]" />
-        ) : (
-          <ChevronRight className="w-3 h-3 text-[#666666]" />
-        )}
+        <ChevronDown
+          className="w-3.5 h-3.5 text-[#777777] transition-transform duration-200 ease-out"
+          style={{ transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)" }}
+        />
       </button>
 
-      {isOpen && (
-        <div className="my-1.5 rounded-xl bg-[#141416] border border-[#26262a] text-[13px] leading-relaxed text-[#b0b0b0] select-text shadow-xs overflow-hidden font-sans">
-          <div className="px-3 py-1.5 border-b border-[#222225] bg-[#18181b]/70 flex items-center justify-between text-xs text-[#a0a0a0]">
-            <span className="font-medium">Thinking Process</span>
-            {isExecuting && (
-              <span className="flex items-center gap-1 text-[#ff7a00] text-[11px]">
-                <Loader2 className="w-2.5 h-2.5 animate-spin" />
-                <span>Reasoning...</span>
-              </span>
-            )}
-          </div>
-          <ScrollArea className="max-h-72 w-full p-3 font-sans">
-            <MarkdownContent
-              content={thinking}
-              className="text-[13px] leading-relaxed text-[#b5b5b5] [&_h1]:text-sm [&_h2]:text-xs [&_h3]:text-xs [&_h1]:font-semibold [&_h2]:font-semibold [&_h3]:font-semibold [&_h1]:text-[#e0e0e0] [&_h2]:text-[#e0e0e0] [&_h3]:text-[#e0e0e0] [&_p]:my-1.5"
-            />
-          </ScrollArea>
+      <SmoothCollapse isOpen={isOpen}>
+        <div className="pt-1.5 pb-2 pl-0.5 text-[12.5px] leading-relaxed text-[#888888] select-text">
+          <MarkdownContent
+            content={thinking}
+            className="text-[12.5px] leading-relaxed text-[#888888] [&_strong]:font-semibold [&_strong]:text-[#d4d4d4] [&_strong]:block [&_strong]:mb-1 [&_h1]:text-[13px] [&_h1]:font-semibold [&_h1]:text-[#d4d4d4] [&_h1]:mb-1 [&_h2]:text-[13px] [&_h2]:font-semibold [&_h2]:text-[#d4d4d4] [&_h2]:mb-1 [&_h3]:text-[12.5px] [&_h3]:font-semibold [&_h3]:text-[#d4d4d4] [&_h3]:mb-1 [&_p]:my-1"
+          />
         </div>
-      )}
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Commands Group: e.g. "Ran 2 commands ⌵"
-// By default, individual terminal cards are collapsed so it stays clean and concise
-// ---------------------------------------------------------------------------
-function CommandsGroup({ tools }: { tools: TraceToolCall[] }) {
-  const [isGroupOpen, setIsGroupOpen] = useState(true);
-
-  if (tools.length === 1 && tools[0]) {
-    return <TerminalCard tool={tools[0]} isSingle />;
-  }
-
-  return (
-    <div className="flex flex-col gap-1 w-full min-w-0">
-      <button
-        type="button"
-        onClick={() => setIsGroupOpen((prev) => !prev)}
-        className="inline-flex items-center gap-1.5 text-[13px] text-[#888888] hover:text-[#d4d4d4] transition-colors cursor-pointer w-fit py-0.5"
-      >
-        <span>Ran {tools.length} commands</span>
-        {isGroupOpen ? (
-          <ChevronDown className="w-3 h-3 text-[#666666]" />
-        ) : (
-          <ChevronRight className="w-3 h-3 text-[#666666]" />
-        )}
-      </button>
-
-      {isGroupOpen && (
-        <div className="w-full min-w-0 pl-3 border-l border-[#2e2e2e]/50 ml-1">
-          {tools.length > 5 ? (
-            <ScrollArea className="max-h-[360px] w-full pr-2">
-              <div className="flex flex-col gap-1 py-0.5">
-                {tools.map((tc, idx) => (
-                  <TerminalCard
-                    key={tc.id || idx}
-                    tool={tc}
-                    isDefaultOpen={Boolean(tc.isError)}
-                  />
-                ))}
-              </div>
-            </ScrollArea>
-          ) : (
-            <div className="flex flex-col gap-1 py-0.5">
-              {tools.map((tc, idx) => (
-                <TerminalCard
-                  key={tc.id || idx}
-                  tool={tc}
-                  isDefaultOpen={Boolean(tc.isError)}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-      )}
+      </SmoothCollapse>
     </div>
   );
 }
@@ -332,14 +329,12 @@ function CommandsGroup({ tools }: { tools: TraceToolCall[] }) {
 // ---------------------------------------------------------------------------
 function TerminalCard({
   tool,
-  isSingle = false,
   isDefaultOpen = false,
 }: {
-  tool: TraceToolCall;
-  isSingle?: boolean;
+  tool: TraceToolCall | TraceStep;
   isDefaultOpen?: boolean;
 }) {
-  const [isOpen, setIsOpen] = useState(isDefaultOpen || isSingle);
+  const [isOpen, setIsOpen] = useState(isDefaultOpen);
 
   let cmd = "";
   if (tool.args) {
@@ -388,19 +383,25 @@ function TerminalCard({
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
-        className="w-full text-left inline-flex items-center gap-1.5 text-[13px] text-[#888888] hover:text-[#d4d4d4] transition-colors cursor-pointer py-1 px-1.5 rounded hover:bg-white/5 min-w-0 max-w-full justify-start"
+        className="w-full text-left inline-flex items-center gap-1.5 text-[13px] text-[#888888] hover:text-[#d4d4d4] transition-colors cursor-pointer py-1 px-1.5 rounded hover:bg-white/5 min-w-0 max-w-full justify-start select-none"
       >
         <TerminalIcon className="w-3.5 h-3.5 text-[#777777] shrink-0" />
         <span className="font-mono text-xs text-[#d4d4d4] truncate flex-1 min-w-0 text-left">
           {cmd || "command"}
         </span>
-        <span className="shrink-0 text-[#666666] ml-1">
-          {isOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-        </span>
+        {isFailed ? (
+          <span className="w-1.5 h-1.5 rounded-full bg-[#ff5c5c] shrink-0" title="Failed" />
+        ) : tool.result !== undefined ? (
+          <span className="w-1.5 h-1.5 rounded-full bg-[#409D62] shrink-0" title="Success" />
+        ) : null}
+        <ChevronDown
+          className="w-3 h-3 text-[#666666] shrink-0 ml-1 transition-transform duration-200 ease-out"
+          style={{ transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)" }}
+        />
       </button>
 
-      {/* Expanded Terminal Panel */}
-      {isOpen && (
+      {/* Expanded Terminal Panel with Smooth Collapse */}
+      <SmoothCollapse isOpen={isOpen}>
         <div className="mt-1 p-2.5 rounded-xl bg-[#0e0e10] border border-[#232328] font-mono text-[12px] leading-relaxed select-text shadow-xs w-full min-w-0">
           {/* Header line: $ command */}
           <div className="text-[#cccccc] flex items-start gap-1.5 pb-1.5 mb-1.5 border-b border-[#202024] min-w-0">
@@ -435,57 +436,23 @@ function TerminalCard({
             )}
           </ScrollArea>
         </div>
-      )}
+      </SmoothCollapse>
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// File Mutation Group: Tool calls that edited/created files
-// Clean rows with Seti VS Code icons and #409D62 / #ff5c5c line diffs
+// File Mutation Tool Item: Clean Seti icon + filename + +X -Y diffs (#409D62 / #ff5c5c)
 // ---------------------------------------------------------------------------
-function FileMutationToolGroup({
-  tools,
-  mutations,
-}: {
-  tools: TraceToolCall[];
-  mutations: FileMutationRecord[];
-}) {
-  const [isOpen, setIsOpen] = useState(true);
-
-  return (
-    <div className="flex flex-col gap-1 w-full min-w-0 my-0.5">
-      <button
-        type="button"
-        onClick={() => setIsOpen((prev) => !prev)}
-        className="inline-flex items-center gap-1.5 text-[13px] text-[#888888] hover:text-[#d4d4d4] transition-colors cursor-pointer w-fit py-0.5"
-      >
-        <span>Modified {tools.length} file{tools.length > 1 ? "s" : ""}</span>
-        {isOpen ? (
-          <ChevronDown className="w-3 h-3 text-[#666666]" />
-        ) : (
-          <ChevronRight className="w-3 h-3 text-[#666666]" />
-        )}
-      </button>
-
-      {isOpen && (
-        <div className="flex flex-col gap-0.5 pl-3 border-l border-[#2e2e2e]/50 ml-1 py-0.5">
-          {tools.map((tc, idx) => (
-            <FileMutationToolItem key={tc.id || idx} tool={tc} mutations={mutations} />
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 function FileMutationToolItem({
   tool,
   mutations,
 }: {
-  tool: TraceToolCall;
+  tool: TraceToolCall | TraceStep;
   mutations: FileMutationRecord[];
 }) {
+  const [isOpen, setIsOpen] = useState(false);
+
   let targetArg = "";
   if (tool.args) {
     if (typeof tool.args === "string") {
@@ -516,101 +483,63 @@ function FileMutationToolItem({
   const diffStats = matched ? getMutationDiffStats(matched) : null;
 
   return (
-    <div className="flex items-center justify-between py-1 px-1.5 rounded-md hover:bg-white/5 transition-colors text-[13px] min-w-0">
-      <div className="flex items-center gap-2 min-w-0 pr-2">
-        <FileIcon filename={fileName} />
-        <span className="text-[#d4d4d4] truncate font-sans">{fileName}</span>
-      </div>
-      {diffStats && (diffStats.added > 0 || diffStats.removed > 0) && (
-        <div className="flex items-center gap-1.5 font-mono text-xs shrink-0">
-          <span className="text-[#409D62]">+{diffStats.added}</span>
-          <span className="text-[#ff5c5c]">-{diffStats.removed}</span>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Exploration Group: e.g. "Explored 9 files, 5 searches ⌵"
-// ---------------------------------------------------------------------------
-function ExplorationGroup({
-  tools,
-  mutations,
-}: {
-  tools: TraceToolCall[];
-  mutations: FileMutationRecord[];
-}) {
-  const [isOpen, setIsOpen] = useState(false);
-
-  // Separate searches from file reads
-  const searches = tools.filter((t) => {
-    const norm = t.name.toLowerCase().replace(/[-_]/g, "");
-    return norm === "search" || norm === "grep" || norm === "grepsearch" || norm === "find" || norm === "findbyname";
-  });
-  const reads = tools.filter((t) => !searches.includes(t));
-
-  const countFiles = reads.length;
-  const countSearches = searches.length;
-
-  let summaryLabel = "";
-  if (countFiles > 0 && countSearches > 0) {
-    summaryLabel = `Explored ${countFiles} file${countFiles > 1 ? "s" : ""}, ${countSearches} search${countSearches > 1 ? "es" : ""}`;
-  } else if (countFiles > 0) {
-    summaryLabel = `Explored ${countFiles} file${countFiles > 1 ? "s" : ""}`;
-  } else {
-    summaryLabel = `${countSearches} search${countSearches > 1 ? "es" : ""}`;
-  }
-
-  return (
-    <div className="flex flex-col gap-1 w-full min-w-0 my-0.5">
-      <button
-        type="button"
-        onClick={() => setIsOpen((prev) => !prev)}
-        className="inline-flex items-center gap-1.5 text-[13px] text-[#888888] hover:text-[#d4d4d4] transition-colors cursor-pointer w-fit py-0.5"
+    <div className="w-full min-w-0 flex flex-col my-0.5">
+      <div
+        onClick={() => diffStats && setIsOpen((prev) => !prev)}
+        className={`flex items-center justify-between py-1 px-1.5 rounded-md hover:bg-white/5 transition-colors text-[13px] min-w-0 select-none ${
+          diffStats ? "cursor-pointer" : ""
+        }`}
       >
-        <span>{summaryLabel}</span>
-        {isOpen ? (
-          <ChevronDown className="w-3 h-3 text-[#666666]" />
-        ) : (
-          <ChevronRight className="w-3 h-3 text-[#666666]" />
-        )}
-      </button>
-
-      {isOpen && (
-        <div className="w-full min-w-0 pl-3 border-l border-[#2e2e2e]/50 ml-1 py-0.5">
-          {tools.length > 8 ? (
-            <ScrollArea className="max-h-[300px] w-full pr-2">
-              <div className="flex flex-col gap-0.5">
-                {tools.map((tc, idx) => (
-                  <ExplorationItem key={tc.id || idx} tool={tc} mutations={mutations} />
-                ))}
-              </div>
-            </ScrollArea>
-          ) : (
-            <div className="flex flex-col gap-0.5">
-              {tools.map((tc, idx) => (
-                <ExplorationItem key={tc.id || idx} tool={tc} mutations={mutations} />
-              ))}
+        <div className="flex items-center gap-2 min-w-0 pr-2">
+          <FileIcon filename={fileName} />
+          <span className="text-[#d4d4d4] truncate font-sans">{fileName}</span>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {diffStats && (diffStats.added > 0 || diffStats.removed > 0) && (
+            <div className="flex items-center gap-1.5 font-mono text-xs">
+              <span className="text-[#409D62]">+{diffStats.added}</span>
+              <span className="text-[#ff5c5c]">-{diffStats.removed}</span>
             </div>
           )}
+          {diffStats && (
+            <ChevronDown
+              className="w-3 h-3 text-[#666666] transition-transform duration-200 ease-out"
+              style={{ transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)" }}
+            />
+          )}
         </div>
+      </div>
+
+      {matched && (
+        <SmoothCollapse isOpen={isOpen}>
+          <div className="mt-1 p-2 rounded-xl bg-[#0e0e10] border border-[#232328] text-xs font-mono select-text">
+            <div className="text-[#888888] text-[11px] mb-1">
+              Operation: <span className="uppercase text-[#d4d4d4]">{matched.operation}</span>
+            </div>
+            {matched.newContent && (
+              <ScrollArea className="max-h-40 w-full text-[11.5px] text-[#999999]">
+                <pre className="whitespace-pre-wrap">{matched.newContent.slice(0, 1000)}</pre>
+              </ScrollArea>
+            )}
+          </div>
+        </SmoothCollapse>
       )}
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Exploration Item: e.g. "Searched *pattern* 7 results" or "Analyzed file.tsx"
+// Exploration Item: e.g. "Searched *pattern* 7 results" or "Read file.tsx"
 // ---------------------------------------------------------------------------
 function ExplorationItem({
   tool,
   mutations,
 }: {
-  tool: TraceToolCall;
+  tool: TraceToolCall | TraceStep;
   mutations: FileMutationRecord[];
 }) {
-  const norm = tool.name.toLowerCase().replace(/[-_]/g, "");
+  const [isOpen, setIsOpen] = useState(false);
+  const norm = (tool.name || "").toLowerCase().replace(/[-_]/g, "");
 
   // 1. Searches (grep, search, find)
   if (
@@ -641,13 +570,44 @@ function ExplorationItem({
       resultCount = `${matchLines} results`;
     }
 
+    const hasResult = Boolean(tool.result);
+
     return (
-      <div className="flex items-center gap-2 py-1 px-1.5 rounded-md hover:bg-white/5 text-[13px] text-[#888888] min-w-0">
-        <Search className="w-3.5 h-3.5 text-[#777777] shrink-0" />
-        <span className="shrink-0">Searched</span>
-        <span className="text-[#d4d4d4] font-medium truncate">*{query}*</span>
-        {resultCount && (
-          <span className="text-[#666666] text-xs shrink-0 ml-auto font-mono">{resultCount}</span>
+      <div className="w-full min-w-0 flex flex-col my-0.5">
+        <div
+          onClick={() => hasResult && setIsOpen((prev) => !prev)}
+          className={`flex items-center gap-2 py-1 px-1.5 rounded-md hover:bg-white/5 text-[13px] text-[#888888] min-w-0 select-none ${
+            hasResult ? "cursor-pointer" : ""
+          }`}
+        >
+          <Search className="w-3.5 h-3.5 text-[#777777] shrink-0" />
+          <span className="shrink-0">Searched</span>
+          <span className="text-[#d4d4d4] font-medium truncate">*{query}*</span>
+          <div className="ml-auto flex items-center gap-1.5 shrink-0">
+            {resultCount && (
+              <span className="text-[#666666] text-xs font-mono">{resultCount}</span>
+            )}
+            {hasResult && (
+              <ChevronDown
+                className="w-3 h-3 text-[#666666] transition-transform duration-200 ease-out"
+                style={{ transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)" }}
+              />
+            )}
+          </div>
+        </div>
+
+        {hasResult && (
+          <SmoothCollapse isOpen={isOpen}>
+            <div className="mt-1 p-2 rounded-xl bg-[#0e0e10] border border-[#232328] text-xs font-mono select-text">
+              <ScrollArea className="max-h-40 w-full text-[11px] text-[#999999]">
+                <pre className="whitespace-pre-wrap">
+                  {typeof tool.result === "string"
+                    ? tool.result.slice(0, 1500)
+                    : JSON.stringify(tool.result, null, 2)}
+                </pre>
+              </ScrollArea>
+            </div>
+          </SmoothCollapse>
         )}
       </div>
     );
@@ -691,23 +651,51 @@ function ExplorationItem({
     );
   });
   const diffStats = matched ? getMutationDiffStats(matched) : null;
+  const hasResult = Boolean(tool.result);
 
   return (
-    <div className="flex items-center justify-between py-1 px-1.5 rounded-md hover:bg-white/5 text-[13px] text-[#888888] min-w-0">
-      <div className="flex items-center gap-2 min-w-0 pr-2">
-        <FileIcon filename={fileName} />
-        <span className="text-[#d4d4d4] truncate font-sans">
-          {fileName}
-        </span>
-        {lineRange && (
-          <span className="text-xs text-[#666666] shrink-0 font-mono">{lineRange}</span>
-        )}
-      </div>
-      {diffStats && (diffStats.added > 0 || diffStats.removed > 0) && (
-        <div className="flex items-center gap-1.5 font-mono text-xs shrink-0">
-          <span className="text-[#409D62]">+{diffStats.added}</span>
-          <span className="text-[#ff5c5c]">-{diffStats.removed}</span>
+    <div className="w-full min-w-0 flex flex-col my-0.5">
+      <div
+        onClick={() => hasResult && setIsOpen((prev) => !prev)}
+        className={`flex items-center justify-between py-1 px-1.5 rounded-md hover:bg-white/5 text-[13px] text-[#888888] min-w-0 select-none ${
+          hasResult ? "cursor-pointer" : ""
+        }`}
+      >
+        <div className="flex items-center gap-2 min-w-0 pr-2">
+          <FileIcon filename={fileName} />
+          <span className="text-[#d4d4d4] truncate font-sans">{fileName}</span>
+          {lineRange && (
+            <span className="text-xs text-[#666666] shrink-0 font-mono">{lineRange}</span>
+          )}
         </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {diffStats && (diffStats.added > 0 || diffStats.removed > 0) && (
+            <div className="flex items-center gap-1.5 font-mono text-xs">
+              <span className="text-[#409D62]">+{diffStats.added}</span>
+              <span className="text-[#ff5c5c]">-{diffStats.removed}</span>
+            </div>
+          )}
+          {hasResult && (
+            <ChevronDown
+              className="w-3 h-3 text-[#666666] transition-transform duration-200 ease-out"
+              style={{ transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)" }}
+            />
+          )}
+        </div>
+      </div>
+
+      {hasResult && (
+        <SmoothCollapse isOpen={isOpen}>
+          <div className="mt-1 p-2 rounded-xl bg-[#0e0e10] border border-[#232328] text-xs font-mono select-text">
+            <ScrollArea className="max-h-40 w-full text-[11px] text-[#999999]">
+              <pre className="whitespace-pre-wrap">
+                {typeof tool.result === "string"
+                  ? tool.result.slice(0, 1500)
+                  : JSON.stringify(tool.result, null, 2)}
+              </pre>
+            </ScrollArea>
+          </div>
+        </SmoothCollapse>
       )}
     </div>
   );
@@ -716,7 +704,7 @@ function ExplorationItem({
 // ---------------------------------------------------------------------------
 // Generic Tool Item fallback
 // ---------------------------------------------------------------------------
-function GenericToolItem({ tool }: { tool: TraceToolCall }) {
+function GenericToolItem({ tool }: { tool: TraceToolCall | TraceStep }) {
   let targetArg = "";
   if (tool.args) {
     if (typeof tool.args === "string") {
@@ -727,20 +715,18 @@ function GenericToolItem({ tool }: { tool: TraceToolCall }) {
   }
 
   return (
-    <div className="flex items-center gap-2 py-1 px-1.5 rounded-md hover:bg-white/5 text-[13px] text-[#888888] min-w-0">
+    <div className="flex items-center gap-2 py-1 px-1.5 rounded-md hover:bg-white/5 text-[13px] text-[#888888] min-w-0 select-none">
       <Layers className="w-3.5 h-3.5 text-[#777777] shrink-0" />
       <span className="capitalize shrink-0">{tool.name}</span>
-      {targetArg && (
-        <span className="text-[#d4d4d4] truncate">{targetArg}</span>
-      )}
+      {targetArg && <span className="text-[#d4d4d4] truncate">{targetArg}</span>}
     </div>
   );
 }
 
 // ---------------------------------------------------------------------------
-// Changed Files Summary Card (Image 5)
+// Changed Files Summary Card
 // "7 files changed +1370 -189 ⌵" with [Undo all] and [Review]
-// Uses #409D62 and #ff5c5c colors
+// Uses #409D62 and #ff5c5c colors and SmoothCollapse
 // ---------------------------------------------------------------------------
 export function MutationsSummaryCard({
   mutations,
@@ -778,11 +764,10 @@ export function MutationsSummaryCard({
           </span>
           <span className="font-mono text-xs text-[#409D62]">+{totalAdded}</span>
           <span className="font-mono text-xs text-[#ff5c5c]">-{totalRemoved}</span>
-          {isOpen ? (
-            <ChevronDown className="w-3.5 h-3.5 text-[#666666]" />
-          ) : (
-            <ChevronRight className="w-3.5 h-3.5 text-[#666666]" />
-          )}
+          <ChevronDown
+            className="w-3.5 h-3.5 text-[#666666] transition-transform duration-200 ease-out"
+            style={{ transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)" }}
+          />
         </button>
 
         <div className="flex items-center gap-2">
@@ -812,34 +797,26 @@ export function MutationsSummaryCard({
         </div>
       </div>
 
-      {/* Expanded list of mutated files */}
-      {isOpen && (
+      {/* Expanded list of mutated files with SmoothCollapse */}
+      <SmoothCollapse isOpen={isOpen}>
         <div className="pt-1.5 border-t border-[#222222] w-full">
           {mutations.length > 6 ? (
             <ScrollArea className="max-h-60 w-full pr-1">
               <div className="flex flex-col gap-0.5">
                 {mutations.map((mut) => (
-                  <MutationRowItem
-                    key={mut.id}
-                    mut={mut}
-                    onRollback={onRollback}
-                  />
+                  <MutationRowItem key={mut.id} mut={mut} onRollback={onRollback} />
                 ))}
               </div>
             </ScrollArea>
           ) : (
             <div className="flex flex-col gap-0.5">
               {mutations.map((mut) => (
-                <MutationRowItem
-                  key={mut.id}
-                  mut={mut}
-                  onRollback={onRollback}
-                />
+                <MutationRowItem key={mut.id} mut={mut} onRollback={onRollback} />
               ))}
             </div>
           )}
         </div>
-      )}
+      </SmoothCollapse>
     </div>
   );
 }

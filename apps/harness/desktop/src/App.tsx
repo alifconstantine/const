@@ -43,7 +43,7 @@ import {
   generateAiTitle,
   type ConversationItem,
 } from "./lib/conversation-store";
-import type { FileMutationRecord } from "./vite-env";
+import type { FileMutationRecord, TraceStep } from "./vite-env";
 import authArt from "./assets/auth-art.jpg";
 
 function getGreeting(): string {
@@ -71,6 +71,7 @@ interface ChatMessage {
   role: "user" | "assistant" | "system";
   content: string;
   thinking?: string;
+  traceSteps?: TraceStep[];
   toolCalls?: Array<{
     id: string;
     name: string;
@@ -393,9 +394,25 @@ function AuthenticatedContent({
           const lastIdx = prev.length - 1;
           const last = prev[lastIdx];
           if (!last || last.role !== "assistant") return prev;
+          const steps: TraceStep[] = last.traceSteps ? [...last.traceSteps] : [];
+          const lastStep = steps[steps.length - 1];
+          if (lastStep && lastStep.type === "thought") {
+            steps[steps.length - 1] = {
+              ...lastStep,
+              content: (lastStep.content || "") + (event.thinking || ""),
+            };
+          } else {
+            steps.push({
+              id: `thought_${Date.now()}_${steps.length}`,
+              type: "thought",
+              content: event.thinking || "",
+              startTime: Date.now(),
+            });
+          }
           const updated: ChatMessage = {
             ...last,
             thinking: (last.thinking || "") + (event.thinking || ""),
+            traceSteps: steps,
           };
           const next = [...prev];
           next[lastIdx] = updated;
@@ -407,13 +424,33 @@ function AuthenticatedContent({
           const lastIdx = prev.length - 1;
           const last = prev[lastIdx];
           if (!last || last.role !== "assistant") return prev;
-          const tools = last.toolCalls ? [...last.toolCalls] : [];
-          tools.push({
-            id: event.toolCallId || `tc_${Date.now()}`,
+          const steps: TraceStep[] = last.traceSteps ? [...last.traceSteps] : [];
+          const lastStep = steps[steps.length - 1];
+          if (lastStep && lastStep.type === "thought" && lastStep.startTime && !lastStep.durationMs) {
+            steps[steps.length - 1] = {
+              ...lastStep,
+              durationMs: Math.max(1000, Date.now() - lastStep.startTime),
+            };
+          }
+          const callId = event.toolCallId || `tc_${Date.now()}_${steps.length}`;
+          steps.push({
+            id: callId,
+            type: "tool",
+            toolCallId: callId,
             name: event.toolName || "tool",
             args: event.args,
           });
-          const updated: ChatMessage = { ...last, toolCalls: tools };
+          const tools = last.toolCalls ? [...last.toolCalls] : [];
+          tools.push({
+            id: callId,
+            name: event.toolName || "tool",
+            args: event.args,
+          });
+          const updated: ChatMessage = {
+            ...last,
+            toolCalls: tools,
+            traceSteps: steps,
+          };
           const next = [...prev];
           next[lastIdx] = updated;
           return next;
@@ -429,7 +466,16 @@ function AuthenticatedContent({
               ? { ...tc, result: event.result, isError: event.isError }
               : tc
           );
-          const updated: ChatMessage = { ...last, toolCalls: tools };
+          const steps = (last.traceSteps || []).map((st) =>
+            st.type === "tool" && (st.toolCallId === event.toolCallId || st.id === event.toolCallId)
+              ? { ...st, result: event.result, isError: event.isError }
+              : st
+          );
+          const updated: ChatMessage = {
+            ...last,
+            toolCalls: tools,
+            traceSteps: steps,
+          };
           const next = [...prev];
           next[lastIdx] = updated;
           return next;
@@ -444,7 +490,20 @@ function AuthenticatedContent({
           if (event.record) {
             mutations.push(event.record);
           }
-          const updated: ChatMessage = { ...last, mutations };
+          const steps = (last.traceSteps || []).map((st) => {
+            if (st.type === "tool" && event.record && !st.mutation) {
+              const norm = (st.name || "").toLowerCase().replace(/[-_]/g, "");
+              if (norm.includes("write") || norm.includes("edit") || norm.includes("replace")) {
+                return { ...st, mutation: event.record };
+              }
+            }
+            return st;
+          });
+          const updated: ChatMessage = {
+            ...last,
+            mutations,
+            traceSteps: steps,
+          };
           const next = [...prev];
           next[lastIdx] = updated;
           return next;
@@ -462,10 +521,20 @@ function AuthenticatedContent({
             const lastIdx = updatedLatest.length - 1;
             if (updatedLatest[lastIdx]?.role === "assistant") {
               const curContent = updatedLatest[lastIdx].content;
+              const steps = (updatedLatest[lastIdx].traceSteps || []).map((st) => {
+                if (st.type === "thought" && st.startTime && !st.durationMs) {
+                  return {
+                    ...st,
+                    durationMs: Math.max(1000, Date.now() - st.startTime),
+                  };
+                }
+                return st;
+              });
               updatedLatest[lastIdx] = {
                 ...updatedLatest[lastIdx],
                 content: curContent || event.fullContent || "",
                 durationMs: finalDuration,
+                traceSteps: steps,
               };
             }
           }
@@ -524,6 +593,7 @@ function AuthenticatedContent({
       role: "assistant",
       content: "",
       thinking: "",
+      traceSteps: [],
       toolCalls: [],
       mutations: [],
       timestamp: Date.now(),
@@ -918,6 +988,7 @@ function AuthenticatedContent({
                         <ExecutionTrace
                           thinking={msg.thinking}
                           toolCalls={msg.toolCalls}
+                          traceSteps={msg.traceSteps}
                           mutations={msg.mutations}
                           isExecuting={isExecuting && idx === messages.length - 1}
                           durationMs={
