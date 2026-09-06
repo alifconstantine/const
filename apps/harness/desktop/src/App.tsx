@@ -1045,6 +1045,7 @@ function AuthenticatedContent({
                         {msg.mutations && msg.mutations.length > 0 && (
                           <MutationsSummaryCard
                             mutations={msg.mutations}
+                            isExecuting={isExecuting && idx === messages.length - 1}
                             onRollback={handleRollback}
                             onRollbackAll={handleRollbackAll}
                             onOpenReview={() => setReviewingMutations(msg.mutations || null)}

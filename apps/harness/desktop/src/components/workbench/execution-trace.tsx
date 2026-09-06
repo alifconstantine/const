@@ -1,15 +1,16 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   ChevronDown,
+  ChevronRight,
   RotateCcw,
   Check,
   Terminal as TerminalIcon,
   Loader2,
   Layers,
   Search,
-  Eye,
+  FileSearch,
 } from "lucide-react";
-import { ScrollArea } from "@const/ui";
+import { ScrollArea, cn } from "@const/ui";
 import type { FileMutationRecord, TraceStep } from "../../vite-env";
 import { FileIcon } from "./file-icon";
 import { MarkdownContent } from "./markdown-content";
@@ -78,7 +79,20 @@ export function ExecutionTrace({
   onRollbackAll,
   onOpenReview,
 }: ExecutionTraceProps) {
-  const [isMainOpen, setIsMainOpen] = useState(true);
+  // Default: Open while executing to view progress live; automatically closed when worked/finished
+  const [isMainOpen, setIsMainOpen] = useState(isExecuting);
+  const wasExecutingRef = useRef(isExecuting);
+
+  useEffect(() => {
+    if (isExecuting && !wasExecutingRef.current) {
+      // Started executing -> auto open
+      setIsMainOpen(true);
+    } else if (!isExecuting && wasExecutingRef.current) {
+      // Completed execution -> auto close
+      setIsMainOpen(false);
+    }
+    wasExecutingRef.current = isExecuting;
+  }, [isExecuting]);
 
   // Normalize chronological steps (supports live traceSteps and fallback history)
   const steps: TraceStep[] = useMemo(() => {
@@ -142,16 +156,18 @@ export function ExecutionTrace({
 
   return (
     <div className="w-full flex flex-col gap-1.5 select-none my-1 font-sans">
-      {/* Root Summary Header: e.g. Worked for 22s ⌄ */}
+      {/* Root Summary Header: e.g. Worked for 22s > */}
       <button
         type="button"
         onClick={() => setIsMainOpen((prev) => !prev)}
-        className="inline-flex items-center gap-1.5 text-[13px] text-[#969696] hover:text-[#e0e0e0] transition-colors cursor-pointer py-0.5 w-fit"
+        className="inline-flex items-center gap-1.5 text-[13px] text-[#969696] hover:text-[#e0e0e0] transition-colors cursor-pointer py-0.5 w-fit select-none"
       >
         <span>{formatDuration()}</span>
-        <ChevronDown
-          className="w-3.5 h-3.5 text-[#777777] transition-transform duration-200 ease-out"
-          style={{ transform: isMainOpen ? "rotate(0deg)" : "rotate(-90deg)" }}
+        <ChevronRight
+          className={cn(
+            "w-3.5 h-3.5 text-[#777777] transition-transform duration-200 ease-out",
+            isMainOpen && "rotate-90"
+          )}
         />
       </button>
 
@@ -252,6 +268,7 @@ export function ExecutionTrace({
       {showMutationsSummary && mutations.length > 0 && (
         <MutationsSummaryCard
           mutations={mutations}
+          isExecuting={isExecuting}
           onRollback={onRollback}
           onRollbackAll={onRollbackAll}
           onOpenReview={onOpenReview}
@@ -730,16 +747,29 @@ function GenericToolItem({ tool }: { tool: TraceToolCall | TraceStep }) {
 // ---------------------------------------------------------------------------
 export function MutationsSummaryCard({
   mutations,
+  isExecuting = false,
   onRollback,
   onRollbackAll,
   onOpenReview,
 }: {
   mutations: FileMutationRecord[];
+  isExecuting?: boolean;
   onRollback?: (record: FileMutationRecord) => void;
   onRollbackAll?: (records: FileMutationRecord[]) => void;
   onOpenReview?: () => void;
 }) {
-  const [isOpen, setIsOpen] = useState(true);
+  // Default: Open while executing, automatically closes when finished
+  const [isOpen, setIsOpen] = useState(isExecuting);
+  const wasExecutingRef = useRef(isExecuting);
+
+  useEffect(() => {
+    if (isExecuting && !wasExecutingRef.current) {
+      setIsOpen(true);
+    } else if (!isExecuting && wasExecutingRef.current) {
+      setIsOpen(false);
+    }
+    wasExecutingRef.current = isExecuting;
+  }, [isExecuting]);
 
   let totalAdded = 0;
   let totalRemoved = 0;
@@ -751,22 +781,24 @@ export function MutationsSummaryCard({
   }
 
   return (
-    <div className="w-full rounded-2xl bg-[#141414] border border-[#262626] p-3 my-2 shadow-xs flex flex-col gap-2 select-none font-sans">
-      {/* Header: 7 files changed +1370 -189 ⌵  |  [Undo all] [Review] */}
-      <div className="flex items-center justify-between">
+    <div className="w-full rounded-xl bg-[#141414] border border-[#2b2b2b] my-2 select-none font-sans overflow-hidden transition-all shadow-xs">
+      {/* Header matching reference image: 1 file changed +27 -13 >  |  [Undo all] [Review] */}
+      <div className={cn("flex items-center justify-between px-3.5 py-2 transition-all", isOpen && "border-b border-[#242424]")}>
         <button
           type="button"
           onClick={() => setIsOpen((prev) => !prev)}
-          className="inline-flex items-center gap-2 text-[13px] text-[#888888] hover:text-[#d4d4d4] transition-colors cursor-pointer"
+          className="inline-flex items-center gap-2 text-[13px] text-[#cccccc] hover:text-white transition-colors cursor-pointer group/card"
         >
-          <span>
+          <span className="font-normal text-[#d4d4d4]">
             {mutations.length} file{mutations.length > 1 ? "s" : ""} changed
           </span>
-          <span className="font-mono text-xs text-[#409D62]">+{totalAdded}</span>
-          <span className="font-mono text-xs text-[#ff5c5c]">-{totalRemoved}</span>
-          <ChevronDown
-            className="w-3.5 h-3.5 text-[#666666] transition-transform duration-200 ease-out"
-            style={{ transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)" }}
+          <span className="font-mono text-xs text-[#409D62] font-medium">+{totalAdded}</span>
+          <span className="font-mono text-xs text-[#ff5c5c] font-medium">-{totalRemoved}</span>
+          <ChevronRight
+            className={cn(
+              "w-3.5 h-3.5 text-[#777777] group-hover/card:text-[#cccccc] transition-transform duration-200 ease-out",
+              isOpen && "rotate-90"
+            )}
           />
         </button>
 
@@ -775,10 +807,10 @@ export function MutationsSummaryCard({
             <button
               type="button"
               onClick={() => onRollbackAll(mutations)}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#1e1e1e] hover:bg-[#2b2b2b] border border-[#333333] hover:border-[#444444] text-[11px] text-[#d4d4d4] transition-all cursor-pointer font-medium"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#1e1e1e] hover:bg-[#282828] border border-[#333333] hover:border-[#444444] text-[11.5px] text-[#d4d4d4] hover:text-white transition-all cursor-pointer font-medium shadow-xs"
               title="Undo all changes in this turn"
             >
-              <RotateCcw className="w-2.5 h-2.5 text-[#ff7a00]" />
+              <RotateCcw className="w-3 h-3 text-[#d4d4d4]" />
               <span>Undo all</span>
             </button>
           )}
@@ -787,10 +819,10 @@ export function MutationsSummaryCard({
             <button
               type="button"
               onClick={onOpenReview}
-              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-[#222222] hover:bg-[#2e2e2e] border border-[#383838] hover:border-[#484848] text-[11px] text-[#e0e0e0] transition-all cursor-pointer font-medium"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#1e1e1e] hover:bg-[#282828] border border-[#333333] hover:border-[#444444] text-[11.5px] text-[#e0e0e0] hover:text-white transition-all cursor-pointer font-medium shadow-xs"
               title="Review line by line diffs"
             >
-              <Eye className="w-3 h-3 text-[#999999]" />
+              <FileSearch className="w-3.5 h-3.5 text-[#9e9e9e]" />
               <span>Review</span>
             </button>
           )}
@@ -799,9 +831,9 @@ export function MutationsSummaryCard({
 
       {/* Expanded list of mutated files with SmoothCollapse */}
       <SmoothCollapse isOpen={isOpen}>
-        <div className="pt-1.5 border-t border-[#222222] w-full">
+        <div className="px-3 py-2 w-full">
           {mutations.length > 6 ? (
-            <ScrollArea className="max-h-60 w-full pr-1">
+            <ScrollArea className="max-h-60 w-full pr-1" viewportClassName="[&>div[style]]:!block">
               <div className="flex flex-col gap-0.5">
                 {mutations.map((mut) => (
                   <MutationRowItem key={mut.id} mut={mut} onRollback={onRollback} />
@@ -836,7 +868,7 @@ function MutationRowItem({
   const fileStats = getMutationDiffStats(mut);
 
   return (
-    <div className="flex items-center justify-between group py-1 px-1.5 rounded-lg hover:bg-white/[0.04] transition-colors">
+    <div className="flex items-center justify-between group py-1.5 px-2 rounded-lg hover:bg-white/[0.04] transition-colors">
       <div className="flex items-center gap-2 min-w-0 pr-2">
         <FileIcon filename={fileName} />
         <span
@@ -854,7 +886,7 @@ function MutationRowItem({
       </div>
 
       <div className="shrink-0 ml-2 flex items-center gap-2">
-        {/* Colors #409D62 and #ff5c5c */}
+        {/* Colors #409D62 and #ff5c5c matching worked */}
         <div className="flex items-center gap-1.5 font-mono text-xs">
           <span className="text-[#409D62]">+{fileStats.added}</span>
           <span className="text-[#ff5c5c]">-{fileStats.removed}</span>
@@ -862,17 +894,17 @@ function MutationRowItem({
 
         {mut.rolledBack ? (
           <span className="text-[10px] text-[#409D62] flex items-center gap-0.5">
-            <Check className="w-3 h-3" />
+            <Check className="w-3 h-3 text-[#409D62]" />
             <span>Undone</span>
           </span>
         ) : onRollback ? (
           <button
             type="button"
             onClick={() => onRollback(mut)}
-            className="opacity-0 group-hover:opacity-100 flex items-center gap-1 px-2 py-0.5 rounded bg-[#202020] hover:bg-[#2e2e2e] border border-[#333333] text-[10px] text-[#cccccc] transition-all cursor-pointer shadow-xs"
+            className="opacity-0 group-hover:opacity-100 flex items-center gap-1 px-2 py-0.5 rounded bg-[#202020] hover:bg-[#2e2e2e] border border-[#333333] text-[10px] text-[#d4d4d4] hover:text-white transition-all cursor-pointer shadow-xs"
             title="Undo changes to this file"
           >
-            <RotateCcw className="w-2.5 h-2.5 text-[#ff7a00]" />
+            <RotateCcw className="w-2.5 h-2.5 text-[#d4d4d4]" />
             <span>Undo</span>
           </button>
         ) : null}
@@ -880,3 +912,4 @@ function MutationRowItem({
     </div>
   );
 }
+
