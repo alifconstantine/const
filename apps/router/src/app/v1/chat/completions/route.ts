@@ -25,8 +25,8 @@ interface OpenAIChatRequestBody {
   messages: OpenAIMessage[];
   temperature?: number;
   stream?: boolean;
-  reasoning_effort?: "off" | "low" | "medium" | "high";
-  reasoning?: "off" | "low" | "medium" | "high" | { effort?: "off" | "low" | "medium" | "high" };
+  reasoning_effort?: "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max" | string;
+  reasoning?: "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max" | string | { effort?: string };
   providerDocId?: string;
   max_tokens?: number;
   max_completion_tokens?: number;
@@ -89,6 +89,9 @@ export async function POST(req: NextRequest) {
       rawReasoningEffort === "low" ||
       rawReasoningEffort === "medium" ||
       rawReasoningEffort === "high" ||
+      rawReasoningEffort === "xhigh" ||
+      rawReasoningEffort === "max" ||
+      rawReasoningEffort === "minimal" ||
       rawReasoningEffort === "off"
         ? rawReasoningEffort
         : undefined;
@@ -150,22 +153,50 @@ export async function POST(req: NextRequest) {
     // ========================================================
     // COMBO DETECTION & RESOLUTION
     // ========================================================
-    const isCombo =
-      model.startsWith("combo/") ||
-      model === "auto" ||
-      model === "fast" ||
-      model === "coding";
+    const lowerModel = model.toLowerCase().trim();
+    let comboSlug: string | null = null;
+    if (model.startsWith("combo/")) {
+      comboSlug = model.replace(/^combo\//, "");
+    } else if (
+      lowerModel === "auto" ||
+      lowerModel === "auto (best available)" ||
+      lowerModel === "auto router"
+    ) {
+      comboSlug = "auto";
+    } else if (
+      lowerModel === "fast" ||
+      lowerModel === "fast (low latency)" ||
+      lowerModel === "low-latency fast chain"
+    ) {
+      comboSlug = "fast";
+    } else if (
+      lowerModel === "coding" ||
+      lowerModel === "coding & reasoning" ||
+      lowerModel === "coding agent chain"
+    ) {
+      comboSlug = "coding";
+    }
 
-    if (isCombo && convexUrl) {
-      const comboSlug = model.replace(/^combo\//, "");
-      telemetryMeta.model = model.startsWith("combo/") ? model : `combo/${model}`;
+    if (comboSlug && convexUrl) {
+      telemetryMeta.model = `combo/${comboSlug}`;
       telemetryMeta.provider = "Virtual Combo";
+
+      let comboThinkingLevel: string = "off";
+      if (comboSlug === "auto") {
+        comboThinkingLevel = reasoning_effort && reasoning_effort !== "off" ? reasoning_effort : "medium";
+      } else if (comboSlug === "fast") {
+        comboThinkingLevel = "off";
+      } else if (comboSlug === "coding") {
+        comboThinkingLevel = reasoning_effort && reasoning_effort !== "off" ? reasoning_effort : "high";
+      } else {
+        comboThinkingLevel = reasoning_effort && reasoning_effort !== "off" ? reasoning_effort : "medium";
+      }
 
       const comboResponse = await executeComboChat({
         comboSlug,
         messages,
         temperature,
-        thinkingLevel: reasoning_effort === "low" || reasoning_effort === "high" ? reasoning_effort : "medium",
+        thinkingLevel: comboThinkingLevel,
         apiKey: providedKey,
         ssoToken,
         convexUrl,
@@ -222,7 +253,7 @@ async function dispatchSingleModel({
   messages: OpenAIMessage[];
   temperature: number;
   stream: boolean;
-  reasoning_effort?: "off" | "low" | "medium" | "high";
+  reasoning_effort?: string;
   max_tokens?: number;
   max_completion_tokens?: number;
   providedKey?: string;

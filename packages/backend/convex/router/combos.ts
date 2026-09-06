@@ -9,20 +9,32 @@ export const SYSTEM_DEFAULT_SLUGS = ["auto", "fast", "coding"] as const;
 export const SYSTEM_DEFAULT_COMBOS = [
   {
     _id: "builtin_auto",
-    name: "Auto (Best Available)",
+    name: "combo/auto",
     slug: "auto",
     description: "Intelligently balances accuracy, reasoning depth, and latency with multi-model failover.",
     systemMessage: undefined,
-    contextLength: 262144, // 256K
+    contextLength: 1000000, // 1M
     strategy: "priority" as const,
     isBuiltin: true,
     status: "active" as const,
     models: [
       {
-        modelId: "gemini-3.6-flash",
+        modelId: "gemini-3.8-flash",
         providerId: "const",
         providerName: "Const Gateway",
         priority: 1,
+      },
+      {
+        modelId: "gemini-3.7-flash",
+        providerId: "const",
+        providerName: "Const Gateway",
+        priority: 2,
+      },
+      {
+        modelId: "gemini-3.6-flash",
+        providerId: "const",
+        providerName: "Const Gateway",
+        priority: 3,
       },
     ],
     createdAt: 1700000000000,
@@ -30,20 +42,32 @@ export const SYSTEM_DEFAULT_COMBOS = [
   },
   {
     _id: "builtin_fast",
-    name: "Fast (Low Latency)",
+    name: "combo/fast",
     slug: "fast",
     description: "Sub-second time-to-first-token and ultra-high throughput for instant conversational feedback.",
     systemMessage: undefined,
-    contextLength: 262144, // 256K
+    contextLength: 1000000, // 1M
     strategy: "priority" as const,
     isBuiltin: true,
     status: "active" as const,
     models: [
       {
-        modelId: "gemini-3.6-flash",
+        modelId: "gemini-3.8-flash",
         providerId: "const",
         providerName: "Const Gateway",
         priority: 1,
+      },
+      {
+        modelId: "gemini-3.7-flash",
+        providerId: "const",
+        providerName: "Const Gateway",
+        priority: 2,
+      },
+      {
+        modelId: "gemini-3.6-flash",
+        providerId: "const",
+        providerName: "Const Gateway",
+        priority: 3,
       },
     ],
     createdAt: 1700000000000,
@@ -51,20 +75,32 @@ export const SYSTEM_DEFAULT_COMBOS = [
   },
   {
     _id: "builtin_coding",
-    name: "Coding & Reasoning",
+    name: "combo/coding",
     slug: "coding",
     description: "Specialized models tuned for software architecture, code generation, refactoring, and logical reasoning.",
     systemMessage: undefined,
-    contextLength: 262144, // 256K
+    contextLength: 1000000, // 1M
     strategy: "priority" as const,
     isBuiltin: true,
     status: "active" as const,
     models: [
       {
-        modelId: "gemini-3.6-flash",
+        modelId: "gemini-3.8-flash",
         providerId: "const",
         providerName: "Const Gateway",
         priority: 1,
+      },
+      {
+        modelId: "gemini-3.7-flash",
+        providerId: "const",
+        providerName: "Const Gateway",
+        priority: 2,
+      },
+      {
+        modelId: "gemini-3.6-flash",
+        providerId: "const",
+        providerName: "Const Gateway",
+        priority: 3,
       },
     ],
     createdAt: 1700000000000,
@@ -74,18 +110,28 @@ export const SYSTEM_DEFAULT_COMBOS = [
 
 // Dynamically generate default combos based ONLY on real models available to the user
 export async function getDynamicDefaultCombos(ctx: any, userId?: string | null) {
-  // 1. Const Gateway managed model is ALWAYS available
-  const constModel = {
-    modelId: "gemini-3.6-flash",
-    providerId: "const",
-    providerName: "Const Gateway",
-  };
-
+  // 1. Const Gateway managed models are ALWAYS available (Gemini 3.8 Flash is priority 1)
   const availablePool: Array<{
     modelId: string;
     providerId: string;
     providerName: string;
-  }> = [constModel];
+  }> = [
+    {
+      modelId: "gemini-3.8-flash",
+      providerId: "const",
+      providerName: "Const Gateway",
+    },
+    {
+      modelId: "gemini-3.7-flash",
+      providerId: "const",
+      providerName: "Const Gateway",
+    },
+    {
+      modelId: "gemini-3.6-flash",
+      providerId: "const",
+      providerName: "Const Gateway",
+    },
+  ];
 
   // 2. Fetch active BYOK models configured by this user
   if (userId) {
@@ -112,11 +158,16 @@ export async function getDynamicDefaultCombos(ctx: any, userId?: string | null) 
   const assignPriorities = (models: Array<{ modelId: string; providerId: string; providerName: string }>) =>
     models.map((m, idx) => ({ ...m, priority: idx + 1 }));
 
-  // AUTO: All available models in balanced priority order (Const first, then connected BYOKs)
+  // AUTO: All available models with Gemini 3.8 Flash first, then 3.7, 3.6, and connected BYOKs
   const autoModels = assignPriorities(availablePool);
 
-  // FAST: Prioritize fast / flash / low-latency models
+  // FAST: Prioritize fast / flash / low-latency models, with Gemini 3.8 Flash as top tier
   const fastSorted = [...availablePool].sort((a, b) => {
+    const is38A = a.modelId === "gemini-3.8-flash";
+    const is38B = b.modelId === "gemini-3.8-flash";
+    if (is38A && !is38B) return -1;
+    if (!is38A && is38B) return 1;
+
     const isFastA = /(?:flash|mini|instant|8b|groq|turbo|haiku|speed|small)/i.test(a.modelId);
     const isFastB = /(?:flash|mini|instant|8b|groq|turbo|haiku|speed|small)/i.test(b.modelId);
     if (isFastA && !isFastB) return -1;
@@ -125,10 +176,15 @@ export async function getDynamicDefaultCombos(ctx: any, userId?: string | null) 
   });
   const fastModels = assignPriorities(fastSorted);
 
-  // CODING: Prioritize coding / reasoning models
+  // CODING: Prioritize coding / high-reasoning models (gemini-3.8-flash, deepseek, sonnet, etc.)
   const codingSorted = [...availablePool].sort((a, b) => {
-    const isCodeA = /(?:code|coder|deepseek|reasoner|sonnet|opus|claude|gpt-4|pro|qwen)/i.test(a.modelId);
-    const isCodeB = /(?:code|coder|deepseek|reasoner|sonnet|opus|claude|gpt-4|pro|qwen)/i.test(b.modelId);
+    const is38A = a.modelId === "gemini-3.8-flash";
+    const is38B = b.modelId === "gemini-3.8-flash";
+    if (is38A && !is38B) return -1;
+    if (!is38A && is38B) return 1;
+
+    const isCodeA = /(?:3\.8|code|coder|deepseek|reasoner|sonnet|opus|claude|gpt-4|pro|qwen)/i.test(a.modelId);
+    const isCodeB = /(?:3\.8|code|coder|deepseek|reasoner|sonnet|opus|claude|gpt-4|pro|qwen)/i.test(b.modelId);
     if (isCodeA && !isCodeB) return -1;
     if (!isCodeA && isCodeB) return 1;
     return 0;
@@ -138,11 +194,11 @@ export async function getDynamicDefaultCombos(ctx: any, userId?: string | null) 
   return [
     {
       _id: "builtin_auto",
-      name: "Auto (Best Available)",
+      name: "combo/auto",
       slug: "auto",
       description: "Intelligently balances accuracy, reasoning depth, and latency with multi-model failover.",
       systemMessage: undefined,
-      contextLength: 262144, // 256K
+      contextLength: 1000000, // 1M
       strategy: "priority" as const,
       isBuiltin: true,
       status: "active" as const,
@@ -152,11 +208,11 @@ export async function getDynamicDefaultCombos(ctx: any, userId?: string | null) 
     },
     {
       _id: "builtin_fast",
-      name: "Fast (Low Latency)",
+      name: "combo/fast",
       slug: "fast",
       description: "Sub-second time-to-first-token and ultra-high throughput for instant conversational feedback.",
       systemMessage: undefined,
-      contextLength: 262144, // 256K
+      contextLength: 1000000, // 1M
       strategy: "priority" as const,
       isBuiltin: true,
       status: "active" as const,
@@ -166,11 +222,11 @@ export async function getDynamicDefaultCombos(ctx: any, userId?: string | null) 
     },
     {
       _id: "builtin_coding",
-      name: "Coding & Reasoning",
+      name: "combo/coding",
       slug: "coding",
       description: "Specialized models tuned for software architecture, code generation, refactoring, and logical reasoning.",
       systemMessage: undefined,
-      contextLength: 262144, // 256K
+      contextLength: 1000000, // 1M
       strategy: "priority" as const,
       isBuiltin: true,
       status: "active" as const,

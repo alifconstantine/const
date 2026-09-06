@@ -19,7 +19,7 @@ export interface ExecuteComboChatOptions {
   messages: Array<{ role: string; content: unknown; attachments?: any[] }>;
   systemInstruction?: string;
   temperature?: number;
-  thinkingLevel?: "off" | "low" | "medium" | "high";
+  thinkingLevel?: "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max" | string;
   stream?: boolean;
   apiKey?: string;
   ssoToken?: string | null;
@@ -77,10 +77,44 @@ export async function executeComboChat(
   }
 
   // 1. Fetch the Combo definition
-  const combo = await client.query(api.router.combos.getCombo, {
-    slug: comboSlug,
-    rawApiKey: apiKey || undefined,
-  });
+  let combo: any = null;
+  try {
+    combo = await client.query(api.router.combos.getCombo, {
+      slug: comboSlug,
+      rawApiKey: apiKey || undefined,
+    });
+  } catch (queryErr) {
+    console.warn("[Combo Executor] Failed to query getCombo from Convex, checking built-in fallback:", queryErr);
+  }
+
+  // Robust fallback for system built-in combos if Convex returns null or fails
+  if (!combo && (comboSlug === "auto" || comboSlug === "fast" || comboSlug === "coding")) {
+    const defaultModelsMap: Record<string, ComboTargetModel[]> = {
+      auto: [
+        { modelId: "gemini-3.8-flash", providerId: "const", providerName: "Const Gateway", priority: 1 },
+        { modelId: "gemini-3.7-flash", providerId: "const", providerName: "Const Gateway", priority: 2 },
+        { modelId: "gemini-3.6-flash", providerId: "const", providerName: "Const Gateway", priority: 3 },
+      ],
+      fast: [
+        { modelId: "gemini-3.8-flash", providerId: "const", providerName: "Const Gateway", priority: 1 },
+        { modelId: "gemini-3.7-flash", providerId: "const", providerName: "Const Gateway", priority: 2 },
+        { modelId: "gemini-3.6-flash", providerId: "const", providerName: "Const Gateway", priority: 3 },
+      ],
+      coding: [
+        { modelId: "gemini-3.8-flash", providerId: "const", providerName: "Const Gateway", priority: 1 },
+        { modelId: "gemini-3.7-flash", providerId: "const", providerName: "Const Gateway", priority: 2 },
+        { modelId: "gemini-3.6-flash", providerId: "const", providerName: "Const Gateway", priority: 3 },
+      ],
+    };
+
+    combo = {
+      name: `combo/${comboSlug}`,
+      slug: comboSlug,
+      contextLength: 1000000,
+      strategy: "priority",
+      models: defaultModelsMap[comboSlug] || [],
+    };
+  }
 
   if (!combo) {
     return new Response(

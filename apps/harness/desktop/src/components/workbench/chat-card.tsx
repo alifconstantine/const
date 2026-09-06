@@ -21,11 +21,33 @@ import {
   Play,
   FileText,
   X,
+  Brain,
 } from "lucide-react";
 import { ScrollArea, cn } from "@const/ui";
 import { useQuery } from "convex/react";
 import { api } from "@const/backend/_generated/api";
 import { ImageLightbox } from "./image-lightbox";
+
+function getThinkingDescription(lvl: string): string {
+  switch (lvl.toLowerCase()) {
+    case "low":
+      return "Fast reasoning";
+    case "medium":
+      return "Balanced thinking";
+    case "high":
+      return "Thorough analysis";
+    case "xhigh":
+      return "Extended reasoning";
+    case "max":
+      return "Maximum depth";
+    case "minimal":
+      return "Minimal tokens";
+    case "off":
+      return "No thinking";
+    default:
+      return `${lvl} effort`;
+  }
+}
 
 function formatTokenDisplay(tokens: number): string {
   if (tokens < 1000) return `${tokens}`;
@@ -83,6 +105,7 @@ interface ChatCardProps {
     project: string;
     mode: "ask_before_changes" | "full_access";
     model?: string;
+    thinkingLevel?: string;
     attachments?: AttachedFile[];
   }) => void;
   isExecuting?: boolean;
@@ -205,6 +228,9 @@ export function ChatCard({
     desc?: string;
     provider: string;
     providerName: string;
+    supportsThinking?: boolean;
+    thinkingLevels?: string[];
+    defaultThinkingLevel?: string;
   }
   const isConstProvider = (p?: string) => {
     if (!p) return true;
@@ -223,9 +249,60 @@ export function ChatCard({
     {
       id: "gemini-3.6-flash",
       name: "Gemini 3.6 Flash",
-      desc: "Included in 7M Free Weekly Quota",
+      desc: "Frontier multimodal reasoning & code generation",
       provider: "const",
       providerName: "Const",
+      supportsThinking: true,
+      thinkingLevels: ["low", "medium", "high"],
+      defaultThinkingLevel: "medium",
+    },
+    {
+      id: "gemini-3.7-flash",
+      name: "Gemini 3.7 Flash",
+      desc: "Hybrid frontier reasoning model",
+      provider: "const",
+      providerName: "Const",
+      supportsThinking: true,
+      thinkingLevels: ["low", "medium", "high"],
+      defaultThinkingLevel: "medium",
+    },
+    {
+      id: "gemini-3.8-flash",
+      name: "Gemini 3.8 Flash",
+      desc: "Advanced frontier thinking & max depth",
+      provider: "const",
+      providerName: "Const",
+      supportsThinking: true,
+      thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
+      defaultThinkingLevel: "medium",
+    },
+    {
+      id: "combo/auto",
+      name: "combo/auto",
+      desc: "Virtual Combo auto router with dynamic reasoning",
+      provider: "const",
+      providerName: "Const",
+      supportsThinking: true,
+      thinkingLevels: ["low", "medium", "high"],
+      defaultThinkingLevel: "medium",
+    },
+    {
+      id: "combo/fast",
+      name: "combo/fast",
+      desc: "Virtual Combo fast chain optimized for sub-second latency",
+      provider: "const",
+      providerName: "Const",
+      supportsThinking: false,
+    },
+    {
+      id: "combo/coding",
+      name: "combo/coding",
+      desc: "Virtual Combo coding chain optimized for high-depth reasoning",
+      provider: "const",
+      providerName: "Const",
+      supportsThinking: true,
+      thinkingLevels: ["low", "medium", "high"],
+      defaultThinkingLevel: "high",
     },
   ]);
   const [expandedProviders, setExpandedProviders] = useState<Record<string, boolean>>({});
@@ -256,10 +333,71 @@ export function ChatCard({
     if (!saved || saved === "Const" || saved.includes("(Const Router)") || saved.includes("(Native)")) {
       return "Gemini 3.6 Flash";
     }
+    if (saved === "Auto Router" || saved === "Auto (Best Available)" || saved === "combo/auto") return "combo/auto";
+    if (saved === "Low-Latency Fast Chain" || saved === "Fast (Low Latency)" || saved === "combo/fast") return "combo/fast";
+    if (saved === "Coding Agent Chain" || saved === "Coding & Reasoning" || saved === "combo/coding") return "combo/coding";
     return saved;
   });
   const [isModelOpen, setIsModelOpen] = useState(false);
   const modelMenuRef = useRef<HTMLDivElement>(null);
+
+  // Active Model Object & Dynamic Thinking Level Support
+  const currentModelItem = useMemo(() => {
+    return (
+      models.find((m) => m.name === selectedModel || m.id === selectedModel) ||
+      models.find((m) => m.id === "gemini-3.6-flash") ||
+      models[0]
+    );
+  }, [models, selectedModel]);
+
+  const isThinkingSupported = Boolean(
+    currentModelItem?.id === "combo/fast"
+      ? false
+      : currentModelItem?.supportsThinking ||
+        (currentModelItem?.id?.startsWith("gemini-3.") ?? false) ||
+        currentModelItem?.id === "combo/coding" ||
+        currentModelItem?.id === "combo/auto"
+  );
+
+  const supportedThinkingLevels: string[] = useMemo(() => {
+    if (!isThinkingSupported) return [];
+    if (currentModelItem?.thinkingLevels && currentModelItem.thinkingLevels.length > 0) {
+      return currentModelItem.thinkingLevels;
+    }
+    if (
+      currentModelItem?.id === "gemini-3.8-flash" ||
+      currentModelItem?.name?.toLowerCase().includes("3.8")
+    ) {
+      return ["low", "medium", "high", "xhigh", "max"];
+    }
+    return ["low", "medium", "high"];
+  }, [isThinkingSupported, currentModelItem]);
+
+  const [thinkingLevel, setThinkingLevel] = useState<string>(() => {
+    return localStorage.getItem("const_harness_thinking_level") || "medium";
+  });
+  const [isThinkingOpen, setIsThinkingOpen] = useState(false);
+  const thinkingMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (isThinkingSupported && supportedThinkingLevels.length > 0) {
+      if (currentModelItem?.id === "combo/coding" && supportedThinkingLevels.includes("high")) {
+        // High reasoning effort by default for coding combo
+        if (thinkingLevel !== "high" && !localStorage.getItem("const_harness_user_thinking_override")) {
+          setThinkingLevel("high");
+          localStorage.setItem("const_harness_thinking_level", "high");
+          return;
+        }
+      }
+      if (!supportedThinkingLevels.includes(thinkingLevel)) {
+        const fallback = currentModelItem?.defaultThinkingLevel || (supportedThinkingLevels.includes("medium")
+          ? "medium"
+          : supportedThinkingLevels[0]!);
+        setThinkingLevel(fallback);
+        localStorage.setItem("const_harness_thinking_level", fallback);
+      }
+    }
+  }, [isThinkingSupported, supportedThinkingLevels, thinkingLevel, currentModelItem]);
 
   // Fetch available models and user config from engine
   useEffect(() => {
@@ -268,27 +406,70 @@ export function ChatCard({
         .getModels()
         .then((items: any[]) => {
           if (items && items.length > 0) {
-            setModels(
-              items.map((m: any) => {
-                const isConst = isConstProvider(m.provider);
-                return {
-                  id: m.id,
-                  name: m.displayName || m.id,
-                  desc: m.supportsThinking
-                    ? "Supports thinking & tools"
-                    : m.supportsTools
-                    ? "Supports tools"
-                    : undefined,
-                  provider: isConst ? "const" : (m.provider || "custom"),
-                  providerName: isConst ? "Const" : (m.providerName || "Custom"),
-                };
-              })
-            );
+            const mapped = items.map((m: any) => {
+              const isConst = isConstProvider(m.provider);
+              let supportsThinking = Boolean(
+                m.supportsThinking || m.supports_thinking || m.supports_reasoning
+              );
+              let name = m.displayName || m.name || m.id;
+              let defaultThinkingLevel = m.defaultThinkingLevel || m.default_thinking_level || "medium";
+
+              if (m.id === "combo/auto" || name === "Auto Router" || name === "Auto (Best Available)") {
+                name = "combo/auto";
+                supportsThinking = true;
+                defaultThinkingLevel = "medium";
+              } else if (m.id === "combo/fast" || name === "Low-Latency Fast Chain" || name === "Fast (Low Latency)") {
+                name = "combo/fast";
+                supportsThinking = false;
+              } else if (m.id === "combo/coding" || name === "Coding Agent Chain" || name === "Coding & Reasoning") {
+                name = "combo/coding";
+                supportsThinking = true;
+                defaultThinkingLevel = "high";
+              }
+
+              return {
+                id: m.id,
+                name,
+                desc: supportsThinking
+                  ? "Supports thinking & tools"
+                  : m.supportsTools
+                  ? "Supports tools"
+                  : undefined,
+                provider: isConst ? "const" : (m.provider || "custom"),
+                providerName: isConst ? "Const" : (m.providerName || "Custom"),
+                supportsThinking,
+                thinkingLevels:
+                  m.thinkingLevels ||
+                  m.thinking_levels ||
+                  (m.id === "gemini-3.8-flash" || (name || m.id).includes("3.8")
+                    ? ["low", "medium", "high", "xhigh", "max"]
+                    : supportsThinking
+                    ? ["low", "medium", "high"]
+                    : undefined),
+                defaultThinkingLevel,
+              };
+            });
+
+            // Deduplicate items defensively so neither same normalized ID nor same name appears twice
+            const seenIds = new Set<string>();
+            const seenNames = new Set<string>();
+            const deduped: ModelItem[] = [];
+            for (const item of mapped) {
+              const normId = item.id.toLowerCase().replace(/\s+/g, "-").trim();
+              const normName = item.name.toLowerCase().trim();
+              if (normId && !seenIds.has(normId) && normName && !seenNames.has(normName)) {
+                seenIds.add(normId);
+                seenNames.add(normName);
+                deduped.push(item);
+              }
+            }
+            setModels(deduped);
+
             const saved = localStorage.getItem("const_harness_active_model");
             if (!saved) {
-              const first = items[0];
+              const first = deduped[0];
               if (first) {
-                const initialName = first.displayName || first.id;
+                const initialName = first.name || first.id;
                 setSelectedModel(initialName);
                 localStorage.setItem("const_harness_active_model", initialName);
               }
@@ -301,8 +482,12 @@ export function ChatCard({
     if (window.electron?.getConfig) {
       window.electron.getConfig().then((cfg) => {
         if (cfg?.activeModel) {
-          setSelectedModel(cfg.activeModel);
-          localStorage.setItem("const_harness_active_model", cfg.activeModel);
+          let modelName = cfg.activeModel;
+          if (modelName === "combo/auto" || modelName === "Auto Router" || modelName === "Auto (Best Available)") modelName = "combo/auto";
+          else if (modelName === "combo/fast" || modelName === "Low-Latency Fast Chain" || modelName === "Fast (Low Latency)") modelName = "combo/fast";
+          else if (modelName === "combo/coding" || modelName === "Coding Agent Chain" || modelName === "Coding & Reasoning") modelName = "combo/coding";
+          setSelectedModel(modelName);
+          localStorage.setItem("const_harness_active_model", modelName);
         }
       }).catch(() => {});
     }
@@ -321,6 +506,9 @@ export function ChatCard({
       if (modelMenuRef.current && !modelMenuRef.current.contains(target)) {
         setIsModelOpen(false);
       }
+      if (thinkingMenuRef.current && !thinkingMenuRef.current.contains(target)) {
+        setIsThinkingOpen(false);
+      }
       if (contextMenuRef.current && !contextMenuRef.current.contains(target)) {
         setIsContextOpen(false);
       }
@@ -334,6 +522,7 @@ export function ChatCard({
         setIsProjectOpen(false);
         setIsModeOpen(false);
         setIsModelOpen(false);
+        setIsThinkingOpen(false);
         setIsContextOpen(false);
         setIsPlusOpen(false);
       }
@@ -410,6 +599,7 @@ export function ChatCard({
       project: currentProject,
       mode,
       model: matchedModel?.id || "gemini-3.6-flash",
+      thinkingLevel: isThinkingSupported ? thinkingLevel : undefined,
       attachments: currentAttachments.length > 0 ? currentAttachments : undefined,
     });
   };
@@ -979,6 +1169,7 @@ export function ChatCard({
                   type="button"
                   onClick={() => {
                     setIsModelOpen((prev) => !prev);
+                    setIsThinkingOpen(false);
                     setIsProjectOpen(false);
                     setIsModeOpen(false);
                     setIsContextOpen(false);
@@ -1025,6 +1216,13 @@ export function ChatCard({
                                                 setSelectedModel(m.name);
                                                 localStorage.setItem("const_harness_active_model", m.name);
                                                 window.electron?.saveConfig?.({ activeModel: m.id });
+                                                if (m.id === "combo/coding" || m.name === "combo/coding") {
+                                                  setThinkingLevel("high");
+                                                  localStorage.setItem("const_harness_thinking_level", "high");
+                                                } else if (m.defaultThinkingLevel) {
+                                                  setThinkingLevel(m.defaultThinkingLevel);
+                                                  localStorage.setItem("const_harness_thinking_level", m.defaultThinkingLevel);
+                                                }
                                                 setIsModelOpen(false);
                                               }}
                                               className={cn(
@@ -1034,13 +1232,8 @@ export function ChatCard({
                                                   : "text-[#d4d4d4] hover:text-white hover:bg-white/5"
                                               )}
                                             >
-                                              <div className="flex flex-col text-left">
-                                                <span className="font-normal">{m.name}</span>
-                                                {m.desc && (
-                                                  <span className="text-[10px] text-[#888888] leading-tight mt-0.5">
-                                                    {m.desc}
-                                                  </span>
-                                                )}
+                                              <div className="flex items-center text-left min-w-0 pr-1">
+                                                <span className="font-normal truncate">{m.name}</span>
                                               </div>
                                               {isSelected && (
                                                 <Check className="w-3.5 h-3.5 text-[#d4d4d4] shrink-0 ml-2" />
@@ -1118,6 +1311,72 @@ export function ChatCard({
                   </div>
                 )}
               </div>
+
+              {/* 2.5 Thinking / Reasoning Level Selector (Right next to Model Selector, shown when model supports thinking) */}
+              {isThinkingSupported && supportedThinkingLevels.length > 0 && (
+                <div className="relative" ref={thinkingMenuRef}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsThinkingOpen((prev) => !prev);
+                      setIsModelOpen(false);
+                      setIsProjectOpen(false);
+                      setIsModeOpen(false);
+                      setIsContextOpen(false);
+                      setIsPlusOpen(false);
+                    }}
+                    className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[#d4d4d4] hover:text-white hover:bg-white/5 text-[12px] font-medium transition-colors cursor-pointer border border-[#383838]/70 bg-[#262626]/80"
+                    title={`Thinking effort: ${thinkingLevel}`}
+                    aria-label={`Thinking effort: ${thinkingLevel}`}
+                  >
+                    <Brain className="w-3.5 h-3.5 text-[#ff9838]" />
+                    <span className="capitalize">{thinkingLevel}</span>
+                    <ChevronDown className="w-3 h-3 text-[#777777] ml-0.5" />
+                  </button>
+
+                  {/* Thinking Level Popover Dropdown */}
+                  {isThinkingOpen && (
+                    <div className="absolute bottom-full mb-2 right-0 w-48 bg-[#222222] border border-[#383838] rounded-2xl shadow-2xl p-2 z-50 flex flex-col text-left select-none animate-in fade-in zoom-in-95 duration-100">
+                      <div className="px-2 py-1 text-[11px] font-medium text-[#888888] uppercase tracking-wider border-b border-[#383838]/40 mb-1 flex items-center justify-between">
+                        <span>Thinking Level</span>
+                        <Brain className="w-3 h-3 text-[#ff9838]" />
+                      </div>
+                      <div className="flex flex-col gap-0.5">
+                        {supportedThinkingLevels.map((lvl) => {
+                          const isSelected = thinkingLevel === lvl;
+                          return (
+                            <button
+                              key={lvl}
+                              type="button"
+                              onClick={() => {
+                                setThinkingLevel(lvl);
+                                localStorage.setItem("const_harness_thinking_level", lvl);
+                                setIsThinkingOpen(false);
+                              }}
+                              className={cn(
+                                "w-full px-2.5 py-1.5 flex items-center justify-between text-[12px] rounded-lg transition-colors cursor-pointer capitalize text-left",
+                                isSelected
+                                  ? "bg-white/10 text-white font-medium"
+                                  : "text-[#d4d4d4] hover:text-white hover:bg-white/5"
+                              )}
+                            >
+                              <div className="flex flex-col">
+                                <span className="font-normal capitalize">{lvl}</span>
+                                <span className="text-[10px] text-[#777777] lowercase">
+                                  {getThinkingDescription(lvl)}
+                                </span>
+                              </div>
+                              {isSelected && (
+                                <Check className="w-3.5 h-3.5 text-[#ff9838] shrink-0 ml-2" />
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* 3. Send or Stop Generation Button */}
               {isExecuting ? (

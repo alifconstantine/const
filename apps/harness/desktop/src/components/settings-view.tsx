@@ -65,6 +65,7 @@ export const BUILTIN_CONST_MODELS = [
     contextWindow: "1M Context",
     maxOutput: "128K Output",
     supportsThinking: true,
+    thinkingLevels: ["low", "medium", "high"],
     isDefault: true,
     desc: "Frontier multimodal reasoning & code generation. Included in your 7M weekly tokens quota.",
   },
@@ -74,6 +75,7 @@ export const BUILTIN_CONST_MODELS = [
     contextWindow: "1M Context",
     maxOutput: "128K Output",
     supportsThinking: true,
+    thinkingLevels: ["low", "medium", "high"],
     desc: "Hybrid frontier reasoning model with dynamic thinking effort. Included in your 7M weekly tokens quota.",
   },
   {
@@ -82,7 +84,34 @@ export const BUILTIN_CONST_MODELS = [
     contextWindow: "1M Context",
     maxOutput: "128K Output",
     supportsThinking: true,
-    desc: "Advanced frontier thinking and deep analytical reasoning. Included in your 7M weekly tokens quota.",
+    thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
+    desc: "Advanced frontier thinking with extended reasoning depth (up to max). Included in your 7M weekly tokens quota.",
+  },
+  {
+    id: "combo/auto",
+    name: "combo/auto",
+    contextWindow: "1M Context",
+    maxOutput: "128K Output",
+    supportsThinking: true,
+    thinkingLevels: ["low", "medium", "high"],
+    desc: "Intelligent dynamic router balancing latency, reasoning, and multi-model failover.",
+  },
+  {
+    id: "combo/fast",
+    name: "combo/fast",
+    contextWindow: "1M Context",
+    maxOutput: "128K Output",
+    supportsThinking: false,
+    desc: "Sub-second time-to-first-token and ultra-high throughput for instant conversational feedback.",
+  },
+  {
+    id: "combo/coding",
+    name: "combo/coding",
+    contextWindow: "1M Context",
+    maxOutput: "128K Output",
+    supportsThinking: true,
+    thinkingLevels: ["low", "medium", "high"],
+    desc: "Specialized models tuned for software architecture, code generation, refactoring, and logical reasoning.",
   },
 ];
 
@@ -764,6 +793,11 @@ export function SettingsView({
                                       <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#ff7a00]/20 text-[#ff9838] border border-[#ff7a00]/30 font-medium flex items-center gap-1">
                                         <Check className="w-3 h-3" />
                                         Active in Chat
+                                      </span>
+                                    )}
+                                    {m.supportsThinking && (
+                                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#ff7a00]/10 text-[#ff9838] border border-[#ff7a00]/25 font-mono">
+                                        Thinking: {m.thinkingLevels?.join(", ") || "low, medium, high"}
                                       </span>
                                     )}
                                   </div>

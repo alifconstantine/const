@@ -167,6 +167,12 @@ export class ConstAgent {
             messages: formattedMessages,
             tools: CONST_DEFAULT_TOOLS,
             stream: true,
+            ...(this.config.thinkingLevel && this.config.thinkingLevel !== "off"
+              ? {
+                  reasoning: this.config.thinkingLevel,
+                  reasoning_effort: this.config.thinkingLevel,
+                }
+              : {}),
           }),
           signal,
         });

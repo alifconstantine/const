@@ -50,8 +50,11 @@ export interface ModelOption {
   id: string;
   displayName: string;
   provider?: string;
+  providerName?: string;
   supportsThinking?: boolean;
   supportsTools?: boolean;
+  thinkingLevels?: string[];
+  defaultThinkingLevel?: string;
 }
 
 export interface ProviderConfig {
@@ -96,6 +99,7 @@ declare global {
       sendMessage: (payload: {
         messages: any[];
         model?: string;
+        thinkingLevel?: string;
         workspacePath?: string;
         mode?: "ask_before_changes" | "full_access";
         conversationId?: string;

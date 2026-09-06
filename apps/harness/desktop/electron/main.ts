@@ -383,15 +383,22 @@ app.whenReady().then(() => {
       if (res.ok) {
         const json: any = await res.json();
         if (json && Array.isArray(json.data) && json.data.length > 0) {
-          remoteModels = json.data.map((m: any) => ({
-            id: m.id,
-            displayName: m.display_name || m.name || m.id,
-            provider: m.provider || "const",
-            providerName: m.provider_name || (m.provider === "const" ? "Const" : "Custom"),
-            baseUrl: routerBaseUrl,
-            supportsThinking: Boolean(m.supports_thinking),
-            supportsTools: Boolean(m.supports_tools ?? true),
-          }));
+          remoteModels = json.data.map((m: any) => {
+            const supportsThinking = Boolean(
+              m.supports_thinking || m.supportsThinking || m.supports_reasoning
+            );
+            return {
+              id: m.id,
+              displayName: m.display_name || m.name || m.id,
+              provider: m.provider || "const",
+              providerName: m.provider_name || (m.provider === "const" ? "Const" : "Custom"),
+              baseUrl: routerBaseUrl,
+              supportsThinking,
+              supportsTools: Boolean(m.supports_tools ?? true),
+              thinkingLevels: m.thinking_levels || m.thinkingLevels || (supportsThinking ? ["low", "medium", "high"] : undefined),
+              defaultThinkingLevel: m.default_thinking_level || m.defaultThinkingLevel || "medium",
+            };
+          });
         }
       }
     } catch (err) {
@@ -400,22 +407,65 @@ app.whenReady().then(() => {
 
     const baseModels = remoteModels.length > 0 ? remoteModels : DEFAULT_MODELS;
 
-    const custom = (config.customModels || []).map((m) => ({
-      id: m.id,
-      displayName: m.displayName || m.id,
-      provider: m.provider || "custom",
-      providerName: config.providers[m.provider]?.name || "Custom",
-      baseUrl: m.baseUrl || config.providers[m.provider]?.baseUrl,
-      supportsThinking: Boolean(m.supportsThinking),
-      supportsTools: m.supportsTools ?? true,
-    }));
+    const custom = (config.customModels || []).map((m) => {
+      const supportsThinking = Boolean(m.supportsThinking);
+      return {
+        id: m.id,
+        displayName: m.displayName || m.id,
+        provider: m.provider || "custom",
+        providerName: config.providers[m.provider]?.name || "Custom",
+        baseUrl: m.baseUrl || config.providers[m.provider]?.baseUrl,
+        supportsThinking,
+        supportsTools: m.supportsTools ?? true,
+        thinkingLevels: (m as any).thinkingLevels || (supportsThinking ? ["low", "medium", "high"] : undefined),
+        defaultThinkingLevel: (m as any).defaultThinkingLevel || "medium",
+      };
+    });
 
-    const seen = new Set<string>();
+    const seenIds = new Set<string>();
+    const seenNames = new Set<string>();
     const combined: any[] = [];
     for (const m of [...baseModels, ...custom]) {
-      if (!seen.has(m.id)) {
-        seen.add(m.id);
-        combined.push(m);
+      const rawId = m.id || "";
+      let displayName = m.displayName || m.name || rawId;
+
+      // Align combo display names and thinking properties with official router definitions
+      let supportsThinking = m.supportsThinking;
+      let thinkingLevels = m.thinkingLevels;
+      let defaultThinkingLevel = m.defaultThinkingLevel;
+
+      if (rawId === "combo/auto" || displayName === "Auto Router" || displayName === "Auto (Best Available)" || displayName === "combo/auto") {
+        displayName = "combo/auto";
+        supportsThinking = true;
+        thinkingLevels = ["low", "medium", "high"];
+        defaultThinkingLevel = "medium";
+      } else if (rawId === "combo/fast" || displayName === "Low-Latency Fast Chain" || displayName === "Fast (Low Latency)" || displayName === "combo/fast") {
+        displayName = "combo/fast";
+        supportsThinking = false;
+        thinkingLevels = undefined;
+      } else if (rawId === "combo/coding" || displayName === "Coding Agent Chain" || displayName === "Coding & Reasoning" || displayName === "combo/coding") {
+        displayName = "combo/coding";
+        supportsThinking = true;
+        thinkingLevels = ["low", "medium", "high"];
+        defaultThinkingLevel = "high";
+      }
+
+      const item = {
+        ...m,
+        displayName,
+        supportsThinking,
+        thinkingLevels,
+        defaultThinkingLevel,
+      };
+
+      const normId = rawId.toLowerCase().replace(/\s+/g, "-").trim();
+      const normName = displayName.toLowerCase().trim();
+
+      if (!normId) continue;
+      if (!seenIds.has(normId) && !seenNames.has(normName)) {
+        seenIds.add(normId);
+        seenNames.add(normName);
+        combined.push(item);
       }
     }
     return combined;
@@ -478,6 +528,7 @@ app.whenReady().then(() => {
       payload: {
         messages: AgentMessage[];
         model?: string;
+        thinkingLevel?: string;
         workspacePath?: string;
         mode?: "ask_before_changes" | "full_access";
         conversationId?: string;
@@ -526,6 +577,7 @@ app.whenReady().then(() => {
         model,
         workspacePath: targetWorkspace,
         mode: payload.mode || "ask_before_changes",
+        thinkingLevel: payload.thinkingLevel as any,
       });
 
       try {

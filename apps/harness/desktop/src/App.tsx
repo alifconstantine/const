@@ -440,12 +440,14 @@ function AuthenticatedContent({
     project,
     mode,
     model,
+    thinkingLevel,
     attachments,
   }: {
     prompt: string;
     project: string;
     mode: "ask_before_changes" | "full_access";
     model?: string;
+    thinkingLevel?: string;
     attachments?: AttachedFile[];
   }) => {
     if ((!prompt.trim() && (!attachments || attachments.length === 0)) || isExecuting) return;
@@ -524,6 +526,7 @@ function AuthenticatedContent({
         const res = await window.electron.sendMessage({
           messages: payloadMessages,
           model,
+          thinkingLevel,
           workspacePath: project,
           mode,
           conversationId,
