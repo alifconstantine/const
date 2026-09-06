@@ -16,7 +16,14 @@ export interface ComboTargetModel {
 
 export interface ExecuteComboChatOptions {
   comboSlug: string;
-  messages: Array<{ role: string; content: unknown; attachments?: any[] }>;
+  messages: Array<{
+    role: string;
+    content?: unknown;
+    attachments?: any[];
+    name?: string;
+    tool_call_id?: string;
+    tool_calls?: unknown[];
+  }>;
   systemInstruction?: string;
   temperature?: number;
   thinkingLevel?: "off" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max" | string;
@@ -28,6 +35,8 @@ export interface ExecuteComboChatOptions {
   ip?: string;
   userAgent?: string;
   signal?: AbortSignal;
+  tools?: unknown[];
+  tool_choice?: unknown;
 }
 
 async function extractErrorMessage(response: Response): Promise<string> {
@@ -69,6 +78,8 @@ export async function executeComboChat(
     convexUrl,
     requestId,
     signal,
+    tools,
+    tool_choice,
   } = opts;
 
   const client = new ConvexHttpClient(convexUrl);
@@ -274,6 +285,12 @@ export async function executeComboChat(
         if (thinkingLevel && thinkingLevel !== "off") {
           constPayload.reasoning = thinkingLevel;
           constPayload.reasoning_effort = thinkingLevel;
+        }
+        if (tools) {
+          constPayload.tools = tools;
+        }
+        if (tool_choice) {
+          constPayload.tool_choice = tool_choice;
         }
 
         const response = await fetch(`${constBaseUrl}/v1/chat/completions`, {
@@ -500,6 +517,12 @@ export async function executeComboChat(
         temperature,
         stream: true,
       };
+      if (tools) {
+        requestPayload.tools = tools;
+      }
+      if (tool_choice) {
+        requestPayload.tool_choice = tool_choice;
+      }
 
       const response = await fetch(endpoint, {
         method: "POST",

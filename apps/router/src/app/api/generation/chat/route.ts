@@ -104,10 +104,18 @@ export async function POST(req: NextRequest) {
       providedKey = bearerValue;
     }
 
+    const DEFAULT_PLAYGROUND_SYSTEM_INSTRUCTION =
+      "You are Const Assistant, an intelligent and helpful AI assistant powered by Const.\n" +
+      "- You communicate directly with the user in this conversational web interface.\n" +
+      "- In this web environment, you operate purely in chat mode; you do not possess direct terminal execution, shell access, or local file reading/writing tools.\n" +
+      "- When asked to provide code, commands, or file edits, provide complete explanations and instructions directly within clear markdown code blocks.";
+
+    const effectiveSystemInstruction = systemInstruction.trim() || DEFAULT_PLAYGROUND_SYSTEM_INSTRUCTION;
+
     // Prepare OpenAI-format messages
     const formattedMessages: Array<{ role: string; content: unknown }> = [];
-    if (systemInstruction.trim()) {
-      formattedMessages.push({ role: "system", content: systemInstruction.trim() });
+    if (effectiveSystemInstruction) {
+      formattedMessages.push({ role: "system", content: effectiveSystemInstruction });
     }
     for (const msg of messages) {
       const hasMedia = Boolean(msg.attachments && msg.attachments.length > 0);
@@ -191,7 +199,7 @@ export async function POST(req: NextRequest) {
       const comboResponse = await executeComboChat({
         comboSlug,
         messages,
-        systemInstruction,
+        systemInstruction: effectiveSystemInstruction,
         temperature,
         thinkingLevel: thinkingLevel === "low" || thinkingLevel === "high" ? thinkingLevel : "medium",
         apiKey: providedKey,
@@ -448,8 +456,8 @@ export async function POST(req: NextRequest) {
               temperature: Math.min(1.0, Math.max(0.0, temperature)),
               stream: true,
             };
-            if (systemInstruction.trim()) {
-              anthropicPayload.system = systemInstruction.trim();
+            if (effectiveSystemInstruction) {
+              anthropicPayload.system = effectiveSystemInstruction;
             }
 
             if (thinkingLevel && !hasFixedThinking(model)) {
@@ -605,8 +613,8 @@ export async function POST(req: NextRequest) {
         contents,
         generationConfig: { temperature },
       };
-      if (systemInstruction.trim()) {
-        geminiPayload.systemInstruction = { parts: [{ text: systemInstruction.trim() }] };
+      if (effectiveSystemInstruction) {
+        geminiPayload.systemInstruction = { parts: [{ text: effectiveSystemInstruction }] };
       }
 
       const response = await fetch(url, {

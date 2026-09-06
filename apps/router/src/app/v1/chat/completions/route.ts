@@ -16,8 +16,11 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 interface OpenAIMessage {
-  role: "user" | "assistant" | "system";
-  content: string;
+  role: "user" | "assistant" | "system" | "tool" | "function" | string;
+  content?: string | null | unknown;
+  name?: string;
+  tool_call_id?: string;
+  tool_calls?: unknown[];
 }
 
 interface OpenAIChatRequestBody {
@@ -85,6 +88,20 @@ export async function POST(req: NextRequest) {
       tool_choice,
     } = body;
 
+    const hasSystemMessage = messages.some((m) => m.role === "system");
+    const hasTools = Boolean(tools && Array.isArray(tools) && tools.length > 0);
+
+    const effectiveMessages = [...messages];
+    // If client supplied neither a system prompt nor tools, provide a clean base Const identity
+    // so upstream doesn't fall back to Antigravity's internal IDE prompt
+    if (!hasSystemMessage && !hasTools) {
+      effectiveMessages.unshift({
+        role: "system",
+        content:
+          "You are Const AI, an intelligent AI assistant powered by the Const platform. Provide helpful, direct, and accurate responses.",
+      });
+    }
+
     const rawReasoning = body.reasoning;
     const rawReasoningEffort =
       body.reasoning_effort ||
@@ -139,7 +156,7 @@ export async function POST(req: NextRequest) {
 
     const ip = req.headers.get("x-forwarded-for") || req.headers.get("x-real-ip") || undefined;
     const userAgent = req.headers.get("user-agent") || undefined;
-    const estimatedPromptTokens = estimateMessagesTokens(messages);
+    const estimatedPromptTokens = estimateMessagesTokens(effectiveMessages);
 
     const telemetryMeta: TelemetryMetadata = {
       requestId,
@@ -198,7 +215,7 @@ export async function POST(req: NextRequest) {
 
       const comboResponse = await executeComboChat({
         comboSlug,
-        messages,
+        messages: effectiveMessages,
         temperature,
         thinkingLevel: comboThinkingLevel,
         apiKey: providedKey,
@@ -208,6 +225,8 @@ export async function POST(req: NextRequest) {
         ip,
         userAgent,
         signal: req.signal,
+        tools,
+        tool_choice,
       });
 
       return wrapWithTelemetry(comboResponse, telemetryMeta);
@@ -217,7 +236,7 @@ export async function POST(req: NextRequest) {
     return await dispatchSingleModel({
       targetModel: model,
       providerDocId,
-      messages,
+      messages: effectiveMessages,
       temperature,
       stream,
       reasoning_effort,
