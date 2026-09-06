@@ -21,7 +21,6 @@ interface TopToolbarProps {
   onNewChat?: () => void;
   conversationTitle?: string;
   project?: string;
-  diffStats?: { additions: number; deletions: number };
 }
 
 export function TopToolbar({
@@ -30,7 +29,6 @@ export function TopToolbar({
   onNewChat,
   conversationTitle,
   project,
-  diffStats,
 }: TopToolbarProps) {
   const [isMaximized, setIsMaximized] = useState(false);
 
@@ -140,20 +138,11 @@ export function TopToolbar({
         )}
       </div>
 
-      {/* Right section: Folder, Changes, Terminal, Right Panel, and Window Controls */}
+      {/* Right section: Terminal, Right Panel, and Window Controls */}
       <div
         className="flex items-center gap-1 text-[#d4d4d4]"
         style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
       >
-
-        {/* Changes Badge (+X -Y) */}
-        {diffStats && (diffStats.additions > 0 || diffStats.deletions > 0) && (
-          <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-[#222222] border border-[#333333] text-xs font-mono text-[#a0a0a0]">
-            <span>Changes</span>
-            <span className="text-[#409D62]">+{diffStats.additions}</span>
-            <span className="text-[#ff5c5c]">-{diffStats.deletions}</span>
-          </div>
-        )}
 
         <button
           type="button"

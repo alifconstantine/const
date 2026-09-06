@@ -255,34 +255,6 @@ function AuthenticatedContent({
     );
   };
 
-  // Compute accumulated diff stats across assistant messages in this conversation
-  const diffStats = useMemo(() => {
-    let additions = 0;
-    let deletions = 0;
-    for (const msg of messages) {
-      if (msg.mutations) {
-        for (const mut of msg.mutations) {
-          if (mut.rolledBack) continue;
-          if (mut.operation === "create") {
-            additions += mut.newContent ? mut.newContent.split("\n").length : 1;
-          } else if (mut.operation === "modify") {
-            const prev = mut.previousContent ? mut.previousContent.split("\n").length : 0;
-            const next = mut.newContent ? mut.newContent.split("\n").length : 0;
-            if (next >= prev) {
-              additions += next - prev + 1;
-            } else {
-              additions += 1;
-              deletions += prev - next;
-            }
-          } else if (mut.operation === "delete") {
-            deletions += mut.previousContent ? mut.previousContent.split("\n").length : 1;
-          }
-        }
-      }
-    }
-    return { additions, deletions };
-  }, [messages]);
-
   // Clean display project name (e.g. "small-web" instead of full path)
   const displayProject = useMemo(() => {
     if (currentProject === "Outside Project") return "";
@@ -901,7 +873,6 @@ function AuthenticatedContent({
           onNewChat={handleNewChat}
           conversationTitle={conversationTitle}
           project={displayProject}
-          diffStats={diffStats}
         />
 
         {/* Dynamic Canvas: Landing Layout when 0 messages vs Active Stream Layout */}
