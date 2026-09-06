@@ -175,8 +175,12 @@ export function ChatMessageItem({
           </button>
 
           {isThinkingOpen && (
-            <div className="ml-1 pl-4 border-l-2 border-border/80 text-xs sm:text-sm font-sans text-foreground/85 whitespace-pre-wrap leading-relaxed py-2 my-1.5 max-h-72 overflow-y-auto overscroll-contain [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-              {message.thinkingContent}
+            <div className="ml-1 pl-4 border-l-2 border-border/70 text-xs sm:text-sm font-sans py-2 my-1.5 max-h-80 overflow-y-auto overscroll-contain [scrollbar-width:thin]">
+              <MarkdownContent
+                content={message.thinkingContent || ""}
+                isStreaming={isStreaming && isLast && !message.content}
+                compact
+              />
             </div>
           )}
         </div>

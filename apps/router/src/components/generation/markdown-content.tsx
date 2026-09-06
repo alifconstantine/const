@@ -9,6 +9,7 @@ import { cn } from "@const/ui";
 interface MarkdownContentProps {
   content: string;
   isStreaming?: boolean;
+  compact?: boolean;
   className?: string;
 }
 
@@ -21,6 +22,7 @@ marked.setOptions({
 export function MarkdownContent({
   content,
   isStreaming = false,
+  compact = false,
   className = "",
 }: MarkdownContentProps) {
   const tokens = useMemo(() => {
@@ -37,7 +39,9 @@ export function MarkdownContent({
   return (
     <div
       className={cn(
-        "space-y-3.5 text-[14px] sm:text-[15px] leading-relaxed text-foreground select-text font-sans",
+        compact
+          ? "space-y-2.5 text-[13px] sm:text-[13.5px] leading-relaxed text-foreground/85 select-text font-sans"
+          : "space-y-3.5 text-[14px] sm:text-[15px] leading-relaxed text-foreground select-text font-sans",
         className
       )}
     >
@@ -46,6 +50,7 @@ export function MarkdownContent({
           key={index}
           token={token}
           isStreaming={isStreaming && index === tokens.length - 1}
+          compact={compact}
         />
       ))}
     </div>
@@ -58,16 +63,25 @@ export function MarkdownContent({
 function BlockTokenRenderer({
   token,
   isStreaming,
+  compact = false,
 }: {
   token: Token;
   isStreaming?: boolean;
+  compact?: boolean;
 }) {
   switch (token.type) {
     case "heading": {
       const heading = token as Tokens.Heading;
       const Tag = `h${Math.min(heading.depth, 6)}` as keyof React.JSX.IntrinsicElements;
-      const sizeClasses =
-        heading.depth === 1
+      const sizeClasses = compact
+        ? heading.depth === 1
+          ? "text-base font-semibold text-foreground mt-3 mb-1.5 tracking-tight border-b border-border/30 pb-1"
+          : heading.depth === 2
+          ? "text-sm sm:text-base font-semibold text-foreground mt-2.5 mb-1 tracking-tight"
+          : heading.depth === 3
+          ? "text-xs sm:text-sm font-semibold text-foreground/95 mt-2 mb-1"
+          : "text-xs font-medium text-foreground/90 mt-1.5 mb-0.5"
+        : heading.depth === 1
           ? "text-xl sm:text-2xl font-semibold text-foreground mt-5 mb-2.5 tracking-tight border-b border-border/40 pb-1.5"
           : heading.depth === 2
           ? "text-lg sm:text-xl font-semibold text-foreground mt-4 mb-2 tracking-tight border-b border-border/30 pb-1"
@@ -85,7 +99,12 @@ function BlockTokenRenderer({
     case "paragraph": {
       const paragraph = token as Tokens.Paragraph;
       return (
-        <p className="leading-relaxed text-foreground/90 my-2">
+        <p
+          className={cn(
+            "leading-relaxed",
+            compact ? "text-foreground/85 my-1.5 text-[13px] sm:text-[13.5px]" : "text-foreground/90 my-2"
+          )}
+        >
           <InlineTokensRenderer tokens={paragraph.tokens} fallbackText={paragraph.text} />
         </p>
       );
@@ -98,33 +117,39 @@ function BlockTokenRenderer({
           code={code.text}
           language={code.lang || "text"}
           isStreaming={isStreaming}
+          compact={compact}
         />
       );
     }
 
     case "table": {
       const table = token as Tokens.Table;
-      return <TableRenderer table={table} />;
+      return <TableRenderer table={table} compact={compact} />;
     }
 
     case "list": {
       const list = token as Tokens.List;
-      return <ListRenderer list={list} />;
+      return <ListRenderer list={list} compact={compact} />;
     }
 
     case "blockquote": {
       const bq = token as Tokens.Blockquote;
       return (
-        <blockquote className="border-l-2 border-foreground/30 pl-4 py-1.5 my-3 text-muted-foreground bg-secondary/15 rounded-r-xl italic font-sans">
+        <blockquote
+          className={cn(
+            "border-l-2 border-foreground/30 pl-4 text-muted-foreground bg-secondary/15 rounded-r-xl italic font-sans",
+            compact ? "py-1 my-2 text-xs sm:text-[13px]" : "py-1.5 my-3"
+          )}
+        >
           {bq.tokens?.map((t, i) => (
-            <BlockTokenRenderer key={i} token={t} />
+            <BlockTokenRenderer key={i} token={t} compact={compact} />
           )) || <InlineTokensRenderer fallbackText={bq.text} />}
         </blockquote>
       );
     }
 
     case "hr":
-      return <hr className="border-border/60 my-4" />;
+      return <hr className={cn("border-border/60", compact ? "my-2.5" : "my-4")} />;
 
     case "space":
       return null;
@@ -134,7 +159,7 @@ function BlockTokenRenderer({
       return (
         <div
           dangerouslySetInnerHTML={{ __html: htmlToken.text }}
-          className="my-2"
+          className={compact ? "my-1" : "my-2"}
         />
       );
     }
@@ -160,12 +185,14 @@ interface CodeBlockProps {
   language?: string;
   className?: string;
   isStreaming?: boolean;
+  compact?: boolean;
 }
 
 export function CodeBlock({
   code,
   language = "text",
   className = "",
+  compact = false,
 }: CodeBlockProps) {
   const [copied, setCopied] = useState(false);
 
@@ -200,29 +227,43 @@ export function CodeBlock({
   return (
     <div
       className={cn(
-        "rounded-2xl overflow-hidden bg-[#0d1117] border border-[#30363d] my-3.5 select-none shadow-md",
+        "rounded-2xl overflow-hidden bg-[#0d1117] border border-[#30363d] select-none shadow-md",
+        compact ? "my-2" : "my-3.5",
         className
       )}
     >
       {/* GitHub Dark Code Header */}
-      <div className="flex items-center justify-between px-4 py-2 bg-[#161b22] border-b border-[#30363d] text-xs">
-        <span className="font-mono text-[11.5px] text-[#8b949e] font-medium tracking-wide lowercase">
+      <div
+        className={cn(
+          "flex items-center justify-between bg-[#161b22] border-b border-[#30363d] text-xs",
+          compact ? "px-3.5 py-1.5" : "px-4 py-2"
+        )}
+      >
+        <span
+          className={cn(
+            "font-mono text-[#8b949e] font-medium tracking-wide lowercase",
+            compact ? "text-[11px]" : "text-[11.5px]"
+          )}
+        >
           {cleanLang}
         </span>
         <button
           type="button"
           onClick={handleCopy}
-          className="flex items-center gap-1.5 text-[11px] font-mono text-[#8b949e] hover:text-[#c9d1d9] transition-colors cursor-pointer py-1 px-2 rounded-lg hover:bg-white/5 active:scale-95"
+          className={cn(
+            "flex items-center gap-1.5 font-mono text-[#8b949e] hover:text-[#c9d1d9] transition-colors cursor-pointer rounded-lg hover:bg-white/5 active:scale-95",
+            compact ? "text-[10.5px] py-0.5 px-2" : "text-[11px] py-1 px-2"
+          )}
           title="Copy code"
         >
           {copied ? (
             <>
-              <Check className="w-3.5 h-3.5 text-[#3fb950]" />
+              <Check className={compact ? "w-3 h-3 text-[#3fb950]" : "w-3.5 h-3.5 text-[#3fb950]"} />
               <span className="text-[#3fb950] font-medium">Copied!</span>
             </>
           ) : (
             <>
-              <Copy className="w-3.5 h-3.5" />
+              <Copy className={compact ? "w-3 h-3" : "w-3.5 h-3.5"} />
               <span>Copy</span>
             </>
           )}
@@ -230,7 +271,12 @@ export function CodeBlock({
       </div>
 
       {/* Code Body with GitHub Dark Color Tokens */}
-      <pre className="p-4 overflow-x-auto text-[13px] sm:text-[13.5px] font-mono leading-relaxed text-[#c9d1d9] select-text [scrollbar-width:thin] github-dark-highlight">
+      <pre
+        className={cn(
+          "overflow-x-auto font-mono leading-relaxed text-[#c9d1d9] select-text [scrollbar-width:thin] github-dark-highlight",
+          compact ? "p-3 text-[12px] sm:text-[12.5px]" : "p-4 text-[13px] sm:text-[13.5px]"
+        )}
+      >
         <code
           dangerouslySetInnerHTML={{ __html: highlightedHtml }}
           className="font-mono"
@@ -321,9 +367,20 @@ export function CodeBlock({
 // ---------------------------------------------------------------------------
 // Table Renderer (GFM GitHub Dark Style)
 // ---------------------------------------------------------------------------
-function TableRenderer({ table }: { table: Tokens.Table }) {
+function TableRenderer({
+  table,
+  compact = false,
+}: {
+  table: Tokens.Table;
+  compact?: boolean;
+}) {
   return (
-    <div className="my-4 overflow-x-auto rounded-2xl border border-[#30363d] bg-[#0d1117] shadow-sm select-text [scrollbar-width:thin]">
+    <div
+      className={cn(
+        "overflow-x-auto rounded-2xl border border-[#30363d] bg-[#0d1117] shadow-sm select-text [scrollbar-width:thin]",
+        compact ? "my-2 text-xs" : "my-4"
+      )}
+    >
       <table className="w-full text-left text-xs sm:text-sm font-sans border-collapse">
         <thead className="bg-[#161b22] border-b border-[#30363d] text-foreground font-semibold">
           <tr>
@@ -338,7 +395,8 @@ function TableRenderer({ table }: { table: Tokens.Table }) {
                 <th
                   key={idx}
                   className={cn(
-                    "px-4 py-3 text-xs font-semibold text-foreground/90 tracking-wide border-r border-[#30363d]/50 last:border-r-0 whitespace-nowrap",
+                    "font-semibold text-foreground/90 tracking-wide border-r border-[#30363d]/50 last:border-r-0 whitespace-nowrap",
+                    compact ? "px-3 py-2 text-xs" : "px-4 py-3 text-xs",
                     alignClass
                   )}
                 >
@@ -368,7 +426,8 @@ function TableRenderer({ table }: { table: Tokens.Table }) {
                   <td
                     key={cellIdx}
                     className={cn(
-                      "px-4 py-2.5 text-foreground/85 border-r border-[#30363d]/50 last:border-r-0",
+                      "text-foreground/85 border-r border-[#30363d]/50 last:border-r-0",
+                      compact ? "px-3 py-1.5 text-xs" : "px-4 py-2.5",
                       alignClass
                     )}
                   >
@@ -390,22 +449,40 @@ function TableRenderer({ table }: { table: Tokens.Table }) {
 // ---------------------------------------------------------------------------
 // List Renderer (Ordered, Unordered, Task List)
 // ---------------------------------------------------------------------------
-function ListRenderer({ list }: { list: Tokens.List }) {
+function ListRenderer({
+  list,
+  compact = false,
+}: {
+  list: Tokens.List;
+  compact?: boolean;
+}) {
   const Tag = list.ordered ? "ol" : "ul";
   const listClasses = list.ordered
-    ? "list-decimal pl-6 space-y-1.5 my-2.5 text-foreground/90"
-    : "list-disc pl-6 space-y-1.5 my-2.5 text-foreground/90";
+    ? cn(
+        "list-decimal pl-6 text-foreground/90",
+        compact ? "space-y-1 my-1.5 text-xs sm:text-[13px]" : "space-y-1.5 my-2.5"
+      )
+    : cn(
+        "list-disc pl-6 text-foreground/90",
+        compact ? "space-y-1 my-1.5 text-xs sm:text-[13px]" : "space-y-1.5 my-2.5"
+      );
 
   return (
     <Tag className={listClasses} start={list.start || 1}>
       {list.items.map((item, idx) => (
-        <ListItemRenderer key={idx} item={item} />
+        <ListItemRenderer key={idx} item={item} compact={compact} />
       ))}
     </Tag>
   );
 }
 
-function ListItemRenderer({ item }: { item: Tokens.ListItem }) {
+function ListItemRenderer({
+  item,
+  compact = false,
+}: {
+  item: Tokens.ListItem;
+  compact?: boolean;
+}) {
   if (item.task) {
     return (
       <li className="list-none -ml-4 flex items-start gap-2.5 leading-relaxed py-0.5">
@@ -420,7 +497,7 @@ function ListItemRenderer({ item }: { item: Tokens.ListItem }) {
             item.tokens.map((tok, i) => {
               if (tok.type === "checkbox") return null;
               if (tok.type === "list") {
-                return <ListRenderer key={i} list={tok as Tokens.List} />;
+                return <ListRenderer key={i} list={tok as Tokens.List} compact={compact} />;
               }
               if (tok.type === "text") {
                 const textTok = tok as Tokens.Text;
@@ -432,7 +509,7 @@ function ListItemRenderer({ item }: { item: Tokens.ListItem }) {
                   />
                 );
               }
-              return <BlockTokenRenderer key={i} token={tok} />;
+              return <BlockTokenRenderer key={i} token={tok} compact={compact} />;
             })
           ) : (
             <InlineTokensRenderer fallbackText={item.text} />
@@ -447,7 +524,7 @@ function ListItemRenderer({ item }: { item: Tokens.ListItem }) {
       {item.tokens ? (
         item.tokens.map((tok, i) => {
           if (tok.type === "list") {
-            return <ListRenderer key={i} list={tok as Tokens.List} />;
+            return <ListRenderer key={i} list={tok as Tokens.List} compact={compact} />;
           }
           if (tok.type === "text") {
             const textTok = tok as Tokens.Text;
@@ -459,7 +536,7 @@ function ListItemRenderer({ item }: { item: Tokens.ListItem }) {
               />
             );
           }
-          return <BlockTokenRenderer key={i} token={tok} />;
+          return <BlockTokenRenderer key={i} token={tok} compact={compact} />;
         })
       ) : (
         <InlineTokensRenderer fallbackText={item.text} />

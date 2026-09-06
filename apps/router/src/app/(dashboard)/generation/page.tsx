@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useMemo } from "react";
+import { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from "react";
 import { useRouterAuth } from "@/components/providers/convex-client-provider";
 import { useQuery, useMutation } from "convex/react";
 import { api } from "@const/backend/_generated/api";
@@ -137,42 +137,45 @@ export default function GenerationPage() {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
-  // Handle textarea text changes and dynamically detect multi-line wrapping
-  const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const val = e.target.value;
-    setInputPrompt(val);
-    if (isExpanded) return;
-    if (val.includes("\n") || val.length > 70) {
-      setIsMultiLine(true);
-    } else if (val.length === 0) {
-      setIsMultiLine(false);
-    } else {
-      requestAnimationFrame(() => {
-        if (textareaRef.current) {
-          setIsMultiLine(textareaRef.current.scrollHeight > 36);
-        }
-      });
-    }
-  };
+  const MIN_TEXTAREA_HEIGHT = 28;
+  const MAX_TEXTAREA_HEIGHT = 260;
+  const [scrollAreaHeight, setScrollAreaHeight] = useState(MIN_TEXTAREA_HEIGHT);
 
-  // Sync multi-line layout on input or expand toggle
-  useEffect(() => {
-    if (isExpanded) {
-      setIsMultiLine(true);
-      return;
-    }
+  // Auto-resize textarea and ScrollArea height smoothly as text grows or shrinks without unmounting
+  const adjustTextareaHeight = useCallback(() => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    // Reset height to auto first to accurately calculate new scrollHeight
+    textarea.style.height = "auto";
+    const scrollHeight = textarea.scrollHeight;
+
     if (!inputPrompt) {
+      setScrollAreaHeight(MIN_TEXTAREA_HEIGHT);
+      textarea.style.height = `${MIN_TEXTAREA_HEIGHT}px`;
       setIsMultiLine(false);
       return;
     }
-    if (inputPrompt.includes("\n") || inputPrompt.length > 70) {
+
+    if (isExpanded) {
+      textarea.style.height = `${Math.max(scrollHeight, 400)}px`;
       setIsMultiLine(true);
       return;
     }
-    if (textareaRef.current) {
-      setIsMultiLine(textareaRef.current.scrollHeight > 36);
-    }
+
+    const nextHeight = Math.min(Math.max(scrollHeight, MIN_TEXTAREA_HEIGHT), MAX_TEXTAREA_HEIGHT);
+    setScrollAreaHeight(nextHeight);
+    textarea.style.height = `${scrollHeight}px`;
+    setIsMultiLine(nextHeight > 38 || inputPrompt.includes("\n"));
   }, [inputPrompt, isExpanded]);
+
+  useLayoutEffect(() => {
+    adjustTextareaHeight();
+  }, [inputPrompt, isExpanded, adjustTextareaHeight]);
+
+  const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInputPrompt(e.target.value);
+  };
 
   // Helper to format file sizes
   const formatFileSize = (bytes: number): string => {
@@ -407,6 +410,7 @@ export default function GenerationPage() {
     const updatedMessages = [...messages, userMessage, assistantMessage];
     setMessages(updatedMessages);
     setInputPrompt("");
+    setScrollAreaHeight(MIN_TEXTAREA_HEIGHT);
     setIsExpanded(false);
     setIsMultiLine(false);
     setIsStreaming(true);
@@ -585,9 +589,26 @@ export default function GenerationPage() {
     }
   };
 
-  // Keyboard shortcut: Enter to send, Shift+Enter for newline
+  // Keyboard shortcut: Enter to send (unless Shift+Enter or IME), Cmd/Ctrl+Enter always sends
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
+    if (isExpanded) {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        setIsExpanded(false);
+        return;
+      }
+      if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        handleSendPrompt();
+        return;
+      }
+      return;
+    }
+
+    if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+      e.preventDefault();
+      handleSendPrompt();
+    } else if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
       handleSendPrompt();
     }
@@ -731,212 +752,101 @@ export default function GenerationPage() {
               </div>
             )}
 
-            {/* Adaptive Input Layout: Expanded (Image 4), Multi-line (Image 3), Single-line (Image 2) */}
-            {isExpanded ? (
-              /* Expanded Mode (Image 4) */
-              <div className="flex flex-col h-[55vh] min-h-[360px] max-h-[75vh]">
-                {/* Textarea Area with Minimize Button */}
-                <div className="relative p-4 flex-1 flex flex-col min-h-0">
-                  <textarea
-                    ref={textareaRef}
-                    value={inputPrompt}
-                    onChange={handleTextareaChange}
-                    onKeyDown={handleKeyDown}
-                    onPaste={handlePaste}
-                    placeholder={
-                      stagedAttachments.length > 0
-                        ? "Add a message or press enter to send..."
-                        : "Start typing a prompt to see what our models can do..."
-                    }
-                    className="w-full flex-1 bg-transparent border-none p-0 pr-8 focus:outline-none focus:ring-0 text-sm sm:text-base font-sans text-foreground placeholder:text-muted-foreground/70 resize-none leading-relaxed overflow-y-auto"
-                  />
-
-                  {/* Minimize Button in Top-Right corner */}
-                  <button
-                    type="button"
-                    onClick={() => setIsExpanded(false)}
-                    className="absolute top-3 right-3 p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors cursor-pointer"
-                    title="Collapse prompt"
-                  >
-                    <Minimize2 className="h-4 w-4" />
-                  </button>
-                </div>
-
-                {/* Bottom Actions Bar */}
-                <div className="flex items-center justify-between px-4 pb-3 pt-2 shrink-0">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="h-9 w-9 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary cursor-pointer shrink-0"
-                    title="Attach files or media"
-                  >
-                    <Paperclip className="h-4 w-4" />
-                  </Button>
-
-                  {isStreaming ? (
-                    <Button
-                      onClick={handleStopStreaming}
-                      size="icon"
-                      variant="destructive"
-                      className="rounded-full h-9 w-9 cursor-pointer shrink-0"
-                      title="Stop generating"
-                    >
-                      <Square className="h-4 w-4 fill-current" />
-                    </Button>
-                  ) : (
-                    <Button
-                      onClick={handleSendPrompt}
-                      disabled={!inputPrompt.trim() && stagedAttachments.length === 0}
-                      size="icon"
-                      className="rounded-full h-9 w-9 cursor-pointer shrink-0 bg-foreground text-background hover:bg-foreground/90 disabled:opacity-40"
-                      title="Send (Enter)"
-                    >
-                      <ArrowUp className="h-5 w-5 stroke-[2.25]" />
-                    </Button>
-                  )}
-                </div>
-              </div>
-            ) : isMultiLine ? (
-              /* Multi-line Mode (Image 3) */
-              <div className="flex flex-col">
-                {/* Textarea Area with Maximize Button in Top-Right */}
-                <div className="relative p-3.5 pb-2">
-                  <textarea
-                    ref={textareaRef}
-                    value={inputPrompt}
-                    onChange={handleTextareaChange}
-                    onKeyDown={handleKeyDown}
-                    onPaste={handlePaste}
-                    placeholder={
-                      stagedAttachments.length > 0
-                        ? "Add a message or press enter to send..."
-                        : "Start typing a prompt to see what our models can do..."
-                    }
-                    rows={3}
-                    className="w-full bg-transparent border-none p-0 pr-8 focus:outline-none focus:ring-0 text-sm sm:text-base font-sans text-foreground placeholder:text-muted-foreground/70 resize-none leading-relaxed min-h-[64px] max-h-48 overflow-y-auto"
-                  />
-
-                  {/* Maximize Button in Top-Right corner */}
-                  <button
-                    type="button"
-                    onClick={() => setIsExpanded(true)}
-                    className="absolute top-2.5 right-3 p-1.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/80 transition-colors cursor-pointer"
-                    title="Expand prompt"
-                  >
-                    <Maximize2 className="h-4 w-4" />
-                  </button>
-                </div>
-
-                {/* Bottom Actions Bar */}
-                <div className="flex items-center justify-between px-3 pb-3 pt-1">
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="h-9 w-9 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary cursor-pointer shrink-0"
-                    title="Attach files or media"
-                  >
-                    <Paperclip className="h-4 w-4" />
-                  </Button>
-
-                  {isStreaming ? (
-                    <Button
-                      onClick={handleStopStreaming}
-                      size="icon"
-                      variant="destructive"
-                      className="rounded-full h-9 w-9 cursor-pointer shrink-0"
-                      title="Stop generating"
-                    >
-                      <Square className="h-4 w-4 fill-current" />
-                    </Button>
-                  ) : (
-                    <Button
-                      onClick={handleSendPrompt}
-                      disabled={!inputPrompt.trim() && stagedAttachments.length === 0}
-                      size="icon"
-                      className="rounded-full h-9 w-9 cursor-pointer shrink-0 bg-foreground text-background hover:bg-foreground/90 disabled:opacity-40"
-                      title="Send (Enter)"
-                    >
-                      <ArrowUp className="h-5 w-5 stroke-[2.25]" />
-                    </Button>
-                  )}
-                </div>
-              </div>
-            ) : (
-              /* Single-line Centered Mode (Image 2) */
-              <div className="flex items-center gap-2 px-3 py-2">
-                {/* Paperclip Button */}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="h-9 w-9 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary cursor-pointer shrink-0"
-                  title="Attach files or media"
-                >
-                  <Paperclip className="h-4 w-4" />
-                </Button>
-
-                {/* Textarea Centered Vertically with Left and Right buttons */}
-                <div className="flex-1 flex items-center min-h-[36px]">
-                  <textarea
-                    ref={textareaRef}
-                    value={inputPrompt}
-                    onChange={handleTextareaChange}
-                    onKeyDown={handleKeyDown}
-                    onPaste={handlePaste}
-                    placeholder={
-                      stagedAttachments.length > 0
-                        ? "Add a message or press enter to send..."
-                        : "Start typing a prompt to see what our models can do..."
-                    }
-                    rows={1}
-                    className="w-full bg-transparent border-none p-0 focus:outline-none focus:ring-0 text-sm sm:text-base font-sans text-foreground placeholder:text-muted-foreground/70 resize-none leading-normal my-auto h-6 overflow-hidden"
-                  />
-                </div>
-
-                {/* Subtle Maximize button */}
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  type="button"
-                  onClick={() => {
-                    setIsExpanded(true);
-                    setIsMultiLine(true);
-                  }}
-                  className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary cursor-pointer shrink-0"
-                  title="Expand prompt"
-                >
-                  <Maximize2 className="h-3.5 w-3.5" />
-                </Button>
-
-                {/* Arrow Up Send / Stop Button */}
-                {isStreaming ? (
-                  <Button
-                    onClick={handleStopStreaming}
-                    size="icon"
-                    variant="destructive"
-                    className="rounded-full h-9 w-9 cursor-pointer shrink-0"
-                    title="Stop generating"
-                  >
-                    <Square className="h-4 w-4 fill-current" />
-                  </Button>
-                ) : (
-                  <Button
-                    onClick={handleSendPrompt}
-                    disabled={!inputPrompt.trim() && stagedAttachments.length === 0}
-                    size="icon"
-                    className="rounded-full h-9 w-9 cursor-pointer shrink-0 bg-foreground text-background hover:bg-foreground/90 disabled:opacity-40"
-                    title="Send (Enter)"
-                  >
-                    <ArrowUp className="h-5 w-5 stroke-[2.25]" />
-                  </Button>
+            {/* Unified Adaptive Input: Single permanent Textarea with @const/ui ScrollArea */}
+            <div
+              className={cn(
+                "w-full flex flex-col p-3 sm:p-3.5",
+                isExpanded && "h-[72vh] min-h-[460px] max-h-[85vh]"
+              )}
+            >
+              {/* Scrollable Textarea Area using @const/ui ScrollArea */}
+              <ScrollArea
+                className={cn(
+                  "w-full",
+                  isExpanded ? "flex-1 min-h-0" : ""
                 )}
+                viewportClassName="pr-3"
+                style={{
+                  height: isExpanded ? "100%" : `${scrollAreaHeight}px`,
+                  maxHeight: isExpanded ? "none" : "260px",
+                }}
+              >
+                <textarea
+                  ref={textareaRef}
+                  value={inputPrompt}
+                  onChange={handleTextareaChange}
+                  onKeyDown={handleKeyDown}
+                  onPaste={handlePaste}
+                  placeholder={
+                    stagedAttachments.length > 0
+                      ? "Add a message or press enter to send..."
+                      : "Start typing a prompt to see what our models can do..."
+                  }
+                  rows={1}
+                  className="w-full bg-transparent border-none p-0 focus:outline-none focus:ring-0 text-sm sm:text-base font-sans text-foreground placeholder:text-muted-foreground/70 resize-none leading-relaxed overflow-hidden"
+                />
+              </ScrollArea>
+
+              {/* Bottom Actions Toolbar (completely separated from ScrollArea to avoid overlap) */}
+              <div className="flex items-center justify-between pt-2.5 shrink-0">
+                {/* Left Actions: Attach File / Media */}
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="h-8 w-8 sm:h-9 sm:w-9 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary cursor-pointer shrink-0"
+                    title="Attach files or media"
+                  >
+                    <Paperclip className="h-4 w-4" />
+                  </Button>
+                </div>
+
+                {/* Right Actions: Maximize/Minimize toggle + Send / Stop button */}
+                <div className="flex items-center gap-1.5">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    type="button"
+                    onClick={() => {
+                      setIsExpanded(!isExpanded);
+                      setTimeout(() => textareaRef.current?.focus(), 50);
+                    }}
+                    className="h-8 w-8 sm:h-9 sm:w-9 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary cursor-pointer shrink-0"
+                    title={isExpanded ? "Collapse prompt (Esc)" : "Expand prompt"}
+                  >
+                    {isExpanded ? (
+                      <Minimize2 className="h-4 w-4" />
+                    ) : (
+                      <Maximize2 className="h-4 w-4" />
+                    )}
+                  </Button>
+
+                  {isStreaming ? (
+                    <Button
+                      onClick={handleStopStreaming}
+                      size="icon"
+                      variant="destructive"
+                      className="rounded-full h-8 w-8 sm:h-9 sm:w-9 cursor-pointer shrink-0"
+                      title="Stop generating"
+                    >
+                      <Square className="h-4 w-4 fill-current" />
+                    </Button>
+                  ) : (
+                    <Button
+                      onClick={handleSendPrompt}
+                      disabled={!inputPrompt.trim() && stagedAttachments.length === 0}
+                      size="icon"
+                      className="rounded-full h-8 w-8 sm:h-9 sm:w-9 cursor-pointer shrink-0 bg-foreground text-background hover:bg-foreground/90 disabled:opacity-40 transition-opacity"
+                      title={isExpanded ? "Send (Cmd+Enter / Ctrl+Enter)" : "Send (Enter)"}
+                    >
+                      <ArrowUp className="h-4 w-4 sm:h-5 sm:w-5 stroke-[2.25]" />
+                    </Button>
+                  )}
+                </div>
               </div>
-            )}
+            </div>
           </div>
         </div>
       </div>
