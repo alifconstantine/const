@@ -781,7 +781,7 @@ export function MutationsSummaryCard({
   }
 
   return (
-    <div className="w-full rounded-xl bg-[#141414] border border-[#2b2b2b] my-2 select-none font-sans overflow-hidden transition-all shadow-xs">
+    <div className="w-full rounded-xl bg-[#141414] border border-[#2b2b2b] my-2 select-none font-sans overflow-hidden transition-all shadow-xs animate-in fade-in-0 duration-200">
       {/* Header matching reference image: 1 file changed +27 -13 >  |  [Undo all] [Review] */}
       <div className={cn("flex items-center justify-between px-3.5 py-2 transition-all", isOpen && "border-b border-[#242424]")}>
         <button

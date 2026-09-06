@@ -1044,11 +1044,11 @@ function AuthenticatedContent({
                           </div>
                         ) : null}
 
-                        {/* Requirement 3: Changed Files Summary Card at the bottom of the chat message */}
-                        {msg.mutations && msg.mutations.length > 0 && (
+                        {/* Requirement: Changed Files Summary Card at the bottom of the message only after all output is finished */}
+                        {!(isExecuting && idx === messages.length - 1) && msg.mutations && msg.mutations.length > 0 && (
                           <MutationsSummaryCard
                             mutations={msg.mutations}
-                            isExecuting={isExecuting && idx === messages.length - 1}
+                            isExecuting={false}
                             onRollback={handleRollback}
                             onRollbackAll={handleRollbackAll}
                             onOpenReview={() => setReviewingMutations(msg.mutations || null)}
