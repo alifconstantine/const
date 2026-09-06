@@ -1151,27 +1151,30 @@ export function ChatCard({
         </div>
       </div>
 
-      {/* Active Conversation Footer Info Bar (Image 2) */}
+      {/* Active Conversation Footer Info Bar (Option A: Condensed, No Scrollbar) */}
       {compact && metrics && (
-        <div className="w-full flex items-center justify-center gap-2 text-[11px] font-mono text-[#888888] pt-1 pb-0.5 select-none overflow-x-auto whitespace-nowrap">
-          <span>
+        <div
+          className="w-full flex flex-wrap items-center justify-center gap-x-2 gap-y-0.5 text-[11px] font-mono text-[#888888] pt-1 pb-0.5 select-none overflow-hidden"
+          title="Session telemetry metrics"
+        >
+          <span title={`${metrics.turns} conversation turns, ${metrics.steps} tool execution steps`}>
             {metrics.turns} turns · {metrics.steps} steps
           </span>
           <span className="text-[#444444]">|</span>
-          <span>
-            LLM {formatDurationDisplay(metrics.llmDurationMs)} · Tool call {formatDurationDisplay(metrics.toolDurationMs)}
+          <span title={`LLM duration: ${formatDurationDisplay(metrics.llmDurationMs)} · Tools duration: ${formatDurationDisplay(metrics.toolDurationMs)}`}>
+            LLM {formatDurationDisplay(metrics.llmDurationMs)} · Tools {formatDurationDisplay(metrics.toolDurationMs)}
           </span>
           <span className="text-[#444444]">|</span>
-          <span>
-            TTFT avg {metrics.ttftSeconds.toFixed(1)}s · {metrics.tokPerSec} tok/s
+          <span title={`Average TTFT: ${metrics.ttftSeconds.toFixed(1)}s · Generation speed: ${metrics.tokPerSec} tok/s`}>
+            {metrics.tokPerSec} tok/s
           </span>
           <span className="text-[#444444]">|</span>
-          <span>
-            Cache hit {metrics.cacheHitRate}%
+          <span title={`Prompt cache hit rate: ${metrics.cacheHitRate}%`}>
+            {metrics.cacheHitRate}% cache
           </span>
           <span className="text-[#444444]">|</span>
-          <span>
-            Input {formatTokenDisplay(metrics.inputTokens)} tok · Output {formatTokenDisplay(metrics.outputTokens)} tok
+          <span title={`Input: ${metrics.inputTokens.toLocaleString()} tokens · Output: ${metrics.outputTokens.toLocaleString()} tokens`}>
+            ↑{formatTokenDisplay(metrics.inputTokens)} · ↓{formatTokenDisplay(metrics.outputTokens)} tok
           </span>
         </div>
       )}
