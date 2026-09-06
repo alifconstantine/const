@@ -42,4 +42,15 @@ contextBridge.exposeInMainWorld("electron", {
     ipcRenderer.on("agent:stream-event", handler);
     return () => ipcRenderer.removeListener("agent:stream-event", handler);
   },
+  listConversations: (includeArchived?: boolean) => ipcRenderer.invoke("conversations:list", includeArchived),
+  listArchivedConversations: () => ipcRenderer.invoke("conversations:list-archived"),
+  getConversation: (id: string) => ipcRenderer.invoke("conversations:get", id),
+  saveConversation: (convo: any) => ipcRenderer.invoke("conversations:save", convo),
+  deleteConversation: (id: string) => ipcRenderer.invoke("conversations:delete", id),
+  renameConversation: (id: string, title: string) => ipcRenderer.invoke("conversations:rename", id, title),
+  archiveConversation: (id: string) => ipcRenderer.invoke("conversations:archive", id),
+  unarchiveConversation: (id: string) => ipcRenderer.invoke("conversations:unarchive", id),
+  pinProject: (projectName: string, isPinned: boolean) => ipcRenderer.invoke("conversations:pin-project", projectName, isPinned),
+  getProjectPins: () => ipcRenderer.invoke("conversations:get-project-pins"),
+  importLegacyConversations: (convos: any[]) => ipcRenderer.invoke("conversations:import-legacy", convos),
 });

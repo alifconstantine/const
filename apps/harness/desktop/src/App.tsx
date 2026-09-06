@@ -34,6 +34,10 @@ import {
   loadConversations,
   saveConversation,
   deleteConversation,
+  renameConversation,
+  archiveConversation,
+  unarchiveConversation,
+  initConversationStore,
   generateFallbackTitle,
   generateAiTitle,
   type ConversationItem,
@@ -101,6 +105,13 @@ function AuthenticatedContent({
   const [conversations, setConversations] = useState<ConversationItem[]>(() => {
     return loadConversations();
   });
+
+  useEffect(() => {
+    initConversationStore().then((list) => {
+      setConversations(list);
+    });
+  }, []);
+
   const [conversationId, setConversationId] = useState<string>(
     () => `session_${Date.now()}`
   );
@@ -641,7 +652,31 @@ function AuthenticatedContent({
     }
   };
 
+  const handleRenameConversation = (id: string, title: string) => {
+    renameConversation(id, title);
+    const updated = loadConversations();
+    setConversations(updated);
+    if (id === conversationId) {
+      setConversationTitle(title);
+    }
+  };
 
+  const handleArchiveConversation = (id: string) => {
+    archiveConversation(id);
+    const updated = loadConversations();
+    setConversations(updated);
+    if (id === conversationId) {
+      handleNewChat();
+    }
+    toast.success("Conversation archived");
+  };
+
+  const handleUnarchiveConversation = async (id: string) => {
+    await unarchiveConversation(id);
+    const updated = loadConversations();
+    setConversations(updated);
+    toast.success("Conversation restored");
+  };
 
   if (isSettingsOpen) {
     return (
@@ -670,6 +705,9 @@ function AuthenticatedContent({
           activeConversationId={conversationId}
           onSelectConversation={handleSelectConversation}
           onDeleteConversation={handleDeleteConversation}
+          onRenameConversation={handleRenameConversation}
+          onArchiveConversation={handleArchiveConversation}
+          onUnarchiveConversation={handleUnarchiveConversation}
           onOpenSettings={() => handleOpenSettings("model")}
         />
       )}

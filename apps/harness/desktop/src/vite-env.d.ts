@@ -122,6 +122,17 @@ declare global {
       saveConfig: (config: Partial<UserConfig>) => Promise<UserConfig>;
       generateTitle: (prompt: string, authToken?: string) => Promise<string | null>;
       onAgentEvent: (callback: (event: AgentStreamEvent) => void) => () => void;
+      listConversations?: (includeArchived?: boolean) => Promise<any[]>;
+      listArchivedConversations?: () => Promise<any[]>;
+      getConversation?: (id: string) => Promise<any | null>;
+      saveConversation?: (convo: any) => Promise<boolean>;
+      deleteConversation?: (id: string) => Promise<boolean>;
+      renameConversation?: (id: string, title: string) => Promise<boolean>;
+      archiveConversation?: (id: string) => Promise<boolean>;
+      unarchiveConversation?: (id: string) => Promise<boolean>;
+      pinProject?: (projectName: string, isPinned: boolean) => Promise<boolean>;
+      getProjectPins?: () => Promise<string[]>;
+      importLegacyConversations?: (convos: any[]) => Promise<boolean>;
     };
   }
 }

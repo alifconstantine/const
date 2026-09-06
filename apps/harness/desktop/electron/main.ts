@@ -9,13 +9,26 @@ import {
   type AgentMessage,
   type FileMutationRecord,
 } from "@const/agent";
+import { ConversationDatabase, type ConversationRecord } from "./database";
 
-// Initialize ~/.const directory hierarchy (Antigravity-aligned)
+// Initialize ~/.const/harness directory hierarchy (.gemini/antigravity aligned)
 const constHomeDir = path.join(os.homedir(), ".const");
-const constProjectsDir = path.join(constHomeDir, "projects");
-const constBrainDir = path.join(constHomeDir, "brain");
-const constConversationsDir = path.join(constHomeDir, "conversations");
-const constConfigFile = path.join(constHomeDir, "config.json");
+const harnessHomeDir = path.join(constHomeDir, "harness");
+const constProjectsDir = path.join(harnessHomeDir, "projects");
+const constBrainDir = path.join(harnessHomeDir, "brain");
+const constConversationsDir = path.join(harnessHomeDir, "conversations");
+const constConfigFile = path.join(harnessHomeDir, "config.json");
+
+// Legacy root config fallback / migration
+const rootConfigFile = path.join(constHomeDir, "config.json");
+if (!fs.existsSync(constConfigFile) && fs.existsSync(rootConfigFile)) {
+  try {
+    if (!fs.existsSync(harnessHomeDir)) fs.mkdirSync(harnessHomeDir, { recursive: true });
+    fs.copyFileSync(rootConfigFile, constConfigFile);
+  } catch {}
+}
+
+const conversationDb = new ConversationDatabase(harnessHomeDir);
 
 export interface ProviderConfig {
   name: string;
@@ -587,8 +600,26 @@ app.whenReady().then(() => {
             if (win && !win.isDestroyed()) {
               win.webContents.send("agent:stream-event", agentEvent);
             }
+            conversationDb.appendTranscriptEvent(convoId, agentEvent);
           }
         );
+
+        // Auto-save to SQLite conversation database
+        try {
+          const existingConvo = conversationDb.getConversation(convoId);
+          conversationDb.saveConversation({
+            id: convoId,
+            title: existingConvo?.title || "New Task",
+            project: payload.workspacePath || "Outside Project",
+            model,
+            updatedAt: Date.now(),
+            createdAt: existingConvo?.createdAt || Date.now(),
+            messages: updatedMessages,
+          });
+        } catch (dbErr) {
+          console.warn("[Electron Main] Failed to auto-save conversation to database:", dbErr);
+        }
+
         return {
           success: true,
           messages: updatedMessages,
@@ -602,6 +633,58 @@ app.whenReady().then(() => {
       }
     }
   );
+
+  // Conversations Database IPC Handlers
+  ipcMain.handle("conversations:list", async (_event, includeArchived?: boolean) => {
+    return conversationDb.listConversations(includeArchived);
+  });
+
+  ipcMain.handle("conversations:list-archived", async () => {
+    return conversationDb.listArchivedConversations();
+  });
+
+  ipcMain.handle("conversations:get", async (_event, id: string) => {
+    return conversationDb.getConversation(id);
+  });
+
+  ipcMain.handle("conversations:save", async (_event, convo: ConversationRecord) => {
+    conversationDb.saveConversation(convo);
+    return true;
+  });
+
+  ipcMain.handle("conversations:delete", async (_event, id: string) => {
+    conversationDb.deleteConversation(id);
+    return true;
+  });
+
+  ipcMain.handle("conversations:rename", async (_event, id: string, title: string) => {
+    conversationDb.renameConversation(id, title);
+    return true;
+  });
+
+  ipcMain.handle("conversations:archive", async (_event, id: string) => {
+    conversationDb.archiveConversation(id);
+    return true;
+  });
+
+  ipcMain.handle("conversations:unarchive", async (_event, id: string) => {
+    conversationDb.unarchiveConversation(id);
+    return true;
+  });
+
+  ipcMain.handle("conversations:pin-project", async (_event, projectName: string, isPinned: boolean) => {
+    conversationDb.pinProject(projectName, isPinned);
+    return true;
+  });
+
+  ipcMain.handle("conversations:get-project-pins", async () => {
+    return conversationDb.getProjectPins();
+  });
+
+  ipcMain.handle("conversations:import-legacy", async (_event, convos: ConversationRecord[]) => {
+    conversationDb.importLegacyConversations(convos);
+    return true;
+  });
 
   ipcMain.handle("agent:abort", async () => {
     if (activeAgent) {

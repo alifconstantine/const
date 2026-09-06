@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   ConstLogoIcon,
   Avatar,
@@ -10,6 +10,14 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   ScrollArea,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  Button,
+  Input,
 } from "@const/ui";
 import {
   PanelLeftClose,
@@ -30,16 +38,26 @@ import {
   ChevronsDownUp,
   SlidersHorizontal,
   Archive,
+  ArchiveRestore,
   Settings,
   LogOut,
   ArrowLeftRight,
   User as UserIcon,
   ChevronsUpDown,
   Plus,
+  Pin,
+  MoreHorizontal,
+  Pencil,
+  Trash2,
+  X,
 } from "lucide-react";
 import {
   type ConversationItem,
   formatRelativeTime,
+  loadArchivedConversations,
+  unarchiveConversation,
+  setProjectPinned,
+  getPinnedProjects,
 } from "../lib/conversation-store";
 
 export interface UserProfile {
@@ -54,12 +72,15 @@ interface SidebarProps {
   onSignOut: () => void;
   onSwitchAccount?: () => void;
   onCollapse: () => void;
-  onNewChat?: () => void;
+  onNewChat?: (project?: string) => void;
   onNewChatOutside?: () => void;
   conversations?: ConversationItem[];
   activeConversationId?: string;
   onSelectConversation?: (id: string) => void;
   onDeleteConversation?: (id: string) => void;
+  onRenameConversation?: (id: string, newTitle: string) => void;
+  onArchiveConversation?: (id: string) => void;
+  onUnarchiveConversation?: (id: string) => void;
   onOpenSettings?: () => void;
 }
 
@@ -103,6 +124,9 @@ export function Sidebar({
   activeConversationId,
   onSelectConversation,
   onDeleteConversation,
+  onRenameConversation,
+  onArchiveConversation,
+  onUnarchiveConversation,
   onOpenSettings,
 }: SidebarProps) {
   const [activeTab, setActiveTab] = useState<"project" | "design" | "outside">("project");
@@ -123,6 +147,104 @@ export function Sidebar({
       return [];
     }
   });
+
+  // Pinned projects state (persisted to SQLite disk and localStorage)
+  const [pinnedProjects, setPinnedProjects] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem("const_harness_pinned_projects");
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  useEffect(() => {
+    getPinnedProjects().then((pins) => {
+      if (Array.isArray(pins) && pins.length > 0) {
+        setPinnedProjects(pins);
+        localStorage.setItem("const_harness_pinned_projects", JSON.stringify(pins));
+      }
+    });
+  }, []);
+
+  const togglePinProject = (projectName: string) => {
+    setPinnedProjects((prev) => {
+      const isPinned = prev.includes(projectName);
+      const next = isPinned ? prev.filter((p) => p !== projectName) : [...prev, projectName];
+      localStorage.setItem("const_harness_pinned_projects", JSON.stringify(next));
+      setProjectPinned(projectName, !isPinned);
+      return next;
+    });
+  };
+
+  // State to track which conversation item's 3-dots dropdown menu is open
+  const [openMenuConvoId, setOpenMenuConvoId] = useState<string | null>(null);
+
+  // Archive Modal State
+  const [isArchiveModalOpen, setIsArchiveModalOpen] = useState(false);
+  const [archivedSessions, setArchivedSessions] = useState<ConversationItem[]>([]);
+  const [archiveSearchQuery, setArchiveSearchQuery] = useState("");
+  const [isArchiveLoading, setIsArchiveLoading] = useState(false);
+
+  const handleOpenArchiveModal = async () => {
+    setIsArchiveModalOpen(true);
+    setArchiveSearchQuery("");
+    setIsArchiveLoading(true);
+    try {
+      const list = await loadArchivedConversations();
+      setArchivedSessions(list);
+    } finally {
+      setIsArchiveLoading(false);
+    }
+  };
+
+  const handleUnarchiveSession = async (id: string) => {
+    await unarchiveConversation(id);
+    onUnarchiveConversation?.(id);
+    setArchivedSessions((prev) => prev.filter((c) => c.id !== id));
+  };
+
+  // Rename Modal State
+  const [renameTarget, setRenameTarget] = useState<ConversationItem | null>(null);
+  const [renameDraft, setRenameDraft] = useState("");
+
+  const handleOpenRename = (convo: ConversationItem) => {
+    setRenameTarget(convo);
+    setRenameDraft(convo.title || "");
+  };
+
+  const handleConfirmRename = () => {
+    if (renameTarget && renameDraft.trim()) {
+      onRenameConversation?.(renameTarget.id, renameDraft.trim());
+    }
+    setRenameTarget(null);
+    setRenameDraft("");
+  };
+
+  // Delete Modal State
+  const [deleteTarget, setDeleteTarget] = useState<ConversationItem | null>(null);
+
+  const handleOpenDelete = (convo: ConversationItem) => {
+    setDeleteTarget(convo);
+  };
+
+  const handleConfirmDelete = () => {
+    if (deleteTarget) {
+      onDeleteConversation?.(deleteTarget.id);
+      setArchivedSessions((prev) => prev.filter((c) => c.id !== deleteTarget.id));
+    }
+    setDeleteTarget(null);
+  };
+
+  const filteredArchivedSessions = useMemo(() => {
+    if (!archiveSearchQuery.trim()) return archivedSessions;
+    const q = archiveSearchQuery.toLowerCase();
+    return archivedSessions.filter(
+      (c) =>
+        (c.title && c.title.toLowerCase().includes(q)) ||
+        (c.project && c.project.toLowerCase().includes(q))
+    );
+  }, [archivedSessions, archiveSearchQuery]);
 
   const [draggedProjectIndex, setDraggedProjectIndex] = useState<number | null>(null);
   const [dragOverProjectIndex, setDragOverProjectIndex] = useState<number | null>(null);
@@ -182,12 +304,17 @@ export function Sidebar({
       }
     }
 
+    // Pinned projects always come first!
+    const pinned = ordered.filter((k) => pinnedProjects.includes(k));
+    const unpinned = ordered.filter((k) => !pinnedProjects.includes(k));
+    const finalOrdered = [...pinned, ...unpinned];
+
     return {
       projectMap: pMap,
       outsideConversations: outside,
-      sortedProjectKeys: ordered,
+      sortedProjectKeys: finalOrdered,
     };
-  }, [conversations, projectOrder]);
+  }, [conversations, projectOrder, pinnedProjects]);
 
   const toggleCollapseAllProjects = () => {
     setIsProjectsSectionCollapsed((prev) => {
@@ -298,7 +425,7 @@ export function Sidebar({
           {/* New Task / Chat */}
           <button
             type="button"
-            onClick={onNewChat}
+            onClick={() => onNewChat?.()}
             className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[#d4d4d4] hover:bg-[#383838] hover:text-white transition-colors cursor-pointer"
           >
             <MessageCirclePlus className="w-4 h-4 text-[#d4d4d4]" />
@@ -440,9 +567,10 @@ export function Sidebar({
               </button>
               <button
                 type="button"
+                onClick={handleOpenArchiveModal}
                 className="p-1 rounded-md hover:bg-[#383838] hover:text-white transition-colors cursor-pointer"
-                title="Archive"
-                aria-label="Archive"
+                title="Archived sessions"
+                aria-label="Archived sessions"
               >
                 <Archive className="w-3.5 h-3.5" />
               </button>
@@ -540,44 +668,162 @@ export function Sidebar({
                               }`}
                             >
                               {/* Collapsible Project / Group Header */}
-                              <button
-                                type="button"
-                                onClick={() => toggleFolder(projectName)}
-                                className="w-full flex items-center gap-2 px-2.5 py-1 text-[13px] font-medium text-[#d4d4d4] hover:text-white transition-colors cursor-grab active:cursor-grabbing text-left group select-none"
+                              <div
+                                className="relative w-full flex items-center justify-between px-2 py-1 rounded-lg text-[13px] font-medium text-[#d4d4d4] hover:text-white transition-colors group/folder select-none hover:bg-white/5"
                                 title={`Drag to reorder • ${projectName}`}
                               >
-                                {isCollapsed ? (
-                                  <Folder className="w-4 h-4 text-[#777777] group-hover:text-[#d4d4d4] shrink-0" />
-                                ) : (
-                                  <FolderOpen className="w-4 h-4 text-[#777777] group-hover:text-[#d4d4d4] shrink-0" />
-                                )}
-                                <span className="truncate">{getProjectDisplayName(projectName)}</span>
-                              </button>
+                                <button
+                                  type="button"
+                                  onClick={() => toggleFolder(projectName)}
+                                  className="w-full flex items-center gap-2 min-w-0 pr-14 cursor-pointer text-left cursor-grab active:cursor-grabbing"
+                                >
+                                  {isCollapsed ? (
+                                    <Folder className="w-4 h-4 text-[#777777] group-hover/folder:text-[#d4d4d4] shrink-0" />
+                                  ) : (
+                                    <FolderOpen className="w-4 h-4 text-[#777777] group-hover/folder:text-[#d4d4d4] shrink-0" />
+                                  )}
+                                  <span className="truncate">{getProjectDisplayName(projectName)}</span>
+                                </button>
+
+                                {/* Action icons on hover: Pin (left of plus) and MessageCirclePlus */}
+                                <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5 z-10">
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      togglePinProject(projectName);
+                                    }}
+                                    className={`p-1 rounded hover:bg-[#383838] transition-colors cursor-pointer ${
+                                      pinnedProjects.includes(projectName)
+                                        ? "text-white opacity-100"
+                                        : "text-[#888888] hover:text-white opacity-0 group-hover/folder:opacity-100"
+                                    }`}
+                                    title={pinnedProjects.includes(projectName) ? "Unpin project" : "Pin project"}
+                                    aria-label="Pin project"
+                                  >
+                                    <Pin
+                                      className={`w-3.5 h-3.5 ${
+                                        pinnedProjects.includes(projectName)
+                                          ? "fill-current text-[#d4d4d4] rotate-45"
+                                          : ""
+                                      }`}
+                                    />
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onNewChat?.(projectName);
+                                    }}
+                                    className="p-1 rounded hover:bg-[#383838] text-[#888888] hover:text-white transition-colors cursor-pointer opacity-0 group-hover/folder:opacity-100"
+                                    title={`New task in ${getProjectDisplayName(projectName)}`}
+                                    aria-label="New chat in this project"
+                                  >
+                                    <MessageCirclePlus className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              </div>
 
                               {/* Task / Conversation Items inside Project */}
                               {!isCollapsed && (
                                 <div className="flex flex-col gap-0.5 pl-1">
                                   {items.map((convo) => {
                                     const isActive = convo.id === activeConversationId;
+                                    const isMenuOpen = openMenuConvoId === convo.id;
                                     return (
-                                      <button
+                                      <div
                                         key={convo.id}
-                                        type="button"
                                         onClick={() => onSelectConversation?.(convo.id)}
-                                        className={`w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg text-[13px] transition-colors cursor-pointer group text-left ${
+                                        className={`relative w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[13px] transition-colors cursor-pointer group/chat text-left overflow-hidden ${
                                           isActive
                                             ? "bg-[#383838] text-white font-medium shadow-xs"
                                             : "text-[#d4d4d4] hover:text-white hover:bg-white/5"
                                         }`}
-                                        title={convo.title}
                                       >
-                                        <span className="truncate font-normal">
+                                        <span className="truncate font-normal flex-1 pr-14" title={convo.title}>
                                           {convo.title || "Untitled task"}
                                         </span>
-                                        <span className="text-xs text-[#888888] font-mono shrink-0 ml-1">
+
+                                        <span
+                                          className={`absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-[#888888] font-mono pointer-events-none transition-opacity duration-150 ${
+                                            isMenuOpen ? "opacity-0" : "group-hover/chat:opacity-0"
+                                          }`}
+                                        >
                                           {formatRelativeTime(convo.updatedAt || convo.createdAt)}
                                         </span>
-                                      </button>
+
+                                        <div
+                                          className={`absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5 pl-1.5 py-0.5 rounded-md transition-opacity duration-150 z-10 ${
+                                            isMenuOpen
+                                              ? "opacity-100 pointer-events-auto bg-[#383838]"
+                                              : "opacity-0 pointer-events-none group-hover/chat:opacity-100 group-hover/chat:pointer-events-auto"
+                                          }`}
+                                        >
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              onArchiveConversation?.(convo.id);
+                                            }}
+                                            className="p-1 rounded hover:bg-[#484848] text-[#969696] hover:text-white transition-colors cursor-pointer"
+                                            title="Archive task"
+                                            aria-label="Archive task"
+                                          >
+                                            <Archive className="w-3.5 h-3.5" />
+                                          </button>
+
+                                          <DropdownMenu
+                                            open={isMenuOpen}
+                                            onOpenChange={(open) => setOpenMenuConvoId(open ? convo.id : null)}
+                                          >
+                                            <DropdownMenuTrigger asChild>
+                                              <button
+                                                type="button"
+                                                onClick={(e) => e.stopPropagation()}
+                                                className={`p-1 rounded transition-colors cursor-pointer outline-none ${
+                                                  isMenuOpen
+                                                    ? "bg-[#484848] text-white"
+                                                    : "hover:bg-[#484848] text-[#969696] hover:text-white"
+                                                }`}
+                                                title="More actions"
+                                                aria-label="More actions"
+                                              >
+                                                <MoreHorizontal className="w-3.5 h-3.5" />
+                                              </button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent
+                                              side="bottom"
+                                              align="end"
+                                              sideOffset={4}
+                                              className="w-36 bg-[#222222] border-[#383838] text-[#d4d4d4] p-1 rounded-xl shadow-xl z-50 text-xs"
+                                            >
+                                              <DropdownMenuItem
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  setOpenMenuConvoId(null);
+                                                  handleOpenRename(convo);
+                                                }}
+                                                className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer hover:bg-[#303030] text-[#d4d4d4] hover:text-white"
+                                              >
+                                                <Pencil className="w-3.5 h-3.5" />
+                                                <span>Rename</span>
+                                              </DropdownMenuItem>
+                                              <DropdownMenuItem
+                                                onClick={(e) => {
+                                                  e.stopPropagation();
+                                                  setOpenMenuConvoId(null);
+                                                  handleOpenDelete(convo);
+                                                }}
+                                                className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer hover:bg-red-500/10 text-red-400 hover:text-red-300"
+                                              >
+                                                <Trash2 className="w-3.5 h-3.5" />
+                                                <span>Delete</span>
+                                              </DropdownMenuItem>
+                                            </DropdownMenuContent>
+                                          </DropdownMenu>
+                                        </div>
+                                      </div>
                                     );
                                   })}
                                 </div>
@@ -641,25 +887,100 @@ export function Sidebar({
                         ) : (
                           outsideConversations.map((convo) => {
                             const isActive = convo.id === activeConversationId;
+                            const isMenuOpen = openMenuConvoId === convo.id;
                             return (
-                              <button
+                              <div
                                 key={convo.id}
-                                type="button"
                                 onClick={() => onSelectConversation?.(convo.id)}
-                                className={`w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg text-[13px] transition-colors cursor-pointer group text-left ${
+                                className={`relative w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-[13px] transition-colors cursor-pointer group/chat text-left overflow-hidden ${
                                   isActive
                                     ? "bg-[#383838] text-white font-medium shadow-xs"
                                     : "text-[#d4d4d4] hover:text-white hover:bg-white/5"
                                 }`}
-                                title={convo.title}
                               >
-                                <span className="truncate font-normal">
+                                <span className="truncate font-normal flex-1 pr-14" title={convo.title}>
                                   {convo.title || "Untitled task"}
                                 </span>
-                                <span className="text-xs text-[#888888] font-mono shrink-0 ml-1">
+
+                                <span
+                                  className={`absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-[#888888] font-mono pointer-events-none transition-opacity duration-150 ${
+                                    isMenuOpen ? "opacity-0" : "group-hover/chat:opacity-0"
+                                  }`}
+                                >
                                   {formatRelativeTime(convo.updatedAt || convo.createdAt)}
                                 </span>
-                              </button>
+
+                                <div
+                                  className={`absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5 pl-1.5 py-0.5 rounded-md transition-opacity duration-150 z-10 ${
+                                    isMenuOpen
+                                      ? "opacity-100 pointer-events-auto bg-[#383838]"
+                                      : "opacity-0 pointer-events-none group-hover/chat:opacity-100 group-hover/chat:pointer-events-auto"
+                                  }`}
+                                >
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onArchiveConversation?.(convo.id);
+                                    }}
+                                    className="p-1 rounded hover:bg-[#484848] text-[#969696] hover:text-white transition-colors cursor-pointer"
+                                    title="Archive task"
+                                    aria-label="Archive task"
+                                  >
+                                    <Archive className="w-3.5 h-3.5" />
+                                  </button>
+
+                                  <DropdownMenu
+                                    open={isMenuOpen}
+                                    onOpenChange={(open) => setOpenMenuConvoId(open ? convo.id : null)}
+                                  >
+                                    <DropdownMenuTrigger asChild>
+                                      <button
+                                        type="button"
+                                        onClick={(e) => e.stopPropagation()}
+                                        className={`p-1 rounded transition-colors cursor-pointer outline-none ${
+                                          isMenuOpen
+                                            ? "bg-[#484848] text-white"
+                                            : "hover:bg-[#484848] text-[#969696] hover:text-white"
+                                        }`}
+                                        title="More actions"
+                                        aria-label="More actions"
+                                      >
+                                        <MoreHorizontal className="w-3.5 h-3.5" />
+                                      </button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent
+                                      side="bottom"
+                                      align="end"
+                                      sideOffset={4}
+                                      className="w-36 bg-[#222222] border-[#383838] text-[#d4d4d4] p-1 rounded-xl shadow-xl z-50 text-xs"
+                                    >
+                                      <DropdownMenuItem
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setOpenMenuConvoId(null);
+                                          handleOpenRename(convo);
+                                        }}
+                                        className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer hover:bg-[#303030] text-[#d4d4d4] hover:text-white"
+                                      >
+                                        <Pencil className="w-3.5 h-3.5" />
+                                        <span>Rename</span>
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setOpenMenuConvoId(null);
+                                          handleOpenDelete(convo);
+                                        }}
+                                        className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer hover:bg-red-500/10 text-red-400 hover:text-red-300"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                        <span>Delete</span>
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </div>
+                              </div>
                             );
                           })
                         )}
@@ -761,6 +1082,207 @@ export function Sidebar({
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
+      {/* 1. Archived Sessions Modal (matching const-harness) */}
+      <Dialog open={isArchiveModalOpen} onOpenChange={setIsArchiveModalOpen}>
+        <DialogContent className="max-w-md bg-[#1e1e1e] border border-[#383838] text-[#d4d4d4] p-0 rounded-2xl shadow-2xl overflow-hidden duration-0 data-[state=open]:animate-none data-[state=closed]:animate-none">
+          <DialogHeader className="px-5 pt-4 pb-3 border-b border-[#333333]">
+            <DialogTitle className="text-sm font-semibold flex items-center gap-2 text-white">
+              <Archive className="w-4 h-4 text-[#888888]" />
+              <span>Archived Sessions</span>
+              {archivedSessions.length > 0 && (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-[#2a2a2a] text-[#888888] font-mono">
+                  {archivedSessions.length}
+                </span>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="p-4 flex flex-col gap-3">
+            {archivedSessions.length > 0 && (
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-[#777777] absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  value={archiveSearchQuery}
+                  onChange={(e) => setArchiveSearchQuery(e.target.value)}
+                  placeholder="Search archived sessions..."
+                  className="w-full pl-9 pr-8 py-1.5 text-xs bg-[#282828] border border-[#383838] rounded-lg text-[#d4d4d4] placeholder-[#777777] focus:outline-none focus:border-[#555555]"
+                />
+                {archiveSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setArchiveSearchQuery("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#777777] hover:text-white p-0.5"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            )}
+
+            <div className="max-h-80 overflow-y-auto flex flex-col gap-1 pr-1">
+              {isArchiveLoading ? (
+                <div className="py-8 text-center text-xs text-[#777777]">Loading archived sessions...</div>
+              ) : archivedSessions.length === 0 ? (
+                <div className="py-12 flex flex-col items-center justify-center gap-2 text-[#777777]">
+                  <Archive className="w-8 h-8 opacity-40" />
+                  <span className="text-xs">No archived conversations</span>
+                </div>
+              ) : filteredArchivedSessions.length === 0 ? (
+                <div className="py-8 text-center text-xs text-[#777777]">No matching archived conversations</div>
+              ) : (
+                filteredArchivedSessions.map((convo) => (
+                  <div
+                    key={convo.id}
+                    className="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-[#242424] hover:bg-[#2c2c2c] border border-transparent hover:border-[#383838] transition-all group"
+                  >
+                    <div className="min-w-0 flex-1 flex flex-col gap-0.5">
+                      <span className="text-xs font-medium text-[#d4d4d4] truncate">
+                        {convo.title || "Untitled task"}
+                      </span>
+                      <div className="flex items-center gap-2 text-[11px] text-[#777777]">
+                        <span className="truncate max-w-[120px]">
+                          {getProjectDisplayName(convo.project)}
+                        </span>
+                        <span>•</span>
+                        <span>{formatRelativeTime(convo.updatedAt || convo.createdAt)}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setIsArchiveModalOpen(false);
+                          onSelectConversation?.(convo.id);
+                        }}
+                        className="h-7 px-2.5 text-xs bg-[#2b2b2b] border-[#383838] hover:bg-[#383838] text-[#d4d4d4] hover:text-white"
+                      >
+                        Open
+                      </Button>
+
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button
+                            type="button"
+                            className="p-1.5 rounded-lg hover:bg-[#383838] text-[#888888] hover:text-white transition-colors cursor-pointer outline-none"
+                            title="More actions"
+                          >
+                            <MoreHorizontal className="w-3.5 h-3.5" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent
+                          align="end"
+                          className="w-40 bg-[#222222] border-[#383838] text-[#d4d4d4] p-1 rounded-xl shadow-xl z-50 text-xs"
+                        >
+                          <DropdownMenuItem
+                            onClick={() => handleUnarchiveSession(convo.id)}
+                            className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer hover:bg-[#303030] text-[#d4d4d4] hover:text-white"
+                          >
+                            <ArchiveRestore className="w-3.5 h-3.5" />
+                            <span>Unarchive session</span>
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => handleOpenDelete(convo)}
+                            className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer hover:bg-red-500/10 text-red-400 hover:text-red-300"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            <span>Delete session</span>
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 2. Rename Task Dialog */}
+      <Dialog open={renameTarget !== null} onOpenChange={(open) => !open && setRenameTarget(null)}>
+        <DialogContent className="max-w-sm bg-[#1e1e1e] border border-[#383838] text-[#d4d4d4] p-5 rounded-2xl shadow-2xl duration-0 data-[state=open]:animate-none data-[state=closed]:animate-none">
+          <DialogHeader>
+            <DialogTitle className="text-sm font-semibold text-white">Rename Task</DialogTitle>
+            <DialogDescription className="text-xs text-[#777777]">
+              Enter a new title for this conversation.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-3">
+            <Input
+              value={renameDraft}
+              onChange={(e) => setRenameDraft(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  handleConfirmRename();
+                }
+              }}
+              autoFocus
+              placeholder="Conversation title..."
+              className="bg-[#282828] border-[#383838] text-white text-xs focus-visible:ring-1 focus-visible:ring-[#555555]"
+            />
+          </div>
+
+          <DialogFooter className="flex items-center justify-end gap-2 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setRenameTarget(null)}
+              className="bg-transparent border-[#383838] text-xs hover:bg-[#303030] text-[#d4d4d4]"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleConfirmRename}
+              disabled={!renameDraft.trim()}
+              className="bg-white hover:bg-zinc-200 text-black text-xs font-medium"
+            >
+              Save
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 3. Delete Confirmation Dialog */}
+      <Dialog open={deleteTarget !== null} onOpenChange={(open) => !open && setDeleteTarget(null)}>
+        <DialogContent className="max-w-sm bg-[#1e1e1e] border border-[#383838] text-[#d4d4d4] p-5 rounded-2xl shadow-2xl duration-0 data-[state=open]:animate-none data-[state=closed]:animate-none">
+          <DialogHeader>
+            <DialogTitle className="text-sm font-semibold text-white">Delete Task</DialogTitle>
+            <DialogDescription className="text-xs text-[#999999] pt-1">
+              Are you sure you want to permanently delete{" "}
+              <span className="text-white font-medium">"{deleteTarget?.title || "Untitled task"}"</span>? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+
+          <DialogFooter className="flex items-center justify-end gap-2 pt-4">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setDeleteTarget(null)}
+              className="bg-transparent border-[#383838] text-xs hover:bg-[#303030] text-[#d4d4d4]"
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              onClick={handleConfirmDelete}
+              className="bg-red-600 hover:bg-red-700 text-white text-xs font-medium"
+            >
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </aside>
   );
 }
