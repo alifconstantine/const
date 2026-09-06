@@ -15,6 +15,7 @@ import {
 } from "@const/ui";
 import { Copy, Check, Code2, X } from "lucide-react";
 import { type ChatMessage } from "./chat-message-item";
+import { CodeBlock } from "./markdown-content";
 
 interface ViewCodeDialogProps {
   open: boolean;
@@ -214,22 +215,16 @@ main().catch(console.error);
           </div>
 
           <div className="flex-1 overflow-auto p-4 sm:p-6 bg-secondary/10">
-            <TabsContent value="curl" className="mt-0 h-full">
-              <pre className="p-4 rounded-2xl bg-zinc-950 text-zinc-100 font-mono text-xs overflow-x-auto leading-relaxed border border-border/60">
-                <code>{curlCode}</code>
-              </pre>
+            <TabsContent value="curl" className="mt-0">
+              <CodeBlock code={curlCode} language="bash" className="my-0" />
             </TabsContent>
 
-            <TabsContent value="python" className="mt-0 h-full">
-              <pre className="p-4 rounded-2xl bg-zinc-950 text-zinc-100 font-mono text-xs overflow-x-auto leading-relaxed border border-border/60">
-                <code>{pythonCode}</code>
-              </pre>
+            <TabsContent value="python" className="mt-0">
+              <CodeBlock code={pythonCode} language="python" className="my-0" />
             </TabsContent>
 
-            <TabsContent value="typescript" className="mt-0 h-full">
-              <pre className="p-4 rounded-2xl bg-zinc-950 text-zinc-100 font-mono text-xs overflow-x-auto leading-relaxed border border-border/60">
-                <code>{tsCode}</code>
-              </pre>
+            <TabsContent value="typescript" className="mt-0">
+              <CodeBlock code={tsCode} language="typescript" className="my-0" />
             </TabsContent>
           </div>
         </Tabs>

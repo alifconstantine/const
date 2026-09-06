@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Button, cn, toast } from "@const/ui";
 import { Copy, Check, ChevronDown, ChevronRight, Pencil, FileText, Film, Music, File } from "lucide-react";
+import { MarkdownContent } from "./markdown-content";
 
 export interface ChatAttachment {
   name: string;
@@ -181,10 +182,13 @@ export function ChatMessageItem({
         </div>
       )}
 
-      {/* Main Response Text Content (Frameless, clean typography) */}
+      {/* Main Response Text Content (Frameless, clean typography with Markdown formatting) */}
       {message.content ? (
-        <div className="text-sm sm:text-base font-sans text-foreground leading-relaxed whitespace-pre-wrap break-words selection:bg-primary selection:text-primary-foreground space-y-3">
-          {message.content}
+        <div className="text-sm sm:text-base font-sans text-foreground leading-relaxed selection:bg-primary selection:text-primary-foreground">
+          <MarkdownContent
+            content={message.content}
+            isStreaming={isStreaming && isLast}
+          />
           {isStreaming && isLast && (
             <span className="inline-block w-2 h-4 ml-1 bg-foreground animate-pulse align-middle" />
           )}
