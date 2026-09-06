@@ -67,9 +67,13 @@ export default function DashboardLayout({
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated && !isSigningOut) {
-      signIn("/dashboard");
+      const destination =
+        typeof window !== "undefined"
+          ? `${window.location.pathname}${window.location.search || ""}`
+          : pathname || "/dashboard";
+      signIn(destination);
     }
-  }, [isLoading, isAuthenticated, isSigningOut, signIn]);
+  }, [isLoading, isAuthenticated, isSigningOut, signIn, pathname]);
 
   useEffect(() => {
     if (isAuthenticated && user === null && !isSigningOut) {
@@ -77,18 +81,22 @@ export default function DashboardLayout({
         setHasAttemptedRefresh(true);
         void refreshSession().then((refreshed) => {
           if (!refreshed) {
+            const destination =
+              typeof window !== "undefined"
+                ? `${window.location.pathname}${window.location.search || ""}`
+                : pathname || "/dashboard";
             toast.error("Session Reconnect Needed", {
               description: "Could not restore session. Please sign in again.",
               action: {
                 label: "Sign In",
-                onClick: () => signIn("/dashboard"),
+                onClick: () => signIn(destination),
               },
             });
           }
         });
       }
     }
-  }, [isAuthenticated, user, isSigningOut, hasAttemptedRefresh, refreshSession, signIn]);
+  }, [isAuthenticated, user, isSigningOut, hasAttemptedRefresh, refreshSession, signIn, pathname]);
 
   // Unauthenticated / Signing Out Fallback
   if (!isLoading && !isAuthenticated) {

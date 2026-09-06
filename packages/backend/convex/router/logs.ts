@@ -380,6 +380,7 @@ export const getLogMetrics = query({
 export const getDashboardAnalytics = query({
   args: {
     timeRange: v.optional(v.string()), // "today", "7d", "30d", "90d", "all"
+    tzOffset: v.optional(v.number()),  // Client timezone offset in minutes (e.g. from -new Date().getTimezoneOffset())
   },
   handler: async (ctx, args) => {
     const userId = await getAuthUserId(ctx);
@@ -388,11 +389,13 @@ export const getDashboardAnalytics = query({
     }
 
     const now = Date.now();
+    const tzOffsetMinutes = typeof args.tzOffset === "number" ? args.tzOffset : 0;
+    const tzOffsetMs = tzOffsetMinutes * 60 * 1000;
+
     let startTime = 0;
     if (args.timeRange === "today") {
-      const startOfDay = new Date();
-      startOfDay.setHours(0, 0, 0, 0);
-      startTime = startOfDay.getTime();
+      // Rolling 24 hours for "today" to guarantee 24 accurate hourly buckets up to "now"
+      startTime = now - 24 * 60 * 60 * 1000;
     } else if (args.timeRange === "7d") {
       startTime = now - 7 * 24 * 60 * 60 * 1000;
     } else if (args.timeRange === "30d") {
@@ -400,6 +403,7 @@ export const getDashboardAnalytics = query({
     } else if (args.timeRange === "90d") {
       startTime = now - 90 * 24 * 60 * 60 * 1000;
     }
+    // "all" leaves startTime = 0 (all time)
 
     // 1. Fetch filtered logs for the selected timeRange
     const logsQuery = ctx.db
@@ -409,7 +413,7 @@ export const getDashboardAnalytics = query({
       )
       .order("desc");
 
-    const logs = await logsQuery.take(1000);
+    const logs = await logsQuery.take(1500);
 
     // 2. Fetch active infrastructure counts
     const apiKeys = await ctx.db
@@ -437,7 +441,7 @@ export const getDashboardAnalytics = query({
     let speedCount = 0;
 
     const modelMap = new Map<string, { requests: number; inputTokens: number; outputTokens: number; totalTokens: number }>();
-    const providerMap = new Map<string, { requests: number; totalTokens: number }>();
+    const providerMap = new Map<string, { requests: number; inputTokens: number; outputTokens: number; totalTokens: number; durationSum: number; successCount: number }>();
     const keyMap = new Map<string, { keyPrefix?: string; requests: number; totalTokens: number }>();
 
     logs.forEach((l) => {
@@ -468,9 +472,15 @@ export const getDashboardAnalytics = query({
       modelMap.set(l.model, m);
 
       // Group by provider
-      const p = providerMap.get(l.provider) || { requests: 0, totalTokens: 0 };
+      const p = providerMap.get(l.provider) || { requests: 0, inputTokens: 0, outputTokens: 0, totalTokens: 0, durationSum: 0, successCount: 0 };
       p.requests++;
+      p.inputTokens += l.promptTokens;
+      p.outputTokens += l.completionTokens;
       p.totalTokens += l.totalTokens;
+      p.durationSum += l.durationMs;
+      if (l.status >= 200 && l.status < 300) {
+        p.successCount++;
+      }
       providerMap.set(l.provider, p);
 
       // Group by API key
@@ -505,7 +515,11 @@ export const getDashboardAnalytics = query({
       .map(([provider, data]) => ({
         provider,
         requests: data.requests,
+        inputTokens: data.inputTokens,
+        outputTokens: data.outputTokens,
         totalTokens: data.totalTokens,
+        avgDurationMs: data.requests > 0 ? Math.round(data.durationSum / data.requests) : 0,
+        successRate: data.requests > 0 ? Math.round((data.successCount / data.requests) * 100) : 100,
         sharePercent: totalTokens > 0 ? parseFloat(((data.totalTokens / totalTokens) * 100).toFixed(1)) : 0,
       }))
       .sort((a, b) => b.totalTokens - a.totalTokens);
@@ -524,38 +538,60 @@ export const getDashboardAnalytics = query({
     // 4. Build Timeline Buckets for Usage Trend
     const timeline: Array<{ label: string; totalTokens: number; promptTokens: number; completionTokens: number; requests: number }> = [];
     if (args.timeRange === "today") {
-      for (let h = 0; h < 24; h++) {
-        const hourLabel = `${String(h).padStart(2, "0")}:00`;
+      // 24 hourly buckets from 23 hours ago up to the current hour ("Now")
+      for (let i = 23; i >= 0; i--) {
+        const bucketTime = now - i * 60 * 60 * 1000;
+        const localD = new Date(bucketTime - tzOffsetMs);
+        const hourLabel = `${String(localD.getUTCHours()).padStart(2, "0")}:00`;
         timeline.push({ label: hourLabel, totalTokens: 0, promptTokens: 0, completionTokens: 0, requests: 0 });
       }
+
       logs.forEach((l) => {
-        const hour = new Date(l.createdAt).getHours();
-        if (timeline[hour]) {
-          timeline[hour].totalTokens += l.totalTokens;
-          timeline[hour].promptTokens += l.promptTokens;
-          timeline[hour].completionTokens += l.completionTokens;
-          timeline[hour].requests++;
+        const diffMs = now - l.createdAt;
+        if (diffMs >= 0 && diffMs < 24 * 60 * 60 * 1000) {
+          const hoursAgo = Math.floor(diffMs / (60 * 60 * 1000));
+          const bucketIndex = 23 - hoursAgo;
+          if (timeline[bucketIndex]) {
+            timeline[bucketIndex].totalTokens += l.totalTokens;
+            timeline[bucketIndex].promptTokens += l.promptTokens;
+            timeline[bucketIndex].completionTokens += l.completionTokens;
+            timeline[bucketIndex].requests++;
+          }
         }
       });
     } else {
-      const daysCount = args.timeRange === "7d" ? 7 : args.timeRange === "90d" ? 90 : 30;
+      let daysCount = 30;
+      if (args.timeRange === "7d") {
+        daysCount = 7;
+      } else if (args.timeRange === "90d") {
+        daysCount = 90;
+      } else if (args.timeRange === "all") {
+        if (logs.length > 0) {
+          const oldestLog = logs[logs.length - 1];
+          const daysSpan = Math.ceil((now - (oldestLog?.createdAt || now)) / (24 * 60 * 60 * 1000));
+          daysCount = Math.max(7, Math.min(180, daysSpan + 1));
+        } else {
+          daysCount = 30;
+        }
+      }
+
       const dayMap = new Map<string, { label: string; totalTokens: number; promptTokens: number; completionTokens: number; requests: number }>();
       
       for (let i = daysCount - 1; i >= 0; i--) {
-        const d = new Date(now - i * 24 * 60 * 60 * 1000);
-        const yyyy = d.getFullYear();
-        const mm = String(d.getMonth() + 1).padStart(2, "0");
-        const dd = String(d.getDate()).padStart(2, "0");
+        const d = new Date(now - i * 24 * 60 * 60 * 1000 - tzOffsetMs);
+        const yyyy = d.getUTCFullYear();
+        const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+        const dd = String(d.getUTCDate()).padStart(2, "0");
         const key = `${yyyy}-${mm}-${dd}`;
         const label = `${mm}/${dd}`;
         dayMap.set(key, { label, totalTokens: 0, promptTokens: 0, completionTokens: 0, requests: 0 });
       }
 
       logs.forEach((l) => {
-        const d = new Date(l.createdAt);
-        const yyyy = d.getFullYear();
-        const mm = String(d.getMonth() + 1).padStart(2, "0");
-        const dd = String(d.getDate()).padStart(2, "0");
+        const d = new Date(l.createdAt - tzOffsetMs);
+        const yyyy = d.getUTCFullYear();
+        const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+        const dd = String(d.getUTCDate()).padStart(2, "0");
         const key = `${yyyy}-${mm}-${dd}`;
         const item = dayMap.get(key);
         if (item) {
@@ -582,10 +618,10 @@ export const getDashboardAnalytics = query({
     let mostActiveDay = { date: "—", tokens: 0, requests: 0 };
 
     yearLogs.forEach((l) => {
-      const d = new Date(l.createdAt);
-      const yyyy = d.getFullYear();
-      const mm = String(d.getMonth() + 1).padStart(2, "0");
-      const dd = String(d.getDate()).padStart(2, "0");
+      const d = new Date(l.createdAt - tzOffsetMs);
+      const yyyy = d.getUTCFullYear();
+      const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+      const dd = String(d.getUTCDate()).padStart(2, "0");
       const dateKey = `${yyyy}-${mm}-${dd}`;
       const entry = heatmapMap.get(dateKey) || { count: 0, tokens: 0 };
       entry.count++;
@@ -600,10 +636,10 @@ export const getDashboardAnalytics = query({
 
     const dailyHeatmap: Array<{ date: string; count: number; tokens: number; level: 0 | 1 | 2 | 3 | 4 }> = [];
     for (let i = 363; i >= 0; i--) {
-      const d = new Date(now - i * 24 * 60 * 60 * 1000);
-      const yyyy = d.getFullYear();
-      const mm = String(d.getMonth() + 1).padStart(2, "0");
-      const dd = String(d.getDate()).padStart(2, "0");
+      const d = new Date(now - i * 24 * 60 * 60 * 1000 - tzOffsetMs);
+      const yyyy = d.getUTCFullYear();
+      const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
+      const dd = String(d.getUTCDate()).padStart(2, "0");
       const dateKey = `${yyyy}-${mm}-${dd}`;
       const data = heatmapMap.get(dateKey) || { count: 0, tokens: 0 };
 

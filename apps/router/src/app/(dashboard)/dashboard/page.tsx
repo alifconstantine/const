@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouterAuth } from "@/components/providers/convex-client-provider";
 import { useQuery } from "convex/react";
 import { api } from "@const/backend/_generated/api";
-import { CliQuotaCard } from "@/components/dashboard/cli-quota-card";
+import { QuotaCard } from "@/components/dashboard/quota-card";
 import {
   Card,
   Button,
@@ -40,6 +40,7 @@ import {
   ShieldCheck,
   CalendarDays,
   Activity,
+  Cpu,
 } from "lucide-react";
 
 function formatTokens(tokens?: number): string {
@@ -78,10 +79,36 @@ export default function DashboardOverviewPage() {
   const activeKey = keys?.find((k) => k.status === "active");
 
   const [timeRange, setTimeRange] = useState<TimeRangeOption>("7d");
+  const tzOffset = useMemo(() => {
+    return typeof window !== "undefined" ? new Date().getTimezoneOffset() : 0;
+  }, []);
+
   const analytics = useQuery(
     api.router.logs.getDashboardAnalytics,
-    isAuthenticated ? { timeRange } : "skip"
+    isAuthenticated ? { timeRange, tzOffset } : "skip"
   );
+
+  const timeRangeLabel = useMemo(() => {
+    switch (timeRange) {
+      case "today": return "Today (24h)";
+      case "7d": return "Past 7 Days";
+      case "30d": return "Past 30 Days";
+      case "90d": return "Past 90 Days";
+      case "all": return "All Time";
+      default: return timeRange;
+    }
+  }, [timeRange]);
+
+  const startRangeLabel = useMemo(() => {
+    switch (timeRange) {
+      case "today": return "24h ago";
+      case "7d": return "7 days ago";
+      case "30d": return "30 days ago";
+      case "90d": return "90 days ago";
+      case "all": return "Earliest log";
+      default: return "Start";
+    }
+  }, [timeRange]);
 
   const [copiedEndpoint, setCopiedEndpoint] = useState(false);
   const [copiedModel, setCopiedModel] = useState(false);
@@ -273,153 +300,158 @@ export default function DashboardOverviewPage() {
         </div>
       </div>
 
-      {/* Weekly Const Quota CLI Telemetry Card */}
-      <CliQuotaCard />
-
-      {/* 2. Top KPI Cards (4 Cards - Pure Token & Performance Accounting) */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Card 1: Total Tokens */}
-        <Card className="rounded-3xl border-border/70 bg-card p-5 transition-colors">
-          <div className="flex items-center justify-between pb-3">
-            <span className="text-xs text-muted-foreground font-medium font-sans">
-              Total Tokens
-            </span>
-            <div className="h-8 w-8 rounded-xl bg-secondary text-foreground flex items-center justify-center border border-border/50">
-              <Coins className="h-4 w-4 stroke-[1.75]" />
-            </div>
-          </div>
-          <div className="space-y-1">
-            {analytics ? (
-              <div className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground font-sans tabular-nums">
-                {formatTokens(analytics.kpi.totalTokens)}
+      {/* 2. Top Telemetry Section: Usage Stats (Left) + Circular Free Quota Ring (Right) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-stretch">
+        {/* Left: 4 KPI Usage Stats Cards in 2x2 grid */}
+        <div className="lg:col-span-8 xl:col-span-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Card 1: Total Tokens */}
+          <Card className="rounded-3xl border-border/70 bg-card p-5 transition-colors">
+            <div className="flex items-center justify-between pb-3">
+              <span className="text-xs text-muted-foreground font-medium font-sans">
+                Total Tokens
+              </span>
+              <div className="h-8 w-8 rounded-xl bg-secondary text-foreground flex items-center justify-center border border-border/50">
+                <Coins className="h-4 w-4 stroke-[1.75]" />
               </div>
-            ) : (
-              <Skeleton className="h-8 w-28 rounded-lg my-0.5" />
-            )}
-            {analytics ? (
-              <p className="text-xs text-muted-foreground font-light flex items-center gap-1 font-sans">
-                <span className="tabular-nums font-normal text-foreground/80">
-                  {analytics.kpi.totalRequests.toLocaleString()}
-                </span>{" "}
-                requests logged
-              </p>
-            ) : (
-              <Skeleton className="h-4 w-32 rounded mt-1" />
-            )}
-          </div>
-        </Card>
-
-        {/* Card 2: Input Tokens */}
-        <Card className="rounded-3xl border-border/70 bg-card p-5 transition-colors">
-          <div className="flex items-center justify-between pb-3">
-            <span className="text-xs text-muted-foreground font-medium font-sans">
-              Input Tokens
-            </span>
-            <div className="h-8 w-8 rounded-xl bg-secondary text-foreground flex items-center justify-center border border-border/50">
-              <Layers className="h-4 w-4 stroke-[1.75]" />
             </div>
-          </div>
-          <div className="space-y-1">
-            {analytics ? (
-              <div className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground font-sans tabular-nums">
-                {formatTokens(analytics.kpi.promptTokens)}
+            <div className="space-y-1">
+              {analytics ? (
+                <div className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground font-sans tabular-nums">
+                  {formatTokens(analytics.kpi.totalTokens)}
+                </div>
+              ) : (
+                <Skeleton className="h-8 w-28 rounded-lg my-0.5" />
+              )}
+              {analytics ? (
+                <p className="text-xs text-muted-foreground font-light flex items-center gap-1 font-sans">
+                  <span className="tabular-nums font-normal text-foreground/80">
+                    {analytics.kpi.totalRequests.toLocaleString()}
+                  </span>{" "}
+                  requests logged
+                </p>
+              ) : (
+                <Skeleton className="h-4 w-32 rounded mt-1" />
+              )}
+            </div>
+          </Card>
+
+          {/* Card 2: Input Tokens */}
+          <Card className="rounded-3xl border-border/70 bg-card p-5 transition-colors">
+            <div className="flex items-center justify-between pb-3">
+              <span className="text-xs text-muted-foreground font-medium font-sans">
+                Input Tokens
+              </span>
+              <div className="h-8 w-8 rounded-xl bg-secondary text-foreground flex items-center justify-center border border-border/50">
+                <Layers className="h-4 w-4 stroke-[1.75]" />
               </div>
-            ) : (
-              <Skeleton className="h-8 w-28 rounded-lg my-0.5" />
-            )}
-            {analytics ? (
-              <p className="text-xs text-muted-foreground font-light font-sans">
-                {analytics.kpi.cachedTokens ? (
-                  <span>
-                    incl.{" "}
-                    <strong className="font-medium text-foreground">
-                      {formatTokens(analytics.kpi.cachedTokens)}
-                    </strong>{" "}
-                    cached
-                  </span>
-                ) : (
-                  "Prompt context payload"
-                )}
-              </p>
-            ) : (
-              <Skeleton className="h-4 w-36 rounded mt-1" />
-            )}
-          </div>
-        </Card>
-
-        {/* Card 3: Output Tokens */}
-        <Card className="rounded-3xl border-border/70 bg-card p-5 transition-colors">
-          <div className="flex items-center justify-between pb-3">
-            <span className="text-xs text-muted-foreground font-medium font-sans">
-              Output Tokens
-            </span>
-            <div className="h-8 w-8 rounded-xl bg-secondary text-foreground flex items-center justify-center border border-border/50">
-              <Zap className="h-4 w-4 stroke-[1.75]" />
             </div>
-          </div>
-          <div className="space-y-1">
-            {analytics ? (
-              <div className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground font-sans tabular-nums">
-                {formatTokens(analytics.kpi.completionTokens)}
-              </div>
-            ) : (
-              <Skeleton className="h-8 w-28 rounded-lg my-0.5" />
-            )}
-            {analytics ? (
-              <p className="text-xs text-muted-foreground font-light font-sans">
-                Generated response tokens
-              </p>
-            ) : (
-              <Skeleton className="h-4 w-36 rounded mt-1" />
-            )}
-          </div>
-        </Card>
-
-        {/* Card 4: Throughput & Speed */}
-        <Card className="rounded-3xl border-border/70 bg-card p-5 transition-colors">
-          <div className="flex items-center justify-between pb-3">
-            <span className="text-xs text-muted-foreground font-medium font-sans">
-              Speed & Latency
-            </span>
-            <div className="h-8 w-8 rounded-xl bg-secondary text-foreground flex items-center justify-center border border-border/50">
-              <Gauge className="h-4 w-4 stroke-[1.75]" />
-            </div>
-          </div>
-          <div className="space-y-1">
-            {analytics ? (
-              <div className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground font-sans tabular-nums">
-                {analytics.kpi.avgSpeed ? (
-                  <>
-                    {analytics.kpi.avgSpeed}{" "}
-                    <span className="text-xs font-normal text-muted-foreground">
-                      tok/s
+            <div className="space-y-1">
+              {analytics ? (
+                <div className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground font-sans tabular-nums">
+                  {formatTokens(analytics.kpi.promptTokens)}
+                </div>
+              ) : (
+                <Skeleton className="h-8 w-28 rounded-lg my-0.5" />
+              )}
+              {analytics ? (
+                <p className="text-xs text-muted-foreground font-light font-sans">
+                  {analytics.kpi.cachedTokens ? (
+                    <span>
+                      incl.{" "}
+                      <strong className="font-medium text-foreground">
+                        {formatTokens(analytics.kpi.cachedTokens)}
+                      </strong>{" "}
+                      cached
                     </span>
-                  </>
-                ) : (
-                  "—"
-                )}
+                  ) : (
+                    "Prompt context payload"
+                  )}
+                </p>
+              ) : (
+                <Skeleton className="h-4 w-36 rounded mt-1" />
+              )}
+            </div>
+          </Card>
+
+          {/* Card 3: Output Tokens */}
+          <Card className="rounded-3xl border-border/70 bg-card p-5 transition-colors">
+            <div className="flex items-center justify-between pb-3">
+              <span className="text-xs text-muted-foreground font-medium font-sans">
+                Output Tokens
+              </span>
+              <div className="h-8 w-8 rounded-xl bg-secondary text-foreground flex items-center justify-center border border-border/50">
+                <Zap className="h-4 w-4 stroke-[1.75]" />
               </div>
-            ) : (
-              <Skeleton className="h-8 w-24 rounded-lg my-0.5" />
-            )}
-            {analytics ? (
-              <p className="text-xs text-muted-foreground font-light font-sans tabular-nums">
-                {analytics.kpi.avgTtftMs ? (
-                  <>
-                    <span className="text-foreground/80 font-normal">
-                      {analytics.kpi.avgTtftMs}ms
-                    </span>{" "}
-                    TTFT &middot; {analytics.kpi.avgDurationMs}ms total
-                  </>
-                ) : (
-                  "No latency recorded"
-                )}
-              </p>
-            ) : (
-              <Skeleton className="h-4 w-40 rounded mt-1" />
-            )}
-          </div>
-        </Card>
+            </div>
+            <div className="space-y-1">
+              {analytics ? (
+                <div className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground font-sans tabular-nums">
+                  {formatTokens(analytics.kpi.completionTokens)}
+                </div>
+              ) : (
+                <Skeleton className="h-8 w-28 rounded-lg my-0.5" />
+              )}
+              {analytics ? (
+                <p className="text-xs text-muted-foreground font-light font-sans">
+                  Generated response tokens
+                </p>
+              ) : (
+                <Skeleton className="h-4 w-36 rounded mt-1" />
+              )}
+            </div>
+          </Card>
+
+          {/* Card 4: Throughput & Speed */}
+          <Card className="rounded-3xl border-border/70 bg-card p-5 transition-colors">
+            <div className="flex items-center justify-between pb-3">
+              <span className="text-xs text-muted-foreground font-medium font-sans">
+                Speed & Latency
+              </span>
+              <div className="h-8 w-8 rounded-xl bg-secondary text-foreground flex items-center justify-center border border-border/50">
+                <Gauge className="h-4 w-4 stroke-[1.75]" />
+              </div>
+            </div>
+            <div className="space-y-1">
+              {analytics ? (
+                <div className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground font-sans tabular-nums">
+                  {analytics.kpi.avgSpeed ? (
+                    <>
+                      {analytics.kpi.avgSpeed}{" "}
+                      <span className="text-xs font-normal text-muted-foreground">
+                        tok/s
+                      </span>
+                    </>
+                  ) : (
+                    "—"
+                  )}
+                </div>
+              ) : (
+                <Skeleton className="h-8 w-24 rounded-lg my-0.5" />
+              )}
+              {analytics ? (
+                <p className="text-xs text-muted-foreground font-light font-sans tabular-nums">
+                  {analytics.kpi.avgTtftMs ? (
+                    <>
+                      <span className="text-foreground/80 font-normal">
+                        {analytics.kpi.avgTtftMs}ms
+                      </span>{" "}
+                      TTFT &middot; {analytics.kpi.avgDurationMs}ms total
+                    </>
+                  ) : (
+                    "No latency recorded"
+                  )}
+                </p>
+              ) : (
+                <Skeleton className="h-4 w-40 rounded mt-1" />
+              )}
+            </div>
+          </Card>
+        </div>
+
+        {/* Right: Free Weekly Quota Card */}
+        <div className="lg:col-span-4 xl:col-span-4 flex">
+          <QuotaCard className="w-full" />
+        </div>
       </div>
 
       {/* 3. Infrastructure & Performance Snapshot Strip */}
@@ -858,172 +890,248 @@ export default function DashboardOverviewPage() {
         </Card>
       </div>
 
-      {/* 5. Middle Grid: Usage Trend & Provider Distribution */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left: Usage Trend Chart (Swapped from Top Left) */}
-        <Card className="lg:col-span-2 rounded-3xl border-border/70 bg-card p-6 flex flex-col justify-between transition-colors">
-          <div className="flex items-center justify-between pb-4">
-            <div className="space-y-0.5">
-              <div className="flex items-center gap-2">
-                <h3 className="text-base font-semibold tracking-tight text-foreground font-sans">
-                  Usage Trend
-                </h3>
-                <Link
-                  href="/logs"
-                  className="text-xs font-mono text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
-                >
-                  <span>View audit logs</span>
-                  <ExternalLink className="h-3 w-3" />
-                </Link>
-              </div>
-              <p className="text-xs text-muted-foreground font-light">
-                {analytics && analytics.kpi.totalRequests > 0
-                  ? `${analytics.kpi.totalTokens.toLocaleString()} tokens across ${analytics.kpi.totalRequests} requests (${timeRange.toUpperCase()})`
-                  : "No requests in selected window"}
-              </p>
+      {/* 5. Middle Section: Usage Trend Chart (Full Width) */}
+      <Card className="rounded-3xl border-border/70 bg-card p-6 flex flex-col justify-between transition-colors">
+        <div className="flex items-center justify-between pb-4">
+          <div className="space-y-0.5">
+            <div className="flex items-center gap-2">
+              <h3 className="text-base font-semibold tracking-tight text-foreground font-sans">
+                Usage Trend
+              </h3>
+              <Link
+                href="/logs"
+                className="text-xs font-mono text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+              >
+                <span>View audit logs</span>
+                <ExternalLink className="h-3 w-3" />
+              </Link>
             </div>
-          </div>
-
-          {/* Activity Bar Chart Visualization */}
-          <div className="h-64 w-full flex flex-col justify-between py-2">
-            {!analytics ? (
-              <div className="flex-1 flex flex-col justify-end p-2">
-                <Skeleton className="h-48 w-full rounded-2xl" />
-              </div>
-            ) : analytics && analytics.timeline.length > 0 && analytics.kpi.totalRequests > 0 ? (
-              <div className="flex-1 flex flex-col justify-end">
-                <div className="h-48 flex items-end gap-1 sm:gap-2 px-1 border-b border-border/60 pb-1">
-                  {analytics.timeline.map((bucket, idx) => {
-                    const heightPercent = Math.max(
-                      4,
-                      Math.round((bucket.totalTokens / timelineMaxTokens) * 100)
-                    );
-                    return (
-                      <TooltipProvider key={idx}>
-                        <Tooltip delayDuration={100}>
-                          <TooltipTrigger asChild>
-                            <div className="flex-1 h-full flex flex-col justify-end group cursor-pointer">
-                              <div
-                                style={{ height: `${heightPercent}%` }}
-                                className={cn(
-                                  "w-full rounded-t-sm transition-all duration-300",
-                                  bucket.totalTokens > 0
-                                    ? "bg-foreground group-hover:bg-foreground/80"
-                                    : "bg-muted/30"
-                                )}
-                              />
-                            </div>
-                          </TooltipTrigger>
-                          <TooltipContent
-                            side="top"
-                            className="text-xs p-2.5 font-sans bg-popover border-border/80 shadow-lg space-y-1"
-                          >
-                            <div className="font-semibold text-foreground">
-                              {bucket.label}
-                            </div>
-                            <div className="text-[11px] font-mono text-muted-foreground space-y-0.5 tabular-nums">
-                              <div>Total: {bucket.totalTokens.toLocaleString()} tok</div>
-                              <div>
-                                {bucket.promptTokens.toLocaleString()} in / {bucket.completionTokens.toLocaleString()} out
-                              </div>
-                              <div className="text-foreground/90 font-medium pt-0.5">
-                                {bucket.requests} requests
-                              </div>
-                            </div>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    );
-                  })}
-                </div>
-                <div className="flex justify-between text-[11px] font-mono text-muted-foreground/60 pt-2 px-1">
-                  <span>Start of {timeRange.toUpperCase()}</span>
-                  <span>Token Traffic Intensity</span>
-                  <span>Now</span>
-                </div>
-              </div>
-            ) : (
-              <div className="flex-1 flex flex-col items-center justify-center text-center space-y-2 border border-dashed border-border/60 rounded-2xl p-6">
-                <Terminal className="h-6 w-6 text-muted-foreground/40" />
-                <div className="space-y-0.5">
-                  <p className="text-xs font-medium text-foreground">
-                    No requests recorded for this period
-                  </p>
-                  <p className="text-[11px] text-muted-foreground font-light">
-                    Send requests via cURL or test in Playground to generate live telemetry.
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
-        </Card>
-
-        {/* Right: Provider Distribution (Swapped from Top Right) */}
-        <Card className="rounded-3xl border-border/70 bg-card p-6 flex flex-col justify-between transition-colors">
-          <div className="space-y-1 pb-4">
-            <h3 className="text-base font-semibold tracking-tight text-foreground font-sans">
-              Provider Distribution
-            </h3>
             <p className="text-xs text-muted-foreground font-light">
-              Routing share across active AI providers.
+              {analytics && analytics.kpi.totalRequests > 0
+                ? `${analytics.kpi.totalTokens.toLocaleString()} tokens across ${analytics.kpi.totalRequests} requests (${timeRangeLabel})`
+                : "No requests in selected window"}
             </p>
           </div>
+        </div>
 
-          <div className="flex-1 flex flex-col justify-center space-y-4">
-            {!analytics ? (
-              <div className="space-y-4 py-2">
-                {[1, 2, 3].map((i) => (
-                  <div key={i} className="space-y-1.5">
-                    <div className="flex justify-between">
-                      <Skeleton className="h-4 w-24 rounded" />
-                      <Skeleton className="h-4 w-12 rounded" />
-                    </div>
-                    <Skeleton className="h-2 w-full rounded-full" />
-                  </div>
-                ))}
+        {/* Activity Bar Chart Visualization */}
+        <div className="h-64 w-full flex flex-col justify-between py-2">
+          {!analytics ? (
+            <div className="flex-1 flex flex-col justify-end p-2">
+              <Skeleton className="h-48 w-full rounded-2xl" />
+            </div>
+          ) : analytics && analytics.timeline.length > 0 && analytics.kpi.totalRequests > 0 ? (
+            <div className="flex-1 flex flex-col justify-end">
+              <div className="h-48 flex items-end gap-1 sm:gap-2 px-1 border-b border-border/60 pb-1">
+                {analytics.timeline.map((bucket, idx) => {
+                  const heightPercent = Math.max(
+                    4,
+                    Math.round((bucket.totalTokens / timelineMaxTokens) * 100)
+                  );
+                  return (
+                    <TooltipProvider key={idx}>
+                      <Tooltip delayDuration={100}>
+                        <TooltipTrigger asChild>
+                          <div className="flex-1 h-full flex flex-col justify-end group cursor-pointer">
+                            <div
+                              style={{ height: `${heightPercent}%` }}
+                              className={cn(
+                                "w-full rounded-t-sm transition-all duration-300",
+                                bucket.totalTokens > 0
+                                  ? "bg-foreground group-hover:bg-foreground/80"
+                                  : "bg-muted/30"
+                              )}
+                            />
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent
+                          side="top"
+                          className="text-xs p-2.5 font-sans bg-popover border-border/80 shadow-lg space-y-1"
+                        >
+                          <div className="font-semibold text-foreground">
+                            {bucket.label}
+                          </div>
+                          <div className="text-[11px] font-mono text-muted-foreground space-y-0.5 tabular-nums">
+                            <div>Total: {bucket.totalTokens.toLocaleString()} tok</div>
+                            <div>
+                              {bucket.promptTokens.toLocaleString()} in / {bucket.completionTokens.toLocaleString()} out
+                            </div>
+                            <div className="text-foreground/90 font-medium pt-0.5">
+                              {bucket.requests} requests
+                            </div>
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  );
+                })}
               </div>
-            ) : !analytics?.providerBreakdown || analytics.providerBreakdown.length === 0 ? (
-              <div className="py-8 text-center text-xs text-muted-foreground font-light">
-                No provider traffic yet
+              <div className="flex justify-between text-[11px] font-mono text-muted-foreground/60 pt-2 px-1">
+                <span>{startRangeLabel}</span>
+                <span>{timeRangeLabel} Traffic</span>
+                <span>Now</span>
               </div>
-            ) : (
-              analytics.providerBreakdown.map((item) => (
-                <div key={item.provider} className="space-y-1.5">
-                  <div className="flex items-center justify-between text-xs font-sans">
-                    <div className="flex items-center gap-2 font-medium text-foreground">
-                      <span className="h-2 w-2 rounded-full bg-foreground" />
-                      <span>{item.provider}</span>
-                    </div>
-                    <div className="flex items-center gap-2 font-mono text-muted-foreground tabular-nums">
-                      <span>{formatTokens(item.totalTokens)}</span>
-                      <span className="font-semibold text-foreground">
-                        {item.sharePercent}%
+            </div>
+          ) : (
+            <div className="flex-1 flex flex-col items-center justify-center text-center space-y-2 border border-dashed border-border/60 rounded-2xl p-6">
+              <Terminal className="h-6 w-6 text-muted-foreground/40" />
+              <div className="space-y-0.5">
+                <p className="text-xs font-medium text-foreground">
+                  No requests recorded for this period
+                </p>
+                <p className="text-[11px] text-muted-foreground font-light">
+                  Send requests via cURL or test in Playground to generate live telemetry.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      </Card>
+
+      {/* 6. Lower Section: Provider Distribution Comprehensive Table (Full Width) */}
+      <Card className="rounded-3xl border-border/70 bg-card overflow-hidden transition-colors">
+        <div className="p-6 pb-4 border-b border-border/60 flex items-center justify-between">
+          <div className="space-y-0.5">
+            <div className="flex items-center gap-2">
+              <Cpu className="h-4 w-4 text-foreground stroke-[1.75]" />
+              <h3 className="text-base font-semibold tracking-tight text-foreground font-sans">
+                Provider Distribution
+              </h3>
+            </div>
+            <p className="text-xs text-muted-foreground font-light">
+              Routing share, throughput, latency, and token consumption across active AI providers.
+            </p>
+          </div>
+          <Link
+            href="/providers"
+            className="text-xs font-mono text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors"
+          >
+            <span>Manage providers</span>
+            <ChevronRight className="h-3.5 w-3.5" />
+          </Link>
+        </div>
+
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader className="bg-secondary/20">
+              <TableRow className="border-border/60 hover:bg-transparent">
+                <TableHead className="text-xs font-medium text-muted-foreground pl-6 py-3">
+                  Provider
+                </TableHead>
+                <TableHead className="text-xs font-medium text-muted-foreground text-right py-3">
+                  Requests
+                </TableHead>
+                <TableHead className="text-xs font-medium text-muted-foreground text-right py-3">
+                  Input Tokens
+                </TableHead>
+                <TableHead className="text-xs font-medium text-muted-foreground text-right py-3">
+                  Output Tokens
+                </TableHead>
+                <TableHead className="text-xs font-medium text-muted-foreground text-right py-3">
+                  Total Tokens
+                </TableHead>
+                <TableHead className="text-xs font-medium text-muted-foreground text-right py-3">
+                  Avg Latency
+                </TableHead>
+                <TableHead className="text-xs font-medium text-muted-foreground text-right py-3">
+                  Success Rate
+                </TableHead>
+                <TableHead className="text-xs font-medium text-muted-foreground pr-6 py-3 w-48 text-right">
+                  Share (%)
+                </TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {!analytics ? (
+                Array.from({ length: 3 }).map((_, i) => (
+                  <TableRow key={i} className="border-border/40 hover:bg-transparent">
+                    <TableCell className="pl-6 py-3.5"><Skeleton className="h-4 w-32 rounded" /></TableCell>
+                    <TableCell className="text-right py-3.5"><Skeleton className="h-4 w-12 rounded ml-auto" /></TableCell>
+                    <TableCell className="text-right py-3.5"><Skeleton className="h-4 w-14 rounded ml-auto" /></TableCell>
+                    <TableCell className="text-right py-3.5"><Skeleton className="h-4 w-14 rounded ml-auto" /></TableCell>
+                    <TableCell className="text-right py-3.5"><Skeleton className="h-4 w-16 rounded ml-auto" /></TableCell>
+                    <TableCell className="text-right py-3.5"><Skeleton className="h-4 w-14 rounded ml-auto" /></TableCell>
+                    <TableCell className="text-right py-3.5"><Skeleton className="h-4 w-12 rounded ml-auto" /></TableCell>
+                    <TableCell className="pr-6 py-3.5 text-right"><Skeleton className="h-2.5 w-24 rounded-full ml-auto" /></TableCell>
+                  </TableRow>
+                ))
+              ) : !analytics?.providerBreakdown || analytics.providerBreakdown.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={8}
+                    className="py-12 text-center text-xs text-muted-foreground font-sans"
+                  >
+                    No provider traffic recorded yet in this window.
+                  </TableCell>
+                </TableRow>
+              ) : (
+                analytics.providerBreakdown.map((item) => (
+                  <TableRow
+                    key={item.provider}
+                    className="border-border/40 hover:bg-secondary/20 transition-colors"
+                  >
+                    {/* Provider Name */}
+                    <TableCell className="pl-6 py-3.5 whitespace-nowrap">
+                      <span className="font-sans text-xs font-medium text-foreground">
+                        {item.provider}
                       </span>
-                    </div>
-                  </div>
-                  {/* Progress bar */}
-                  <div className="h-2 w-full rounded-full bg-secondary/80 overflow-hidden">
-                    <div
-                      style={{ width: `${Math.min(100, Math.max(3, item.sharePercent))}%` }}
-                      className="h-full bg-foreground rounded-full transition-all duration-500"
-                    />
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
+                    </TableCell>
 
-          <div className="pt-4 border-t border-border/50 text-[11px] text-muted-foreground font-sans flex items-center justify-between">
-            <span>Dynamic load balanced</span>
-            <Link
-              href="/providers"
-              className="underline hover:text-foreground font-medium transition-colors"
-            >
-              Manage providers
-            </Link>
-          </div>
-        </Card>
-      </div>
+                    {/* Requests */}
+                    <TableCell className="text-right py-3.5 text-xs font-sans text-foreground/90 tabular-nums">
+                      {item.requests.toLocaleString()}
+                    </TableCell>
+
+                    {/* Input Tokens */}
+                    <TableCell className="text-right py-3.5 text-xs font-sans text-muted-foreground tabular-nums">
+                      {formatTokens(item.inputTokens)}
+                    </TableCell>
+
+                    {/* Output Tokens */}
+                    <TableCell className="text-right py-3.5 text-xs font-sans text-muted-foreground tabular-nums">
+                      {formatTokens(item.outputTokens)}
+                    </TableCell>
+
+                    {/* Total Tokens */}
+                    <TableCell className="text-right py-3.5 text-xs font-sans font-semibold text-foreground tabular-nums">
+                      {formatTokens(item.totalTokens)}
+                    </TableCell>
+
+                    {/* Avg Latency */}
+                    <TableCell className="text-right py-3.5 text-xs font-sans text-muted-foreground tabular-nums">
+                      {item.avgDurationMs ? `${item.avgDurationMs}ms` : "—"}
+                    </TableCell>
+
+                    {/* Success Rate */}
+                    <TableCell className="text-right py-3.5 text-xs font-sans text-muted-foreground tabular-nums">
+                      <span className="inline-flex items-center gap-1 font-medium text-foreground">
+                        {item.successRate}%
+                      </span>
+                    </TableCell>
+
+                    {/* Share Bar */}
+                    <TableCell className="pr-6 py-3.5 text-right whitespace-nowrap">
+                      <div className="flex items-center justify-end gap-2.5">
+                        <div className="h-2 w-24 rounded-full bg-secondary/80 overflow-hidden">
+                          <div
+                            style={{
+                              width: `${Math.min(100, Math.max(3, item.sharePercent))}%`,
+                            }}
+                            className="h-full bg-foreground rounded-full"
+                          />
+                        </div>
+                        <span className="text-xs font-mono font-medium text-foreground w-12 text-right tabular-nums">
+                          {item.sharePercent}%
+                        </span>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </Card>
 
       {/* 6. Bottom Section: Model Breakdown Table (Moved to Very Bottom) */}
       <Card className="rounded-3xl border-border/70 bg-card overflow-hidden transition-colors">

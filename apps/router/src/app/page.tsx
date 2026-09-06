@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { useRouter } from "next/navigation";
 import { useRouterAuth } from "@/components/providers/convex-client-provider";
 import { useQuery } from "convex/react";
 import { api } from "@const/backend/_generated/api";
@@ -23,6 +24,7 @@ import {
 } from "lucide-react";
 
 export default function HomePage() {
+  const router = useRouter();
   const { isAuthenticated, isLoading, signIn } = useRouterAuth();
   const user = useQuery(
     api.auth.queries.currentUser,
@@ -32,6 +34,26 @@ export default function HomePage() {
   useEffect(() => {
     document.title = "Const Router - Universal AI Gateway";
   }, []);
+
+  useEffect(() => {
+    if (!isLoading && isAuthenticated) {
+      router.replace("/dashboard");
+    }
+  }, [isLoading, isAuthenticated, router]);
+
+  if (isLoading || isAuthenticated) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-background text-foreground p-4">
+        <div className="flex flex-col items-center gap-3 text-center">
+          <ConstLogoIcon size="md" className="w-8 h-8 text-foreground animate-pulse" />
+          <p className="text-xs font-mono text-muted-foreground">
+            {isAuthenticated ? "Redirecting to Dashboard..." : "Checking session..."}
+          </p>
+          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground mt-1" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
