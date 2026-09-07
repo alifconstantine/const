@@ -425,7 +425,10 @@ async function dispatchSingleModel({
         durationMs,
         promptTokens: data.usage?.prompt_tokens,
         completionTokens: data.usage?.completion_tokens,
-        cachedTokens: data.usage?.prompt_tokens_details?.cached_tokens,
+        cachedTokens:
+          data.usage?.prompt_tokens_details?.cached_tokens ??
+          data.usage?.cached_tokens ??
+          data.usage?.cache_read_input_tokens,
       });
 
       return NextResponse.json(data, {
@@ -598,7 +601,10 @@ async function dispatchSingleModel({
       durationMs,
       promptTokens: data.usage?.prompt_tokens,
       completionTokens: data.usage?.completion_tokens,
-      cachedTokens: data.usage?.prompt_tokens_details?.cached_tokens,
+      cachedTokens:
+        data.usage?.prompt_tokens_details?.cached_tokens ??
+        data.usage?.cached_tokens ??
+        data.usage?.cache_read_input_tokens,
     });
 
     return NextResponse.json(data, {

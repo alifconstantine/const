@@ -97,6 +97,25 @@ export function convertGoogleSseToOpenAiSse(body: ReadableStream<Uint8Array>): R
                 });
                 controller.enqueue(encoder.encode(`data: ${payload}\n\n`));
               }
+
+              if (data.usageMetadata) {
+                const promptTokens = data.usageMetadata.promptTokenCount ?? 0;
+                const completionTokens = data.usageMetadata.candidatesTokenCount ?? 0;
+                const totalTokens = data.usageMetadata.totalTokenCount ?? (promptTokens + completionTokens);
+                const cachedTokens = data.usageMetadata.cachedContentTokenCount ?? 0;
+                const usagePayload = JSON.stringify({
+                  choices: [],
+                  usage: {
+                    prompt_tokens: promptTokens,
+                    completion_tokens: completionTokens,
+                    total_tokens: totalTokens,
+                    prompt_tokens_details: {
+                      cached_tokens: cachedTokens,
+                    },
+                  },
+                });
+                controller.enqueue(encoder.encode(`data: ${usagePayload}\n\n`));
+              }
             } catch {}
           }
         }
@@ -125,6 +144,9 @@ export function convertAnthropicSseToOpenAiSse(body: ReadableStream<Uint8Array>)
   const reader = body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
+  let anthropicInputTokens = 0;
+  let anthropicCachedTokens = 0;
+  let anthropicOutputTokens = 0;
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -145,7 +167,12 @@ export function convertAnthropicSseToOpenAiSse(body: ReadableStream<Uint8Array>)
 
             try {
               const data = JSON.parse(jsonStr);
-              if (data.type === "content_block_delta" && data.delta?.text) {
+              if (data.type === "message_start" && data.message?.usage) {
+                anthropicInputTokens = data.message.usage.input_tokens || 0;
+                anthropicCachedTokens = data.message.usage.cache_read_input_tokens || 0;
+              } else if (data.type === "message_delta" && data.usage?.output_tokens) {
+                anthropicOutputTokens = data.usage.output_tokens;
+              } else if (data.type === "content_block_delta" && data.delta?.text) {
                 const payload = JSON.stringify({
                   choices: [
                     {
@@ -157,6 +184,18 @@ export function convertAnthropicSseToOpenAiSse(body: ReadableStream<Uint8Array>)
                 });
                 controller.enqueue(encoder.encode(`data: ${payload}\n\n`));
               } else if (data.type === "message_stop") {
+                const usagePayload = JSON.stringify({
+                  choices: [],
+                  usage: {
+                    prompt_tokens: anthropicInputTokens + anthropicCachedTokens,
+                    completion_tokens: anthropicOutputTokens,
+                    total_tokens: anthropicInputTokens + anthropicCachedTokens + anthropicOutputTokens,
+                    prompt_tokens_details: {
+                      cached_tokens: anthropicCachedTokens,
+                    },
+                  },
+                });
+                controller.enqueue(encoder.encode(`data: ${usagePayload}\n\n`));
                 controller.enqueue(encoder.encode("data: [DONE]\n\n"));
               }
             } catch {}

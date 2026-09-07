@@ -357,11 +357,10 @@ export default function DashboardOverviewPage() {
                 <p className="text-xs text-muted-foreground font-light font-sans">
                   {analytics.kpi.cachedTokens ? (
                     <span>
-                      incl.{" "}
                       <strong className="font-medium text-foreground">
                         {formatTokens(analytics.kpi.cachedTokens)}
                       </strong>{" "}
-                      cached
+                      cached (free)
                     </span>
                   ) : (
                     "Prompt context payload"

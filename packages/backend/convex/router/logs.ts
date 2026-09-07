@@ -80,6 +80,25 @@ export const recordLog = mutation({
       } catch {}
     }
 
+    const cachedTokens = args.cachedTokens || 0;
+    let promptTokens = args.promptTokens;
+    let totalTokens = args.totalTokens;
+
+    // Backend guard: Ensure cached tokens are excluded from promptTokens and totalTokens
+    if (cachedTokens > 0) {
+      if (totalTokens >= promptTokens + args.completionTokens + cachedTokens) {
+        totalTokens = Math.max(0, totalTokens - cachedTokens);
+      }
+      if (
+        promptTokens >= cachedTokens &&
+        totalTokens === promptTokens + args.completionTokens &&
+        args.totalTokens > promptTokens
+      ) {
+        promptTokens = Math.max(0, promptTokens - cachedTokens);
+        totalTokens = promptTokens + args.completionTokens;
+      }
+    }
+
     // C. Or resolve via raw API key
     if (args.rawApiKey) {
       const keyHash = await hashKey(args.rawApiKey.trim());
@@ -94,9 +113,9 @@ export const recordLog = mutation({
         resolvedKeyName = apiKeyDoc.name;
         resolvedKeyPrefix = apiKeyDoc.keyPrefix;
 
-        // Increment token usage for the API key
+        // Increment token usage for the API key (excluding cache)
         await ctx.db.patch(apiKeyDoc._id, {
-          usedTodayTokens: apiKeyDoc.usedTodayTokens + args.totalTokens,
+          usedTodayTokens: apiKeyDoc.usedTodayTokens + totalTokens,
           lastUsedAt: Date.now(),
         });
       }
@@ -119,10 +138,10 @@ export const recordLog = mutation({
       comboName: args.comboName,
       status: args.status,
       errorMessage: args.errorMessage,
-      promptTokens: args.promptTokens,
-      cachedTokens: args.cachedTokens || 0,
+      promptTokens,
+      cachedTokens,
       completionTokens: args.completionTokens,
-      totalTokens: args.totalTokens,
+      totalTokens,
       ttftMs: args.ttftMs,
       durationMs: args.durationMs,
       tokensPerSecond: args.tokensPerSecond,
@@ -131,13 +150,13 @@ export const recordLog = mutation({
       createdAt: Date.now(),
     });
 
-    // Deduct tokens from user's weekly quota for Const-managed models
+    // Deduct tokens from user's weekly quota for Const-managed models (excluding cache)
     const isConstModel =
       args.provider === "const" ||
       args.provider === "Google AI" ||
       args.provider.toLowerCase().includes("const");
 
-    if (isConstModel && args.status === 200 && args.totalTokens > 0) {
+    if (isConstModel && args.status === 200 && totalTokens > 0) {
       const now = Date.now();
       const WEEKLY_LIMIT = 7_000_000;
       const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
@@ -151,7 +170,7 @@ export const recordLog = mutation({
         await ctx.db.insert("userQuotas", {
           userId: resolvedUserId,
           weeklyLimitTokens: WEEKLY_LIMIT,
-          usedTokens: Math.min(WEEKLY_LIMIT, args.totalTokens),
+          usedTokens: Math.min(WEEKLY_LIMIT, totalTokens),
           periodStartAt: now,
           periodEndAt: now + WEEK_MS,
           lastDeductedAt: now,
@@ -172,7 +191,7 @@ export const recordLog = mutation({
 
         const newUsed = Math.min(
           quotaDoc.weeklyLimitTokens || WEEKLY_LIMIT,
-          currentUsed + args.totalTokens
+          currentUsed + totalTokens
         );
 
         await ctx.db.patch(quotaDoc._id, {

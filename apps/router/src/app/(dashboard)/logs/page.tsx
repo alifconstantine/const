@@ -217,6 +217,9 @@ export default function LogsPage() {
             </div>
             <p className="text-[11px] text-muted-foreground font-sans">
               Prompt: <span className="tabular-nums">{formatTokens(metrics?.promptTokens)}</span> · Out: <span className="tabular-nums">{formatTokens(metrics?.completionTokens)}</span>
+              {metrics?.cachedTokens && metrics.cachedTokens > 0 ? (
+                <span> · <span className="tabular-nums">{formatTokens(metrics.cachedTokens)}</span> cached</span>
+              ) : null}
             </p>
           </Card>
 
@@ -495,8 +498,8 @@ export default function LogsPage() {
                               {formatTokens(log.promptTokens)}
                             </span>
                             {log.cachedTokens && log.cachedTokens > 0 ? (
-                              <span className="text-[10px] font-sans text-muted-foreground tabular-nums">
-                                +{formatTokens(log.cachedTokens)} cache
+                              <span className="text-[10px] font-sans text-muted-foreground/80 tabular-nums">
+                                {formatTokens(log.cachedTokens)} cached
                               </span>
                             ) : null}
                           </div>
@@ -673,21 +676,21 @@ export default function LogsPage() {
                     <div className="p-4 rounded-2xl bg-secondary/20 border border-border/60 space-y-2.5 font-sans text-xs">
                       <div className="flex justify-between items-center">
                         <span className="text-muted-foreground">Input / Prompt Tokens</span>
-                        <span className="font-sans font-medium text-foreground tabular-nums">{selectedLog.promptTokens}</span>
+                        <span className="font-sans font-medium text-foreground tabular-nums">{selectedLog.promptTokens.toLocaleString()}</span>
                       </div>
                       {selectedLog.cachedTokens ? (
                         <div className="flex justify-between items-center">
-                          <span className="text-muted-foreground">Prompt Cache Hit</span>
-                          <span className="font-sans font-medium text-foreground tabular-nums">{selectedLog.cachedTokens}</span>
+                          <span className="text-muted-foreground">Prompt Cache (Free)</span>
+                          <span className="font-sans font-medium text-muted-foreground tabular-nums">{selectedLog.cachedTokens.toLocaleString()}</span>
                         </div>
                       ) : null}
                       <div className="flex justify-between items-center">
                         <span className="text-muted-foreground">Output / Completion Tokens</span>
-                        <span className="font-sans font-medium text-foreground tabular-nums">{selectedLog.completionTokens}</span>
+                        <span className="font-sans font-medium text-foreground tabular-nums">{selectedLog.completionTokens.toLocaleString()}</span>
                       </div>
                       <div className="pt-2 border-t border-border/60 flex justify-between items-center font-semibold">
-                        <span className="text-foreground">Total Tokens</span>
-                        <span className="font-sans font-semibold text-foreground tabular-nums">{selectedLog.totalTokens}</span>
+                        <span className="text-foreground">Total Counted Tokens</span>
+                        <span className="font-sans font-semibold text-foreground tabular-nums">{selectedLog.totalTokens.toLocaleString()}</span>
                       </div>
                     </div>
                   </div>

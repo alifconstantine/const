@@ -74,9 +74,14 @@ export function createTelemetryStream(
       const completionTokens = extractedCompletionTokens > 0
         ? extractedCompletionTokens
         : estimateTokens(accumulatedOutputText);
-      const promptTokens = extractedPromptTokens > 0
+      const rawPromptTokens = extractedPromptTokens > 0
         ? extractedPromptTokens
         : (meta.estimatedPromptTokens || 1);
+      const cachedTokens = extractedCachedTokens > 0 ? extractedCachedTokens : 0;
+
+      // Independent prompt tokens: cache is no longer counted as input tokens
+      const promptTokens = Math.max(0, rawPromptTokens - cachedTokens);
+      // Total tokens excludes cached tokens
       const totalTokens = promptTokens + completionTokens;
 
       const durationSec = durationMs / 1000;
@@ -106,7 +111,7 @@ export function createTelemetryStream(
         status,
         errorMessage: errorMsg,
         promptTokens,
-        cachedTokens: extractedCachedTokens,
+        cachedTokens,
         completionTokens,
         totalTokens,
         ttftMs,
@@ -134,7 +139,7 @@ export function createTelemetryStream(
         const text = textDecoder.decode(chunk, { stream: true });
         accumulatedOutputText += text;
 
-        // Try extracting OpenAI / OpenRouter usage if present in chunk
+        // Try extracting OpenAI / OpenRouter / Anthropic usage if present in chunk
         if (text.includes('"usage"')) {
           const lines = text.split("\n");
           for (const line of lines) {
@@ -143,10 +148,19 @@ export function createTelemetryStream(
               try {
                 const parsed = JSON.parse(trimmed.slice(6));
                 if (parsed.usage) {
-                  if (parsed.usage.prompt_tokens) extractedPromptTokens = parsed.usage.prompt_tokens;
-                  if (parsed.usage.completion_tokens) extractedCompletionTokens = parsed.usage.completion_tokens;
-                  if (parsed.usage.prompt_tokens_details?.cached_tokens) {
-                    extractedCachedTokens = parsed.usage.prompt_tokens_details.cached_tokens;
+                  if (typeof parsed.usage.prompt_tokens === "number") {
+                    extractedPromptTokens = parsed.usage.prompt_tokens;
+                  }
+                  if (typeof parsed.usage.completion_tokens === "number") {
+                    extractedCompletionTokens = parsed.usage.completion_tokens;
+                  }
+                  const cached =
+                    parsed.usage.prompt_tokens_details?.cached_tokens ??
+                    parsed.usage.cache_read_input_tokens ??
+                    parsed.usage.cached_tokens ??
+                    0;
+                  if (typeof cached === "number") {
+                    extractedCachedTokens = cached;
                   }
                 }
               } catch {}
@@ -188,8 +202,12 @@ export async function recordDirectTelemetry(
   }
 ) {
   try {
-    const promptTokens = params.promptTokens ?? meta.estimatedPromptTokens ?? 1;
+    const rawPromptTokens = params.promptTokens ?? meta.estimatedPromptTokens ?? 1;
+    const cachedTokens = params.cachedTokens || 0;
+    // Independent prompt tokens: cache is no longer counted as input tokens
+    const promptTokens = Math.max(0, rawPromptTokens - cachedTokens);
     const completionTokens = params.completionTokens ?? 0;
+    // Total tokens excludes cached tokens
     const totalTokens = promptTokens + completionTokens;
     const durationSec = params.durationMs / 1000;
     const speed = durationSec > 0 && completionTokens > 0
@@ -218,7 +236,7 @@ export async function recordDirectTelemetry(
       status: params.status,
       errorMessage: params.errorMessage,
       promptTokens,
-      cachedTokens: params.cachedTokens || 0,
+      cachedTokens,
       completionTokens,
       totalTokens,
       ttftMs: params.ttftMs,
