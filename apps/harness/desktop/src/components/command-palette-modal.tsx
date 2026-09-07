@@ -57,6 +57,57 @@ interface TaskItem {
   updatedAt?: number;
   isProject: boolean;
   isScheduled?: boolean;
+  rawMessages?: any[];
+  matchedSnippet?: string;
+  matchedRole?: "user" | "assistant";
+  matchPriority?: number;
+}
+
+/**
+ * Search inside conversation messages (inputs and outputs) and extract a contextual snippet.
+ */
+function extractMessageMatch(
+  messages: any[],
+  query: string
+): { role: "user" | "assistant"; snippet: string } | null {
+  if (!Array.isArray(messages) || !query.trim()) return null;
+  const qLower = query.toLowerCase().trim();
+
+  // Search in reverse to prioritize recent messages
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const msg = messages[i];
+    if (!msg) continue;
+    let text = "";
+    if (typeof msg.content === "string") {
+      text = msg.content;
+    } else if (Array.isArray(msg.content)) {
+      text = msg.content
+        .map((part: any) => (typeof part === "string" ? part : part?.text || ""))
+        .join(" ");
+    }
+
+    if (!text) continue;
+    const lower = text.toLowerCase();
+    const idx = lower.indexOf(qLower);
+    if (idx !== -1) {
+      const singleLine = text.replace(/\s+/g, " ").trim();
+      const cleanIdx = singleLine.toLowerCase().indexOf(qLower);
+      const matchPos = cleanIdx !== -1 ? cleanIdx : 0;
+      const start = Math.max(0, matchPos - 35);
+      const end = Math.min(singleLine.length, matchPos + qLower.length + 65);
+      const snippet =
+        (start > 0 ? "..." : "") +
+        singleLine.slice(start, end).trim() +
+        (end < singleLine.length ? "..." : "");
+
+      return {
+        role: msg.role === "assistant" ? "assistant" : "user",
+        snippet,
+      };
+    }
+  }
+
+  return null;
 }
 
 /**
@@ -144,12 +195,13 @@ export function CommandPaletteModal({
           updatedAt: c.updatedAt,
           isProject,
           isScheduled: isScheduledTaskConversation(c),
+          rawMessages: c.messages,
         };
       })
       .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
   }, [conversations]);
 
-  // Filtered Tasks based on query and taskCategory
+  // Filtered Tasks based on query and taskCategory (Title > Workspace > Messages)
   const filteredTasks = useMemo(() => {
     const q = query.toLowerCase().trim();
     let list = allTasks;
@@ -164,11 +216,46 @@ export function CommandPaletteModal({
 
     if (!q) return list;
 
-    return list.filter((t) => {
+    const matchedList: TaskItem[] = [];
+
+    for (const t of list) {
       const matchTitle = t.title.toLowerCase().includes(q);
       const matchWs = (t.workspaceName || "").toLowerCase().includes(q);
       const matchId = t.id.toLowerCase().includes(q);
-      return matchTitle || matchWs || matchId;
+
+      if (matchTitle) {
+        matchedList.push({
+          ...t,
+          matchPriority: 0,
+        });
+        continue;
+      }
+
+      if (matchWs || matchId) {
+        matchedList.push({
+          ...t,
+          matchPriority: 1,
+        });
+        continue;
+      }
+
+      // Deep search into conversation prompt input & assistant output
+      const messageMatch = extractMessageMatch(t.rawMessages || [], q);
+      if (messageMatch) {
+        matchedList.push({
+          ...t,
+          matchPriority: 2,
+          matchedSnippet: messageMatch.snippet,
+          matchedRole: messageMatch.role,
+        });
+      }
+    }
+
+    // Sort: Title/Workspace match first, then message content match; within each group, newest first
+    return matchedList.sort((a, b) => {
+      const pDiff = (a.matchPriority ?? 0) - (b.matchPriority ?? 0);
+      if (pDiff !== 0) return pDiff;
+      return (b.updatedAt ?? 0) - (a.updatedAt ?? 0);
     });
   }, [allTasks, query, tab, taskCategory]);
 
@@ -369,7 +456,7 @@ export function CommandPaletteModal({
               ref={inputRef}
               type="text"
               className="flex-1 h-full bg-transparent border-none text-white text-sm outline-none placeholder:text-white/40 p-0 font-sans"
-              placeholder="Search actions or tasks..."
+              placeholder="Search actions, tasks, or messages..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={onKeyDown}
@@ -494,6 +581,7 @@ export function CommandPaletteModal({
                 {displayedTasks.map((task) => {
                   const currentIndex = itemCursor++;
                   const isActive = currentIndex === selectedIndex;
+                  const hasSnippet = Boolean(task.matchedSnippet);
                   return (
                     <button
                       key={task.id}
@@ -502,31 +590,52 @@ export function CommandPaletteModal({
                       }}
                       type="button"
                       className={cn(
-                        "w-full h-9 flex items-center gap-2.5 px-2.5 rounded-lg text-left transition-colors duration-75 cursor-pointer text-white border-none",
+                        "w-full flex flex-col justify-center px-2.5 rounded-lg text-left transition-colors duration-75 cursor-pointer text-white border-none",
+                        hasSnippet ? "py-1.5 min-h-[48px] gap-1" : "h-9",
                         isActive ? "bg-white/[0.08]" : "bg-transparent hover:bg-white/[0.08]"
                       )}
                       onClick={() => handleSelectTask(task.id)}
                       onMouseEnter={() => setSelectedIndex(currentIndex)}
                     >
-                      <span className="text-white/50 shrink-0 flex items-center justify-center">
-                        <MessageSquare size={16} />
-                      </span>
-                      <span className="text-[13.5px] font-normal text-white truncate flex-1 min-w-0">
-                        <HighlightMatch text={task.title} query={query} />
-                      </span>
-                      <div className="shrink-0 flex items-center gap-2 ml-2">
-                        <span className="text-[11px] text-white/50 bg-white/[0.06] border border-white/[0.08] px-1.5 py-0.5 rounded max-w-[120px] truncate">
-                          {task.workspaceName || "default"}
+                      <div className="w-full flex items-center gap-2.5 min-w-0">
+                        <span className="text-white/50 shrink-0 flex items-center justify-center">
+                          <MessageSquare size={16} />
                         </span>
-                        <div className="flex items-center gap-1 min-w-[24px] text-right">
-                          {task.isScheduled && (
-                            <Clock size={12} className="text-white/40 shrink-0" />
-                          )}
-                          <span className="text-xs text-white/40">
-                            {formatRelativeTime(task.updatedAt ?? Date.now())}
+                        <span className="text-[13.5px] font-normal text-white truncate flex-1 min-w-0">
+                          <HighlightMatch text={task.title} query={query} />
+                        </span>
+                        <div className="shrink-0 flex items-center gap-2 ml-2">
+                          <span className="text-[11px] text-white/50 bg-white/[0.06] border border-white/[0.08] px-1.5 py-0.5 rounded max-w-[120px] truncate">
+                            {task.workspaceName || "default"}
                           </span>
+                          <div className="flex items-center gap-1 min-w-[24px] text-right">
+                            {task.isScheduled && (
+                              <Clock size={12} className="text-white/40 shrink-0" />
+                            )}
+                            <span className="text-xs text-white/40">
+                              {formatRelativeTime(task.updatedAt ?? Date.now())}
+                            </span>
+                          </div>
                         </div>
                       </div>
+
+                      {hasSnippet && (
+                        <div className="w-full flex items-center gap-1.5 pl-[26px] text-[11.5px] min-w-0">
+                          <span
+                            className={cn(
+                              "px-1 py-[0.5px] text-[9.5px] font-medium uppercase tracking-wider rounded border shrink-0",
+                              task.matchedRole === "user"
+                                ? "text-[#93c5fd] bg-[#1e3a8a]/30 border-[#1e3a8a]/50"
+                                : "text-[#86efac] bg-[#14532d]/30 border-[#14532d]/50"
+                            )}
+                          >
+                            {task.matchedRole === "user" ? "User" : "Agent"}
+                          </span>
+                          <span className="truncate text-white/60">
+                            <HighlightMatch text={task.matchedSnippet!} query={query} />
+                          </span>
+                        </div>
+                      )}
                     </button>
                   );
                 })}
