@@ -121,7 +121,15 @@ export function getSafeRedirectUrl(
 
     const hostname = parsed.hostname.toLowerCase();
 
-    // 4. Local development origins - STRICTLY DISABLED in production
+    // 4. Native App Loopback interface (RFC 8252) - 127.0.0.1 or localhost /callback
+    if (
+      (hostname === "127.0.0.1" || hostname === "localhost") &&
+      parsed.pathname === "/callback"
+    ) {
+      return trimmed;
+    }
+
+    // 5. Local development origins - STRICTLY DISABLED in production
     const isDevEnvironment =
       process.env.NODE_ENV !== "production" ||
       (typeof window !== "undefined" &&
@@ -137,7 +145,7 @@ export function getSafeRedirectUrl(
       return trimmed;
     }
 
-    // 5. Allow official production domains (*.const.web.id and *.vercel.app deployments)
+    // 6. Allow official production domains (*.const.web.id and *.vercel.app deployments)
     if (
       hostname === "const.web.id" ||
       hostname.endsWith(".const.web.id") ||

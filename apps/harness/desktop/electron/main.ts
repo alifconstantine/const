@@ -10,6 +10,12 @@ import {
   type FileMutationRecord,
 } from "@const/agent";
 import { ConversationDatabase, type ConversationRecord } from "./database";
+import {
+  startLoopbackAuthServer,
+  stopLoopbackAuthServer,
+  registerLinuxProtocolHandler,
+  isValidAuthToken,
+} from "./auth-server";
 
 // Initialize ~/.const/harness directory hierarchy (.gemini/antigravity aligned)
 const constHomeDir = path.join(os.homedir(), ".const");
@@ -223,25 +229,45 @@ if (!app.isPackaged) {
   app.setAsDefaultProtocolClient(PROTOCOL_NAME, process.execPath, [
     mainScriptPath,
   ]);
+  registerLinuxProtocolHandler(process.execPath, mainScriptPath);
 } else {
   app.setAsDefaultProtocolClient(PROTOCOL_NAME);
+  registerLinuxProtocolHandler(process.execPath);
 }
 
 let win: BrowserWindow | null = null;
 let pendingDeepLink: string | null = null;
+let activeLoginSessionState: string | null = null;
 
 function extractTokenFromUrl(rawUrl: string): string | undefined {
   try {
     const cleaned = rawUrl.replace(/["']/g, "").trim();
     const parsed = new URL(cleaned);
     const token = parsed.searchParams.get("token");
-    if (token) return token;
+    if (token && isValidAuthToken(token)) return token;
   } catch {
     // ignore
   }
   const match = rawUrl.match(/[?&]token=([^&"'\s]+)/);
   const matchedToken = match?.[1];
-  return matchedToken ? decodeURIComponent(matchedToken) : undefined;
+  if (matchedToken) {
+    const decoded = decodeURIComponent(matchedToken);
+    if (isValidAuthToken(decoded)) return decoded;
+  }
+  return undefined;
+}
+
+function extractStateFromUrl(rawUrl: string): string | undefined {
+  try {
+    const cleaned = rawUrl.replace(/["']/g, "").trim();
+    const parsed = new URL(cleaned);
+    const state = parsed.searchParams.get("state");
+    if (state) return state;
+  } catch {
+    // ignore
+  }
+  const match = rawUrl.match(/[?&]state=([^&"'\s]+)/);
+  return match?.[1] ? decodeURIComponent(match[1]) : undefined;
 }
 
 function sendDeepLinkToRenderer(url: string) {
@@ -250,8 +276,38 @@ function sendDeepLinkToRenderer(url: string) {
     return;
   }
   const token = extractTokenFromUrl(url);
-  console.log("[Electron Main] Extracted token from deep link:", token ? "YES" : "NO");
-  win.webContents.send("auth:deep-link", { url, token });
+  const returnedState = extractStateFromUrl(url);
+
+  console.log("[Electron Main] Processing auth callback. Active session:", activeLoginSessionState ? "ACTIVE" : "NONE");
+
+  // Strict session cancellation / invalidation defense:
+  // If the user cancelled the sign-in in the desktop app, or no session is active, strictly reject the token
+  if (!activeLoginSessionState) {
+    console.warn("[Electron Main] Rejected callback: no active login session (user cancelled or uninitiated).");
+    win.webContents.send("auth:deep-link", {
+      url,
+      token: undefined,
+      cancelled: true,
+      error: "Authentication request was cancelled.",
+    });
+    return;
+  }
+
+  // Strict CSRF verification: if state is provided, ensure it matches the active session state
+  if (returnedState && returnedState !== activeLoginSessionState) {
+    console.warn("[Electron Main] Rejected callback: state mismatch.");
+    win.webContents.send("auth:deep-link", {
+      url,
+      token: undefined,
+      cancelled: true,
+      error: "Invalid authentication state.",
+    });
+    return;
+  }
+
+  // Consume session state upon first valid use (single-use nonce)
+  activeLoginSessionState = null;
+  win.webContents.send("auth:deep-link", { url, token, cancelled: false });
 }
 
 // PRIMARY INSTANCE: Listen for second instance launches from deep links
@@ -362,6 +418,48 @@ app.whenReady().then(() => {
       return true;
     }
     return false;
+  });
+
+  // Dedicated Loopback Auth Login Handlers
+  ipcMain.handle("auth:start-login", async (_event, options?: { accountsUrl?: string; action?: string }) => {
+    try {
+      const serverRes = await startLoopbackAuthServer((token, _refreshToken) => {
+        sendDeepLinkToRenderer(`const-harness://callback?token=${encodeURIComponent(token)}&state=${encodeURIComponent(serverRes.state)}`);
+      });
+
+      // Bind active session state for strict cancellation and anti-replay
+      activeLoginSessionState = serverRes.state;
+
+      const accountsBase = (options?.accountsUrl || process.env.VITE_ACCOUNTS_URL || "https://accounts.const.web.id").replace(/\/+$/, "");
+      const actionParam = options?.action ? `&action=${encodeURIComponent(options.action)}` : "&prompt=select_account";
+      const continueTarget = "const-harness://callback";
+      const targetUrl = `${accountsBase}/?continue=${encodeURIComponent(continueTarget)}${actionParam}&app=harness&port=${serverRes.port}&state=${encodeURIComponent(serverRes.state)}`;
+
+      console.log("[Electron Main] Starting auth, opening external browser:", targetUrl);
+      await shell.openExternal(targetUrl);
+
+      return {
+        success: true,
+        port: serverRes.port,
+        state: serverRes.state,
+        callbackUrl: serverRes.callbackUrl,
+        authUrl: targetUrl,
+      };
+    } catch (err: any) {
+      activeLoginSessionState = null;
+      console.error("[Electron Main] Failed to start loopback auth server:", err);
+      return {
+        success: false,
+        error: err.message || "Failed to initialize authentication server",
+      };
+    }
+  });
+
+  ipcMain.handle("auth:cancel-login", async () => {
+    activeLoginSessionState = null;
+    stopLoopbackAuthServer();
+    console.log("[Electron Main] Authentication session cancelled by user");
+    return { success: true };
   });
 
   // ---------------------------------------------------------------------------
@@ -720,6 +818,7 @@ app.whenReady().then(() => {
 });
 
 app.on("window-all-closed", () => {
+  stopLoopbackAuthServer();
   if (process.platform !== "darwin") {
     app.quit();
   }

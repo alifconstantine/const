@@ -108,8 +108,17 @@ declare global {
       isMaximized?: () => Promise<boolean>;
       onMaximizedChange?: (callback: (isMaximized: boolean) => void) => () => void;
       onAuthCallback: (
-        callback: (data: { url: string; token?: string }) => void
+        callback: (data: { url: string; token?: string; cancelled?: boolean; error?: string }) => void
       ) => () => void;
+      startAuth?: (options?: { accountsUrl?: string; action?: string }) => Promise<{
+        success: boolean;
+        port?: number;
+        state?: string;
+        callbackUrl?: string;
+        authUrl?: string;
+        error?: string;
+      }>;
+      cancelAuth?: () => Promise<{ success: boolean }>;
       sendMessage: (payload: {
         messages: any[];
         model?: string;

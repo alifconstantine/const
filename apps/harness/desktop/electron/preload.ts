@@ -19,11 +19,16 @@ contextBridge.exposeInMainWorld("electron", {
     ipcRenderer.on("window:maximized-change", handler);
     return () => ipcRenderer.removeListener("window:maximized-change", handler);
   },
-  onAuthCallback: (callback: (data: { url: string; token?: string }) => void) => {
+  onAuthCallback: (
+    callback: (data: { url: string; token?: string; cancelled?: boolean; error?: string }) => void
+  ) => {
     const handler = (_event: any, data: any) => callback(data);
     ipcRenderer.on("auth:deep-link", handler);
     return () => ipcRenderer.removeListener("auth:deep-link", handler);
   },
+  startAuth: (options?: { accountsUrl?: string }) =>
+    ipcRenderer.invoke("auth:start-login", options),
+  cancelAuth: () => ipcRenderer.invoke("auth:cancel-login"),
   sendMessage: (payload: {
     messages: any[];
     model?: string;

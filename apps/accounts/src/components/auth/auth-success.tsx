@@ -139,13 +139,17 @@ export function AuthSuccess({ user: _user, forceProceed = false }: AuthSuccessPr
       }
     } catch {}
 
-    // 3. Construct final destination with token & optional refreshToken
+    // 3. Construct final destination with token & optional refreshToken & state
     let destination = safeTarget || getDefaultRedirectUrl();
     if (safeTarget) {
       const separator = destination.includes("?") ? "&" : "?";
       let authParams = `token=${encodeURIComponent(activeToken)}`;
       if (refreshToken) {
         authParams += `&refreshToken=${encodeURIComponent(refreshToken)}`;
+      }
+      const state = params.get("state");
+      if (state) {
+        authParams += `&state=${encodeURIComponent(state)}`;
       }
       destination = `${destination}${separator}${authParams}`;
     }
@@ -159,13 +163,34 @@ export function AuthSuccess({ user: _user, forceProceed = false }: AuthSuccessPr
       // Instant redirect via replaceState/location.replace without delays or intermediate screens
       window.location.replace(destination);
     } else {
-      // NATIVE APP FLOW (e.g. apps/learn desktop/mobile):
-      // 1. Invoke native deep-link protocol handler once
+      // NATIVE APP FLOW (e.g. apps/learn desktop/mobile, apps/harness):
+      // 1. Attempt background notify to local loopback server (for Linux & friction-free auth)
+      const port = params.get("port") || "24125";
+      const state = params.get("state") || "";
+      const stateParam = state ? `&state=${encodeURIComponent(state)}` : "";
+
+      if (destination.includes("const-harness") || appName.toLowerCase().includes("harness")) {
+        try {
+          fetch(`http://127.0.0.1:${port}/callback?token=${encodeURIComponent(activeToken)}${stateParam}`, {
+            mode: "no-cors",
+          }).catch(() => {});
+        } catch {}
+      }
+
+      // 2. Invoke native deep-link protocol handler once
       window.location.href = destination;
-      // 2. Transition browser tab to dedicated clean /auth-success page (Antigravity style)
-      const appCode = appName.toLowerCase().includes("learn") ? "learn" : "app";
+      // 3. Transition browser tab to dedicated clean /auth-success page (Antigravity style)
+      const appCode = appName.toLowerCase().includes("learn")
+        ? "learn"
+        : appName.toLowerCase().includes("harness")
+        ? "harness"
+        : "app";
+      let successUrl = `/auth-success?app=${appCode}`;
+      if (params.get("port")) successUrl += `&port=${encodeURIComponent(port)}`;
+      if (state) successUrl += `&state=${encodeURIComponent(state)}`;
+
       setTimeout(() => {
-        window.location.replace(`/auth-success?app=${appCode}`);
+        window.location.replace(successUrl);
       }, 250);
     }
   }, [activeToken]);

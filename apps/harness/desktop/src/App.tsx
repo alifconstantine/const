@@ -1154,6 +1154,10 @@ export default function App() {
     return localStorage.getItem("const_harness_auth_token");
   });
   const [isWaitingAuth, setIsWaitingAuth] = useState(false);
+  const isWaitingAuthRef = useRef(false);
+  isWaitingAuthRef.current = isWaitingAuth;
+  const [manualToken, setManualToken] = useState("");
+  const [showManualInput, setShowManualInput] = useState(false);
 
   // Set Accounts Hub URL: Default to production accounts.const.web.id
   const accountsBaseUrl =
@@ -1164,11 +1168,25 @@ export default function App() {
     // 1. Electron deep-link listener
     if (window.electron?.onAuthCallback) {
       const unsubscribe = window.electron.onAuthCallback(
-        (data: { url: string; token?: string }) => {
+        (data: { url: string; token?: string; cancelled?: boolean; error?: string }) => {
+          // If cancelled by main process or state invalidated
+          if (data.cancelled) {
+            toast.info("Sign-in attempt was cancelled. Click 'Sign in' to try again.");
+            return;
+          }
+
+          // Strict UI guard: If user is no longer waiting (clicked Cancel), reject callback
+          if (!isWaitingAuthRef.current) {
+            toast.info("Sign-in attempt was cancelled. Click 'Sign in' to try again.");
+            return;
+          }
+
           if (data.token) {
             localStorage.setItem("const_harness_auth_token", data.token);
             setToken(data.token);
             setIsWaitingAuth(false);
+            isWaitingAuthRef.current = false;
+            toast.success("Signed in successfully");
           }
         }
       );
@@ -1177,9 +1195,10 @@ export default function App() {
 
     // 2. Storage event listener (sync across windows or tabs)
     const handleStorage = (e: StorageEvent) => {
-      if (e.key === "const_harness_auth_token" && e.newValue) {
+      if (e.key === "const_harness_auth_token" && e.newValue && isWaitingAuthRef.current) {
         setToken(e.newValue);
         setIsWaitingAuth(false);
+        isWaitingAuthRef.current = false;
       }
     };
     window.addEventListener("storage", handleStorage);
@@ -1187,10 +1206,11 @@ export default function App() {
     // 3. Browser query param fallback (if tested in browser)
     const searchParams = new URLSearchParams(window.location.search);
     const urlToken = searchParams.get("token");
-    if (urlToken) {
+    if (urlToken && isWaitingAuthRef.current) {
       localStorage.setItem("const_harness_auth_token", urlToken);
       setToken(urlToken);
       setIsWaitingAuth(false);
+      isWaitingAuthRef.current = false;
       window.history.replaceState({}, document.title, window.location.pathname);
     }
 
@@ -1213,19 +1233,60 @@ export default function App() {
   }, [isWaitingAuth]);
 
   const handleSignIn = async () => {
-    const continueTarget = window.electron?.openExternal
-      ? "const-harness://callback"
-      : `${window.location.origin}${window.location.pathname}`;
-
-    const base = accountsBaseUrl.replace(/\/+$/, "");
-    const targetUrl = `${base}/?continue=${encodeURIComponent(continueTarget)}&prompt=select_account`;
     setIsWaitingAuth(true);
+    isWaitingAuthRef.current = true;
 
-    if (window.electron?.openExternal) {
-      await window.electron.openExternal(targetUrl);
+    if (window.electron?.startAuth) {
+      try {
+        const res = await window.electron.startAuth({
+          accountsUrl: accountsBaseUrl,
+        });
+        if (!res.success) {
+          toast.error(res.error || "Failed to start authentication");
+          setIsWaitingAuth(false);
+          isWaitingAuthRef.current = false;
+        }
+      } catch (err: any) {
+        toast.error(err.message || "Failed to start authentication server");
+        setIsWaitingAuth(false);
+        isWaitingAuthRef.current = false;
+      }
     } else {
+      const continueTarget = `${window.location.origin}${window.location.pathname}`;
+      const base = accountsBaseUrl.replace(/\/+$/, "");
+      const targetUrl = `${base}/?continue=${encodeURIComponent(continueTarget)}&prompt=select_account&app=harness`;
       window.location.href = targetUrl;
     }
+  };
+
+  const handleCancelAuth = async () => {
+    setIsWaitingAuth(false);
+    isWaitingAuthRef.current = false;
+    setShowManualInput(false);
+    setManualToken("");
+
+    if (window.electron?.cancelAuth) {
+      try {
+        await window.electron.cancelAuth();
+      } catch {}
+    }
+
+    localStorage.removeItem("const_harness_auth_token");
+    localStorage.removeItem("const_sso_token");
+    toast.info("Sign-in cancelled");
+  };
+
+  const handleManualTokenSubmit = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const cleanToken = manualToken.trim();
+    if (!cleanToken || cleanToken.length < 10 || !/^[A-Za-z0-9_\-\.\+\=\|\~]+$/.test(cleanToken)) {
+      toast.error("Invalid token format");
+      return;
+    }
+    localStorage.setItem("const_harness_auth_token", cleanToken);
+    setToken(cleanToken);
+    setIsWaitingAuth(false);
+    toast.success("Authenticated successfully");
   };
 
   const handleSignOut = () => {
@@ -1241,16 +1302,24 @@ export default function App() {
     setToken(null);
     setIsWaitingAuth(true);
 
-    const continueTarget = window.electron?.openExternal
-      ? "const-harness://callback"
-      : `${window.location.origin}${window.location.pathname}`;
-
-    const base = accountsBaseUrl.replace(/\/+$/, "");
-    const targetUrl = `${base}/?continue=${encodeURIComponent(continueTarget)}&action=switch_account`;
-
-    if (window.electron?.openExternal) {
-      await window.electron.openExternal(targetUrl);
+    if (window.electron?.startAuth) {
+      try {
+        const res = await window.electron.startAuth({
+          accountsUrl: accountsBaseUrl,
+          action: "switch_account",
+        });
+        if (!res.success) {
+          toast.error(res.error || "Failed to switch account");
+          setIsWaitingAuth(false);
+        }
+      } catch (err: any) {
+        toast.error(err.message || "Failed to switch account");
+        setIsWaitingAuth(false);
+      }
     } else {
+      const continueTarget = `${window.location.origin}${window.location.pathname}`;
+      const base = accountsBaseUrl.replace(/\/+$/, "");
+      const targetUrl = `${base}/?continue=${encodeURIComponent(continueTarget)}&action=switch_account&app=harness`;
       window.location.href = targetUrl;
     }
   };
@@ -1298,15 +1367,73 @@ export default function App() {
             Sign in to start building and debugging with native AI agents — no complex setup required.
           </p>
 
-          <div className="mt-8 space-y-4">
-            <Button
-              onClick={handleSignIn}
-              size="lg"
-              className="w-full h-12 rounded-xl text-sm font-medium gap-2 cursor-pointer transition-all active:scale-[0.99]"
-            >
-              <LogIn className="h-4 w-4" />
-              {isWaitingAuth ? "Return to Login Tab" : "Sign in to Const Harness"}
-            </Button>
+          <div className="mt-8 min-h-[148px]">
+            {!isWaitingAuth ? (
+              <Button
+                onClick={handleSignIn}
+                size="lg"
+                className="w-full h-12 rounded-xl text-sm font-medium gap-2 cursor-pointer transition-all active:scale-[0.99]"
+              >
+                <LogIn className="h-4 w-4" />
+                Sign in to Const Harness
+              </Button>
+            ) : (
+              <div className="space-y-3 animate-in fade-in duration-300">
+                {/* Button 1: Waiting state matching user reference image */}
+                <div className="w-full h-12 rounded-xl text-sm font-medium gap-2.5 flex items-center justify-center bg-[#222222] border border-[#383838] text-[#969696] select-none cursor-wait transition-all">
+                  <Loader2 className="h-4 w-4 animate-spin text-[#969696]" />
+                  <span>Waiting for Const authentication...</span>
+                </div>
+
+                {/* Button 2: Cancel button smoothly animated in */}
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleCancelAuth}
+                  className="w-full h-12 rounded-xl text-sm font-medium border border-[#383838] bg-[#2b2b2b] hover:bg-[#383838] text-[#d4d4d4] hover:text-white cursor-pointer transition-all active:scale-[0.99] animate-in fade-in slide-in-from-top-1 duration-200"
+                >
+                  Cancel
+                </Button>
+
+                {/* Manual token fallback */}
+                <div className="pt-2 text-center">
+                  {!showManualInput ? (
+                    <button
+                      type="button"
+                      onClick={() => setShowManualInput(true)}
+                      className="text-[11px] text-[#5d5d5d] hover:text-[#969696] underline underline-offset-4 cursor-pointer transition-colors"
+                    >
+                      Having trouble? Enter token manually
+                    </button>
+                  ) : (
+                    <form
+                      onSubmit={handleManualTokenSubmit}
+                      className="space-y-2 text-left mt-2 p-3 rounded-xl bg-[#222222] border border-[#383838] animate-in fade-in duration-200"
+                    >
+                      <label className="text-[11px] font-medium text-[#969696]">
+                        Paste authentication token:
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={manualToken}
+                          onChange={(e) => setManualToken(e.target.value)}
+                          placeholder="eyJhbGciOi..."
+                          className="flex-1 h-9 px-3 text-xs bg-[#2b2b2b] border border-[#383838] rounded-xl text-[#d4d4d4] placeholder-[#5d5d5d] focus:outline-none focus:border-[#5d5d5d]"
+                        />
+                        <Button
+                          type="submit"
+                          size="sm"
+                          className="h-9 px-3 text-xs rounded-xl"
+                        >
+                          Verify
+                        </Button>
+                      </div>
+                    </form>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
 
