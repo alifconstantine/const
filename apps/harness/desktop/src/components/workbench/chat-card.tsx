@@ -23,7 +23,14 @@ import {
   X,
   Brain,
 } from "lucide-react";
-import { ScrollArea, cn } from "@const/ui";
+import {
+  ScrollArea,
+  cn,
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+  TooltipProvider,
+} from "@const/ui";
 import { useQuery } from "convex/react";
 import { api } from "@const/backend/_generated/api";
 import { ImageLightbox } from "./image-lightbox";
@@ -801,91 +808,97 @@ export function ChatCard({
         >
           {/* Attachments Shelf (Square Cards for Images, Videos, PDFs, Docs) */}
           {attachments.length > 0 && (
-            <div className="w-full flex items-center gap-2.5 pt-7 pb-2 px-1 overflow-x-auto select-none scrollbar-none">
-              {attachments.map((file) => {
-                const isImage = file.type === "image";
-                const isVideo = file.type === "video";
-                const isMedia = isImage || isVideo;
-                const ext = (file.name.split(".").pop() || "FILE").toUpperCase();
+            <div className="w-full flex items-center gap-2.5 pt-1.5 pb-2.5 px-0.5 overflow-x-auto select-none scrollbar-none">
+              <TooltipProvider delayDuration={150}>
+                {attachments.map((file) => {
+                  const isImage = file.type === "image";
+                  const isVideo = file.type === "video";
+                  const isMedia = isImage || isVideo;
+                  const ext = (file.name.split(".").pop() || "FILE").toUpperCase();
 
-                return (
-                  <div
-                    key={file.id}
-                    onClick={() => setPreviewItem(file)}
-                    className={`relative w-20 h-20 group shrink-0 rounded-xl border border-[#e2e2e4] dark:border-[#383838] shadow-sm animate-in fade-in zoom-in-95 duration-100 bg-[#f4f4f6] dark:bg-[#1a1917] select-none cursor-pointer transition-all ${
-                      isMedia
-                        ? "hover:opacity-90 active:scale-[0.98]"
-                        : "hover:border-black/30 dark:hover:border-white/30"
-                    }`}
-                  >
-                    {isImage && file.url ? (
-                      <div className="w-full h-full rounded-xl overflow-hidden">
-                        <img
-                          src={file.url}
-                          alt={file.name}
-                          className="w-full h-full object-cover block"
-                        />
-                      </div>
-                    ) : isVideo ? (
-                      <div className="w-full h-full rounded-xl overflow-hidden bg-black relative">
-                        {file.url && (
-                          <video
-                            src={file.url}
-                            className="w-full h-full object-cover block pointer-events-none"
-                            muted
-                            playsInline
-                            autoPlay
-                            loop
-                          />
-                        )}
-                        <span className="absolute bottom-1 right-1 text-[8px] font-bold text-white bg-black/60 px-1 py-0.5 rounded uppercase tracking-wider font-mono">
-                          Video
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="w-full h-full p-2 flex flex-col justify-between items-start text-left bg-[#f4f4f6] dark:bg-[#1a1917]/70 rounded-xl">
-                        <div className="flex items-center justify-between w-full">
-                          <span className="text-[9px] font-bold text-[#888888] dark:text-[#888888] tracking-wider uppercase font-mono">
-                            {ext}
-                          </span>
-                          <FileText className="w-3.5 h-3.5 text-[#e79737] shrink-0" />
+                  return (
+                    <Tooltip key={file.id}>
+                      <TooltipTrigger asChild>
+                        <div
+                          onClick={() => setPreviewItem(file)}
+                          className={`relative w-20 h-20 group shrink-0 rounded-xl border border-[#e2e2e4] dark:border-[#383838] shadow-sm animate-in fade-in zoom-in-95 duration-100 bg-[#f4f4f6] dark:bg-[#1a1917] select-none cursor-pointer transition-all ${
+                            isMedia
+                              ? "hover:opacity-90 active:scale-[0.98]"
+                              : "hover:border-black/30 dark:hover:border-white/30"
+                          }`}
+                        >
+                          {isImage && file.url ? (
+                            <div className="w-full h-full rounded-xl overflow-hidden">
+                              <img
+                                src={file.url}
+                                alt={file.name}
+                                className="w-full h-full object-cover block"
+                              />
+                            </div>
+                          ) : isVideo ? (
+                            <div className="w-full h-full rounded-xl overflow-hidden bg-black relative">
+                              {file.url && (
+                                <video
+                                  src={file.url}
+                                  className="w-full h-full object-cover block pointer-events-none"
+                                  muted
+                                  playsInline
+                                  autoPlay
+                                  loop
+                                />
+                              )}
+                              <span className="absolute bottom-1 right-1 text-[8px] font-bold text-white bg-black/60 px-1 py-0.5 rounded uppercase tracking-wider font-mono">
+                                Video
+                              </span>
+                            </div>
+                          ) : (
+                            <div className="w-full h-full p-2 flex flex-col justify-between items-start text-left bg-[#f4f4f6] dark:bg-[#1a1917]/70 rounded-xl">
+                              <div className="flex items-center justify-between w-full">
+                                <span className="text-[9px] font-bold text-[#888888] dark:text-[#888888] tracking-wider uppercase font-mono">
+                                  {ext}
+                                </span>
+                                <FileText className="w-3.5 h-3.5 text-[#e79737] shrink-0" />
+                              </div>
+                              <div className="w-full min-w-0">
+                                <span className="text-[11px] font-medium text-[#262626] dark:text-[#d4d4d4] leading-tight w-full line-clamp-2 break-words block">
+                                  {file.name}
+                                </span>
+                                <span className="text-[8.5px] text-[#a9a9a9] dark:text-[#777777] font-mono mt-0.5 block truncate">
+                                  {formatFileSize(file.size)}
+                                </span>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Close / Remove button */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              removeAttachment(file.id);
+                            }}
+                            className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-white dark:bg-[#262626] shadow-md border border-[#e2e2e4] dark:border-[#444444] flex items-center justify-center cursor-pointer text-[#555555] dark:text-[#cccccc] hover:bg-[#e11d48] hover:text-white dark:hover:bg-[#e11d48] dark:hover:text-white dark:hover:border-[#e11d48] hover:scale-105 active:scale-95 transition-all z-20"
+                            title="Remove attachment"
+                            aria-label="Remove attachment"
+                          >
+                            <X className="w-3 h-3 stroke-[2.5]" />
+                          </button>
                         </div>
-                        <div className="w-full min-w-0">
-                          <span className="text-[11px] font-medium text-[#262626] dark:text-[#d4d4d4] leading-tight w-full line-clamp-2 break-words block">
-                            {file.name}
-                          </span>
-                          <span className="text-[8.5px] text-[#a9a9a9] dark:text-[#777777] font-mono mt-0.5 block truncate">
-                            {formatFileSize(file.size)}
-                          </span>
+                      </TooltipTrigger>
+                      <TooltipContent
+                        side="top"
+                        sideOffset={6}
+                        className="z-50 max-w-[220px] bg-[#262626] dark:bg-[#1e1e1e] text-white dark:text-[#e0e0e0] text-[11px] px-2.5 py-1.5 rounded-lg shadow-2xl border border-black/10 dark:border-[#383838] select-none pointer-events-none break-all"
+                      >
+                        <div className="font-medium truncate max-w-[200px]">{file.name}</div>
+                        <div className="text-[9.5px] text-[#a0a0a0] font-mono mt-0.5">
+                          {formatFileSize(file.size)}
                         </div>
-                      </div>
-                    )}
-
-                    {/* Close / Remove button */}
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        removeAttachment(file.id);
-                      }}
-                      className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-white dark:bg-[#262626] shadow-md border border-[#e2e2e4] dark:border-[#444444] flex items-center justify-center cursor-pointer text-[#555555] dark:text-[#cccccc] hover:bg-[#e11d48] hover:text-white dark:hover:bg-[#e11d48] dark:hover:text-white dark:hover:border-[#e11d48] hover:scale-105 active:scale-95 transition-all z-20"
-                      title="Remove attachment"
-                      aria-label="Remove attachment"
-                    >
-                      <X className="w-3 h-3 stroke-[2.5]" />
-                    </button>
-
-                    {/* Tooltip on hover (positioned above card) */}
-                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-[200px] bg-[#262626] dark:bg-[#1e1e1e] text-white dark:text-[#e0e0e0] text-[10.5px] px-2.5 py-1 rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-150 shadow-xl z-30 select-none break-all border border-black/10 dark:border-[#383838]">
-                      <div className="font-medium truncate max-w-[180px]">{file.name}</div>
-                      <div className="text-[9px] text-[#a0a0a0] font-mono mt-0.5">
-                        {formatFileSize(file.size)}
-                      </div>
-                      <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-[#262626] dark:bg-[#1e1e1e] border-b border-r border-black/10 dark:border-[#383838] rotate-45" />
-                    </div>
-                  </div>
-                );
-              })}
+                      </TooltipContent>
+                    </Tooltip>
+                  );
+                })}
+              </TooltipProvider>
             </div>
           )}
 
