@@ -508,7 +508,7 @@ export function Sidebar({
               <DropdownMenuTrigger asChild>
                 <button
                   type="button"
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[#ffffff] dark:bg-[#222222] hover:bg-[#dedee2] dark:hover:bg-[#383838] text-[#262626] dark:text-[#d4d4d4] rounded-lg text-xs font-medium transition-colors cursor-pointer outline-none select-none border border-[#dedee2] dark:border-transparent"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-transparent hover:bg-[#dedee2] dark:hover:bg-[#383838] data-[state=open]:bg-[#dedee2] dark:data-[state=open]:bg-[#383838] text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white dark:data-[state=open]:text-white rounded-lg text-xs font-medium transition-colors cursor-pointer outline-none select-none"
                 >
                   {activeTab === "recent" && (
                     <>
