@@ -249,11 +249,44 @@ export function ChatCard({
 
   const [models, setModels] = useState<ModelItem[]>([
     {
+      id: "deepseek-v4-flash",
+      name: "DeepSeek-V4-Flash",
+      desc: "Frontier speed & reasoning",
+      provider: "deepseek",
+      providerName: "DeepSeek",
+      supportsThinking: true,
+      thinkingLevels: ["low", "medium", "high"],
+      defaultThinkingLevel: "medium",
+      maxOutputTokens: 128000,
+    },
+    {
+      id: "deepseek-v4-pro",
+      name: "DeepSeek-V4-Pro",
+      desc: "Advanced reasoning & deep code generation",
+      provider: "deepseek",
+      providerName: "DeepSeek",
+      supportsThinking: true,
+      thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
+      defaultThinkingLevel: "high",
+      maxOutputTokens: 128000,
+    },
+    {
+      id: "deepseek-v4-flash-vision-exp",
+      name: "DeepSeek-V4-Flash-Vision-Exp",
+      desc: "Multimodal frontier reasoning",
+      provider: "deepseek",
+      providerName: "DeepSeek",
+      supportsThinking: true,
+      thinkingLevels: ["low", "medium", "high"],
+      defaultThinkingLevel: "medium",
+      maxOutputTokens: 128000,
+    },
+    {
       id: "gemini-3.6-flash",
       name: "Gemini 3.6 Flash",
       desc: "Frontier multimodal reasoning & code generation",
       provider: "const",
-      providerName: "Const",
+      providerName: "ConstRouter",
       supportsThinking: true,
       thinkingLevels: ["low", "medium", "high"],
       defaultThinkingLevel: "medium",
@@ -264,7 +297,7 @@ export function ChatCard({
       name: "Gemini 3.7 Flash",
       desc: "Hybrid frontier reasoning model",
       provider: "const",
-      providerName: "Const",
+      providerName: "ConstRouter",
       supportsThinking: true,
       thinkingLevels: ["low", "medium", "high"],
       defaultThinkingLevel: "medium",
@@ -275,7 +308,7 @@ export function ChatCard({
       name: "Gemini 3.8 Flash",
       desc: "Advanced frontier thinking & max depth",
       provider: "const",
-      providerName: "Const",
+      providerName: "ConstRouter",
       supportsThinking: true,
       thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
       defaultThinkingLevel: "medium",
@@ -286,7 +319,7 @@ export function ChatCard({
       name: "combo/auto",
       desc: "Virtual Combo auto router with dynamic reasoning",
       provider: "const",
-      providerName: "Const",
+      providerName: "ConstRouter",
       supportsThinking: true,
       thinkingLevels: ["low", "medium", "high"],
       defaultThinkingLevel: "medium",
@@ -297,7 +330,7 @@ export function ChatCard({
       name: "combo/fast",
       desc: "Virtual Combo fast chain optimized for sub-second latency",
       provider: "const",
-      providerName: "Const",
+      providerName: "ConstRouter",
       supportsThinking: false,
       maxOutputTokens: 128000,
     },
@@ -306,28 +339,22 @@ export function ChatCard({
       name: "combo/coding",
       desc: "Virtual Combo coding chain optimized for high-depth reasoning",
       provider: "const",
-      providerName: "Const",
+      providerName: "ConstRouter",
       supportsThinking: true,
       thinkingLevels: ["low", "medium", "high"],
       defaultThinkingLevel: "high",
       maxOutputTokens: 128000,
     },
   ]);
-  const [expandedProviders, setExpandedProviders] = useState<Record<string, boolean>>({});
 
-  const toggleProvider = (providerId: string) => {
-    setExpandedProviders((prev) => ({
-      ...prev,
-      [providerId]: !prev[providerId],
-    }));
-  };
+  const [searchModelQuery, setSearchModelQuery] = useState("");
 
   const groupedModels = useMemo(() => {
     const map = new Map<string, { providerId: string; providerName: string; items: ModelItem[] }>();
     for (const m of models) {
       const isConst = isConstProvider(m.provider);
       const pid = isConst ? "const" : (m.provider || "custom");
-      const pname = isConst ? "Const" : (m.providerName || "Custom");
+      const pname = isConst ? "ConstRouter" : (m.providerName || "Custom");
       if (!map.has(pid)) {
         map.set(pid, { providerId: pid, providerName: pname, items: [] });
       }
@@ -335,6 +362,27 @@ export function ChatCard({
     }
     return Array.from(map.values());
   }, [models]);
+
+  const filteredGroupedModels = useMemo(() => {
+    const q = searchModelQuery.toLowerCase().trim();
+    if (!q) return groupedModels;
+
+    return groupedModels
+      .map((group) => {
+        const matchesProvider = group.providerName.toLowerCase().includes(q);
+        const matchingItems = group.items.filter(
+          (m) =>
+            matchesProvider ||
+            m.name.toLowerCase().includes(q) ||
+            m.id.toLowerCase().includes(q)
+        );
+        return {
+          ...group,
+          items: matchingItems,
+        };
+      })
+      .filter((group) => group.items.length > 0);
+  }, [groupedModels, searchModelQuery]);
 
   const [selectedModel, setSelectedModel] = useState<string | null>(() => {
     const saved = localStorage.getItem("const_harness_active_model");
@@ -1179,7 +1227,10 @@ export function ChatCard({
                 <button
                   type="button"
                   onClick={() => {
-                    setIsModelOpen((prev) => !prev);
+                    setIsModelOpen((prev) => {
+                      if (!prev) setSearchModelQuery("");
+                      return !prev;
+                    });
                     setIsThinkingOpen(false);
                     setIsProjectOpen(false);
                     setIsModeOpen(false);
@@ -1194,95 +1245,91 @@ export function ChatCard({
 
                 {/* Model Selector Popover */}
                 {isModelOpen && (
-                  <div className="absolute bottom-full mb-2 right-0 w-72 bg-white dark:bg-[#222222] border border-[#e2e2e4] dark:border-[#383838] rounded-2xl shadow-2xl p-2 z-50 flex flex-col text-left select-none animate-in fade-in zoom-in-95 duration-100">
+                  <div className="absolute bottom-full mb-2 right-0 w-[260px] max-w-[280px] bg-white dark:bg-[#1e1e1e] border border-[#e2e2e4] dark:border-[#333333] rounded-2xl shadow-2xl p-1.5 z-50 flex flex-col text-left select-none animate-in fade-in zoom-in-95 duration-100">
                     {models.length > 0 ? (
                       <>
-                        <div className="px-2.5 py-1.5 flex items-center justify-between text-[11px] font-medium tracking-wider text-[#a9a9a9] dark:text-[#969696] border-b border-[#e2e2e4] dark:border-[#383838]/40 mb-1.5">
-                          <span className="uppercase tracking-wider">Models</span>
-                          {quota && (
-                            <span className="text-[10px] text-[#16a34a] dark:text-[#4ade80] font-mono">
-                              {formatTokenDisplay(quota.remainingTokens)} left
-                            </span>
+                        {/* Search Input at the top */}
+                        <div className="flex items-center gap-2 px-2 py-1 mb-1 border-b border-[#e2e2e4] dark:border-[#333333]/60">
+                          <Search className="w-3.5 h-3.5 text-[#a9a9a9] dark:text-[#777777] shrink-0" />
+                          <input
+                            type="text"
+                            value={searchModelQuery}
+                            onChange={(e) => setSearchModelQuery(e.target.value)}
+                            placeholder="Search models..."
+                            className="w-full bg-transparent text-[12px] text-[#262626] dark:text-[#d4d4d4] placeholder:text-[#a9a9a9] dark:placeholder:text-[#666666] outline-none font-sans"
+                            autoFocus
+                          />
+                          {searchModelQuery && (
+                            <button
+                              type="button"
+                              onClick={() => setSearchModelQuery("")}
+                              className="p-0.5 hover:bg-black/5 dark:hover:bg-white/10 rounded text-[#a9a9a9] hover:text-[#262626] dark:hover:text-white transition-colors cursor-pointer"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
                           )}
                         </div>
 
-                        <div className="flex flex-col gap-1 pr-0.5">
-                          {groupedModels.map((group) => {
-                            const isExpanded = Boolean(expandedProviders[group.providerId]);
-                            return (
-                              <div key={group.providerId} className="flex flex-col">
-                                {/* Collapsible Models List under this Provider */}
-                                {isExpanded && (
-                                  <div className="pl-3 pr-1 py-0.5 border-l border-[#e2e2e4] dark:border-[#383838]/40 ml-3.5 mb-1.5">
-                                    <ScrollArea className="max-h-56">
-                                      <div className="space-y-0.5 pr-2">
-                                        {group.items.map((m) => {
-                                          const isSelected =
-                                            selectedModel === m.name || selectedModel === m.id;
-                                          return (
-                                            <button
-                                              key={m.id}
-                                              type="button"
-                                              onClick={() => {
-                                                setSelectedModel(m.name);
-                                                localStorage.setItem("const_harness_active_model", m.name);
-                                                window.electron?.saveConfig?.({ activeModel: m.id });
-                                                if (m.id === "combo/coding" || m.name === "combo/coding") {
-                                                  setThinkingLevel("high");
-                                                  localStorage.setItem("const_harness_thinking_level", "high");
-                                                } else if (m.defaultThinkingLevel) {
-                                                  setThinkingLevel(m.defaultThinkingLevel);
-                                                  localStorage.setItem("const_harness_thinking_level", m.defaultThinkingLevel);
-                                                }
-                                                setIsModelOpen(false);
-                                              }}
-                                              className={cn(
-                                                "w-full px-2 py-1.5 flex items-center justify-between text-[12px] rounded-lg transition-colors cursor-pointer",
-                                                isSelected
-                                                  ? "bg-black/10 dark:bg-white/10 text-black dark:text-white font-medium"
-                                                  : "text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5"
-                                              )}
-                                            >
-                                              <div className="flex items-center text-left min-w-0 pr-1">
-                                                <span className="font-normal truncate">{m.name}</span>
-                                              </div>
-                                              {isSelected && (
-                                                <Check className="w-3.5 h-3.5 text-[#262626] dark:text-[#d4d4d4] shrink-0 ml-2" />
-                                              )}
-                                            </button>
-                                          );
-                                        })}
-                                      </div>
-                                    </ScrollArea>
+                        {/* Models categorized with ScrollArea */}
+                        {filteredGroupedModels.length > 0 ? (
+                          <ScrollArea className="max-h-[300px] w-full" viewportClassName="pr-1">
+                            <div className="space-y-2 py-0.5 pr-0.5">
+                              {filteredGroupedModels.map((group) => (
+                                <div key={group.providerId} className="flex flex-col">
+                                  {/* Category Header */}
+                                  <div className="px-2 pt-1 pb-0.5 text-[11px] font-medium text-[#5ea0e8] dark:text-[#5ea0e8] select-none tracking-wide">
+                                    {group.providerName}
                                   </div>
-                                )}
 
-                                {/* Provider Accordion Trigger Row */}
-                                <button
-                                  type="button"
-                                  onClick={() => toggleProvider(group.providerId)}
-                                  className="w-full px-2.5 py-1.5 flex items-center justify-between text-[12px] font-medium text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 rounded-xl transition-colors cursor-pointer group"
-                                >
-                                  <div className="flex items-center">
-                                    <span className="text-[#262626] dark:text-[#d4d4d4] group-hover:text-black dark:group-hover:text-white font-medium text-[13px]">
-                                      {group.providerName}
-                                    </span>
+                                  {/* Model Items */}
+                                  <div className="flex flex-col space-y-0.5">
+                                    {group.items.map((m) => {
+                                      const isSelected =
+                                        selectedModel === m.name || selectedModel === m.id;
+                                      return (
+                                        <button
+                                          key={m.id}
+                                          type="button"
+                                          onClick={() => {
+                                            setSelectedModel(m.name);
+                                            localStorage.setItem("const_harness_active_model", m.name);
+                                            window.electron?.saveConfig?.({ activeModel: m.id });
+                                            if (m.id === "combo/coding" || m.name === "combo/coding") {
+                                              setThinkingLevel("high");
+                                              localStorage.setItem("const_harness_thinking_level", "high");
+                                            } else if (m.defaultThinkingLevel) {
+                                              setThinkingLevel(m.defaultThinkingLevel);
+                                              localStorage.setItem("const_harness_thinking_level", m.defaultThinkingLevel);
+                                            }
+                                            setIsModelOpen(false);
+                                          }}
+                                          className={cn(
+                                            "w-full px-2.5 py-1.5 flex items-center justify-between text-[13px] rounded-lg transition-colors cursor-pointer text-left",
+                                            isSelected
+                                              ? "bg-black/5 dark:bg-white/[0.08] text-black dark:text-white font-medium"
+                                              : "text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/[0.06]"
+                                          )}
+                                        >
+                                          <span className="truncate font-normal min-w-0 pr-2">{m.name}</span>
+                                          {isSelected && (
+                                            <Check className="w-4 h-4 text-[#262626] dark:text-white shrink-0 ml-auto" />
+                                          )}
+                                        </button>
+                                      );
+                                    })}
                                   </div>
-                                  <div className="flex items-center">
-                                    {isExpanded ? (
-                                      <ChevronDown className="w-3.5 h-3.5 text-[#a9a9a9] dark:text-[#888888] group-hover:text-[#262626] dark:group-hover:text-[#d4d4d4] shrink-0 transition-transform" />
-                                    ) : (
-                                      <ChevronUp className="w-3.5 h-3.5 text-[#a9a9a9] dark:text-[#888888] group-hover:text-[#262626] dark:group-hover:text-[#d4d4d4] shrink-0 transition-transform" />
-                                    )}
-                                  </div>
-                                </button>
-                              </div>
-                            );
-                          })}
-                        </div>
+                                </div>
+                              ))}
+                            </div>
+                          </ScrollArea>
+                        ) : (
+                          <div className="py-6 px-3 text-center text-xs text-[#a9a9a9] dark:text-[#777777]">
+                            No models found
+                          </div>
+                        )}
 
                         {/* Bottom Footer: Manage models */}
-                        <div className="h-[1px] bg-[#e2e2e4] dark:bg-[#383838]/60 my-1" />
+                        <div className="h-[1px] bg-[#e2e2e4] dark:bg-[#333333]/60 my-1" />
                         <button
                           type="button"
                           onClick={() => {
@@ -1348,9 +1395,8 @@ export function ChatCard({
                   {/* Thinking Level Popover Dropdown */}
                   {isThinkingOpen && (
                     <div className="absolute bottom-full mb-2 right-0 w-44 bg-white dark:bg-[#222222] border border-[#e2e2e4] dark:border-[#383838] rounded-2xl shadow-2xl p-1.5 z-50 flex flex-col text-left select-none animate-in fade-in zoom-in-95 duration-100">
-                      <div className="px-2 py-1 text-[11px] font-medium text-[#a9a9a9] dark:text-[#888888] uppercase tracking-wider mb-1 flex items-center justify-between">
+                      <div className="px-2 py-1 text-[11px] font-medium text-[#a9a9a9] dark:text-[#888888] uppercase tracking-wider mb-1">
                         <span>Thinking</span>
-                        <Brain className="w-3.5 h-3.5 text-[#a9a9a9] dark:text-[#777777]" />
                       </div>
                       <div className="flex flex-col gap-0.5">
                         {supportedThinkingLevels.map((lvl) => {
