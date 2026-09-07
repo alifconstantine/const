@@ -30,6 +30,7 @@ import { MarkdownContent } from "./components/workbench/markdown-content";
 import { ExecutionTrace, MutationsSummaryCard } from "./components/workbench/execution-trace";
 import { ReviewDialog } from "./components/workbench/review-dialog";
 import { SettingsView } from "./components/settings-view";
+import { ScheduledTasksView } from "./components/scheduled-tasks";
 import { useAppAuth } from "./components/convex-provider";
 import { useConversationWidth } from "./lib/theme";
 import {
@@ -97,6 +98,7 @@ function AuthenticatedContent({
   const { token } = useAppAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isScheduledTasksOpen, setIsScheduledTasksOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState<string>("model");
   const greeting = getGreeting();
 
@@ -119,6 +121,10 @@ function AuthenticatedContent({
   const [conversationId, setConversationId] = useState<string>(
     () => `session_${Date.now()}`
   );
+  const conversationIdRef = React.useRef(conversationId);
+  useEffect(() => {
+    conversationIdRef.current = conversationId;
+  }, [conversationId]);
   const [conversationTitle, setConversationTitle] = useState<string>("");
   const [currentProject, setCurrentProject] = useState<string>(() => {
     return localStorage.getItem("const_harness_current_project") || "Outside Project";
@@ -380,6 +386,11 @@ function AuthenticatedContent({
     if (!window.electron?.onAgentEvent) return;
 
     const unsubscribe = window.electron.onAgentEvent((event: any) => {
+      // Guard against background scheduled tasks or other sessions polluting the active conversation
+      if (event.conversationId && event.conversationId !== conversationIdRef.current) {
+        return;
+      }
+
       if (event.type === "token") {
         setMessages((prev) => {
           if (prev.length === 0) return prev;
@@ -787,6 +798,7 @@ function AuthenticatedContent({
     if (isExecuting) {
       handleAbort();
     }
+    setIsScheduledTasksOpen(false);
     setMessages([]);
     setConversationTitle("");
     setConversationId(`session_${Date.now()}`);
@@ -802,6 +814,7 @@ function AuthenticatedContent({
     if (isExecuting) {
       handleAbort();
     }
+    setIsScheduledTasksOpen(false);
     const target = conversations.find((c) => c.id === id);
     if (target) {
       setConversationId(target.id);
@@ -879,6 +892,8 @@ function AuthenticatedContent({
           onArchiveConversation={handleArchiveConversation}
           onUnarchiveConversation={handleUnarchiveConversation}
           onOpenSettings={() => handleOpenSettings("model")}
+          onOpenScheduledTasks={() => setIsScheduledTasksOpen(true)}
+          isScheduledTasksActive={isScheduledTasksOpen}
         />
       )}
 
@@ -888,14 +903,25 @@ function AuthenticatedContent({
           isSidebarOpen ? "rounded-l-2xl sm:rounded-l-3xl border-l border-[#dedee2] dark:border-[#333333]/40" : ""
         }`}
       >
-        {/* Top Window Toolbar */}
-        <TopToolbar
-          isSidebarOpen={isSidebarOpen}
-          onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
-          onNewChat={handleNewChat}
-          conversationTitle={conversationTitle}
-          project={displayProject}
-        />
+        {isScheduledTasksOpen ? (
+          <ScheduledTasksView
+            onBackToWorkspace={() => setIsScheduledTasksOpen(false)}
+            onOpenSession={(sessionId) => {
+              setIsScheduledTasksOpen(false);
+              handleSelectConversation(sessionId);
+            }}
+            currentWorkspacePath={currentProject === "Outside Project" ? undefined : currentProject}
+          />
+        ) : (
+          <>
+            {/* Top Window Toolbar */}
+            <TopToolbar
+              isSidebarOpen={isSidebarOpen}
+              onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
+              onNewChat={handleNewChat}
+              conversationTitle={conversationTitle}
+              project={displayProject}
+            />
 
         {/* Dynamic Canvas: Landing Layout when 0 messages vs Active Stream Layout */}
         {messages.length === 0 ? (
@@ -1121,6 +1147,8 @@ function AuthenticatedContent({
               </div>
             </div>
           </div>
+        )}
+          </>
         )}
       </main>
 

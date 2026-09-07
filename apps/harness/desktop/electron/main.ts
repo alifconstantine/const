@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell, ipcMain, dialog, nativeTheme } from "electron";
+import { app, BrowserWindow, shell, ipcMain, dialog, nativeTheme, powerSaveBlocker } from "electron";
 import path from "node:path";
 import fs from "node:fs";
 import os from "node:os";
@@ -16,6 +16,11 @@ import {
   registerLinuxProtocolHandler,
   isValidAuthToken,
 } from "./auth-server";
+import {
+  ScheduledTasksManager,
+  type ScheduledTaskItem,
+  type ScheduledTaskSchedule,
+} from "./scheduled-tasks";
 
 // Initialize ~/.const/harness directory hierarchy (.gemini/antigravity aligned)
 const constHomeDir = path.join(os.homedir(), ".const");
@@ -35,6 +40,8 @@ if (!fs.existsSync(constConfigFile) && fs.existsSync(rootConfigFile)) {
 }
 
 const conversationDb = new ConversationDatabase(harnessHomeDir);
+const scheduledTasksDir = path.join(harnessHomeDir, "automations");
+let scheduledTasksManager: ScheduledTasksManager | null = null;
 
 export interface ProviderConfig {
   name: string;
@@ -238,6 +245,7 @@ if (!app.isPackaged) {
 let win: BrowserWindow | null = null;
 let pendingDeepLink: string | null = null;
 let activeLoginSessionState: string | null = null;
+let lastAuthToken: string | null = null;
 
 function extractTokenFromUrl(rawUrl: string): string | undefined {
   try {
@@ -307,6 +315,9 @@ function sendDeepLinkToRenderer(url: string) {
 
   // Consume session state upon first valid use (single-use nonce)
   activeLoginSessionState = null;
+  if (token) {
+    lastAuthToken = token;
+  }
   win.webContents.send("auth:deep-link", { url, token, cancelled: false });
 }
 
@@ -662,8 +673,11 @@ app.whenReady().then(() => {
       let apiKey = providerCfg?.apiKey || "";
 
       // Fallback for Const Router: use user's SSO authToken if available
+      if (payload.authToken && isValidAuthToken(payload.authToken)) {
+        lastAuthToken = payload.authToken;
+      }
       if (!apiKey && (providerKey === "const" || providerKey === "const-engine")) {
-        apiKey = payload.authToken || process.env.CONST_ROUTER_API_KEY || process.env.CONST_ENGINE_API_KEY || "const-local-dev-key";
+        apiKey = payload.authToken || lastAuthToken || process.env.CONST_ROUTER_API_KEY || process.env.CONST_ENGINE_API_KEY || "const-local-dev-key";
       }
 
       const convoId = payload.conversationId || `session_${Date.now()}`;
@@ -700,7 +714,7 @@ app.whenReady().then(() => {
           payload.messages,
           (agentEvent: any) => {
             if (win && !win.isDestroyed()) {
-              win.webContents.send("agent:stream-event", agentEvent);
+              win.webContents.send("agent:stream-event", { ...agentEvent, conversationId: convoId });
             }
             conversationDb.appendTranscriptEvent(convoId, agentEvent);
           }
@@ -808,6 +822,142 @@ app.whenReady().then(() => {
     }
   );
 
+  // ---------------------------------------------------------------------------
+  // Scheduled Tasks Manager & IPC Handlers
+  // ---------------------------------------------------------------------------
+  scheduledTasksManager = new ScheduledTasksManager(scheduledTasksDir, {
+    executeTaskRunner: async (task) => {
+      const convoId = `scheduled_${task.id}_${Date.now()}`;
+      const config = loadUserConfig();
+      const model = task.model || config.activeModel || "gemini-3.6-flash";
+
+      const allModels = [...DEFAULT_MODELS, ...(config.customModels || [])];
+      const modelDef = allModels.find((m) => m.id === model || m.displayName === model);
+      const providerKey = modelDef?.provider || config.activeProvider || "const";
+      const providerCfg =
+        config.providers[providerKey] ||
+        config.providers["const"] ||
+        config.providers["const-engine"];
+
+      let baseUrl =
+        modelDef?.baseUrl || providerCfg?.baseUrl || "https://router.const.web.id/v1";
+      let apiKey = providerCfg?.apiKey || "";
+
+      if (!apiKey && (providerKey === "const" || providerKey === "const-engine")) {
+        apiKey =
+          lastAuthToken ||
+          process.env.CONST_ROUTER_API_KEY ||
+          process.env.CONST_ENGINE_API_KEY ||
+          "const-local-dev-key";
+      }
+
+      let targetWorkspace: string;
+      if (task.workspacePath && fs.existsSync(task.workspacePath)) {
+        targetWorkspace = path.resolve(task.workspacePath);
+      } else {
+        targetWorkspace = path.join(constBrainDir, convoId);
+        if (!fs.existsSync(targetWorkspace)) {
+          fs.mkdirSync(targetWorkspace, { recursive: true });
+        }
+      }
+
+      // Scheduled tasks run autonomously in the background with full access
+      const agent = createConstAgent({
+        baseUrl,
+        apiKey,
+        model,
+        workspacePath: targetWorkspace,
+        mode: "full_access",
+        thinkingLevel: "medium",
+      });
+
+      const taskName = task.name || task.title;
+      const taskPrompt = task.prompt || task.instructions;
+
+      const initialMessage: AgentMessage = {
+        role: "user",
+        content: `[Scheduled Task: ${taskName}]\n\n${taskPrompt}`,
+      };
+
+      // Keep OS awake during background scheduled task execution
+      let blockerId: number | null = null;
+      try {
+        blockerId = powerSaveBlocker.start("prevent-app-suspension");
+      } catch {}
+
+      try {
+        const updatedMessages = await agent.run([initialMessage], (agentEvent: any) => {
+          if (win && !win.isDestroyed()) {
+            win.webContents.send("agent:stream-event", {
+              ...agentEvent,
+              conversationId: convoId,
+              isScheduled: true,
+            });
+          }
+          conversationDb.appendTranscriptEvent(convoId, agentEvent);
+        });
+
+        try {
+          conversationDb.saveConversation({
+            id: convoId,
+            title: `[Scheduled] ${taskName}`,
+            project: task.workspacePath || "Outside Project",
+            model,
+            updatedAt: Date.now(),
+            createdAt: Date.now(),
+            messages: updatedMessages,
+          });
+        } catch (dbErr) {
+          console.warn("[ScheduledTasks] Failed to save conversation to DB:", dbErr);
+        }
+
+        return { sessionId: convoId };
+      } finally {
+        if (blockerId !== null && powerSaveBlocker.isStarted(blockerId)) {
+          try {
+            powerSaveBlocker.stop(blockerId);
+          } catch {}
+        }
+      }
+    },
+    onChanged: () => {
+      if (win && !win.isDestroyed()) {
+        win.webContents.send("scheduled-tasks:changed");
+      }
+    },
+  });
+
+  scheduledTasksManager.start();
+
+  ipcMain.handle("scheduled-tasks:list", async () => {
+    return scheduledTasksManager?.listTasks() || [];
+  });
+
+  ipcMain.handle("scheduled-tasks:create", async (_event, data: any) => {
+    return scheduledTasksManager?.createTask(data) || null;
+  });
+
+  ipcMain.handle("scheduled-tasks:update", async (_event, data: any) => {
+    return scheduledTasksManager?.updateTask(data) || null;
+  });
+
+  ipcMain.handle("scheduled-tasks:delete", async (_event, id: string) => {
+    return scheduledTasksManager?.deleteTask(id) || false;
+  });
+
+  ipcMain.handle("scheduled-tasks:run", async (_event, id: string) => {
+    if (!scheduledTasksManager) return { success: false, error: "Manager not initialized" };
+    return await scheduledTasksManager.executeTask(id, "manual");
+  });
+
+  ipcMain.handle("scheduled-tasks:history", async (_event, taskId?: string) => {
+    return scheduledTasksManager?.getHistory(taskId) || [];
+  });
+
+  ipcMain.handle("scheduled-tasks:delete-run", async (_event, id: string) => {
+    return scheduledTasksManager?.deleteRun(id) || false;
+  });
+
   createWindow();
 
   app.on("activate", () => {
@@ -819,6 +969,7 @@ app.whenReady().then(() => {
 
 app.on("window-all-closed", () => {
   stopLoopbackAuthServer();
+  scheduledTasksManager?.stop();
   if (process.platform !== "darwin") {
     app.quit();
   }

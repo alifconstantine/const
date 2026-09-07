@@ -82,6 +82,8 @@ interface SidebarProps {
   onArchiveConversation?: (id: string) => void;
   onUnarchiveConversation?: (id: string) => void;
   onOpenSettings?: () => void;
+  onOpenScheduledTasks?: () => void;
+  isScheduledTasksActive?: boolean;
 }
 
 export function getUserInitials(name?: string | null, email?: string | null): string {
@@ -128,6 +130,8 @@ export function Sidebar({
   onArchiveConversation,
   onUnarchiveConversation,
   onOpenSettings,
+  onOpenScheduledTasks,
+  isScheduledTasksActive,
 }: SidebarProps) {
   const [activeTab, setActiveTab] = useState<"project" | "design" | "outside">("project");
   const [collapsedFolders, setCollapsedFolders] = useState<Record<string, boolean>>({});
@@ -441,13 +445,18 @@ export function Sidebar({
             <span>Search</span>
           </button>
 
-          {/* Automations */}
+          {/* Scheduled Tasks */}
           <button
             type="button"
-            className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[#262626] dark:text-[#d4d4d4] hover:bg-[#dedee2] dark:hover:bg-[#383838] hover:text-black dark:hover:text-white transition-colors cursor-pointer"
+            onClick={onOpenScheduledTasks}
+            className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[#262626] dark:text-[#d4d4d4] hover:bg-[#dedee2] dark:hover:bg-[#383838] hover:text-black dark:hover:text-white transition-colors cursor-pointer ${
+              isScheduledTasksActive
+                ? "bg-[#dedee2] dark:bg-[#383838] text-black dark:text-white font-medium"
+                : ""
+            }`}
           >
             <CalendarClock className="w-4 h-4 text-[#8a8a8a] dark:text-[#d4d4d4]" />
-            <span>Automations</span>
+            <span>Scheduled Tasks</span>
           </button>
 
           {/* Design */}

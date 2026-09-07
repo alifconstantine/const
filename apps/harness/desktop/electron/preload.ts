@@ -61,4 +61,18 @@ contextBridge.exposeInMainWorld("electron", {
   pinProject: (projectName: string, isPinned: boolean) => ipcRenderer.invoke("conversations:pin-project", projectName, isPinned),
   getProjectPins: () => ipcRenderer.invoke("conversations:get-project-pins"),
   importLegacyConversations: (convos: any[]) => ipcRenderer.invoke("conversations:import-legacy", convos),
+  scheduledTasks: {
+    list: () => ipcRenderer.invoke("scheduled-tasks:list"),
+    create: (data: any) => ipcRenderer.invoke("scheduled-tasks:create", data),
+    update: (data: any) => ipcRenderer.invoke("scheduled-tasks:update", data),
+    delete: (id: string) => ipcRenderer.invoke("scheduled-tasks:delete", id),
+    run: (id: string) => ipcRenderer.invoke("scheduled-tasks:run", id),
+    history: (taskId?: string) => ipcRenderer.invoke("scheduled-tasks:history", taskId),
+    deleteRun: (id: string) => ipcRenderer.invoke("scheduled-tasks:delete-run", id),
+    onChanged: (callback: () => void) => {
+      const handler = () => callback();
+      ipcRenderer.on("scheduled-tasks:changed", handler);
+      return () => ipcRenderer.removeListener("scheduled-tasks:changed", handler);
+    },
+  },
 });

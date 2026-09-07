@@ -157,7 +157,61 @@ declare global {
       pinProject?: (projectName: string, isPinned: boolean) => Promise<boolean>;
       getProjectPins?: () => Promise<string[]>;
       importLegacyConversations?: (convos: any[]) => Promise<boolean>;
+      scheduledTasks?: {
+        list: () => Promise<ScheduledTaskItem[]>;
+        create: (data: Partial<ScheduledTaskItem>) => Promise<ScheduledTaskItem>;
+        update: (data: Partial<ScheduledTaskItem> & { id: string }) => Promise<ScheduledTaskItem | null>;
+        delete: (id: string) => Promise<boolean>;
+        run: (id: string) => Promise<boolean>;
+        history: (taskId?: string) => Promise<ScheduledTaskRunHistory[]>;
+        deleteRun: (id: string) => Promise<boolean>;
+        onChanged: (callback: () => void) => () => void;
+      };
     };
   }
+}
+
+export interface ScheduledTaskSchedule {
+  type?: "hourly" | "daily" | "weekdays" | "weekly" | "monthly" | "custom";
+  kind?: "hourly" | "daily" | "weekdays" | "weekly" | "monthly" | "custom";
+  time?: string;
+  dayOfWeek?: number;
+  dayOfMonth?: number;
+  customInterval?: number;
+  customUnit?: "minutes" | "hours" | "days" | "weeks" | "months";
+  endsType?: "never" | "date";
+  endDate?: string;
+}
+
+export interface ScheduledTaskItem {
+  id: string;
+  name: string;
+  prompt: string;
+  title?: string;
+  instructions?: string;
+  workspacePath: string;
+  schedule: ScheduledTaskSchedule;
+  model?: string;
+  permissionPreset?: "ask_before_changes" | "full_access" | "read-only" | "workspace-write" | "danger-full-access" | "prompt" | "auto";
+  enabled: boolean;
+  createdAt: number | string;
+  updatedAt: number | string;
+  lastRunAt?: number | string;
+  nextRunAt?: number | string;
+  runCount: number;
+}
+
+export interface ScheduledTaskRunHistory {
+  id: string;
+  taskId: string;
+  taskName: string;
+  sessionId?: string;
+  conversationId?: string;
+  status: "completed" | "failed" | "in-progress" | "skipped";
+  startedAt: number;
+  finishedAt?: number;
+  durationMs?: number;
+  error?: string;
+  source?: "scheduled" | "manual";
 }
 
