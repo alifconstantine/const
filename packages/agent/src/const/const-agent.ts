@@ -68,9 +68,10 @@ Available tools:
 CRITICAL INSTRUCTIONS FOR FILE CREATION & PROJECT GENERATION:
 - When asked to create, generate, or build files, websites, or projects (including prompts like "buat folder baru", "create project", "build website", or when given design/code specifications):
   1. DO NOT wander or explore with shell commands (do NOT run ls, pwd, mkdir, or dir). The 'write' tool automatically creates any missing parent directories recursively.
-  2. DO NOT pre-draft or formulate full file contents inside your internal reasoning/thinking. Keep your internal thought brief and concise (under 30 words).
-  3. Immediately invoke the 'write' tool to create the target file (e.g. index.html or target path) with the complete, functional code in the 'content' argument.
-  4. Never output raw project source code as conversational chat text when asked to write or create files. Always use the 'write' tool.
+  2. Keep your internal thought brief, focused, and decisive. Once you determine the target file and requirements, immediately invoke the 'write' tool in the SAME TURN.
+  3. Never exhaust your output generation capacity on prolonged internal drafting or repetitive monologue. Commit the code directly to the 'write' tool.
+  4. Always invoke the 'write' tool to create the target file (e.g. index.html or target path) with the complete, functional code in the 'content' argument.
+  5. Never output raw project source code as conversational chat text when asked to write or create files. Always use the 'write' tool.
 
 GENERAL WORKFLOW & TOOL GUIDELINES:
 - Use 'read' to inspect existing files before editing them, or to read document files (including PDFs).
@@ -124,6 +125,7 @@ export class ConstAgent {
 
     const conversationHistory: AgentMessage[] = [...messages];
     let currentTurn = 0;
+    let consecutiveStreamRetries = 0;
     const maxTurns = this.config.maxTurns || 25;
     const workspacePath = this.config.workspacePath || process.cwd();
     const toolCallHistory: Array<{ name: string; argsHash: string; isError: boolean }> = [];
@@ -153,6 +155,9 @@ export class ConstAgent {
               role: m.role,
               content: m.content ?? "",
             };
+            if (m.role === "assistant" && m.thinking) {
+              item.reasoning_content = m.thinking;
+            }
             if (m.name) item.name = m.name;
             if (m.tool_call_id) item.tool_call_id = m.tool_call_id;
             if (m.tool_calls && m.tool_calls.length > 0) {
@@ -237,12 +242,15 @@ export class ConstAgent {
         let turnContent = "";
         let turnThinking = "";
         let turnFinishReason: string | null = null;
+        let hasReceivedAnyData = false;
+        let hasCleanDone = false;
         const toolCallsMap: Map<number, { id: string; name: string; arguments: string }> = new Map();
 
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
 
+          hasReceivedAnyData = true;
           buffer += decoder.decode(value, { stream: true });
           const lines = buffer.split("\n");
           buffer = lines.pop() || "";
@@ -251,13 +259,17 @@ export class ConstAgent {
             const trimmed = line.trim();
             if (!trimmed.startsWith("data:")) continue;
             const dataStr = trimmed.slice(5).trim();
-            if (dataStr === "[DONE]") continue;
+            if (dataStr === "[DONE]") {
+              hasCleanDone = true;
+              continue;
+            }
 
             try {
               const json = JSON.parse(dataStr);
               const choice = json.choices?.[0];
               if (choice?.finish_reason) {
                 turnFinishReason = choice.finish_reason;
+                hasCleanDone = true;
               }
 
               const delta = choice?.delta || choice?.message;
@@ -309,7 +321,10 @@ export class ConstAgent {
             try {
               const json = JSON.parse(dataStr);
               const choice = json.choices?.[0];
-              if (choice?.finish_reason) turnFinishReason = choice.finish_reason;
+              if (choice?.finish_reason) {
+                turnFinishReason = choice.finish_reason;
+                hasCleanDone = true;
+              }
               const delta = choice?.delta || choice?.message;
               if (delta) {
                 if (delta.content) {
@@ -340,24 +355,57 @@ export class ConstAgent {
 
         const toolCalls: ToolCall[] = Array.from(toolCallsMap.values())
           .filter((tc) => tc.name && tc.name.trim().length > 0)
-          .map((tc) => ({
-            id: tc.id,
-            type: "function",
-            function: { name: tc.name, arguments: tc.arguments },
-          }));
+          .map((tc) => {
+            // Auto-repair synthetic tool calls (e.g. Google Antigravity call:google:run_shell_command)
+            if (tc.name === "malformed_tool_call" || tc.name.includes("malformed")) {
+              try {
+                const parsed = JSON.parse(tc.arguments);
+                const msg = parsed.message || parsed.error || "";
+                const shellMatch = msg.match(
+                  /call:(?:google|default_api):(run_shell_command|run_command)\s*\{(?:\s*command\s*:\s*)?([^}]+)\}/i
+                );
+                if (shellMatch && shellMatch[2]) {
+                  const extractedCmd = shellMatch[2].replace(/^["']|["']$/g, "").trim();
+                  return {
+                    id: tc.id,
+                    type: "function" as const,
+                    function: {
+                      name: "bash",
+                      arguments: JSON.stringify({ command: extractedCmd }),
+                    },
+                  };
+                }
+              } catch {}
+            }
+            return {
+              id: tc.id,
+              type: "function" as const,
+              function: { name: tc.name, arguments: tc.arguments },
+            };
+          });
 
         // Handle case where model paused after thinking without emitting tool calls or content
         if (toolCalls.length === 0 && !turnContent) {
+          // If no content, no thinking, and no tool calls arrived, check if it's an abrupt stream drop
+          if (!turnThinking && !hasReceivedAnyData && consecutiveStreamRetries < 2) {
+            consecutiveStreamRetries++;
+            currentTurn--; // Don't consume a turn on connection drop
+            onEvent({
+              type: "status",
+              status: "thinking",
+              message: `Stream connection refreshed. Reconnecting (attempt ${consecutiveStreamRetries}/2)...`,
+            });
+            await new Promise((resolve) => setTimeout(resolve, 800));
+            continue;
+          }
+
           if (turnThinking && currentTurn < maxTurns) {
             // Model generated internal reasoning but paused before calling tools or outputting text.
-            // Prompt it to proceed directly to execution without bloating the context with thousands of raw thinking tokens.
-            const compactThinkingSummary =
-              turnThinking.length > 800
-                ? `${turnThinking.slice(0, 400)}...\n[Analysis concluded]\n...${turnThinking.slice(-400)}`
-                : turnThinking;
+            // Retain the native reasoning on the assistant message so the multi-turn context
+            // is preserved natively with reasoning_content without synthetic text pollution.
             const thinkingStepMsg: AgentMessage = {
               role: "assistant",
-              content: `[Thinking Analysis]\n${compactThinkingSummary}`,
+              content: "",
               thinking: turnThinking,
               timestamp: Date.now(),
             };
@@ -365,12 +413,14 @@ export class ConstAgent {
             conversationHistory.push({
               role: "user",
               content:
-                "Continue. Please proceed immediately to call the necessary tools (such as 'write' or 'edit') or provide the final code output to complete the task.",
+                turnFinishReason === "length"
+                  ? "Output token limit reached during planning. Without further reasoning, immediately invoke the required tool call (such as 'write' or 'edit')."
+                  : "Proceed immediately with the required tool calls (e.g. 'write' or 'edit') based on your analysis to complete the task.",
             });
             onEvent({
               type: "status",
               status: "thinking",
-              message: "Continuing execution from thinking analysis...",
+              message: "Planning concluded. Proceeding directly to tool execution...",
             });
             continue;
           }
@@ -382,9 +432,12 @@ export class ConstAgent {
             turnContent = `Completed thinking analysis:\n\n${turnThinking.slice(0, 500)}...\n\nPlease confirm if you would like me to proceed with creating the requested files.`;
           } else {
             turnContent =
-              "No response was generated by the model. Please verify provider connectivity or retry your request.";
+              "No response was received from the model provider. Please verify provider connectivity or retry your request.";
           }
           onEvent({ type: "token", token: turnContent });
+        } else {
+          // Reset retry counter on successful data receipt
+          consecutiveStreamRetries = 0;
         }
 
         const assistantMsg: AgentMessage = {

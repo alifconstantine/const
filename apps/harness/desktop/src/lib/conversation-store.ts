@@ -272,7 +272,7 @@ export function generateFallbackTitle(prompt: string): string {
 
   if (!cleaned) return "New Task";
 
-  const firstLine = cleaned.split("\n")[0].trim();
+  const firstLine = (cleaned.split("\n")[0] || "").trim();
   if (firstLine.length <= 120) {
     return firstLine;
   }

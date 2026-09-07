@@ -49,9 +49,10 @@ export function generateRequestId(): string {
 }
 
 /**
- * Creates a pass-through TransformStream that calculates TTFT, duration,
+ * Creates a pass-through ReadableStream that calculates TTFT, duration,
  * completion tokens, and generation speed without introducing latency.
- * When the stream completes, it records the telemetry to Convex.
+ * Emits periodic SSE keep-alive heartbeats (: keep-alive\n\n) every 10s
+ * to ensure intermediate proxies (Cloudflare, Nginx) never timeout during deep model reasoning.
  */
 export function createTelemetryStream(
   upstreamBody: ReadableStream<Uint8Array>,
@@ -64,6 +65,11 @@ export function createTelemetryStream(
   let extractedCompletionTokens = 0;
   let extractedCachedTokens = 0;
   const textDecoder = new TextDecoder();
+  const textEncoder = new TextEncoder();
+
+  // SSE comment keep-alive heartbeat (every 10 seconds) to prevent Cloudflare/Nginx/proxy idle timeouts
+  const HEARTBEAT_INTERVAL_MS = 10000;
+  const HEARTBEAT_CHUNK = textEncoder.encode(": keep-alive\n\n");
 
   const recordAsync = async (status: number, errorMsg?: string) => {
     try {
@@ -125,60 +131,108 @@ export function createTelemetryStream(
     }
   };
 
-  const transformStream = new TransformStream<Uint8Array, Uint8Array>({
-    transform(chunk, controller) {
-      if (firstChunkTime === null) {
-        firstChunkTime = performance.now();
-      }
+  const reader = upstreamBody.getReader();
+  let heartbeatTimer: NodeJS.Timeout | null = null;
+  let isClosed = false;
 
-      // Pass chunk forward immediately to preserve high-speed streaming
-      controller.enqueue(chunk);
+  const clearHeartbeat = () => {
+    if (heartbeatTimer) {
+      clearInterval(heartbeatTimer);
+      heartbeatTimer = null;
+    }
+  };
 
-      // Parse chunk for text accumulation & usage payloads
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      // Send an immediate keepalive byte to establish real-time SSE stream without proxy buffering
       try {
-        const text = textDecoder.decode(chunk, { stream: true });
-        accumulatedOutputText += text;
-
-        // Try extracting OpenAI / OpenRouter / Anthropic usage if present in chunk
-        if (text.includes('"usage"')) {
-          const lines = text.split("\n");
-          for (const line of lines) {
-            const trimmed = line.trim();
-            if (trimmed.startsWith("data: ") && trimmed !== "data: [DONE]") {
-              try {
-                const parsed = JSON.parse(trimmed.slice(6));
-                if (parsed.usage) {
-                  if (typeof parsed.usage.prompt_tokens === "number") {
-                    extractedPromptTokens = parsed.usage.prompt_tokens;
-                  }
-                  if (typeof parsed.usage.completion_tokens === "number") {
-                    extractedCompletionTokens = parsed.usage.completion_tokens;
-                  }
-                  const cached =
-                    parsed.usage.prompt_tokens_details?.cached_tokens ??
-                    parsed.usage.cache_read_input_tokens ??
-                    parsed.usage.cached_tokens ??
-                    0;
-                  if (typeof cached === "number") {
-                    extractedCachedTokens = cached;
-                  }
-                }
-              } catch {}
-            }
-          }
-        }
+        controller.enqueue(HEARTBEAT_CHUNK);
       } catch {}
+
+      // Heartbeat interval to maintain active TCP / HTTP connection while upstream model is deliberating
+      heartbeatTimer = setInterval(() => {
+        if (isClosed) {
+          clearHeartbeat();
+          return;
+        }
+        try {
+          controller.enqueue(HEARTBEAT_CHUNK);
+        } catch {
+          clearHeartbeat();
+        }
+      }, HEARTBEAT_INTERVAL_MS);
     },
-    async flush() {
-      // Stream finished successfully - await telemetry before closing stream
-      await recordAsync(200);
+    async pull(controller) {
+      try {
+        const { done, value } = await reader.read();
+        if (done) {
+          isClosed = true;
+          clearHeartbeat();
+          await recordAsync(200);
+          controller.close();
+          return;
+        }
+
+        if (value) {
+          if (firstChunkTime === null) {
+            firstChunkTime = performance.now();
+          }
+          controller.enqueue(value);
+
+          // Parse chunk for text accumulation & usage payloads
+          try {
+            const text = textDecoder.decode(value, { stream: true });
+            accumulatedOutputText += text;
+
+            // Try extracting OpenAI / OpenRouter / Anthropic usage if present in chunk
+            if (text.includes('"usage"')) {
+              const lines = text.split("\n");
+              for (const line of lines) {
+                const trimmed = line.trim();
+                if (trimmed.startsWith("data: ") && trimmed !== "data: [DONE]") {
+                  try {
+                    const parsed = JSON.parse(trimmed.slice(6));
+                    if (parsed.usage) {
+                      if (typeof parsed.usage.prompt_tokens === "number") {
+                        extractedPromptTokens = parsed.usage.prompt_tokens;
+                      }
+                      if (typeof parsed.usage.completion_tokens === "number") {
+                        extractedCompletionTokens = parsed.usage.completion_tokens;
+                      }
+                      const cached =
+                        parsed.usage.prompt_tokens_details?.cached_tokens ??
+                        parsed.usage.cache_read_input_tokens ??
+                        parsed.usage.cached_tokens ??
+                        0;
+                      if (typeof cached === "number") {
+                        extractedCachedTokens = cached;
+                      }
+                    }
+                  } catch {}
+                }
+              }
+            }
+          } catch {}
+        }
+      } catch (err: any) {
+        isClosed = true;
+        clearHeartbeat();
+        await recordAsync(500, err?.message || String(err));
+        controller.error(err);
+      }
+    },
+    async cancel(reason) {
+      isClosed = true;
+      clearHeartbeat();
+      await recordAsync(499, "Client disconnected / stream cancelled");
+      try {
+        await reader.cancel(reason);
+      } catch {}
     },
   });
 
-  const pipedStream = upstreamBody.pipeThrough(transformStream);
-
   return {
-    stream: pipedStream,
+    stream,
     getMetrics: () => ({
       ttftMs: firstChunkTime ? Math.round(firstChunkTime - startTime) : undefined,
       durationMs: Math.round(performance.now() - startTime),
