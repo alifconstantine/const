@@ -39,7 +39,18 @@ contextBridge.exposeInMainWorld("electron", {
     authToken?: string;
     maxOutputTokens?: number;
   }) => ipcRenderer.invoke("agent:send-message", payload),
-  abortAgent: () => ipcRenderer.invoke("agent:abort"),
+  abortAgent: (conversationId?: string) => ipcRenderer.invoke("agent:abort", conversationId),
+  getRunningSessions: () => ipcRenderer.invoke("agent:get-running-sessions"),
+  onSessionStarted: (callback: (data: { conversationId: string }) => void) => {
+    const handler = (_event: any, data: any) => callback(data);
+    ipcRenderer.on("agent:session-started", handler);
+    return () => ipcRenderer.removeListener("agent:session-started", handler);
+  },
+  onSessionEnded: (callback: (data: { conversationId: string }) => void) => {
+    const handler = (_event: any, data: any) => callback(data);
+    ipcRenderer.on("agent:session-ended", handler);
+    return () => ipcRenderer.removeListener("agent:session-ended", handler);
+  },
   rollbackFile: (record: any) => ipcRenderer.invoke("agent:rollback-file", { record }),
   getModels: () => ipcRenderer.invoke("agent:get-models"),
   getConfig: () => ipcRenderer.invoke("config:get"),

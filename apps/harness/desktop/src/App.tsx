@@ -151,8 +151,20 @@ function AuthenticatedContent({
   });
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [isExecuting, setIsExecuting] = useState(false);
-  const executionStartTimeRef = React.useRef<number | null>(null);
+  const messagesRef = React.useRef(messages);
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
+  const conversationsRef = React.useRef(conversations);
+  useEffect(() => {
+    conversationsRef.current = conversations;
+  }, [conversations]);
+
+  const [runningConvoIds, setRunningConvoIds] = useState<Set<string>>(new Set());
+  const isExecuting = runningConvoIds.has(conversationId);
+  const activeSessionMessagesRef = React.useRef<Map<string, ChatMessage[]>>(new Map());
+  const executionStartTimeMapRef = React.useRef<Map<string, number>>(new Map());
   const [liveDurationMs, setLiveDurationMs] = useState<number>(0);
 
   useEffect(() => {
@@ -160,13 +172,16 @@ function AuthenticatedContent({
       setLiveDurationMs(0);
       return;
     }
+    const startTime = executionStartTimeMapRef.current.get(conversationId) || Date.now();
+    setLiveDurationMs(Date.now() - startTime);
     const interval = setInterval(() => {
-      if (executionStartTimeRef.current) {
-        setLiveDurationMs(Date.now() - executionStartTimeRef.current);
+      const start = executionStartTimeMapRef.current.get(conversationId);
+      if (start) {
+        setLiveDurationMs(Date.now() - start);
       }
     }, 500);
     return () => clearInterval(interval);
-  }, [isExecuting]);
+  }, [isExecuting, conversationId]);
 
   const messagesEndRef = React.useRef<HTMLDivElement>(null);
   const chatScrollRef = React.useRef<HTMLDivElement>(null);
@@ -401,194 +416,266 @@ function AuthenticatedContent({
     }
   }, [messages, isExecuting]);
 
-  // Handle agent streaming events from Electron main process
+  // Query active background sessions on mount & subscribe to session lifecycle
+  useEffect(() => {
+    if (window.electron?.getRunningSessions) {
+      window.electron.getRunningSessions().then((ids) => {
+        if (ids && ids.length > 0) {
+          setRunningConvoIds(new Set(ids));
+        }
+      });
+    }
+
+    const unsubStarted = window.electron?.onSessionStarted?.((data) => {
+      if (data?.conversationId) {
+        setRunningConvoIds((prev) => new Set(prev).add(data.conversationId));
+      }
+    });
+
+    const unsubEnded = window.electron?.onSessionEnded?.((data) => {
+      if (data?.conversationId) {
+        setRunningConvoIds((prev) => {
+          const next = new Set(prev);
+          next.delete(data.conversationId);
+          return next;
+        });
+      }
+    });
+
+    return () => {
+      unsubStarted?.();
+      unsubEnded?.();
+    };
+  }, []);
+
+  // Handle agent streaming events from Electron main process concurrently across all conversations
   useEffect(() => {
     if (!window.electron?.onAgentEvent) return;
 
     const unsubscribe = window.electron.onAgentEvent((event: any) => {
-      // Guard against background scheduled tasks or other sessions polluting the active conversation
-      if (event.conversationId && event.conversationId !== conversationIdRef.current) {
-        return;
+      const targetConvoId = event.conversationId || conversationIdRef.current;
+      if (!targetConvoId) return;
+
+      // Retrieve or initialize accumulated message list for this session
+      let targetMsgs = activeSessionMessagesRef.current.get(targetConvoId);
+      if (!targetMsgs) {
+        if (targetConvoId === conversationIdRef.current) {
+          targetMsgs = [...messagesRef.current];
+        } else {
+          const found = conversationsRef.current.find((c) => c.id === targetConvoId);
+          targetMsgs = found?.messages ? [...found.messages] : [];
+        }
       }
 
       if (event.type === "token") {
-        setMessages((prev) => {
-          if (prev.length === 0) return prev;
-          const lastIdx = prev.length - 1;
-          const last = prev[lastIdx];
-          if (!last || last.role !== "assistant") return prev;
-          const updated: ChatMessage = {
-            ...last,
-            content: last.content + (event.token || ""),
-          };
-          const next = [...prev];
-          next[lastIdx] = updated;
-          return next;
-        });
+        if (targetMsgs.length > 0) {
+          const lastIdx = targetMsgs.length - 1;
+          const last = targetMsgs[lastIdx];
+          if (last && last.role === "assistant") {
+            const updated: ChatMessage = {
+              ...last,
+              content: last.content + (event.token || ""),
+            };
+            targetMsgs = [...targetMsgs];
+            targetMsgs[lastIdx] = updated;
+          }
+        }
+        activeSessionMessagesRef.current.set(targetConvoId, targetMsgs);
+        if (targetConvoId === conversationIdRef.current) {
+          setMessages(targetMsgs);
+        }
       } else if (event.type === "thinking") {
-        setMessages((prev) => {
-          if (prev.length === 0) return prev;
-          const lastIdx = prev.length - 1;
-          const last = prev[lastIdx];
-          if (!last || last.role !== "assistant") return prev;
-          const steps: TraceStep[] = last.traceSteps ? [...last.traceSteps] : [];
-          const lastStep = steps[steps.length - 1];
-          if (lastStep && lastStep.type === "thought") {
-            steps[steps.length - 1] = {
-              ...lastStep,
-              content: (lastStep.content || "") + (event.thinking || ""),
-            };
-          } else {
-            steps.push({
-              id: `thought_${Date.now()}_${steps.length}`,
-              type: "thought",
-              content: event.thinking || "",
-              startTime: Date.now(),
-            });
-          }
-          const updated: ChatMessage = {
-            ...last,
-            thinking: (last.thinking || "") + (event.thinking || ""),
-            traceSteps: steps,
-          };
-          const next = [...prev];
-          next[lastIdx] = updated;
-          return next;
-        });
-      } else if (event.type === "tool_call") {
-        setMessages((prev) => {
-          if (prev.length === 0) return prev;
-          const lastIdx = prev.length - 1;
-          const last = prev[lastIdx];
-          if (!last || last.role !== "assistant") return prev;
-          const steps: TraceStep[] = last.traceSteps ? [...last.traceSteps] : [];
-          const lastStep = steps[steps.length - 1];
-          if (lastStep && lastStep.type === "thought" && lastStep.startTime && !lastStep.durationMs) {
-            steps[steps.length - 1] = {
-              ...lastStep,
-              durationMs: Math.max(1000, Date.now() - lastStep.startTime),
-            };
-          }
-          const callId = event.toolCallId || `tc_${Date.now()}_${steps.length}`;
-          steps.push({
-            id: callId,
-            type: "tool",
-            toolCallId: callId,
-            name: event.toolName || "tool",
-            args: event.args,
-          });
-          const tools = last.toolCalls ? [...last.toolCalls] : [];
-          tools.push({
-            id: callId,
-            name: event.toolName || "tool",
-            args: event.args,
-          });
-          const updated: ChatMessage = {
-            ...last,
-            toolCalls: tools,
-            traceSteps: steps,
-          };
-          const next = [...prev];
-          next[lastIdx] = updated;
-          return next;
-        });
-      } else if (event.type === "tool_result") {
-        setMessages((prev) => {
-          if (prev.length === 0) return prev;
-          const lastIdx = prev.length - 1;
-          const last = prev[lastIdx];
-          if (!last || last.role !== "assistant") return prev;
-          const tools = (last.toolCalls || []).map((tc) =>
-            tc.id === event.toolCallId
-              ? { ...tc, result: event.result, isError: event.isError }
-              : tc
-          );
-          const steps = (last.traceSteps || []).map((st) =>
-            st.type === "tool" && (st.toolCallId === event.toolCallId || st.id === event.toolCallId)
-              ? { ...st, result: event.result, isError: event.isError }
-              : st
-          );
-          const updated: ChatMessage = {
-            ...last,
-            toolCalls: tools,
-            traceSteps: steps,
-          };
-          const next = [...prev];
-          next[lastIdx] = updated;
-          return next;
-        });
-      } else if (event.type === "file_mutation") {
-        setMessages((prev) => {
-          if (prev.length === 0) return prev;
-          const lastIdx = prev.length - 1;
-          const last = prev[lastIdx];
-          if (!last || last.role !== "assistant") return prev;
-          const mutations = last.mutations ? [...last.mutations] : [];
-          if (event.record) {
-            mutations.push(event.record);
-          }
-          const steps = (last.traceSteps || []).map((st) => {
-            if (st.type === "tool" && event.record && !st.mutation) {
-              const norm = (st.name || "").toLowerCase().replace(/[-_]/g, "");
-              if (norm.includes("write") || norm.includes("edit") || norm.includes("replace")) {
-                return { ...st, mutation: event.record };
-              }
-            }
-            return st;
-          });
-          const updated: ChatMessage = {
-            ...last,
-            mutations,
-            traceSteps: steps,
-          };
-          const next = [...prev];
-          next[lastIdx] = updated;
-          return next;
-        });
-      } else if (event.type === "done") {
-        setIsExecuting(false);
-        const finalDuration = executionStartTimeRef.current
-          ? Date.now() - executionStartTimeRef.current
-          : undefined;
-        executionStartTimeRef.current = null;
-
-        setMessages((latest) => {
-          const updatedLatest = [...latest];
-          if (updatedLatest.length > 0) {
-            const lastIdx = updatedLatest.length - 1;
-            if (updatedLatest[lastIdx]?.role === "assistant") {
-              const curContent = updatedLatest[lastIdx].content;
-              const steps = (updatedLatest[lastIdx].traceSteps || []).map((st) => {
-                if (st.type === "thought" && st.startTime && !st.durationMs) {
-                  return {
-                    ...st,
-                    durationMs: Math.max(1000, Date.now() - st.startTime),
-                  };
-                }
-                return st;
+        if (targetMsgs.length > 0) {
+          const lastIdx = targetMsgs.length - 1;
+          const last = targetMsgs[lastIdx];
+          if (last && last.role === "assistant") {
+            const steps: TraceStep[] = last.traceSteps ? [...last.traceSteps] : [];
+            const lastStep = steps[steps.length - 1];
+            if (lastStep && lastStep.type === "thought") {
+              steps[steps.length - 1] = {
+                ...lastStep,
+                content: (lastStep.content || "") + (event.thinking || ""),
+              };
+            } else {
+              steps.push({
+                id: `thought_${Date.now()}_${steps.length}`,
+                type: "thought",
+                content: event.thinking || "",
+                startTime: Date.now(),
               });
-              updatedLatest[lastIdx] = {
-                ...updatedLatest[lastIdx],
+            }
+            const updated: ChatMessage = {
+              ...last,
+              thinking: (last.thinking || "") + (event.thinking || ""),
+              traceSteps: steps,
+            };
+            targetMsgs = [...targetMsgs];
+            targetMsgs[lastIdx] = updated;
+          }
+        }
+        activeSessionMessagesRef.current.set(targetConvoId, targetMsgs);
+        if (targetConvoId === conversationIdRef.current) {
+          setMessages(targetMsgs);
+        }
+      } else if (event.type === "tool_call") {
+        if (targetMsgs.length > 0) {
+          const lastIdx = targetMsgs.length - 1;
+          const last = targetMsgs[lastIdx];
+          if (last && last.role === "assistant") {
+            const steps: TraceStep[] = last.traceSteps ? [...last.traceSteps] : [];
+            const lastStep = steps[steps.length - 1];
+            if (lastStep && lastStep.type === "thought" && lastStep.startTime && !lastStep.durationMs) {
+              steps[steps.length - 1] = {
+                ...lastStep,
+                durationMs: Math.max(1000, Date.now() - lastStep.startTime),
+              };
+            }
+            const callId = event.toolCallId || `tc_${Date.now()}_${steps.length}`;
+            steps.push({
+              id: callId,
+              type: "tool",
+              toolCallId: callId,
+              name: event.toolName || "tool",
+              args: event.args,
+            });
+            const tools = last.toolCalls ? [...last.toolCalls] : [];
+            tools.push({
+              id: callId,
+              name: event.toolName || "tool",
+              args: event.args,
+            });
+            const updated: ChatMessage = {
+              ...last,
+              toolCalls: tools,
+              traceSteps: steps,
+            };
+            targetMsgs = [...targetMsgs];
+            targetMsgs[lastIdx] = updated;
+          }
+        }
+        activeSessionMessagesRef.current.set(targetConvoId, targetMsgs);
+        if (targetConvoId === conversationIdRef.current) {
+          setMessages(targetMsgs);
+        }
+      } else if (event.type === "tool_result") {
+        if (targetMsgs.length > 0) {
+          const lastIdx = targetMsgs.length - 1;
+          const last = targetMsgs[lastIdx];
+          if (last && last.role === "assistant") {
+            const tools = (last.toolCalls || []).map((tc) =>
+              tc.id === event.toolCallId
+                ? { ...tc, result: event.result, isError: event.isError }
+                : tc
+            );
+            const steps = (last.traceSteps || []).map((st) =>
+              st.type === "tool" && (st.toolCallId === event.toolCallId || st.id === event.toolCallId)
+                ? { ...st, result: event.result, isError: event.isError }
+                : st
+            );
+            const updated: ChatMessage = {
+              ...last,
+              toolCalls: tools,
+              traceSteps: steps,
+            };
+            targetMsgs = [...targetMsgs];
+            targetMsgs[lastIdx] = updated;
+          }
+        }
+        activeSessionMessagesRef.current.set(targetConvoId, targetMsgs);
+        if (targetConvoId === conversationIdRef.current) {
+          setMessages(targetMsgs);
+        }
+      } else if (event.type === "file_mutation") {
+        if (targetMsgs.length > 0) {
+          const lastIdx = targetMsgs.length - 1;
+          const last = targetMsgs[lastIdx];
+          if (last && last.role === "assistant") {
+            const mutations = last.mutations ? [...last.mutations] : [];
+            if (event.record) {
+              mutations.push(event.record);
+            }
+            const steps = (last.traceSteps || []).map((st) => {
+              if (st.type === "tool" && event.record && !st.mutation) {
+                const norm = (st.name || "").toLowerCase().replace(/[-_]/g, "");
+                if (norm.includes("write") || norm.includes("edit") || norm.includes("replace")) {
+                  return { ...st, mutation: event.record };
+                }
+              }
+              return st;
+            });
+            const updated: ChatMessage = {
+              ...last,
+              mutations,
+              traceSteps: steps,
+            };
+            targetMsgs = [...targetMsgs];
+            targetMsgs[lastIdx] = updated;
+          }
+        }
+        activeSessionMessagesRef.current.set(targetConvoId, targetMsgs);
+        if (targetConvoId === conversationIdRef.current) {
+          setMessages(targetMsgs);
+        }
+      } else if (event.type === "done") {
+        setRunningConvoIds((prev) => {
+          const next = new Set(prev);
+          next.delete(targetConvoId);
+          return next;
+        });
+
+        const startTime = executionStartTimeMapRef.current.get(targetConvoId);
+        const finalDuration = startTime ? Date.now() - startTime : undefined;
+        executionStartTimeMapRef.current.delete(targetConvoId);
+
+        if (targetMsgs.length > 0) {
+          const lastIdx = targetMsgs.length - 1;
+          if (targetMsgs[lastIdx]?.role === "assistant") {
+            const curContent = targetMsgs[lastIdx].content;
+            const steps = (targetMsgs[lastIdx].traceSteps || []).map((st) => {
+              if (st.type === "thought" && st.startTime && !st.durationMs) {
+                return {
+                  ...st,
+                  durationMs: Math.max(1000, Date.now() - st.startTime),
+                };
+              }
+              return st;
+            });
+            const lastMsg = targetMsgs[lastIdx];
+            if (lastMsg) {
+              targetMsgs = [...targetMsgs];
+              targetMsgs[lastIdx] = {
+                ...lastMsg,
+                id: lastMsg.id || `msg_${Date.now()}_assistant`,
+                role: "assistant",
                 content: curContent || event.fullContent || "",
                 durationMs: finalDuration,
                 traceSteps: steps,
               };
             }
           }
+        }
+        activeSessionMessagesRef.current.delete(targetConvoId);
 
-          const stored = loadConversations();
-          const target = stored.find((c) => c.id === conversationId);
-          if (target) {
-            target.messages = updatedLatest;
-            target.updatedAt = Date.now();
-            saveConversation(target);
-            setConversations(loadConversations());
-          }
-          return updatedLatest;
-        });
+        if (targetConvoId === conversationIdRef.current) {
+          setMessages(targetMsgs);
+        }
+
+        const stored = loadConversations();
+        const target = stored.find((c) => c.id === targetConvoId);
+        if (target) {
+          target.messages = targetMsgs;
+          target.updatedAt = Date.now();
+          saveConversation(target);
+          setConversations(loadConversations());
+        }
       } else if (event.type === "error") {
-        setIsExecuting(false);
-        executionStartTimeRef.current = null;
+        setRunningConvoIds((prev) => {
+          const next = new Set(prev);
+          next.delete(targetConvoId);
+          return next;
+        });
+        executionStartTimeMapRef.current.delete(targetConvoId);
+        activeSessionMessagesRef.current.delete(targetConvoId);
         toast.error(event.error || "Agent execution error");
       }
     });
@@ -596,7 +683,7 @@ function AuthenticatedContent({
     return () => {
       unsubscribe();
     };
-  }, [conversationId]);
+  }, []);
 
   const handleSendMessage = async ({
     prompt,
@@ -639,9 +726,11 @@ function AuthenticatedContent({
     };
 
     const currentStreamMessages = [...messages, userMsg];
-    setMessages([...currentStreamMessages, assistantPlaceholder]);
-    setIsExecuting(true);
-    executionStartTimeRef.current = Date.now();
+    const initialSessionMsgs = [...currentStreamMessages, assistantPlaceholder];
+    setMessages(initialSessionMsgs);
+    setRunningConvoIds((prev) => new Set(prev).add(conversationId));
+    executionStartTimeMapRef.current.set(conversationId, Date.now());
+    activeSessionMessagesRef.current.set(conversationId, initialSessionMsgs);
     setLiveDurationMs(0);
 
     const isFirstMessage = messages.length === 0;
@@ -704,11 +793,21 @@ function AuthenticatedContent({
 
         if (!res.success && res.error) {
           toast.error(res.error);
-          setIsExecuting(false);
+          setRunningConvoIds((prev) => {
+            const next = new Set(prev);
+            next.delete(conversationId);
+            return next;
+          });
+          activeSessionMessagesRef.current.delete(conversationId);
         }
       } catch (err: any) {
         toast.error(err.message || "Communication error with agent");
-        setIsExecuting(false);
+        setRunningConvoIds((prev) => {
+          const next = new Set(prev);
+          next.delete(conversationId);
+          return next;
+        });
+        activeSessionMessagesRef.current.delete(conversationId);
       }
     } else {
       setTimeout(() => {
@@ -725,7 +824,12 @@ function AuthenticatedContent({
           next[lastIdx] = updated;
           return next;
         });
-        setIsExecuting(false);
+        setRunningConvoIds((prev) => {
+          const next = new Set(prev);
+          next.delete(conversationId);
+          return next;
+        });
+        activeSessionMessagesRef.current.delete(conversationId);
       }, 600);
     }
   };
@@ -807,23 +911,26 @@ function AuthenticatedContent({
     }
   };
 
-  const handleAbort = async () => {
+  const handleAbort = async (targetId?: string) => {
+    const idToAbort = targetId || conversationId;
     if (window.electron?.abortAgent) {
-      await window.electron.abortAgent();
+      await window.electron.abortAgent(idToAbort);
     }
-    setIsExecuting(false);
+    setRunningConvoIds((prev) => {
+      const next = new Set(prev);
+      next.delete(idToAbort);
+      return next;
+    });
+    activeSessionMessagesRef.current.delete(idToAbort);
+    executionStartTimeMapRef.current.delete(idToAbort);
   };
 
   const handleNewChat = (targetProject?: string) => {
-    if (isExecuting) {
-      handleAbort();
-    }
     setIsScheduledTasksOpen(false);
     setMessages([]);
     setConversationTitle("");
     setConversationId(`session_${Date.now()}`);
     setEditingPrompt("");
-    setIsExecuting(false);
     if (targetProject) {
       setCurrentProject(targetProject);
       localStorage.setItem("const_harness_current_project", targetProject);
@@ -831,10 +938,20 @@ function AuthenticatedContent({
   };
 
   const handleSelectConversation = async (id: string) => {
-    if (isExecuting) {
-      handleAbort();
-    }
     setIsScheduledTasksOpen(false);
+
+    // If this conversation is currently executing in background, restore its live session messages
+    const activeRunningMsgs = activeSessionMessagesRef.current.get(id);
+    if (activeRunningMsgs) {
+      let target = conversations.find((c) => c.id === id);
+      setConversationId(id);
+      setConversationTitle(target?.title || "Task");
+      setCurrentProject(target?.project || "Outside Project");
+      setMessages([...activeRunningMsgs]);
+      setEditingPrompt("");
+      return;
+    }
+
     let target = conversations.find((c) => c.id === id);
     if (!target && window.electron?.getConversation) {
       const diskConvo = await window.electron.getConversation(id);
@@ -850,7 +967,6 @@ function AuthenticatedContent({
       setCurrentProject(target.project || "Outside Project");
       setMessages(target.messages || []);
       setEditingPrompt("");
-      setIsExecuting(false);
     }
   };
 
@@ -914,6 +1030,7 @@ function AuthenticatedContent({
           onNewChatOutside={() => handleNewChat("Outside Project")}
           conversations={conversations}
           activeConversationId={conversationId}
+          runningConvoIds={runningConvoIds}
           onSelectConversation={handleSelectConversation}
           onDeleteConversation={handleDeleteConversation}
           onRenameConversation={handleRenameConversation}

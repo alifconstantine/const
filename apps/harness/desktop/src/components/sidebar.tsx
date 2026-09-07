@@ -55,6 +55,7 @@ import {
   Pencil,
   Trash2,
   X,
+  Loader2,
 } from "lucide-react";
 import { AutoScrollTitle } from "./auto-scroll-title";
 import {
@@ -82,6 +83,7 @@ interface SidebarProps {
   onNewChatOutside?: () => void;
   conversations?: ConversationItem[];
   activeConversationId?: string;
+  runningConvoIds?: Set<string>;
   onSelectConversation?: (id: string) => void;
   onDeleteConversation?: (id: string) => void;
   onRenameConversation?: (id: string, newTitle: string) => void;
@@ -130,6 +132,7 @@ export function Sidebar({
   onNewChatOutside,
   conversations = [],
   activeConversationId,
+  runningConvoIds,
   onSelectConversation,
   onDeleteConversation,
   onRenameConversation,
@@ -674,11 +677,15 @@ export function Sidebar({
                                 isParentHovered={isHovered}
                               />
 
-                              {/* Right: Timestamp + Action Menu */}
+                              {/* Right: Timestamp or Loading Spinner + Action Menu */}
                               <div className="flex items-center gap-1.5 shrink-0 ml-auto select-none">
-                                <span className="text-[11px] text-[#a9a9a9] dark:text-[#888888] font-mono whitespace-nowrap">
-                                  {formatRelativeTime(convo.updatedAt || convo.createdAt)}
-                                </span>
+                                {runningConvoIds?.has(convo.id) ? (
+                                  <Loader2 className="w-3.5 h-3.5 animate-spin text-[#969696]" />
+                                ) : (
+                                  <span className="text-[11px] text-[#a9a9a9] dark:text-[#888888] font-mono whitespace-nowrap">
+                                    {formatRelativeTime(convo.updatedAt || convo.createdAt)}
+                                  </span>
+                                )}
 
                                 <div
                                   data-no-select="true"
@@ -920,10 +927,14 @@ export function Sidebar({
                                           onPointerDown={(e) => e.stopPropagation()}
                                           className="flex items-center gap-1.5 shrink-0 ml-auto select-none"
                                         >
-                                          {/* Relative time */}
-                                          <span className="text-[11px] text-[#a9a9a9] dark:text-[#888888] font-mono whitespace-nowrap select-none">
-                                            {formatRelativeTime(convo.updatedAt || convo.createdAt)}
-                                          </span>
+                                          {/* Relative time or Loading Spinner */}
+                                          {runningConvoIds?.has(convo.id) ? (
+                                            <Loader2 className="w-3.5 h-3.5 animate-spin text-[#969696]" />
+                                          ) : (
+                                            <span className="text-[11px] text-[#a9a9a9] dark:text-[#888888] font-mono whitespace-nowrap select-none">
+                                              {formatRelativeTime(convo.updatedAt || convo.createdAt)}
+                                            </span>
+                                          )}
 
                                           {/* Actions on hover or when dropdown menu is open */}
                                           <div
@@ -1089,10 +1100,14 @@ export function Sidebar({
                                   onPointerDown={(e) => e.stopPropagation()}
                                   className="flex items-center gap-1.5 shrink-0 ml-auto select-none"
                                 >
-                                  {/* Relative time */}
-                                  <span className="text-[11px] text-[#a9a9a9] dark:text-[#888888] font-mono whitespace-nowrap select-none">
-                                    {formatRelativeTime(convo.updatedAt || convo.createdAt)}
-                                  </span>
+                                  {/* Relative time or Loading Spinner */}
+                                  {runningConvoIds?.has(convo.id) ? (
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin text-[#969696]" />
+                                  ) : (
+                                    <span className="text-[11px] text-[#a9a9a9] dark:text-[#888888] font-mono whitespace-nowrap select-none">
+                                      {formatRelativeTime(convo.updatedAt || convo.createdAt)}
+                                    </span>
+                                  )}
 
                                   {/* Actions on hover or when dropdown menu is open */}
                                   <div

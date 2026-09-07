@@ -135,7 +135,10 @@ declare global {
         isOutsideProject?: boolean;
         error?: string;
       }>;
-      abortAgent: () => Promise<boolean>;
+      abortAgent: (conversationId?: string) => Promise<boolean>;
+      getRunningSessions?: () => Promise<string[]>;
+      onSessionStarted?: (callback: (data: { conversationId: string }) => void) => () => void;
+      onSessionEnded?: (callback: (data: { conversationId: string }) => void) => () => void;
       rollbackFile: (record: FileMutationRecord) => Promise<{
         success: boolean;
         message?: string;

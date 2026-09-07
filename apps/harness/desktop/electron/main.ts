@@ -641,9 +641,16 @@ app.whenReady().then(() => {
   });
 
   // ---------------------------------------------------------------------------
-  // Agent & Execution IPC Handlers
+  // Agent & Execution IPC Handlers (Multi-Session Concurrent Architecture)
   // ---------------------------------------------------------------------------
-  let activeAgent: any = null;
+  interface ActiveAgentSession {
+    agent: any;
+    conversationId: string;
+    workspacePath: string;
+    model: string;
+    startedAt: number;
+  }
+  const activeSessions = new Map<string, ActiveAgentSession>();
 
   ipcMain.handle(
     "agent:send-message",
@@ -699,7 +706,7 @@ app.whenReady().then(() => {
         }
       }
 
-      activeAgent = createConstAgent({
+      const agent = createConstAgent({
         baseUrl,
         apiKey,
         model,
@@ -709,8 +716,20 @@ app.whenReady().then(() => {
         maxOutputTokens: payload.maxOutputTokens ?? (modelDef as any)?.maxOutputTokens,
       });
 
+      activeSessions.set(convoId, {
+        agent,
+        conversationId: convoId,
+        workspacePath: targetWorkspace,
+        model,
+        startedAt: Date.now(),
+      });
+
+      if (win && !win.isDestroyed()) {
+        win.webContents.send("agent:session-started", { conversationId: convoId });
+      }
+
       try {
-        const updatedMessages = await activeAgent.run(
+        const updatedMessages = await agent.run(
           payload.messages,
           (agentEvent: any) => {
             if (win && !win.isDestroyed()) {
@@ -732,6 +751,11 @@ app.whenReady().then(() => {
             createdAt: existingConvo?.createdAt || Date.now(),
             messages: updatedMessages,
           });
+
+          // Notify renderer that conversations have changed
+          if (win && !win.isDestroyed()) {
+            win.webContents.send("conversations:changed", { conversationId: convoId });
+          }
         } catch (dbErr) {
           console.warn("[Electron Main] Failed to auto-save conversation to database:", dbErr);
         }
@@ -745,7 +769,10 @@ app.whenReady().then(() => {
       } catch (err: any) {
         return { success: false, error: err.message };
       } finally {
-        activeAgent = null;
+        activeSessions.delete(convoId);
+        if (win && !win.isDestroyed()) {
+          win.webContents.send("agent:session-ended", { conversationId: convoId });
+        }
       }
     }
   );
@@ -802,13 +829,34 @@ app.whenReady().then(() => {
     return true;
   });
 
-  ipcMain.handle("agent:abort", async () => {
-    if (activeAgent) {
-      activeAgent.abort();
-      activeAgent = null;
-      return true;
+  ipcMain.handle("agent:abort", async (_event, conversationId?: string) => {
+    if (conversationId) {
+      const session = activeSessions.get(conversationId);
+      if (session) {
+        session.agent.abort();
+        activeSessions.delete(conversationId);
+        if (win && !win.isDestroyed()) {
+          win.webContents.send("agent:session-ended", { conversationId });
+        }
+        return true;
+      }
+      return false;
     }
-    return false;
+
+    let abortedAny = false;
+    for (const [id, session] of activeSessions.entries()) {
+      session.agent.abort();
+      abortedAny = true;
+      if (win && !win.isDestroyed()) {
+        win.webContents.send("agent:session-ended", { conversationId: id });
+      }
+    }
+    activeSessions.clear();
+    return abortedAny;
+  });
+
+  ipcMain.handle("agent:get-running-sessions", async () => {
+    return Array.from(activeSessions.keys());
   });
 
   // Rollback file mutation handler
