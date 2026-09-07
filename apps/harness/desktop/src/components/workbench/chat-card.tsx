@@ -801,7 +801,7 @@ export function ChatCard({
         >
           {/* Attachments Shelf (Square Cards for Images, Videos, PDFs, Docs) */}
           {attachments.length > 0 && (
-            <div className="w-full flex items-center gap-3 pt-1.5 pb-3 overflow-x-auto select-none">
+            <div className="w-full flex items-center gap-2.5 pt-7 pb-2 px-1 overflow-x-auto select-none scrollbar-none">
               {attachments.map((file) => {
                 const isImage = file.type === "image";
                 const isVideo = file.type === "video";
@@ -812,14 +812,14 @@ export function ChatCard({
                   <div
                     key={file.id}
                     onClick={() => setPreviewItem(file)}
-                    className={`relative w-24 h-24 group shrink-0 rounded-2xl border border-[#e2e2e4] dark:border-[#383838] shadow-sm animate-in fade-in zoom-in-95 duration-100 bg-[#f4f4f6] dark:bg-[#1a1917] select-none cursor-pointer transition-all ${
+                    className={`relative w-20 h-20 group shrink-0 rounded-xl border border-[#e2e2e4] dark:border-[#383838] shadow-sm animate-in fade-in zoom-in-95 duration-100 bg-[#f4f4f6] dark:bg-[#1a1917] select-none cursor-pointer transition-all ${
                       isMedia
                         ? "hover:opacity-90 active:scale-[0.98]"
                         : "hover:border-black/30 dark:hover:border-white/30"
                     }`}
                   >
                     {isImage && file.url ? (
-                      <div className="w-full h-full rounded-2xl overflow-hidden">
+                      <div className="w-full h-full rounded-xl overflow-hidden">
                         <img
                           src={file.url}
                           alt={file.name}
@@ -827,7 +827,7 @@ export function ChatCard({
                         />
                       </div>
                     ) : isVideo ? (
-                      <div className="w-full h-full rounded-2xl overflow-hidden bg-black relative">
+                      <div className="w-full h-full rounded-xl overflow-hidden bg-black relative">
                         {file.url && (
                           <video
                             src={file.url}
@@ -838,23 +838,23 @@ export function ChatCard({
                             loop
                           />
                         )}
-                        <span className="absolute bottom-1.5 right-1.5 text-[8.5px] font-bold text-white bg-black/60 px-1 py-0.5 rounded uppercase tracking-wider font-mono">
+                        <span className="absolute bottom-1 right-1 text-[8px] font-bold text-white bg-black/60 px-1 py-0.5 rounded uppercase tracking-wider font-mono">
                           Video
                         </span>
                       </div>
                     ) : (
-                      <div className="w-full h-full p-2.5 flex flex-col justify-between items-start text-left bg-[#f4f4f6] dark:bg-[#1a1917]/70 rounded-2xl">
+                      <div className="w-full h-full p-2 flex flex-col justify-between items-start text-left bg-[#f4f4f6] dark:bg-[#1a1917]/70 rounded-xl">
                         <div className="flex items-center justify-between w-full">
-                          <span className="text-[10px] font-bold text-[#888888] dark:text-[#888888] tracking-wider uppercase font-mono">
+                          <span className="text-[9px] font-bold text-[#888888] dark:text-[#888888] tracking-wider uppercase font-mono">
                             {ext}
                           </span>
                           <FileText className="w-3.5 h-3.5 text-[#e79737] shrink-0" />
                         </div>
                         <div className="w-full min-w-0">
-                          <span className="text-[11.5px] font-medium text-[#262626] dark:text-[#d4d4d4] leading-tight w-full line-clamp-2 break-words block">
+                          <span className="text-[11px] font-medium text-[#262626] dark:text-[#d4d4d4] leading-tight w-full line-clamp-2 break-words block">
                             {file.name}
                           </span>
-                          <span className="text-[9.5px] text-[#a9a9a9] dark:text-[#777777] font-mono mt-0.5 block truncate">
+                          <span className="text-[8.5px] text-[#a9a9a9] dark:text-[#777777] font-mono mt-0.5 block truncate">
                             {formatFileSize(file.size)}
                           </span>
                         </div>
@@ -875,13 +875,13 @@ export function ChatCard({
                       <X className="w-3 h-3 stroke-[2.5]" />
                     </button>
 
-                    {/* Tooltip on hover */}
-                    <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-max max-w-[220px] bg-[#262626] dark:bg-[#1e1e1e] text-white dark:text-[#e0e0e0] text-[11px] px-2.5 py-1.5 rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-150 shadow-xl z-30 select-text break-all border border-black/10 dark:border-[#383838]">
-                      <div className="font-medium truncate">{file.name}</div>
-                      <div className="text-[9.5px] text-[#a0a0a0] font-mono mt-0.5">
+                    {/* Tooltip on hover (positioned above card) */}
+                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-max max-w-[200px] bg-[#262626] dark:bg-[#1e1e1e] text-white dark:text-[#e0e0e0] text-[10.5px] px-2.5 py-1 rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-150 shadow-xl z-30 select-none break-all border border-black/10 dark:border-[#383838]">
+                      <div className="font-medium truncate max-w-[180px]">{file.name}</div>
+                      <div className="text-[9px] text-[#a0a0a0] font-mono mt-0.5">
                         {formatFileSize(file.size)}
                       </div>
-                      <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-[#262626] dark:bg-[#1e1e1e] border-t border-l border-black/10 dark:border-[#383838] rotate-45" />
+                      <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-[#262626] dark:bg-[#1e1e1e] border-b border-r border-black/10 dark:border-[#383838] rotate-45" />
                     </div>
                   </div>
                 );
