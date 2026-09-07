@@ -66,7 +66,7 @@ export function TopToolbar({
     >
       {/* Left section: Conversation breadcrumb / title and project badge */}
       <div
-        className="flex items-center gap-2 min-w-0"
+        className="flex items-center gap-2 min-w-0 flex-1 overflow-hidden mr-2"
         style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
       >
         {!isSidebarOpen && (
@@ -143,7 +143,7 @@ export function TopToolbar({
 
       {/* Right section: Terminal, Right Panel, and Window Controls */}
       <div
-        className="flex items-center gap-1 text-[#262626] dark:text-[#d4d4d4]"
+        className="flex items-center gap-1 text-[#262626] dark:text-[#d4d4d4] shrink-0 ml-auto"
         style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
       >
 

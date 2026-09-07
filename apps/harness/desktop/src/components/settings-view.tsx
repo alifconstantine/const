@@ -576,7 +576,7 @@ export function SettingsView({
         >
           {/* Window Controls */}
           <div
-            className="flex items-center gap-0.5 text-[#262626] dark:text-[#d4d4d4]"
+            className="flex items-center gap-0.5 text-[#262626] dark:text-[#d4d4d4] shrink-0 ml-auto"
             style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
           >
             <button

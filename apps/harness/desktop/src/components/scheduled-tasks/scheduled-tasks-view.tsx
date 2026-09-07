@@ -199,7 +199,7 @@ export function ScheduledTasksView({
 
         {/* Right: Window Controls */}
         <div
-          className="flex items-center gap-0.5 text-[#969696]"
+          className="flex items-center gap-0.5 text-[#969696] shrink-0 ml-auto"
           style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
         >
           <button

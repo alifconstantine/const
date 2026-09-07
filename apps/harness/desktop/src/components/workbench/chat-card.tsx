@@ -679,17 +679,17 @@ export function ChatCard({
   const percentUsed = Math.max(1, Math.min(100, Math.round((usedTokens / totalTokens) * 100)));
 
   return (
-    <div className="w-full flex flex-col items-center gap-2 select-none">
+    <div className="w-full max-w-full flex flex-col items-center gap-2 select-none min-w-0">
       {/* Unified Card */}
       <div
-        className={`w-full rounded-2xl border border-[#e2e2e4] dark:border-[#383838] select-none transition-colors shadow-sm dark:shadow-none ${
+        className={`w-full max-w-full rounded-2xl border border-[#e2e2e4] dark:border-[#383838] select-none transition-colors shadow-sm dark:shadow-none min-w-0 ${
           compact ? "bg-[#ffffff] dark:bg-[#2b2b2b]" : "bg-[#ffffff] dark:bg-[#222222]"
         }`}
       >
         {/* Top Header Strip: Choose Project (Only visible in landing view) */}
         {!compact && (
-          <div className="w-full px-3.5 pt-2 pb-1.5 flex items-center relative">
-            <div className="relative" ref={projectMenuRef}>
+          <div className="w-full px-3.5 pt-2 pb-1.5 flex items-center relative min-w-0">
+            <div className="relative max-w-full min-w-0" ref={projectMenuRef}>
               <button
                 type="button"
                 onClick={() => {
@@ -698,17 +698,17 @@ export function ChatCard({
                   setIsModelOpen(false);
                   setIsContextOpen(false);
                 }}
-                className="inline-flex items-center gap-1.5 text-[13px] text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white transition-colors cursor-pointer font-sans"
+                className="inline-flex items-center gap-1.5 text-[13px] text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white transition-colors cursor-pointer font-sans max-w-full"
                 title={currentProject}
               >
-                <Folder className="w-3.5 h-3.5 text-[#a9a9a9] dark:text-[#5d5d5d]" />
-                <span>{displayProjectName}</span>
-                <ChevronDown className="w-3 h-3 text-[#a9a9a9] dark:text-[#5d5d5d] ml-0.5" />
+                <Folder className="w-3.5 h-3.5 text-[#a9a9a9] dark:text-[#5d5d5d] shrink-0" />
+                <span className="truncate max-w-[200px] sm:max-w-[320px]">{displayProjectName}</span>
+                <ChevronDown className="w-3 h-3 text-[#a9a9a9] dark:text-[#5d5d5d] ml-0.5 shrink-0" />
               </button>
 
               {/* Choose Project Dropdown Popover */}
               {isProjectOpen && (
-                <div className="absolute top-full left-0 mt-2 w-64 sm:w-72 bg-white dark:bg-[#222222] border border-[#e2e2e4] dark:border-[#383838] rounded-2xl shadow-2xl p-1.5 z-50 flex flex-col text-left select-none animate-in fade-in zoom-in-95 duration-100">
+                <div className="absolute top-full left-0 mt-2 w-64 sm:w-72 max-w-[calc(100vw-32px)] bg-white dark:bg-[#222222] border border-[#e2e2e4] dark:border-[#383838] rounded-2xl shadow-2xl p-1.5 z-50 flex flex-col text-left select-none animate-in fade-in zoom-in-95 duration-100">
                   {/* Real Workspaces List (only shown if real folders were opened) */}
                   {workspaces.length > 0 && (
                     <>
@@ -795,9 +795,9 @@ export function ChatCard({
 
         {/* AI Input Box: Background is #ffffff (light) / #2b2b2b (dark) with #262626 / #d4d4d4 text */}
         <div
-          className={`w-full bg-[#ffffff] dark:bg-[#2b2b2b] rounded-2xl ${
+          className={`w-full max-w-full bg-[#ffffff] dark:bg-[#2b2b2b] rounded-2xl ${
             compact ? "" : "border-t border-[#e2e2e4] dark:border-[#383838]"
-          } px-3.5 pt-2.5 pb-2.5 flex flex-col justify-between transition-colors focus-within:border-[#a9a9a9] dark:focus-within:border-[#555555]`}
+          } px-3 sm:px-3.5 pt-2.5 pb-2.5 flex flex-col justify-between transition-colors focus-within:border-[#a9a9a9] dark:focus-within:border-[#555555] min-w-0`}
         >
           {/* Attachments Shelf (Full Previews for Images, Videos, PDFs, Docs) */}
           {attachments.length > 0 && (
@@ -916,11 +916,11 @@ export function ChatCard({
           </ScrollArea>
 
           {/* Bottom Actions Row: Plus, Hand/Shield, Context Window, Model Selector, Send Button */}
-          <div className="flex items-center justify-between pt-2.5 text-xs relative">
+          <div className="flex items-center justify-between pt-2.5 text-xs relative min-w-0 gap-1.5 sm:gap-2">
             {/* Left Actions: Plus and Mode Selector */}
-            <div className="flex items-center gap-2 sm:gap-3">
+            <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 shrink">
               {/* Plus Button & Add Context Dropdown */}
-              <div className="relative" ref={plusMenuRef}>
+              <div className="relative shrink-0" ref={plusMenuRef}>
                 <button
                   type="button"
                   onClick={() => {
@@ -954,7 +954,7 @@ export function ChatCard({
 
                 {/* Add Context Popover Menu */}
                 {isPlusOpen && (
-                  <div className="absolute bottom-full mb-2 left-0 w-44 bg-white dark:bg-[#1e1e1e] border border-[#e2e2e4] dark:border-[#383838] rounded-2xl shadow-2xl p-1.5 z-50 flex flex-col text-left select-none animate-in fade-in zoom-in-95 duration-100">
+                  <div className="absolute bottom-full mb-2 left-0 w-44 max-w-[calc(100vw-32px)] bg-white dark:bg-[#1e1e1e] border border-[#e2e2e4] dark:border-[#383838] rounded-2xl shadow-2xl p-1.5 z-50 flex flex-col text-left select-none animate-in fade-in zoom-in-95 duration-100">
                     <div className="px-2.5 py-1 text-[11px] font-medium text-[#a9a9a9] dark:text-[#777777]">
                       Add Context
                     </div>
@@ -1017,31 +1017,34 @@ export function ChatCard({
                 )}
               </div>
 
-              {/* Mode Selector Dropdown */}
-              <div className="relative" ref={modeMenuRef}>
+              {/* Access Mode Selector: Ask before changes vs Full access */}
+              <div className="relative min-w-0" ref={modeMenuRef}>
                 <button
                   type="button"
                   onClick={() => {
                     setIsModeOpen((prev) => !prev);
                     setIsProjectOpen(false);
                     setIsModelOpen(false);
+                    setIsContextOpen(false);
+                    setIsPlusOpen(false);
                   }}
-                  className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[13px] font-normal transition-colors cursor-pointer ${
+                  className={`inline-flex items-center gap-1.5 px-1.5 sm:px-2 py-1 rounded-md text-[13px] font-normal transition-colors cursor-pointer shrink-0 max-w-[155px] sm:max-w-none ${
                     mode === "full_access"
                       ? "text-[#e79737] hover:bg-[#e79737]/10"
                       : "text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5"
                   }`}
+                  title={mode === "full_access" ? "Full access" : "Ask before changes"}
                 >
                   {mode === "full_access" ? (
-                    <ShieldAlert className="w-3.5 h-3.5 text-[#e79737] stroke-[1.75]" />
+                    <ShieldAlert className="w-3.5 h-3.5 text-[#e79737] stroke-[1.75] shrink-0" />
                   ) : (
-                    <Hand className="w-3.5 h-3.5 text-[#a9a9a9] dark:text-[#5d5d5d] stroke-[1.75]" />
+                    <Hand className="w-3.5 h-3.5 text-[#a9a9a9] dark:text-[#5d5d5d] stroke-[1.75] shrink-0" />
                   )}
-                  <span>
+                  <span className="truncate">
                     {mode === "full_access" ? "Full access" : "Ask before changes"}
                   </span>
                   <ChevronDown
-                    className={`w-3 h-3 ml-0.5 ${
+                    className={`w-3 h-3 ml-0.5 shrink-0 ${
                       mode === "full_access" ? "text-[#e79737]" : "text-[#a9a9a9] dark:text-[#5d5d5d]"
                     }`}
                   />
@@ -1049,7 +1052,7 @@ export function ChatCard({
 
                 {/* Mode Selector Popover (Only 2 items: Ask before changes & Full access) */}
                 {isModeOpen && (
-                  <div className="absolute bottom-full mb-2 left-0 w-64 sm:w-72 bg-white dark:bg-[#222222] border border-[#e2e2e4] dark:border-[#383838] rounded-2xl shadow-2xl p-1.5 z-50 flex flex-col text-left select-none animate-in fade-in zoom-in-95 duration-100">
+                  <div className="absolute bottom-full mb-2 left-0 w-64 sm:w-72 max-w-[calc(100vw-32px)] bg-white dark:bg-[#222222] border border-[#e2e2e4] dark:border-[#383838] rounded-2xl shadow-2xl p-1.5 z-50 flex flex-col text-left select-none animate-in fade-in zoom-in-95 duration-100">
                     {/* 1. Ask before changes */}
                     <button
                       type="button"
@@ -1101,7 +1104,7 @@ export function ChatCard({
             </div>
 
             {/* Right Actions: Context Window (1st, only if compact), Model Selector (2nd), Send Button (3rd) */}
-            <div className="flex items-center gap-2 sm:gap-2.5">
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 ml-auto">
               {/* 1. Context Windows Indicator & Detailed Popover (Only visible when conversation is active) */}
               {compact && (
                 <div className="relative" ref={contextMenuRef}>
@@ -1237,15 +1240,16 @@ export function ChatCard({
                     setIsContextOpen(false);
                     setIsPlusOpen(false);
                   }}
-                  className="inline-flex items-center gap-1 px-1.5 py-1 rounded-md text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 text-[13px] font-normal transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1 px-1.5 py-1 rounded-md text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 text-[13px] font-normal transition-colors cursor-pointer max-w-[135px] sm:max-w-[180px] md:max-w-[240px]"
+                  title={selectedModel || "Manage model"}
                 >
-                  <span>{selectedModel || "Manage model"}</span>
-                  <ChevronDown className="w-3 h-3 text-[#a9a9a9] dark:text-[#5d5d5d] ml-0.5" />
+                  <span className="truncate">{selectedModel || "Manage model"}</span>
+                  <ChevronDown className="w-3 h-3 text-[#a9a9a9] dark:text-[#5d5d5d] ml-0.5 shrink-0" />
                 </button>
 
                 {/* Model Selector Popover */}
                 {isModelOpen && (
-                  <div className="absolute bottom-full mb-2 right-0 w-[260px] max-w-[280px] bg-white dark:bg-[#1e1e1e] border border-[#e2e2e4] dark:border-[#333333] rounded-2xl shadow-2xl p-1.5 z-50 flex flex-col text-left select-none animate-in fade-in zoom-in-95 duration-100">
+                  <div className="absolute bottom-full mb-2 right-0 w-[260px] max-w-[calc(100vw-32px)] bg-white dark:bg-[#1e1e1e] border border-[#e2e2e4] dark:border-[#333333] rounded-2xl shadow-2xl p-1.5 z-50 flex flex-col text-left select-none animate-in fade-in zoom-in-95 duration-100">
                     {models.length > 0 ? (
                       <>
                         {/* Search Input at the top */}
@@ -1383,19 +1387,19 @@ export function ChatCard({
                       setIsContextOpen(false);
                       setIsPlusOpen(false);
                     }}
-                    className="inline-flex items-center gap-1 px-1.5 py-1 rounded-md text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 text-[13px] font-normal transition-colors cursor-pointer"
+                    className="inline-flex items-center gap-1 px-1.5 py-1 rounded-md text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 text-[13px] font-normal transition-colors cursor-pointer shrink-0"
                     title={`Thinking effort: ${thinkingLevel}`}
                     aria-label={`Thinking effort: ${thinkingLevel}`}
                   >
-                    <Brain className="w-3.5 h-3.5 text-[#a9a9a9] dark:text-[#888888]" />
+                    <Brain className="w-3.5 h-3.5 text-[#a9a9a9] dark:text-[#888888] shrink-0" />
                     <span className="capitalize">{thinkingLevel}</span>
-                    <ChevronDown className="w-3 h-3 text-[#a9a9a9] dark:text-[#5d5d5d] ml-0.5" />
+                    <ChevronDown className="w-3 h-3 text-[#a9a9a9] dark:text-[#5d5d5d] ml-0.5 shrink-0" />
                   </button>
 
                   {/* Thinking Level Popover Dropdown */}
                   {isThinkingOpen && (
-                    <div className="absolute bottom-full mb-2 right-0 w-44 bg-white dark:bg-[#222222] border border-[#e2e2e4] dark:border-[#383838] rounded-2xl shadow-2xl p-1.5 z-50 flex flex-col text-left select-none animate-in fade-in zoom-in-95 duration-100">
-                      <div className="px-2 py-1 text-[11px] font-medium text-[#a9a9a9] dark:text-[#888888] uppercase tracking-wider mb-1">
+                    <div className="absolute bottom-full mb-2 right-0 w-44 max-w-[calc(100vw-32px)] bg-white dark:bg-[#222222] border border-[#e2e2e4] dark:border-[#383838] rounded-2xl shadow-2xl p-1.5 z-50 flex flex-col text-left select-none animate-in fade-in zoom-in-95 duration-100">
+                      <div className="px-2 py-1 text-[11px] font-medium text-[#a9a9a9] dark:text-[#888888] uppercase tracking-wider mb-1 flex items-center justify-between">
                         <span>Thinking</span>
                       </div>
                       <div className="flex flex-col gap-0.5">
@@ -1435,7 +1439,7 @@ export function ChatCard({
                 <button
                   type="button"
                   onClick={onAbort}
-                  className="w-7 h-7 rounded-lg bg-[#dedee2] hover:bg-[#d5d5d9] dark:bg-[#383838] dark:hover:bg-[#454545] text-[#e79737] dark:text-[#ff7a00] flex items-center justify-center cursor-pointer select-none transition-colors"
+                  className="w-7 h-7 rounded-lg bg-[#dedee2] hover:bg-[#d5d5d9] dark:bg-[#383838] dark:hover:bg-[#454545] text-[#e79737] dark:text-[#ff7a00] flex items-center justify-center cursor-pointer select-none transition-colors shrink-0"
                   title="Stop generation"
                   aria-label="Stop generation"
                 >
@@ -1446,7 +1450,7 @@ export function ChatCard({
                   type="button"
                   onClick={handleSend}
                   disabled={!prompt.trim() && attachments.length === 0}
-                  className={`w-7 h-7 rounded-lg flex items-center justify-center select-none transition-all ${
+                  className={`w-7 h-7 rounded-lg flex items-center justify-center select-none transition-all shrink-0 ${
                     prompt.trim() || attachments.length > 0
                       ? "bg-[#262626] dark:bg-[#d4d4d4] text-white dark:text-[#161616] hover:bg-black dark:hover:bg-white cursor-pointer shadow-sm active:scale-95"
                       : "bg-[#f0f0f2] dark:bg-[#48484e]/60 text-[#a9a9a9] dark:text-[#888888] cursor-not-allowed"

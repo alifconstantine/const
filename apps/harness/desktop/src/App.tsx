@@ -1057,7 +1057,7 @@ function AuthenticatedContent({
   }
 
   return (
-    <div className="h-screen w-screen flex bg-[#ececee] dark:bg-[#2b2b2b] text-[#262626] dark:text-[#d4d4d4] overflow-hidden select-none">
+    <div className="h-screen w-full max-w-full flex bg-[#ececee] dark:bg-[#2b2b2b] text-[#262626] dark:text-[#d4d4d4] overflow-hidden select-none">
       {/* Left Sidebar (Only visible when isSidebarOpen = true) */}
       {isSidebarOpen && (
         <Sidebar
@@ -1084,7 +1084,7 @@ function AuthenticatedContent({
 
       {/* Main Content Area: Background #f8f8f8 (light) / #161616 (dark), text #262626 / #d4d4d4 */}
       <main
-        className={`flex-1 h-full bg-[#f8f8f8] dark:bg-[#161616] text-[#262626] dark:text-[#d4d4d4] overflow-hidden flex flex-col relative transition-[border-radius] duration-200 ${
+        className={`flex-1 min-w-0 h-full bg-[#f8f8f8] dark:bg-[#161616] text-[#262626] dark:text-[#d4d4d4] overflow-hidden flex flex-col relative transition-[border-radius] duration-200 ${
           isSidebarOpen ? "rounded-l-2xl sm:rounded-l-3xl border-l border-[#dedee2] dark:border-[#333333]/40" : ""
         }`}
       >
@@ -1110,9 +1110,9 @@ function AuthenticatedContent({
 
         {/* Dynamic Canvas: Landing Layout when 0 messages vs Active Stream Layout */}
         {messages.length === 0 ? (
-          <div className="flex-1 relative flex flex-col items-center justify-center px-4 sm:px-8 pt-6 pb-6 overflow-y-auto">
+          <div className="flex-1 min-w-0 relative flex flex-col items-center justify-center px-3.5 sm:px-6 md:px-8 pt-6 pb-6 overflow-y-auto">
             {/* Centered Conversation Container */}
-            <div className={cn("relative flex flex-col items-center w-full z-10 translate-y-6 sm:translate-y-8", landingWidthClass)}>
+            <div className={cn("relative flex flex-col items-center w-full max-w-full z-10 translate-y-6 sm:translate-y-8", landingWidthClass)}>
 
               {/* Greeting Text */}
               <h1 className="text-2xl sm:text-[28px] font-medium tracking-tight text-[#262626] dark:text-[#d4d4d4] text-center mb-6 z-10 font-sans">
@@ -1120,7 +1120,7 @@ function AuthenticatedContent({
               </h1>
 
               {/* Floating Chat Input Card */}
-              <div className="w-full z-10">
+              <div className="w-full max-w-full z-10 min-w-0">
                 <ChatCard
                   onSendMessage={handleSendMessage}
                   isExecuting={isExecuting}
@@ -1135,7 +1135,7 @@ function AuthenticatedContent({
             </div>
           </div>
         ) : (
-          <div className="flex-1 overflow-hidden flex flex-col relative">
+          <div className="flex-1 min-w-0 overflow-hidden flex flex-col relative">
             {/* Left Vertical Mini-Timeline Navigator (TurnTimelineNav matching const-harness) */}
             <ChatIndicator
               messages={messages}
@@ -1147,9 +1147,9 @@ function AuthenticatedContent({
             <ScrollArea
               ref={chatScrollRef}
               data-chat-viewport="true"
-              className="flex-1 w-full h-full [&>div>div[style]]:!block"
+              className="flex-1 w-full h-full min-w-0 [&>div>div[style]]:!block"
             >
-              <div className={cn("w-full mx-auto px-4 sm:px-8 py-6 flex flex-col gap-6", streamWidthClass)}>
+              <div className={cn("w-full max-w-full mx-auto px-3.5 sm:px-6 md:px-8 py-6 flex flex-col gap-6", streamWidthClass)}>
                 {messages.map((msg, idx) => (
                   <div key={msg.id} data-chat-anchor-key={msg.id} className="w-full flex flex-col">
                     {msg.role === "user" ? (
@@ -1226,7 +1226,7 @@ function AuthenticatedContent({
                         </div>
                       </div>
                     ) : (
-                      <div className={cn("w-full flex flex-col gap-2.5 group", streamWidthClass)}>
+                      <div className="w-full flex flex-col gap-2.5 group">
                         <ExecutionTrace
                           thinking={msg.thinking}
                           toolCalls={msg.toolCalls}
@@ -1315,8 +1315,8 @@ function AuthenticatedContent({
             </ScrollArea>
 
             {/* Anchored Bottom Chat Input (No dividing line!) */}
-            <div className="w-full px-4 sm:px-8 pb-4 pt-2 flex justify-center bg-[#f8f8f8] dark:bg-[#161616] shrink-0">
-              <div className={cn("w-full", streamWidthClass)}>
+            <div className="w-full px-3.5 sm:px-6 md:px-8 pb-4 pt-2 flex justify-center bg-[#f8f8f8] dark:bg-[#161616] shrink-0 min-w-0">
+              <div className={cn("w-full max-w-full min-w-0", streamWidthClass)}>
                 <ChatCard
                   compact
                   isExecuting={isExecuting}
