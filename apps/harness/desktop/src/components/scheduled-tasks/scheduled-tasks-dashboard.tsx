@@ -135,29 +135,23 @@ export function ScheduledTasksDashboard({
 
   return (
     <div className="w-full max-w-4xl mx-auto px-6 sm:px-10 py-12 flex flex-col select-none">
-      {/* Page Heading */}
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-white tracking-tight mb-1">Scheduled Tasks</h1>
-        <p className="text-[13px] text-[#969696]">
-          Run tasks on a schedule or whenever you need them.
-        </p>
-      </div>
-
-      {/* Controls Bar */}
-      <div className="flex items-center justify-between gap-4 mb-6">
-        <div className="inline-flex items-center bg-[#222222] border border-[#383838] rounded-lg p-0.5">
-          <span className="px-3 py-1.5 rounded-md text-[13px] font-medium bg-[#2b2b2b] text-white cursor-default">
-            Scheduled tasks
-          </span>
+      {/* Page Heading & Actions */}
+      <div className="flex items-start justify-between gap-4 mb-6">
+        <div>
+          <h1 className="text-2xl font-semibold text-white tracking-tight mb-1">Scheduled Tasks</h1>
+          <p className="text-[13px] text-[#969696]">
+            Run tasks on a schedule or whenever you need them.
+          </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0 pt-0.5">
           {onRefresh && (
             <button
               type="button"
               className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#222222] hover:bg-[#2b2b2b] border border-[#383838] hover:border-[#484848] text-[#969696] hover:text-white transition-colors cursor-pointer"
               onClick={onRefresh}
               title="Refresh"
+              aria-label="Refresh scheduled tasks"
             >
               <RotateCw className="w-3.5 h-3.5" />
             </button>
@@ -165,7 +159,7 @@ export function ScheduledTasksDashboard({
 
           <button
             type="button"
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-medium text-[#161616] bg-[#d4d4d4] hover:bg-white transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-medium text-[#161616] bg-[#d4d4d4] hover:bg-white transition-colors cursor-pointer h-8"
             onClick={onCreateNew}
           >
             <Plus className="w-3.5 h-3.5" />
