@@ -41,6 +41,7 @@ import {
   archiveConversation,
   unarchiveConversation,
   initConversationStore,
+  refreshConversationsFromDisk,
   generateFallbackTitle,
   generateAiTitle,
   type ConversationItem,
@@ -116,6 +117,24 @@ function AuthenticatedContent({
     initConversationStore().then((list) => {
       setConversations(list);
     });
+
+    if (window.electron?.onConversationsChanged) {
+      const unsubscribe = window.electron.onConversationsChanged(async (data) => {
+        const refreshed = await refreshConversationsFromDisk();
+        setConversations(refreshed);
+
+        // If the changed conversation is currently open, reload its messages
+        if (data?.conversationId && data.conversationId === conversationIdRef.current) {
+          if (window.electron?.getConversation) {
+            const activeConvo = await window.electron.getConversation(data.conversationId);
+            if (activeConvo && activeConvo.messages) {
+              setMessages(activeConvo.messages as any);
+            }
+          }
+        }
+      });
+      return () => unsubscribe();
+    }
   }, []);
 
   const [conversationId, setConversationId] = useState<string>(
@@ -810,12 +829,20 @@ function AuthenticatedContent({
     }
   };
 
-  const handleSelectConversation = (id: string) => {
+  const handleSelectConversation = async (id: string) => {
     if (isExecuting) {
       handleAbort();
     }
     setIsScheduledTasksOpen(false);
-    const target = conversations.find((c) => c.id === id);
+    let target = conversations.find((c) => c.id === id);
+    if (!target && window.electron?.getConversation) {
+      const diskConvo = await window.electron.getConversation(id);
+      if (diskConvo) {
+        target = diskConvo;
+        const refreshed = await refreshConversationsFromDisk();
+        setConversations(refreshed);
+      }
+    }
     if (target) {
       setConversationId(target.id);
       setConversationTitle(target.title);

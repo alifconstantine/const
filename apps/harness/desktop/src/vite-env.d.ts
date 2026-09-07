@@ -157,12 +157,13 @@ declare global {
       pinProject?: (projectName: string, isPinned: boolean) => Promise<boolean>;
       getProjectPins?: () => Promise<string[]>;
       importLegacyConversations?: (convos: any[]) => Promise<boolean>;
+      onConversationsChanged?: (callback: (data: { conversationId?: string }) => void) => () => void;
       scheduledTasks?: {
         list: () => Promise<ScheduledTaskItem[]>;
         create: (data: Partial<ScheduledTaskItem>) => Promise<ScheduledTaskItem>;
         update: (data: Partial<ScheduledTaskItem> & { id: string }) => Promise<ScheduledTaskItem | null>;
         delete: (id: string) => Promise<boolean>;
-        run: (id: string) => Promise<boolean>;
+        run: (id: string) => Promise<{ success: boolean; sessionId?: string; error?: string }>;
         history: (taskId?: string) => Promise<ScheduledTaskRunHistory[]>;
         deleteRun: (id: string) => Promise<boolean>;
         onChanged: (callback: () => void) => () => void;
@@ -192,7 +193,8 @@ export interface ScheduledTaskItem {
   workspacePath: string;
   schedule: ScheduledTaskSchedule;
   model?: string;
-  permissionPreset?: "ask_before_changes" | "full_access" | "read-only" | "workspace-write" | "danger-full-access" | "prompt" | "auto";
+  conversationId?: string;
+  permissionPreset?: "ask_before_changes" | "full_access" | "read-only" | "workspace-write" | "danger-full-access" | "prompt" | "auto" | string;
   enabled: boolean;
   createdAt: number | string;
   updatedAt: number | string;

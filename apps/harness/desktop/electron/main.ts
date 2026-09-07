@@ -827,7 +827,26 @@ app.whenReady().then(() => {
   // ---------------------------------------------------------------------------
   scheduledTasksManager = new ScheduledTasksManager(scheduledTasksDir, {
     executeTaskRunner: async (task) => {
-      const convoId = `scheduled_${task.id}_${Date.now()}`;
+      // Maintain a single dedicated, persistent conversation per scheduled task
+      const convoId = task.conversationId || `scheduled_${task.id}`;
+      task.conversationId = convoId;
+
+      const existingConvo = conversationDb.getConversation(convoId);
+      const previousAgentMessages: AgentMessage[] = [];
+
+      if (existingConvo && Array.isArray(existingConvo.messages)) {
+        for (const m of existingConvo.messages) {
+          if (!m || !m.role || !m.content) continue;
+          previousAgentMessages.push({
+            id: m.id,
+            role: m.role as any,
+            content: typeof m.content === "string" ? m.content : JSON.stringify(m.content),
+            thinking: m.thinking,
+            timestamp: m.createdAt || m.timestamp,
+          });
+        }
+      }
+
       const config = loadUserConfig();
       const model = task.model || config.activeModel || "gemini-3.6-flash";
 
@@ -871,13 +890,17 @@ app.whenReady().then(() => {
         thinkingLevel: "medium",
       });
 
-      const taskName = task.name || task.title;
-      const taskPrompt = task.prompt || task.instructions;
+      const taskName = task.name || task.title || "Scheduled Task";
+      const taskPrompt = task.prompt || task.instructions || "";
+      const runCount = (task.runCount || 0) + 1;
 
       const initialMessage: AgentMessage = {
         role: "user",
-        content: `[Scheduled Task: ${taskName}]\n\n${taskPrompt}`,
+        content: `[Scheduled Task: ${taskName} — Run #${runCount}]\n\n${taskPrompt}`,
+        timestamp: Date.now(),
       };
+
+      const messagesToRun: AgentMessage[] = [...previousAgentMessages, initialMessage];
 
       // Keep OS awake during background scheduled task execution
       let blockerId: number | null = null;
@@ -886,7 +909,7 @@ app.whenReady().then(() => {
       } catch {}
 
       try {
-        const updatedMessages = await agent.run([initialMessage], (agentEvent: any) => {
+        const updatedMessages = await agent.run(messagesToRun, (agentEvent: any) => {
           if (win && !win.isDestroyed()) {
             win.webContents.send("agent:stream-event", {
               ...agentEvent,
@@ -904,9 +927,14 @@ app.whenReady().then(() => {
             project: task.workspacePath || "Outside Project",
             model,
             updatedAt: Date.now(),
-            createdAt: Date.now(),
+            createdAt: existingConvo?.createdAt || Date.now(),
             messages: updatedMessages,
           });
+
+          // Realtime notification: Notify renderer that conversations have changed
+          if (win && !win.isDestroyed()) {
+            win.webContents.send("conversations:changed", { conversationId: convoId });
+          }
         } catch (dbErr) {
           console.warn("[ScheduledTasks] Failed to save conversation to DB:", dbErr);
         }

@@ -35,6 +35,7 @@ export interface ScheduledTaskItem {
   workspacePath?: string;
   permissionPreset: "full_access" | "ask_before_changes" | "read-only" | "workspace-write" | "danger-full-access" | "prompt" | "auto" | string;
   model?: string;
+  conversationId?: string;
   enabled: boolean;
   createdAt: string;
   updatedAt: string;
@@ -266,6 +267,7 @@ export class ScheduledTasksManager {
     workspacePath?: string;
     permissionPreset?: ScheduledTaskItem["permissionPreset"];
     model?: string;
+    conversationId?: string;
   }): ScheduledTaskItem {
     this.ensureLoaded();
     const id = `task_${crypto.randomUUID().slice(0, 8)}`;
@@ -288,6 +290,7 @@ export class ScheduledTasksManager {
       nextRunAt,
       ...(data.workspacePath !== undefined ? { workspacePath: data.workspacePath } : {}),
       ...(data.model !== undefined ? { model: data.model } : {}),
+      ...(data.conversationId !== undefined ? { conversationId: data.conversationId } : {}),
     };
     this.tasks.unshift(item);
     this.persist();
@@ -305,6 +308,7 @@ export class ScheduledTasksManager {
     workspacePath?: string;
     permissionPreset?: ScheduledTaskItem["permissionPreset"];
     model?: string;
+    conversationId?: string;
     enabled?: boolean;
   }): ScheduledTaskItem | null {
     this.ensureLoaded();
@@ -332,6 +336,7 @@ export class ScheduledTasksManager {
         ? { permissionPreset: data.permissionPreset }
         : {}),
       ...(data.model !== undefined ? { model: data.model } : {}),
+      ...(data.conversationId !== undefined ? { conversationId: data.conversationId } : {}),
       ...(data.enabled !== undefined ? { enabled: data.enabled } : {}),
       updatedAt: now,
     };
@@ -445,6 +450,9 @@ export class ScheduledTasksManager {
       historyEntry.status = "completed";
       historyEntry.durationMs = durationMs;
       historyEntry.sessionId = res.sessionId;
+      if (res.sessionId && item.conversationId !== res.sessionId) {
+        item.conversationId = res.sessionId;
+      }
       this.persist();
       this.deps.onChanged?.();
       return { success: true, sessionId: res.sessionId };
