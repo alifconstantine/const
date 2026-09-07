@@ -100,11 +100,12 @@ function AuthenticatedContent({
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isScheduledTasksOpen, setIsScheduledTasksOpen] = useState(false);
-  const [settingsTab, setSettingsTab] = useState<string>("model");
+  const [settingsTab, setSettingsTab] = useState<string>("general");
   const greeting = getGreeting();
 
-  const handleOpenSettings = (tab: string = "model") => {
-    setSettingsTab(tab);
+  const handleOpenSettings = (tab: string = "general") => {
+    const resolvedTab = tab === "model" ? "model-settings" : tab;
+    setSettingsTab(resolvedTab);
     setIsSettingsOpen(true);
   };
 
@@ -918,7 +919,7 @@ function AuthenticatedContent({
           onRenameConversation={handleRenameConversation}
           onArchiveConversation={handleArchiveConversation}
           onUnarchiveConversation={handleUnarchiveConversation}
-          onOpenSettings={() => handleOpenSettings("model")}
+          onOpenSettings={() => handleOpenSettings("general")}
           onOpenScheduledTasks={() => setIsScheduledTasksOpen(true)}
           isScheduledTasksActive={isScheduledTasksOpen}
         />
@@ -970,7 +971,7 @@ function AuthenticatedContent({
                   contextUsage={contextUsage}
                   project={currentProject}
                   onProjectChange={setCurrentProject}
-                  onOpenSettings={() => handleOpenSettings("model")}
+                  onOpenSettings={(tab) => handleOpenSettings(tab || "model-settings")}
                   initialPrompt={editingPrompt}
                 />
               </div>
@@ -1168,7 +1169,7 @@ function AuthenticatedContent({
                   metrics={conversationMetrics}
                   project={currentProject}
                   onProjectChange={setCurrentProject}
-                  onOpenSettings={() => handleOpenSettings("model")}
+                  onOpenSettings={(tab) => handleOpenSettings(tab || "model-settings")}
                   initialPrompt={editingPrompt}
                 />
               </div>

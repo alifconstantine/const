@@ -43,6 +43,10 @@ import {
   X,
   Sun,
   Moon,
+  Hand,
+  ShieldAlert,
+  LogOut,
+  ArrowLeftRight,
 } from "lucide-react";
 import { useQuery } from "convex/react";
 import { api } from "@const/backend/_generated/api";
@@ -148,10 +152,23 @@ function generateAsciiBar(
 export function SettingsView({
   onBackToWorkspace,
   user,
-  initialTab = "model-settings",
+  onSignOut,
+  onSwitchAccount,
+  initialTab = "general",
 }: SettingsViewProps) {
+  // Normalize legacy tab names
+  const normalizedInitialTab = useMemo(() => {
+    if (initialTab === "model" || initialTab === "models") return "model-settings";
+    return initialTab || "general";
+  }, [initialTab]);
+
   // Navigation active tab
-  const [activeTab, setActiveTab] = useState<string>(initialTab);
+  const [activeTab, setActiveTab] = useState<string>(normalizedInitialTab);
+
+  // Sync activeTab when initialTab prop changes
+  useEffect(() => {
+    setActiveTab(normalizedInitialTab);
+  }, [normalizedInitialTab]);
 
   // Appearance & Theme settings
   const [theme, setTheme] = useTheme();
@@ -168,6 +185,24 @@ export function SettingsView({
   const [activeModel, setActiveModel] = useState<string>(() => {
     return localStorage.getItem("const_harness_active_model") || "gemini-3.6-flash";
   });
+
+  const [defaultConfirmationMode, setDefaultConfirmationMode] = useState<
+    "ask_before_changes" | "full_access"
+  >(() => {
+    return (
+      (localStorage.getItem("const_harness_default_mode") as
+        | "ask_before_changes"
+        | "full_access") || "ask_before_changes"
+    );
+  });
+
+  const handleSetDefaultMode = (mode: "ask_before_changes" | "full_access") => {
+    setDefaultConfirmationMode(mode);
+    localStorage.setItem("const_harness_default_mode", mode);
+    toast.success(
+      `Default confirmation mode set to ${mode === "full_access" ? "Full access" : "Ask before changes"}`
+    );
+  };
 
   const [customProviders, setCustomProviders] = useState<
     Array<{
@@ -576,53 +611,300 @@ export function SettingsView({
         </div>
 
         {/* Dynamic Section Content */}
-        <div className="flex-1 overflow-y-auto px-8 py-4 max-w-6xl w-full mx-auto">
-          {activeTab === "appearance" ? (
+        <div className="flex-1 overflow-y-auto px-6 sm:px-8 py-5 max-w-6xl w-full mx-auto">
+          {activeTab === "general" ? (
             /* ----------------------------------------------------------- */
-            /* Appearance Settings Tab (1:1 with Image 1 reference) */
+            /* General Settings Tab                                        */
             /* ----------------------------------------------------------- */
-            <div className="flex flex-col gap-6 max-w-4xl">
+            <div className="flex flex-col gap-5 max-w-2xl">
               {/* Header */}
               <div>
-                <h1 className="text-2xl font-medium text-[#262626] dark:text-white">Appearance</h1>
-                <p className="mt-1 text-xs text-[#a9a9a9] dark:text-[#888888]">
-                  Configure conversation layout width and visual appearance.
+                <h1 className="text-xl font-medium tracking-tight text-[#262626] dark:text-white">General</h1>
+                <p className="mt-1 text-xs text-[#8a8a8a] dark:text-[#888888]">
+                  Manage profile details, default workbench preferences, and system environment.
                 </p>
               </div>
 
-              {/* Chat Settings Section (Image 1) */}
+              {/* Account Profile Card */}
               <div className="flex flex-col gap-2">
-                <span className="text-xs font-semibold text-[#262626] dark:text-[#d4d4d4] tracking-tight">
-                  Chat Settings
+                <span className="text-[11px] font-medium text-[#8a8a8a] dark:text-[#777777] uppercase tracking-wider">
+                  Account
                 </span>
-                <div className="rounded-2xl border border-[#dedee2] dark:border-[#2e2e2e] bg-[#ffffff] dark:bg-[#1a1a1a] p-4 sm:p-5 shadow-xs flex flex-col gap-4">
-                  {/* Conversation Width row */}
-                  <div className="flex items-center justify-between gap-4">
+                <div className="rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#1e1e1e] p-4 flex flex-col gap-3.5">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <Avatar className="h-10 w-10 rounded-full bg-[#f4f4f6] dark:bg-[#252525] border border-[#dedee2] dark:border-[#383838] shrink-0">
+                        {user?.image ? (
+                          <AvatarImage src={user.image} alt={user?.name || "User"} className="object-cover" />
+                        ) : (
+                          <AvatarFallback className="text-xs font-semibold text-[#262626] dark:text-white bg-[#dedee2] dark:bg-[#383838]">
+                            {initials}
+                          </AvatarFallback>
+                        )}
+                      </Avatar>
+                      <div className="min-w-0 flex flex-col">
+                        <span className="text-[13px] font-medium text-[#262626] dark:text-white truncate">
+                          {user?.name || "Const User"}
+                        </span>
+                        <span className="text-xs text-[#8a8a8a] dark:text-[#888888] truncate">
+                          {user?.email || "Local Workspace"}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="px-2 py-0.5 rounded-md text-[10px] font-mono bg-[#f0f0f2] dark:bg-[#282828] text-[#262626] dark:text-[#d4d4d4] border border-[#e2e2e4] dark:border-[#383838]">
+                        Local Studio
+                      </span>
+                    </div>
+                  </div>
+
+                  {quota && (
+                    <div className="pt-3 border-t border-[#dedee2]/60 dark:border-[#383838]/60 flex flex-col gap-1.5">
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-[#8a8a8a] dark:text-[#888888]">Weekly Token Quota</span>
+                        <span className="font-mono text-[#262626] dark:text-[#d4d4d4]">
+                          {formatTokenDisplay(quota.remainingTokens)} / {formatTokenDisplay(quota.weeklyLimitTokens || 7_000_000)}
+                        </span>
+                      </div>
+                      <div className="w-full h-1.5 bg-[#f0f0f2] dark:bg-[#282828] rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-[#22c55e] transition-all rounded-full"
+                          style={{ width: `${Math.max(2, percentRemaining)}%` }}
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  {(onSwitchAccount || onSignOut) && (
+                    <div className="pt-2 border-t border-[#dedee2]/60 dark:border-[#383838]/60 flex items-center justify-end gap-2">
+                      {onSwitchAccount && (
+                        <button
+                          type="button"
+                          onClick={onSwitchAccount}
+                          className="px-2.5 py-1 text-xs rounded-lg border border-[#dedee2] dark:border-[#383838] hover:bg-black/5 dark:hover:bg-white/5 text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white transition-colors cursor-pointer flex items-center gap-1.5"
+                        >
+                          <ArrowLeftRight className="w-3.5 h-3.5" />
+                          <span>Switch account</span>
+                        </button>
+                      )}
+                      {onSignOut && (
+                        <button
+                          type="button"
+                          onClick={onSignOut}
+                          className="px-2.5 py-1 text-xs rounded-lg text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer flex items-center gap-1.5"
+                        >
+                          <LogOut className="w-3.5 h-3.5" />
+                          <span>Sign out</span>
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Workbench Preferences Card */}
+              <div className="flex flex-col gap-2">
+                <span className="text-[11px] font-medium text-[#8a8a8a] dark:text-[#777777] uppercase tracking-wider">
+                  Workbench Preferences
+                </span>
+                <div className="rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#1e1e1e] divide-y divide-[#dedee2]/60 dark:divide-[#383838]/60 overflow-hidden">
+                  {/* Default confirmation mode */}
+                  <div className="px-4 py-3 sm:px-4 sm:py-3.5 flex items-center justify-between gap-4">
                     <div className="flex flex-col">
-                      <span className="text-sm font-medium text-[#262626] dark:text-white">
+                      <span className="text-[13px] font-medium text-[#262626] dark:text-white">
+                        Confirmation Mode
+                      </span>
+                      <span className="text-[11px] text-[#8a8a8a] dark:text-[#888888] mt-0.5">
+                        Ask before changing files, or run with fewer confirmations.
+                      </span>
+                    </div>
+
+                    <div className="inline-flex p-0.5 rounded-lg bg-[#f0f0f2] dark:bg-[#282828] border border-[#e2e2e4] dark:border-[#383838] items-center gap-0.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => handleSetDefaultMode("ask_before_changes")}
+                        className={cn(
+                          "px-2.5 py-1 text-[11px] rounded-md transition-all cursor-pointer flex items-center gap-1.5",
+                          defaultConfirmationMode === "ask_before_changes"
+                            ? "bg-white dark:bg-[#383838] text-[#262626] dark:text-white font-medium"
+                            : "text-[#8a8a8a] dark:text-[#888888] hover:text-[#262626] dark:hover:text-[#d4d4d4]"
+                        )}
+                      >
+                        <Hand className="w-3.5 h-3.5" />
+                        <span>Ask before changes</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleSetDefaultMode("full_access")}
+                        className={cn(
+                          "px-2.5 py-1 text-[11px] rounded-md transition-all cursor-pointer flex items-center gap-1.5",
+                          defaultConfirmationMode === "full_access"
+                            ? "bg-white dark:bg-[#383838] text-[#e79737] font-medium"
+                            : "text-[#8a8a8a] dark:text-[#888888] hover:text-[#262626] dark:hover:text-[#d4d4d4]"
+                        )}
+                      >
+                        <ShieldAlert className="w-3.5 h-3.5" />
+                        <span>Full access</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Active model quick link */}
+                  <div className="px-4 py-3 sm:px-4 sm:py-3.5 flex items-center justify-between gap-4">
+                    <div className="flex flex-col">
+                      <span className="text-[13px] font-medium text-[#262626] dark:text-white">
+                        Default Model
+                      </span>
+                      <span className="text-[11px] text-[#8a8a8a] dark:text-[#888888] mt-0.5">
+                        Active model selected for new tasks and workbench chat.
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab("model-settings")}
+                      className="px-2.5 py-1 text-[11px] rounded-lg border border-[#dedee2] dark:border-[#383838] hover:bg-black/5 dark:hover:bg-white/5 text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer"
+                      title="Manage models in Model settings"
+                    >
+                      <Cpu className="w-3.5 h-3.5 text-[#8a8a8a] dark:text-[#888888]" />
+                      <span className="font-mono">{activeModel}</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* About & System Card */}
+              <div className="flex flex-col gap-2">
+                <span className="text-[11px] font-medium text-[#8a8a8a] dark:text-[#777777] uppercase tracking-wider">
+                  About
+                </span>
+                <div className="rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#1e1e1e] divide-y divide-[#dedee2]/60 dark:divide-[#383838]/60 overflow-hidden">
+                  <div className="px-4 py-2.5 flex items-center justify-between text-xs">
+                    <span className="text-[#8a8a8a] dark:text-[#888888]">Version</span>
+                    <span className="font-mono text-[#262626] dark:text-[#d4d4d4]">v0.1.0-alpha</span>
+                  </div>
+                  <div className="px-4 py-2.5 flex items-center justify-between text-xs">
+                    <span className="text-[#8a8a8a] dark:text-[#888888]">Platform</span>
+                    <span className="font-mono text-[#262626] dark:text-[#d4d4d4]">
+                      {window.electron?.platform || "desktop"}
+                    </span>
+                  </div>
+                  <div className="px-4 py-2.5 flex items-center justify-between text-xs">
+                    <span className="text-[#8a8a8a] dark:text-[#888888]">Runtime</span>
+                    <span className="font-mono text-[#262626] dark:text-[#d4d4d4]">
+                      Electron {window.electron?.versions?.electron || "34"} • Node {window.electron?.versions?.node || "20"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : activeTab === "appearance" ? (
+            /* ----------------------------------------------------------- */
+            /* Appearance Settings Tab (Refined, proportional, sleek)       */
+            /* ----------------------------------------------------------- */
+            <div className="flex flex-col gap-5 max-w-2xl">
+              {/* Header */}
+              <div>
+                <h1 className="text-xl font-medium tracking-tight text-[#262626] dark:text-white">Appearance</h1>
+                <p className="mt-1 text-xs text-[#8a8a8a] dark:text-[#888888]">
+                  Configure theme mode and conversation workbench layout.
+                </p>
+              </div>
+
+              {/* Appearance & Chat Settings Grouped Card */}
+              <div className="flex flex-col gap-2">
+                <span className="text-[11px] font-medium text-[#8a8a8a] dark:text-[#777777] uppercase tracking-wider">
+                  Interface & Layout
+                </span>
+                <div className="rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#1e1e1e] divide-y divide-[#dedee2]/60 dark:divide-[#383838]/60 overflow-hidden">
+                  {/* Theme row */}
+                  <div className="px-4 py-3 sm:px-4 sm:py-3.5 flex items-center justify-between gap-4">
+                    <div className="flex flex-col">
+                      <span className="text-[13px] font-medium text-[#262626] dark:text-white">
+                        Theme
+                      </span>
+                      <span className="text-[11px] text-[#8a8a8a] dark:text-[#888888] mt-0.5">
+                        Select light, dark, or follow system appearance.
+                      </span>
+                    </div>
+
+                    {/* Segmented Control: [Monitor System] [Sun Light] [Moon Dark] */}
+                    <div className="inline-flex p-0.5 rounded-lg bg-[#f0f0f2] dark:bg-[#282828] border border-[#e2e2e4] dark:border-[#383838] items-center gap-0.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setTheme("system")}
+                        className={cn(
+                          "px-2.5 py-1 text-[11px] rounded-md transition-all cursor-pointer flex items-center gap-1.5",
+                          theme === "system"
+                            ? "bg-[#ffffff] dark:bg-[#383838] text-[#262626] dark:text-white font-medium"
+                            : "text-[#8a8a8a] dark:text-[#888888] hover:text-[#262626] dark:hover:text-[#d4d4d4]"
+                        )}
+                        title="Follow system appearance"
+                      >
+                        <Monitor className="w-3.5 h-3.5" />
+                        <span>System</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setTheme("light")}
+                        className={cn(
+                          "px-2.5 py-1 text-[11px] rounded-md transition-all cursor-pointer flex items-center gap-1.5",
+                          theme === "light"
+                            ? "bg-[#ffffff] dark:bg-[#383838] text-[#262626] dark:text-white font-medium"
+                            : "text-[#8a8a8a] dark:text-[#888888] hover:text-[#262626] dark:hover:text-[#d4d4d4]"
+                        )}
+                        title="Light theme"
+                      >
+                        <Sun className="w-3.5 h-3.5" />
+                        <span>Light</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setTheme("dark")}
+                        className={cn(
+                          "px-2.5 py-1 text-[11px] rounded-md transition-all cursor-pointer flex items-center gap-1.5",
+                          theme === "dark"
+                            ? "bg-[#ffffff] dark:bg-[#383838] text-[#262626] dark:text-white font-medium"
+                            : "text-[#8a8a8a] dark:text-[#888888] hover:text-[#262626] dark:hover:text-[#d4d4d4]"
+                        )}
+                        title="Dark theme"
+                      >
+                        <Moon className="w-3.5 h-3.5" />
+                        <span>Dark</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Conversation Width row */}
+                  <div className="px-4 py-3 sm:px-4 sm:py-3.5 flex items-center justify-between gap-4">
+                    <div className="flex flex-col">
+                      <span className="text-[13px] font-medium text-[#262626] dark:text-white">
                         Conversation Width
                       </span>
-                      <span className="text-xs text-[#a9a9a9] dark:text-[#888888] mt-0.5">
-                        Configure the maximum width of the conversation panel.
+                      <span className="text-[11px] text-[#8a8a8a] dark:text-[#888888] mt-0.5">
+                        Maximum width of the conversation container in workbench.
                       </span>
                     </div>
 
                     {/* Segmented Control: [Default] [Narrow] [Wide] */}
-                    <div className="inline-flex p-1 rounded-xl bg-[#ececee] dark:bg-[#252525] border border-[#dedee2] dark:border-[#333333] items-center gap-1 shrink-0">
+                    <div className="inline-flex p-0.5 rounded-lg bg-[#f0f0f2] dark:bg-[#282828] border border-[#e2e2e4] dark:border-[#383838] items-center gap-0.5 shrink-0">
                       {(["default", "narrow", "wide"] as const).map((w) => {
                         const isSelected = conversationWidth === w;
                         const label = w === "default" ? "Default" : w === "narrow" ? "Narrow" : "Wide";
+                        const sizeHint = w === "default" ? "672px" : w === "narrow" ? "540px" : "896px";
                         return (
                           <button
                             key={w}
                             type="button"
                             onClick={() => setConversationWidth(w)}
                             className={cn(
-                              "px-3.5 py-1 text-xs rounded-lg transition-all cursor-pointer",
+                              "px-2.5 py-1 text-[11px] rounded-md transition-all cursor-pointer",
                               isSelected
-                                ? "bg-[#ffffff] dark:bg-[#383838] text-[#262626] dark:text-white shadow-xs font-medium"
-                                : "text-[#a9a9a9] dark:text-[#888888] hover:text-[#262626] dark:hover:text-white font-normal"
+                                ? "bg-[#ffffff] dark:bg-[#383838] text-[#262626] dark:text-white font-medium"
+                                : "text-[#8a8a8a] dark:text-[#888888] hover:text-[#262626] dark:hover:text-[#d4d4d4]"
                             )}
+                            title={`${label} width (${sizeHint})`}
                           >
                             {label}
                           </button>
@@ -632,74 +914,14 @@ export function SettingsView({
                   </div>
                 </div>
               </div>
-
-              {/* Appearance Section (Image 1) */}
-              <div className="flex flex-col gap-2">
-                <span className="text-xs font-semibold text-[#262626] dark:text-[#d4d4d4] tracking-tight">
-                  Appearance
-                </span>
-                <div className="rounded-2xl border border-[#dedee2] dark:border-[#2e2e2e] bg-[#ffffff] dark:bg-[#1a1a1a] p-4 sm:p-5 shadow-xs flex flex-col gap-4">
-                  {/* Theme row */}
-                  <div className="flex items-center justify-between gap-4">
-                    <div className="flex flex-col">
-                      <span className="text-sm font-medium text-[#262626] dark:text-white">
-                        Theme
-                      </span>
-                    </div>
-
-                    {/* Segmented Icon Control: [Monitor] [Sun] [Moon] */}
-                    <div className="inline-flex p-1 rounded-xl bg-[#ececee] dark:bg-[#252525] border border-[#dedee2] dark:border-[#333333] items-center gap-0.5 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => setTheme("system")}
-                        className={cn(
-                          "p-1.5 rounded-lg transition-all cursor-pointer",
-                          theme === "system"
-                            ? "bg-[#ffffff] dark:bg-[#383838] text-[#262626] dark:text-white shadow-xs"
-                            : "text-[#a9a9a9] dark:text-[#888888] hover:text-[#262626] dark:hover:text-white"
-                        )}
-                        title="System"
-                      >
-                        <Monitor className="w-4 h-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setTheme("light")}
-                        className={cn(
-                          "p-1.5 rounded-lg transition-all cursor-pointer",
-                          theme === "light"
-                            ? "bg-[#ffffff] dark:bg-[#383838] text-[#262626] dark:text-white shadow-xs"
-                            : "text-[#a9a9a9] dark:text-[#888888] hover:text-[#262626] dark:hover:text-white"
-                        )}
-                        title="Light"
-                      >
-                        <Sun className="w-4 h-4" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setTheme("dark")}
-                        className={cn(
-                          "p-1.5 rounded-lg transition-all cursor-pointer",
-                          theme === "dark"
-                            ? "bg-[#ffffff] dark:bg-[#383838] text-[#262626] dark:text-white shadow-xs"
-                            : "text-[#a9a9a9] dark:text-[#888888] hover:text-[#262626] dark:hover:text-white"
-                        )}
-                        title="Dark"
-                      >
-                        <Moon className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
             </div>
           ) : activeTab !== "model-settings" ? (
             /* Clean placeholder for other tabs as requested */
-            <div className="flex flex-col gap-2 pt-6">
-              <h1 className="text-2xl font-medium text-[#262626] dark:text-white capitalize">
+            <div className="flex flex-col gap-2 pt-6 max-w-2xl">
+              <h1 className="text-xl font-medium text-[#262626] dark:text-white capitalize">
                 {activeTab.replace(/-/g, " ")}
               </h1>
-              <p className="text-sm text-[#a9a9a9] dark:text-[#888888]">
+              <p className="text-xs text-[#a9a9a9] dark:text-[#888888]">
                 This section is currently being configured and will be available in an upcoming update.
               </p>
             </div>

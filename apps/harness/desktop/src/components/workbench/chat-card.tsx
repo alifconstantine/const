@@ -116,7 +116,7 @@ interface ChatCardProps {
   metrics?: ConversationMetrics;
   project?: string;
   onProjectChange?: (project: string) => void;
-  onOpenSettings?: () => void;
+  onOpenSettings?: (tab?: string) => void;
   initialPrompt?: string;
 }
 
@@ -886,7 +886,7 @@ export function ChatCard({
                     "w-6 h-6 flex items-center justify-center rounded-md transition-colors cursor-pointer",
                     isPlusOpen
                       ? "text-[#262626] dark:text-white bg-black/10 dark:bg-white/10"
-                      : "text-[#a9a9a9] dark:text-[#5d5d5d] hover:text-[#262626] dark:hover:text-[#d4d4d4] hover:bg-black/5 dark:hover:bg-white/5"
+                      : "text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5"
                   )}
                   title="Add context"
                   aria-label="Add context"
@@ -1287,7 +1287,7 @@ export function ChatCard({
                           type="button"
                           onClick={() => {
                             setIsModelOpen(false);
-                            onOpenSettings?.();
+                            onOpenSettings?.("model-settings");
                           }}
                           className="w-full px-2.5 py-1.5 flex items-center gap-2 text-[12px] text-[#a9a9a9] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 rounded-lg transition-colors cursor-pointer"
                         >
@@ -1310,7 +1310,7 @@ export function ChatCard({
                           type="button"
                           onClick={() => {
                             setIsModelOpen(false);
-                            onOpenSettings?.();
+                            onOpenSettings?.("model-settings");
                           }}
                           className="w-full py-1.5 px-3 rounded-lg bg-[#dedee2] hover:bg-[#d5d5d9] dark:bg-[#333333] dark:hover:bg-[#3d3d3d] border border-[#d5d5d9] dark:border-[#444444]/60 text-[12px] font-medium text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white transition-colors cursor-pointer flex items-center justify-center gap-1.5"
                         >
