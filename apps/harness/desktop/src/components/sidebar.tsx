@@ -35,7 +35,6 @@ import {
   Speech,
   ChevronDown,
   ChevronRight,
-  GripVertical,
   MessageSquare,
   Hash,
   Folder,
@@ -795,24 +794,6 @@ export function Sidebar({
                       <div className="flex items-center gap-1 text-[#777777]">
                         <button
                           type="button"
-                          onClick={() => {
-                            // Toggle all project folders inside
-                            const allFoldersCollapsed =
-                              sortedProjectKeys.length > 0 &&
-                              sortedProjectKeys.every((k) => collapsedFolders[k]);
-                            const next: Record<string, boolean> = {};
-                            for (const k of sortedProjectKeys) {
-                              next[k] = !allFoldersCollapsed;
-                            }
-                            setCollapsedFolders(next);
-                          }}
-                          className="p-1 rounded hover:bg-[#383838] hover:text-[#d4d4d4] transition-colors cursor-pointer"
-                          title="Toggle all project folders"
-                        >
-                          <GripVertical className="w-3.5 h-3.5" />
-                        </button>
-                        <button
-                          type="button"
                           onClick={() => onNewChat?.()}
                           className="p-1 rounded hover:bg-[#383838] hover:text-white transition-colors cursor-pointer"
                           title="New task in project"
@@ -1052,9 +1033,6 @@ export function Sidebar({
                       </button>
 
                       <div className="flex items-center gap-1 text-[#a9a9a9] dark:text-[#777777]">
-                        <div className="p-1 text-[#a9a9a9] dark:text-[#666666]">
-                          <GripVertical className="w-3.5 h-3.5 opacity-60" />
-                        </div>
                         <button
                           type="button"
                           onClick={(e) => {
