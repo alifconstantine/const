@@ -20,6 +20,7 @@ export interface ConversationRecord {
   project: string;
   isPinned?: boolean;
   isArchived?: boolean;
+  isScheduled?: boolean;
   createdAt: number;
   updatedAt: number;
   model?: string;
@@ -64,6 +65,7 @@ export class ConversationDatabase {
         project TEXT NOT NULL,
         is_pinned INTEGER NOT NULL DEFAULT 0,
         is_archived INTEGER NOT NULL DEFAULT 0,
+        is_scheduled INTEGER NOT NULL DEFAULT 0,
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL,
         model TEXT,
@@ -94,6 +96,25 @@ export class ConversationDatabase {
       CREATE INDEX IF NOT EXISTS idx_conv_archived ON conversations(is_archived);
       CREATE INDEX IF NOT EXISTS idx_msg_conv ON messages(conversation_id, created_at ASC);
     `);
+
+    // Schema migrations
+    try {
+      this.db.exec("ALTER TABLE conversations ADD COLUMN is_scheduled INTEGER NOT NULL DEFAULT 0;");
+    } catch {}
+
+    // Clean up legacy [Scheduled] titles in existing database
+    try {
+      this.db.exec(`
+        UPDATE conversations 
+        SET is_scheduled = 1, title = TRIM(SUBSTR(title, 13)) 
+        WHERE title LIKE '[Scheduled] %';
+      `);
+      this.db.exec(`
+        UPDATE conversations 
+        SET is_scheduled = 1 
+        WHERE id LIKE 'scheduled_%';
+      `);
+    } catch {}
   }
 
   public listConversations(includeArchived = false): ConversationRecord[] {
@@ -125,18 +146,20 @@ export class ConversationDatabase {
     const createdAt = convo.createdAt || now;
     const isPinned = convo.isPinned ? 1 : 0;
     const isArchived = convo.isArchived ? 1 : 0;
+    const isScheduled = convo.isScheduled || convo.id?.startsWith("scheduled_") ? 1 : 0;
 
     const diffStatsJson = convo.diffStats ? JSON.stringify(convo.diffStats) : null;
     const contextUsageJson = convo.contextUsage ? JSON.stringify(convo.contextUsage) : null;
 
     const stmt = this.db.prepare(`
-      INSERT INTO conversations (id, title, project, is_pinned, is_archived, created_at, updated_at, model, diff_stats, context_usage)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO conversations (id, title, project, is_pinned, is_archived, is_scheduled, created_at, updated_at, model, diff_stats, context_usage)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         title = excluded.title,
         project = excluded.project,
         is_pinned = excluded.is_pinned,
         is_archived = excluded.is_archived,
+        is_scheduled = excluded.is_scheduled,
         updated_at = excluded.updated_at,
         model = excluded.model,
         diff_stats = excluded.diff_stats,
@@ -149,6 +172,7 @@ export class ConversationDatabase {
       convo.project || "Outside Project",
       isPinned,
       isArchived,
+      isScheduled,
       createdAt,
       updatedAt,
       convo.model || null,
@@ -319,12 +343,23 @@ export class ConversationDatabase {
       };
     });
 
+    const isScheduled = Boolean(
+      row.is_scheduled ||
+      row.id?.startsWith("scheduled_") ||
+      row.title?.startsWith("[Scheduled]")
+    );
+    let title = row.title;
+    if (title && title.startsWith("[Scheduled]")) {
+      title = title.replace(/^\[Scheduled\]\s*/i, "");
+    }
+
     return {
       id: row.id,
-      title: row.title,
+      title,
       project: row.project,
       isPinned: Boolean(row.is_pinned),
       isArchived: Boolean(row.is_archived),
+      isScheduled,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
       model: row.model || undefined,

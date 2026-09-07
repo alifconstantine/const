@@ -7,6 +7,7 @@ export interface ConversationItem {
   messages: any[];
   isPinned?: boolean;
   isArchived?: boolean;
+  isScheduled?: boolean;
   model?: string;
   contextUsage?: {
     usedTokens: number;
@@ -18,6 +19,23 @@ export interface ConversationItem {
   };
 }
 
+export function getCleanConversationTitle(title?: string): string {
+  if (!title) return "Untitled task";
+  return title.replace(/^\[Scheduled\]\s*/i, "");
+}
+
+export function isScheduledTaskConversation(convo?: {
+  id?: string;
+  title?: string;
+  isScheduled?: boolean;
+}): boolean {
+  if (!convo) return false;
+  if (convo.isScheduled) return true;
+  if (convo.id && convo.id.startsWith("scheduled_")) return true;
+  if (convo.title && convo.title.startsWith("[Scheduled]")) return true;
+  return false;
+}
+
 const STORAGE_KEY = "const_harness_conversations";
 let cachedConversations: ConversationItem[] | null = null;
 
@@ -26,14 +44,20 @@ let cachedConversations: ConversationItem[] | null = null;
  * Synchronous from memory/localStorage cache for instant React rendering.
  */
 export function loadConversations(): ConversationItem[] {
+  const normalize = (c: ConversationItem): ConversationItem => ({
+    ...c,
+    title: getCleanConversationTitle(c.title),
+    isScheduled: isScheduledTaskConversation(c),
+  });
+
   if (cachedConversations) {
-    return cachedConversations.filter((c) => !c.isArchived);
+    return cachedConversations.filter((c) => !c.isArchived).map(normalize);
   }
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
     const parsed: ConversationItem[] = JSON.parse(raw);
-    cachedConversations = parsed.sort((a, b) => b.updatedAt - a.updatedAt);
+    cachedConversations = parsed.map(normalize).sort((a, b) => b.updatedAt - a.updatedAt);
     return cachedConversations.filter((c) => !c.isArchived);
   } catch {
     return [];

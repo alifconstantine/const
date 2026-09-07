@@ -1077,9 +1077,10 @@ app.whenReady().then(() => {
         try {
           conversationDb.saveConversation({
             id: convoId,
-            title: `[Scheduled] ${taskName}`,
+            title: taskName,
             project: task.workspacePath || "Outside Project",
             model,
+            isScheduled: true,
             updatedAt: Date.now(),
             createdAt: existingConvo?.createdAt || Date.now(),
             messages: updatedMessages,

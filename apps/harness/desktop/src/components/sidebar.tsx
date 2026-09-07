@@ -63,6 +63,8 @@ import {
   unarchiveConversation,
   setProjectPinned,
   getPinnedProjects,
+  isScheduledTaskConversation,
+  getCleanConversationTitle,
 } from "../lib/conversation-store";
 
 export interface UserProfile {
@@ -660,7 +662,7 @@ export function Sidebar({
                             >
                               {/* Left: Auto-scrolling title */}
                               <AutoScrollTitle
-                                text={convo.title || "Untitled task"}
+                                text={getCleanConversationTitle(convo.title)}
                                 className="flex-1 mr-2"
                                 textClassName={
                                   isActive
@@ -675,18 +677,40 @@ export function Sidebar({
                                 {runningConvoIds?.has(convo.id) ? (
                                   <Loader2 className="w-3.5 h-3.5 animate-spin text-[#969696]" />
                                 ) : (
-                                  <span className="text-[11px] text-[#a9a9a9] dark:text-[#888888] font-mono whitespace-nowrap">
-                                    {formatRelativeTime(convo.updatedAt || convo.createdAt)}
-                                  </span>
+                                  <div
+                                    className={`items-center gap-1 ${
+                                      isMenuOpen ? "hidden" : "flex group-hover/chat:hidden"
+                                    }`}
+                                  >
+                                    {isScheduledTaskConversation(convo) && (
+                                      <Clock className="w-3 h-3 text-[#a9a9a9] dark:text-[#888888] shrink-0" />
+                                    )}
+                                    <span className="text-[11px] text-[#a9a9a9] dark:text-[#888888] font-mono whitespace-nowrap">
+                                      {formatRelativeTime(convo.updatedAt || convo.createdAt)}
+                                    </span>
+                                  </div>
                                 )}
 
                                 <div
                                   data-no-select="true"
                                   onPointerDown={(e) => e.stopPropagation()}
-                                  className={`items-center ${
+                                  className={`items-center gap-0.5 ${
                                     isMenuOpen ? "flex" : "hidden group-hover/chat:flex"
                                   }`}
                                 >
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onArchiveConversation?.(convo.id);
+                                    }}
+                                    className="p-1 rounded hover:bg-[#dedee2] dark:hover:bg-[#484848] text-[#888888] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white transition-colors cursor-pointer"
+                                    title="Archive task"
+                                    aria-label="Archive task"
+                                  >
+                                    <Archive className="w-3.5 h-3.5" />
+                                  </button>
+
                                   <DropdownMenu
                                     open={isMenuOpen}
                                     onOpenChange={(open) =>
@@ -891,7 +915,7 @@ export function Sidebar({
                                         }`}
                                       >
                                         <AutoScrollTitle
-                                          text={convo.title || "Untitled task"}
+                                          text={getCleanConversationTitle(convo.title)}
                                           className="flex-1 mr-2"
                                           textClassName={isActive ? "font-medium" : "font-normal"}
                                           isParentHovered={hoveredConvoId === convo.id}
@@ -906,9 +930,18 @@ export function Sidebar({
                                           {runningConvoIds?.has(convo.id) ? (
                                             <Loader2 className="w-3.5 h-3.5 animate-spin text-[#969696]" />
                                           ) : (
-                                            <span className="text-[11px] text-[#a9a9a9] dark:text-[#888888] font-mono whitespace-nowrap select-none">
-                                              {formatRelativeTime(convo.updatedAt || convo.createdAt)}
-                                            </span>
+                                            <div
+                                              className={`items-center gap-1 ${
+                                                isMenuOpen ? "hidden" : "flex group-hover/chat:hidden"
+                                              }`}
+                                            >
+                                              {isScheduledTaskConversation(convo) && (
+                                                <Clock className="w-3 h-3 text-[#a9a9a9] dark:text-[#888888] shrink-0" />
+                                              )}
+                                              <span className="text-[11px] text-[#a9a9a9] dark:text-[#888888] font-mono whitespace-nowrap select-none">
+                                                {formatRelativeTime(convo.updatedAt || convo.createdAt)}
+                                              </span>
+                                            </div>
                                           )}
 
                                           {/* Actions on hover or when dropdown menu is open */}
@@ -1061,7 +1094,7 @@ export function Sidebar({
                                 }`}
                               >
                                 <AutoScrollTitle
-                                  text={convo.title || "Untitled task"}
+                                  text={getCleanConversationTitle(convo.title)}
                                   className="flex-1 mr-2"
                                   textClassName={isActive ? "font-medium" : "font-normal"}
                                   isParentHovered={hoveredConvoId === convo.id}
@@ -1076,9 +1109,18 @@ export function Sidebar({
                                   {runningConvoIds?.has(convo.id) ? (
                                     <Loader2 className="w-3.5 h-3.5 animate-spin text-[#969696]" />
                                   ) : (
-                                    <span className="text-[11px] text-[#a9a9a9] dark:text-[#888888] font-mono whitespace-nowrap select-none">
-                                      {formatRelativeTime(convo.updatedAt || convo.createdAt)}
-                                    </span>
+                                    <div
+                                      className={`items-center gap-1 ${
+                                        isMenuOpen ? "hidden" : "flex group-hover/chat:hidden"
+                                      }`}
+                                    >
+                                      {isScheduledTaskConversation(convo) && (
+                                        <Clock className="w-3 h-3 text-[#a9a9a9] dark:text-[#888888] shrink-0" />
+                                      )}
+                                      <span className="text-[11px] text-[#a9a9a9] dark:text-[#888888] font-mono whitespace-nowrap select-none">
+                                        {formatRelativeTime(convo.updatedAt || convo.createdAt)}
+                                      </span>
+                                    </div>
                                   )}
 
                                   {/* Actions on hover or when dropdown menu is open */}

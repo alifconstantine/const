@@ -3,6 +3,7 @@ import {
   Archive,
   CalendarClock,
   ChevronDown,
+  Clock,
   FolderPlus,
   List,
   MessageSquare,
@@ -17,6 +18,8 @@ import { ScrollArea, cn } from "@const/ui";
 import {
   type ConversationItem,
   formatRelativeTime,
+  getCleanConversationTitle,
+  isScheduledTaskConversation,
 } from "../lib/conversation-store";
 import { getProjectDisplayName } from "./sidebar";
 
@@ -53,6 +56,7 @@ interface TaskItem {
   workspaceName: string;
   updatedAt?: number;
   isProject: boolean;
+  isScheduled?: boolean;
 }
 
 /**
@@ -135,10 +139,11 @@ export function CommandPaletteModal({
         const workspaceName = getProjectDisplayName(c.project);
         return {
           id: c.id,
-          title: c.title || "Untitled Task",
+          title: getCleanConversationTitle(c.title) || "Untitled Task",
           workspaceName: workspaceName || "default",
           updatedAt: c.updatedAt,
           isProject,
+          isScheduled: isScheduledTaskConversation(c),
         };
       })
       .sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0));
@@ -513,9 +518,14 @@ export function CommandPaletteModal({
                         <span className="text-[11px] text-white/50 bg-white/[0.06] border border-white/[0.08] px-1.5 py-0.5 rounded max-w-[120px] truncate">
                           {task.workspaceName || "default"}
                         </span>
-                        <span className="text-xs text-white/40 min-w-[24px] text-right">
-                          {formatRelativeTime(task.updatedAt ?? Date.now())}
-                        </span>
+                        <div className="flex items-center gap-1 min-w-[24px] text-right">
+                          {task.isScheduled && (
+                            <Clock size={12} className="text-white/40 shrink-0" />
+                          )}
+                          <span className="text-xs text-white/40">
+                            {formatRelativeTime(task.updatedAt ?? Date.now())}
+                          </span>
+                        </div>
                       </div>
                     </button>
                   );
