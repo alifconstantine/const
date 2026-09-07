@@ -799,91 +799,90 @@ export function ChatCard({
             compact ? "" : "border-t border-[#e2e2e4] dark:border-[#383838]"
           } px-3 sm:px-3.5 pt-2.5 pb-2.5 flex flex-col justify-between transition-colors focus-within:border-[#a9a9a9] dark:focus-within:border-[#555555] min-w-0`}
         >
-          {/* Attachments Shelf (Full Previews for Images, Videos, PDFs, Docs) */}
+          {/* Attachments Shelf (Square Cards for Images, Videos, PDFs, Docs) */}
           {attachments.length > 0 && (
-            <div className="w-full flex items-center gap-2.5 pb-2.5 overflow-x-auto select-none">
+            <div className="w-full flex items-center gap-3 pt-1.5 pb-3 overflow-x-auto select-none">
               {attachments.map((file) => {
-                const isMedia = file.type === "image" || file.type === "video";
-                if (isMedia) {
-                  return (
-                    <div
-                      key={file.id}
-                      onClick={() => setPreviewItem(file)}
-                      className="group relative w-16 h-16 rounded-xl overflow-hidden border border-[#e2e2e4] dark:border-[#383838] hover:border-black/40 dark:hover:border-white/40 bg-[#f4f4f6] dark:bg-black/40 shrink-0 cursor-pointer transition-all shadow-sm"
-                    >
-                      {file.type === "image" && file.url ? (
-                        <img
-                          src={file.url}
-                          alt={file.name}
-                          className="w-full h-full object-cover block"
-                        />
-                      ) : (
-                        <div className="w-full h-full relative bg-[#f4f4f6] dark:bg-[#1c1c1c] flex items-center justify-center">
-                          {file.url && (
-                            <video
-                              src={file.url}
-                              className="w-full h-full object-cover block pointer-events-none"
-                            />
-                          )}
-                          <div className="absolute inset-0 bg-black/30 flex items-center justify-center">
-                            <Play className="w-4 h-4 text-white fill-white/80" />
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Tooltip overlay on hover */}
-                      <div className="absolute inset-0 bg-black/75 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col justify-between p-1.5 text-[10px] text-white pointer-events-none">
-                        <span className="truncate font-medium" title={file.name}>
-                          {file.name}
-                        </span>
-                        <span className="text-[#a0a0a0] font-mono">
-                          {formatFileSize(file.size)}
-                        </span>
-                      </div>
-
-                      {/* Close button */}
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          removeAttachment(file.id);
-                        }}
-                        className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/70 hover:bg-[#e11d48] text-white flex items-center justify-center border border-white/20 shadow-md transition-colors cursor-pointer z-20"
-                        title="Remove attachment"
-                      >
-                        <X className="w-3 h-3 stroke-[2.5]" />
-                      </button>
-                    </div>
-                  );
-                }
+                const isImage = file.type === "image";
+                const isVideo = file.type === "video";
+                const isMedia = isImage || isVideo;
+                const ext = (file.name.split(".").pop() || "FILE").toUpperCase();
 
                 return (
                   <div
                     key={file.id}
                     onClick={() => setPreviewItem(file)}
-                    className="group relative flex items-center gap-2 bg-[#f4f4f6] hover:bg-[#eaeaea] dark:bg-[#1b1b1b] dark:hover:bg-[#222222] border border-[#e2e2e4] dark:border-[#383838] rounded-xl px-2.5 py-1.5 shrink-0 transition-colors cursor-pointer"
+                    className={`relative w-24 h-24 group shrink-0 rounded-2xl border border-[#e2e2e4] dark:border-[#383838] shadow-sm animate-in fade-in zoom-in-95 duration-100 bg-[#f4f4f6] dark:bg-[#1a1917] select-none cursor-pointer transition-all ${
+                      isMedia
+                        ? "hover:opacity-90 active:scale-[0.98]"
+                        : "hover:border-black/30 dark:hover:border-white/30"
+                    }`}
                   >
-                    <FileText className="w-5 h-5 text-[#e79737] shrink-0" />
-                    <div className="flex flex-col min-w-0 max-w-[180px]">
-                      <span className="text-[12px] text-[#262626] dark:text-[#d4d4d4] font-medium truncate" title={file.name}>
-                        {file.name}
-                      </span>
-                      <span className="text-[10px] text-[#a9a9a9] dark:text-[#777777] font-mono">
-                        {formatFileSize(file.size)}
-                      </span>
-                    </div>
+                    {isImage && file.url ? (
+                      <div className="w-full h-full rounded-2xl overflow-hidden">
+                        <img
+                          src={file.url}
+                          alt={file.name}
+                          className="w-full h-full object-cover block"
+                        />
+                      </div>
+                    ) : isVideo ? (
+                      <div className="w-full h-full rounded-2xl overflow-hidden bg-black relative">
+                        {file.url && (
+                          <video
+                            src={file.url}
+                            className="w-full h-full object-cover block pointer-events-none"
+                            muted
+                            playsInline
+                            autoPlay
+                            loop
+                          />
+                        )}
+                        <span className="absolute bottom-1.5 right-1.5 text-[8.5px] font-bold text-white bg-black/60 px-1 py-0.5 rounded uppercase tracking-wider font-mono">
+                          Video
+                        </span>
+                      </div>
+                    ) : (
+                      <div className="w-full h-full p-2.5 flex flex-col justify-between items-start text-left bg-[#f4f4f6] dark:bg-[#1a1917]/70 rounded-2xl">
+                        <div className="flex items-center justify-between w-full">
+                          <span className="text-[10px] font-bold text-[#888888] dark:text-[#888888] tracking-wider uppercase font-mono">
+                            {ext}
+                          </span>
+                          <FileText className="w-3.5 h-3.5 text-[#e79737] shrink-0" />
+                        </div>
+                        <div className="w-full min-w-0">
+                          <span className="text-[11.5px] font-medium text-[#262626] dark:text-[#d4d4d4] leading-tight w-full line-clamp-2 break-words block">
+                            {file.name}
+                          </span>
+                          <span className="text-[9.5px] text-[#a9a9a9] dark:text-[#777777] font-mono mt-0.5 block truncate">
+                            {formatFileSize(file.size)}
+                          </span>
+                        </div>
+                      </div>
+                    )}
 
+                    {/* Close / Remove button */}
                     <button
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
                         removeAttachment(file.id);
                       }}
-                      className="ml-1 p-0.5 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-[#a9a9a9] dark:text-[#777777] hover:text-[#e11d48] transition-colors cursor-pointer"
+                      className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-white dark:bg-[#262626] shadow-md border border-[#e2e2e4] dark:border-[#444444] flex items-center justify-center cursor-pointer text-[#555555] dark:text-[#cccccc] hover:bg-[#e11d48] hover:text-white dark:hover:bg-[#e11d48] dark:hover:text-white dark:hover:border-[#e11d48] hover:scale-105 active:scale-95 transition-all z-20"
                       title="Remove attachment"
+                      aria-label="Remove attachment"
                     >
-                      <X className="w-3.5 h-3.5 stroke-[2]" />
+                      <X className="w-3 h-3 stroke-[2.5]" />
                     </button>
+
+                    {/* Tooltip on hover */}
+                    <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 w-max max-w-[220px] bg-[#262626] dark:bg-[#1e1e1e] text-white dark:text-[#e0e0e0] text-[11px] px-2.5 py-1.5 rounded-lg opacity-0 pointer-events-none group-hover:opacity-100 transition-opacity duration-150 shadow-xl z-30 select-text break-all border border-black/10 dark:border-[#383838]">
+                      <div className="font-medium truncate">{file.name}</div>
+                      <div className="text-[9.5px] text-[#a0a0a0] font-mono mt-0.5">
+                        {formatFileSize(file.size)}
+                      </div>
+                      <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 bg-[#262626] dark:bg-[#1e1e1e] border-t border-l border-black/10 dark:border-[#383838] rotate-45" />
+                    </div>
                   </div>
                 );
               })}
@@ -1252,8 +1251,8 @@ export function ChatCard({
                   <div className="absolute bottom-full mb-2 right-0 w-[260px] max-w-[calc(100vw-32px)] bg-white dark:bg-[#1e1e1e] border border-[#e2e2e4] dark:border-[#333333] rounded-2xl shadow-2xl p-1.5 z-50 flex flex-col text-left select-none animate-in fade-in zoom-in-95 duration-100">
                     {models.length > 0 ? (
                       <>
-                        {/* Search Input at the top */}
-                        <div className="flex items-center gap-2 px-2 py-1 mb-1 border-b border-[#e2e2e4] dark:border-[#333333]/60">
+                        {/* Search Input at the top (pinned, outside scroll) */}
+                        <div className="flex-none flex items-center gap-2 px-2 py-1 mb-1">
                           <Search className="w-3.5 h-3.5 text-[#a9a9a9] dark:text-[#777777] shrink-0" />
                           <input
                             type="text"
@@ -1276,7 +1275,7 @@ export function ChatCard({
 
                         {/* Models categorized with ScrollArea */}
                         {filteredGroupedModels.length > 0 ? (
-                          <ScrollArea className="max-h-[300px] w-full" viewportClassName="pr-1">
+                          <ScrollArea className="max-h-[260px] w-full flex-1 min-h-0" viewportClassName="pr-1">
                             <div className="space-y-2 py-0.5 pr-0.5">
                               {filteredGroupedModels.map((group) => (
                                 <div key={group.providerId} className="flex flex-col">
@@ -1332,19 +1331,20 @@ export function ChatCard({
                           </div>
                         )}
 
-                        {/* Bottom Footer: Manage models */}
-                        <div className="h-[1px] bg-[#e2e2e4] dark:bg-[#333333]/60 my-1" />
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsModelOpen(false);
-                            onOpenSettings?.("model-settings");
-                          }}
-                          className="w-full px-2.5 py-1.5 flex items-center gap-2 text-[12px] text-[#a9a9a9] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 rounded-lg transition-colors cursor-pointer"
-                        >
-                          <Settings className="w-3.5 h-3.5 text-[#a9a9a9] dark:text-[#777777] shrink-0" />
-                          <span>Manage models</span>
-                        </button>
+                        {/* Bottom Footer: Manage models (pinned, outside scroll) */}
+                        <div className="flex-none pt-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsModelOpen(false);
+                              onOpenSettings?.("model-settings");
+                            }}
+                            className="w-full px-2.5 py-1.5 flex items-center gap-2 text-[12px] text-[#a9a9a9] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 rounded-lg transition-colors cursor-pointer"
+                          >
+                            <Settings className="w-3.5 h-3.5 text-[#a9a9a9] dark:text-[#777777] shrink-0" />
+                            <span>Manage models</span>
+                          </button>
+                        </div>
                       </>
                     ) : (
                       <div className="p-3.5 flex flex-col items-center text-center">
