@@ -14,6 +14,7 @@ import {
   MoreHorizontal,
 } from "lucide-react";
 import { ConstLogoIcon } from "@const/ui";
+import { AutoScrollTitle } from "../auto-scroll-title";
 
 interface TopToolbarProps {
   isSidebarOpen: boolean;
@@ -115,9 +116,11 @@ export function TopToolbar({
         {/* Conversation Title & Project Pill */}
         {conversationTitle && (
           <div className="flex items-center gap-2 min-w-0 pl-1">
-            <span className="text-sm font-medium text-[#161616] dark:text-[#ececec] truncate max-w-[280px]">
-              {conversationTitle}
-            </span>
+            <AutoScrollTitle
+              text={conversationTitle}
+              className="max-w-[280px]"
+              textClassName="text-sm font-medium text-[#161616] dark:text-[#ececec]"
+            />
 
             {project && (
               <div className="flex items-center gap-1 px-2 py-0.5 rounded-md bg-white dark:bg-[#222222] border border-[#e2e2e4] dark:border-[#333333] text-xs text-[#262626] dark:text-[#a0a0a0] shrink-0">

@@ -18,6 +18,10 @@ import {
   DialogFooter,
   Button,
   Input,
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+  TooltipProvider,
 } from "@const/ui";
 import {
   PanelLeftClose,
@@ -26,6 +30,7 @@ import {
   MessageCirclePlus,
   Search,
   CalendarClock,
+  Clock,
   Palette,
   Speech,
   ChevronDown,
@@ -51,6 +56,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
+import { AutoScrollTitle } from "./auto-scroll-title";
 import {
   type ConversationItem,
   formatRelativeTime,
@@ -133,7 +139,8 @@ export function Sidebar({
   onOpenScheduledTasks,
   isScheduledTasksActive,
 }: SidebarProps) {
-  const [activeTab, setActiveTab] = useState<"project" | "design" | "outside">("project");
+  const [activeTab, setActiveTab] = useState<"project" | "recent" | "design" | "outside">("project");
+  const [hoveredConvoId, setHoveredConvoId] = useState<string | null>(null);
   const [collapsedFolders, setCollapsedFolders] = useState<Record<string, boolean>>({});
   const [isProjectsSectionCollapsed, setIsProjectsSectionCollapsed] = useState<boolean>(() => {
     return localStorage.getItem("const_harness_projects_section_collapsed") === "true";
@@ -320,6 +327,15 @@ export function Sidebar({
     };
   }, [conversations, projectOrder, pinnedProjects]);
 
+  // Flat chronologically sorted conversations for Recent view
+  const recentConversations = useMemo(() => {
+    return [...conversations].sort((a, b) => {
+      const timeA = a.updatedAt || a.createdAt || 0;
+      const timeB = b.updatedAt || b.createdAt || 0;
+      return timeB - timeA;
+    });
+  }, [conversations]);
+
   const toggleCollapseAllProjects = () => {
     setIsProjectsSectionCollapsed((prev) => {
       const next = !prev;
@@ -488,6 +504,12 @@ export function Sidebar({
                   type="button"
                   className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-[#ffffff] dark:bg-[#222222] hover:bg-[#dedee2] dark:hover:bg-[#383838] text-[#262626] dark:text-[#d4d4d4] rounded-lg text-xs font-medium transition-colors cursor-pointer outline-none select-none border border-[#dedee2] dark:border-transparent"
                 >
+                  {activeTab === "recent" && (
+                    <>
+                      <Clock className="w-3.5 h-3.5 text-[#262626] dark:text-[#d4d4d4]" />
+                      <span>Recent</span>
+                    </>
+                  )}
                   {activeTab === "project" && (
                     <>
                       <Folder className="w-3.5 h-3.5 text-[#262626] dark:text-[#d4d4d4]" />
@@ -513,6 +535,17 @@ export function Sidebar({
                 align="start"
                 className="w-44 bg-[#ffffff] dark:bg-[#222222] border-[#dedee2] dark:border-[#383838] text-[#262626] dark:text-[#d4d4d4] p-1 rounded-xl shadow-xl z-50 text-xs"
               >
+                <DropdownMenuItem
+                  onClick={() => setActiveTab("recent")}
+                  className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer transition-colors ${
+                    activeTab === "recent"
+                      ? "bg-[#dedee2] dark:bg-[#383838] text-[#262626] dark:text-white font-medium"
+                      : "hover:bg-[#dedee2]/60 dark:hover:bg-[#303030] text-[#262626] dark:text-[#d4d4d4]"
+                  }`}
+                >
+                  <Clock className="w-3.5 h-3.5 text-[#8a8a8a] dark:text-[#d4d4d4]" />
+                  <span>Recent</span>
+                </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => setActiveTab("project")}
                   className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer transition-colors ${
@@ -596,6 +629,126 @@ export function Sidebar({
               <div className="px-2.5 py-6 text-xs text-[#777777] italic text-center">
                 Design workspace
               </div>
+            ) : activeTab === "recent" ? (
+              <TooltipProvider delayDuration={150}>
+                <div className="flex flex-col gap-0.5 pl-1 w-full max-w-full">
+                  {recentConversations.length === 0 ? (
+                    <div className="px-2.5 py-4 text-xs text-[#a9a9a9] dark:text-[#777777] italic text-center">
+                      No recent tasks
+                    </div>
+                  ) : (
+                    recentConversations.map((convo) => {
+                      const isActive = convo.id === activeConversationId;
+                      const isMenuOpen = openMenuConvoId === convo.id;
+                      const isHovered = hoveredConvoId === convo.id;
+                      const projectName =
+                        convo.project && convo.project !== "Outside Project"
+                          ? convo.project
+                          : "Outside Project";
+
+                      return (
+                        <Tooltip key={convo.id} open={isMenuOpen ? false : undefined}>
+                          <TooltipTrigger asChild>
+                            <div
+                              onClick={(e) => {
+                                if ((e.target as HTMLElement).closest("[data-no-select]")) return;
+                                onSelectConversation?.(convo.id);
+                              }}
+                              onMouseEnter={() => setHoveredConvoId(convo.id)}
+                              onMouseLeave={() => setHoveredConvoId(null)}
+                              className={`relative w-full max-w-full h-8 flex items-center justify-between rounded-xl px-2.5 text-[13px] transition-colors cursor-pointer group/chat text-left ${
+                                isActive
+                                  ? "bg-[#dedee2] dark:bg-[#383838] text-[#262626] dark:text-white font-medium shadow-xs"
+                                  : "text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-[#dedee2]/60 dark:hover:bg-white/[0.08]"
+                              }`}
+                            >
+                              {/* Left: Auto-scrolling title */}
+                              <AutoScrollTitle
+                                text={convo.title || "Untitled task"}
+                                className="flex-1 mr-2"
+                                textClassName={
+                                  isActive
+                                    ? "font-medium text-[#262626] dark:text-white"
+                                    : "font-normal text-[#262626] dark:text-[#d4d4d4]"
+                                }
+                                isParentHovered={isHovered}
+                              />
+
+                              {/* Right: Timestamp + Action Menu */}
+                              <div className="flex items-center gap-1.5 shrink-0 ml-auto select-none">
+                                <span className="text-[11px] text-[#a9a9a9] dark:text-[#888888] font-mono whitespace-nowrap">
+                                  {formatRelativeTime(convo.updatedAt || convo.createdAt)}
+                                </span>
+
+                                <div
+                                  data-no-select="true"
+                                  onPointerDown={(e) => e.stopPropagation()}
+                                  className={`items-center ${
+                                    isMenuOpen ? "flex" : "hidden group-hover/chat:flex"
+                                  }`}
+                                >
+                                  <DropdownMenu
+                                    open={isMenuOpen}
+                                    onOpenChange={(open) =>
+                                      setOpenMenuConvoId(open ? convo.id : null)
+                                    }
+                                  >
+                                    <DropdownMenuTrigger asChild>
+                                      <button
+                                        type="button"
+                                        className="p-1 rounded hover:bg-[#dedee2] dark:hover:bg-[#484848] text-[#a9a9a9] dark:text-[#888888] hover:text-black dark:hover:text-white transition-colors cursor-pointer"
+                                        title="More options"
+                                        aria-label="More options"
+                                      >
+                                        <MoreHorizontal className="w-3.5 h-3.5" />
+                                      </button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent
+                                      align="end"
+                                      className="w-36 bg-[#ffffff] dark:bg-[#222222] border-[#dedee2] dark:border-[#383838] text-[#262626] dark:text-[#d4d4d4] p-1 rounded-xl shadow-xl z-50 text-xs"
+                                    >
+                                      <DropdownMenuItem
+                                        onClick={() => handleOpenRename(convo)}
+                                        className="flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer hover:bg-[#dedee2]/60 dark:hover:bg-[#303030]"
+                                      >
+                                        <Pencil className="w-3.5 h-3.5 text-[#8a8a8a] dark:text-[#a0a0a0]" />
+                                        <span>Rename</span>
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem
+                                        onClick={() => onArchiveConversation?.(convo.id)}
+                                        className="flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer hover:bg-[#dedee2]/60 dark:hover:bg-[#303030]"
+                                      >
+                                        <Archive className="w-3.5 h-3.5 text-[#8a8a8a] dark:text-[#a0a0a0]" />
+                                        <span>Archive</span>
+                                      </DropdownMenuItem>
+                                      <DropdownMenuSeparator className="bg-[#dedee2] dark:bg-[#383838] my-1" />
+                                      <DropdownMenuItem
+                                        onClick={() => handleOpenDelete(convo)}
+                                        className="flex items-center gap-2 px-2 py-1.5 rounded-lg cursor-pointer text-red-600 dark:text-red-400 hover:bg-red-500/10 dark:hover:bg-red-500/20"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                        <span>Delete</span>
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </div>
+                              </div>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent
+                            side="right"
+                            sideOffset={8}
+                            className="bg-[#222222] border border-[#383838] text-[#d4d4d4] rounded-xl px-2.5 py-1 text-xs font-medium flex items-center gap-1.5 shadow-xl select-none pointer-events-none"
+                          >
+                            <Folder className="w-3.5 h-3.5 text-[#969696]" />
+                            <span>{projectName}</span>
+                          </TooltipContent>
+                        </Tooltip>
+                      );
+                    })
+                  )}
+                </div>
+              </TooltipProvider>
             ) : sortedProjectKeys.length === 0 && outsideConversations.length === 0 ? (
               <div className="px-2.5 py-4 text-xs text-[#777777] italic text-center">
                 No tasks yet
@@ -747,31 +900,28 @@ export function Sidebar({
                                           if ((e.target as HTMLElement).closest("[data-no-select]")) return;
                                           onSelectConversation?.(convo.id);
                                         }}
-                                        className={`relative w-full max-w-full h-8 flex items-center rounded-lg px-2 text-[13px] transition-colors cursor-pointer group/chat text-left overflow-hidden ${
+                                        onMouseEnter={() => setHoveredConvoId(convo.id)}
+                                        onMouseLeave={() => setHoveredConvoId(null)}
+                                        className={`relative w-full max-w-full h-8 flex items-center justify-between rounded-lg px-2 text-[13px] transition-colors cursor-pointer group/chat text-left ${
                                           isActive
                                             ? "bg-[#dedee2] dark:bg-[#383838] text-[#262626] dark:text-white font-medium shadow-xs"
                                             : "text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-[#dedee2]/60 dark:hover:bg-white/5"
                                         }`}
                                       >
-                                        <span className="truncate flex-1 min-w-0 pr-16 font-normal" title={convo.title}>
-                                          {convo.title || "Untitled task"}
-                                        </span>
+                                        <AutoScrollTitle
+                                          text={convo.title || "Untitled task"}
+                                          className="flex-1 mr-2"
+                                          textClassName={isActive ? "font-medium" : "font-normal"}
+                                          isParentHovered={hoveredConvoId === convo.id}
+                                        />
 
                                         <div
                                           data-no-select="true"
                                           onPointerDown={(e) => e.stopPropagation()}
-                                          className={`absolute right-1.5 inset-y-0 flex items-center justify-end pl-2 z-10 ${
-                                            isActive
-                                              ? "bg-[#dedee2] dark:bg-[#383838]"
-                                              : "bg-transparent group-hover/chat:bg-[#dedee2] dark:group-hover/chat:bg-[#333333]"
-                                          }`}
+                                          className="flex items-center gap-1.5 shrink-0 ml-auto select-none"
                                         >
-                                          {/* Relative time when NOT hovering */}
-                                          <span
-                                            className={`text-[11px] text-[#a9a9a9] dark:text-[#888888] font-mono whitespace-nowrap select-none transition-opacity duration-150 ${
-                                              isMenuOpen ? "hidden" : "group-hover/chat:hidden"
-                                            }`}
-                                          >
+                                          {/* Relative time */}
+                                          <span className="text-[11px] text-[#a9a9a9] dark:text-[#888888] font-mono whitespace-nowrap select-none">
                                             {formatRelativeTime(convo.updatedAt || convo.createdAt)}
                                           </span>
 
@@ -919,31 +1069,28 @@ export function Sidebar({
                                   if ((e.target as HTMLElement).closest("[data-no-select]")) return;
                                   onSelectConversation?.(convo.id);
                                 }}
-                                className={`relative w-full max-w-full h-8 flex items-center rounded-lg px-2 text-[13px] transition-colors cursor-pointer group/chat text-left overflow-hidden ${
+                                onMouseEnter={() => setHoveredConvoId(convo.id)}
+                                onMouseLeave={() => setHoveredConvoId(null)}
+                                className={`relative w-full max-w-full h-8 flex items-center justify-between rounded-lg px-2 text-[13px] transition-colors cursor-pointer group/chat text-left ${
                                   isActive
                                     ? "bg-[#dedee2] dark:bg-[#383838] text-[#262626] dark:text-white font-medium shadow-xs"
                                     : "text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5"
                                 }`}
                               >
-                                <span className="truncate flex-1 min-w-0 pr-16 font-normal" title={convo.title}>
-                                  {convo.title || "Untitled task"}
-                                </span>
+                                <AutoScrollTitle
+                                  text={convo.title || "Untitled task"}
+                                  className="flex-1 mr-2"
+                                  textClassName={isActive ? "font-medium" : "font-normal"}
+                                  isParentHovered={hoveredConvoId === convo.id}
+                                />
 
                                 <div
                                   data-no-select="true"
                                   onPointerDown={(e) => e.stopPropagation()}
-                                  className={`absolute right-1.5 inset-y-0 flex items-center justify-end pl-2 z-10 ${
-                                    isActive
-                                      ? "bg-[#dedee2] dark:bg-[#383838]"
-                                      : "bg-transparent group-hover/chat:bg-[#e0e0e4] dark:group-hover/chat:bg-[#333333]"
-                                  }`}
+                                  className="flex items-center gap-1.5 shrink-0 ml-auto select-none"
                                 >
-                                  {/* Relative time when NOT hovering */}
-                                  <span
-                                    className={`text-[11px] text-[#a9a9a9] dark:text-[#888888] font-mono whitespace-nowrap select-none transition-opacity duration-150 ${
-                                      isMenuOpen ? "hidden" : "group-hover/chat:hidden"
-                                    }`}
-                                  >
+                                  {/* Relative time */}
+                                  <span className="text-[11px] text-[#a9a9a9] dark:text-[#888888] font-mono whitespace-nowrap select-none">
                                     {formatRelativeTime(convo.updatedAt || convo.createdAt)}
                                   </span>
 

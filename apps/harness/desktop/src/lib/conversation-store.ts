@@ -272,18 +272,11 @@ export function generateFallbackTitle(prompt: string): string {
 
   if (!cleaned) return "New Task";
 
-  cleaned = cleaned.charAt(0).toUpperCase() + cleaned.slice(1);
-
-  if (cleaned.length <= 36) {
-    return cleaned;
+  const firstLine = cleaned.split("\n")[0].trim();
+  if (firstLine.length <= 120) {
+    return firstLine;
   }
-
-  const words = cleaned.slice(0, 36).trim().split(" ");
-  if (words.length > 1) {
-    words.pop();
-    return words.join(" ") + "...";
-  }
-  return cleaned.slice(0, 36) + "...";
+  return firstLine.slice(0, 120).trim();
 }
 
 /**
