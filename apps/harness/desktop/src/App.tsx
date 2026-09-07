@@ -1104,7 +1104,6 @@ function AuthenticatedContent({
               isSidebarOpen={isSidebarOpen}
               onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
               onNewChat={handleNewChat}
-              onOpenSearch={() => setIsSearchOpen(true)}
               conversationTitle={conversationTitle}
               project={displayProject}
             />

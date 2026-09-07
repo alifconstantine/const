@@ -40,7 +40,6 @@ import {
   Folder,
   FolderOpen,
   ChevronsDownUp,
-  SlidersHorizontal,
   Archive,
   ArchiveRestore,
   Settings,
@@ -420,20 +419,11 @@ export function Sidebar({
             <PanelLeftClose className="w-5 h-5 hidden group-hover:block text-[#262626] dark:text-[#d4d4d4]" />
           </button>
 
-          {/* Go Back & Go Forward & Search */}
+          {/* Go Back & Go Forward */}
           <div
             className="flex items-center gap-0.5 text-[#262626] dark:text-[#d4d4d4]"
             style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
           >
-            <button
-              type="button"
-              onClick={onOpenSearch}
-              className="p-1.5 rounded-md hover:bg-[#dedee2] dark:hover:bg-[#383838] text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white transition-colors cursor-pointer"
-              title="Search (Ctrl+K)"
-              aria-label="Search"
-            >
-              <Search className="w-4 h-4" />
-            </button>
             <button
               type="button"
               className="p-1.5 rounded-md hover:bg-[#dedee2] dark:hover:bg-[#383838] hover:text-black dark:hover:text-white transition-colors disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
@@ -612,14 +602,6 @@ export function Sidebar({
                     <ChevronsDownUp className="w-3.5 h-3.5 text-[#d4d4d4] group-hover:text-white transition-all duration-200" />
                   )}
                 </div>
-              </button>
-              <button
-                type="button"
-                className="p-1 rounded-md hover:bg-[#383838] hover:text-white transition-colors cursor-pointer"
-                title="Filter and sort"
-                aria-label="Filter and sort"
-              >
-                <SlidersHorizontal className="w-3.5 h-3.5" />
               </button>
               <button
                 type="button"
