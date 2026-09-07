@@ -72,6 +72,8 @@ contextBridge.exposeInMainWorld("electron", {
   pinProject: (projectName: string, isPinned: boolean) => ipcRenderer.invoke("conversations:pin-project", projectName, isPinned),
   getProjectPins: () => ipcRenderer.invoke("conversations:get-project-pins"),
   importLegacyConversations: (convos: any[]) => ipcRenderer.invoke("conversations:import-legacy", convos),
+  listFiles: (workspacePath?: string) => ipcRenderer.invoke("workspace:list-files", workspacePath),
+  openPath: (targetPath: string) => ipcRenderer.invoke("shell:open-path", targetPath),
   onConversationsChanged: (callback: (data: { conversationId?: string }) => void) => {
     const handler = (_event: any, data: any) => callback(data);
     ipcRenderer.on("conversations:changed", handler);

@@ -12,6 +12,7 @@ import {
   X,
   Folder,
   MoreHorizontal,
+  Search,
 } from "lucide-react";
 import { ConstLogoIcon } from "@const/ui";
 import { AutoScrollTitle } from "../auto-scroll-title";
@@ -20,6 +21,7 @@ interface TopToolbarProps {
   isSidebarOpen: boolean;
   onToggleSidebar: () => void;
   onNewChat?: () => void;
+  onOpenSearch?: () => void;
   conversationTitle?: string;
   project?: string;
 }
@@ -28,6 +30,7 @@ export function TopToolbar({
   isSidebarOpen,
   onToggleSidebar,
   onNewChat,
+  onOpenSearch,
   conversationTitle,
   project,
 }: TopToolbarProps) {
@@ -109,6 +112,16 @@ export function TopToolbar({
               aria-label="New task"
             >
               <MessageCirclePlus className="w-4 h-4" />
+            </button>
+
+            <button
+              type="button"
+              onClick={onOpenSearch}
+              className="p-1.5 rounded-md text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-[#222222] transition-colors cursor-pointer"
+              title="Search (Ctrl+K)"
+              aria-label="Search"
+            >
+              <Search className="w-4 h-4" />
             </button>
           </>
         )}

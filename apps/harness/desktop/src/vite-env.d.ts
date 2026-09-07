@@ -160,6 +160,18 @@ declare global {
       pinProject?: (projectName: string, isPinned: boolean) => Promise<boolean>;
       getProjectPins?: () => Promise<string[]>;
       importLegacyConversations?: (convos: any[]) => Promise<boolean>;
+      listFiles?: (
+        workspacePath?: string
+      ) => Promise<
+        Array<{
+          id: string;
+          name: string;
+          path: string;
+          fullPath: string;
+          type: "code" | "image" | "doc" | "generic";
+        }>
+      >;
+      openPath?: (targetPath: string) => Promise<boolean>;
       onConversationsChanged?: (callback: (data: { conversationId?: string }) => void) => () => void;
       scheduledTasks?: {
         list: () => Promise<ScheduledTaskItem[]>;

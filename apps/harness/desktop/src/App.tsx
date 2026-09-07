@@ -31,6 +31,7 @@ import { ExecutionTrace, MutationsSummaryCard } from "./components/workbench/exe
 import { ReviewDialog } from "./components/workbench/review-dialog";
 import { SettingsView } from "./components/settings-view";
 import { ScheduledTasksView } from "./components/scheduled-tasks";
+import { CommandPaletteModal } from "./components/command-palette-modal";
 import { useAppAuth } from "./components/convex-provider";
 import { useConversationWidth } from "./lib/theme";
 import {
@@ -100,6 +101,7 @@ function AuthenticatedContent({
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isScheduledTasksOpen, setIsScheduledTasksOpen] = useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState<string>("general");
   const greeting = getGreeting();
 
@@ -108,6 +110,23 @@ function AuthenticatedContent({
     setSettingsTab(resolvedTab);
     setIsSettingsOpen(true);
   };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setIsSearchOpen((prev) => !prev);
+      }
+    };
+    const handleOpenCommandPalette = () => setIsSearchOpen(true);
+
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("const:open-command-palette", handleOpenCommandPalette);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("const:open-command-palette", handleOpenCommandPalette);
+    };
+  }, []);
 
   // Conversation history & state
   const [conversations, setConversations] = useState<ConversationItem[]>(() => {
@@ -1005,6 +1024,26 @@ function AuthenticatedContent({
     toast.success("Conversation restored");
   };
 
+  const handleOpenWorkspaceFromPalette = async () => {
+    if (window.electron?.openDirectoryDialog) {
+      const selectedDir = await window.electron.openDirectoryDialog();
+      if (selectedDir) {
+        setCurrentProject(selectedDir);
+        localStorage.setItem("const_harness_current_project", selectedDir);
+        const existingRaw = localStorage.getItem("const_harness_workspaces");
+        let list: string[] = [];
+        try {
+          list = existingRaw ? JSON.parse(existingRaw) : [];
+        } catch {}
+        if (!list.includes(selectedDir)) {
+          list.unshift(selectedDir);
+          localStorage.setItem("const_harness_workspaces", JSON.stringify(list));
+        }
+        handleNewChat(selectedDir);
+      }
+    }
+  };
+
   if (isSettingsOpen) {
     return (
       <SettingsView
@@ -1039,6 +1078,7 @@ function AuthenticatedContent({
           onOpenSettings={() => handleOpenSettings("general")}
           onOpenScheduledTasks={() => setIsScheduledTasksOpen(true)}
           isScheduledTasksActive={isScheduledTasksOpen}
+          onOpenSearch={() => setIsSearchOpen(true)}
         />
       )}
 
@@ -1064,6 +1104,7 @@ function AuthenticatedContent({
               isSidebarOpen={isSidebarOpen}
               onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
               onNewChat={handleNewChat}
+              onOpenSearch={() => setIsSearchOpen(true)}
               conversationTitle={conversationTitle}
               project={displayProject}
             />
@@ -1317,6 +1358,24 @@ function AuthenticatedContent({
         mutations={reviewingMutations || []}
         onRollbackFile={handleRollback}
         onRollbackAll={handleRollbackAll}
+      />
+
+      {/* Command Palette / Quick Search Modal (1:1 with const-harness) */}
+      <CommandPaletteModal
+        open={isSearchOpen}
+        onClose={() => setIsSearchOpen(false)}
+        conversations={conversations}
+        activeConversationId={conversationId}
+        currentProject={currentProject}
+        onSelectConversation={handleSelectConversation}
+        onNewChat={() => handleNewChat()}
+        onOpenWorkspace={handleOpenWorkspaceFromPalette}
+        onOpenScheduledTasks={() => setIsScheduledTasksOpen(true)}
+        onOpenArchive={() => {
+          window.dispatchEvent(new CustomEvent("const:open-archive-modal"));
+        }}
+        onOpenSettings={handleOpenSettings}
+        onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
       />
     </div>
   );

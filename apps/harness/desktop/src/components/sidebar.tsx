@@ -92,6 +92,7 @@ interface SidebarProps {
   onOpenSettings?: () => void;
   onOpenScheduledTasks?: () => void;
   isScheduledTasksActive?: boolean;
+  onOpenSearch?: () => void;
 }
 
 export function getUserInitials(name?: string | null, email?: string | null): string {
@@ -141,6 +142,7 @@ export function Sidebar({
   onOpenSettings,
   onOpenScheduledTasks,
   isScheduledTasksActive,
+  onOpenSearch,
 }: SidebarProps) {
   const [activeTab, setActiveTab] = useState<"project" | "recent" | "design" | "outside">("project");
   const [hoveredConvoId, setHoveredConvoId] = useState<string | null>(null);
@@ -419,11 +421,20 @@ export function Sidebar({
             <PanelLeftClose className="w-5 h-5 hidden group-hover:block text-[#262626] dark:text-[#d4d4d4]" />
           </button>
 
-          {/* Go Back & Go Forward */}
+          {/* Go Back & Go Forward & Search */}
           <div
             className="flex items-center gap-0.5 text-[#262626] dark:text-[#d4d4d4]"
             style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
           >
+            <button
+              type="button"
+              onClick={onOpenSearch}
+              className="p-1.5 rounded-md hover:bg-[#dedee2] dark:hover:bg-[#383838] text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white transition-colors cursor-pointer"
+              title="Search (Ctrl+K)"
+              aria-label="Search"
+            >
+              <Search className="w-4 h-4" />
+            </button>
             <button
               type="button"
               className="p-1.5 rounded-md hover:bg-[#dedee2] dark:hover:bg-[#383838] hover:text-black dark:hover:text-white transition-colors disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
@@ -458,6 +469,7 @@ export function Sidebar({
           {/* Search */}
           <button
             type="button"
+            onClick={onOpenSearch}
             className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[#262626] dark:text-[#d4d4d4] hover:bg-[#dedee2] dark:hover:bg-[#383838] hover:text-black dark:hover:text-white transition-colors cursor-pointer"
           >
             <Search className="w-4 h-4 text-[#8a8a8a] dark:text-[#d4d4d4]" />

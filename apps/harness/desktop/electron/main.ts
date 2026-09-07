@@ -870,6 +870,112 @@ app.whenReady().then(() => {
     }
   );
 
+  // Workspace files scanning and shell open-path handlers for Command Palette
+  ipcMain.handle("workspace:list-files", async (_event, workspacePath?: string) => {
+    if (!workspacePath || !fs.existsSync(workspacePath)) return [];
+    try {
+      const results: Array<{
+        id: string;
+        name: string;
+        path: string;
+        fullPath: string;
+        type: "code" | "image" | "doc" | "generic";
+      }> = [];
+      const ignored = new Set([
+        "node_modules",
+        ".git",
+        "dist",
+        "build",
+        ".next",
+        ".turbo",
+        ".cache",
+        "out",
+        ".idea",
+        ".vscode",
+      ]);
+
+      const getFileType = (ext: string): "code" | "image" | "doc" | "generic" => {
+        const lower = ext.toLowerCase();
+        if (
+          [
+            ".ts",
+            ".tsx",
+            ".js",
+            ".jsx",
+            ".json",
+            ".html",
+            ".css",
+            ".scss",
+            ".py",
+            ".rs",
+            ".go",
+            ".c",
+            ".cpp",
+            ".h",
+            ".sh",
+            ".yaml",
+            ".yml",
+            ".toml",
+            ".sql",
+          ].includes(lower)
+        ) {
+          return "code";
+        }
+        if ([".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".ico"].includes(lower)) {
+          return "image";
+        }
+        if ([".md", ".txt", ".pdf", ".doc", ".docx", ".csv"].includes(lower)) {
+          return "doc";
+        }
+        return "generic";
+      };
+
+      const walk = (currentDir: string, depth: number) => {
+        if (depth > 4 || results.length >= 120) return;
+        try {
+          const entries = fs.readdirSync(currentDir, { withFileTypes: true });
+          for (const entry of entries) {
+            if (results.length >= 120) break;
+            if (entry.name.startsWith(".") && entry.name !== ".env") continue;
+            const fullPath = path.join(currentDir, entry.name);
+            if (entry.isDirectory()) {
+              if (!ignored.has(entry.name)) {
+                walk(fullPath, depth + 1);
+              }
+            } else if (entry.isFile()) {
+              const ext = path.extname(entry.name);
+              const relPath = path.relative(workspacePath, currentDir);
+              results.push({
+                id: fullPath,
+                name: entry.name,
+                path: relPath || ".",
+                fullPath,
+                type: getFileType(ext),
+              });
+            }
+          }
+        } catch {}
+      };
+
+      walk(workspacePath, 0);
+      return results;
+    } catch (err) {
+      console.error("Failed to list workspace files:", err);
+      return [];
+    }
+  });
+
+  ipcMain.handle("shell:open-path", async (_event, targetPath: string) => {
+    if (!targetPath) return false;
+    try {
+      const res = await shell.openPath(targetPath);
+      return res === "";
+    } catch (err) {
+      console.error("Failed to open path:", err);
+      return false;
+    }
+  });
+
   // ---------------------------------------------------------------------------
   // Scheduled Tasks Manager & IPC Handlers
   // ---------------------------------------------------------------------------
