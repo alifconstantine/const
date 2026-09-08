@@ -34,6 +34,7 @@ import { TrajectoryDialog } from "./components/workbench/trajectory-dialog";
 import { SettingsView } from "./components/settings-view";
 import { ScheduledTasksView } from "./components/scheduled-tasks";
 import { CommandPaletteModal } from "./components/command-palette-modal";
+import { RightPane, type RightPaneTab, type RightPaneTabType } from "./components/right-pane";
 import { useAppAuth } from "./components/convex-provider";
 import { useConversationWidth } from "./lib/theme";
 import {
@@ -173,6 +174,167 @@ function AuthenticatedContent({
   const [currentProject, setCurrentProject] = useState<string>(() => {
     return localStorage.getItem("const_harness_current_project") || "Outside Project";
   });
+
+  // Right Sidebar (Side Pane) state & tab management
+  const [isRightSidebarOpen, setIsRightSidebarOpen] = useState<boolean>(() => {
+    const saved = localStorage.getItem("const_harness_right_sidebar_open");
+    return saved ? JSON.parse(saved) : false;
+  });
+  const [rightSidebarWidth, setRightSidebarWidth] = useState<number>(() => {
+    const saved = localStorage.getItem("const_harness_right_sidebar_width");
+    return saved ? Number(saved) : 480;
+  });
+  const [rightPaneTabs, setRightPaneTabs] = useState<RightPaneTab[]>([]);
+  const [activeRightPaneTabId, setActiveRightPaneTabId] = useState<string | null>(null);
+  const [isOpeningNewTab, setIsOpeningNewTab] = useState<boolean>(false);
+
+  useEffect(() => {
+    localStorage.setItem("const_harness_right_sidebar_open", JSON.stringify(isRightSidebarOpen));
+  }, [isRightSidebarOpen]);
+
+  useEffect(() => {
+    localStorage.setItem("const_harness_right_sidebar_width", String(rightSidebarWidth));
+  }, [rightSidebarWidth]);
+
+  const handleToggleRightSidebar = () => {
+    setIsRightSidebarOpen((prev) => !prev);
+  };
+
+  const handleOpenTerminal = async () => {
+    setIsRightSidebarOpen(true);
+    let resolvedCwd = currentProject === "Outside Project" ? undefined : currentProject;
+    if (window.electron?.resolveWorkspacePath) {
+      try {
+        resolvedCwd = await window.electron.resolveWorkspacePath({
+          project: currentProject,
+          conversationId,
+        });
+      } catch {}
+    }
+
+    const baseTitle =
+      currentProject !== "Outside Project"
+        ? currentProject.replace(/\\/g, "/").split("/").filter(Boolean).pop() || currentProject
+        : "outside";
+
+    const existingMatchingTerm = rightPaneTabs.find(
+      (t) =>
+        t.type === "terminal" &&
+        ((resolvedCwd && t.cwd === resolvedCwd) ||
+          (t.project === currentProject &&
+            (currentProject !== "Outside Project" || t.conversationId === conversationId)))
+    );
+
+    if (existingMatchingTerm) {
+      setActiveRightPaneTabId(existingMatchingTerm.id);
+      setIsOpeningNewTab(false);
+      return;
+    }
+
+    const countWithBase = rightPaneTabs.filter(
+      (t) => t.type === "terminal" && t.title.startsWith(baseTitle)
+    ).length;
+    const title = countWithBase === 0 ? baseTitle : `${baseTitle} (${countWithBase + 1})`;
+
+    const newTab: RightPaneTab = {
+      id: `terminal_${Date.now()}`,
+      type: "terminal",
+      title,
+      cwd: resolvedCwd,
+      project: currentProject,
+      conversationId,
+    };
+    setRightPaneTabs((prev) => [...prev, newTab]);
+    setActiveRightPaneTabId(newTab.id);
+    setIsOpeningNewTab(false);
+  };
+
+  const handleOpenTabType = async (type: RightPaneTabType) => {
+    let title = "";
+    let resolvedCwd = currentProject === "Outside Project" ? undefined : currentProject;
+    if (type === "terminal") {
+      if (window.electron?.resolveWorkspacePath) {
+        try {
+          resolvedCwd = await window.electron.resolveWorkspacePath({
+            project: currentProject,
+            conversationId,
+          });
+        } catch {}
+      }
+      const baseTitle =
+        currentProject !== "Outside Project"
+          ? currentProject.replace(/\\/g, "/").split("/").filter(Boolean).pop() || currentProject
+          : "outside";
+
+      const countWithBase = rightPaneTabs.filter(
+        (t) => t.type === "terminal" && t.title.startsWith(baseTitle)
+      ).length;
+      title = countWithBase === 0 ? baseTitle : `${baseTitle} (${countWithBase + 1})`;
+    } else if (type === "review") {
+      const count = rightPaneTabs.filter((t) => t.type === type).length;
+      title = count === 0 ? "Review" : `Review (${count + 1})`;
+    } else if (type === "side_conversation") {
+      const count = rightPaneTabs.filter((t) => t.type === type).length;
+      title = count === 0 ? "Side chat" : `Side chat ${count + 1}`;
+    } else {
+      const count = rightPaneTabs.filter((t) => t.type === type).length;
+      title = count === 0 ? "Browser" : `Browser ${count + 1}`;
+    }
+
+    const newTab: RightPaneTab = {
+      id: `${type}_${Date.now()}`,
+      type,
+      title,
+      cwd: resolvedCwd,
+      project: currentProject,
+      conversationId,
+    };
+    setRightPaneTabs((prev) => [...prev, newTab]);
+    setActiveRightPaneTabId(newTab.id);
+    setIsOpeningNewTab(false);
+  };
+
+  const handleCloseTab = (tabId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    const tabIndex = rightPaneTabs.findIndex((t) => t.id === tabId);
+    const tabToClose = rightPaneTabs.find((t) => t.id === tabId);
+    if (tabToClose && tabToClose.type === "terminal") {
+      window.electron?.terminal?.destroy(tabId);
+    }
+    const nextTabs = rightPaneTabs.filter((t) => t.id !== tabId);
+    setRightPaneTabs(nextTabs);
+    if (activeRightPaneTabId === tabId) {
+      if (nextTabs.length > 0) {
+        const nextActive = nextTabs[Math.min(tabIndex, nextTabs.length - 1)] ?? nextTabs[0];
+        if (nextActive) {
+          setActiveRightPaneTabId(nextActive.id);
+          setIsOpeningNewTab(false);
+        } else {
+          setActiveRightPaneTabId(null);
+          setIsOpeningNewTab(true);
+        }
+      } else {
+        setActiveRightPaneTabId(null);
+        setIsOpeningNewTab(true);
+      }
+    }
+  };
+
+  const handleNewTab = () => {
+    setIsOpeningNewTab(true);
+  };
+
+  const handleReorderTabs = (fromIndex: number, toIndex: number) => {
+    if (fromIndex === toIndex) return;
+    setRightPaneTabs((prev) => {
+      const next = [...prev];
+      const [moved] = next.splice(fromIndex, 1);
+      if (moved) {
+        next.splice(toIndex, 0, moved);
+      }
+      return next;
+    });
+  };
 
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const messagesRef = React.useRef(messages);
@@ -1113,7 +1275,6 @@ function AuthenticatedContent({
           />
         ) : (
           <>
-            {/* Top Window Toolbar */}
             {(() => {
               const activeConvo = conversations.find((c) => c.id === conversationId);
               return (
@@ -1131,12 +1292,18 @@ function AuthenticatedContent({
                   onArchive={() => handleArchiveConversation(conversationId)}
                   onOpenSettings={handleOpenSettings}
                   onOpenTrajectory={() => setIsTrajectoryOpen(true)}
+                  isRightSidebarOpen={isRightSidebarOpen}
+                  onToggleRightSidebar={handleToggleRightSidebar}
+                  onOpenTerminal={handleOpenTerminal}
                 />
               );
             })()}
 
-        {/* Dynamic Canvas: Landing Layout when 0 messages vs Active Stream Layout */}
-        {messages.length === 0 ? (
+            {/* Main Workbench Body: Center Conversation Canvas + Collapsible Right Sidebar */}
+            <div className="flex-1 min-w-0 flex flex-row overflow-hidden relative">
+              <div className="flex-1 min-w-0 h-full flex flex-col relative overflow-hidden">
+                {/* Dynamic Canvas: Landing Layout when 0 messages vs Active Stream Layout */}
+                {messages.length === 0 ? (
           <div className="flex-1 min-w-0 relative flex flex-col items-center justify-center px-3.5 sm:px-6 md:px-8 pt-6 pb-6 overflow-y-auto">
             {/* Centered Conversation Container */}
             <div className={cn("relative flex flex-col items-center w-full max-w-full z-10 translate-y-6 sm:translate-y-8", landingWidthClass)}>
@@ -1360,6 +1527,30 @@ function AuthenticatedContent({
             </div>
           </div>
         )}
+              </div>
+
+              {/* Right Sidebar (Side Pane) matching Image 1 & 2 */}
+              {isRightSidebarOpen && (
+                <RightPane
+                  width={rightSidebarWidth}
+                  onWidthChange={setRightSidebarWidth}
+                  tabs={rightPaneTabs}
+                  activeTabId={activeRightPaneTabId}
+                  isOpeningNewTab={isOpeningNewTab}
+                  onSelectTab={(tabId) => {
+                    setActiveRightPaneTabId(tabId);
+                    setIsOpeningNewTab(false);
+                  }}
+                  onCloseTab={handleCloseTab}
+                  onNewTab={handleNewTab}
+                  onOpenTabType={handleOpenTabType}
+                  onReorderTabs={handleReorderTabs}
+                  workspacePath={currentProject === "Outside Project" ? undefined : currentProject}
+                  mutations={reviewingMutations || undefined}
+                  onRollbackFile={handleRollback}
+                />
+              )}
+            </div>
           </>
         )}
       </main>

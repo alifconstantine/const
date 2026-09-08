@@ -2,6 +2,7 @@ import { app, BrowserWindow, shell, ipcMain, dialog, nativeTheme, powerSaveBlock
 import path from "node:path";
 import fs from "node:fs";
 import os from "node:os";
+import { spawn, type ChildProcess } from "node:child_process";
 import {
   createConstAgent,
   DEFAULT_MODELS,
@@ -246,6 +247,7 @@ let win: BrowserWindow | null = null;
 let pendingDeepLink: string | null = null;
 let activeLoginSessionState: string | null = null;
 let lastAuthToken: string | null = null;
+const activeTerminals = new Map<string, { process: ChildProcess; cwd: string }>();
 
 function extractTokenFromUrl(rawUrl: string): string | undefined {
   try {
@@ -907,6 +909,27 @@ app.whenReady().then(() => {
     }
   );
 
+  // Workspace directory resolution
+  ipcMain.handle(
+    "workspace:resolve-path",
+    async (_event, options?: { project?: string; conversationId?: string }) => {
+      const project = options?.project;
+      const convoId = options?.conversationId || `session_${Date.now()}`;
+      if (project && project !== "Outside Project" && fs.existsSync(project)) {
+        return path.resolve(project);
+      }
+      const outsideDir = path.join(constBrainDir, convoId);
+      if (!fs.existsSync(outsideDir)) {
+        try {
+          fs.mkdirSync(outsideDir, { recursive: true });
+        } catch (err) {
+          console.error("Failed to create outside brain directory:", outsideDir, err);
+        }
+      }
+      return outsideDir;
+    }
+  );
+
   // Workspace files scanning and shell open-path handlers for Command Palette
   ipcMain.handle("workspace:list-files", async (_event, workspacePath?: string) => {
     if (!workspacePath || !fs.existsSync(workspacePath)) return [];
@@ -1178,6 +1201,148 @@ app.whenReady().then(() => {
     return scheduledTasksManager?.deleteRun(id) || false;
   });
 
+  // ---------------------------------------------------------------------------
+  // Terminal Management IPC Handlers
+  // ---------------------------------------------------------------------------
+  ipcMain.handle(
+    "terminal:create",
+    async (
+      _event,
+      options: {
+        id: string;
+        cwd?: string;
+        project?: string;
+        conversationId?: string;
+        shell?: string;
+        cols?: number;
+        rows?: number;
+      }
+    ) => {
+      const { id } = options;
+      if (activeTerminals.has(id)) {
+        return { success: true, id };
+      }
+
+      let targetCwd = options.cwd;
+      if (!targetCwd || targetCwd === "Outside Project") {
+        if (options.project && options.project !== "Outside Project" && fs.existsSync(options.project)) {
+          targetCwd = path.resolve(options.project);
+        } else {
+          const convoId = options.conversationId || `session_${Date.now()}`;
+          targetCwd = path.join(constBrainDir, convoId);
+        }
+      }
+
+      if (targetCwd && !fs.existsSync(targetCwd)) {
+        try {
+          fs.mkdirSync(targetCwd, { recursive: true });
+        } catch (err) {
+          console.error("Failed to create target directory for terminal:", targetCwd, err);
+        }
+      }
+
+      if (!targetCwd || !fs.existsSync(targetCwd)) {
+        targetCwd = os.homedir();
+      }
+
+      const defaultShell =
+        process.platform === "win32"
+          ? process.env.COMSPEC || "powershell.exe"
+          : process.env.SHELL || "/bin/bash";
+      const shellPath = options.shell || defaultShell;
+
+      let cmd = shellPath;
+      let args: string[] = [];
+
+      if (process.platform === "linux") {
+        cmd = "script";
+        args = ["-q", "-f", "-c", `env TERM=xterm-256color COLORTERM=truecolor ${shellPath}`, "/dev/null"];
+      } else if (process.platform === "win32") {
+        cmd = shellPath;
+        args = [];
+      } else {
+        cmd = shellPath;
+        args = ["-i"];
+      }
+
+      try {
+        const proc = spawn(cmd, args, {
+          cwd: targetCwd,
+          env: {
+            ...process.env,
+            TERM: "xterm-256color",
+            COLORTERM: "truecolor",
+            COLUMNS: String(options.cols || 80),
+            LINES: String(options.rows || 24),
+          },
+          stdio: ["pipe", "pipe", "pipe"],
+        });
+
+        activeTerminals.set(id, { process: proc, cwd: targetCwd });
+
+        proc.stdout?.on("data", (chunk: Buffer) => {
+          const str = chunk.toString("utf-8");
+          // Instant auto-response to shell terminal capability probes (e.g. fish) so prompt appears without delay
+          if (str.includes("\x1b[0c") || str.includes("\x1b[c")) {
+            try { proc.stdin?.write("\x1b[?1;2c"); } catch {}
+          }
+          if (str.includes("11;?")) {
+            try { proc.stdin?.write("\x1b]11;rgb:1010/1010/1010\x1b\\"); } catch {}
+          }
+          if (win && !win.isDestroyed()) {
+            win.webContents.send("terminal:data", { id, data: str });
+          }
+        });
+
+        proc.stderr?.on("data", (chunk: Buffer) => {
+          if (win && !win.isDestroyed()) {
+            win.webContents.send("terminal:data", { id, data: chunk.toString("utf-8") });
+          }
+        });
+
+        proc.on("exit", (code) => {
+          activeTerminals.delete(id);
+          if (win && !win.isDestroyed()) {
+            win.webContents.send("terminal:exit", { id, code });
+          }
+        });
+
+        proc.on("error", (err) => {
+          console.error(`[Terminal ${id}] Process error:`, err);
+        });
+
+        return { success: true, id };
+      } catch (err: any) {
+        console.error(`[Terminal ${id}] Spawn failed:`, err);
+        return { success: false, error: err.message };
+      }
+    }
+  );
+
+  ipcMain.handle(
+    "terminal:write",
+    async (_event, options: { id: string; data: string }) => {
+      const term = activeTerminals.get(options.id);
+      if (term && term.process.stdin && !term.process.stdin.destroyed) {
+        term.process.stdin.write(options.data);
+        return true;
+      }
+      return false;
+    }
+  );
+
+  ipcMain.handle("terminal:destroy", async (_event, id: string) => {
+    const term = activeTerminals.get(id);
+    if (term) {
+      try {
+        term.process.kill();
+      } catch {}
+      activeTerminals.delete(id);
+      return true;
+    }
+    return false;
+  });
+
   createWindow();
 
   app.on("activate", () => {
@@ -1190,6 +1355,12 @@ app.whenReady().then(() => {
 app.on("window-all-closed", () => {
   stopLoopbackAuthServer();
   scheduledTasksManager?.stop();
+  for (const [, term] of activeTerminals) {
+    try {
+      term.process.kill();
+    } catch {}
+  }
+  activeTerminals.clear();
   if (process.platform !== "darwin") {
     app.quit();
   }

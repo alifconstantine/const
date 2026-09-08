@@ -77,6 +77,8 @@ contextBridge.exposeInMainWorld("electron", {
   getTranscript: (conversationId: string) => ipcRenderer.invoke("conversations:get-transcript", conversationId),
   importLegacyConversations: (convos: any[]) => ipcRenderer.invoke("conversations:import-legacy", convos),
   listFiles: (workspacePath?: string) => ipcRenderer.invoke("workspace:list-files", workspacePath),
+  resolveWorkspacePath: (options?: { project?: string; conversationId?: string }) =>
+    ipcRenderer.invoke("workspace:resolve-path", options),
   openPath: (targetPath: string) => ipcRenderer.invoke("shell:open-path", targetPath),
   onConversationsChanged: (callback: (data: { conversationId?: string }) => void) => {
     const handler = (_event: any, data: any) => callback(data);
@@ -95,6 +97,31 @@ contextBridge.exposeInMainWorld("electron", {
       const handler = () => callback();
       ipcRenderer.on("scheduled-tasks:changed", handler);
       return () => ipcRenderer.removeListener("scheduled-tasks:changed", handler);
+    },
+  },
+  terminal: {
+    create: (options: {
+      id: string;
+      cwd?: string;
+      project?: string;
+      conversationId?: string;
+      shell?: string;
+      cols?: number;
+      rows?: number;
+    }) => ipcRenderer.invoke("terminal:create", options),
+    write: (options: { id: string; data: string }) =>
+      ipcRenderer.invoke("terminal:write", options),
+    destroy: (id: string) =>
+      ipcRenderer.invoke("terminal:destroy", id),
+    onData: (callback: (data: { id: string; data: string }) => void) => {
+      const handler = (_event: any, payload: any) => callback(payload);
+      ipcRenderer.on("terminal:data", handler);
+      return () => ipcRenderer.removeListener("terminal:data", handler);
+    },
+    onExit: (callback: (data: { id: string; code: number | null }) => void) => {
+      const handler = (_event: any, payload: any) => callback(payload);
+      ipcRenderer.on("terminal:exit", handler);
+      return () => ipcRenderer.removeListener("terminal:exit", handler);
     },
   },
 });

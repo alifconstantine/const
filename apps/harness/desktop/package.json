@@ -14,6 +14,8 @@
     "@const/ui": "workspace:*",
     "@iconify/react": "^6.0.2",
     "@types/marked": "^6.0.0",
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/xterm": "^6.0.0",
     "convex": "^1.45.0",
     "lucide-react": "^1.16.0",
     "marked": "18.0.5",

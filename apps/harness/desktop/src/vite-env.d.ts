@@ -183,6 +183,7 @@ declare global {
         }>
       >;
       openPath?: (targetPath: string) => Promise<boolean>;
+      resolveWorkspacePath?: (options?: { project?: string; conversationId?: string }) => Promise<string>;
       onConversationsChanged?: (callback: (data: { conversationId?: string }) => void) => () => void;
       scheduledTasks?: {
         list: () => Promise<ScheduledTaskItem[]>;
@@ -193,6 +194,21 @@ declare global {
         history: (taskId?: string) => Promise<ScheduledTaskRunHistory[]>;
         deleteRun: (id: string) => Promise<boolean>;
         onChanged: (callback: () => void) => () => void;
+      };
+      terminal?: {
+        create: (options: {
+          id: string;
+          cwd?: string;
+          project?: string;
+          conversationId?: string;
+          shell?: string;
+          cols?: number;
+          rows?: number;
+        }) => Promise<{ success: boolean; id?: string; cwd?: string; error?: string }>;
+        write: (options: { id: string; data: string }) => Promise<boolean>;
+        destroy: (id: string) => Promise<boolean>;
+        onData: (callback: (data: { id: string; data: string }) => void) => () => void;
+        onExit: (callback: (data: { id: string; code: number | null }) => void) => () => void;
       };
     };
   }

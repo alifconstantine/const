@@ -38,6 +38,9 @@ interface TopToolbarProps {
   onArchive?: () => void;
   onOpenSettings?: (tab?: string) => void;
   onOpenTrajectory?: () => void;
+  isRightSidebarOpen?: boolean;
+  onToggleRightSidebar?: () => void;
+  onOpenTerminal?: () => void;
 }
 
 export function TopToolbar({
@@ -54,6 +57,9 @@ export function TopToolbar({
   onArchive,
   onOpenSettings,
   onOpenTrajectory,
+  isRightSidebarOpen = false,
+  onToggleRightSidebar,
+  onOpenTerminal,
 }: TopToolbarProps) {
   const [isMaximized, setIsMaximized] = useState(false);
 
@@ -356,6 +362,7 @@ export function TopToolbar({
 
         <button
           type="button"
+          onClick={onOpenTerminal}
           className="p-1.5 rounded-lg text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-[#222222] transition-colors cursor-pointer"
           title="Open terminal"
           aria-label="Open terminal"
@@ -365,8 +372,13 @@ export function TopToolbar({
 
         <button
           type="button"
-          className="p-1.5 rounded-lg text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-[#222222] transition-colors cursor-pointer"
-          title="Toggle right sidebar"
+          onClick={onToggleRightSidebar}
+          className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+            isRightSidebarOpen
+              ? "bg-black/10 dark:bg-white/10 text-black dark:text-white border border-black/10 dark:border-white/10 shadow-xs"
+              : "text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-[#222222]"
+          }`}
+          title={isRightSidebarOpen ? "Close right sidebar" : "Open right sidebar"}
           aria-label="Toggle right sidebar"
         >
           <PanelRight className="w-4 h-4" />
