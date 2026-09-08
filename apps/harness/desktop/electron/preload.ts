@@ -69,8 +69,12 @@ contextBridge.exposeInMainWorld("electron", {
   renameConversation: (id: string, title: string) => ipcRenderer.invoke("conversations:rename", id, title),
   archiveConversation: (id: string) => ipcRenderer.invoke("conversations:archive", id),
   unarchiveConversation: (id: string) => ipcRenderer.invoke("conversations:unarchive", id),
+  pinConversation: (id: string, isPinned: boolean) => ipcRenderer.invoke("conversations:pin", id, isPinned),
   pinProject: (projectName: string, isPinned: boolean) => ipcRenderer.invoke("conversations:pin-project", projectName, isPinned),
   getProjectPins: () => ipcRenderer.invoke("conversations:get-project-pins"),
+  getConversationPaths: (conversationId?: string, workspacePath?: string) =>
+    ipcRenderer.invoke("conversations:get-paths", conversationId, workspacePath),
+  getTranscript: (conversationId: string) => ipcRenderer.invoke("conversations:get-transcript", conversationId),
   importLegacyConversations: (convos: any[]) => ipcRenderer.invoke("conversations:import-legacy", convos),
   listFiles: (workspacePath?: string) => ipcRenderer.invoke("workspace:list-files", workspacePath),
   openPath: (targetPath: string) => ipcRenderer.invoke("shell:open-path", targetPath),

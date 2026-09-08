@@ -29,6 +29,8 @@ import { ImageLightbox } from "./components/workbench/image-lightbox";
 import { MarkdownContent } from "./components/workbench/markdown-content";
 import { ExecutionTrace, MutationsSummaryCard } from "./components/workbench/execution-trace";
 import { ReviewDialog } from "./components/workbench/review-dialog";
+import { RenameTaskDialog } from "./components/workbench/rename-task-dialog";
+import { TrajectoryDialog } from "./components/workbench/trajectory-dialog";
 import { SettingsView } from "./components/settings-view";
 import { ScheduledTasksView } from "./components/scheduled-tasks";
 import { CommandPaletteModal } from "./components/command-palette-modal";
@@ -41,6 +43,7 @@ import {
   renameConversation,
   archiveConversation,
   unarchiveConversation,
+  pinConversation,
   initConversationStore,
   refreshConversationsFromDisk,
   generateFallbackTitle,
@@ -102,6 +105,8 @@ function AuthenticatedContent({
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isScheduledTasksOpen, setIsScheduledTasksOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
+  const [isTrajectoryOpen, setIsTrajectoryOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState<string>("general");
   const greeting = getGreeting();
 
@@ -1024,6 +1029,15 @@ function AuthenticatedContent({
     toast.success("Conversation restored");
   };
 
+  const handleTogglePinConversation = async (id: string) => {
+    const target = conversations.find((c) => c.id === id);
+    const nextPinned = !target?.isPinned;
+    await pinConversation(id, nextPinned);
+    const updated = loadConversations();
+    setConversations(updated);
+    toast.success(nextPinned ? "Task pinned" : "Task unpinned");
+  };
+
   const handleOpenWorkspaceFromPalette = async () => {
     if (window.electron?.openDirectoryDialog) {
       const selectedDir = await window.electron.openDirectoryDialog();
@@ -1100,13 +1114,26 @@ function AuthenticatedContent({
         ) : (
           <>
             {/* Top Window Toolbar */}
-            <TopToolbar
-              isSidebarOpen={isSidebarOpen}
-              onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
-              onNewChat={handleNewChat}
-              conversationTitle={conversationTitle}
-              project={displayProject}
-            />
+            {(() => {
+              const activeConvo = conversations.find((c) => c.id === conversationId);
+              return (
+                <TopToolbar
+                  isSidebarOpen={isSidebarOpen}
+                  onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
+                  onNewChat={handleNewChat}
+                  conversationTitle={conversationTitle}
+                  project={displayProject}
+                  conversationId={conversationId}
+                  isPinned={Boolean(activeConvo?.isPinned)}
+                  workspacePath={currentProject === "Outside Project" ? undefined : currentProject}
+                  onTogglePin={() => handleTogglePinConversation(conversationId)}
+                  onOpenRename={() => setIsRenameDialogOpen(true)}
+                  onArchive={() => handleArchiveConversation(conversationId)}
+                  onOpenSettings={handleOpenSettings}
+                  onOpenTrajectory={() => setIsTrajectoryOpen(true)}
+                />
+              );
+            })()}
 
         {/* Dynamic Canvas: Landing Layout when 0 messages vs Active Stream Layout */}
         {messages.length === 0 ? (
@@ -1375,6 +1402,23 @@ function AuthenticatedContent({
         }}
         onOpenSettings={handleOpenSettings}
         onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
+      />
+
+      {/* Rename Task Dialog */}
+      <RenameTaskDialog
+        open={isRenameDialogOpen}
+        currentTitle={conversationTitle || ""}
+        onClose={() => setIsRenameDialogOpen(false)}
+        onConfirm={(newTitle) => handleRenameConversation(conversationId, newTitle)}
+      />
+
+      {/* Trajectory Modal Dialog */}
+      <TrajectoryDialog
+        open={isTrajectoryOpen}
+        onClose={() => setIsTrajectoryOpen(false)}
+        conversationId={conversationId}
+        conversationTitle={conversationTitle}
+        messages={messages}
       />
     </div>
   );

@@ -157,8 +157,19 @@ declare global {
       renameConversation?: (id: string, title: string) => Promise<boolean>;
       archiveConversation?: (id: string) => Promise<boolean>;
       unarchiveConversation?: (id: string) => Promise<boolean>;
+      pinConversation?: (id: string, isPinned: boolean) => Promise<boolean>;
       pinProject?: (projectName: string, isPinned: boolean) => Promise<boolean>;
       getProjectPins?: () => Promise<string[]>;
+      getConversationPaths?: (
+        conversationId?: string,
+        workspacePath?: string
+      ) => Promise<{
+        workspacePath: string;
+        taskPath: string;
+        logPath: string;
+        configPath: string;
+      }>;
+      getTranscript?: (conversationId: string) => Promise<string>;
       importLegacyConversations?: (convos: any[]) => Promise<boolean>;
       listFiles?: (
         workspacePath?: string

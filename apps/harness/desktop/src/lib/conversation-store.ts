@@ -50,14 +50,21 @@ export function loadConversations(): ConversationItem[] {
     isScheduled: isScheduledTaskConversation(c),
   });
 
+  const sortFn = (a: ConversationItem, b: ConversationItem) => {
+    if (Boolean(a.isPinned) !== Boolean(b.isPinned)) {
+      return a.isPinned ? -1 : 1;
+    }
+    return (b.updatedAt || 0) - (a.updatedAt || 0);
+  };
+
   if (cachedConversations) {
-    return cachedConversations.filter((c) => !c.isArchived).map(normalize);
+    return cachedConversations.filter((c) => !c.isArchived).map(normalize).sort(sortFn);
   }
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
     const parsed: ConversationItem[] = JSON.parse(raw);
-    cachedConversations = parsed.map(normalize).sort((a, b) => b.updatedAt - a.updatedAt);
+    cachedConversations = parsed.map(normalize).sort(sortFn);
     return cachedConversations.filter((c) => !c.isArchived);
   } catch {
     return [];
@@ -256,6 +263,28 @@ export async function unarchiveConversation(id: string): Promise<void> {
       }
     }
   } catch {}
+}
+
+/**
+ * Pin or unpin a conversation/task.
+ */
+export async function pinConversation(id: string, isPinned: boolean): Promise<void> {
+  try {
+    const list = loadConversations();
+    const item = list.find((c) => c.id === id);
+    if (item) {
+      item.isPinned = isPinned;
+      item.updatedAt = Date.now();
+      cachedConversations = list;
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
+    }
+
+    if (typeof window !== "undefined" && window.electron?.pinConversation) {
+      await window.electron.pinConversation(id, isPinned);
+    }
+  } catch (err) {
+    console.warn("[ConversationStore] Failed to pin conversation:", err);
+  }
 }
 
 /**

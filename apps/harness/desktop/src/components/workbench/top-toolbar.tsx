@@ -13,7 +13,15 @@ import {
   Folder,
   MoreHorizontal,
 } from "lucide-react";
-import { ConstLogoIcon } from "@const/ui";
+import {
+  ConstLogoIcon,
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  toast,
+} from "@const/ui";
 import { AutoScrollTitle } from "../auto-scroll-title";
 
 interface TopToolbarProps {
@@ -22,6 +30,14 @@ interface TopToolbarProps {
   onNewChat?: () => void;
   conversationTitle?: string;
   project?: string;
+  conversationId?: string;
+  isPinned?: boolean;
+  workspacePath?: string;
+  onTogglePin?: () => void;
+  onOpenRename?: () => void;
+  onArchive?: () => void;
+  onOpenSettings?: (tab?: string) => void;
+  onOpenTrajectory?: () => void;
 }
 
 export function TopToolbar({
@@ -30,6 +46,14 @@ export function TopToolbar({
   onNewChat,
   conversationTitle,
   project,
+  conversationId,
+  isPinned = false,
+  workspacePath,
+  onTogglePin,
+  onOpenRename,
+  onArchive,
+  onOpenSettings,
+  onOpenTrajectory,
 }: TopToolbarProps) {
   const [isMaximized, setIsMaximized] = useState(false);
 
@@ -57,6 +81,98 @@ export function TopToolbar({
 
   const handleClose = () => {
     window.electron?.close?.();
+  };
+
+  const handleOpenInExplorer = async () => {
+    try {
+      if (workspacePath && window.electron?.openPath) {
+        const ok = await window.electron.openPath(workspacePath);
+        if (ok) return;
+      }
+      if (window.electron?.getConversationPaths && window.electron?.openPath) {
+        const paths = await window.electron.getConversationPaths(conversationId, workspacePath);
+        if (paths.workspacePath) {
+          await window.electron.openPath(paths.workspacePath);
+        } else if (paths.taskPath) {
+          await window.electron.openPath(paths.taskPath);
+        }
+      }
+    } catch {
+      toast.error("Failed to open file explorer");
+    }
+  };
+
+  const handleCopyPath = async () => {
+    try {
+      let targetPath = workspacePath;
+      if (!targetPath && window.electron?.getConversationPaths) {
+        const paths = await window.electron.getConversationPaths(conversationId, workspacePath);
+        targetPath = paths.workspacePath || paths.taskPath;
+      }
+      if (targetPath) {
+        await navigator.clipboard.writeText(targetPath);
+        toast.success("Path copied to clipboard");
+      } else {
+        toast.error("No active path available");
+      }
+    } catch {
+      toast.error("Failed to copy path");
+    }
+  };
+
+  const handleCopyTaskPath = async () => {
+    try {
+      if (window.electron?.getConversationPaths) {
+        const paths = await window.electron.getConversationPaths(conversationId, workspacePath);
+        if (paths.taskPath) {
+          await navigator.clipboard.writeText(paths.taskPath);
+          toast.success("Task path copied to clipboard");
+          return;
+        }
+      }
+      if (conversationId) {
+        await navigator.clipboard.writeText(`task://${conversationId}`);
+        toast.success("Task path copied");
+      }
+    } catch {
+      toast.error("Failed to copy task path");
+    }
+  };
+
+  const handleCopyLogPath = async () => {
+    try {
+      if (window.electron?.getConversationPaths) {
+        const paths = await window.electron.getConversationPaths(conversationId, workspacePath);
+        if (paths.logPath) {
+          await navigator.clipboard.writeText(paths.logPath);
+          toast.success("Log path copied to clipboard");
+          return;
+        }
+      }
+      toast.error("No log path found");
+    } catch {
+      toast.error("Failed to copy log path");
+    }
+  };
+
+  const handleCopySessionId = async () => {
+    if (conversationId) {
+      try {
+        await navigator.clipboard.writeText(conversationId);
+        toast.success("Session ID copied to clipboard");
+      } catch {
+        toast.error("Failed to copy session ID");
+      }
+    }
+  };
+
+  const handleReportIssue = () => {
+    const url = "https://github.com/alifconstantine/const/issues";
+    if (window.electron?.openExternal) {
+      window.electron.openExternal(url);
+    } else {
+      window.open(url, "_blank");
+    }
   };
 
   return (
@@ -129,14 +245,105 @@ export function TopToolbar({
               </div>
             )}
 
-            <button
-              type="button"
-              className="p-1 rounded hover:bg-black/5 dark:hover:bg-[#222222] text-[#a9a9a9] dark:text-[#888888] hover:text-[#262626] dark:hover:text-[#d4d4d4] transition-colors cursor-pointer"
-              title="More options"
-              aria-label="More options"
-            >
-              <MoreHorizontal className="w-3.5 h-3.5" />
-            </button>
+            {/* Three-dots menu matching Image 2 */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="p-1 rounded hover:bg-black/5 dark:hover:bg-[#222222] text-[#a9a9a9] dark:text-[#888888] hover:text-[#262626] dark:hover:text-[#d4d4d4] transition-colors cursor-pointer data-[state=open]:bg-black/5 dark:data-[state=open]:bg-[#222222] data-[state=open]:text-white"
+                  title="Task options"
+                  aria-label="Task options"
+                >
+                  <MoreHorizontal className="w-3.5 h-3.5" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="start"
+                sideOffset={6}
+                className="w-56 bg-[#222222] border border-[#383838] text-[#d4d4d4] rounded-xl p-1 shadow-none select-none z-50 font-sans text-[13px]"
+              >
+                <DropdownMenuItem
+                  onClick={onTogglePin}
+                  className="px-3 py-1.5 text-[13px] text-[#d4d4d4] hover:text-white focus:text-white hover:bg-[#303030] focus:bg-[#303030] rounded-lg cursor-pointer outline-none transition-colors"
+                >
+                  {isPinned ? "Unpin task" : "Pin task"}
+                </DropdownMenuItem>
+
+                <DropdownMenuItem
+                  onClick={onOpenRename}
+                  className="px-3 py-1.5 text-[13px] text-[#d4d4d4] hover:text-white focus:text-white hover:bg-[#303030] focus:bg-[#303030] rounded-lg cursor-pointer outline-none transition-colors"
+                >
+                  Rename task
+                </DropdownMenuItem>
+
+                <DropdownMenuItem
+                  onClick={onArchive}
+                  className="px-3 py-1.5 text-[13px] text-[#d4d4d4] hover:text-white focus:text-white hover:bg-[#303030] focus:bg-[#303030] rounded-lg cursor-pointer outline-none transition-colors"
+                >
+                  Archive task
+                </DropdownMenuItem>
+
+                <DropdownMenuSeparator className="h-[1px] bg-[#383838] my-1 -mx-1" />
+
+                <DropdownMenuItem
+                  onClick={handleOpenInExplorer}
+                  className="px-3 py-1.5 text-[13px] text-[#d4d4d4] hover:text-white focus:text-white hover:bg-[#303030] focus:bg-[#303030] rounded-lg cursor-pointer outline-none transition-colors"
+                >
+                  Open in File Explorer
+                </DropdownMenuItem>
+
+                <DropdownMenuItem
+                  onClick={handleCopyPath}
+                  className="px-3 py-1.5 text-[13px] text-[#d4d4d4] hover:text-white focus:text-white hover:bg-[#303030] focus:bg-[#303030] rounded-lg cursor-pointer outline-none transition-colors"
+                >
+                  Copy path
+                </DropdownMenuItem>
+
+                <DropdownMenuItem
+                  onClick={handleCopyTaskPath}
+                  className="px-3 py-1.5 text-[13px] text-[#d4d4d4] hover:text-white focus:text-white hover:bg-[#303030] focus:bg-[#303030] rounded-lg cursor-pointer outline-none transition-colors"
+                >
+                  Copy task path
+                </DropdownMenuItem>
+
+                <DropdownMenuItem
+                  onClick={handleCopyLogPath}
+                  className="px-3 py-1.5 text-[13px] text-[#d4d4d4] hover:text-white focus:text-white hover:bg-[#303030] focus:bg-[#303030] rounded-lg cursor-pointer outline-none transition-colors"
+                >
+                  Copy log path
+                </DropdownMenuItem>
+
+                <DropdownMenuItem
+                  onClick={handleCopySessionId}
+                  className="px-3 py-1.5 text-[13px] text-[#d4d4d4] hover:text-white focus:text-white hover:bg-[#303030] focus:bg-[#303030] rounded-lg cursor-pointer outline-none transition-colors"
+                >
+                  Copy session ID
+                </DropdownMenuItem>
+
+                <DropdownMenuItem
+                  onClick={() => onOpenSettings?.("general")}
+                  className="px-3 py-1.5 text-[13px] text-[#d4d4d4] hover:text-white focus:text-white hover:bg-[#303030] focus:bg-[#303030] rounded-lg cursor-pointer outline-none transition-colors"
+                >
+                  Go to config
+                </DropdownMenuItem>
+
+                <DropdownMenuSeparator className="h-[1px] bg-[#383838] my-1 -mx-1" />
+
+                <DropdownMenuItem
+                  onClick={onOpenTrajectory}
+                  className="px-3 py-1.5 text-[13px] text-[#d4d4d4] hover:text-white focus:text-white hover:bg-[#303030] focus:bg-[#303030] rounded-lg cursor-pointer outline-none transition-colors"
+                >
+                  View model trajectory
+                </DropdownMenuItem>
+
+                <DropdownMenuItem
+                  onClick={handleReportIssue}
+                  className="px-3 py-1.5 text-[13px] text-[#d4d4d4] hover:text-white focus:text-white hover:bg-[#303030] focus:bg-[#303030] rounded-lg cursor-pointer outline-none transition-colors"
+                >
+                  Report issue
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         )}
       </div>

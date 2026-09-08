@@ -140,18 +140,24 @@ export function ExecutionTrace({
   const hasContent = steps.length > 0 || mutations.length > 0 || isExecuting;
   if (!hasContent) return null;
 
-  // Format execution duration e.g. "Worked for 5m", "Worked for 22s", or "Working for 12s..."
+  // Format execution duration e.g. "Worked for 1m 56s", "Worked for 22s", or "Working for 12s..."
   const formatDuration = () => {
     if (isExecuting) {
       if (!durationMs || durationMs < 1000) return "Working...";
       const s = Math.round(durationMs / 1000);
-      return `Working for ${s}s...`;
+      if (s < 60) return `Working for ${s}s...`;
+      const m = Math.floor(s / 60);
+      const remS = s % 60;
+      if (remS === 0) return `Working for ${m}m...`;
+      return `Working for ${m}m ${remS}s...`;
     }
     if (!durationMs || durationMs < 1000) return "Worked for a few seconds";
     const s = Math.round(durationMs / 1000);
     if (s < 60) return `Worked for ${s}s`;
     const m = Math.floor(s / 60);
-    return `Worked for ${m}m`;
+    const remS = s % 60;
+    if (remS === 0) return `Worked for ${m}m`;
+    return `Worked for ${m}m ${remS}s`;
   };
 
   return (

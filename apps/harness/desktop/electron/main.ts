@@ -815,6 +815,11 @@ app.whenReady().then(() => {
     return true;
   });
 
+  ipcMain.handle("conversations:pin", async (_event, id: string, isPinned: boolean) => {
+    conversationDb.pinConversation(id, isPinned);
+    return true;
+  });
+
   ipcMain.handle("conversations:pin-project", async (_event, projectName: string, isPinned: boolean) => {
     conversationDb.pinProject(projectName, isPinned);
     return true;
@@ -822,6 +827,38 @@ app.whenReady().then(() => {
 
   ipcMain.handle("conversations:get-project-pins", async () => {
     return conversationDb.getProjectPins();
+  });
+
+  ipcMain.handle("conversations:get-paths", async (_event, conversationId?: string, workspacePath?: string) => {
+    const home = harnessHomeDir;
+    const brain = path.join(home, "brain");
+    const id = conversationId || "";
+    const taskDbPath = path.join(home, "conversations", "conversations.db");
+    const logPath = id ? path.join(brain, id, ".system_generated", "logs", "transcript_full.jsonl") : "";
+    return {
+      workspacePath: workspacePath || "",
+      taskPath: taskDbPath,
+      logPath,
+      configPath: constConfigFile,
+    };
+  });
+
+  ipcMain.handle("conversations:get-transcript", async (_event, conversationId: string) => {
+    if (!conversationId) return "";
+    try {
+      const logsDir = path.join(harnessHomeDir, "brain", conversationId, ".system_generated", "logs");
+      const fullPath = path.join(logsDir, "transcript_full.jsonl");
+      if (fs.existsSync(fullPath)) {
+        return fs.readFileSync(fullPath, "utf-8");
+      }
+      const simplePath = path.join(logsDir, "transcript.jsonl");
+      if (fs.existsSync(simplePath)) {
+        return fs.readFileSync(simplePath, "utf-8");
+      }
+    } catch (err) {
+      console.warn("Failed to read transcript for", conversationId, err);
+    }
+    return "";
   });
 
   ipcMain.handle("conversations:import-legacy", async (_event, convos: ConversationRecord[]) => {
