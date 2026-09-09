@@ -272,3 +272,40 @@ export const checkGatewayQuota = query({
     };
   },
 });
+
+// 4. Admin / Self-service Quota Reset
+export const resetUserQuota = mutation({
+  args: {
+    userId: v.optional(v.id("users")),
+  },
+  handler: async (ctx, args) => {
+    const now = Date.now();
+    if (args.userId) {
+      const quotaDoc = await ctx.db
+        .query("userQuotas")
+        .withIndex("by_user", (q) => q.eq("userId", args.userId!))
+        .first();
+      if (quotaDoc) {
+        await ctx.db.patch(quotaDoc._id, {
+          usedTokens: 0,
+          periodStartAt: now,
+          periodEndAt: now + WEEK_MS,
+          updatedAt: now,
+        });
+        return { success: true, reset: 1 };
+      }
+    }
+
+    const allQuotas = await ctx.db.query("userQuotas").collect();
+    for (const q of allQuotas) {
+      await ctx.db.patch(q._id, {
+        usedTokens: 0,
+        periodStartAt: now,
+        periodEndAt: now + WEEK_MS,
+        updatedAt: now,
+      });
+    }
+    return { success: true, reset: allQuotas.length };
+  },
+});
+

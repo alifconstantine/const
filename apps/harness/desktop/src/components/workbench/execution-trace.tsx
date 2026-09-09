@@ -187,7 +187,8 @@ export function ExecutionTrace({
                   key={step.id || `thought_${idx}`}
                   thinking={step.content || ""}
                   durationMs={step.durationMs}
-                  isExecuting={isExecuting && idx === steps.length - 1}
+                  startTime={step.startTime}
+                  isExecuting={isExecuting && idx === steps.length - 1 && !step.durationMs}
                 />
               );
             }
@@ -293,28 +294,49 @@ function ThoughtItem({
   thinking,
   isExecuting,
   durationMs,
+  startTime,
 }: {
   thinking: string;
   isExecuting?: boolean;
   durationMs?: number;
+  startTime?: number;
 }) {
-  const [isOpen, setIsOpen] = useState(isExecuting ?? true);
+  // 1. Auto open when thinking starts, and auto close when thinking completes
+  const [isOpen, setIsOpen] = useState(Boolean(isExecuting));
+  const prevExecutingRef = useRef(Boolean(isExecuting));
 
   useEffect(() => {
-    if (isExecuting) {
+    if (isExecuting && !prevExecutingRef.current) {
       setIsOpen(true);
+    } else if (!isExecuting && prevExecutingRef.current) {
+      setIsOpen(false);
     }
+    prevExecutingRef.current = Boolean(isExecuting);
   }, [isExecuting]);
+
+  // 2. Bugfix: Live timer measures strictly THIS thought step's duration from startTime
+  const [liveStepDuration, setLiveStepDuration] = useState<number>(0);
+
+  useEffect(() => {
+    if (!isExecuting) return;
+    const effectiveStart = startTime || Date.now();
+    const update = () => setLiveStepDuration(Math.max(0, Date.now() - effectiveStart));
+    update();
+    const interval = setInterval(update, 500);
+    return () => clearInterval(interval);
+  }, [isExecuting, startTime]);
 
   const thoughtLabel = () => {
     if (isExecuting) {
-      if (durationMs && durationMs >= 1000) {
-        return `Thinking (${Math.round(durationMs / 1000)}s)...`;
+      if (liveStepDuration >= 1000) {
+        return `Thinking (${Math.round(liveStepDuration / 1000)}s)...`;
       }
       return "Thinking...";
     }
-    if (durationMs && durationMs >= 1000) {
-      return `Thought for ${Math.round(durationMs / 1000)}s`;
+    const finalMs = durationMs ?? (liveStepDuration > 0 ? liveStepDuration : undefined);
+    if (finalMs !== undefined && finalMs > 0) {
+      const s = Math.max(1, Math.round(finalMs / 1000));
+      return `Thought for ${s}s`;
     }
     return "Thought for a few seconds";
   };
@@ -337,10 +359,13 @@ function ThoughtItem({
 
       <SmoothCollapse isOpen={isOpen}>
         <div className="pt-1.5 pb-2 pl-0.5 text-[12.5px] leading-relaxed text-[#888888] select-text">
-          <MarkdownContent
-            content={thinking}
-            className="text-[12.5px] leading-relaxed text-[#888888] [&_strong]:font-semibold [&_strong]:text-[#d4d4d4] [&_strong]:block [&_strong]:mb-1 [&_h1]:text-[13px] [&_h1]:font-semibold [&_h1]:text-[#d4d4d4] [&_h1]:mb-1 [&_h2]:text-[13px] [&_h2]:font-semibold [&_h2]:text-[#d4d4d4] [&_h2]:mb-1 [&_h3]:text-[12.5px] [&_h3]:font-semibold [&_h3]:text-[#d4d4d4] [&_h3]:mb-1 [&_p]:my-1"
-          />
+          {/* Scroll area bounded max height matching Image 1 */}
+          <ScrollArea className="w-full max-h-56 pr-2.5 [&>div>div[style]]:!block">
+            <MarkdownContent
+              content={thinking}
+              className="text-[12.5px] leading-relaxed text-[#888888] [&_strong]:font-semibold [&_strong]:text-[#d4d4d4] [&_strong]:block [&_strong]:mb-1 [&_h1]:text-[13px] [&_h1]:font-semibold [&_h1]:text-[#d4d4d4] [&_h1]:mb-1 [&_h2]:text-[13px] [&_h2]:font-semibold [&_h2]:text-[#d4d4d4] [&_h2]:mb-1 [&_h3]:text-[12.5px] [&_h3]:font-semibold [&_h3]:text-[#d4d4d4] [&_h3]:mb-1 [&_p]:my-1"
+            />
+          </ScrollArea>
         </div>
       </SmoothCollapse>
     </div>

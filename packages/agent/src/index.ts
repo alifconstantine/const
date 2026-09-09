@@ -166,5 +166,9 @@ export {
 	type FileMutationRecord,
 	type AgentConfig as ConstAgentConfig,
 	type AgentMessage as ConstAgentMessage,
+	ThinkingStreamFilter,
+	extractFallbackToolCalls,
+	compactHistoryForContext,
+	isDevServerCommand,
 } from "./const/index.ts";
 

@@ -38,6 +38,7 @@ import type { FileMutationRecord } from "./mutation-ledger.js";
 
 export interface AgentEventMap {
   token: { token: string };
+  token_reset: {};
   thinking: { thinking: string };
   tool_call: { toolCallId: string; toolName: string; args: any };
   tool_result: { toolCallId: string; toolName: string; result: any; isError?: boolean };

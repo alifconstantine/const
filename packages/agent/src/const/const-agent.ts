@@ -28,6 +28,259 @@ function parseToolArguments(rawArgs: any): Record<string, any> {
   }
 }
 
+// ---------------------------------------------------------------------------
+// Thinking Stream Filter (Eliminates <think>...</think> leaks in streaming)
+// ---------------------------------------------------------------------------
+
+export interface ThinkingFilterResult {
+  content: string;
+  thinking: string;
+}
+
+export class ThinkingStreamFilter {
+  private inThink = false;
+  private buffer = "";
+
+  public push(chunk: string): ThinkingFilterResult {
+    this.buffer += chunk;
+    let content = "";
+    let thinking = "";
+
+    while (this.buffer.length > 0) {
+      if (!this.inThink) {
+        const openMatch = this.buffer.match(/<(think|thought|reasoning|thought_process|scratchpad|antthinking|plan|internal_thought)>/i);
+        if (openMatch && openMatch.index !== undefined) {
+          const index = openMatch.index;
+          content += this.buffer.slice(0, index);
+          this.buffer = this.buffer.slice(index + openMatch[0].length);
+          this.inThink = true;
+          continue;
+        }
+
+        // Catch orphan closing tags if open tag was missed or truncated
+        const orphanCloseMatch = this.buffer.match(/<\/(think|thought|reasoning|thought_process|scratchpad|antthinking|plan|internal_thought)>/i);
+        if (orphanCloseMatch && orphanCloseMatch.index !== undefined) {
+          const index = orphanCloseMatch.index;
+          thinking += this.buffer.slice(0, index);
+          this.buffer = this.buffer.slice(index + orphanCloseMatch[0].length);
+          this.inThink = false;
+          continue;
+        }
+
+        const partialMatch = this.buffer.match(/<(?:\/?)(?:t(?:h(?:i(?:n(?:k)?)?)?|h(?:o(?:u(?:g(?:h(?:t)?)?)?)?)?)|r(?:e(?:a(?:s(?:o(?:n(?:i(?:n(?:g)?)?)?)?)?)?)?)?|s(?:c(?:r(?:a(?:t(?:c(?:h(?:p(?:a(?:d)?)?)?)?)?)?)?)?)?)$/i);
+        if (partialMatch && partialMatch[0].startsWith("<") && !partialMatch[0].startsWith("</") && partialMatch.index !== undefined) {
+          const partialIndex = partialMatch.index;
+          content += this.buffer.slice(0, partialIndex);
+          this.buffer = this.buffer.slice(partialIndex);
+          break;
+        }
+
+        content += this.buffer;
+        this.buffer = "";
+      } else {
+        const closeMatch = this.buffer.match(/<\/(think|thought|reasoning|thought_process|scratchpad|antthinking|plan|internal_thought)>/i);
+        if (closeMatch && closeMatch.index !== undefined) {
+          const index = closeMatch.index;
+          thinking += this.buffer.slice(0, index);
+          this.buffer = this.buffer.slice(index + closeMatch[0].length);
+          this.inThink = false;
+          continue;
+        }
+
+        const partialClose = this.buffer.match(/<\/(?:t(?:h(?:i(?:n(?:k)?)?)?|h(?:o(?:u(?:g(?:h(?:t)?)?)?)?)?)|r(?:e(?:a(?:s(?:o(?:n(?:i(?:n(?:g)?)?)?)?)?)?)?)?)$/i);
+        if (partialClose && partialClose.index !== undefined) {
+          const partialIndex = partialClose.index;
+          thinking += this.buffer.slice(0, partialIndex);
+          this.buffer = this.buffer.slice(partialIndex);
+          break;
+        }
+
+        thinking += this.buffer;
+        this.buffer = "";
+      }
+    }
+
+    return { content, thinking };
+  }
+
+  public flush(): ThinkingFilterResult {
+    let content = "";
+    let thinking = "";
+    if (this.buffer.length > 0) {
+      if (this.inThink) {
+        thinking += this.buffer;
+      } else {
+        content += this.buffer;
+      }
+      this.buffer = "";
+    }
+    return { content, thinking };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Fallback Tool Call Extractor (Catches text-embedded JSON or XML tool calls)
+// ---------------------------------------------------------------------------
+
+const VALID_FALLBACK_TOOLS = new Set([
+  "read",
+  "write",
+  "edit",
+  "bash",
+  "powershell",
+  "ls",
+  "find",
+  "grep",
+  "mkdir",
+]);
+
+export function extractFallbackToolCalls(content: string): ToolCall[] {
+  const toolCalls: ToolCall[] = [];
+  if (!content || typeof content !== "string") return toolCalls;
+
+  // Pattern 1: <tool_call>...</tool_call>
+  const tagRegex = /<tool_call>([\s\S]*?)<\/tool_call>/gi;
+  let tagMatch: RegExpExecArray | null;
+  while ((tagMatch = tagRegex.exec(content)) !== null) {
+    try {
+      const parsed = JSON.parse(tagMatch[1].trim());
+      const name = (parsed.name || parsed.tool || parsed.function?.name || "").toLowerCase();
+      const args = parsed.arguments || parsed.parameters || parsed.args || parsed.function?.arguments || {};
+      if (name && VALID_FALLBACK_TOOLS.has(name)) {
+        toolCalls.push({
+          id: `fallback_${Date.now()}_${toolCalls.length}`,
+          type: "function",
+          function: {
+            name,
+            arguments: typeof args === "string" ? args : JSON.stringify(args),
+          },
+        });
+      }
+    } catch {}
+  }
+  if (toolCalls.length > 0) return toolCalls;
+
+  // Pattern 2: ```json { "name" / "tool": "write", "arguments" / "parameters": { ... } } ```
+  const codeBlockRegex = /```(?:json)?\s*(\{[\s\S]*?\})\s*```/gi;
+  let blockMatch: RegExpExecArray | null;
+  while ((blockMatch = codeBlockRegex.exec(content)) !== null) {
+    try {
+      const parsed = JSON.parse(blockMatch[1].trim());
+      const name = (parsed.name || parsed.tool || (parsed.action === "command" ? "bash" : "")).toLowerCase();
+      if (name && VALID_FALLBACK_TOOLS.has(name)) {
+        const args = parsed.arguments || parsed.parameters || parsed.args || parsed.input || {};
+        toolCalls.push({
+          id: `fallback_${Date.now()}_${toolCalls.length}`,
+          type: "function",
+          function: {
+            name,
+            arguments: typeof args === "string" ? args : JSON.stringify(args),
+          },
+        });
+      }
+    } catch {}
+  }
+  if (toolCalls.length > 0) return toolCalls;
+
+  // Pattern 3: Standalone JSON object containing tool name and arguments/path/command
+  const standaloneMatch = content.match(/\{\s*"(?:name|tool)"\s*:\s*"([a-zA-Z0-9_-]+)"\s*,\s*"(?:arguments|parameters|path|command)"[\s\S]*?\}/);
+  if (standaloneMatch) {
+    try {
+      const parsed = JSON.parse(standaloneMatch[0].trim());
+      const name = (parsed.name || parsed.tool || "").toLowerCase();
+      if (VALID_FALLBACK_TOOLS.has(name)) {
+        let args = parsed.arguments || parsed.parameters || parsed.args;
+        if (!args) {
+          const { name: _n, tool: _t, ...rest } = parsed;
+          args = rest;
+        }
+        toolCalls.push({
+          id: `fallback_${Date.now()}_${toolCalls.length}`,
+          type: "function",
+          function: {
+            name,
+            arguments: typeof args === "string" ? args : JSON.stringify(args),
+          },
+        });
+      }
+    } catch {}
+  }
+
+  return toolCalls;
+}
+
+// ---------------------------------------------------------------------------
+// Context Compaction for Long Horizon Tasks
+// ---------------------------------------------------------------------------
+
+export function compactHistoryForContext(
+  messages: AgentMessage[],
+  preserveRecentCount = 4
+): AgentMessage[] {
+  if (!messages || messages.length <= preserveRecentCount) {
+    return messages;
+  }
+
+  const cutoffIndex = messages.length - preserveRecentCount;
+
+  // Identify the latest user message index
+  let latestUserIndex = -1;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role === "user") {
+      latestUserIndex = i;
+      break;
+    }
+  }
+
+  return messages.map((m, index) => {
+    if (index >= cutoffIndex) {
+      return m;
+    }
+
+    const compacted: AgentMessage = { ...m };
+
+    // 1. Compact older USER messages (e.g. from previous completed tasks in the same session)
+    if (
+      compacted.role === "user" &&
+      index !== latestUserIndex &&
+      typeof compacted.content === "string" &&
+      compacted.content.length > 800
+    ) {
+      const originalLen = compacted.content.length;
+      const head = compacted.content.slice(0, 300);
+      const tail = compacted.content.slice(-150);
+      compacted.content = `${head}\n\n... [Prior task instructions: ${originalLen} characters compacted for context optimization] ...\n\n${tail}`;
+    }
+
+    // 2. Compact older tool result messages with large text outputs (> 800 chars)
+    if (compacted.role === "tool" && typeof compacted.content === "string" && compacted.content.length > 800) {
+      const originalLen = compacted.content.length;
+      const head = compacted.content.slice(0, 400);
+      const tail = compacted.content.slice(-300);
+      compacted.content = `${head}\n\n... [Tool output: ${originalLen} characters compacted for context optimization] ...\n\n${tail}`;
+    }
+
+    // 3. Prune older assistant reasoning (older turns don't need 10,000+ chars of old thinking)
+    if (compacted.role === "assistant" && typeof compacted.thinking === "string") {
+      if (compacted.thinking.length > 400) {
+        const originalLen = compacted.thinking.length;
+        const head = compacted.thinking.slice(0, 350);
+        compacted.thinking = `${head}\n... [Prior reasoning: ${originalLen} chars compacted]`;
+      }
+    }
+
+    // 4. Compact older assistant responses if very large (> 1000 chars)
+    if (compacted.role === "assistant" && typeof compacted.content === "string" && compacted.content.length > 1000) {
+      const originalLen = compacted.content.length;
+      const head = compacted.content.slice(0, 400);
+      const tail = compacted.content.slice(-200);
+      compacted.content = `${head}\n\n... [Prior assistant response: ${originalLen} chars compacted] ...\n\n${tail}`;
+    }
+
+    return compacted;
+  });
+}
+
 function buildConstSystemPrompt(workspacePath: string, customPrompt?: string): string {
   if (customPrompt) return customPrompt;
 
@@ -70,10 +323,18 @@ Available tools:
 - grep: Search file contents for regex or text patterns across files in the workspace.
 - mkdir: Explicitly create a new directory or folder structure recursively.
 
+
+CRITICAL CODE GENERATION & TOOL CALLING PROTOCOL:
+- When the user asks you to create or modify code, files, or applications (e.g. "buat web", "buat index.html", "create file"):
+  You MUST call the 'write' tool (or 'edit' for changes) to write the code directly to disk.
+- NEVER output large code files, HTML, CSS, JavaScript, SVG paths, or implementation pseudocode directly into conversational chat text tokens.
+- Conversational chat text is strictly reserved for brief explanations or final summaries AFTER files have been written with tools.
+- Outputting file code in conversational text will cause token truncation and task failure. Always invoke 'write' with the complete code!
+
 GENERAL WORKFLOW & TOOL GUIDELINES:
 - When asked to create new folders or directories (e.g. "buat folder", "mkdir", "create directory"):
   Use 'mkdir' to create the directory directly, or use 'write' to create files inside the intended directory path.
-- Use 'ls', 'find', and 'grep' for file exploration, project discovery, and locating relevant code.
+- Use 'ls', 'find', and 'grep' for file exploration, project discovery, and locating relevant code inside the workspace.
 - Use 'read' to inspect existing files before editing them.
 - Use 'edit' for surgical modifications to existing files. Provide exact matching old_content.
 - Use 'write' for creating new files or complete rewrites.
@@ -87,6 +348,91 @@ CRITICAL LOOP PREVENTION & ERROR RECOVERY PROTOCOL:
   2. If 'edit' fails because 'old_content' was not found, call 'read' immediately to inspect the latest file content and exact lines before attempting another edit.
   3. If 'bash' fails with exit code != 0, examine stderr/stdout carefully to understand why it failed before trying an alternative fix.
   4. If an operation is blocked or impossible, explain the blocker clearly to the user rather than repeating failing tool calls.${projectContext ? `\n\n<project_context>${projectContext}</project_context>` : ""}`;
+}
+
+// ---------------------------------------------------------------------------
+// Resilient Fetch with Exponential Backoff & Keep-Alive Recovery
+// ---------------------------------------------------------------------------
+
+interface FetchRetryOptions {
+  maxRetries?: number;
+  initialDelayMs?: number;
+  maxDelayMs?: number;
+  signal?: AbortSignal;
+  onRetry?: (attempt: number, maxRetries: number, reason: string) => void;
+}
+
+async function fetchWithRetry(
+  url: string,
+  init: RequestInit,
+  options: FetchRetryOptions = {}
+): Promise<Response> {
+  const maxRetries = options.maxRetries ?? 4;
+  const initialDelayMs = options.initialDelayMs ?? 1000;
+  const maxDelayMs = options.maxDelayMs ?? 6000;
+  const signal = options.signal;
+
+  let attempt = 0;
+  while (true) {
+    if (signal?.aborted) {
+      throw new DOMException("The operation was aborted.", "AbortError");
+    }
+
+    try {
+      const response = await fetch(url, {
+        ...init,
+        signal,
+      });
+
+      // Transient HTTP errors: 429 (Rate limit) or 5xx server errors
+      const isTransientHttp =
+        response.status === 429 ||
+        response.status === 500 ||
+        response.status === 502 ||
+        response.status === 503 ||
+        response.status === 504 ||
+        response.status === 529;
+
+      if (isTransientHttp && attempt < maxRetries) {
+        attempt++;
+        let delayMs = Math.min(initialDelayMs * Math.pow(2, attempt - 1), maxDelayMs);
+        const retryAfter = response.headers.get("retry-after");
+        if (retryAfter) {
+          const parsed = parseInt(retryAfter, 10);
+          if (!isNaN(parsed) && parsed > 0 && parsed <= 15) {
+            delayMs = parsed * 1000;
+          }
+        }
+        delayMs += Math.floor(Math.random() * 300);
+
+        const reason = `Server returned HTTP ${response.status} (${response.statusText || "Transient error"})`;
+        options.onRetry?.(attempt, maxRetries, reason);
+
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+        continue;
+      }
+
+      return response;
+    } catch (err: any) {
+      if (signal?.aborted || err.name === "AbortError") {
+        throw err;
+      }
+
+      if (attempt < maxRetries) {
+        attempt++;
+        const delayMs =
+          Math.min(initialDelayMs * Math.pow(2, attempt - 1), maxDelayMs) +
+          Math.floor(Math.random() * 300);
+        const reason = err.message || "Network connection failed";
+        options.onRetry?.(attempt, maxRetries, reason);
+
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+        continue;
+      }
+
+      throw err;
+    }
+  }
 }
 
 export class ConstAgent {
@@ -129,6 +475,7 @@ export class ConstAgent {
     const conversationHistory: AgentMessage[] = [...messages];
     let currentTurn = 0;
     let consecutiveStreamRetries = 0;
+    let consecutivePlanningTurns = 0;
     const maxTurns = this.config.maxTurns || 200;
     const workspacePath = this.config.workspacePath || process.cwd();
     const toolCallHistory: Array<{ name: string; argsHash: string; isError: boolean }> = [];
@@ -148,12 +495,20 @@ export class ConstAgent {
           this.config.systemPrompt
         );
 
+        let effectiveSystemPrompt = systemPrompt;
+        if (consecutivePlanningTurns >= 2) {
+          effectiveSystemPrompt +=
+            "\n\n[CRITICAL DIRECTIVE: You have completed all initial planning and analysis. You are REQUIRED to invoke tools now ('write', 'edit', 'bash', etc.) to make concrete file modifications. Do not output conversational planning without tool calls.]";
+        }
+
+        const historyForContext = compactHistoryForContext(conversationHistory);
+
         const formattedMessages = [
           {
             role: "system",
-            content: systemPrompt,
+            content: effectiveSystemPrompt,
           },
-          ...conversationHistory.map((m) => {
+          ...historyForContext.map((m, mIdx) => {
             const item: Record<string, any> = {
               role: m.role,
               content: m.content ?? "",
@@ -162,7 +517,11 @@ export class ConstAgent {
               item.reasoning_content = m.thinking;
             }
             if (m.name) item.name = m.name;
-            if (m.tool_call_id) item.tool_call_id = m.tool_call_id;
+            if (m.role === "tool") {
+              item.tool_call_id = m.tool_call_id || `call_tool_${mIdx}`;
+            } else if (m.tool_call_id) {
+              item.tool_call_id = m.tool_call_id;
+            }
             if (m.tool_calls && m.tool_calls.length > 0) {
               item.tool_calls = m.tool_calls;
               // If assistant made tool calls and content is empty, pass null for OpenAPI compatibility
@@ -188,28 +547,41 @@ export class ConstAgent {
           this.config.maxTokens ??
           (is128kModel ? 128000 : DEFAULT_MAX_OUTPUT_TOKENS);
 
-        const response = await fetch(endpoint, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(this.config.apiKey ? { Authorization: `Bearer ${this.config.apiKey}` } : {}),
+        const response = await fetchWithRetry(
+          endpoint,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...(this.config.apiKey ? { Authorization: `Bearer ${this.config.apiKey}` } : {}),
+            },
+            body: JSON.stringify({
+              model: this.config.model,
+              messages: formattedMessages,
+              tools: CONST_DEFAULT_TOOLS,
+              stream: true,
+              max_tokens: resolvedMaxTokens,
+              max_completion_tokens: resolvedMaxTokens,
+              ...(this.config.thinkingLevel && this.config.thinkingLevel !== "off"
+                ? {
+                    reasoning: this.config.thinkingLevel,
+                    reasoning_effort: this.config.thinkingLevel,
+                  }
+                : {}),
+            }),
           },
-          body: JSON.stringify({
-            model: this.config.model,
-            messages: formattedMessages,
-            tools: CONST_DEFAULT_TOOLS,
-            stream: true,
-            max_tokens: resolvedMaxTokens,
-            max_completion_tokens: resolvedMaxTokens,
-            ...(this.config.thinkingLevel && this.config.thinkingLevel !== "off"
-              ? {
-                  reasoning: this.config.thinkingLevel,
-                  reasoning_effort: this.config.thinkingLevel,
-                }
-              : {}),
-          }),
-          signal,
-        });
+          {
+            signal,
+            maxRetries: 4,
+            onRetry: (attempt, maxRetries, reason) => {
+              onEvent({
+                type: "status",
+                status: "thinking",
+                message: `Connection interrupted (${reason}). Reconnecting (attempt ${attempt}/${maxRetries})...`,
+              });
+            },
+          }
+        );
 
         if (!response.ok) {
           const rawErr = await response.text().catch(() => "Unknown error");
@@ -226,10 +598,12 @@ export class ConstAgent {
           if (
             cleanMessage.includes("<!DOCTYPE") ||
             cleanMessage.includes("<html") ||
-            response.status === 502
+            response.status === 502 ||
+            response.status === 503 ||
+            response.status === 504
           ) {
             cleanMessage =
-              "Const Engine server is offline or unreachable (502 Bad Gateway).";
+              `Const Engine server gateway error (${response.status}). Upstream connection timed out or is temporarily unreachable.`;
           }
 
           throw new Error(`Const error (${response.status}): ${cleanMessage}`);
@@ -247,73 +621,100 @@ export class ConstAgent {
         let turnFinishReason: string | null = null;
         let hasReceivedAnyData = false;
         let hasCleanDone = false;
+        const streamFilter = new ThinkingStreamFilter();
         const toolCallsMap: Map<number, { id: string; name: string; arguments: string }> = new Map();
 
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
 
-          hasReceivedAnyData = true;
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split("\n");
-          buffer = lines.pop() || "";
+            hasReceivedAnyData = true;
+            buffer += decoder.decode(value, { stream: true });
+            const lines = buffer.split("\n");
+            buffer = lines.pop() || "";
 
-          for (const line of lines) {
-            const trimmed = line.trim();
-            if (!trimmed.startsWith("data:")) continue;
-            const dataStr = trimmed.slice(5).trim();
-            if (dataStr === "[DONE]") {
-              hasCleanDone = true;
-              continue;
-            }
-
-            try {
-              const json = JSON.parse(dataStr);
-              const choice = json.choices?.[0];
-              if (choice?.finish_reason) {
-                turnFinishReason = choice.finish_reason;
+            for (const line of lines) {
+              const trimmed = line.trim();
+              if (!trimmed.startsWith("data:")) continue;
+              const dataStr = trimmed.slice(5).trim();
+              if (dataStr === "[DONE]") {
                 hasCleanDone = true;
+                continue;
               }
 
-              const delta = choice?.delta || choice?.message;
-              if (!delta) continue;
+              try {
+                const json = JSON.parse(dataStr);
+                const choice = json.choices?.[0];
+                if (choice?.finish_reason) {
+                  turnFinishReason = choice.finish_reason;
+                  hasCleanDone = true;
+                }
 
-              const reasoningDelta =
-                delta.reasoning_content ||
-                delta.reasoning ||
-                delta.thought ||
-                (typeof delta.thinking === "string" ? delta.thinking : "");
-              if (reasoningDelta) {
-                turnThinking += reasoningDelta;
-                onEvent({ type: "thinking", thinking: reasoningDelta });
-              }
+                const delta = choice?.delta || choice?.message;
+                if (!delta) continue;
 
-              if (delta.content) {
-                turnContent += delta.content;
-                onEvent({ type: "token", token: delta.content });
-              }
+                const reasoningDelta =
+                  delta.reasoning_content ||
+                  delta.reasoning ||
+                  delta.thought ||
+                  (typeof delta.thinking === "string" ? delta.thinking : "");
+                if (reasoningDelta) {
+                  turnThinking += reasoningDelta;
+                  onEvent({ type: "thinking", thinking: reasoningDelta });
+                }
 
-              if (delta.tool_calls && Array.isArray(delta.tool_calls)) {
-                for (const tc of delta.tool_calls) {
-                  const idx = tc.index ?? 0;
-                  if (!toolCallsMap.has(idx)) {
-                    toolCallsMap.set(idx, {
-                      id: tc.id || `call_${Date.now()}_${idx}`,
-                      name: tc.function?.name || "",
-                      arguments: tc.function?.arguments || "",
-                    });
-                  } else {
-                    const c = toolCallsMap.get(idx)!;
-                    if (tc.id) c.id = tc.id;
-                    if (tc.function?.name) c.name += tc.function.name;
-                    if (tc.function?.arguments) c.arguments += tc.function.arguments;
+                if (delta.content) {
+                  const filtered = streamFilter.push(delta.content);
+                  if (filtered.thinking) {
+                    turnThinking += filtered.thinking;
+                    onEvent({ type: "thinking", thinking: filtered.thinking });
+                  }
+                  if (filtered.content) {
+                    turnContent += filtered.content;
+                    onEvent({ type: "token", token: filtered.content });
                   }
                 }
+
+                if (delta.tool_calls && Array.isArray(delta.tool_calls)) {
+                  for (const tc of delta.tool_calls) {
+                    const idx = tc.index ?? 0;
+                    if (!toolCallsMap.has(idx)) {
+                      toolCallsMap.set(idx, {
+                        id: tc.id || `call_${Date.now()}_${idx}`,
+                        name: tc.function?.name || "",
+                        arguments: tc.function?.arguments || "",
+                      });
+                    } else {
+                      const c = toolCallsMap.get(idx)!;
+                      if (tc.id) c.id = tc.id;
+                      if (tc.function?.name) c.name += tc.function.name;
+                      if (tc.function?.arguments) c.arguments += tc.function.arguments;
+                    }
+                  }
+                }
+              } catch {
+                // ignore
               }
-            } catch {
-              // ignore
             }
           }
+        } catch (streamErr: any) {
+          if (signal?.aborted || streamErr.name === "AbortError") {
+            throw streamErr;
+          }
+          if (consecutiveStreamRetries < 3) {
+            consecutiveStreamRetries++;
+            currentTurn--;
+            const backoffMs = Math.min(1000 * Math.pow(2, consecutiveStreamRetries - 1), 4000);
+            onEvent({
+              type: "status",
+              status: "thinking",
+              message: `Stream read interrupted (${streamErr.message || "connection drop"}). Reconnecting turn (attempt ${consecutiveStreamRetries}/3 in ${backoffMs / 1000}s)...`,
+            });
+            await new Promise((resolve) => setTimeout(resolve, backoffMs));
+            continue;
+          }
+          throw streamErr;
         }
 
         // Process any trailing data remaining in buffer
@@ -330,9 +731,25 @@ export class ConstAgent {
               }
               const delta = choice?.delta || choice?.message;
               if (delta) {
+                const reasoningDelta =
+                  delta.reasoning_content ||
+                  delta.reasoning ||
+                  delta.thought ||
+                  (typeof delta.thinking === "string" ? delta.thinking : "");
+                if (reasoningDelta) {
+                  turnThinking += reasoningDelta;
+                  onEvent({ type: "thinking", thinking: reasoningDelta });
+                }
                 if (delta.content) {
-                  turnContent += delta.content;
-                  onEvent({ type: "token", token: delta.content });
+                  const filtered = streamFilter.push(delta.content);
+                  if (filtered.thinking) {
+                    turnThinking += filtered.thinking;
+                    onEvent({ type: "thinking", thinking: filtered.thinking });
+                  }
+                  if (filtered.content) {
+                    turnContent += filtered.content;
+                    onEvent({ type: "token", token: filtered.content });
+                  }
                 }
                 if (delta.tool_calls && Array.isArray(delta.tool_calls)) {
                   for (const tc of delta.tool_calls) {
@@ -354,6 +771,17 @@ export class ConstAgent {
               }
             } catch {}
           }
+        }
+
+        // Flush any remaining buffered tokens from streamFilter
+        const flushed = streamFilter.flush();
+        if (flushed.thinking) {
+          turnThinking += flushed.thinking;
+          onEvent({ type: "thinking", thinking: flushed.thinking });
+        }
+        if (flushed.content) {
+          turnContent += flushed.content;
+          onEvent({ type: "token", token: flushed.content });
         }
 
         const toolCalls: ToolCall[] = Array.from(toolCallsMap.values())
@@ -387,39 +815,75 @@ export class ConstAgent {
             };
           });
 
+        // Fallback Tool Call Extraction: Recover tool calls from markdown code blocks or text
+        if (toolCalls.length === 0 && turnContent) {
+          const fallback = extractFallbackToolCalls(turnContent);
+          if (fallback.length > 0) {
+            toolCalls.push(...fallback);
+            turnContent = turnContent.replace(/```(?:json)?\s*\{[\s\S]*?\}\s*```/gi, "").trim();
+          }
+        }
+
         // Handle case where model paused after thinking without emitting tool calls or content
         if (toolCalls.length === 0 && !turnContent) {
           // If no content, no thinking, and no tool calls arrived, check if it's an abrupt stream drop
-          if (!turnThinking && !hasReceivedAnyData && consecutiveStreamRetries < 2) {
+          if (!turnThinking && !hasReceivedAnyData && consecutiveStreamRetries < 3) {
             consecutiveStreamRetries++;
             currentTurn--; // Don't consume a turn on connection drop
+            const backoffMs = Math.min(1000 * Math.pow(2, consecutiveStreamRetries - 1), 4000);
             onEvent({
               type: "status",
               status: "thinking",
-              message: `Stream connection refreshed. Reconnecting (attempt ${consecutiveStreamRetries}/2)...`,
+              message: `Stream connection interrupted. Reconnecting (attempt ${consecutiveStreamRetries}/3 in ${backoffMs / 1000}s)...`,
             });
-            await new Promise((resolve) => setTimeout(resolve, 800));
+            await new Promise((resolve) => setTimeout(resolve, backoffMs));
             continue;
           }
 
+          // If stream closed with zero data received across all retry attempts, report error instead of done
+          if (!turnThinking && !hasReceivedAnyData) {
+            const timeoutErrMsg =
+              "Connection to model provider timed out or dropped with no response. Please verify network connectivity and retry.";
+            onEvent({ type: "error", error: timeoutErrMsg });
+            onEvent({ type: "status", status: "error", message: timeoutErrMsg });
+            conversationHistory.push({
+              role: "assistant",
+              content: timeoutErrMsg,
+              timestamp: Date.now(),
+            });
+            return conversationHistory;
+          }
+
           if (turnThinking && currentTurn < maxTurns) {
+            consecutivePlanningTurns++;
             // Model generated internal reasoning but paused before calling tools or outputting text.
             // Retain the native reasoning on the assistant message so the multi-turn context
             // is preserved natively with reasoning_content without synthetic text pollution.
             const thinkingStepMsg: AgentMessage = {
               role: "assistant",
-              content: "",
+              content: "I have analyzed the workspace requirements and completed the implementation plan. Proceeding now to invoke the required tool calls.",
               thinking: turnThinking,
               timestamp: Date.now(),
             };
             conversationHistory.push(thinkingStepMsg);
-            conversationHistory.push({
-              role: "user",
-              content:
-                turnFinishReason === "length"
-                  ? "Output token limit reached during planning. Without further reasoning, immediately invoke the required tool call (such as 'write' or 'edit')."
-                  : "Proceed immediately with the required tool calls (e.g. 'write' or 'edit') based on your analysis to complete the task.",
-            });
+
+            // Avoid accumulating duplicate user transition prompts
+            const lastUserMsg = [...conversationHistory].reverse().find((m) => m.role === "user");
+            const isAlreadyPrompted =
+              lastUserMsg &&
+              (lastUserMsg.content.includes("tool call") || lastUserMsg.content.includes("Output token limit"));
+
+            if (!isAlreadyPrompted) {
+              conversationHistory.push({
+                role: "user",
+                content:
+                  turnFinishReason === "length"
+                    ? "Output token limit reached during planning. Without further reasoning, immediately invoke the required tool call (such as 'write' or 'edit')."
+                    : "Proceed immediately with the required tool calls (e.g. 'write' or 'edit') based on your analysis to complete the task.",
+                timestamp: Date.now(),
+              });
+            }
+
             onEvent({
               type: "status",
               status: "thinking",
@@ -443,16 +907,47 @@ export class ConstAgent {
           consecutiveStreamRetries = 0;
         }
 
-        const assistantMsg: AgentMessage = {
-          role: "assistant",
-          content: turnContent,
-          thinking: turnThinking || undefined,
-          tool_calls: toolCalls.length > 0 ? toolCalls : undefined,
-          timestamp: Date.now(),
-        };
-        conversationHistory.push(assistantMsg);
+        if (toolCalls.length > 0) {
+          consecutivePlanningTurns = 0;
+        }
 
         if (toolCalls.length === 0) {
+          if (turnFinishReason === "length" && currentTurn < maxTurns) {
+            // Response was truncated mid-turn while planning or drafting code!
+            // Retract streaming tokens from the UI so partial draft doesn't pollute the chat card
+            onEvent({ type: "token_reset" });
+
+            // Preserve the draft inside thinking so the model retains its reasoning context
+            const combinedThinking = (turnThinking ? turnThinking + "\n\n" : "") + turnContent;
+            conversationHistory.push({
+              role: "assistant",
+              content: "",
+              thinking: combinedThinking,
+              timestamp: Date.now(),
+            });
+
+            conversationHistory.push({
+              role: "user",
+              content: "Proceed immediately by invoking the required tool (such as 'write' or 'edit') to save the file.",
+              timestamp: Date.now(),
+            });
+
+            onEvent({
+              type: "status",
+              status: "thinking",
+              message: "Output reached token limit during draft. Directing model to execute tool calls...",
+            });
+            continue;
+          }
+
+          const assistantMsg: AgentMessage = {
+            role: "assistant",
+            content: turnContent,
+            thinking: turnThinking || undefined,
+            timestamp: Date.now(),
+          };
+          conversationHistory.push(assistantMsg);
+
           onEvent({
             type: "done",
             fullContent: turnContent,
@@ -461,6 +956,15 @@ export class ConstAgent {
           onEvent({ type: "status", status: "done" });
           return conversationHistory;
         }
+
+        const assistantMsg: AgentMessage = {
+          role: "assistant",
+          content: turnContent,
+          thinking: turnThinking || undefined,
+          tool_calls: toolCalls,
+          timestamp: Date.now(),
+        };
+        conversationHistory.push(assistantMsg);
 
         // Emit tool calls and execute native tools
         onEvent({
@@ -597,8 +1101,9 @@ export class ConstAgent {
 
       return conversationHistory;
     } catch (err: any) {
-      if (err.name === "AbortError") {
-        onEvent({ type: "status", status: "idle", message: "Dibatalkan" });
+      if (err.name === "AbortError" || signal?.aborted) {
+        onEvent({ type: "error", error: "User cancelled agent execution." });
+        onEvent({ type: "status", status: "idle", message: "User cancelled agent execution." });
       } else {
         onEvent({ type: "error", error: err.message });
         onEvent({ type: "status", status: "error", message: err.message });

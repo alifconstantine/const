@@ -36,6 +36,123 @@ export function isScheduledTaskConversation(convo?: {
   return false;
 }
 
+export function normalizeUiMessages(rawMessages: any[]): any[] {
+  if (!Array.isArray(rawMessages) || rawMessages.length === 0) return [];
+
+  const hasToolRole = rawMessages.some((m) => m && m.role === "tool");
+  if (!hasToolRole) {
+    return rawMessages;
+  }
+
+  const normalized: any[] = [];
+  let currentAssistant: any = null;
+
+  for (let i = 0; i < rawMessages.length; i++) {
+    const msg = rawMessages[i];
+    if (!msg) continue;
+
+    if (msg.role === "user") {
+      if (currentAssistant) {
+        normalized.push(currentAssistant);
+        currentAssistant = null;
+      }
+      normalized.push(msg);
+    } else if (msg.role === "assistant") {
+      if (!currentAssistant) {
+        currentAssistant = {
+          id: msg.id || `msg_${msg.timestamp || Date.now()}_assistant`,
+          role: "assistant",
+          content: msg.content || "",
+          thinking: msg.thinking || "",
+          traceSteps: Array.isArray(msg.traceSteps) ? [...msg.traceSteps] : [],
+          toolCalls: Array.isArray(msg.toolCalls) ? [...msg.toolCalls] : [],
+          mutations: Array.isArray(msg.mutations) ? [...msg.mutations] : [],
+          durationMs: msg.durationMs,
+          timestamp: msg.timestamp || msg.createdAt || Date.now(),
+        };
+      } else {
+        if (msg.content) {
+          currentAssistant.content = currentAssistant.content
+            ? `${currentAssistant.content}\n\n${msg.content}`
+            : msg.content;
+        }
+        if (msg.thinking) {
+          currentAssistant.thinking = (currentAssistant.thinking || "") + msg.thinking;
+        }
+        if (Array.isArray(msg.traceSteps)) {
+          currentAssistant.traceSteps.push(...msg.traceSteps);
+        }
+        if (msg.durationMs) {
+          currentAssistant.durationMs = (currentAssistant.durationMs || 0) + msg.durationMs;
+        }
+      }
+
+      // Handle raw assistant tool_calls from LLM API format
+      if (Array.isArray(msg.tool_calls)) {
+        for (const tc of msg.tool_calls) {
+          const fn = tc.function || tc;
+          const callId = tc.id || `call_${Date.now()}`;
+          let parsedArgs = fn.arguments;
+          try {
+            if (typeof parsedArgs === "string") parsedArgs = JSON.parse(parsedArgs);
+          } catch {}
+          currentAssistant.toolCalls.push({
+            id: callId,
+            name: fn.name || "tool",
+            args: parsedArgs,
+          });
+          currentAssistant.traceSteps.push({
+            id: callId,
+            type: "tool",
+            toolCallId: callId,
+            name: fn.name || "tool",
+            args: parsedArgs,
+          });
+        }
+      }
+    } else if (msg.role === "tool") {
+      // Raw tool result message -> attach to current assistant's traceSteps
+      if (!currentAssistant) {
+        currentAssistant = {
+          id: `msg_${msg.timestamp || Date.now()}_assistant`,
+          role: "assistant",
+          content: "",
+          thinking: "",
+          traceSteps: [],
+          toolCalls: [],
+          mutations: [],
+          timestamp: msg.timestamp || msg.createdAt || Date.now(),
+        };
+      }
+      const toolId = msg.tool_call_id || msg.id;
+      const existingStep = currentAssistant.traceSteps.find(
+        (st: any) => st.type === "tool" && (st.toolCallId === toolId || st.id === toolId)
+      );
+      if (existingStep) {
+        existingStep.result = msg.content;
+      } else {
+        currentAssistant.traceSteps.push({
+          id: toolId || `tool_${Date.now()}_${currentAssistant.traceSteps.length}`,
+          type: "tool",
+          toolCallId: toolId,
+          name: msg.name || "tool",
+          result: msg.content,
+        });
+      }
+      const existingCall = currentAssistant.toolCalls.find((tc: any) => tc.id === toolId);
+      if (existingCall) {
+        existingCall.result = msg.content;
+      }
+    }
+  }
+
+  if (currentAssistant) {
+    normalized.push(currentAssistant);
+  }
+
+  return normalized;
+}
+
 const STORAGE_KEY = "const_harness_conversations";
 let cachedConversations: ConversationItem[] | null = null;
 
@@ -48,6 +165,7 @@ export function loadConversations(): ConversationItem[] {
     ...c,
     title: getCleanConversationTitle(c.title),
     isScheduled: isScheduledTaskConversation(c),
+    messages: normalizeUiMessages(c.messages || []),
   });
 
   const sortFn = (a: ConversationItem, b: ConversationItem) => {
@@ -95,9 +213,15 @@ export async function initConversationStore(): Promise<ConversationItem[]> {
       // Load fresh list from SQLite disk database
       const diskList = await window.electron.listConversations(false);
       if (Array.isArray(diskList)) {
-        cachedConversations = diskList;
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(diskList));
-        return diskList;
+        const normalized = diskList.map((c) => ({
+          ...c,
+          title: getCleanConversationTitle(c.title),
+          isScheduled: isScheduledTaskConversation(c),
+          messages: normalizeUiMessages(c.messages || []),
+        }));
+        cachedConversations = normalized;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
+        return normalized;
       }
     }
   } catch (err) {
@@ -114,9 +238,15 @@ export async function refreshConversationsFromDisk(): Promise<ConversationItem[]
     try {
       const diskList = await window.electron.listConversations(false);
       if (Array.isArray(diskList)) {
-        cachedConversations = diskList;
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(diskList));
-        return diskList;
+        const normalized = diskList.map((c) => ({
+          ...c,
+          title: getCleanConversationTitle(c.title),
+          isScheduled: isScheduledTaskConversation(c),
+          messages: normalizeUiMessages(c.messages || []),
+        }));
+        cachedConversations = normalized;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(normalized));
+        return normalized;
       }
     } catch (err) {
       console.warn("[ConversationStore] Disk refresh error:", err);

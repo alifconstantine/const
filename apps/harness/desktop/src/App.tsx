@@ -10,6 +10,7 @@ import {
   ThumbsDown,
   Play,
   FileText,
+  ArrowDown,
 } from "lucide-react";
 import { ConstLogoIcon, Button, toast, ScrollArea, cn } from "@const/ui";
 import { useQuery } from "convex/react";
@@ -49,6 +50,7 @@ import {
   refreshConversationsFromDisk,
   generateFallbackTitle,
   generateAiTitle,
+  normalizeUiMessages,
   type ConversationItem,
 } from "./lib/conversation-store";
 import type { FileMutationRecord, TraceStep } from "./vite-env";
@@ -149,12 +151,15 @@ function AuthenticatedContent({
         const refreshed = await refreshConversationsFromDisk();
         setConversations(refreshed);
 
-        // If the changed conversation is currently open, reload its messages
+        // If the changed conversation is currently open, reload its messages ONLY if not currently executing
         if (data?.conversationId && data.conversationId === conversationIdRef.current) {
+          if (runningConvoIdsRef.current.has(data.conversationId)) {
+            return;
+          }
           if (window.electron?.getConversation) {
             const activeConvo = await window.electron.getConversation(data.conversationId);
             if (activeConvo && activeConvo.messages) {
-              setMessages(activeConvo.messages as any);
+              setMessages(normalizeUiMessages(activeConvo.messages) as any);
             }
           }
         }
@@ -348,6 +353,10 @@ function AuthenticatedContent({
   }, [conversations]);
 
   const [runningConvoIds, setRunningConvoIds] = useState<Set<string>>(new Set());
+  const runningConvoIdsRef = React.useRef(runningConvoIds);
+  useEffect(() => {
+    runningConvoIdsRef.current = runningConvoIds;
+  }, [runningConvoIds]);
   const isExecuting = runningConvoIds.has(conversationId);
   const activeSessionMessagesRef = React.useRef<Map<string, ChatMessage[]>>(new Map());
   const executionStartTimeMapRef = React.useRef<Map<string, number>>(new Map());
@@ -595,10 +604,60 @@ function AuthenticatedContent({
     };
   }, [messages]);
 
-  // Auto scroll to bottom
+  // Smart auto-scroll: pause when user scrolls up, resume when user is near bottom
+  const isAutoScrollEnabledRef = useRef<boolean>(true);
+  const [showScrollBottomBtn, setShowScrollBottomBtn] = useState<boolean>(false);
+
   useEffect(() => {
-    if (messages.length > 0) {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const scrollContainer = chatScrollRef.current;
+    if (!scrollContainer) return;
+    const viewport = (scrollContainer.querySelector("[data-radix-scroll-area-viewport]") ||
+      scrollContainer) as HTMLElement;
+    if (!viewport) return;
+
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = viewport;
+      const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+      // If user is within 80px from bottom, auto-scroll is kept on
+      const isNearBottom = distanceFromBottom <= 80;
+      isAutoScrollEnabledRef.current = isNearBottom;
+      setShowScrollBottomBtn(!isNearBottom);
+    };
+
+    const handleWheel = (e: WheelEvent) => {
+      if (e.deltaY < 0) {
+        // User scrolled up with mousewheel -> immediately disable auto-scroll
+        isAutoScrollEnabledRef.current = false;
+        setShowScrollBottomBtn(true);
+      }
+    };
+
+    viewport.addEventListener("scroll", handleScroll, { passive: true });
+    viewport.addEventListener("wheel", handleWheel, { passive: true });
+    return () => {
+      viewport.removeEventListener("scroll", handleScroll);
+      viewport.removeEventListener("wheel", handleWheel);
+    };
+  }, [messages.length > 0]);
+
+  const scrollToBottom = () => {
+    isAutoScrollEnabledRef.current = true;
+    setShowScrollBottomBtn(false);
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  };
+
+  // Auto scroll to bottom only when enabled
+  useEffect(() => {
+    if (messages.length > 0 && isAutoScrollEnabledRef.current) {
+      const scrollContainer = chatScrollRef.current;
+      const viewport = (scrollContainer?.querySelector("[data-radix-scroll-area-viewport]") ||
+        scrollContainer) as HTMLElement | null;
+      if (viewport) {
+        // Direct scrollTop adjustment avoids browser smooth-scroll animation locks during streaming
+        viewport.scrollTop = viewport.scrollHeight;
+      } else {
+        messagesEndRef.current?.scrollIntoView({ behavior: "instant" as any });
+      }
     }
   }, [messages, isExecuting]);
 
@@ -658,9 +717,39 @@ function AuthenticatedContent({
           const lastIdx = targetMsgs.length - 1;
           const last = targetMsgs[lastIdx];
           if (last && last.role === "assistant") {
+            // Finalize any open thought step so ThoughtItem auto-closes and freezes duration
+            let steps = last.traceSteps;
+            if (steps && steps.length > 0) {
+              const lastStep = steps[steps.length - 1];
+              if (lastStep && lastStep.type === "thought" && lastStep.startTime && !lastStep.durationMs) {
+                steps = [...steps];
+                steps[steps.length - 1] = {
+                  ...lastStep,
+                  durationMs: Math.max(1000, Date.now() - lastStep.startTime),
+                };
+              }
+            }
             const updated: ChatMessage = {
               ...last,
               content: last.content + (event.token || ""),
+              traceSteps: steps,
+            };
+            targetMsgs = [...targetMsgs];
+            targetMsgs[lastIdx] = updated;
+          }
+        }
+        activeSessionMessagesRef.current.set(targetConvoId, targetMsgs);
+        if (targetConvoId === conversationIdRef.current) {
+          setMessages(targetMsgs);
+        }
+      } else if (event.type === "token_reset") {
+        if (targetMsgs.length > 0) {
+          const lastIdx = targetMsgs.length - 1;
+          const last = targetMsgs[lastIdx];
+          if (last && last.role === "assistant") {
+            const updated: ChatMessage = {
+              ...last,
+              content: "",
             };
             targetMsgs = [...targetMsgs];
             targetMsgs[lastIdx] = updated;
@@ -833,7 +922,7 @@ function AuthenticatedContent({
                 ...lastMsg,
                 id: lastMsg.id || `msg_${Date.now()}_assistant`,
                 role: "assistant",
-                content: curContent || event.fullContent || "",
+                content: event.fullContent || curContent || "",
                 durationMs: finalDuration,
                 traceSteps: steps,
               };
@@ -860,9 +949,72 @@ function AuthenticatedContent({
           next.delete(targetConvoId);
           return next;
         });
+
+        const startTime = executionStartTimeMapRef.current.get(targetConvoId);
+        const finalDuration = startTime ? Date.now() - startTime : undefined;
         executionStartTimeMapRef.current.delete(targetConvoId);
+
+        if (targetMsgs.length > 0) {
+          const lastIdx = targetMsgs.length - 1;
+          if (targetMsgs[lastIdx]?.role === "assistant") {
+            const lastMsg = targetMsgs[lastIdx];
+            const steps = (lastMsg.traceSteps || []).map((st) => {
+              if (st.type === "thought" && st.startTime && !st.durationMs) {
+                return {
+                  ...st,
+                  durationMs: Math.max(1000, Date.now() - st.startTime),
+                };
+              }
+              return st;
+            });
+
+            const errorText = event.error || "Agent execution stopped";
+            const isUserCancelled =
+              errorText.toLowerCase().includes("user cancelled") ||
+              errorText.toLowerCase().includes("abort");
+
+            let finalContent = lastMsg.content ? lastMsg.content.trim() : "";
+            if (!finalContent) {
+              finalContent = isUserCancelled ? "User cancelled agent execution." : errorText;
+            } else if (
+              !finalContent.includes(errorText) &&
+              !finalContent.includes("User cancelled")
+            ) {
+              finalContent = `${finalContent}\n\n${isUserCancelled ? "User cancelled agent execution." : errorText}`;
+            }
+
+            targetMsgs = [...targetMsgs];
+            targetMsgs[lastIdx] = {
+              ...lastMsg,
+              id: lastMsg.id || `msg_${Date.now()}_assistant`,
+              role: "assistant",
+              content: finalContent,
+              durationMs: finalDuration,
+              traceSteps: steps,
+            };
+          }
+        }
+
         activeSessionMessagesRef.current.delete(targetConvoId);
-        toast.error(event.error || "Agent execution error");
+
+        if (targetConvoId === conversationIdRef.current) {
+          setMessages(targetMsgs);
+        }
+
+        const stored = loadConversations();
+        const target = stored.find((c) => c.id === targetConvoId);
+        if (target) {
+          target.messages = targetMsgs;
+          target.updatedAt = Date.now();
+          saveConversation(target);
+          setConversations(loadConversations());
+        }
+
+        if (event.error?.toLowerCase().includes("user cancelled")) {
+          toast.info("Agent execution stopped");
+        } else {
+          toast.error(event.error || "Agent execution error");
+        }
       }
     });
 
@@ -1107,8 +1259,59 @@ function AuthenticatedContent({
       next.delete(idToAbort);
       return next;
     });
-    activeSessionMessagesRef.current.delete(idToAbort);
+
+    const startTime = executionStartTimeMapRef.current.get(idToAbort);
+    const finalDuration = startTime ? Date.now() - startTime : undefined;
     executionStartTimeMapRef.current.delete(idToAbort);
+
+    let sessionMsgs = activeSessionMessagesRef.current.get(idToAbort) || messagesRef.current;
+    if (sessionMsgs && sessionMsgs.length > 0) {
+      const lastIdx = sessionMsgs.length - 1;
+      const last = sessionMsgs[lastIdx];
+      if (last && last.role === "assistant") {
+        const steps = (last.traceSteps || []).map((st) => {
+          if (st.type === "thought" && st.startTime && !st.durationMs) {
+            return {
+              ...st,
+              durationMs: Math.max(1000, Date.now() - st.startTime),
+            };
+          }
+          return st;
+        });
+
+        const cancelNote = "User cancelled agent execution.";
+        const curContent = last.content ? last.content.trim() : "";
+        const finalContent = curContent
+          ? (curContent.includes(cancelNote) ? curContent : `${curContent}\n\n${cancelNote}`)
+          : cancelNote;
+
+        const updatedMsgs = [...sessionMsgs];
+        updatedMsgs[lastIdx] = {
+          ...last,
+          id: last.id || `msg_${Date.now()}_assistant`,
+          role: "assistant",
+          content: finalContent,
+          durationMs: finalDuration,
+          traceSteps: steps,
+        };
+        sessionMsgs = updatedMsgs;
+
+        if (idToAbort === conversationIdRef.current) {
+          setMessages(sessionMsgs);
+        }
+
+        const stored = loadConversations();
+        const target = stored.find((c) => c.id === idToAbort);
+        if (target) {
+          target.messages = sessionMsgs;
+          target.updatedAt = Date.now();
+          saveConversation(target);
+          setConversations(loadConversations());
+        }
+      }
+    }
+    activeSessionMessagesRef.current.delete(idToAbort);
+    toast.info("Agent execution stopped");
   };
 
   const handleNewChat = (targetProject?: string) => {
@@ -1151,7 +1354,7 @@ function AuthenticatedContent({
       setConversationId(target.id);
       setConversationTitle(target.title);
       setCurrentProject(target.project || "Outside Project");
-      setMessages(target.messages || []);
+      setMessages(normalizeUiMessages(target.messages || []));
       setEditingPrompt("");
     }
   };
@@ -1507,6 +1710,21 @@ function AuthenticatedContent({
                 <div ref={messagesEndRef} />
               </div>
             </ScrollArea>
+
+            {/* Floating Scroll to Bottom Button */}
+            {showScrollBottomBtn && (
+              <div className="absolute bottom-20 right-8 z-30 animate-in fade-in zoom-in-95 duration-150 pointer-events-auto">
+                <button
+                  type="button"
+                  onClick={scrollToBottom}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white dark:bg-[#252528] border border-[#e2e2e4] dark:border-[#383838] text-[#262626] dark:text-[#ececec] text-xs font-medium shadow-md hover:bg-[#f4f4f5] dark:hover:bg-[#2e2e32] transition-colors cursor-pointer select-none"
+                  title="Scroll to bottom"
+                >
+                  <ArrowDown className="w-3.5 h-3.5 text-[#e79737] dark:text-[#ff7a00]" />
+                  <span>Latest</span>
+                </button>
+              </div>
+            )}
 
             {/* Anchored Bottom Chat Input (No dividing line!) */}
             <div className="w-full px-3.5 sm:px-6 md:px-8 pb-4 pt-2 flex justify-center bg-[#f8f8f8] dark:bg-[#161616] shrink-0 min-w-0">

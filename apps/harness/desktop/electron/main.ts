@@ -746,6 +746,8 @@ app.whenReady().then(() => {
         // Auto-save to SQLite conversation database
         try {
           const existingConvo = conversationDb.getConversation(convoId);
+          // Preserve rich UI messages with traceSteps/durationMs if already present
+          const hasRichMessages = existingConvo?.messages && existingConvo.messages.length > 0;
           conversationDb.saveConversation({
             id: convoId,
             title: existingConvo?.title || "New Task",
@@ -753,7 +755,7 @@ app.whenReady().then(() => {
             model,
             updatedAt: Date.now(),
             createdAt: existingConvo?.createdAt || Date.now(),
-            messages: updatedMessages,
+            messages: hasRichMessages ? existingConvo.messages : updatedMessages,
           });
 
           // Notify renderer that conversations have changed
@@ -780,6 +782,34 @@ app.whenReady().then(() => {
       }
     }
   );
+
+  ipcMain.handle("agent:abort", async (_event, targetConvoId?: string) => {
+    if (targetConvoId) {
+      const session = activeSessions.get(targetConvoId);
+      if (session) {
+        session.agent.abort();
+        activeSessions.delete(targetConvoId);
+        if (win && !win.isDestroyed()) {
+          win.webContents.send("agent:session-ended", { conversationId: targetConvoId });
+        }
+        return { success: true };
+      }
+    } else {
+      for (const [id, session] of activeSessions.entries()) {
+        session.agent.abort();
+        if (win && !win.isDestroyed()) {
+          win.webContents.send("agent:session-ended", { conversationId: id });
+        }
+      }
+      activeSessions.clear();
+      return { success: true };
+    }
+    return { success: false, error: "No active session found" };
+  });
+
+  ipcMain.handle("agent:get-running-sessions", async () => {
+    return Array.from(activeSessions.keys());
+  });
 
   // Conversations Database IPC Handlers
   ipcMain.handle("conversations:list", async (_event, includeArchived?: boolean) => {
@@ -870,35 +900,6 @@ app.whenReady().then(() => {
     return true;
   });
 
-  ipcMain.handle("agent:abort", async (_event, conversationId?: string) => {
-    if (conversationId) {
-      const session = activeSessions.get(conversationId);
-      if (session) {
-        session.agent.abort();
-        activeSessions.delete(conversationId);
-        if (win && !win.isDestroyed()) {
-          win.webContents.send("agent:session-ended", { conversationId });
-        }
-        return true;
-      }
-      return false;
-    }
-
-    let abortedAny = false;
-    for (const [id, session] of activeSessions.entries()) {
-      session.agent.abort();
-      abortedAny = true;
-      if (win && !win.isDestroyed()) {
-        win.webContents.send("agent:session-ended", { conversationId: id });
-      }
-    }
-    activeSessions.clear();
-    return abortedAny;
-  });
-
-  ipcMain.handle("agent:get-running-sessions", async () => {
-    return Array.from(activeSessions.keys());
-  });
 
   // Rollback file mutation handler
   ipcMain.handle(

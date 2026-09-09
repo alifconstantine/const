@@ -130,4 +130,184 @@ describe("Const Agent Native Tools & Self-Healing Engine", () => {
     });
     expect(agent.maxTurns).toBe(200);
   });
+
+  it("filters thinking tags cleanly without leaking into output tokens", async () => {
+    const { ThinkingStreamFilter } = await import("../src/const/const-agent.js");
+    const filter = new ThinkingStreamFilter();
+
+    // Stream arrives in chunks that split tag boundaries
+    const chunks = ["Hello, <th", "ink>This is internal ", "step 1", "</thi", "nk> here is the output!"];
+    let content = "";
+    let thinking = "";
+
+    for (const chunk of chunks) {
+      const res = filter.push(chunk);
+      content += res.content;
+      thinking += res.thinking;
+    }
+    const flushed = filter.flush();
+    content += flushed.content;
+    thinking += flushed.thinking;
+
+    expect(content).toBe("Hello,  here is the output!");
+    expect(thinking).toBe("This is internal step 1");
+  });
+
+  it("extracts fallback tool calls from markdown code blocks and XML tags", async () => {
+    const { extractFallbackToolCalls } = await import("../src/const/const-agent.js");
+
+    const markdownCall = 'I will write the file:\n```json\n{\n  "name": "write",\n  "arguments": {\n    "path": "app.css",\n    "content": "body { margin: 0; }"\n  }\n}\n```';
+    const calls1 = extractFallbackToolCalls(markdownCall);
+    expect(calls1.length).toBe(1);
+    expect(calls1[0].function.name).toBe("write");
+    expect(JSON.parse(calls1[0].function.arguments).path).toBe("app.css");
+
+    const xmlCall = '<tool_call>{"name": "bash", "arguments": {"command": "pnpm build"}}</tool_call>';
+    const calls2 = extractFallbackToolCalls(xmlCall);
+    expect(calls2.length).toBe(1);
+    expect(calls2[0].function.name).toBe("bash");
+
+    const normalText = "This is just a helpful explanation with no tool calls.";
+    expect(extractFallbackToolCalls(normalText)).toEqual([]);
+  });
+
+  it("compacts older large tool outputs for long-horizon context optimization", async () => {
+    const { compactHistoryForContext } = await import("../src/const/const-agent.js");
+
+    const longOutput = "A".repeat(3000);
+    const history: any[] = [
+      { role: "user", content: "Init project" },
+      { role: "assistant", content: "Reading files", thinking: "T".repeat(3000) },
+      { role: "tool", tool_call_id: "c1", name: "read", content: longOutput },
+      { role: "assistant", content: "Second step" },
+      { role: "user", content: "Continue" },
+      { role: "assistant", content: "Recent step" },
+      { role: "tool", tool_call_id: "c2", name: "read", content: longOutput },
+      { role: "assistant", content: "Final answer" },
+    ];
+
+    // preserveRecentCount = 3 -> only the last 3 messages are untouched
+    const compacted = compactHistoryForContext(history, 3);
+    expect(compacted[2].content).toContain("[Tool output: 3000 characters compacted for context optimization]");
+    expect(compacted[1].thinking).toContain("[Prior reasoning: 3000 chars compacted]");
+    // Recent tool output at index 6 must NOT be truncated
+    expect(compacted[6].content).toBe(longOutput);
+  });
+
+  it("compacts older large user prompts from prior tasks while keeping the latest user prompt intact", async () => {
+    const { compactHistoryForContext } = await import("../src/const/const-agent.js");
+
+    const hugePriorUserPrompt = "Build a massive application with 100 features... ".repeat(100); // ~4900 chars
+    const currentTaskPrompt = "Now add a simple reset button";
+
+    const history: any[] = [
+      { role: "user", content: hugePriorUserPrompt },
+      { role: "assistant", content: "Done building initial application" },
+      { role: "user", content: currentTaskPrompt },
+      { role: "assistant", content: "Working on reset button..." },
+    ];
+
+    const compacted = compactHistoryForContext(history, 2);
+    // Older user prompt must be compacted
+    expect(compacted[0].content).toContain("[Prior task instructions:");
+    expect(compacted[0].content).toContain("characters compacted for context optimization]");
+    // Latest user prompt must NOT be compacted
+    expect(compacted[2].content).toBe(currentTaskPrompt);
+  });
+
+  it("allows native tools to access paths outside workspace when required", async () => {
+    const foreignDir = await fs.mkdtemp(path.join(os.tmpdir(), "foreign-test-"));
+    const foreignFile = path.join(foreignDir, "external.txt");
+    await fs.writeFile(foreignFile, "external project data", "utf-8");
+
+    try {
+      // 1. Reading foreign file outside workspace is allowed
+      const readRes = await executeNativeTool("read", { path: foreignFile }, tempDir);
+      expect(readRes.isError).toBe(false);
+      expect(readRes.result).toContain("external project data");
+
+      // 2. Writing foreign file outside workspace is allowed
+      const writePath = path.join(foreignDir, "written.txt");
+      const writeRes = await executeNativeTool(
+        "write",
+        { path: writePath, content: "written outside workspace" },
+        tempDir
+      );
+      expect(writeRes.isError).toBe(false);
+      expect(writeRes.result).toContain("File written successfully");
+
+      // 3. Listing directory outside workspace is allowed
+      const lsRes = await executeNativeTool("ls", { path: foreignDir }, tempDir);
+      expect(lsRes.isError).toBe(false);
+      expect(lsRes.result).toContain("external.txt");
+      expect(lsRes.result).toContain("written.txt");
+
+      // 4. Grep outside workspace is allowed
+      const grepRes = await executeNativeTool("grep", { path: foreignDir, query: "external" }, tempDir);
+      expect(grepRes.isError).toBe(false);
+      expect(grepRes.result).toContain("external.txt");
+    } finally {
+      await fs.rm(foreignDir, { recursive: true, force: true });
+    }
+  });
+
+  it("handles reasoning tags and orphan closing tags in ThinkingStreamFilter", async () => {
+    const { ThinkingStreamFilter } = await import("../src/const/const-agent.js");
+    const filter = new ThinkingStreamFilter();
+
+    // Test reasoning tags
+    const res1 = filter.push("Start <reasoning>Step by step plan</reasoning> Done");
+    expect(res1.content).toBe("Start  Done");
+    expect(res1.thinking).toBe("Step by step plan");
+
+    // Test orphan close tag (missing open tag)
+    const filter2 = new ThinkingStreamFilter();
+    const res2 = filter2.push("Hidden thought process</think> Visible response");
+    expect(res2.content).toBe(" Visible response");
+    expect(res2.thinking).toBe("Hidden thought process");
+  });
+
+  it("detects dev server commands vs build commands correctly", async () => {
+    const { isDevServerCommand } = await import("../src/const/tools.js");
+
+    expect(isDevServerCommand("npm run dev")).toBe(true);
+    expect(isDevServerCommand("pnpm dev")).toBe(true);
+    expect(isDevServerCommand("yarn dev")).toBe(true);
+    expect(isDevServerCommand("bun run dev")).toBe(true);
+    expect(isDevServerCommand("vite")).toBe(true);
+    expect(isDevServerCommand("next dev")).toBe(true);
+    expect(isDevServerCommand("npm start")).toBe(true);
+
+    expect(isDevServerCommand("npm run build")).toBe(false);
+    expect(isDevServerCommand("pnpm run build")).toBe(false);
+    expect(isDevServerCommand("tsc --noEmit")).toBe(false);
+    expect(isDevServerCommand("git status")).toBe(false);
+  });
+
+  it("executes bash commands with custom cwd parameter", async () => {
+    const subDir = path.join(tempDir, "custom-cwd-test");
+    await fs.mkdir(subDir, { recursive: true });
+    await fs.writeFile(path.join(subDir, "marker.txt"), "found inside subDir", "utf-8");
+
+    // Execute in subDir using cwd argument
+    const res = await executeNativeTool(
+      "bash",
+      { command: "node -e \"console.log(process.cwd())\"", cwd: subDir },
+      tempDir
+    );
+    expect(res.isError).toBe(false);
+    expect(path.normalize(res.result)).toContain(path.normalize(subDir));
+  });
+
+  it("truncates extremely large command output in bash tool", async () => {
+    // Generate ~60,000 characters of output
+    const res = await executeNativeTool(
+      "bash",
+      { command: "node -e \"console.log('A'.repeat(60000))\"" },
+      tempDir
+    );
+    expect(res.isError).toBe(false);
+    expect(res.result).toContain("[Output truncated:");
+    expect(res.result).toContain("total characters");
+  });
 });

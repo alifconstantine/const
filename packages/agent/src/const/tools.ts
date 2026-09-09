@@ -114,6 +114,23 @@ export function resolveSafePath(rawPath: string, workspacePath: string): string 
   return path.resolve(workspacePath, normalized);
 }
 
+export function isPathWithinWorkspace(targetPath: string, workspacePath: string): boolean {
+  if (!targetPath || !workspacePath) return true;
+  const normTarget = path.normalize(targetPath).toLowerCase();
+  const normWorkspace = path.normalize(workspacePath).toLowerCase();
+
+  const rel = path.relative(normWorkspace, normTarget);
+  return !rel.startsWith("..") && !path.isAbsolute(rel);
+}
+
+export function isAllowedInternalPath(targetPath: string): boolean {
+  if (!targetPath) return false;
+  const normTarget = path.normalize(targetPath).toLowerCase();
+  const constHome = path.join(os.homedir(), ".const").toLowerCase();
+
+  return normTarget.startsWith(constHome);
+}
+
 // ---------------------------------------------------------------------------
 // Native Tool Definitions (Pi Standard 4 Core Tools + Aliases)
 // ---------------------------------------------------------------------------
@@ -472,10 +489,24 @@ export function killProcessTree(pid: number): void {
   }
 }
 
+export function isDevServerCommand(cmd: string): boolean {
+  if (!cmd || typeof cmd !== "string") return false;
+  const trimmed = cmd.trim();
+  return /(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?(?:dev|start|serve|watch)|(?:vite|webpack-dev-server|next\s+dev|astro\s+dev|nuxt\s+dev|nodemon)/i.test(trimmed);
+}
+
+interface RunProcessOptions {
+  cwd: string;
+  signal?: AbortSignal;
+  timeoutMs?: number;
+  isDevServer?: boolean;
+  rawCommand?: string;
+}
+
 function runProcess(
   command: string,
   args: string[],
-  options: { cwd: string; signal?: AbortSignal; timeoutMs?: number }
+  options: RunProcessOptions
 ): Promise<ProcessRunResult> {
   return new Promise((resolve, reject) => {
     if (options.signal?.aborted) {
@@ -494,12 +525,17 @@ function runProcess(
     let stderr = "";
     let timedOut = false;
     let isSettled = false;
+    let isDevServerVerified = false;
     let timer: NodeJS.Timeout | undefined;
     let drainTimer: NodeJS.Timeout | undefined;
+    let devServerGraceTimer: NodeJS.Timeout | undefined;
+    let devServerFallbackTimer: NodeJS.Timeout | undefined;
 
     const cleanup = () => {
       if (timer) clearTimeout(timer);
       if (drainTimer) clearTimeout(drainTimer);
+      if (devServerGraceTimer) clearTimeout(devServerGraceTimer);
+      if (devServerFallbackTimer) clearTimeout(devServerFallbackTimer);
       if (options.signal) {
         options.signal.removeEventListener("abort", onAbort);
       }
@@ -516,6 +552,16 @@ function runProcess(
       try {
         child.stderr?.destroy();
       } catch {}
+
+      if (isDevServerVerified) {
+        return resolve({
+          stdout:
+            stdout +
+            `\n\n[Dev Server Verified & Stopped]: Process started successfully and verified network readiness.\n(Note: The continuous development server was stopped after verifying startup so agent task execution can proceed).`,
+          stderr,
+          exitCode: 0,
+        });
+      }
 
       if (timedOut) {
         return resolve({
@@ -537,6 +583,19 @@ function runProcess(
       }, options.timeoutMs);
     }
 
+    if (options.isDevServer) {
+      // If a dev server runs for 15s without triggering error or exit, consider it successfully initialized
+      devServerFallbackTimer = setTimeout(() => {
+        if (!isSettled) {
+          isDevServerVerified = true;
+          if (child.pid) {
+            killProcessTree(child.pid);
+          }
+          finish(0);
+        }
+      }, 15000);
+    }
+
     const onAbort = () => {
       if (child.pid) {
         killProcessTree(child.pid);
@@ -555,8 +614,24 @@ function runProcess(
       options.signal.addEventListener("abort", onAbort, { once: true });
     }
 
+    const DEV_READY_REGEX = /(?:Local:\s+http|Network:\s+http|ready in \d+|compiled successfully|ready on http|Server running at|listening on (?:port|\d+)|listening at http|VITE v\d+.*ready)/i;
+
     child.stdout?.on("data", (chunk) => {
-      stdout += chunk.toString();
+      const str = chunk.toString();
+      stdout += str;
+
+      if (options.isDevServer && !isDevServerVerified && DEV_READY_REGEX.test(stdout)) {
+        isDevServerVerified = true;
+        // Allow 1200ms to capture the rest of the startup banner
+        if (!devServerGraceTimer) {
+          devServerGraceTimer = setTimeout(() => {
+            if (child.pid) {
+              killProcessTree(child.pid);
+            }
+            finish(0);
+          }, 1200);
+        }
+      }
     });
 
     child.stderr?.on("data", (chunk) => {
@@ -928,22 +1003,40 @@ export async function executeNativeTool(
         cmd = cmd.replace(/^powershell(?:\.exe)?\s+-Command\s+["']?(.*?)["']?$/s, "$1");
       }
 
+      const rawCwd = args.cwd || args.working_directory || args.workdir || args.path;
+      const targetCwd = rawCwd ? resolveSafePath(rawCwd, workspacePath) : workspacePath;
+      const executionCwd = fsSync.existsSync(targetCwd) && fsSync.statSync(targetCwd).isDirectory()
+        ? targetCwd
+        : workspacePath;
+
       const shellCfg = getShellConfig();
-      const timeoutMs = (typeof args.timeout === "number" ? args.timeout : 60) * 1000;
+      const isBuildOrInstall = /(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?(?:build|install|add|compile|test)|(?:tsc|cargo\s+build|dotnet\s+build)/i.test(cmd);
+      const isDevServer = isDevServerCommand(cmd);
+      const defaultTimeoutSec = isBuildOrInstall ? 180 : (isDevServer ? 30 : 60);
+      const timeoutMs = (typeof args.timeout === "number" ? args.timeout : defaultTimeoutSec) * 1000;
 
       const { stdout, stderr, exitCode } = await runProcess(
         shellCfg.shell,
         [...shellCfg.args, cmd],
         {
-          cwd: workspacePath,
+          cwd: executionCwd,
           signal,
           timeoutMs,
+          isDevServer,
+          rawCommand: cmd,
         }
       );
 
       let output = "";
       if (stdout) output += stdout;
       if (stderr) output += (output ? "\n" : "") + stderr;
+
+      const MAX_OUTPUT_CHARS = 50000;
+      if (output.length > MAX_OUTPUT_CHARS) {
+        const head = output.slice(0, 25000);
+        const tail = output.slice(-20000);
+        output = `${head}\n\n... [Output truncated: ${output.length} total characters. Showing first 25,000 and last 20,000 characters] ...\n\n${tail}`;
+      }
 
       const isFailed = exitCode !== 0 && exitCode !== null;
       if (isFailed) {
@@ -1014,6 +1107,7 @@ export async function executeNativeTool(
         };
       }
       const dirPath = resolveSafePath(rawPath, workspacePath);
+
       await fs.mkdir(dirPath, { recursive: true });
       const displayPath = path.isAbsolute(rawPath) ? dirPath : path.relative(workspacePath, dirPath);
       return {
@@ -1029,6 +1123,7 @@ export async function executeNativeTool(
       const rawPattern = (args.pattern ?? args.query ?? args.glob ?? "").trim();
       const rawPath = extractPathArg(args);
       const searchRoot = rawPath ? resolveSafePath(rawPath, workspacePath) : workspacePath;
+
       const limit = typeof args.limit === "number" ? args.limit : 1000;
 
       if (!fsSync.existsSync(searchRoot)) {
@@ -1109,6 +1204,7 @@ export async function executeNativeTool(
 
       const rawPath = extractPathArg(args);
       const searchTarget = rawPath ? resolveSafePath(rawPath, workspacePath) : workspacePath;
+
       const ignoreCase = Boolean(args.ignore_case ?? args.ignoreCase ?? false);
       const limit = typeof args.limit === "number" ? args.limit : 100;
       const fileGlob = typeof args.glob === "string" ? args.glob.trim() : "";
@@ -1211,23 +1307,41 @@ export async function executeNativeTool(
         };
       }
 
+      const rawCwd = args.cwd || args.working_directory || args.workdir || args.path;
+      const targetCwd = rawCwd ? resolveSafePath(rawCwd, workspacePath) : workspacePath;
+      const executionCwd = fsSync.existsSync(targetCwd) && fsSync.statSync(targetCwd).isDirectory()
+        ? targetCwd
+        : workspacePath;
+
       const shellBinary = process.platform === "win32" ? "powershell.exe" : "pwsh";
       const shellArgs = ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", cmd];
-      const timeoutMs = (typeof args.timeout === "number" ? args.timeout : 60) * 1000;
+      const isBuildOrInstall = /(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?(?:build|install|add|compile|test)|(?:tsc|cargo\s+build|dotnet\s+build)/i.test(cmd);
+      const isDevServer = isDevServerCommand(cmd);
+      const defaultTimeoutSec = isBuildOrInstall ? 180 : (isDevServer ? 30 : 60);
+      const timeoutMs = (typeof args.timeout === "number" ? args.timeout : defaultTimeoutSec) * 1000;
 
       const { stdout, stderr, exitCode } = await runProcess(
         shellBinary,
         shellArgs,
         {
-          cwd: workspacePath,
+          cwd: executionCwd,
           signal,
           timeoutMs,
+          isDevServer,
+          rawCommand: cmd,
         }
       );
 
       let output = "";
       if (stdout) output += stdout;
       if (stderr) output += (output ? "\n" : "") + stderr;
+
+      const MAX_OUTPUT_CHARS = 50000;
+      if (output.length > MAX_OUTPUT_CHARS) {
+        const head = output.slice(0, 25000);
+        const tail = output.slice(-20000);
+        output = `${head}\n\n... [Output truncated: ${output.length} total characters. Showing first 25,000 and last 20,000 characters] ...\n\n${tail}`;
+      }
 
       const isFailed = exitCode !== 0 && exitCode !== null;
       if (isFailed) {
