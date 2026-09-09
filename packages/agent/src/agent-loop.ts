@@ -9,8 +9,8 @@ import {
 	EventStream,
 	type ToolResultMessage,
 	validateToolArguments,
-} from "@const/ai";
-import { getDefaultStreamFn } from "./stream-fn.js";
+} from "@earendil-works/pi-ai";
+import { getDefaultStreamFn } from "./stream-fn.ts";
 import type {
 	AgentContext,
 	AgentEvent,
@@ -19,8 +19,9 @@ import type {
 	AgentTool,
 	AgentToolCall,
 	AgentToolResult,
+	PrepareNextTurnContext,
 	StreamFn,
-} from "./types.js";
+} from "./types.ts";
 
 export type AgentEventSink = (event: AgentEvent) => Promise<void> | void;
 
@@ -71,7 +72,7 @@ export function agentLoopContinue(
 		throw new Error("Cannot continue: no messages in context");
 	}
 
-	if (context.messages[context.messages.length - 1]!.role === "assistant") {
+	if (context.messages[context.messages.length - 1].role === "assistant") {
 		throw new Error("Cannot continue from message role: assistant");
 	}
 
@@ -128,7 +129,7 @@ export async function runAgentLoopContinue(
 		throw new Error("Cannot continue: no messages in context");
 	}
 
-	if (context.messages[context.messages.length - 1]!.role === "assistant") {
+	if (context.messages[context.messages.length - 1].role === "assistant") {
 		throw new Error("Cannot continue from message role: assistant");
 	}
 
@@ -162,7 +163,7 @@ async function runLoop(
 ): Promise<void> {
 	let currentContext = initialContext;
 	let config = initialConfig;
-	let firstTurn = true;
+	let lastCompletedTurn: PrepareNextTurnContext | undefined;
 	// Check for steering messages at start (user may have typed while waiting)
 	let pendingMessages: AgentMessage[] = (await config.getSteeringMessages?.()) || [];
 
@@ -172,10 +173,28 @@ async function runLoop(
 
 		// Inner loop: process tool calls and steering messages
 		while (hasMoreToolCalls || pendingMessages.length > 0) {
-			if (!firstTurn) {
+			if (lastCompletedTurn) {
+				const nextTurnSnapshot = await config.prepareNextTurn?.(lastCompletedTurn);
+				if (nextTurnSnapshot) {
+					currentContext = nextTurnSnapshot.context ?? currentContext;
+					config = {
+						...config,
+						model: nextTurnSnapshot.model ?? config.model,
+						reasoning:
+							nextTurnSnapshot.thinkingLevel === undefined
+								? config.reasoning
+								: nextTurnSnapshot.thinkingLevel === "off"
+									? undefined
+									: nextTurnSnapshot.thinkingLevel,
+					};
+				}
+				// Preparation can be long-running (for example, compaction). Pick up steering
+				// queued while it ran. Only poll again if the earlier poll returned nothing;
+				// otherwise one-at-a-time mode would deliver two messages in this turn.
+				if (pendingMessages.length === 0) {
+					pendingMessages = (await config.getSteeringMessages?.()) || [];
+				}
 				await emit({ type: "turn_start" });
-			} else {
-				firstTurn = false;
 			}
 
 			// Process pending messages (inject before next assistant response)
@@ -223,35 +242,14 @@ async function runLoop(
 
 			await emit({ type: "turn_end", message, toolResults });
 
-			const nextTurnContext = {
+			lastCompletedTurn = {
 				message,
 				toolResults,
 				context: currentContext,
 				newMessages,
 			};
-			const nextTurnSnapshot = await config.prepareNextTurn?.(nextTurnContext);
-			if (nextTurnSnapshot) {
-				currentContext = nextTurnSnapshot.context ?? currentContext;
-				config = {
-					...config,
-					model: nextTurnSnapshot.model ?? config.model,
-					reasoning:
-						nextTurnSnapshot.thinkingLevel === undefined
-							? config.reasoning
-							: nextTurnSnapshot.thinkingLevel === "off"
-								? undefined
-								: nextTurnSnapshot.thinkingLevel,
-				};
-			}
 
-			if (
-				await config.shouldStopAfterTurn?.({
-					message,
-					toolResults,
-					context: currentContext,
-					newMessages,
-				})
-			) {
+			if (await config.shouldStopAfterTurn?.(lastCompletedTurn)) {
 				await emit({ type: "agent_end", messages: newMessages });
 				return;
 			}
@@ -520,6 +518,15 @@ async function executeToolCallsParallel(
 		}
 
 		finalizedCalls.push(async () => {
+			if (signal?.aborted) {
+				const finalized = {
+					toolCall,
+					result: createErrorToolResult("Operation aborted"),
+					isError: true,
+				} satisfies FinalizedToolCallOutcome;
+				await emitToolExecutionEnd(finalized, emit);
+				return finalized;
+			}
 			const executed = await executePreparedToolCall(preparation, signal, emit);
 			const finalized = await finalizeExecutedToolCall(
 				currentContext,

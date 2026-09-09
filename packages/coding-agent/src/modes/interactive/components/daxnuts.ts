@@ -1,10 +1,10 @@
-﻿/**
+/**
  * POWERED BY DAXNUTS - Easter egg for OpenCode + Kimi K2.5
  *
  * A heartfelt tribute to dax (@thdxr) for providing free Kimi K2.5 access via OpenCode.
  */
 
-import type { Component, TUI } from "@const/tui";
+import type { Component, TUI } from "@earendil-works/pi-tui";
 import { theme } from "../theme/theme.ts";
 
 // 32x32 RGB image of dax, hex encoded (3 bytes per pixel)

@@ -6,9 +6,9 @@ import type {
 	TextContent,
 	ThinkingBudgets,
 	Transport,
-} from "@const/ai";
-import { runAgentLoop, runAgentLoopContinue } from "./agent-loop.js";
-import { getDefaultStreamFn } from "./stream-fn.js";
+} from "@earendil-works/pi-ai";
+import { runAgentLoop, runAgentLoopContinue } from "./agent-loop.ts";
+import { getDefaultStreamFn } from "./stream-fn.ts";
 import type {
 	AfterToolCallContext,
 	AfterToolCallResult,

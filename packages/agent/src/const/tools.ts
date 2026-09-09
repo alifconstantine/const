@@ -224,6 +224,127 @@ export const CONST_DEFAULT_TOOLS: NativeToolDefinition[] = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "ls",
+      description:
+        "List directory contents. Returns entries sorted alphabetically with '/' suffix for directories. Essential for inspecting workspace and folder structures.",
+      parameters: {
+        type: "object",
+        properties: {
+          path: {
+            type: "string",
+            description: "Directory to list (defaults to workspace root).",
+          },
+          limit: {
+            type: "number",
+            description: "Maximum number of entries to return (default: 500).",
+          },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "find",
+      description:
+        "Search for files and directories matching a pattern or glob (e.g. '*.ts', '**/*.json', 'src/**/*.tsx'). Respects common ignores (.git, node_modules).",
+      parameters: {
+        type: "object",
+        properties: {
+          pattern: {
+            type: "string",
+            description: "Glob pattern or name to match.",
+          },
+          path: {
+            type: "string",
+            description: "Directory to search in (defaults to workspace root).",
+          },
+          limit: {
+            type: "number",
+            description: "Maximum number of results to return (default: 1000).",
+          },
+        },
+        required: ["pattern"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "grep",
+      description:
+        "Search file contents for regex or text patterns across files in the workspace.",
+      parameters: {
+        type: "object",
+        properties: {
+          pattern: {
+            type: "string",
+            description: "Search pattern (regex or literal text).",
+          },
+          path: {
+            type: "string",
+            description: "Directory or file to search in (defaults to workspace root).",
+          },
+          glob: {
+            type: "string",
+            description: "Optional glob pattern to filter files (e.g. '*.ts', '*.json').",
+          },
+          ignore_case: {
+            type: "boolean",
+            description: "Case-insensitive search (default: false).",
+          },
+          limit: {
+            type: "number",
+            description: "Maximum number of matches to return (default: 100).",
+          },
+        },
+        required: ["pattern"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "mkdir",
+      description:
+        "Explicitly create a new directory or folder structure recursively. Safe to call if the folder already exists.",
+      parameters: {
+        type: "object",
+        properties: {
+          path: {
+            type: "string",
+            description: "Path of the directory to create (relative to workspace or absolute).",
+          },
+        },
+        required: ["path"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "powershell",
+      description:
+        "Execute a PowerShell command (Windows PowerShell or pwsh). Returns standard output, standard error, and exit status.",
+      parameters: {
+        type: "object",
+        properties: {
+          command: {
+            type: "string",
+            description: "The PowerShell command to execute.",
+          },
+          timeout: {
+            type: "number",
+            description: "Optional timeout in seconds (defaults to 60).",
+          },
+        },
+        required: ["command"],
+      },
+    },
+  },
 ];
 
 // Helper argument extractors
@@ -321,6 +442,36 @@ interface ProcessRunResult {
   exitCode: number | null;
 }
 
+export function killProcessTree(pid: number): void {
+  if (process.platform === "win32") {
+    try {
+      const child = spawn(
+        path.join(process.env.SystemRoot ?? "C:\\Windows", "System32", "taskkill.exe"),
+        ["/F", "/T", "/PID", String(pid)],
+        {
+          stdio: "ignore",
+          detached: true,
+          windowsHide: true,
+        }
+      );
+      child.once("error", () => {});
+    } catch {
+      // Ignore errors if taskkill fails
+    }
+  } else {
+    // Unix: kill entire process group with negative PID
+    try {
+      process.kill(-pid, "SIGKILL");
+    } catch {
+      try {
+        process.kill(pid, "SIGKILL");
+      } catch {
+        // Process already dead
+      }
+    }
+  }
+}
+
 function runProcess(
   command: string,
   args: string[],
@@ -331,51 +482,41 @@ function runProcess(
       return reject(new Error("Operation cancelled"));
     }
 
+    const isUnix = process.platform !== "win32";
     const child = spawn(command, args, {
       cwd: options.cwd,
       windowsHide: true,
+      detached: isUnix,
       stdio: ["ignore", "pipe", "pipe"],
     });
 
     let stdout = "";
     let stderr = "";
     let timedOut = false;
+    let isSettled = false;
     let timer: NodeJS.Timeout | undefined;
+    let drainTimer: NodeJS.Timeout | undefined;
 
-    if (options.timeoutMs) {
-      timer = setTimeout(() => {
-        timedOut = true;
-        child.kill();
-      }, options.timeoutMs);
-    }
-
-    const onAbort = () => {
-      child.kill();
-      reject(new Error("Operation cancelled"));
-    };
-
-    if (options.signal) {
-      options.signal.addEventListener("abort", onAbort, { once: true });
-    }
-
-    child.stdout.on("data", (chunk) => {
-      stdout += chunk.toString();
-    });
-
-    child.stderr.on("data", (chunk) => {
-      stderr += chunk.toString();
-    });
-
-    child.on("error", (err) => {
+    const cleanup = () => {
       if (timer) clearTimeout(timer);
-      reject(err);
-    });
-
-    child.on("close", (code) => {
-      if (timer) clearTimeout(timer);
+      if (drainTimer) clearTimeout(drainTimer);
       if (options.signal) {
         options.signal.removeEventListener("abort", onAbort);
       }
+    };
+
+    const finish = (code: number | null) => {
+      if (isSettled) return;
+      isSettled = true;
+      cleanup();
+
+      try {
+        child.stdout?.destroy();
+      } catch {}
+      try {
+        child.stderr?.destroy();
+      } catch {}
+
       if (timedOut) {
         return resolve({
           stdout,
@@ -384,6 +525,65 @@ function runProcess(
         });
       }
       resolve({ stdout, stderr, exitCode: code });
+    };
+
+    if (options.timeoutMs) {
+      timer = setTimeout(() => {
+        timedOut = true;
+        if (child.pid) {
+          killProcessTree(child.pid);
+        }
+        drainTimer = setTimeout(() => finish(124), 1000);
+      }, options.timeoutMs);
+    }
+
+    const onAbort = () => {
+      if (child.pid) {
+        killProcessTree(child.pid);
+      }
+      try {
+        child.stdout?.destroy();
+      } catch {}
+      try {
+        child.stderr?.destroy();
+      } catch {}
+      cleanup();
+      reject(new Error("Operation cancelled"));
+    };
+
+    if (options.signal) {
+      options.signal.addEventListener("abort", onAbort, { once: true });
+    }
+
+    child.stdout?.on("data", (chunk) => {
+      stdout += chunk.toString();
+    });
+
+    child.stderr?.on("data", (chunk) => {
+      stderr += chunk.toString();
+    });
+
+    child.on("error", (err) => {
+      if (isSettled) return;
+      isSettled = true;
+      cleanup();
+      reject(err);
+    });
+
+    // When shell process exits, give remaining background streams at most 1.5s to drain.
+    // Prevents orphan background servers (e.g. `pnpm start &`) from hanging execution indefinitely.
+    child.on("exit", (code) => {
+      if (drainTimer) return;
+      drainTimer = setTimeout(() => {
+        if (child.pid) {
+          killProcessTree(child.pid);
+        }
+        finish(code);
+      }, 1500);
+    });
+
+    child.on("close", (code) => {
+      finish(code);
     });
   });
 }
@@ -763,9 +963,9 @@ export async function executeNativeTool(
     }
 
     // -----------------------------------------------------------------------
-    // Compatibility Aliases: list_dir, ls, dir
+    // Tool: ls (aliases: list_dir, dir)
     // -----------------------------------------------------------------------
-    if (normalizedTool === "listdir" || normalizedTool === "ls" || normalizedTool === "dir") {
+    if (normalizedTool === "ls" || normalizedTool === "listdir" || normalizedTool === "dir") {
       const rawPath = extractPathArg(args);
       const targetDir = rawPath ? resolveSafePath(rawPath, workspacePath) : workspacePath;
 
@@ -776,23 +976,34 @@ export async function executeNativeTool(
         };
       }
 
+      const stat = await fs.stat(targetDir);
+      if (!stat.isDirectory()) {
+        return {
+          result: `Path '${targetDir}' is a file, not a directory.`,
+          isError: true,
+        };
+      }
+
+      const limit = typeof args.limit === "number" ? args.limit : 500;
       const entries = await fs.readdir(targetDir, { withFileTypes: true });
-      const formatted = entries
-        .map((e) => `${e.isDirectory() ? "[DIR]" : "[FILE]"} ${e.name}`)
-        .join("\n");
+      const sorted = entries.sort((a, b) => a.name.localeCompare(b.name));
+      const truncated = sorted.slice(0, limit);
+
+      const formatted = truncated.map((e) => (e.isDirectory() ? `${e.name}/` : e.name)).join("\n");
+      const notice = sorted.length > limit ? `\n... (${sorted.length - limit} more entries truncated)` : "";
 
       return {
-        result: `Directory: ${targetDir}\n\n${formatted || "(Empty directory)"}`,
+        result: formatted ? formatted + notice : "(Empty directory)",
         isError: false,
       };
     }
 
     // -----------------------------------------------------------------------
-    // Compatibility Aliases: create_directory, mkdir
+    // Tool: mkdir (aliases: create_directory, makedir)
     // -----------------------------------------------------------------------
     if (
-      normalizedTool === "createdirectory" ||
       normalizedTool === "mkdir" ||
+      normalizedTool === "createdirectory" ||
       normalizedTool === "makedir"
     ) {
       const rawPath = extractPathArg(args);
@@ -804,14 +1015,239 @@ export async function executeNativeTool(
       }
       const dirPath = resolveSafePath(rawPath, workspacePath);
       await fs.mkdir(dirPath, { recursive: true });
+      const displayPath = path.isAbsolute(rawPath) ? dirPath : path.relative(workspacePath, dirPath);
       return {
-        result: `Directory created: ${dirPath}`,
+        result: `Directory created: ${displayPath || "."}`,
         isError: false,
       };
     }
 
+    // -----------------------------------------------------------------------
+    // Tool: find (aliases: find_files, glob)
+    // -----------------------------------------------------------------------
+    if (normalizedTool === "find" || normalizedTool === "findfiles" || normalizedTool === "glob") {
+      const rawPattern = (args.pattern ?? args.query ?? args.glob ?? "").trim();
+      const rawPath = extractPathArg(args);
+      const searchRoot = rawPath ? resolveSafePath(rawPath, workspacePath) : workspacePath;
+      const limit = typeof args.limit === "number" ? args.limit : 1000;
+
+      if (!fsSync.existsSync(searchRoot)) {
+        return {
+          result: `Search directory not found: '${searchRoot}'`,
+          isError: true,
+        };
+      }
+
+      const results: string[] = [];
+      const ignoreDirs = new Set([".git", "node_modules", "dist", ".turbo", ".next", "build", ".const"]);
+
+      let regex: RegExp;
+      if (rawPattern) {
+        try {
+          const escaped = rawPattern
+            .replace(/[.+^${}()|[\]\\]/g, "\\$&")
+            .replace(/\*\*/g, ".*")
+            .replace(/\*/g, "[^/\\\\]*")
+            .replace(/\?/g, ".");
+          regex = new RegExp(escaped, "i");
+        } catch {
+          regex = new RegExp(rawPattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "i");
+        }
+      } else {
+        regex = /.*/;
+      }
+
+      async function scan(currentDir: string, depth: number) {
+        if (depth > 20 || results.length >= limit) return;
+        let entries: fsSync.Dirent[];
+        try {
+          entries = await fs.readdir(currentDir, { withFileTypes: true });
+        } catch {
+          return;
+        }
+
+        for (const entry of entries) {
+          if (results.length >= limit) break;
+          const fullPath = path.join(currentDir, entry.name);
+          const relPath = path.relative(workspacePath, fullPath).replace(/\\/g, "/");
+
+          if (entry.isDirectory()) {
+            if (!ignoreDirs.has(entry.name)) {
+              if (regex.test(relPath) || regex.test(entry.name)) {
+                results.push(`${relPath}/`);
+              }
+              await scan(fullPath, depth + 1);
+            }
+          } else {
+            if (regex.test(relPath) || regex.test(entry.name)) {
+              results.push(relPath);
+            }
+          }
+        }
+      }
+
+      await scan(searchRoot, 0);
+
+      const notice = results.length >= limit ? `\n... (capped at ${limit} results)` : "";
+      return {
+        result: results.length > 0 ? results.join("\n") + notice : "No matching files found.",
+        isError: false,
+      };
+    }
+
+    // -----------------------------------------------------------------------
+    // Tool: grep (aliases: grep_search, search)
+    // -----------------------------------------------------------------------
+    if (normalizedTool === "grep" || normalizedTool === "grepsearch" || normalizedTool === "search") {
+      const pattern = (args.pattern ?? args.query ?? "").trim();
+      if (!pattern) {
+        return {
+          result: "Error: Missing 'pattern' parameter to search for.",
+          isError: true,
+        };
+      }
+
+      const rawPath = extractPathArg(args);
+      const searchTarget = rawPath ? resolveSafePath(rawPath, workspacePath) : workspacePath;
+      const ignoreCase = Boolean(args.ignore_case ?? args.ignoreCase ?? false);
+      const limit = typeof args.limit === "number" ? args.limit : 100;
+      const fileGlob = typeof args.glob === "string" ? args.glob.trim() : "";
+
+      let globRegex: RegExp | null = null;
+      if (fileGlob) {
+        const escaped = fileGlob
+          .replace(/[.+^${}()|[\]\\]/g, "\\$&")
+          .replace(/\*\*/g, ".*")
+          .replace(/\*/g, "[^/\\\\]*");
+        globRegex = new RegExp(`^${escaped}$`, "i");
+      }
+
+      let searchRegex: RegExp;
+      try {
+        searchRegex = new RegExp(pattern, ignoreCase ? "gi" : "g");
+      } catch {
+        searchRegex = new RegExp(pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), ignoreCase ? "gi" : "g");
+      }
+
+      const matches: string[] = [];
+      const ignoreDirs = new Set([".git", "node_modules", "dist", ".turbo", ".next", "build", ".const"]);
+
+      async function grepFile(filePath: string) {
+        if (matches.length >= limit) return;
+        try {
+          const stat = await fs.stat(filePath);
+          if (stat.size > 2 * 1024 * 1024) return; // Skip files > 2MB
+
+          const content = await fs.readFile(filePath, "utf-8");
+          const lines = content.split(/\r?\n/);
+          const relPath = path.relative(workspacePath, filePath).replace(/\\/g, "/");
+
+          for (let i = 0; i < lines.length; i++) {
+            if (matches.length >= limit) break;
+            const line = lines[i]!;
+            searchRegex.lastIndex = 0;
+            if (searchRegex.test(line)) {
+              matches.push(`${relPath}:${i + 1}: ${line.slice(0, 300)}`);
+            }
+          }
+        } catch {}
+      }
+
+      async function walkDir(currentDir: string, depth: number) {
+        if (depth > 15 || matches.length >= limit) return;
+        let entries: fsSync.Dirent[];
+        try {
+          entries = await fs.readdir(currentDir, { withFileTypes: true });
+        } catch {
+          return;
+        }
+
+        for (const entry of entries) {
+          if (matches.length >= limit) break;
+          const fullPath = path.join(currentDir, entry.name);
+
+          if (entry.isDirectory()) {
+            if (!ignoreDirs.has(entry.name)) {
+              await walkDir(fullPath, depth + 1);
+            }
+          } else if (entry.isFile()) {
+            if (!globRegex || globRegex.test(entry.name)) {
+              await grepFile(fullPath);
+            }
+          }
+        }
+      }
+
+      if (!fsSync.existsSync(searchTarget)) {
+        return {
+          result: `Search target not found: '${searchTarget}'`,
+          isError: true,
+        };
+      }
+
+      const targetStat = await fs.stat(searchTarget);
+      if (targetStat.isDirectory()) {
+        await walkDir(searchTarget, 0);
+      } else {
+        await grepFile(searchTarget);
+      }
+
+      const notice = matches.length >= limit ? `\n... (capped at ${limit} matches)` : "";
+      return {
+        result: matches.length > 0 ? matches.join("\n") + notice : "No matches found.",
+        isError: false,
+      };
+    }
+
+    // -----------------------------------------------------------------------
+    // Tool: powershell (aliases: pwsh)
+    // -----------------------------------------------------------------------
+    if (normalizedTool === "powershell" || normalizedTool === "pwsh") {
+      let cmd = extractCommandArg(args);
+      if (!cmd) {
+        return {
+          result: "Error: No command provided to execute.",
+          isError: true,
+        };
+      }
+
+      const shellBinary = process.platform === "win32" ? "powershell.exe" : "pwsh";
+      const shellArgs = ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", cmd];
+      const timeoutMs = (typeof args.timeout === "number" ? args.timeout : 60) * 1000;
+
+      const { stdout, stderr, exitCode } = await runProcess(
+        shellBinary,
+        shellArgs,
+        {
+          cwd: workspacePath,
+          signal,
+          timeoutMs,
+        }
+      );
+
+      let output = "";
+      if (stdout) output += stdout;
+      if (stderr) output += (output ? "\n" : "") + stderr;
+
+      const isFailed = exitCode !== 0 && exitCode !== null;
+      if (isFailed) {
+        output = `[PowerShell command failed with exit code ${exitCode}]\nExit code: ${exitCode}\n${output}`.trim();
+      }
+
+      if (!output.trim()) {
+        output = isFailed
+          ? `[PowerShell command exited with error code ${exitCode} and produced no output]`
+          : "(Command completed with no output)";
+      }
+
+      return {
+        result: output.trim(),
+        isError: isFailed,
+      };
+    }
+
     return {
-      result: `Tool '${toolName}' is not recognized. Available tools: read, write, edit, bash.`,
+      result: `Tool '${toolName}' is not recognized. Available tools: read, write, edit, bash, powershell, ls, find, grep, mkdir.`,
       isError: true,
     };
   } catch (err: any) {

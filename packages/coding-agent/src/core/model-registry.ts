@@ -1,15 +1,17 @@
-﻿import type {
+import type {
 	Api,
 	AssistantMessage,
+	AssistantMessageEventStream,
 	AuthResult,
 	Context,
 	Model,
 	ModelsApiStreamOptions,
 	ModelsRefreshOptions,
 	ModelsRefreshResult,
+	ModelsSimpleStreamOptions,
 	Provider,
 	ProviderHeaders,
-} from "@const/ai";
+} from "@earendil-works/pi-ai";
 import type { ModelRuntime } from "./model-runtime.ts";
 import type { AuthStatus, ProviderConfigInput } from "./provider-composer.ts";
 
@@ -98,6 +100,20 @@ export class ModelRegistry {
 
 	getProvider(provider: string): Provider | undefined {
 		return this.runtime.getProvider(provider);
+	}
+
+	/** Stream through the configured provider with request-time authentication. */
+	stream<TApi extends Api>(
+		model: Model<TApi>,
+		context: Context,
+		options?: ModelsApiStreamOptions<TApi>,
+	): AssistantMessageEventStream {
+		return this.runtime.stream(model, context, options);
+	}
+
+	/** Stream with provider-neutral options and request-time authentication. */
+	streamSimple(model: Model<Api>, context: Context, options?: ModelsSimpleStreamOptions): AssistantMessageEventStream {
+		return this.runtime.streamSimple(model, context, options);
 	}
 
 	complete<TApi extends Api>(

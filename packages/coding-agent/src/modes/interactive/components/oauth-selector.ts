@@ -1,4 +1,4 @@
-﻿import type { ApiKeyAuth, AuthCheck, OAuthAuth } from "@const/ai";
+import type { ApiKeyAuth, AuthCheck, OAuthAuth } from "@earendil-works/pi-ai";
 import {
 	Container,
 	type Focusable,
@@ -7,7 +7,7 @@ import {
 	Input,
 	Spacer,
 	TruncatedText,
-} from "@const/tui";
+} from "@earendil-works/pi-tui";
 import { theme } from "../theme/theme.ts";
 import { DynamicBorder } from "./dynamic-border.ts";
 

@@ -1,12 +1,12 @@
-﻿/**
+/**
  * RPC Client for programmatic access to the coding agent.
  *
  * Spawns the agent in RPC mode and provides a typed API for all operations.
  */
 
 import { type ChildProcess, spawn } from "node:child_process";
-import type { AgentMessage, ThinkingLevel } from "@const/agent";
-import type { ImageContent } from "@const/ai";
+import type { AgentMessage, ThinkingLevel } from "@earendil-works/pi-agent-core";
+import type { ImageContent } from "@earendil-works/pi-ai";
 import type { SessionStats } from "../../core/agent-session.ts";
 import type { BashResult } from "../../core/bash-executor.ts";
 import type { CompactionResult } from "../../core/compaction/index.ts";
@@ -218,6 +218,14 @@ export class RpcClient {
 	 */
 	async abort(): Promise<void> {
 		await this.send({ type: "abort" });
+	}
+
+	/**
+	 * Clear queued steering and follow-up messages, returning their text.
+	 */
+	async clearQueue(): Promise<{ steering: string[]; followUp: string[] }> {
+		const response = await this.send({ type: "clear_queue" });
+		return this.getData(response);
 	}
 
 	/**

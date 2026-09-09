@@ -1,4 +1,4 @@
-﻿import { dirname, join } from "node:path";
+import { dirname, join } from "node:path";
 import {
 	type Api,
 	type ApiStreamOptions,
@@ -35,8 +35,8 @@ import {
 	type ProviderRequestOptions,
 	type SimpleStreamOptions,
 	type StreamOptions,
-} from "@const/ai";
-import * as builtinProviderCatalog from "@const/ai/providers/all";
+} from "@earendil-works/pi-ai";
+import * as builtinProviderCatalog from "@earendil-works/pi-ai/providers/all";
 import { getAgentDir } from "../config.ts";
 import { operationSignal, raceWithAbortSignal } from "../utils/abort.ts";
 import { AuthStorage as DefaultAuthStorage } from "./auth-storage.ts";
@@ -644,18 +644,26 @@ export class ModelRuntime implements Models {
 		return this.streamSimple(model, context, options).result();
 	}
 
-	async fetchDeferred(
+	streamDeferred(
 		model: Model<Api>,
 		handle: DeferredHandle,
 		options?: ModelsDeferredFetchOptions,
-	): Promise<AssistantMessage> {
+	): AssistantMessageEventStream {
 		return lazyStream(model, async () => {
 			const prepared = await this.prepareRequest(model, options);
 			if (!prepared.provider.fetchDeferred) {
 				throw new ModelsError("provider", `Provider ${model.provider} does not support deferred responses`);
 			}
 			return prepared.provider.fetchDeferred(prepared.model, handle, prepared.options as DeferredFetchOptions);
-		}).result();
+		});
+	}
+
+	async fetchDeferred(
+		model: Model<Api>,
+		handle: DeferredHandle,
+		options?: ModelsDeferredFetchOptions,
+	): Promise<AssistantMessage> {
+		return this.streamDeferred(model, handle, options).result();
 	}
 
 	async cancelDeferred(

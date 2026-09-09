@@ -1,11 +1,11 @@
-﻿/**
+/**
  * Tool wrappers for extension-registered tools.
  *
  * These wrappers only adapt tool execution so extension tools receive the runner context.
  * Tool call and tool result interception is handled by AgentSession via agent-core hooks.
  */
 
-import type { AgentTool } from "@const/agent";
+import type { AgentTool } from "@earendil-works/pi-agent-core";
 import { wrapToolDefinition } from "../tools/tool-definition-wrapper.ts";
 import type { ExtensionRunner } from "./runner.ts";
 import type { RegisteredTool } from "./types.ts";

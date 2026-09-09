@@ -1,4 +1,4 @@
-﻿import type { TUI } from "@const/tui";
+import type { TUI } from "@earendil-works/pi-tui";
 import type { SettingsManager } from "../../../core/settings-manager.ts";
 import {
 	detectTerminalBackgroundFromEnv,
@@ -117,6 +117,12 @@ export class InteractiveThemeController {
 
 	disableAutoSync(): void {
 		this.setAutoSync(false);
+	}
+
+	dispose(): void {
+		this.setAutoSync(false);
+		this.terminalColorSchemeUnsubscribe?.();
+		this.terminalColorSchemeUnsubscribe = undefined;
 	}
 
 	getTerminalTheme(): TerminalTheme {

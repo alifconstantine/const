@@ -6,7 +6,7 @@ import { DatabaseSync } from "node:sqlite";
 export interface StoredMessage {
   id?: string;
   role: string;
-  content: string;
+  content: string | any[];
   thinking?: string;
   toolCalls?: any[];
   toolResults?: any[];

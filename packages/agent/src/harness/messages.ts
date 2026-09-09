@@ -1,4 +1,4 @@
-﻿import type { ImageContent, Message, TextContent } from "@const/ai";
+import type { ImageContent, Message, TextContent } from "@earendil-works/pi-ai";
 import type { AgentMessage } from "../types.ts";
 
 export const COMPACTION_SUMMARY_PREFIX = `The conversation history before this point was compacted into the following summary:
@@ -40,7 +40,7 @@ export interface CustomMessage<T = unknown> {
 export interface BranchSummaryMessage {
 	role: "branchSummary";
 	summary: string;
-	fromId: string;
+	fromId: string | null;
 	timestamp: number;
 }
 
@@ -80,7 +80,7 @@ export function bashExecutionToText(msg: BashExecutionMessage): string {
 
 export function createBranchSummaryMessage(
 	summary: string,
-	fromId: string,
+	fromId: string | null,
 	timestamp: string | number,
 ): BranchSummaryMessage {
 	return {

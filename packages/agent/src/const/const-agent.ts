@@ -55,31 +55,30 @@ function buildConstSystemPrompt(workspacePath: string, customPrompt?: string): s
     }
   }
 
-  return `You are Const Agent, an expert autonomous coding and software engineering assistant operating inside Const Harness. You help users by reading files, executing commands, editing code, and creating new files and applications.
+  return `You are Const Agent, an expert autonomous coding and software engineering assistant operating inside Const Harness. You help users by reading files, executing commands, editing code, creating folders, and developing complete software applications.
 
 Current working directory: ${normalizedCwd}
 
 Available tools:
 - read: Read file contents (supports source code, text, JSON, markdown, images, and PDF documents with automated text extraction).
-- write: Create or overwrite files with specified content. Parent directories are created automatically.
+- write: Create or overwrite files with specified content. Parent directories are created automatically if needed.
 - edit: Make surgical edits to existing files by exact string replacement (old_content -> new_content).
 - bash: Execute terminal shell commands (Git Bash on Windows, bash on Unix).
-
-CRITICAL INSTRUCTIONS FOR FILE CREATION & PROJECT GENERATION:
-- When asked to create, generate, or build files, websites, or projects (including prompts like "buat folder baru", "create project", "build website", or when given design/code specifications):
-  1. DO NOT wander or explore with shell commands (do NOT run ls, pwd, mkdir, or dir). The 'write' tool automatically creates any missing parent directories recursively.
-  2. Keep your internal thought brief, focused, and decisive. Once you determine the target file and requirements, immediately invoke the 'write' tool in the SAME TURN.
-  3. Never exhaust your output generation capacity on prolonged internal drafting or repetitive monologue. Commit the code directly to the 'write' tool.
-  4. Always invoke the 'write' tool to create the target file (e.g. index.html or target path) with the complete, functional code in the 'content' argument.
-  5. Never output raw project source code as conversational chat text when asked to write or create files. Always use the 'write' tool.
+- powershell: Execute PowerShell commands (Windows PowerShell or pwsh).
+- ls: List files and directories in a directory with file types and sizes. Essential for discovering workspace layout.
+- find: Search for files and directories matching a glob pattern or filename (e.g. '*.ts', '**/*.json', 'src/**/*.tsx').
+- grep: Search file contents for regex or text patterns across files in the workspace.
+- mkdir: Explicitly create a new directory or folder structure recursively.
 
 GENERAL WORKFLOW & TOOL GUIDELINES:
-- Use 'read' to inspect existing files before editing them, or to read document files (including PDFs).
+- When asked to create new folders or directories (e.g. "buat folder", "mkdir", "create directory"):
+  Use 'mkdir' to create the directory directly, or use 'write' to create files inside the intended directory path.
+- Use 'ls', 'find', and 'grep' for file exploration, project discovery, and locating relevant code.
+- Use 'read' to inspect existing files before editing them.
 - Use 'edit' for surgical modifications to existing files. Provide exact matching old_content.
 - Use 'write' for creating new files or complete rewrites.
-- Use 'bash' only when execution is truly needed (e.g. running tests, starting dev servers, or inspecting runtime errors).
-- Prefer native tools ('read', 'write', 'edit') over shell commands for file operations.
-- Be concise and direct in your responses. After tool operations are complete, provide a brief summary of what was accomplished.
+- Use 'bash' or 'powershell' when command execution is needed (e.g. running tests, building, starting dev servers).
+- Be concise, decisive, and direct. Commit code and changes directly with appropriate tools rather than merely describing them.
 
 CRITICAL LOOP PREVENTION & ERROR RECOVERY PROTOCOL:
 - Pay close attention to all tool outputs and exit codes.
@@ -97,10 +96,14 @@ export class ConstAgent {
 
   constructor(config: AgentConfig) {
     this.config = {
-      maxTurns: 25,
+      maxTurns: 200,
       workspacePath: process.cwd(),
       ...config,
     };
+  }
+
+  public get maxTurns(): number {
+    return this.config.maxTurns || 200;
   }
 
   public abort(): void {
@@ -126,7 +129,7 @@ export class ConstAgent {
     const conversationHistory: AgentMessage[] = [...messages];
     let currentTurn = 0;
     let consecutiveStreamRetries = 0;
-    const maxTurns = this.config.maxTurns || 25;
+    const maxTurns = this.config.maxTurns || 200;
     const workspacePath = this.config.workspacePath || process.cwd();
     const toolCallHistory: Array<{ name: string; argsHash: string; isError: boolean }> = [];
     const DOOM_LOOP_THRESHOLD = 3;
@@ -470,12 +473,19 @@ export class ConstAgent {
           const parsedArgs = parseToolArguments(tc.function.arguments);
           const argsHash = JSON.stringify(parsedArgs);
 
-          // Doom Loop & Anti-Loop Detection (OpenCode & Pi alignment)
-          const previousCalls = toolCallHistory.filter(
-            (entry) => entry.name === tc.function.name && entry.argsHash === argsHash
+          // Consecutive Doom Loop Detection (OpenCode & Pi alignment)
+          const recentCalls = toolCallHistory.slice(-DOOM_LOOP_THRESHOLD);
+          const isIdenticalConsecutive =
+            recentCalls.length >= DOOM_LOOP_THRESHOLD &&
+            recentCalls.every((entry) => entry.name === tc.function.name && entry.argsHash === argsHash);
+          const lastFailedConsecutive =
+            recentCalls.length >= 2 &&
+            recentCalls.slice(-2).every((entry) => entry.name === tc.function.name && entry.argsHash === argsHash && entry.isError);
+
+          // Benign exploration tools like ls, read, find, grep shouldn't be blocked unless spammed consecutively
+          const isDoomLoop = (isIdenticalConsecutive || lastFailedConsecutive) && (
+            tc.function.name === "bash" || tc.function.name === "powershell" || tc.function.name === "edit" || isIdenticalConsecutive
           );
-          const lastCallFailed = previousCalls.length > 0 && Boolean(previousCalls[previousCalls.length - 1]?.isError);
-          const isDoomLoop = previousCalls.length >= DOOM_LOOP_THRESHOLD || (previousCalls.length >= 2 && lastCallFailed);
 
           if (isDoomLoop) {
             const loopWarning = `[DOOM LOOP INTERCEPTED]: You have called '${tc.function.name}' with identical arguments multiple times without progress or after failing. Execution of this identical call is blocked. You MUST stop repeating this call. Analyze what failed, use 'read' to inspect files if editing failed, or explain the issue clearly to the user.`;
@@ -563,12 +573,14 @@ export class ConstAgent {
 
       // If loop completed without breaking on a zero-tool turn (e.g. maxTurns reached)
       const lastMsg = conversationHistory[conversationHistory.length - 1];
-      const fallbackContent =
-        lastMsg?.role === "assistant" && lastMsg.content
-          ? lastMsg.content
-          : `Finished executing all task operations (${currentTurn} turns executed).`;
+      const reachedTurnLimit = currentTurn >= maxTurns;
+      const fallbackContent: string = reachedTurnLimit
+        ? `Task execution reached the maximum limit (${maxTurns} turns). You can send a follow-up message like "continue" or "lanjutkan" to keep going.`
+        : lastMsg?.role === "assistant" && lastMsg.content
+          ? (typeof lastMsg.content === "string" ? lastMsg.content : JSON.stringify(lastMsg.content))
+          : `Finished executing all task operations.`;
 
-      if (lastMsg?.role !== "assistant" || !lastMsg.content) {
+      if (lastMsg?.role !== "assistant" || !lastMsg.content || reachedTurnLimit) {
         conversationHistory.push({
           role: "assistant",
           content: fallbackContent,

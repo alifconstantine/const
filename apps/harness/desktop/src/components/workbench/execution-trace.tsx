@@ -416,7 +416,9 @@ function TerminalCard({
           <span className="w-1.5 h-1.5 rounded-full bg-[#ff5c5c] shrink-0" title="Failed" />
         ) : tool.result !== undefined ? (
           <span className="w-1.5 h-1.5 rounded-full bg-[#409D62] shrink-0" title="Success" />
-        ) : null}
+        ) : (
+          <span className="w-1.5 h-1.5 rounded-full bg-[#e79737] dark:bg-[#ff7a00] animate-pulse shrink-0" title="Running command..." />
+        )}
         <ChevronDown
           className="w-3 h-3 text-[#666666] shrink-0 ml-1 transition-transform duration-200 ease-out"
           style={{ transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)" }}
@@ -444,7 +446,12 @@ function TerminalCard({
 
           {/* Output stdout/stderr wrapped in ScrollArea */}
           <ScrollArea className="max-h-60 w-full">
-            {cleanResult ? (
+            {tool.result === undefined ? (
+              <div className="text-[#e79737] dark:text-[#ff7a00] flex items-center gap-1.5 text-xs italic py-0.5">
+                <Loader2 className="w-3 h-3 animate-spin shrink-0" />
+                <span>Running command...</span>
+              </div>
+            ) : cleanResult ? (
               <div
                 className={
                   isFailed

@@ -1,4 +1,4 @@
-﻿/**
+/**
  * TUI component for managing package resources (enable/disable)
  */
 
@@ -14,7 +14,7 @@ import {
 	Spacer,
 	truncateToWidth,
 	visibleWidth,
-} from "@const/tui";
+} from "@earendil-works/pi-tui";
 import { CONFIG_DIR_NAME } from "../../../config.ts";
 import type { PathMetadata, ResolvedPaths, ResolvedResource } from "../../../core/package-manager.ts";
 import type { PackageSource, SettingsManager } from "../../../core/settings-manager.ts";

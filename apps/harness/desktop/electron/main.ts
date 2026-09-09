@@ -7,7 +7,7 @@ import {
   createConstAgent,
   DEFAULT_MODELS,
   rollbackFileMutation,
-  type AgentMessage,
+  type ConstAgentMessage as AgentMessage,
   type FileMutationRecord,
 } from "@const/agent";
 import { ConversationDatabase, type ConversationRecord } from "./database";
@@ -667,6 +667,7 @@ app.whenReady().then(() => {
         conversationId?: string;
         authToken?: string;
         maxOutputTokens?: number;
+        maxTurns?: number;
       }
     ) => {
       const config = loadUserConfig();
@@ -716,6 +717,7 @@ app.whenReady().then(() => {
         mode: payload.mode || "ask_before_changes",
         thinkingLevel: payload.thinkingLevel as any,
         maxOutputTokens: payload.maxOutputTokens ?? (modelDef as any)?.maxOutputTokens,
+        maxTurns: payload.maxTurns ?? 200,
       });
 
       activeSessions.set(convoId, {
@@ -1102,6 +1104,7 @@ app.whenReady().then(() => {
         workspacePath: targetWorkspace,
         mode: "full_access",
         thinkingLevel: "medium",
+        maxTurns: 200,
       });
 
       const taskName = task.name || task.title || "Scheduled Task";

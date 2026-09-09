@@ -4,7 +4,13 @@
 		"outDir": "./dist",
 		"rootDir": "./src",
 		"module": "NodeNext",
-		"moduleResolution": "NodeNext"
+		"moduleResolution": "NodeNext",
+		"paths": {
+			"@const/telemetry": ["../telemetry/dist/index.d.ts"],
+			"@const/telemetry/*": ["../telemetry/dist/*.d.ts"],
+			"@earendil-works/pi-telemetry": ["../telemetry/dist/index.d.ts"],
+			"@earendil-works/pi-telemetry/*": ["../telemetry/dist/*.d.ts"]
+		}
 	},
 	"include": ["src/**/*.ts"],
 	"exclude": ["node_modules", "dist", "**/*.d.ts", "src/**/*.d.ts"]

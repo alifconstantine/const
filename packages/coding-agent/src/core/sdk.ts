@@ -1,6 +1,6 @@
-﻿import { join } from "node:path";
-import { Agent, type AgentMessage, setDefaultStreamFn, type ThinkingLevel } from "@const/agent";
-import { clampThinkingLevel, type Message, type Model, streamSimple } from "@const/ai/compat";
+import { join } from "node:path";
+import { Agent, type AgentMessage, setDefaultStreamFn, type ThinkingLevel } from "@earendil-works/pi-agent-core";
+import { clampThinkingLevel, type Message, type Model, streamSimple } from "@earendil-works/pi-ai/compat";
 import { getAgentDir } from "../config.ts";
 import { resolvePath } from "../utils/paths.ts";
 import { AgentSession } from "./agent-session.ts";
@@ -23,6 +23,7 @@ import {
 	createFindTool,
 	createGrepTool,
 	createLsTool,
+	createPowerShellTool,
 	createReadOnlyTools,
 	createReadTool,
 	createWriteTool,
@@ -125,6 +126,7 @@ export {
 	createGrepTool,
 	createFindTool,
 	createLsTool,
+	createPowerShellTool,
 };
 
 // Helper Functions
@@ -142,7 +144,7 @@ function getDefaultAgentDir(): string {
  * const { session } = await createAgentSession();
  *
  * // With explicit model
- * import { getModel } from '@const/ai';
+ * import { getModel } from '@earendil-works/pi-ai';
  * const { session } = await createAgentSession({
  *   model: getModel('anthropic', 'claude-opus-4-5'),
  *   thinkingLevel: 'high',
@@ -213,6 +215,7 @@ export async function createAgentSession(options: CreateAgentSessionOptions = {}
 			defaultProvider: settingsManager.getDefaultProvider(),
 			defaultModelId: settingsManager.getDefaultModel(),
 			defaultThinkingLevel: settingsManager.getDefaultThinkingLevel(),
+			modelThinkingLevels: settingsManager.getAllModelThinkingLevels(),
 			modelRuntime,
 		});
 		model = result.model;
@@ -232,7 +235,13 @@ export async function createAgentSession(options: CreateAgentSessionOptions = {}
 			: (settingsManager.getDefaultThinkingLevel() ?? DEFAULT_THINKING_LEVEL);
 	}
 
-	// Fall back to settings default
+	// Fall back to per-model override, then global default
+	if (thinkingLevel === undefined && model) {
+		const perModel = settingsManager.getModelThinkingLevel(model.provider, model.id);
+		if (perModel) {
+			thinkingLevel = perModel;
+		}
+	}
 	if (thinkingLevel === undefined) {
 		thinkingLevel = settingsManager.getDefaultThinkingLevel() ?? DEFAULT_THINKING_LEVEL;
 	}

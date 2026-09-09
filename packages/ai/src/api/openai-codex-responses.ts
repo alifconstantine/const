@@ -372,7 +372,7 @@ export const stream: StreamFunction<"openai-codex-responses", OpenAICodexRespons
 			if (compressedBody) {
 				sseHeaders.set("content-encoding", "zstd");
 			}
-			const sseBody: Uint8Array | string = compressedBody ?? bodyJson;
+			const sseBody: BodyInit = (compressedBody ?? bodyJson) as BodyInit;
 
 			// Fetch with retry logic for rate limits and transient errors
 			let response: Response | undefined;
@@ -499,7 +499,10 @@ export const streamSimple: StreamFunction<"openai-codex-responses", SimpleStream
 		throw new Error(`No API key for provider: ${model.provider}`);
 	}
 
-	const base = buildBaseOptions(model, context, options, apiKey);
+	const base = {
+		...buildBaseOptions(model, context, options, apiKey),
+		toolChoice: options?.toolChoice,
+	} satisfies OpenAICodexResponsesOptions;
 	const clampedReasoning = options?.reasoning ? clampThinkingLevel(model, options.reasoning) : undefined;
 	const reasoningEffort = clampedReasoning === "off" ? undefined : clampedReasoning;
 
@@ -779,8 +782,9 @@ async function* parseSSE(response: Response, signal?: AbortSignal): AsyncGenerat
 			if (signal?.aborted) {
 				throw new Error("Request was aborted");
 			}
-			if (done) break;
-			buffer += decoder.decode(value, { stream: true });
+			buffer += done ? decoder.decode() : decoder.decode(value, { stream: true });
+			// Treat EOF as terminating the residual SSE frame.
+			if (done && buffer.trim()) buffer += "\n\n";
 
 			let idx = buffer.indexOf("\n\n");
 			while (idx !== -1) {
@@ -806,6 +810,8 @@ async function* parseSSE(response: Response, signal?: AbortSignal): AsyncGenerat
 				}
 				idx = buffer.indexOf("\n\n");
 			}
+
+			if (done) break;
 		}
 	} finally {
 		signal?.removeEventListener("abort", onAbort);

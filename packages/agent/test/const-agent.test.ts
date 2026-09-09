@@ -21,11 +21,14 @@ describe("Const Agent Native Tools & Self-Healing Engine", () => {
 
   it("exposes all required native tools", () => {
     const toolNames = CONST_DEFAULT_TOOLS.map((t) => t.function.name);
-    expect(toolNames).toContain("read_file");
-    expect(toolNames).toContain("write_file");
-    expect(toolNames).toContain("edit_file");
-    expect(toolNames).toContain("list_dir");
-    expect(toolNames).toContain("run_command");
+    expect(toolNames).toContain("read");
+    expect(toolNames).toContain("write");
+    expect(toolNames).toContain("edit");
+    expect(toolNames).toContain("ls");
+    expect(toolNames).toContain("bash");
+    expect(toolNames).toContain("find");
+    expect(toolNames).toContain("grep");
+    expect(toolNames).toContain("mkdir");
   });
 
   it("handles write_file and read_file with multi-alias argument names", async () => {
@@ -80,7 +83,7 @@ describe("Const Agent Native Tools & Self-Healing Engine", () => {
     );
     expect(readRes.isError).toBe(true);
     expect(readRes.result).toContain("File not found");
-    expect(readRes.result).toContain("Berkas yang tersedia di folder");
+    expect(readRes.result).toContain("Files available in");
   });
 
   it("lists directory contents with list_dir", async () => {
@@ -115,5 +118,16 @@ describe("Const Agent Native Tools & Self-Healing Engine", () => {
     } catch {
       // PDF does not exist in this environment, test is skipped gracefully
     }
+  });
+
+  it("defaults maxTurns to 200 to support long autonomous sessions", async () => {
+    const { createConstAgent } = await import("../src/const/const-agent.js");
+    const agent = createConstAgent({
+      sessionId: "test-turns-session",
+      workspacePath: tempDir,
+      model: "test-model",
+      provider: "test-provider",
+    });
+    expect(agent.maxTurns).toBe(200);
   });
 });

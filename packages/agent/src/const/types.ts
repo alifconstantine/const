@@ -13,7 +13,7 @@ export interface ToolCall {
 export interface AgentMessage {
   id?: string;
   role: Role;
-  content: string;
+  content: string | any[];
   name?: string;
   tool_call_id?: string;
   tool_calls?: ToolCall[];
