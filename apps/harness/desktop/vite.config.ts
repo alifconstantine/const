@@ -16,7 +16,7 @@ export default defineConfig({
           },
           resolve: {
             alias: {
-              "@const/agent": path.resolve(__dirname, "../../../packages/agent/dist/const/index.js"),
+              "@const/agent": path.resolve(__dirname, "../../../packages/agent/src/const/index.ts"),
             },
           },
         },
@@ -37,7 +37,7 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
-      "@const/agent": path.resolve(__dirname, "../../../packages/agent/dist/const/index.js"),
+      "@const/agent": path.resolve(__dirname, "../../../packages/agent/src/const/index.ts"),
     },
   },
 });

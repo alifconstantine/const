@@ -476,6 +476,7 @@ export class ConstAgent {
     let currentTurn = 0;
     let consecutiveStreamRetries = 0;
     let consecutivePlanningTurns = 0;
+    let consecutiveDraftCutoffs = 0;
     const maxTurns = this.config.maxTurns || 200;
     const workspacePath = this.config.workspacePath || process.cwd();
     const toolCallHistory: Array<{ name: string; argsHash: string; isError: boolean }> = [];
@@ -854,7 +855,7 @@ export class ConstAgent {
             return conversationHistory;
           }
 
-          if (turnThinking && currentTurn < maxTurns) {
+          if (turnThinking && currentTurn < maxTurns && consecutivePlanningTurns < 3) {
             consecutivePlanningTurns++;
             // Model generated internal reasoning but paused before calling tools or outputting text.
             // Retain the native reasoning on the assistant message so the multi-turn context
@@ -867,22 +868,15 @@ export class ConstAgent {
             };
             conversationHistory.push(thinkingStepMsg);
 
-            // Avoid accumulating duplicate user transition prompts
-            const lastUserMsg = [...conversationHistory].reverse().find((m) => m.role === "user");
-            const isAlreadyPrompted =
-              lastUserMsg &&
-              (lastUserMsg.content.includes("tool call") || lastUserMsg.content.includes("Output token limit"));
-
-            if (!isAlreadyPrompted) {
-              conversationHistory.push({
-                role: "user",
-                content:
-                  turnFinishReason === "length"
-                    ? "Output token limit reached during planning. Without further reasoning, immediately invoke the required tool call (such as 'write' or 'edit')."
-                    : "Proceed immediately with the required tool calls (e.g. 'write' or 'edit') based on your analysis to complete the task.",
-                timestamp: Date.now(),
-              });
-            }
+            // Maintain strictly alternating user/assistant turns in API payload
+            conversationHistory.push({
+              role: "user",
+              content:
+                turnFinishReason === "length"
+                  ? "Output token limit reached during planning. Without further reasoning, immediately invoke the required tool call (such as 'write' or 'edit')."
+                  : "Proceed immediately with the required tool calls (e.g. 'write' or 'edit') based on your analysis to complete the task.",
+              timestamp: Date.now(),
+            });
 
             onEvent({
               type: "status",
@@ -909,10 +903,12 @@ export class ConstAgent {
 
         if (toolCalls.length > 0) {
           consecutivePlanningTurns = 0;
+          consecutiveDraftCutoffs = 0;
         }
 
         if (toolCalls.length === 0) {
-          if (turnFinishReason === "length" && currentTurn < maxTurns) {
+          if (turnFinishReason === "length" && currentTurn < maxTurns && consecutiveDraftCutoffs < 3) {
+            consecutiveDraftCutoffs++;
             // Response was truncated mid-turn while planning or drafting code!
             // Retract streaming tokens from the UI so partial draft doesn't pollute the chat card
             onEvent({ type: "token_reset" });
@@ -921,7 +917,7 @@ export class ConstAgent {
             const combinedThinking = (turnThinking ? turnThinking + "\n\n" : "") + turnContent;
             conversationHistory.push({
               role: "assistant",
-              content: "",
+              content: "I have prepared the implementation draft. Proceeding now to save the file via tool execution.",
               thinking: combinedThinking,
               timestamp: Date.now(),
             });
