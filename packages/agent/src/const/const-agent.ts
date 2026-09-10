@@ -283,7 +283,21 @@ export function compactHistoryForContext(
   });
 }
 
-function buildConstSystemPrompt(workspacePath: string, customPrompt?: string): string {
+export function estimateTextTokens(text: string): number {
+  if (!text) return 0;
+  return Math.max(1, Math.ceil(text.length / 3.8));
+}
+
+export function estimateToolSchemasTokens(tools: any[] = CONST_DEFAULT_TOOLS): number {
+  try {
+    const raw = JSON.stringify(tools);
+    return Math.ceil(raw.length / 3.8);
+  } catch {
+    return 950;
+  }
+}
+
+export function buildConstSystemPrompt(workspacePath: string, customPrompt?: string): string {
   if (customPrompt) return customPrompt;
 
   const normalizedCwd = workspacePath.replace(/\\/g, "/");
@@ -563,6 +577,7 @@ export class ConstAgent {
               messages: formattedMessages,
               tools: CONST_DEFAULT_TOOLS,
               stream: true,
+              stream_options: { include_usage: true },
               max_tokens: resolvedMaxTokens,
               max_completion_tokens: resolvedMaxTokens,
               ...(this.config.thinkingLevel && this.config.thinkingLevel !== "off"
@@ -648,6 +663,19 @@ export class ConstAgent {
 
               try {
                 const json = JSON.parse(dataStr);
+                if (json.usage) {
+                  const promptTokens = Math.max(0, Math.round(Number(json.usage.prompt_tokens ?? json.usage.input_tokens ?? 0) || 0));
+                  const completionTokens = Math.max(0, Math.round(Number(json.usage.completion_tokens ?? json.usage.output_tokens ?? 0) || 0));
+                  const totalTokens = Math.max(0, Math.round(Number(json.usage.total_tokens ?? (promptTokens + completionTokens)) || (promptTokens + completionTokens)));
+                  if (totalTokens > 0) {
+                    onEvent({
+                      type: "usage",
+                      promptTokens,
+                      completionTokens,
+                      totalTokens,
+                    });
+                  }
+                }
                 const choice = json.choices?.[0];
                 if (choice?.finish_reason) {
                   turnFinishReason = choice.finish_reason;
@@ -727,6 +755,19 @@ export class ConstAgent {
           if (dataStr && dataStr !== "[DONE]") {
             try {
               const json = JSON.parse(dataStr);
+              if (json.usage) {
+                const promptTokens = Math.max(0, Math.round(Number(json.usage.prompt_tokens ?? json.usage.input_tokens ?? 0) || 0));
+                const completionTokens = Math.max(0, Math.round(Number(json.usage.completion_tokens ?? json.usage.output_tokens ?? 0) || 0));
+                const totalTokens = Math.max(0, Math.round(Number(json.usage.total_tokens ?? (promptTokens + completionTokens)) || (promptTokens + completionTokens)));
+                if (totalTokens > 0) {
+                  onEvent({
+                    type: "usage",
+                    promptTokens,
+                    completionTokens,
+                    totalTokens,
+                  });
+                }
+              }
               const choice = json.choices?.[0];
               if (choice?.finish_reason) {
                 turnFinishReason = choice.finish_reason;

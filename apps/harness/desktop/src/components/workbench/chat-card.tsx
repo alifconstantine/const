@@ -57,9 +57,15 @@ function getThinkingDescription(lvl: string): string {
 }
 
 function formatTokenDisplay(tokens: number): string {
-  if (tokens < 1000) return `${tokens}`;
-  if (tokens < 1_000_000) return `${(tokens / 1000).toFixed(1)}K`;
-  return `${(tokens / 1_000_000).toFixed(1)}M`;
+  if (!tokens || isNaN(tokens) || tokens <= 0) return "0";
+  const rounded = Math.round(tokens);
+  if (rounded < 1000) return `${rounded}`;
+  if (rounded < 1_000_000) {
+    const k = rounded / 1000;
+    return k >= 100 ? `${Math.round(k)}K` : `${k.toFixed(1).replace(/\.0$/, "")}K`;
+  }
+  const m = rounded / 1_000_000;
+  return `${m.toFixed(1).replace(/\.0$/, "")}M`;
 }
 
 function formatDurationDisplay(ms: number): string {
@@ -106,6 +112,19 @@ export interface ContextUsageData {
   messagesTokens?: number;
 }
 
+export interface ModelItem {
+  id: string;
+  name: string;
+  desc?: string;
+  provider: string;
+  providerName: string;
+  supportsThinking?: boolean;
+  thinkingLevels?: string[];
+  defaultThinkingLevel?: string;
+  maxOutputTokens?: number;
+  contextWindow?: number;
+}
+
 interface ChatCardProps {
   onSendMessage?: (payload: {
     prompt: string;
@@ -123,6 +142,7 @@ interface ChatCardProps {
   metrics?: ConversationMetrics;
   project?: string;
   onProjectChange?: (project: string) => void;
+  onModelChange?: (model: ModelItem) => void;
   onOpenSettings?: (tab?: string) => void;
   initialPrompt?: string;
 }
@@ -136,6 +156,7 @@ export function ChatCard({
   metrics,
   project: initialProject,
   onProjectChange,
+  onModelChange,
   onOpenSettings,
   initialPrompt,
 }: ChatCardProps) {
@@ -230,17 +251,6 @@ export function ChatCard({
 
   // 3. Model Selector State (Persistent in localStorage & ~/.const/config.json)
   const quota = useQuery(api.router.quotas.getUserQuota, {});
-  interface ModelItem {
-    id: string;
-    name: string;
-    desc?: string;
-    provider: string;
-    providerName: string;
-    supportsThinking?: boolean;
-    thinkingLevels?: string[];
-    defaultThinkingLevel?: string;
-    maxOutputTokens?: number;
-  }
   const isConstProvider = (p?: string) => {
     if (!p) return true;
     const clean = p.toLowerCase().trim();
@@ -265,6 +275,7 @@ export function ChatCard({
       thinkingLevels: ["low", "medium", "high"],
       defaultThinkingLevel: "medium",
       maxOutputTokens: 128000,
+      contextWindow: 128000,
     },
     {
       id: "deepseek-v4-pro",
@@ -276,6 +287,7 @@ export function ChatCard({
       thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
       defaultThinkingLevel: "high",
       maxOutputTokens: 128000,
+      contextWindow: 128000,
     },
     {
       id: "deepseek-v4-flash-vision-exp",
@@ -287,6 +299,7 @@ export function ChatCard({
       thinkingLevels: ["low", "medium", "high"],
       defaultThinkingLevel: "medium",
       maxOutputTokens: 128000,
+      contextWindow: 128000,
     },
     {
       id: "gemini-3.6-flash",
@@ -298,6 +311,7 @@ export function ChatCard({
       thinkingLevels: ["low", "medium", "high"],
       defaultThinkingLevel: "medium",
       maxOutputTokens: 128000,
+      contextWindow: 1048576,
     },
     {
       id: "gemini-3.7-flash",
@@ -309,6 +323,7 @@ export function ChatCard({
       thinkingLevels: ["low", "medium", "high"],
       defaultThinkingLevel: "medium",
       maxOutputTokens: 128000,
+      contextWindow: 1048576,
     },
     {
       id: "gemini-3.8-flash",
@@ -320,6 +335,7 @@ export function ChatCard({
       thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
       defaultThinkingLevel: "medium",
       maxOutputTokens: 128000,
+      contextWindow: 1048576,
     },
     {
       id: "combo/auto",
@@ -331,6 +347,7 @@ export function ChatCard({
       thinkingLevels: ["low", "medium", "high"],
       defaultThinkingLevel: "medium",
       maxOutputTokens: 128000,
+      contextWindow: 1000000,
     },
     {
       id: "combo/fast",
@@ -340,6 +357,7 @@ export function ChatCard({
       providerName: "ConstRouter",
       supportsThinking: false,
       maxOutputTokens: 128000,
+      contextWindow: 1000000,
     },
     {
       id: "combo/coding",
@@ -351,6 +369,7 @@ export function ChatCard({
       thinkingLevels: ["low", "medium", "high"],
       defaultThinkingLevel: "high",
       maxOutputTokens: 128000,
+      contextWindow: 1000000,
     },
   ]);
 
@@ -412,6 +431,12 @@ export function ChatCard({
       models[0]
     );
   }, [models, selectedModel]);
+
+  useEffect(() => {
+    if (currentModelItem) {
+      onModelChange?.(currentModelItem);
+    }
+  }, [currentModelItem, onModelChange]);
 
   const isThinkingSupported = Boolean(
     currentModelItem?.id === "combo/fast"
@@ -511,6 +536,10 @@ export function ChatCard({
                     : undefined),
                 defaultThinkingLevel,
                 maxOutputTokens: m.maxOutputTokens ?? m.max_output_tokens ?? (isConst ? 128000 : 65536),
+                contextWindow:
+                  m.contextWindow ??
+                  m.context_window ??
+                  (m.id?.includes("gemini") ? 1048576 : (m.id?.includes("combo") ? 1000000 : 128000)),
               };
             });
 
@@ -678,12 +707,52 @@ export function ChatCard({
     ws.toLowerCase().includes(searchWorkspace.toLowerCase())
   );
 
-  const usedTokens = contextUsage?.usedTokens || 33800;
-  const totalTokens = contextUsage?.totalTokens || 1_000_000;
-  const systemPromptTokens = contextUsage?.systemPromptTokens || 9200;
-  const toolsTokens = contextUsage?.toolsTokens || 224;
-  const messagesTokens = contextUsage?.messagesTokens || Math.max(0, usedTokens - systemPromptTokens - toolsTokens);
-  const percentUsed = Math.max(1, Math.min(100, Math.round((usedTokens / totalTokens) * 100)));
+  // Real-time calculation of tokens for draft prompt and pending attachments
+  const draftInputTokens = useMemo(() => {
+    let tokens = 0;
+    if (prompt && prompt.trim().length > 0) {
+      tokens += Math.max(1, Math.ceil(prompt.trim().length / 3.8));
+    }
+    if (attachments && attachments.length > 0) {
+      for (const att of attachments) {
+        if (att.type === "image") {
+          tokens += 258;
+        } else if (att.size && att.size > 0) {
+          tokens += Math.max(10, Math.ceil(att.size / 3.8));
+        } else {
+          tokens += 50;
+        }
+      }
+    }
+    return tokens;
+  }, [prompt, attachments]);
+
+  const modelContextLimit = useMemo(() => {
+    if (currentModelItem?.contextWindow && currentModelItem.contextWindow > 0) {
+      return currentModelItem.contextWindow;
+    }
+    const id = (currentModelItem?.id || selectedModel || "").toLowerCase();
+    if (id.includes("gemini")) return 1_048_576;
+    if (id.includes("combo")) return 1_000_000;
+    if (id.includes("deepseek")) return 128_000;
+    if (id.includes("claude")) return 200_000;
+    if (id.includes("gpt-4")) return 128_000;
+    return contextUsage?.totalTokens ?? 1_000_000;
+  }, [currentModelItem, selectedModel, contextUsage?.totalTokens]);
+
+  const totalTokens = modelContextLimit > 0 ? modelContextLimit : 1_000_000;
+  const systemPromptTokens = contextUsage?.systemPromptTokens ?? 850;
+  const toolsTokens = contextUsage?.toolsTokens ?? 950;
+  const messagesTokens = contextUsage?.messagesTokens ?? 0;
+  const effectiveMessagesTokens = Math.max(
+    messagesTokens,
+    (contextUsage?.usedTokens ?? 0) - (systemPromptTokens + toolsTokens)
+  );
+  const baseUsedTokens = systemPromptTokens + toolsTokens + effectiveMessagesTokens;
+  const usedTokens = baseUsedTokens + draftInputTokens;
+  const rawPercentUsed = totalTokens > 0 ? (usedTokens / totalTokens) * 100 : 0;
+  const safePercent = isFinite(rawPercentUsed) ? Math.min(100, Math.max(0, rawPercentUsed)) : 0;
+  const percentUsed = safePercent >= 1 ? Math.round(safePercent) : +safePercent.toFixed(1);
 
   return (
     <div className="w-full max-w-full flex flex-col items-center gap-2 select-none min-w-0">
@@ -1115,127 +1184,168 @@ export function ChatCard({
               </div>
             </div>
 
-            {/* Right Actions: Context Window (1st, only if compact), Model Selector (2nd), Send Button (3rd) */}
+            {/* Right Actions: Context Window, Model Selector, Send Button */}
             <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 ml-auto">
-              {/* 1. Context Windows Indicator & Detailed Popover (Only visible when conversation is active) */}
-              {compact && (
-                <div className="relative" ref={contextMenuRef}>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsContextOpen((prev) => !prev);
-                      setIsModelOpen(false);
-                      setIsModeOpen(false);
-                      setIsProjectOpen(false);
-                      setIsPlusOpen(false);
-                    }}
-                    className="w-6 h-6 flex items-center justify-center rounded-md text-[#a9a9a9] dark:text-[#777777] hover:text-[#262626] dark:hover:text-[#d4d4d4] hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
-                    title="Context window usage"
-                    aria-label="Context window usage"
+              {/* 1. Context Windows Indicator & Detailed Popover */}
+              <div className="relative" ref={contextMenuRef}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsContextOpen((prev) => !prev);
+                    setIsModelOpen(false);
+                    setIsModeOpen(false);
+                    setIsProjectOpen(false);
+                    setIsPlusOpen(false);
+                  }}
+                  className={`w-6 h-6 flex items-center justify-center rounded-md transition-colors cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 ${
+                    rawPercentUsed >= 90
+                      ? "text-red-500 hover:text-red-400"
+                      : rawPercentUsed >= 75
+                      ? "text-[#e79737] hover:text-[#ff9838]"
+                      : "text-[#a9a9a9] dark:text-[#777777] hover:text-[#262626] dark:hover:text-[#d4d4d4]"
+                  }`}
+                  title={`Context window: ${rawPercentUsed === 0 ? "0%" : rawPercentUsed < 0.1 ? "<0.1%" : `${percentUsed}%`} (~${formatTokenDisplay(usedTokens)} / ${formatTokenDisplay(totalTokens)})`}
+                  aria-label="Context window usage"
+                >
+                  <svg
+                    className="w-3.5 h-3.5 transform -rotate-90"
+                    viewBox="0 0 24 24"
                   >
-                    <svg
-                      className="w-3.5 h-3.5 transform -rotate-90 text-[#a9a9a9] dark:text-[#777777] hover:text-[#262626] dark:hover:text-[#d4d4d4]"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        cx="12"
-                        cy="12"
-                        r="9"
-                        fill="none"
-                        stroke="currentColor"
-                        className="text-[#e2e2e4] dark:text-[#383838]"
-                        strokeWidth="2.5"
-                      />
-                      <circle
-                        cx="12"
-                        cy="12"
-                        r="9"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.5"
-                        strokeDasharray={56.5}
-                        strokeDashoffset={
-                          56.5 - (56.5 * Math.min(100, Math.max(3, percentUsed))) / 100
-                        }
-                        strokeLinecap="round"
-                      />
-                    </svg>
-                  </button>
+                    <circle
+                      cx="12"
+                      cy="12"
+                      r="9"
+                      fill="none"
+                      stroke="currentColor"
+                      className="text-[#e2e2e4] dark:text-[#383838]"
+                      strokeWidth="2.5"
+                    />
+                    <circle
+                      cx="12"
+                      cy="12"
+                      r="9"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      strokeDasharray={56.55}
+                      strokeDashoffset={
+                        56.55 - (56.55 * safePercent) / 100
+                      }
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                </button>
 
-                  {/* Context Window Popover */}
-                  {isContextOpen && (
-                    <div className="absolute bottom-full mb-2 right-0 w-80 bg-white dark:bg-[#1e1e1e] border border-[#e2e2e4] dark:border-[#383838] rounded-2xl shadow-2xl p-4 z-50 flex flex-col gap-3 text-left select-none animate-in fade-in zoom-in-95 duration-100">
-                      {/* Header: % of context used and tokens */}
-                      <div className="flex items-center justify-between text-[13px]">
-                        <span className="text-[#161616] dark:text-white font-medium">
-                          {percentUsed}% of context used
-                        </span>
-                        <span className="font-mono text-[12px] text-[#a9a9a9] dark:text-[#a0a0a0]">
-                          ~{formatTokenDisplay(usedTokens)} / {totalTokens >= 1_000_000 ? `${(totalTokens / 1_000_000).toFixed(0)}M` : `${(totalTokens / 1000).toFixed(0)}K`}
-                        </span>
-                      </div>
+                {/* Context Window Popover */}
+                {isContextOpen && (
+                  <div className="absolute bottom-full mb-2 right-0 w-80 bg-white dark:bg-[#1e1e1e] border border-[#e2e2e4] dark:border-[#383838] rounded-2xl shadow-2xl p-4 z-50 flex flex-col gap-3 text-left select-none animate-in fade-in zoom-in-95 duration-100">
+                    {/* Header: % of context used and tokens */}
+                    <div className="flex items-center justify-between text-[13px]">
+                      <span className="text-[#161616] dark:text-white font-medium">
+                        {rawPercentUsed === 0 ? "0%" : rawPercentUsed < 0.1 ? "<0.1%" : `${percentUsed}%`} of context used
+                      </span>
+                      <span className="font-mono text-[12px] text-[#a9a9a9] dark:text-[#a0a0a0]">
+                        ~{formatTokenDisplay(usedTokens)} / {formatTokenDisplay(totalTokens)}
+                      </span>
+                    </div>
 
-                      {/* Multi-segment Horizontal Progress Bar */}
-                      <div className="w-full h-2 bg-[#f0f0f2] dark:bg-[#2d2d2d] rounded-full overflow-hidden flex gap-0.5">
+                    {/* Multi-segment Horizontal Progress Bar */}
+                    <div className="w-full h-2 bg-[#f0f0f2] dark:bg-[#2d2d2d] rounded-full overflow-hidden flex gap-0.5">
+                      {systemPromptTokens > 0 && (
                         <div
-                          className="bg-[#71717a] h-full rounded-l-full transition-all"
+                          className="bg-[#71717a] h-full transition-all"
                           style={{
-                            width: `${Math.max(1, (systemPromptTokens / totalTokens) * 100)}%`,
+                            width: `${Math.max(0.5, (systemPromptTokens / totalTokens) * 100)}%`,
                           }}
                           title={`System prompt: ~${formatTokenDisplay(systemPromptTokens)}`}
                         />
+                      )}
+                      {toolsTokens > 0 && (
                         <div
                           className="bg-[#a855f7] h-full transition-all"
                           style={{
-                            width: `${Math.max(1, (toolsTokens / totalTokens) * 100)}%`,
+                            width: `${Math.max(0.5, (toolsTokens / totalTokens) * 100)}%`,
                           }}
                           title={`Tools: ~${formatTokenDisplay(toolsTokens)}`}
                         />
+                      )}
+                      {effectiveMessagesTokens > 0 && (
                         <div
-                          className="bg-[#3b82f6] h-full rounded-r-full transition-all"
+                          className="bg-[#3b82f6] h-full transition-all"
                           style={{
-                            width: `${Math.max(1, (messagesTokens / totalTokens) * 100)}%`,
+                            width: `${Math.max(0.5, (effectiveMessagesTokens / totalTokens) * 100)}%`,
                           }}
-                          title={`Messages: ~${formatTokenDisplay(messagesTokens)}`}
+                          title={`Messages: ~${formatTokenDisplay(effectiveMessagesTokens)}`}
                         />
+                      )}
+                      {draftInputTokens > 0 && (
+                        <div
+                          className="bg-[#10b981] h-full transition-all"
+                          style={{
+                            width: `${Math.max(0.5, (draftInputTokens / totalTokens) * 100)}%`,
+                          }}
+                          title={`Current input: ~${formatTokenDisplay(draftInputTokens)}`}
+                        />
+                      )}
+                    </div>
+
+                    {/* Legend / Breakdown List */}
+                    <div className="flex flex-col gap-2 pt-1">
+                      <div className="flex items-center justify-between text-[12px]">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2.5 h-2.5 rounded-xs bg-[#71717a] shrink-0" />
+                          <span className="text-[#262626] dark:text-[#d4d4d4]">System prompt</span>
+                        </div>
+                        <span className="font-mono text-[#262626] dark:text-[#d4d4d4]">
+                          ~{formatTokenDisplay(systemPromptTokens)}
+                        </span>
                       </div>
 
-                      {/* Legend / Breakdown List */}
-                      <div className="flex flex-col gap-2 pt-1">
-                        <div className="flex items-center justify-between text-[12px]">
-                          <div className="flex items-center gap-2">
-                            <div className="w-2.5 h-2.5 rounded-xs bg-[#71717a] shrink-0" />
-                            <span className="text-[#262626] dark:text-[#d4d4d4]">System prompt</span>
-                          </div>
-                          <span className="font-mono text-[#262626] dark:text-[#d4d4d4]">
-                            ~{formatTokenDisplay(systemPromptTokens)}
-                          </span>
+                      <div className="flex items-center justify-between text-[12px]">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2.5 h-2.5 rounded-xs bg-[#a855f7] shrink-0" />
+                          <span className="text-[#262626] dark:text-[#d4d4d4]">Tools</span>
                         </div>
+                        <span className="font-mono text-[#262626] dark:text-[#d4d4d4]">
+                          ~{formatTokenDisplay(toolsTokens)}
+                        </span>
+                      </div>
 
-                        <div className="flex items-center justify-between text-[12px]">
-                          <div className="flex items-center gap-2">
-                            <div className="w-2.5 h-2.5 rounded-xs bg-[#a855f7] shrink-0" />
-                            <span className="text-[#262626] dark:text-[#d4d4d4]">Tools</span>
-                          </div>
-                          <span className="font-mono text-[#262626] dark:text-[#d4d4d4]">
-                            ~{formatTokenDisplay(toolsTokens)}
-                          </span>
+                      <div className="flex items-center justify-between text-[12px]">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2.5 h-2.5 rounded-xs bg-[#3b82f6] shrink-0" />
+                          <span className="text-[#262626] dark:text-[#d4d4d4]">Messages</span>
                         </div>
+                        <span className="font-mono text-[#262626] dark:text-[#d4d4d4]">
+                          ~{formatTokenDisplay(effectiveMessagesTokens)}
+                        </span>
+                      </div>
 
+                      {draftInputTokens > 0 && (
                         <div className="flex items-center justify-between text-[12px]">
                           <div className="flex items-center gap-2">
-                            <div className="w-2.5 h-2.5 rounded-xs bg-[#3b82f6] shrink-0" />
-                            <span className="text-[#262626] dark:text-[#d4d4d4]">Messages</span>
+                            <div className="w-2.5 h-2.5 rounded-xs bg-[#10b981] shrink-0" />
+                            <span className="text-[#10b981] font-medium">Current input</span>
                           </div>
-                          <span className="font-mono text-[#262626] dark:text-[#d4d4d4]">
-                            ~{formatTokenDisplay(messagesTokens)}
+                          <span className="font-mono text-[#10b981]">
+                            ~{formatTokenDisplay(draftInputTokens)}
                           </span>
                         </div>
+                      )}
+
+                      <div className="flex items-center justify-between text-[12px] pt-1 border-t border-[#e2e2e4] dark:border-[#383838]/60">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2.5 h-2.5 rounded-xs bg-[#e2e2e4] dark:bg-[#383838] shrink-0" />
+                          <span className="text-[#777777] dark:text-[#888888]">Available context</span>
+                        </div>
+                        <span className="font-mono text-[#777777] dark:text-[#888888]">
+                          ~{formatTokenDisplay(Math.max(0, totalTokens - usedTokens))}
+                        </span>
                       </div>
                     </div>
-                  )}
-                </div>
-              )}
+                  </div>
+                )}
+              </div>
 
               {/* 2. Model Selector Dropdown (Const ∨) */}
               <div className="relative" ref={modelMenuRef}>

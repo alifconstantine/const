@@ -22,6 +22,7 @@ import {
   ChatCard,
   type ConversationMetrics,
   type ContextUsageData,
+  type ModelItem,
   type AttachedFile,
   formatFileSize,
 } from "./components/workbench/chat-card";
@@ -179,6 +180,12 @@ function AuthenticatedContent({
   const [currentProject, setCurrentProject] = useState<string>(() => {
     return localStorage.getItem("const_harness_current_project") || "Outside Project";
   });
+  const [activeModelItem, setActiveModelItem] = useState<ModelItem | null>(null);
+  const [lastKnownLlmUsage, setLastKnownLlmUsage] = useState<{
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  } | null>(null);
 
   // Right Sidebar (Side Pane) state & tab management
   const [isRightSidebarOpen, setIsRightSidebarOpen] = useState<boolean>(() => {
@@ -521,8 +528,11 @@ function AuthenticatedContent({
 
   // Dynamic Context Usage computation (Image 3)
   const contextUsage = useMemo<ContextUsageData>(() => {
-    const systemPromptTokens = 9200;
-    const toolsTokens = 2400;
+    // Exact estimate based on agent system prompt + registered tools
+    // System prompt: ~850 tokens (const system prompt template)
+    // Tools schemas: ~950 tokens (11 agent tools JSON schemas)
+    const systemPromptTokens = 850;
+    const toolsTokens = 950;
 
     // Estimate tokens dynamically from active conversation messages (chars / ~3.8)
     const messagesTokens = Math.round(
@@ -530,12 +540,36 @@ function AuthenticatedContent({
         const contentChars = (msg.content || "").length;
         const thinkingChars = (msg.thinking || "").length;
         const toolCallsChars = msg.toolCalls ? JSON.stringify(msg.toolCalls).length : 0;
-        return sum + (contentChars + thinkingChars + toolCallsChars) / 3.8;
+        let traceStepsChars = 0;
+        if (msg.traceSteps) {
+          for (const step of msg.traceSteps) {
+            if (step.type === "tool" && step.result) {
+              traceStepsChars += (typeof step.result === "string" ? step.result : JSON.stringify(step.result)).length;
+            }
+          }
+        }
+        let attachmentTokens = 0;
+        if (msg.attachments) {
+          for (const att of msg.attachments) {
+            if (att.type === "image") attachmentTokens += 1600;
+            else if (att.type === "video") attachmentTokens += 3200;
+            else attachmentTokens += Math.round((att.size || 0) / 4);
+          }
+        }
+        return sum + (contentChars + thinkingChars + toolCallsChars + traceStepsChars) / 3.8 + attachmentTokens;
       }, 0)
     );
 
-    const totalTokens = 1_000_000;
-    const usedTokens = systemPromptTokens + toolsTokens + messagesTokens;
+    const modelLimit = activeModelItem?.contextWindow || 1_048_576;
+    const totalTokens = modelLimit;
+
+    // If we have verified ground-truth usage from the LLM provider API:
+    let usedTokens: number;
+    if (lastKnownLlmUsage && lastKnownLlmUsage.totalTokens > 0) {
+      usedTokens = Math.max(lastKnownLlmUsage.totalTokens, systemPromptTokens + toolsTokens + messagesTokens);
+    } else {
+      usedTokens = systemPromptTokens + toolsTokens + messagesTokens;
+    }
 
     return {
       usedTokens,
@@ -544,7 +578,17 @@ function AuthenticatedContent({
       toolsTokens,
       messagesTokens,
     };
-  }, [messages]);
+  }, [messages, activeModelItem, lastKnownLlmUsage]);
+
+  const contextUsageRef = React.useRef(contextUsage);
+  useEffect(() => {
+    contextUsageRef.current = contextUsage;
+  }, [contextUsage]);
+
+  const activeModelItemRef = React.useRef(activeModelItem);
+  useEffect(() => {
+    activeModelItemRef.current = activeModelItem;
+  }, [activeModelItem]);
 
   // Dynamic Conversation Metrics for footer bar (Image 2)
   const conversationMetrics = useMemo<ConversationMetrics | undefined>(() => {
@@ -575,12 +619,12 @@ function AuthenticatedContent({
     );
 
     // Multi-turn context accumulates input tokens across turns
-    const baseInputTokensPerTurn = 9200 + 2400;
+    const baseInputTokensPerTurn = 850 + 950;
     const messageInputTokens = Math.round(
       userMessages.reduce((sum, m) => sum + (m.content?.length || 0) / 3.8, 0)
     );
     const inputTokens = Math.max(
-      11600,
+      1800,
       baseInputTokensPerTurn * turns + messageInputTokens + Math.round(outputTokens * 0.5)
     );
 
@@ -891,6 +935,30 @@ function AuthenticatedContent({
         if (targetConvoId === conversationIdRef.current) {
           setMessages(targetMsgs);
         }
+      } else if (event.type === "usage") {
+        const usage = event.usage || event;
+        const promptTokens = Math.max(0, Math.round(Number(usage.promptTokens ?? usage.prompt_tokens ?? 0) || 0));
+        const completionTokens = Math.max(0, Math.round(Number(usage.completionTokens ?? usage.completion_tokens ?? 0) || 0));
+        const totalTokens = Math.max(0, Math.round(Number(usage.totalTokens ?? usage.total_tokens ?? (promptTokens + completionTokens)) || (promptTokens + completionTokens)));
+        if (totalTokens > 0) {
+          if (targetConvoId === conversationIdRef.current) {
+            setLastKnownLlmUsage({ promptTokens, completionTokens, totalTokens });
+          }
+          const stored = loadConversations();
+          const target = stored.find((c) => c.id === targetConvoId);
+          if (target) {
+            const sys = target.contextUsage?.systemPromptTokens ?? 850;
+            const tls = target.contextUsage?.toolsTokens ?? 950;
+            target.contextUsage = {
+              usedTokens: totalTokens,
+              totalTokens: target.contextUsage?.totalTokens || (activeModelItemRef.current?.contextWindow || 1_048_576),
+              systemPromptTokens: sys,
+              toolsTokens: tls,
+              messagesTokens: Math.max(0, totalTokens - (sys + tls)),
+            };
+            saveConversation(target);
+          }
+        }
       } else if (event.type === "done") {
         setRunningConvoIds((prev) => {
           const next = new Set(prev);
@@ -940,6 +1008,7 @@ function AuthenticatedContent({
         if (target) {
           target.messages = targetMsgs;
           target.updatedAt = Date.now();
+          target.contextUsage = contextUsageRef.current;
           saveConversation(target);
           setConversations(loadConversations());
         }
@@ -1107,6 +1176,7 @@ function AuthenticatedContent({
       createdAt: Date.now(),
       updatedAt: Date.now(),
       messages: currentStreamMessages,
+      contextUsage: contextUsage,
     };
     saveConversation(updatedConvo);
     setConversations(loadConversations());
@@ -1320,6 +1390,7 @@ function AuthenticatedContent({
     setConversationTitle("");
     setConversationId(`session_${Date.now()}`);
     setEditingPrompt("");
+    setLastKnownLlmUsage(null);
     if (targetProject) {
       setCurrentProject(targetProject);
       localStorage.setItem("const_harness_current_project", targetProject);
@@ -1338,6 +1409,15 @@ function AuthenticatedContent({
       setCurrentProject(target?.project || "Outside Project");
       setMessages([...activeRunningMsgs]);
       setEditingPrompt("");
+      if (target?.contextUsage?.usedTokens) {
+        setLastKnownLlmUsage({
+          promptTokens: target.contextUsage.usedTokens,
+          completionTokens: 0,
+          totalTokens: target.contextUsage.usedTokens,
+        });
+      } else {
+        setLastKnownLlmUsage(null);
+      }
       return;
     }
 
@@ -1356,6 +1436,15 @@ function AuthenticatedContent({
       setCurrentProject(target.project || "Outside Project");
       setMessages(normalizeUiMessages(target.messages || []));
       setEditingPrompt("");
+      if (target.contextUsage?.usedTokens) {
+        setLastKnownLlmUsage({
+          promptTokens: target.contextUsage.usedTokens,
+          completionTokens: 0,
+          totalTokens: target.contextUsage.usedTokens,
+        });
+      } else {
+        setLastKnownLlmUsage(null);
+      }
     }
   };
 
@@ -1527,6 +1616,7 @@ function AuthenticatedContent({
                   onProjectChange={setCurrentProject}
                   onOpenSettings={(tab) => handleOpenSettings(tab || "model-settings")}
                   initialPrompt={editingPrompt}
+                  onModelChange={setActiveModelItem}
                 />
               </div>
             </div>
@@ -1740,6 +1830,7 @@ function AuthenticatedContent({
                   onProjectChange={setCurrentProject}
                   onOpenSettings={(tab) => handleOpenSettings(tab || "model-settings")}
                   initialPrompt={editingPrompt}
+                  onModelChange={setActiveModelItem}
                 />
               </div>
             </div>

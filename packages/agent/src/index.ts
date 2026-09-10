@@ -170,5 +170,8 @@ export {
 	extractFallbackToolCalls,
 	compactHistoryForContext,
 	isDevServerCommand,
+	estimateTextTokens,
+	estimateToolSchemasTokens,
+	buildConstSystemPrompt,
 } from "./const/index.ts";
 

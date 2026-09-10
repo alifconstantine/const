@@ -12,6 +12,9 @@ export interface ConversationItem {
   contextUsage?: {
     usedTokens: number;
     totalTokens: number;
+    systemPromptTokens?: number;
+    toolsTokens?: number;
+    messagesTokens?: number;
   };
   diffStats?: {
     additions: number;

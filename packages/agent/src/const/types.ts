@@ -32,6 +32,7 @@ export interface ModelConfig {
   thinkingLevels?: string[];
   defaultThinkingLevel?: string;
   maxOutputTokens?: number;
+  contextWindow?: number;
 }
 
 import type { FileMutationRecord } from "./mutation-ledger.js";
@@ -43,6 +44,7 @@ export interface AgentEventMap {
   tool_call: { toolCallId: string; toolName: string; args: any };
   tool_result: { toolCallId: string; toolName: string; result: any; isError?: boolean };
   file_mutation: { record: FileMutationRecord };
+  usage: { promptTokens: number; completionTokens: number; totalTokens: number };
   status: { status: "idle" | "thinking" | "calling_tool" | "streaming" | "done" | "error"; message?: string };
   done: { fullContent: string; messages: AgentMessage[] };
   error: { error: string };

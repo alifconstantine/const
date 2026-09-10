@@ -522,6 +522,7 @@ app.whenReady().then(() => {
               thinkingLevels: m.thinking_levels || m.thinkingLevels || (supportsThinking ? ["low", "medium", "high"] : undefined),
               defaultThinkingLevel: m.default_thinking_level || m.defaultThinkingLevel || "medium",
               maxOutputTokens: m.max_output_tokens || m.maxOutputTokens || 128000,
+              contextWindow: m.context_window || m.contextWindow || (m.id.includes("gemini") ? 1048576 : 128000),
             };
           });
         }
@@ -545,6 +546,7 @@ app.whenReady().then(() => {
         thinkingLevels: (m as any).thinkingLevels || (supportsThinking ? ["low", "medium", "high"] : undefined),
         defaultThinkingLevel: (m as any).defaultThinkingLevel || "medium",
         maxOutputTokens: (m as any).maxOutputTokens || 65536,
+        contextWindow: (m as any).contextWindow || (m as any).context_window || 128000,
       };
     });
 

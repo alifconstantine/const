@@ -11,6 +11,7 @@ export const DEFAULT_MODELS: ModelConfig[] = [
     thinkingLevels: ["low", "medium", "high"],
     defaultThinkingLevel: "medium",
     maxOutputTokens: 128000,
+    contextWindow: 1048576,
   },
   {
     id: "gemini-3.7-flash",
@@ -22,6 +23,7 @@ export const DEFAULT_MODELS: ModelConfig[] = [
     thinkingLevels: ["low", "medium", "high"],
     defaultThinkingLevel: "medium",
     maxOutputTokens: 128000,
+    contextWindow: 1048576,
   },
   {
     id: "gemini-3.8-flash",
@@ -33,6 +35,7 @@ export const DEFAULT_MODELS: ModelConfig[] = [
     thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
     defaultThinkingLevel: "medium",
     maxOutputTokens: 128000,
+    contextWindow: 1048576,
   },
   {
     id: "combo/auto",
@@ -44,6 +47,7 @@ export const DEFAULT_MODELS: ModelConfig[] = [
     thinkingLevels: ["low", "medium", "high"],
     defaultThinkingLevel: "medium",
     maxOutputTokens: 128000,
+    contextWindow: 1000000,
   },
   {
     id: "combo/fast",
@@ -53,6 +57,7 @@ export const DEFAULT_MODELS: ModelConfig[] = [
     supportsThinking: false,
     supportsTools: true,
     maxOutputTokens: 128000,
+    contextWindow: 1000000,
   },
   {
     id: "combo/coding",
@@ -64,6 +69,7 @@ export const DEFAULT_MODELS: ModelConfig[] = [
     thinkingLevels: ["low", "medium", "high"],
     defaultThinkingLevel: "high",
     maxOutputTokens: 128000,
+    contextWindow: 1000000,
   },
 ];
 
