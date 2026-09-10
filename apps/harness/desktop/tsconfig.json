@@ -8,12 +8,12 @@
       "@/*": ["./src/*"],
       "@const/ui": ["../../../packages/ui/src/index.ts"],
       "@const/ui/*": ["../../../packages/ui/src/*"],
-      "@const/agent": ["../../../packages/agent/dist/index.d.ts"],
-      "@const/agent/*": ["../../../packages/agent/dist/*.d.ts"],
-      "@const/ai": ["../../../packages/ai/dist/index.d.ts"],
-      "@const/ai/*": ["../../../packages/ai/dist/*.d.ts"],
-      "@const/coding-agent": ["../../../packages/coding-agent/dist/index.d.ts"],
-      "@const/coding-agent/*": ["../../../packages/coding-agent/dist/*.d.ts"],
+      "@const/agent": ["../../../packages/agent/src/const/index.ts"],
+      "@const/agent/*": ["../../../packages/agent/src/const/*"],
+      "@const/ai": ["../../../packages/ai/src/index.ts"],
+      "@const/ai/*": ["../../../packages/ai/src/*"],
+      "@const/coding-agent": ["../../../packages/coding-agent/src/index.ts"],
+      "@const/coding-agent/*": ["../../../packages/coding-agent/src/*"],
       "@const/backend/_generated/*": ["../../../packages/backend/convex/_generated/*"],
       "@const/backend/*": ["../../../packages/backend/convex/*"]
     }

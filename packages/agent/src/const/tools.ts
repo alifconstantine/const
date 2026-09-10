@@ -27,12 +27,16 @@ export function getShellConfig(): ShellConfig {
   if (cachedShellConfig) return cachedShellConfig;
 
   if (process.platform === "win32") {
-    // 1. Check Git Bash in standard locations
+    // 1. Check Git Bash in standard locations and per-user AppData
+    const localAppData =
+      process.env.LOCALAPPDATA ||
+      (process.env.USERPROFILE ? path.join(process.env.USERPROFILE, "AppData", "Local") : "");
     const gitBashCandidates = [
       path.join(process.env.ProgramFiles || "C:\\Program Files", "Git", "bin", "bash.exe"),
       path.join(process.env["ProgramFiles(x86)"] || "C:\\Program Files (x86)", "Git", "bin", "bash.exe"),
+      localAppData ? path.join(localAppData, "Programs", "Git", "bin", "bash.exe") : "",
       "C:\\Program Files\\Git\\bin\\bash.exe",
-    ];
+    ].filter(Boolean);
 
     for (const candidate of gitBashCandidates) {
       if (fsSync.existsSync(candidate)) {
@@ -54,14 +58,25 @@ export function getShellConfig(): ShellConfig {
     return cachedShellConfig;
   }
 
-  // Unix / macOS: /bin/bash, fallback to sh
-  if (fsSync.existsSync("/bin/bash")) {
-    cachedShellConfig = {
-      shell: "/bin/bash",
-      args: ["-c"],
-      type: "bash",
-    };
-    return cachedShellConfig;
+  // Unix / macOS: Check process.env.SHELL first, then standard paths
+  const unixShells = [
+    process.env.SHELL,
+    "/bin/bash",
+    "/usr/bin/bash",
+    "/bin/zsh",
+    "/usr/bin/zsh",
+    "/bin/sh",
+  ].filter(Boolean) as string[];
+
+  for (const candidate of unixShells) {
+    if (candidate.startsWith("/") && fsSync.existsSync(candidate)) {
+      cachedShellConfig = {
+        shell: candidate,
+        args: ["-c"],
+        type: "bash",
+      };
+      return cachedShellConfig;
+    }
   }
 
   cachedShellConfig = {
@@ -80,26 +95,30 @@ export function normalizeWindowsShellPath(filePath: string): string {
   if (!filePath || typeof filePath !== "string") return "";
   let clean = filePath.trim().replace(/^["']|["']$/g, "").trim();
 
-  // Convert Git Bash/MSYS2 paths: /d/Code/... or /cygdrive/c/... -> D:\Code\...
-  const bashDriveMatch = clean.match(/^\/(?:mnt\/|cygdrive\/)?([a-zA-Z])(?:\/(.*))?$/);
-  if (bashDriveMatch) {
-    const drive = bashDriveMatch[1]!.toUpperCase();
-    const rest = (bashDriveMatch[2] || "").replace(/\//g, "\\");
-    return `${drive}:\\${rest}`;
-  }
-
-  // Convert bare drive with slash: d/Code/... or D/Code/... -> D:\Code\...
-  const bareDriveMatch = clean.match(/^([a-zA-Z])\/(.*)$/);
-  if (bareDriveMatch) {
-    const drive = bareDriveMatch[1]!.toUpperCase();
-    const rest = (bareDriveMatch[2] || "").replace(/\//g, "\\");
-    return `${drive}:\\${rest}`;
-  }
-
   // Expand home directory ~
   if (clean === "~" || clean.startsWith("~/") || clean.startsWith("~\\")) {
     const home = os.homedir();
     clean = clean === "~" ? home : path.join(home, clean.slice(2));
+  }
+
+  // Windows-specific drive conversions: only run on Windows
+  if (process.platform === "win32") {
+    // Convert Git Bash/MSYS2 paths: /d/Code/... or /cygdrive/c/... -> D:\Code\...
+    const bashDriveMatch = clean.match(/^\/(?:mnt\/|cygdrive\/)?([a-zA-Z])(?:\/(.*))?$/);
+    if (bashDriveMatch) {
+      const drive = bashDriveMatch[1]!.toUpperCase();
+      const rest = (bashDriveMatch[2] || "").replace(/\//g, "\\");
+      return `${drive}:\\${rest}`;
+    }
+
+    // Convert bare drive with slash: d/Code/... or D/Code/... -> D:\Code\...
+    // Only apply if it has subpaths indicating a drive reference rather than a single relative folder
+    const bareDriveMatch = clean.match(/^([a-zA-Z])\/(.+)$/);
+    if (bareDriveMatch && bareDriveMatch[2] && (bareDriveMatch[2].includes("/") || bareDriveMatch[2].includes("\\") || clean.length > 3)) {
+      const drive = bareDriveMatch[1]!.toUpperCase();
+      const rest = (bareDriveMatch[2] || "").replace(/\//g, "\\");
+      return `${drive}:\\${rest}`;
+    }
   }
 
   return clean;
@@ -116,17 +135,22 @@ export function resolveSafePath(rawPath: string, workspacePath: string): string 
 
 export function isPathWithinWorkspace(targetPath: string, workspacePath: string): boolean {
   if (!targetPath || !workspacePath) return true;
-  const normTarget = path.normalize(targetPath).toLowerCase();
-  const normWorkspace = path.normalize(workspacePath).toLowerCase();
+  const isCaseInsensitive = process.platform === "win32" || process.platform === "darwin";
+  const normTarget = path.normalize(targetPath);
+  const normWorkspace = path.normalize(workspacePath);
 
-  const rel = path.relative(normWorkspace, normTarget);
+  const compareTarget = isCaseInsensitive ? normTarget.toLowerCase() : normTarget;
+  const compareWorkspace = isCaseInsensitive ? normWorkspace.toLowerCase() : normWorkspace;
+
+  const rel = path.relative(compareWorkspace, compareTarget);
   return !rel.startsWith("..") && !path.isAbsolute(rel);
 }
 
 export function isAllowedInternalPath(targetPath: string): boolean {
   if (!targetPath) return false;
-  const normTarget = path.normalize(targetPath).toLowerCase();
-  const constHome = path.join(os.homedir(), ".const").toLowerCase();
+  const isCaseInsensitive = process.platform === "win32" || process.platform === "darwin";
+  const normTarget = isCaseInsensitive ? path.normalize(targetPath).toLowerCase() : path.normalize(targetPath);
+  const constHome = isCaseInsensitive ? path.join(os.homedir(), ".const").toLowerCase() : path.join(os.homedir(), ".const");
 
   return normTarget.startsWith(constHome);
 }
@@ -921,12 +945,14 @@ export async function executeNativeTool(
       }
 
       // 2. CRLF <-> LF tolerant matching
+      const originalEol = fileText.includes("\r\n") ? "\r\n" : "\n";
       const normalizedFileText = fileText.replace(/\r\n/g, "\n");
       const normalizedOld = oldContent.replace(/\r\n/g, "\n");
 
       if (normalizedFileText.includes(normalizedOld)) {
         const updated = normalizedFileText.replace(normalizedOld, newContent.replace(/\r\n/g, "\n"));
-        await fs.writeFile(filePath, updated, "utf-8");
+        const finalContent = originalEol === "\r\n" ? updated.replace(/\n/g, "\r\n") : updated;
+        await fs.writeFile(filePath, finalContent, "utf-8");
 
         options.onFileMutation?.({
           id: `mut_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
@@ -936,7 +962,7 @@ export async function executeNativeTool(
           filePath: filePath,
           targetFile: editDisplayPath || filePath,
           previousContent: fileText,
-          newContent: updated,
+          newContent: finalContent,
           timestamp: Date.now(),
         });
 
@@ -953,7 +979,8 @@ export async function executeNativeTool(
 
       if (trimmedFileText.includes(trimmedOld)) {
         const updated = trimmedFileText.replace(trimmedOld, trimTrailing(newContent.replace(/\r\n/g, "\n")));
-        await fs.writeFile(filePath, updated, "utf-8");
+        const finalContent = originalEol === "\r\n" ? updated.replace(/\n/g, "\r\n") : updated;
+        await fs.writeFile(filePath, finalContent, "utf-8");
 
         options.onFileMutation?.({
           id: `mut_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
@@ -963,7 +990,7 @@ export async function executeNativeTool(
           filePath: filePath,
           targetFile: editDisplayPath || filePath,
           previousContent: fileText,
-          newContent: updated,
+          newContent: finalContent,
           timestamp: Date.now(),
         });
 
@@ -1313,8 +1340,18 @@ export async function executeNativeTool(
         ? targetCwd
         : workspacePath;
 
-      const shellBinary = process.platform === "win32" ? "powershell.exe" : "pwsh";
-      const shellArgs = ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", cmd];
+      let shellBinary = process.platform === "win32" ? "powershell.exe" : "pwsh";
+      let shellArgs = ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", cmd];
+
+      // On Unix, check if pwsh is installed; fallback to system shell if absent
+      if (process.platform !== "win32") {
+        const hasPwsh = fsSync.existsSync("/usr/bin/pwsh") || fsSync.existsSync("/usr/local/bin/pwsh");
+        if (!hasPwsh) {
+          const sysShell = getShellConfig();
+          shellBinary = sysShell.shell;
+          shellArgs = [...sysShell.args, cmd];
+        }
+      }
       const isBuildOrInstall = /(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?(?:build|install|add|compile|test)|(?:tsc|cargo\s+build|dotnet\s+build)/i.test(cmd);
       const isDevServer = isDevServerCommand(cmd);
       const defaultTimeoutSec = isBuildOrInstall ? 180 : (isDevServer ? 30 : 60);

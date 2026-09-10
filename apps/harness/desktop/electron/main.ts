@@ -1313,6 +1313,11 @@ app.whenReady().then(() => {
 
         proc.on("error", (err) => {
           console.error(`[Terminal ${id}] Process error:`, err);
+          activeTerminals.delete(id);
+          if (win && !win.isDestroyed()) {
+            win.webContents.send("terminal:data", { id, data: `\r\n[Terminal Error]: ${err.message}\r\n` });
+            win.webContents.send("terminal:exit", { id, code: 1 });
+          }
         });
 
         return { success: true, id };

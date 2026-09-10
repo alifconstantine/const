@@ -142,6 +142,7 @@ export function extractFallbackToolCalls(content: string): ToolCall[] {
   const tagRegex = /<tool_call>([\s\S]*?)<\/tool_call>/gi;
   let tagMatch: RegExpExecArray | null;
   while ((tagMatch = tagRegex.exec(content)) !== null) {
+    if (!tagMatch[1]) continue;
     try {
       const parsed = JSON.parse(tagMatch[1].trim());
       const name = (parsed.name || parsed.tool || parsed.function?.name || "").toLowerCase();
@@ -164,6 +165,7 @@ export function extractFallbackToolCalls(content: string): ToolCall[] {
   const codeBlockRegex = /```(?:json)?\s*(\{[\s\S]*?\})\s*```/gi;
   let blockMatch: RegExpExecArray | null;
   while ((blockMatch = codeBlockRegex.exec(content)) !== null) {
+    if (!blockMatch[1]) continue;
     try {
       const parsed = JSON.parse(blockMatch[1].trim());
       const name = (parsed.name || parsed.tool || (parsed.action === "command" ? "bash" : "")).toLowerCase();
@@ -226,7 +228,7 @@ export function compactHistoryForContext(
   // Identify the latest user message index
   let latestUserIndex = -1;
   for (let i = messages.length - 1; i >= 0; i--) {
-    if (messages[i].role === "user") {
+    if (messages[i]?.role === "user") {
       latestUserIndex = i;
       break;
     }

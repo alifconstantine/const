@@ -64,3 +64,7 @@ export interface AgentConfig {
   maxTokens?: number;
   maxOutputTokens?: number;
 }
+
+export type ConstAgentMessage = AgentMessage;
+export type ConstAgentConfig = AgentConfig;
+
