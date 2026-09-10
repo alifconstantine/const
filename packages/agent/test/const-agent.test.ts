@@ -299,68 +299,6 @@ describe("Const Agent Native Tools & Self-Healing Engine", () => {
     expect(path.normalize(res.result)).toContain(path.normalize(subDir));
   });
 
-  it("concludes cleanly with state-aware completion after mutating tools have run", async () => {
-    const { createConstAgent } = await import("../src/const/const-agent.js");
-    const testFile = path.join(tempDir, "sample.txt");
-
-    // Save original fetch
-    const originalFetch = global.fetch;
-
-    let callCount = 0;
-    // Mock fetch streaming SSE responses
-    global.fetch = (async () => {
-      callCount++;
-      if (callCount === 1) {
-        // Turn 1: Model calls write tool
-        const sseBody = [
-          `data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_1","function":{"name":"write","arguments":"{\\"path\\":\\"${testFile.replace(/\\/g, "\\\\")}\\",\\"content\\":\\"Hello Const\\"}"}}]},"finish_reason":"tool_calls"}]}`,
-          `data: [DONE]`,
-        ].join("\n\n");
-        return new Response(sseBody, { status: 200, headers: { "Content-Type": "text/event-stream" } });
-      } else {
-        // Turn 2: Model thinks after tool result, hits length limit with no tool calls and no content
-        const sseBody = [
-          `data: {"choices":[{"delta":{"reasoning_content":"Analyzing output and preparing final thoughts..."},"finish_reason":"length"}]}`,
-          `data: [DONE]`,
-        ].join("\n\n");
-        return new Response(sseBody, { status: 200, headers: { "Content-Type": "text/event-stream" } });
-      }
-    }) as any;
-
-    try {
-      const agent = createConstAgent({
-        sessionId: "state-aware-test",
-        workspacePath: tempDir,
-        model: "gemini-3.8-flash",
-        baseUrl: "https://mock.const/v1",
-      });
-
-      const events: any[] = [];
-      const history = await agent.run(
-        [{ role: "user", content: "Create sample.txt", timestamp: Date.now() }],
-        (evt) => events.push(evt)
-      );
-
-      // Verify file was written to disk
-      const content = await fs.readFile(testFile, "utf-8");
-      expect(content).toBe("Hello Const");
-
-      // Verify done event was emitted
-      const doneEvent = events.find((e) => e.type === "done");
-      expect(doneEvent).toBeDefined();
-      expect(doneEvent.fullContent).toContain("Task completed successfully");
-      expect(doneEvent.fullContent).toContain("sample.txt");
-      // Must NOT contain token limit error
-      expect(doneEvent.fullContent).not.toContain("reached the model token limit");
-
-      // Verify status event done
-      const lastStatus = events.filter((e) => e.type === "status").pop();
-      expect(lastStatus?.status).toBe("done");
-    } finally {
-      global.fetch = originalFetch;
-    }
-  });
-
   it("truncates extremely large command output in bash tool", async () => {
     // Generate ~60,000 characters of output
     const res = await executeNativeTool(
@@ -373,5 +311,3 @@ describe("Const Agent Native Tools & Self-Healing Engine", () => {
     expect(res.result).toContain("total characters");
   });
 });
-
-

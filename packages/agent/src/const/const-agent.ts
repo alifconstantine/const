@@ -825,15 +825,6 @@ export class ConstAgent {
           }
         }
 
-        // Check whether mutating tools have already completed successfully in this session
-        const mutatingToolsRan = conversationHistory.filter(
-          (m) =>
-            m.role === "tool" &&
-            (m.name === "write" || m.name === "edit" || m.name === "mkdir") &&
-            (typeof m.content === "string" ? !m.content.startsWith("[TOOL ERROR") : true)
-        );
-        const hasCompletedMutations = mutatingToolsRan.length > 0;
-
         // Handle case where model paused after thinking without emitting tool calls or content
         if (toolCalls.length === 0 && !turnContent) {
           // If no content, no thinking, and no tool calls arrived, check if it's an abrupt stream drop
@@ -864,28 +855,11 @@ export class ConstAgent {
             return conversationHistory;
           }
 
-          // If mutating tools already succeeded, the core task work is completed on disk!
-          // Conclude cleanly without demanding repetitive tool calls or throwing token limit errors.
-          if (hasCompletedMutations) {
-            const modifiedFiles: string[] = [];
-            for (const m of mutatingToolsRan) {
-              const contentStr = typeof m.content === "string" ? m.content : JSON.stringify(m.content ?? "");
-              const match = contentStr.match(
-                /(?:File written successfully:\s*|File edited successfully:\s*|Directory created:\s*)([^\s(]+)/i
-              );
-              if (match && match[1]) {
-                modifiedFiles.push(path.basename(match[1]));
-              }
-            }
-            const uniqueFiles = Array.from(new Set(modifiedFiles));
-            const fileSummary = uniqueFiles.length > 0 ? ` (${uniqueFiles.join(", ")})` : "";
-            turnContent = `Task completed successfully: All requested file operations${fileSummary} have been executed and saved to disk.`;
-            onEvent({ type: "token", token: turnContent });
-          } else if (turnThinking && currentTurn < maxTurns && consecutivePlanningTurns < 5) {
+          if (turnThinking && currentTurn < maxTurns && consecutivePlanningTurns < 3) {
             consecutivePlanningTurns++;
             // Model generated internal reasoning but paused before calling tools or outputting text.
             // Retain the native reasoning on the assistant message so the multi-turn context
-            // is preserved natively with reasoning_content.
+            // is preserved natively with reasoning_content without synthetic text pollution.
             const thinkingStepMsg: AgentMessage = {
               role: "assistant",
               content: "I have analyzed the workspace requirements and completed the implementation plan. Proceeding now to invoke the required tool calls.",
@@ -899,7 +873,7 @@ export class ConstAgent {
               role: "user",
               content:
                 turnFinishReason === "length"
-                  ? "Output turn limit reached during planning. Without further reasoning, immediately invoke the required tool call (such as 'write' or 'edit') to make concrete changes."
+                  ? "Output token limit reached during planning. Without further reasoning, immediately invoke the required tool call (such as 'write' or 'edit')."
                   : "Proceed immediately with the required tool calls (e.g. 'write' or 'edit') based on your analysis to complete the task.",
               timestamp: Date.now(),
             });
@@ -910,14 +884,18 @@ export class ConstAgent {
               message: "Planning concluded. Proceeding directly to tool execution...",
             });
             continue;
+          }
+
+          if (turnFinishReason === "length") {
+            turnContent =
+              "The response reached the model token limit. Please ask to continue or break down the request into smaller parts.";
           } else if (turnThinking) {
-            turnContent = `Analysis completed:\n\n${turnThinking.slice(0, 1000)}...\n\nReady to proceed. Please provide any additional instructions if needed.`;
-            onEvent({ type: "token", token: turnContent });
+            turnContent = `Completed thinking analysis:\n\n${turnThinking.slice(0, 500)}...\n\nPlease confirm if you would like me to proceed with creating the requested files.`;
           } else {
             turnContent =
               "No response was received from the model provider. Please verify provider connectivity or retry your request.";
-            onEvent({ type: "token", token: turnContent });
           }
+          onEvent({ type: "token", token: turnContent });
         } else {
           // Reset retry counter on successful data receipt
           consecutiveStreamRetries = 0;
@@ -929,27 +907,31 @@ export class ConstAgent {
         }
 
         if (toolCalls.length === 0) {
-          // If turn was cut off mid-output by single-turn output capacity:
-          // Seamlessly continue into next turn if mutating tools have not run yet.
-          if (turnFinishReason === "length" && currentTurn < maxTurns && !hasCompletedMutations) {
+          if (turnFinishReason === "length" && currentTurn < maxTurns && consecutiveDraftCutoffs < 3) {
             consecutiveDraftCutoffs++;
+            // Response was truncated mid-turn while planning or drafting code!
+            // Retract streaming tokens from the UI so partial draft doesn't pollute the chat card
+            onEvent({ type: "token_reset" });
+
+            // Preserve the draft inside thinking so the model retains its reasoning context
+            const combinedThinking = (turnThinking ? turnThinking + "\n\n" : "") + turnContent;
             conversationHistory.push({
               role: "assistant",
-              content: turnContent,
-              thinking: turnThinking || undefined,
+              content: "I have prepared the implementation draft. Proceeding now to save the file via tool execution.",
+              thinking: combinedThinking,
               timestamp: Date.now(),
             });
 
             conversationHistory.push({
               role: "user",
-              content: "Continue your response directly from where you were cut off to complete the task.",
+              content: "Proceed immediately by invoking the required tool (such as 'write' or 'edit') to save the file.",
               timestamp: Date.now(),
             });
 
             onEvent({
               type: "status",
               status: "thinking",
-              message: "Continuing response seamlessly in next turn...",
+              message: "Output reached token limit during draft. Directing model to execute tool calls...",
             });
             continue;
           }
