@@ -17,7 +17,12 @@ export function MarkdownContent({ content, className = "" }: MarkdownContentProp
     breaks: true,
   });
 
-  const tokens = marked.lexer(content);
+  // Normalize single-space indented list items so they parse cleanly into nested lists
+  const normalizedContent = content.replace(/\n( +)([*+-]) /g, (match, spaces, bullet) => {
+    return spaces.length === 1 ? `\n  ${bullet} ` : match;
+  });
+
+  const tokens = marked.lexer(normalizedContent);
 
   return (
     <div
@@ -33,7 +38,7 @@ export function MarkdownContent({ content, className = "" }: MarkdownContentProp
   );
 }
 
-function TokenRenderer({ token }: { token: Token }) {
+function TokenRenderer({ token, isNested }: { token: Token; isNested?: boolean }) {
   switch (token.type) {
     case "heading": {
       const heading = token as Tokens.Heading;
@@ -83,14 +88,14 @@ function TokenRenderer({ token }: { token: Token }) {
       if (list.ordered) {
         const start = list.start || 1;
         return (
-          <ol className="space-y-2 my-3 pl-1 text-[#262626] dark:text-[#cfcfcf]">
+          <ol className={cn("space-y-2 my-2.5 pl-0.5 text-[#262626] dark:text-[#cfcfcf]", isNested && "my-1.5 pl-2 space-y-1.5")}>
             {list.items.map((item: Tokens.ListItem, idx: number) => (
               <li key={idx} className="flex items-start gap-2.5 leading-[1.65]">
                 <span className="select-none font-mono text-[12px] text-[#888888] dark:text-[#777777] pt-0.5 w-4 text-right shrink-0">
                   {start + idx}.
                 </span>
                 <div className="flex-1 min-w-0">
-                  <InlineRenderer text={item.text} />
+                  <ListItemContent item={item} />
                 </div>
               </li>
             ))}
@@ -98,14 +103,26 @@ function TokenRenderer({ token }: { token: Token }) {
         );
       }
       return (
-        <ul className="space-y-2 my-3 pl-1 text-[#262626] dark:text-[#cfcfcf]">
+        <ul className={cn("space-y-2 my-2.5 pl-0.5 text-[#262626] dark:text-[#cfcfcf]", isNested && "my-1.5 pl-3 space-y-1.5")}>
           {list.items.map((item: Tokens.ListItem, idx: number) => (
-            <li key={idx} className="flex items-start gap-2.5 leading-[1.65]">
-              <span className="select-none text-[#888888] dark:text-[#737373] text-[15px] leading-[1.6] shrink-0">
-                •
-              </span>
+            <li key={idx} className="flex items-start gap-2 leading-[1.65]">
+              {item.task ? (
+                <input
+                  type="checkbox"
+                  checked={item.checked}
+                  readOnly
+                  className="mt-1 mr-0.5 rounded accent-[#ff7a00] shrink-0 pointer-events-none"
+                />
+              ) : (
+                <span className={cn(
+                  "select-none text-[#888888] dark:text-[#737373] shrink-0 font-medium",
+                  isNested ? "text-[13px] leading-[1.65]" : "text-[15px] leading-[1.6]"
+                )}>
+                  {isNested ? "-" : "•"}
+                </span>
+              )}
               <div className="flex-1 min-w-0">
-                <InlineRenderer text={item.text} />
+                <ListItemContent item={item} />
               </div>
             </li>
           ))}
@@ -139,6 +156,46 @@ function TokenRenderer({ token }: { token: Token }) {
       return null;
     }
   }
+}
+
+function ListItemContent({ item }: { item: Tokens.ListItem }) {
+  if (!item.tokens || item.tokens.length === 0) {
+    return <InlineRenderer text={item.text} />;
+  }
+
+  // If there's only 1 text token, render directly without wrapper div
+  if (item.tokens.length === 1 && item.tokens[0]?.type === "text") {
+    return <InlineRenderer text={item.tokens[0].text} />;
+  }
+
+  return (
+    <div className="space-y-1.5">
+      {item.tokens.map((childToken, cIdx) => {
+        if (childToken.type === "text") {
+          return (
+            <div key={cIdx} className="leading-[1.65]">
+              <InlineRenderer text={childToken.text} />
+            </div>
+          );
+        }
+        if (childToken.type === "paragraph") {
+          return (
+            <div key={cIdx} className="leading-[1.65] my-0.5">
+              <InlineRenderer text={(childToken as Tokens.Paragraph).text} />
+            </div>
+          );
+        }
+        if (childToken.type === "list") {
+          return (
+            <div key={cIdx} className="mt-1">
+              <TokenRenderer token={childToken} isNested />
+            </div>
+          );
+        }
+        return <TokenRenderer key={cIdx} token={childToken} isNested />;
+      })}
+    </div>
+  );
 }
 
 /**
@@ -439,7 +496,7 @@ function InlineRenderer({ text }: { text: string }) {
     return (
       <span
         dangerouslySetInnerHTML={{ __html: html }}
-        className="[&>code]:bg-[#eaeaea] dark:[&>code]:bg-[#242424] [&>code]:text-[#161616] dark:[&>code]:text-[#e0e0e0] [&>code]:font-mono [&>code]:text-[12.5px] [&>code]:px-1.5 [&>code]:py-0.5 [&>code]:rounded [&>code]:border [&>code]:border-[#e2e2e4] dark:[&>code]:border-[#383838] [&>strong]:font-medium [&_strong]:font-medium [&_b]:font-medium [&>strong]:text-[#161616] dark:[&>strong]:text-[#ececec] [&_strong]:text-[#161616] dark:[&_strong]:text-[#ececec] [&>em]:italic [&>em]:text-[#262626] dark:[&>em]:text-[#d4d4d4] [&>a]:text-[#e79737] dark:[&>a]:text-[#ff7a00] [&>a]:hover:underline cursor-text"
+        className="[&_code]:bg-[#eaeaea] dark:[&_code]:bg-[#242424] [&_code]:text-[#161616] dark:[&_code]:text-[#e0e0e0] [&_code]:font-mono [&_code]:text-[12.5px] [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:border [&_code]:border-[#e2e2e4] dark:[&_code]:border-[#383838] [&_strong]:font-medium [&_b]:font-medium [&_strong]:text-[#161616] dark:[&_strong]:text-[#ececec] [&_em]:italic [&_em]:text-[#262626] dark:[&_em]:text-[#d4d4d4] [&_a]:text-[#e79737] dark:[&_a]:text-[#ff7a00] [&_a]:hover:underline cursor-text"
       />
     );
   }
