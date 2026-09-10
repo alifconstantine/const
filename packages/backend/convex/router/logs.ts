@@ -82,22 +82,17 @@ export const recordLog = mutation({
 
     const cachedTokens = args.cachedTokens || 0;
     let promptTokens = args.promptTokens;
-    let totalTokens = args.totalTokens;
+    const completionTokens = args.completionTokens;
 
-    // Backend guard: Ensure cached tokens are excluded from promptTokens and totalTokens
+    // Backend guard: Ensure promptTokens strictly excludes cached tokens
     if (cachedTokens > 0) {
-      if (totalTokens >= promptTokens + args.completionTokens + cachedTokens) {
-        totalTokens = Math.max(0, totalTokens - cachedTokens);
-      }
-      if (
-        promptTokens >= cachedTokens &&
-        totalTokens === promptTokens + args.completionTokens &&
-        args.totalTokens > promptTokens
-      ) {
+      if (args.totalTokens >= promptTokens + completionTokens + cachedTokens) {
         promptTokens = Math.max(0, promptTokens - cachedTokens);
-        totalTokens = promptTokens + args.completionTokens;
       }
     }
+
+    // Total tokens is strictly the sum of pure input tokens and output tokens
+    const totalTokens = promptTokens + completionTokens;
 
     // C. Or resolve via raw API key
     if (args.rawApiKey) {
@@ -139,8 +134,8 @@ export const recordLog = mutation({
       status: args.status,
       errorMessage: args.errorMessage,
       promptTokens,
-      cachedTokens,
-      completionTokens: args.completionTokens,
+      cachedTokens: 0,
+      completionTokens,
       totalTokens,
       ttftMs: args.ttftMs,
       durationMs: args.durationMs,

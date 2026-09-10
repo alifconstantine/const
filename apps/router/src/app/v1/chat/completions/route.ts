@@ -420,16 +420,31 @@ async function dispatchSingleModel({
       const data = await response.json();
       const durationMs = Math.round(performance.now() - reqStartTime);
 
+      const rawPromptTokens = data.usage?.prompt_tokens ?? 0;
+      const cachedTokens =
+        data.usage?.prompt_tokens_details?.cached_tokens ??
+        data.usage?.cached_tokens ??
+        data.usage?.cache_read_input_tokens ??
+        0;
+      const purePromptTokens = Math.max(0, rawPromptTokens - cachedTokens);
+      const completionTokens = data.usage?.completion_tokens ?? 0;
+
       await recordDirectTelemetry(telemetryMeta, {
         status: 200,
         durationMs,
-        promptTokens: data.usage?.prompt_tokens,
-        completionTokens: data.usage?.completion_tokens,
-        cachedTokens:
-          data.usage?.prompt_tokens_details?.cached_tokens ??
-          data.usage?.cached_tokens ??
-          data.usage?.cache_read_input_tokens,
+        promptTokens: purePromptTokens,
+        completionTokens,
+        cachedTokens: 0,
       });
+
+      if (data.usage) {
+        data.usage.prompt_tokens = purePromptTokens;
+        data.usage.completion_tokens = completionTokens;
+        data.usage.total_tokens = purePromptTokens + completionTokens;
+        delete data.usage.prompt_tokens_details;
+        delete data.usage.cached_tokens;
+        delete data.usage.cache_read_input_tokens;
+      }
 
       return NextResponse.json(data, {
         headers: {
@@ -596,16 +611,31 @@ async function dispatchSingleModel({
     const data = await response.json();
     const durationMs = Math.round(performance.now() - reqStartTime);
 
+    const rawPromptTokens = data.usage?.prompt_tokens ?? 0;
+    const cachedTokens =
+      data.usage?.prompt_tokens_details?.cached_tokens ??
+      data.usage?.cached_tokens ??
+      data.usage?.cache_read_input_tokens ??
+      0;
+    const purePromptTokens = Math.max(0, rawPromptTokens - cachedTokens);
+    const completionTokens = data.usage?.completion_tokens ?? 0;
+
     await recordDirectTelemetry(telemetryMeta, {
       status: 200,
       durationMs,
-      promptTokens: data.usage?.prompt_tokens,
-      completionTokens: data.usage?.completion_tokens,
-      cachedTokens:
-        data.usage?.prompt_tokens_details?.cached_tokens ??
-        data.usage?.cached_tokens ??
-        data.usage?.cache_read_input_tokens,
+      promptTokens: purePromptTokens,
+      completionTokens,
+      cachedTokens: 0,
     });
+
+    if (data.usage) {
+      data.usage.prompt_tokens = purePromptTokens;
+      data.usage.completion_tokens = completionTokens;
+      data.usage.total_tokens = purePromptTokens + completionTokens;
+      delete data.usage.prompt_tokens_details;
+      delete data.usage.cached_tokens;
+      delete data.usage.cache_read_input_tokens;
+    }
 
     return NextResponse.json(data, {
       headers: {

@@ -99,19 +99,17 @@ export function convertGoogleSseToOpenAiSse(body: ReadableStream<Uint8Array>): R
               }
 
               if (data.usageMetadata) {
-                const promptTokens = data.usageMetadata.promptTokenCount ?? 0;
-                const completionTokens = data.usageMetadata.candidatesTokenCount ?? 0;
-                const totalTokens = data.usageMetadata.totalTokenCount ?? (promptTokens + completionTokens);
+                const rawPromptTokens = data.usageMetadata.promptTokenCount ?? 0;
                 const cachedTokens = data.usageMetadata.cachedContentTokenCount ?? 0;
+                const promptTokens = Math.max(0, rawPromptTokens - cachedTokens);
+                const completionTokens = data.usageMetadata.candidatesTokenCount ?? 0;
+                const totalTokens = promptTokens + completionTokens;
                 const usagePayload = JSON.stringify({
                   choices: [],
                   usage: {
                     prompt_tokens: promptTokens,
                     completion_tokens: completionTokens,
                     total_tokens: totalTokens,
-                    prompt_tokens_details: {
-                      cached_tokens: cachedTokens,
-                    },
                   },
                 });
                 controller.enqueue(encoder.encode(`data: ${usagePayload}\n\n`));
@@ -184,15 +182,15 @@ export function convertAnthropicSseToOpenAiSse(body: ReadableStream<Uint8Array>)
                 });
                 controller.enqueue(encoder.encode(`data: ${payload}\n\n`));
               } else if (data.type === "message_stop") {
+                const promptTokens = anthropicInputTokens;
+                const completionTokens = anthropicOutputTokens;
+                const totalTokens = promptTokens + completionTokens;
                 const usagePayload = JSON.stringify({
                   choices: [],
                   usage: {
-                    prompt_tokens: anthropicInputTokens + anthropicCachedTokens,
-                    completion_tokens: anthropicOutputTokens,
-                    total_tokens: anthropicInputTokens + anthropicCachedTokens + anthropicOutputTokens,
-                    prompt_tokens_details: {
-                      cached_tokens: anthropicCachedTokens,
-                    },
+                    prompt_tokens: promptTokens,
+                    completion_tokens: completionTokens,
+                    total_tokens: totalTokens,
                   },
                 });
                 controller.enqueue(encoder.encode(`data: ${usagePayload}\n\n`));

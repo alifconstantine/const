@@ -217,9 +217,6 @@ export default function LogsPage() {
             </div>
             <p className="text-[11px] text-muted-foreground font-sans">
               Prompt: <span className="tabular-nums">{formatTokens(metrics?.promptTokens)}</span> · Out: <span className="tabular-nums">{formatTokens(metrics?.completionTokens)}</span>
-              {metrics?.cachedTokens && metrics.cachedTokens > 0 ? (
-                <span> · <span className="tabular-nums">{formatTokens(metrics.cachedTokens)}</span> cached</span>
-              ) : null}
             </p>
           </Card>
 
@@ -491,18 +488,9 @@ export default function LogsPage() {
                           {log.comboName || "—"}
                         </TableCell>
 
-                        {/* 6. Input Tokens (with cached subtext if any) */}
-                        <TableCell className="py-3 px-3 whitespace-nowrap">
-                          <div className="flex flex-col">
-                            <span className="text-xs font-sans font-medium text-foreground tabular-nums">
-                              {formatTokens(log.promptTokens)}
-                            </span>
-                            {log.cachedTokens && log.cachedTokens > 0 ? (
-                              <span className="text-[10px] font-sans text-muted-foreground/80 tabular-nums">
-                                {formatTokens(log.cachedTokens)} cached
-                              </span>
-                            ) : null}
-                          </div>
+                        {/* 6. Input Tokens */}
+                        <TableCell className="py-3 px-3 whitespace-nowrap text-xs font-sans font-medium text-foreground tabular-nums">
+                          {formatTokens(log.promptTokens)}
                         </TableCell>
 
                         {/* 7. Output Tokens */}
@@ -678,12 +666,6 @@ export default function LogsPage() {
                         <span className="text-muted-foreground">Input / Prompt Tokens</span>
                         <span className="font-sans font-medium text-foreground tabular-nums">{selectedLog.promptTokens.toLocaleString()}</span>
                       </div>
-                      {selectedLog.cachedTokens ? (
-                        <div className="flex justify-between items-center">
-                          <span className="text-muted-foreground">Prompt Cache (Free)</span>
-                          <span className="font-sans font-medium text-muted-foreground tabular-nums">{selectedLog.cachedTokens.toLocaleString()}</span>
-                        </div>
-                      ) : null}
                       <div className="flex justify-between items-center">
                         <span className="text-muted-foreground">Output / Completion Tokens</span>
                         <span className="font-sans font-medium text-foreground tabular-nums">{selectedLog.completionTokens.toLocaleString()}</span>
