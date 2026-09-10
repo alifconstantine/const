@@ -17,28 +17,28 @@ export default function GlobalError({
   }, [error]);
 
   return (
-    <div className="min-h-screen w-full flex flex-col items-center justify-center bg-[#161616] text-[#d4d4d4] p-4 select-none">
-      <div className="w-full max-w-md p-8 rounded-3xl bg-[#222222] border border-[#383838]/60 text-center space-y-6 animate-in fade-in zoom-in-95 duration-200">
+    <div className="min-h-screen w-full flex flex-col items-center justify-center bg-background text-foreground p-4 select-none">
+      <div className="w-full max-w-md p-8 rounded-3xl bg-card border border-border text-center space-y-6 animate-in fade-in zoom-in-95 duration-200">
         <div className="flex flex-col items-center gap-3">
-          <div className="h-12 w-12 rounded-2xl bg-[#2b2b2b] border border-[#383838] flex items-center justify-center text-white">
+          <div className="h-12 w-12 rounded-2xl bg-secondary border border-border flex items-center justify-center text-foreground">
             <ConstLogoIcon size="md" className="w-7 h-7" />
           </div>
           <div className="space-y-1">
-            <span className="text-[10px] font-mono tracking-wider uppercase px-2 py-0.5 rounded-full bg-[#1b1b1b] text-[#969696] border border-[#2e2e2e]">
+            <span className="text-[10px] font-mono tracking-wider uppercase px-2 py-0.5 rounded-full bg-secondary text-muted-foreground border border-border">
               Gateway System Alert
             </span>
-            <h1 className="text-xl sm:text-2xl font-serif text-white pt-2">
+            <h1 className="text-xl sm:text-2xl font-serif text-foreground pt-2">
               Something went wrong
             </h1>
-            <p className="text-xs text-[#969696] font-sans leading-relaxed max-w-xs mx-auto">
+            <p className="text-xs text-muted-foreground font-sans leading-relaxed max-w-xs mx-auto">
               An unexpected client error occurred while loading this page.
             </p>
           </div>
         </div>
 
         {error?.message && (
-          <div className="p-3 rounded-xl bg-[#1b1b1b] border border-[#2e2e2e] text-left">
-            <p className="text-[11px] font-mono text-[#969696] break-all line-clamp-3">
+          <div className="p-3 rounded-xl bg-secondary border border-border text-left">
+            <p className="text-[11px] font-mono text-muted-foreground break-all line-clamp-3">
               {error.message}
             </p>
           </div>
@@ -47,7 +47,7 @@ export default function GlobalError({
         <div className="flex items-center gap-3 pt-2">
           <Button
             onClick={() => reset()}
-            className="flex-1 rounded-full h-10 gap-2 text-xs font-medium bg-white text-[#161616] hover:bg-white/90 cursor-pointer"
+            className="flex-1 rounded-full h-10 gap-2 text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer"
           >
             <RotateCcw className="h-3.5 w-3.5" />
             <span>Try Again</span>
@@ -56,7 +56,7 @@ export default function GlobalError({
           <Link href="/dashboard" className="flex-1">
             <Button
               variant="outline"
-              className="w-full rounded-full h-10 gap-2 text-xs font-medium border-[#383838] bg-[#1b1b1b] text-[#d4d4d4] hover:text-white hover:bg-[#2b2b2b] cursor-pointer"
+              className="w-full rounded-full h-10 gap-2 text-xs font-medium border-border bg-secondary text-foreground hover:bg-muted cursor-pointer"
             >
               <Home className="h-3.5 w-3.5" />
               <span>Dashboard</span>
@@ -64,10 +64,10 @@ export default function GlobalError({
           </Link>
         </div>
 
-        <div className="pt-2 border-t border-[#383838]/40 flex justify-center">
+        <div className="pt-2 border-t border-border/60 flex justify-center">
           <button
             onClick={() => window.history.back()}
-            className="text-[11px] text-[#969696] hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer"
+            className="text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-1.5 transition-colors cursor-pointer"
           >
             <ArrowLeft className="h-3 w-3" />
             <span>Go back to previous page</span>

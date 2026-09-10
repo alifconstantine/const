@@ -24,13 +24,13 @@ function LoginContent() {
   }, [isLoading, isAuthenticated, router, signIn, continueParam]);
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-[#161616] text-[#d4d4d4] p-4">
+    <div className="min-h-screen flex flex-col items-center justify-center bg-background text-foreground p-4">
       <div className="flex flex-col items-center gap-3 text-center">
-        <ConstLogoIcon size="md" className="w-8 h-8 text-[#d4d4d4] animate-pulse" />
-        <p className="text-xs font-mono text-[#969696]">
+        <ConstLogoIcon size="md" className="w-8 h-8 text-foreground animate-pulse" />
+        <p className="text-xs font-mono text-muted-foreground">
           {isAuthenticated ? "Redirecting to Dashboard..." : "Connecting to Const Accounts..."}
         </p>
-        <Loader2 className="h-4 w-4 animate-spin text-[#969696] mt-1" />
+        <Loader2 className="h-4 w-4 animate-spin text-muted-foreground mt-1" />
       </div>
     </div>
   );
@@ -40,10 +40,10 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex flex-col items-center justify-center bg-[#161616] text-[#d4d4d4] p-4">
+        <div className="min-h-screen flex flex-col items-center justify-center bg-background text-foreground p-4">
           <div className="flex flex-col items-center gap-3 text-center">
-            <ConstLogoIcon size="md" className="w-8 h-8 text-[#d4d4d4] animate-pulse" />
-            <Loader2 className="h-4 w-4 animate-spin text-[#969696] mt-1" />
+            <ConstLogoIcon size="md" className="w-8 h-8 text-foreground animate-pulse" />
+            <Loader2 className="h-4 w-4 animate-spin text-muted-foreground mt-1" />
           </div>
         </div>
       }

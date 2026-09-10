@@ -121,21 +121,21 @@ export default function DocsPage() {
   return (
     <>
       <title>Documentation - Const Router</title>
-      <div className="min-h-screen bg-[#161616] text-[#d4d4d4] antialiased selection:bg-white selection:text-[#161616] font-sans">
-        {/* Top Navbar matching Const Harness studio header (#222222) and logo structure */}
-        <header className="h-14 sticky top-0 z-50 bg-[#222222] border-b border-[#383838]/60 px-4 sm:px-8 flex items-center justify-between select-none">
+      <div className="min-h-screen bg-background text-foreground antialiased selection:bg-primary selection:text-primary-foreground font-sans">
+        {/* Top Navbar matching Const Harness studio header and logo structure */}
+        <header className="h-14 sticky top-0 z-50 bg-card border-b border-border px-4 sm:px-8 flex items-center justify-between select-none">
         {/* Left: Brand Logo + Home */}
         <div className="flex items-center gap-6">
           <Link href="/dashboard" className="flex items-center gap-2.5 group">
             <ConstLogoIcon
               size="sm"
-              className="w-6 h-6 text-[#d4d4d4] shrink-0 transition-transform duration-300 group-hover:scale-105 group-hover:text-white"
+              className="w-6 h-6 text-foreground shrink-0 transition-transform duration-300 group-hover:scale-105"
             />
             <div className="flex items-center gap-2">
-              <span className="font-serif text-lg font-normal tracking-tight text-[#d4d4d4] group-hover:text-white">
+              <span className="font-serif text-lg font-normal tracking-tight text-foreground">
                 Const
               </span>
-              <span className="text-[10px] font-mono tracking-wider uppercase px-2 py-0.5 rounded-full bg-[#1b1b1b] text-[#969696] border border-[#2e2e2e]">
+              <span className="text-[10px] font-mono tracking-wider uppercase px-2 py-0.5 rounded-full bg-secondary text-muted-foreground border border-border">
                 Router
               </span>
             </div>
@@ -143,7 +143,7 @@ export default function DocsPage() {
 
           <Link
             href="/"
-            className="text-xs font-medium text-[#969696] hover:text-white transition-colors"
+            className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
           >
             Home
           </Link>
@@ -154,13 +154,13 @@ export default function DocsPage() {
           <Link href="/dashboard">
             <Button
               size="sm"
-              className="h-8 px-3.5 rounded-xl bg-white hover:bg-white/90 text-[#161616] font-medium text-xs cursor-pointer shadow-none transition-all gap-1.5"
+              className="h-8 px-3.5 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-medium text-xs cursor-pointer shadow-none transition-all gap-1.5"
             >
               <span>Open dashboard</span>
             </Button>
           </Link>
 
-          <div className="flex items-center gap-1 text-xs text-[#969696] px-2 py-1 rounded-lg border border-[#383838]/60 bg-[#1b1b1b]">
+          <div className="flex items-center gap-1 text-xs text-muted-foreground px-2 py-1 rounded-lg border border-border bg-secondary">
             <Globe className="h-3.5 w-3.5" />
             <span className="font-mono text-[11px]">EN</span>
           </div>
@@ -170,17 +170,17 @@ export default function DocsPage() {
       </header>
 
       {/* Hero Header matching screenshot structure with Const Harness palette */}
-      <div className="relative overflow-hidden border-b border-[#383838]/40 bg-[#161616] py-12 sm:py-16 px-4 sm:px-8">
+      <div className="relative overflow-hidden border-b border-border/60 bg-card/40 py-12 sm:py-16 px-4 sm:px-8">
         <div className="max-w-6xl mx-auto space-y-3.5 relative z-10">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#1b1b1b] border border-[#2e2e2e] text-[#969696] text-xs font-mono">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-secondary border border-border text-muted-foreground text-xs font-mono">
             <span>Developer docs</span>
           </div>
 
-          <h1 className="text-3xl sm:text-5xl font-serif font-normal tracking-tight text-white">
+          <h1 className="text-3xl sm:text-5xl font-serif font-normal tracking-tight text-foreground">
             Build on the Const Router API
           </h1>
 
-          <p className="text-sm sm:text-base text-[#969696] font-light max-w-2xl leading-relaxed">
+          <p className="text-sm sm:text-base text-muted-foreground font-light max-w-2xl leading-relaxed">
             One stable, OpenAI-compatible endpoint across leading models. Point any OpenAI SDK at our base URL, authenticate with your key, and ship.
           </p>
         </div>
@@ -192,7 +192,7 @@ export default function DocsPage() {
           {/* Left Column: ON THIS PAGE Navigation Menu (Sticky) */}
           <aside className="lg:col-span-3">
             <div className="sticky top-24 space-y-3">
-              <span className="text-[11px] font-mono uppercase tracking-wider text-[#969696] font-semibold px-3">
+              <span className="text-[11px] font-mono uppercase tracking-wider text-muted-foreground font-semibold px-3">
                 ON THIS PAGE
               </span>
 
@@ -206,8 +206,8 @@ export default function DocsPage() {
                       className={cn(
                         "w-full text-left px-3 py-1.5 rounded-lg text-xs transition-colors cursor-pointer block",
                         isActive
-                          ? "bg-[#383838] text-white font-medium shadow-sm"
-                          : "text-[#969696] hover:text-[#d4d4d4] hover:bg-[#2b2b2b]"
+                          ? "bg-secondary text-foreground font-medium shadow-sm"
+                          : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
                       )}
                     >
                       {section.title}

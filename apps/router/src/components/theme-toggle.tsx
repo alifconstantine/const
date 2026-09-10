@@ -23,7 +23,7 @@ export function ThemeToggle({ className }: { className?: string }) {
     );
   }
 
-  const isDark = resolvedTheme === "dark" || theme === "dark";
+  const isDark = resolvedTheme ? resolvedTheme === "dark" : theme === "dark";
 
   return (
     <Button

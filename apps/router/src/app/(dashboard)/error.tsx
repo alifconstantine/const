@@ -20,27 +20,27 @@ export default function DashboardError({
 
   return (
     <div className="w-full min-h-[60vh] flex flex-col items-center justify-center p-6 text-center select-none">
-      <div className="w-full max-w-lg p-8 rounded-3xl bg-[#222222] border border-[#383838]/60 space-y-6">
+      <div className="w-full max-w-lg p-8 rounded-3xl bg-card border border-border space-y-6">
         <div className="flex flex-col items-center gap-3">
           <div className="h-12 w-12 rounded-2xl bg-destructive/10 text-destructive flex items-center justify-center border border-destructive/20">
             <AlertCircle className="h-6 w-6" />
           </div>
           <div className="space-y-1">
-            <span className="text-[10px] font-mono tracking-wider uppercase px-2 py-0.5 rounded-full bg-[#1b1b1b] text-destructive border border-destructive/30">
+            <span className="text-[10px] font-mono tracking-wider uppercase px-2 py-0.5 rounded-full bg-secondary text-destructive border border-destructive/30">
               Dashboard Telemetry Error
             </span>
-            <h2 className="text-xl font-serif text-white pt-1">
+            <h2 className="text-xl font-serif text-foreground pt-1">
               Unable to load dashboard data
             </h2>
-            <p className="text-xs text-[#969696] font-sans max-w-sm mx-auto">
+            <p className="text-xs text-muted-foreground font-sans max-w-sm mx-auto">
               We encountered an issue communicating with the AI gateway backend. You can retry loading or refresh your authentication session.
             </p>
           </div>
         </div>
 
         {error?.message && (
-          <div className="p-3 rounded-xl bg-[#1b1b1b] border border-[#2e2e2e] text-left">
-            <p className="text-[11px] font-mono text-[#969696] break-all line-clamp-3">
+          <div className="p-3 rounded-xl bg-secondary border border-border text-left">
+            <p className="text-[11px] font-mono text-muted-foreground break-all line-clamp-3">
               {error.message}
             </p>
           </div>
@@ -49,7 +49,7 @@ export default function DashboardError({
         <div className="flex items-center justify-center gap-3 pt-2">
           <Button
             onClick={() => reset()}
-            className="rounded-full h-10 px-6 gap-2 text-xs font-medium bg-white text-[#161616] hover:bg-white/90 cursor-pointer"
+            className="rounded-full h-10 px-6 gap-2 text-xs font-medium bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer"
           >
             <RotateCcw className="h-3.5 w-3.5" />
             <span>Retry</span>
@@ -58,7 +58,7 @@ export default function DashboardError({
           <Button
             variant="outline"
             onClick={() => signIn("/dashboard")}
-            className="rounded-full h-10 px-6 gap-2 text-xs font-medium border-[#383838] bg-[#1b1b1b] text-[#d4d4d4] hover:text-white hover:bg-[#2b2b2b] cursor-pointer"
+            className="rounded-full h-10 px-6 gap-2 text-xs font-medium border-border bg-secondary text-foreground hover:bg-muted cursor-pointer"
           >
             <LogIn className="h-3.5 w-3.5" />
             <span>Re-authenticate</span>

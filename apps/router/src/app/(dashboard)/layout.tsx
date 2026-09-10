@@ -116,16 +116,16 @@ export default function DashboardLayout({
   return (
     <>
       <title>{`${currentTitle} - Const Router`}</title>
-      <div className="min-h-screen flex flex-col bg-[#2b2b2b] text-[#d4d4d4] antialiased selection:bg-white selection:text-[#161616]">
-      {/* Top Header Bar matching Const Harness #222222 header-strip */}
-      <header className="h-14 w-full border-b border-[#383838]/60 bg-[#222222] sticky top-0 z-40 px-4 sm:px-6 flex items-center justify-between shrink-0 select-none transition-colors">
+      <div className="min-h-screen flex flex-col bg-sidebar text-foreground antialiased selection:bg-primary selection:text-primary-foreground">
+      {/* Top Header Bar matching Const Harness studio header */}
+      <header className="h-14 w-full border-b border-border bg-card sticky top-0 z-40 px-4 sm:px-6 flex items-center justify-between shrink-0 select-none transition-colors">
         {/* Left: Const Logo & Product Badge */}
         <div className="flex items-center gap-3">
           <Button
             variant="ghost"
             size="icon"
             onClick={() => setMobileOpen(true)}
-            className="md:hidden h-8 w-8 text-[#969696] hover:text-[#ffffff] cursor-pointer"
+            className="md:hidden h-8 w-8 text-muted-foreground hover:text-foreground cursor-pointer"
             aria-label="Open sidebar navigation"
           >
             <Menu className="h-4 w-4" />
@@ -134,13 +134,13 @@ export default function DashboardLayout({
           <Link href="/dashboard" className="flex items-center gap-2.5 group">
             <ConstLogoIcon
               size="sm"
-              className="w-6 h-6 text-[#d4d4d4] shrink-0 transition-transform duration-300 group-hover:scale-105 group-hover:text-white"
+              className="w-6 h-6 text-foreground shrink-0 transition-transform duration-300 group-hover:scale-105"
             />
             <div className="flex items-center gap-2">
-              <span className="font-serif text-lg font-normal tracking-tight text-[#d4d4d4] group-hover:text-white">
+              <span className="font-serif text-lg font-normal tracking-tight text-foreground">
                 Const
               </span>
-              <span className="text-[10px] font-mono tracking-wider uppercase px-2 py-0.5 rounded-full bg-[#1b1b1b] text-[#969696] border border-[#2e2e2e]">
+              <span className="text-[10px] font-mono tracking-wider uppercase px-2 py-0.5 rounded-full bg-secondary text-muted-foreground border border-border">
                 Router
               </span>
             </div>
@@ -152,7 +152,7 @@ export default function DashboardLayout({
           <Button
             variant="ghost"
             size="icon"
-            className="h-8 w-8 rounded-full text-[#969696] hover:text-white cursor-pointer"
+            className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground cursor-pointer"
             aria-label="Notifications"
           >
             <Bell className="h-4 w-4 stroke-[1.75]" />
@@ -164,7 +164,7 @@ export default function DashboardLayout({
             <Button
               variant="outline"
               size="sm"
-              className="h-8 rounded-full text-xs font-medium px-4 border-[#383838] bg-[#1b1b1b] text-[#d4d4d4] hover:text-white hover:bg-[#383838] cursor-pointer gap-1.5"
+              className="h-8 rounded-full text-xs font-medium px-4 border-border bg-secondary text-foreground hover:bg-muted cursor-pointer gap-1.5"
             >
               <BookOpen className="h-3.5 w-3.5" />
               <span>Docs</span>
@@ -174,15 +174,15 @@ export default function DashboardLayout({
       </header>
 
       {/* Main Layout: Left Sidebar + Content Area */}
-      <div className="flex-1 flex min-w-0 bg-[#2b2b2b]">
+      <div className="flex-1 flex min-w-0 bg-sidebar">
         {/* Desktop Left Sidebar (Collapsible with smooth transition) */}
         <div
           className={cn(
-            "hidden md:block shrink-0 transition-all duration-300 bg-[#2b2b2b]",
+            "hidden md:block shrink-0 transition-all duration-300 bg-sidebar",
             isCollapsed ? "w-16" : "w-64"
           )}
         >
-          <div className="h-[calc(100vh-3.5rem)] sticky top-14 bg-[#2b2b2b]">
+          <div className="h-[calc(100vh-3.5rem)] sticky top-14 bg-sidebar">
             <Sidebar
               isCollapsed={isCollapsed}
               onToggleCollapse={() => setIsCollapsed(!isCollapsed)}
@@ -193,7 +193,7 @@ export default function DashboardLayout({
         {/* Mobile Slide-out Drawer */}
         <div className="md:hidden">
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-            <SheetContent side="left" className="p-0 w-64 border-none bg-[#2b2b2b]">
+            <SheetContent side="left" className="p-0 w-64 border-none bg-sidebar">
               <SheetTitle className="sr-only">Navigation Menu</SheetTitle>
               <Sidebar
                 onNavigate={() => setMobileOpen(false)}
@@ -203,8 +203,8 @@ export default function DashboardLayout({
           </Sheet>
         </div>
 
-        {/* Page Content Viewport - Studio Canvas #161616 */}
-        <main className="flex-1 min-w-0 p-6 md:p-8 w-full bg-[#161616] text-[#d4d4d4] border-t border-l border-[#383838]/40 overflow-y-auto">
+        {/* Page Content Viewport - Studio Canvas */}
+        <main className="flex-1 min-w-0 p-6 md:p-8 w-full bg-background text-foreground border-t border-l border-border/40 overflow-y-auto">
           {children}
         </main>
       </div>

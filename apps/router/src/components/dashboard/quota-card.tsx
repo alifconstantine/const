@@ -33,7 +33,7 @@ export function QuotaCard({ className }: { className?: string }) {
   const barColor = useMemo(() => {
     if (percentRemaining <= 10) return "bg-rose-500";
     if (percentRemaining <= 30) return "bg-amber-400";
-    return "bg-[#d4d4d4]";
+    return "bg-foreground";
   }, [percentRemaining]);
 
   if (!isAuthenticated) return null;
@@ -88,7 +88,7 @@ export function QuotaCard({ className }: { className?: string }) {
             </div>
 
             {/* Sleek Minimalist Progress Bar */}
-            <div className="h-3 w-full bg-[#242424] rounded-full overflow-hidden border border-border/40 p-[1.5px]">
+            <div className="h-3 w-full bg-secondary rounded-full overflow-hidden border border-border/40 p-[1.5px]">
               <div
                 className={cn(
                   "h-full rounded-full transition-all duration-700 ease-out",
