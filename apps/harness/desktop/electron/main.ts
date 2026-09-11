@@ -7,6 +7,7 @@ import {
   createConstAgent,
   DEFAULT_MODELS,
   rollbackFileMutation,
+  globalTaskManager,
   type ConstAgentMessage as AgentMessage,
   type FileMutationRecord,
 } from "@const/agent";
@@ -655,6 +656,40 @@ app.whenReady().then(() => {
     startedAt: number;
   }
   const activeSessions = new Map<string, ActiveAgentSession>();
+  const pendingQuestions = new Map<string, (answer: any) => void>();
+
+  // Subscribe to background tasks to push real-time events to renderer
+  globalTaskManager.subscribe((event) => {
+    if (win && !win.isDestroyed()) {
+      win.webContents.send("task:event", event);
+    }
+  });
+
+  ipcMain.handle(
+    "agent:answer-question",
+    async (_event, { toolCallId, answer }: { toolCallId: string; answer: any }) => {
+      const resolver = pendingQuestions.get(toolCallId);
+      if (resolver) {
+        pendingQuestions.delete(toolCallId);
+        resolver(answer);
+        return true;
+      }
+      return false;
+    }
+  );
+
+  ipcMain.handle("tasks:list", async () => {
+    return globalTaskManager.listTasks();
+  });
+
+  ipcMain.handle("tasks:kill", async (_event, taskId: string) => {
+    return globalTaskManager.killTask(taskId);
+  });
+
+  ipcMain.handle("tasks:get-output", async (_event, taskId: string) => {
+    const task = globalTaskManager.getTask(taskId);
+    return task ? task.logs : [];
+  });
 
   ipcMain.handle(
     "agent:send-message",
@@ -720,6 +755,19 @@ app.whenReady().then(() => {
         thinkingLevel: payload.thinkingLevel as any,
         maxOutputTokens: payload.maxOutputTokens ?? (modelDef as any)?.maxOutputTokens,
         maxTurns: payload.maxTurns ?? 200,
+        onAskQuestion: (toolCallId, questions) => {
+          return new Promise((resolve) => {
+            pendingQuestions.set(toolCallId, resolve);
+            if (win && !win.isDestroyed()) {
+              win.webContents.send("agent:stream-event", {
+                type: "ask_question",
+                conversationId: convoId,
+                toolCallId,
+                questions,
+              });
+            }
+          });
+        },
       });
 
       activeSessions.set(convoId, {
@@ -778,6 +826,12 @@ app.whenReady().then(() => {
         return { success: false, error: err.message };
       } finally {
         activeSessions.delete(convoId);
+        for (const [tcId, resolver] of pendingQuestions.entries()) {
+          pendingQuestions.delete(tcId);
+          try {
+            resolver({ status: "cancelled", error: "Session ended" });
+          } catch {}
+        }
         if (win && !win.isDestroyed()) {
           win.webContents.send("agent:session-ended", { conversationId: convoId });
         }
@@ -786,6 +840,12 @@ app.whenReady().then(() => {
   );
 
   ipcMain.handle("agent:abort", async (_event, targetConvoId?: string) => {
+    for (const [tcId, resolver] of pendingQuestions.entries()) {
+      pendingQuestions.delete(tcId);
+      try {
+        resolver({ status: "cancelled", error: "Session aborted by user" });
+      } catch {}
+    }
     if (targetConvoId) {
       const session = activeSessions.get(targetConvoId);
       if (session) {

@@ -3,6 +3,7 @@ import { FileText, MessageSquare, Globe, RotateCcw } from "lucide-react";
 import { TabHeader } from "./tab-header";
 import { OpenTabView } from "./open-tab-view";
 import { TerminalTab } from "./terminal-tab";
+import { TaskOutputTab } from "./task-output-tab";
 import type { RightPaneTab, RightPaneTabType } from "./types";
 import type { FileMutationRecord } from "../../vite-env";
 
@@ -20,6 +21,7 @@ interface RightPaneProps {
   workspacePath?: string;
   mutations?: FileMutationRecord[];
   onRollbackFile?: (record: FileMutationRecord) => Promise<any> | void;
+  onStopTask?: (taskId: string) => void;
 }
 
 export function RightPane({
@@ -36,6 +38,7 @@ export function RightPane({
   workspacePath,
   mutations,
   onRollbackFile,
+  onStopTask,
 }: RightPaneProps) {
   const isDraggingRef = useRef(false);
   const startXRef = useRef(0);
@@ -104,6 +107,9 @@ export function RightPane({
         ) : activeTab.type === "terminal" ? (
           /* Interactive Terminal matching Image 1 1:1 */
           <TerminalTab key={activeTab.id} tab={activeTab} />
+        ) : activeTab.type === "task_output" ? (
+          /* Background Task Output Tab */
+          <TaskOutputTab key={activeTab.id} tab={activeTab} onStopTask={onStopTask} />
         ) : activeTab.type === "review" ? (
           /* Review Changes Tab */
           <div className="flex-1 w-full h-full p-4 overflow-y-auto text-white flex flex-col">

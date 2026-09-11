@@ -8,6 +8,7 @@ import {
   MessageSquare,
   Globe,
   Search,
+  Activity,
 } from "lucide-react";
 import type { RightPaneTab, RightPaneTabType } from "./types";
 
@@ -31,6 +32,8 @@ function getTabIcon(type: RightPaneTabType) {
       return MessageSquare;
     case "browser":
       return Globe;
+    case "task_output":
+      return Activity;
     default:
       return SquareTerminal;
   }

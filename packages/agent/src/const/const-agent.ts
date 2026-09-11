@@ -140,6 +140,11 @@ const VALID_FALLBACK_TOOLS = new Set([
   "find",
   "grep",
   "mkdir",
+  "todo_write",
+  "ask_question",
+  "apply_patch",
+  "run_command",
+  "manage_task",
 ]);
 
 export function extractFallbackToolCalls(content: string): ToolCall[] {
@@ -1246,6 +1251,22 @@ export class ConstAgent {
               stepIndex: currentTurn,
               onFileMutation: (record) => {
                 onEvent({ type: "file_mutation", record });
+              },
+              onTodoUpdate: (todos) => {
+                onEvent({ type: "todo_update", todos });
+              },
+              askUser: async (questions) => {
+                onEvent({ type: "ask_question", toolCallId: tc.id, questions });
+                if (this.config.onAskQuestion) {
+                  return await this.config.onAskQuestion(tc.id, questions);
+                }
+                return { status: "submitted" };
+              },
+              onTaskStarted: (task) => {
+                onEvent({ type: "task_started", task });
+              },
+              onTaskStopped: (taskId, code) => {
+                onEvent({ type: "task_stopped", taskId, code });
               },
             }
           );

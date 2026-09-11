@@ -51,6 +51,38 @@ export interface ApprovalRequestData {
   reason?: string;
   createdAt?: number;
   timestamp?: number;
+  approval?: any;
+}
+
+export interface TodoItem {
+  id?: string;
+  title?: string;
+  task?: string;
+  content: string;
+  status: "pending" | "in_progress" | "completed";
+}
+
+export interface QuestionOption {
+  label: string;
+  value?: string;
+  description?: string;
+  recommended?: boolean;
+}
+
+export interface QuestionItem {
+  id?: string;
+  question: string;
+  options?: QuestionOption[];
+  is_multi_select?: boolean;
+}
+
+export interface BackgroundTaskItem {
+  id: string;
+  command: string;
+  pid?: number;
+  startTime: number;
+  status: "running" | "completed" | "failed";
+  output?: string[];
 }
 
 export interface AgentStreamEvent {
@@ -64,9 +96,14 @@ export interface AgentStreamEvent {
     | "approval_request"
     | "approval_resolved"
     | "file_mutation"
+    | "usage"
     | "status"
     | "done"
-    | "error";
+    | "error"
+    | "todo_update"
+    | "ask_question"
+    | "task_started"
+    | "task_stopped";
   token?: string;
   thinking?: string;
   toolCallId?: string;
@@ -75,15 +112,32 @@ export interface AgentStreamEvent {
   result?: any;
   isError?: boolean;
   approvalId?: string;
+  approval?: any;
+  id?: string;
   decision?: "allow_once" | "allow_always" | "deny" | "skip";
   command?: string;
   cwd?: string;
   description?: string;
+  reason?: string;
+  createdAt?: number;
+  timestamp?: number;
   record?: FileMutationRecord;
+  usage?: { promptTokens?: number; completionTokens?: number; totalTokens?: number; prompt_tokens?: number; completion_tokens?: number; total_tokens?: number };
+  promptTokens?: number;
+  completionTokens?: number;
+  totalTokens?: number;
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  total_tokens?: number;
   status?: string;
   fullContent?: string;
   messages?: any[];
   error?: string;
+  todos?: TodoItem[];
+  questions?: QuestionItem[];
+  task?: BackgroundTaskItem;
+  taskId?: string;
+  code?: number | null;
 }
 
 export interface ModelOption {
@@ -242,6 +296,19 @@ declare global {
         onData: (callback: (data: { id: string; data: string }) => void) => () => void;
         onExit: (callback: (data: { id: string; code: number | null }) => void) => () => void;
       };
+      answerQuestion?: (toolCallId: string, answer: any) => Promise<boolean>;
+      listBackgroundTasks?: () => Promise<BackgroundTaskItem[]>;
+      killBackgroundTask?: (taskId: string) => Promise<boolean>;
+      getBackgroundTaskLogs?: (taskId: string) => Promise<string[]>;
+      onBackgroundTaskEvent?: (
+        callback: (event: {
+          type: "output" | "status";
+          taskId: string;
+          data?: string;
+          status?: string;
+          code?: number | null;
+        }) => void
+      ) => () => void;
     };
   }
 }

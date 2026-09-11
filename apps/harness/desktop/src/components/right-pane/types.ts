@@ -2,7 +2,8 @@ export type RightPaneTabType =
   | "side_conversation"
   | "review"
   | "terminal"
-  | "browser";
+  | "browser"
+  | "task_output";
 
 export interface RightPaneTab {
   id: string;
@@ -12,5 +13,7 @@ export interface RightPaneTab {
   project?: string;
   conversationId?: string;
   terminalSessionId?: string;
+  taskId?: string;
+  command?: string;
   createdAt?: number;
 }

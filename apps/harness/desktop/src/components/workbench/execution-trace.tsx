@@ -16,6 +16,8 @@ import type { FileMutationRecord, TraceStep } from "../../vite-env";
 import { FileIcon } from "./file-icon";
 import { MarkdownContent } from "./markdown-content";
 import { getMutationDiffStats } from "./review-dialog";
+import { TodoPill } from "./todo-pill";
+import { QuestionCard } from "./question-card";
 
 export interface TraceToolCall {
   id: string;
@@ -38,6 +40,7 @@ export interface ExecutionTraceProps {
   onRollback?: (record: FileMutationRecord) => void;
   onRollbackAll?: (records: FileMutationRecord[]) => void;
   onOpenReview?: () => void;
+  onAnswerQuestion?: (toolCallId: string, answer: any) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -81,6 +84,7 @@ export function ExecutionTrace({
   onRollback,
   onRollbackAll,
   onOpenReview,
+  onAnswerQuestion,
 }: ExecutionTraceProps) {
   // Default: Open while executing to view progress live; automatically closed when worked/finished
   const [isMainOpen, setIsMainOpen] = useState(isExecuting);
@@ -199,6 +203,48 @@ export function ExecutionTrace({
             if (step.type === "tool") {
               const norm = (step.name || "").toLowerCase().replace(/[-_]/g, "");
 
+              // A. Todo Write / Checklist (Image 1 & 2)
+              if (norm === "todowrite" || norm === "todo") {
+                let parsedArgs = step.args;
+                if (typeof parsedArgs === "string") {
+                  try {
+                    parsedArgs = JSON.parse(parsedArgs);
+                  } catch {}
+                }
+                const rawTodos =
+                  parsedArgs?.todos ||
+                  parsedArgs?.items ||
+                  (Array.isArray(parsedArgs) ? parsedArgs : []);
+                return (
+                  <div key={step.id || `todo_${idx}`} className="py-1">
+                    <TodoPill todos={rawTodos} />
+                  </div>
+                );
+              }
+
+              // B. Ask Question (Interactive choices + write-in user instructions)
+              if (norm === "askquestion" || norm === "question") {
+                let parsedArgs = step.args;
+                if (typeof parsedArgs === "string") {
+                  try {
+                    parsedArgs = JSON.parse(parsedArgs);
+                  } catch {}
+                }
+                const rawQuestions =
+                  parsedArgs?.questions ||
+                  (Array.isArray(parsedArgs) ? parsedArgs : [parsedArgs]);
+                return (
+                  <QuestionCard
+                    key={step.id || `q_${idx}`}
+                    toolCallId={step.toolCallId || step.id}
+                    questions={rawQuestions}
+                    onAnswer={onAnswerQuestion || (() => {})}
+                    isAnswered={Boolean(step.result)}
+                    answeredValue={step.result}
+                  />
+                );
+              }
+
               // 1. Terminal / Shell command (bash, run_command, terminal, exec)
               if (
                 norm === "bash" ||
@@ -222,7 +268,7 @@ export function ExecutionTrace({
                 );
               }
 
-              // 2. File Mutation (write, edit, replace)
+              // 2. File Mutation (write, edit, replace, apply_patch)
               if (
                 norm.includes("write") ||
                 norm.includes("edit") ||

@@ -176,5 +176,8 @@ export {
 	estimateTextTokens,
 	estimateToolSchemasTokens,
 	buildConstSystemPrompt,
+	globalTaskManager,
+	BackgroundProcessManager,
+	applyUnifiedDiff,
 } from "./const/index.ts";
 

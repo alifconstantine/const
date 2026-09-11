@@ -60,6 +60,8 @@ import type {
   TraceStep,
   ApprovalRequestData,
   ApprovalDecision,
+  BackgroundTaskItem,
+  TodoItem,
 } from "./vite-env";
 import authArt from "./assets/auth-art.jpg";
 
@@ -216,6 +218,64 @@ function AuthenticatedContent({
 
   const handleToggleRightSidebar = () => {
     setIsRightSidebarOpen((prev) => !prev);
+  };
+
+  // Background Tasks Management
+  const [runningTasks, setRunningTasks] = useState<BackgroundTaskItem[]>([]);
+
+  useEffect(() => {
+    if (window.electron?.listBackgroundTasks) {
+      window.electron.listBackgroundTasks().then((tasks) => {
+        if (tasks) {
+          setRunningTasks(tasks.filter((t) => t.status === "running"));
+        }
+      });
+    }
+    if (window.electron?.onBackgroundTaskEvent) {
+      const unsub = window.electron.onBackgroundTaskEvent((event) => {
+        if (window.electron?.listBackgroundTasks) {
+          window.electron.listBackgroundTasks().then((tasks) => {
+            if (tasks) {
+              setRunningTasks(tasks.filter((t) => t.status === "running"));
+            }
+          });
+        }
+      });
+      return () => unsub();
+    }
+  }, []);
+
+  const handleSelectRunningTask = (task: BackgroundTaskItem) => {
+    const tabId = `task_${task.id}`;
+    const existingTab = rightPaneTabs.find((t) => t.id === tabId || t.taskId === task.id);
+    if (existingTab) {
+      setActiveRightPaneTabId(existingTab.id);
+      setIsRightSidebarOpen(true);
+      return;
+    }
+    const newTab: RightPaneTab = {
+      id: tabId,
+      title: task.command.length > 20 ? task.command.slice(0, 20) + "..." : task.command,
+      type: "task_output",
+      taskId: task.id,
+      command: task.command,
+    };
+    setRightPaneTabs((prev) => [...prev, newTab]);
+    setActiveRightPaneTabId(newTab.id);
+    setIsRightSidebarOpen(true);
+  };
+
+  const handleStopBackgroundTask = async (taskId: string) => {
+    if (window.electron?.killBackgroundTask) {
+      await window.electron.killBackgroundTask(taskId);
+      setRunningTasks((prev) => prev.filter((t) => t.id !== taskId));
+    }
+  };
+
+  const handleAnswerQuestion = async (toolCallId: string, answer: any) => {
+    if (window.electron?.answerQuestion) {
+      await window.electron.answerQuestion(toolCallId, answer);
+    }
   };
 
   const handleOpenTerminal = async () => {
@@ -999,6 +1059,88 @@ function AuthenticatedContent({
           next.delete(targetConvoId);
           return next;
         });
+      } else if (event.type === "todo_update") {
+        if (targetMsgs.length > 0) {
+          const lastIdx = targetMsgs.length - 1;
+          const last = targetMsgs[lastIdx];
+          if (last && last.role === "assistant") {
+            const steps: TraceStep[] = last.traceSteps ? [...last.traceSteps] : [];
+            const existingIdx = steps.findIndex(
+              (s) => s.name === "todo_write" || s.name === "todo"
+            );
+            if (existingIdx >= 0) {
+              steps[existingIdx] = {
+                ...steps[existingIdx]!,
+                args: { todos: event.todos },
+              };
+            } else {
+              steps.push({
+                id: `todo_${Date.now()}`,
+                type: "tool",
+                toolCallId: `todo_${Date.now()}`,
+                name: "todo_write",
+                args: { todos: event.todos },
+              });
+            }
+            const updated: ChatMessage = {
+              ...last,
+              traceSteps: steps,
+            };
+            targetMsgs = [...targetMsgs];
+            targetMsgs[lastIdx] = updated;
+          }
+        }
+        activeSessionMessagesRef.current.set(targetConvoId, targetMsgs);
+        if (targetConvoId === conversationIdRef.current) {
+          setMessages(targetMsgs);
+        }
+      } else if (event.type === "ask_question") {
+        if (targetMsgs.length > 0) {
+          const lastIdx = targetMsgs.length - 1;
+          const last = targetMsgs[lastIdx];
+          if (last && last.role === "assistant") {
+            const steps: TraceStep[] = last.traceSteps ? [...last.traceSteps] : [];
+            const callId = event.toolCallId || `tc_q_${Date.now()}`;
+            const existing = steps.find((s) => s.id === callId || s.toolCallId === callId);
+            if (!existing) {
+              steps.push({
+                id: callId,
+                type: "tool",
+                toolCallId: callId,
+                name: "ask_question",
+                args: { questions: event.questions },
+              });
+              const tools = last.toolCalls ? [...last.toolCalls] : [];
+              tools.push({
+                id: callId,
+                name: "ask_question",
+                args: { questions: event.questions },
+              });
+              const updated: ChatMessage = {
+                ...last,
+                toolCalls: tools,
+                traceSteps: steps,
+              };
+              targetMsgs = [...targetMsgs];
+              targetMsgs[lastIdx] = updated;
+            }
+          }
+        }
+        activeSessionMessagesRef.current.set(targetConvoId, targetMsgs);
+        if (targetConvoId === conversationIdRef.current) {
+          setMessages(targetMsgs);
+        }
+      } else if (event.type === "task_started") {
+        if (event.task) {
+          setRunningTasks((prev) => {
+            const filtered = prev.filter((t) => t.id !== event.task.id);
+            return [...filtered, event.task];
+          });
+        }
+      } else if (event.type === "task_stopped") {
+        if (event.taskId) {
+          setRunningTasks((prev) => prev.filter((t) => t.id !== event.taskId));
+        }
       } else if (event.type === "done") {
         setRunningConvoIds((prev) => {
           const next = new Set(prev);
@@ -1707,6 +1849,9 @@ function AuthenticatedContent({
                   onOpenSettings={(tab) => handleOpenSettings(tab || "model-settings")}
                   initialPrompt={editingPrompt}
                   onModelChange={setActiveModelItem}
+                  runningTasks={runningTasks}
+                  onSelectTask={handleSelectRunningTask}
+                  onStopTask={handleStopBackgroundTask}
                 />
               </div>
             </div>
@@ -1822,6 +1967,7 @@ function AuthenticatedContent({
                           }
                           onRollback={handleRollback}
                           onRollbackAll={handleRollbackAll}
+                          onAnswerQuestion={handleAnswerQuestion}
                         />
 
                         {/* Interactive Approval Card rendered inline below trace matching screenshot */}
@@ -1944,6 +2090,9 @@ function AuthenticatedContent({
                     onOpenSettings={(tab) => handleOpenSettings(tab || "model-settings")}
                     initialPrompt={editingPrompt}
                     onModelChange={setActiveModelItem}
+                    runningTasks={runningTasks}
+                    onSelectTask={handleSelectRunningTask}
+                    onStopTask={handleStopBackgroundTask}
                   />
                 </div>
               </div>
@@ -1971,6 +2120,7 @@ function AuthenticatedContent({
                   workspacePath={currentProject === "Outside Project" ? undefined : currentProject}
                   mutations={reviewingMutations || undefined}
                   onRollbackFile={handleRollback}
+                  onStopTask={handleStopBackgroundTask}
                 />
               )}
             </div>

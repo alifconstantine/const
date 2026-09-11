@@ -60,6 +60,37 @@ export interface ApprovalResponseData {
   feedback?: string;
 }
 
+export interface TodoItem {
+  id?: string;
+  title?: string;
+  task?: string;
+  content: string;
+  status: "pending" | "in_progress" | "completed";
+}
+
+export interface QuestionOption {
+  label: string;
+  value?: string;
+  description?: string;
+  recommended?: boolean;
+}
+
+export interface QuestionItem {
+  id?: string;
+  question: string;
+  options?: QuestionOption[];
+  is_multi_select?: boolean;
+}
+
+export interface BackgroundTaskItem {
+  id: string;
+  command: string;
+  pid?: number;
+  startTime: number;
+  status: "running" | "completed" | "failed";
+  output?: string[];
+}
+
 export interface AgentEventMap {
   token: { token: string };
   token_reset: {};
@@ -73,6 +104,10 @@ export interface AgentEventMap {
   status: { status: "idle" | "thinking" | "calling_tool" | "waiting_approval" | "streaming" | "done" | "error"; message?: string };
   done: { fullContent: string; messages: AgentMessage[] };
   error: { error: string };
+  todo_update: { todos: TodoItem[] };
+  ask_question: { toolCallId: string; questions: QuestionItem[] };
+  task_started: { task: BackgroundTaskItem };
+  task_stopped: { taskId: string; code: number | null };
 }
 
 export type AgentEvent = {
@@ -90,6 +125,7 @@ export interface AgentConfig {
   thinkingLevel?: ThinkingLevel | string;
   maxTokens?: number;
   maxOutputTokens?: number;
+  onAskQuestion?: (toolCallId: string, questions: QuestionItem[]) => Promise<any>;
 }
 
 export type ConstAgentMessage = AgentMessage;

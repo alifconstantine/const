@@ -2,13 +2,18 @@ import fs from "node:fs/promises";
 import fsSync from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import { spawn } from "node:child_process";
+import { spawn, type ChildProcess } from "node:child_process";
 import type { FileMutationRecord } from "./mutation-ledger.js";
+import type { TodoItem, QuestionItem, BackgroundTaskItem } from "./types.js";
 
 export interface ExecuteToolOptions {
   signal?: AbortSignal;
   stepIndex?: number;
   onFileMutation?: (record: FileMutationRecord) => void;
+  onTodoUpdate?: (todos: TodoItem[]) => void;
+  askUser?: (questions: QuestionItem[]) => Promise<any>;
+  onTaskStarted?: (task: BackgroundTaskItem) => void;
+  onTaskStopped?: (taskId: string, code: number | null) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -386,6 +391,171 @@ export const CONST_DEFAULT_TOOLS: NativeToolDefinition[] = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "todo_write",
+      description:
+        "Update the active task checklist to track plan progress. Replace the entire list on each update. Set status as 'pending', 'in_progress', or 'completed'.",
+      parameters: {
+        type: "object",
+        properties: {
+          todos: {
+            type: "array",
+            description: "The complete updated list of todos.",
+            items: {
+              type: "object",
+              properties: {
+                content: {
+                  type: "string",
+                  description: "Concise description of the task or milestone.",
+                },
+                status: {
+                  type: "string",
+                  enum: ["pending", "in_progress", "completed"],
+                  description: "Status of this task item.",
+                },
+              },
+              required: ["content", "status"],
+            },
+          },
+        },
+        required: ["todos"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "ask_question",
+      description:
+        "Ask the user a clarifying question when requirements or architecture options need user confirmation. Provide recommended options if available. Execution pauses until the user responds.",
+      parameters: {
+        type: "object",
+        properties: {
+          questions: {
+            type: "array",
+            description: "Array of questions to ask the user.",
+            items: {
+              type: "object",
+              properties: {
+                id: {
+                  type: "string",
+                  description: "Unique identifier for this question.",
+                },
+                question: {
+                  type: "string",
+                  description: "The question text to present to the user.",
+                },
+                options: {
+                  type: "array",
+                  description:
+                    "Predefined choices for the user. Place the most recommended option first with recommended: true.",
+                  items: {
+                    type: "object",
+                    properties: {
+                      label: {
+                        type: "string",
+                        description: "Option label.",
+                      },
+                      description: {
+                        type: "string",
+                        description: "Brief rationale or explanation for this choice.",
+                      },
+                      recommended: {
+                        type: "boolean",
+                        description: "Set true if this is the AI's top recommended choice.",
+                      },
+                    },
+                    required: ["label"],
+                  },
+                },
+                is_multi_select: {
+                  type: "boolean",
+                  description: "Whether the user can select multiple options.",
+                },
+              },
+              required: ["question"],
+            },
+          },
+        },
+        required: ["questions"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "apply_patch",
+      description:
+        "Apply a unified diff patch (Git format) to an existing file. Ideal for precise multi-line and multi-hunk modifications.",
+      parameters: {
+        type: "object",
+        properties: {
+          path: {
+            type: "string",
+            description: "Path to the file to patch.",
+          },
+          patch: {
+            type: "string",
+            description:
+              "The unified diff patch string containing @@ -start,len +start,len @@ hunk headers.",
+          },
+        },
+        required: ["path", "patch"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "run_command",
+      description:
+        "Execute a shell command. Set is_daemon to true for long-running processes (like dev servers or background workers) so they run in the background without blocking.",
+      parameters: {
+        type: "object",
+        properties: {
+          command: {
+            type: "string",
+            description: "The shell command to execute.",
+          },
+          is_daemon: {
+            type: "boolean",
+            description:
+              "Set to true if this command starts a long-running/background process (e.g. 'node server.js', 'npm run dev') that should keep running.",
+          },
+          timeout: {
+            type: "number",
+            description: "Optional timeout in seconds for synchronous execution.",
+          },
+        },
+        required: ["command"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "manage_task",
+      description:
+        "Manage active background processes started by the agent. Actions: 'list' (list running tasks), 'status' (view logs and state), 'kill' (terminate a task).",
+      parameters: {
+        type: "object",
+        properties: {
+          action: {
+            type: "string",
+            enum: ["list", "status", "kill"],
+            description: "Action to perform on background tasks.",
+          },
+          task_id: {
+            type: "string",
+            description: "The task ID to inspect or terminate (required for 'status' and 'kill').",
+          },
+        },
+        required: ["action"],
+      },
+    },
+  },
 ];
 
 // Helper argument extractors
@@ -521,6 +691,242 @@ export function isDevServerCommand(cmd: string): boolean {
   if (!cmd || typeof cmd !== "string") return false;
   const trimmed = cmd.trim();
   return /(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?(?:dev|start|serve|watch)|(?:vite|webpack-dev-server|next\s+dev|astro\s+dev|nuxt\s+dev|nodemon)/i.test(trimmed);
+}
+
+// ---------------------------------------------------------------------------
+// Background Process Manager (Supports long-running dev servers & daemons)
+// ---------------------------------------------------------------------------
+
+export interface ActiveBackgroundTask {
+  id: string;
+  command: string;
+  cwd: string;
+  pid?: number;
+  startTime: number;
+  status: "running" | "completed" | "failed";
+  exitCode: number | null;
+  logs: string[];
+  child?: ChildProcess;
+}
+
+export type BackgroundTaskListener = (event: {
+  type: "output" | "status";
+  taskId: string;
+  data?: string;
+  status?: "running" | "completed" | "failed";
+  code?: number | null;
+}) => void;
+
+export class BackgroundProcessManager {
+  private tasks: Map<string, ActiveBackgroundTask> = new Map();
+  private listeners: Set<BackgroundTaskListener> = new Set();
+
+  public startTask(command: string, cwd: string): ActiveBackgroundTask {
+    const taskId = `task_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const shellCfg = getShellConfig();
+    const child = spawn(shellCfg.shell, [...shellCfg.args, command], {
+      cwd,
+      windowsHide: true,
+      detached: process.platform !== "win32",
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+
+    const task: ActiveBackgroundTask = {
+      id: taskId,
+      command,
+      cwd,
+      pid: child.pid,
+      startTime: Date.now(),
+      status: "running",
+      exitCode: null,
+      logs: [`[Process started: ${command} (PID: ${child.pid})]`],
+      child,
+    };
+
+    const appendLog = (chunk: string) => {
+      const lines = chunk.split(/\r?\n/);
+      for (const line of lines) {
+        if (line) {
+          task.logs.push(line);
+          if (task.logs.length > 5000) task.logs.shift();
+          this.emit({ type: "output", taskId, data: line });
+        }
+      }
+    };
+
+    child.stdout?.on("data", (data) => appendLog(data.toString()));
+    child.stderr?.on("data", (data) => appendLog(data.toString()));
+
+    child.on("close", (code) => {
+      task.status = code === 0 ? "completed" : "failed";
+      task.exitCode = code;
+      task.logs.push(`[Process exited with code ${code}]`);
+      this.emit({ type: "status", taskId, status: task.status, code });
+    });
+
+    child.on("error", (err) => {
+      task.status = "failed";
+      task.logs.push(`[Process error: ${err.message}]`);
+      this.emit({ type: "status", taskId, status: "failed" });
+    });
+
+    this.tasks.set(taskId, task);
+    return task;
+  }
+
+  public listTasks(): BackgroundTaskItem[] {
+    return Array.from(this.tasks.values()).map((t) => ({
+      id: t.id,
+      command: t.command,
+      pid: t.pid,
+      status: t.status,
+      startTime: t.startTime,
+      output: t.logs.slice(-20),
+    }));
+  }
+
+  public getTask(taskId: string): ActiveBackgroundTask | undefined {
+    return this.tasks.get(taskId);
+  }
+
+  public killTask(taskId: string): boolean {
+    const task = this.tasks.get(taskId);
+    if (!task) return false;
+    if (task.status !== "running") return true;
+
+    try {
+      if (task.pid) {
+        killProcessTree(task.pid);
+      }
+      task.status = "completed";
+      task.logs.push("[Process terminated by user/AI request]");
+      this.emit({ type: "status", taskId, status: "completed", code: null });
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  public subscribe(cb: BackgroundTaskListener): () => void {
+    this.listeners.add(cb);
+    return () => this.listeners.delete(cb);
+  }
+
+  private emit(event: Parameters<BackgroundTaskListener>[0]) {
+    for (const listener of this.listeners) {
+      try {
+        listener(event);
+      } catch {}
+    }
+  }
+}
+
+export const globalTaskManager = new BackgroundProcessManager();
+
+// ---------------------------------------------------------------------------
+// Unified Diff Patcher (Unified standard Git diff applicator)
+// ---------------------------------------------------------------------------
+
+export function applyUnifiedDiff(
+  originalText: string,
+  patchText: string
+): { success: boolean; resultText?: string; error?: string } {
+  const origLines = originalText.split(/\r?\n/);
+  const patchLines = patchText.split(/\r?\n/);
+  const eol = originalText.includes("\r\n") ? "\r\n" : "\n";
+
+  let i = 0;
+  while (i < patchLines.length && !patchLines[i]!.startsWith("@@")) {
+    i++;
+  }
+
+  if (i >= patchLines.length) {
+    return { success: false, error: "Malformed patch: No hunk header ('@@ -... +... @@') found." };
+  }
+
+  let workingLines = [...origLines];
+  let lineOffset = 0;
+
+  while (i < patchLines.length) {
+    const headerLine = patchLines[i]!;
+    if (!headerLine.startsWith("@@")) {
+      i++;
+      continue;
+    }
+
+    const match = headerLine.match(/@@\s+-(\d+)(?:,(\d+))?\s+\+(\d+)(?:,(\d+))?\s+@@/);
+    if (!match) {
+      return { success: false, error: `Invalid hunk header: '${headerLine}'` };
+    }
+
+    const oldStart = parseInt(match[1]!, 10);
+    let origTargetIdx = oldStart - 1 + lineOffset;
+    i++;
+
+    const hunkOps: Array<{ type: " " | "-" | "+"; line: string }> = [];
+    while (i < patchLines.length && !patchLines[i]!.startsWith("@@")) {
+      const line = patchLines[i]!;
+      if (line.startsWith("---") || line.startsWith("+++")) {
+        i++;
+        continue;
+      }
+      const marker = line[0];
+      if (marker === " " || marker === "-" || marker === "+") {
+        hunkOps.push({ type: marker, line: line.slice(1) });
+      } else if (line.trim() === "") {
+        hunkOps.push({ type: " ", line: "" });
+      }
+      i++;
+    }
+
+    const firstContext = hunkOps.find((op) => op.type === " " || op.type === "-");
+    if (firstContext) {
+      if (
+        origTargetIdx < 0 ||
+        origTargetIdx >= workingLines.length ||
+        workingLines[origTargetIdx]?.trimEnd() !== firstContext.line.trimEnd()
+      ) {
+        let foundIdx = -1;
+        for (let searchOffset = 1; searchOffset <= 25; searchOffset++) {
+          const tryDown = origTargetIdx + searchOffset;
+          if (tryDown < workingLines.length && workingLines[tryDown]?.trimEnd() === firstContext.line.trimEnd()) {
+            foundIdx = tryDown;
+            break;
+          }
+          const tryUp = origTargetIdx - searchOffset;
+          if (tryUp >= 0 && workingLines[tryUp]?.trimEnd() === firstContext.line.trimEnd()) {
+            foundIdx = tryUp;
+            break;
+          }
+        }
+        if (foundIdx !== -1) {
+          origTargetIdx = foundIdx;
+        }
+      }
+    }
+
+    const newChunk: string[] = [];
+    let currentIdx = Math.max(0, origTargetIdx);
+    let removeCount = 0;
+
+    for (const op of hunkOps) {
+      if (op.type === " ") {
+        newChunk.push(workingLines[currentIdx] ?? op.line);
+        currentIdx++;
+        removeCount++;
+      } else if (op.type === "-") {
+        currentIdx++;
+        removeCount++;
+      } else if (op.type === "+") {
+        newChunk.push(op.line);
+      }
+    }
+
+    workingLines.splice(Math.max(0, origTargetIdx), removeCount, ...newChunk);
+    lineOffset += newChunk.length - removeCount;
+  }
+
+  return { success: true, resultText: workingLines.join(eol) };
 }
 
 interface RunProcessOptions {
@@ -1041,6 +1447,24 @@ export async function executeNativeTool(
         : workspacePath;
 
       const shellCfg = getShellConfig();
+
+      // Check if caller explicitly requested background daemon execution
+      if (args.is_daemon || args.isDaemon || args.background) {
+        const bgTask = globalTaskManager.startTask(cmd, executionCwd);
+        options.onTaskStarted?.({
+          id: bgTask.id,
+          command: bgTask.command,
+          pid: bgTask.pid,
+          startTime: bgTask.startTime,
+          status: bgTask.status,
+          output: bgTask.logs,
+        });
+        return {
+          result: `Started background task [${bgTask.id}] (PID: ${bgTask.pid ?? "unknown"}): '${cmd}'. It is now running in the background. Use 'manage_task' to check status, view logs, or kill it.`,
+          isError: false,
+        };
+      }
+
       const isBuildOrInstall = /(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?(?:build|install|add|compile|test)|(?:tsc|cargo\s+build|dotnet\s+build)/i.test(cmd);
       const isDevServer = isDevServerCommand(cmd);
       const defaultTimeoutSec = isBuildOrInstall ? 180 : (isDevServer ? 30 : 60);
@@ -1401,8 +1825,250 @@ export async function executeNativeTool(
       };
     }
 
+    // -----------------------------------------------------------------------
+    // Tool: todo_write (aliases: todo, todowrite)
+    // -----------------------------------------------------------------------
+    if (normalizedTool === "todowrite" || normalizedTool === "todo") {
+      const rawTodos = args.todos ?? args.tasks ?? args.items ?? [];
+      if (!Array.isArray(rawTodos)) {
+        return {
+          result: "Error: 'todos' parameter must be an array of todo items.",
+          isError: true,
+        };
+      }
+
+      const validTodos: TodoItem[] = rawTodos
+        .map((t: any) => ({
+          content: String(t.content ?? t.task ?? t.text ?? "").trim(),
+          status:
+            t.status === "completed" || t.status === "in_progress" || t.status === "pending"
+              ? (t.status as "completed" | "in_progress" | "pending")
+              : "pending",
+        }))
+        .filter((t) => t.content.length > 0);
+
+      options.onTodoUpdate?.(validTodos);
+
+      const pendingCount = validTodos.filter((t) => t.status === "pending").length;
+      const inProgressCount = validTodos.filter((t) => t.status === "in_progress").length;
+      const completedCount = validTodos.filter((t) => t.status === "completed").length;
+
+      return {
+        result: `Updated todo list: ${completedCount} completed, ${inProgressCount} in progress, ${pendingCount} pending (${validTodos.length} total).`,
+        isError: false,
+      };
+    }
+
+    // -----------------------------------------------------------------------
+    // Tool: ask_question (aliases: question, askuser)
+    // -----------------------------------------------------------------------
+    if (
+      normalizedTool === "askquestion" ||
+      normalizedTool === "question" ||
+      normalizedTool === "askuser"
+    ) {
+      const rawQuestions = args.questions ?? (args.question ? [args] : []);
+      if (!Array.isArray(rawQuestions) || rawQuestions.length === 0) {
+        return {
+          result: "Error: Missing 'questions' parameter to ask the user.",
+          isError: true,
+        };
+      }
+
+      const parsedQuestions: QuestionItem[] = rawQuestions
+        .map((q: any, idx: number) => ({
+          id: String(q.id || `q_${idx}_${Date.now()}`),
+          question: String(q.question || q.prompt || q.text || ""),
+          options: Array.isArray(q.options)
+            ? q.options.map((opt: any) => ({
+                label: typeof opt === "string" ? opt : String(opt.label || opt.text || ""),
+                description: typeof opt === "object" ? opt.description : undefined,
+                recommended: typeof opt === "object" ? Boolean(opt.recommended) : false,
+              }))
+            : undefined,
+          is_multi_select: Boolean(q.is_multi_select ?? q.multi_select ?? false),
+        }))
+        .filter((q) => q.question.length > 0);
+
+      if (parsedQuestions.length === 0) {
+        return {
+          result: "Error: No valid questions provided.",
+          isError: true,
+        };
+      }
+
+      if (options.askUser) {
+        try {
+          const userResponse = await options.askUser(parsedQuestions);
+          return {
+            result:
+              typeof userResponse === "string" ? userResponse : JSON.stringify(userResponse),
+            isError: false,
+          };
+        } catch (err: any) {
+          return {
+            result: `Failed to receive answer from user: ${err.message || String(err)}`,
+            isError: true,
+          };
+        }
+      }
+
+      return {
+        result: "User prompt submitted: Waiting for user answer.",
+        isError: false,
+      };
+    }
+
+    // -----------------------------------------------------------------------
+    // Tool: apply_patch (aliases: patch, applypatch)
+    // -----------------------------------------------------------------------
+    if (normalizedTool === "applypatch" || normalizedTool === "patch") {
+      const rawPath = extractPathArg(args);
+      const patchContent = String(args.patch || args.diff || "").trim();
+
+      if (!rawPath) {
+        return {
+          result: "Error: Missing file path. Please specify the 'path' parameter.",
+          isError: true,
+        };
+      }
+
+      if (!patchContent) {
+        return {
+          result: "Error: Missing 'patch' content to apply.",
+          isError: true,
+        };
+      }
+
+      const filePath = resolveSafePath(rawPath, workspacePath);
+      if (!fsSync.existsSync(filePath)) {
+        return {
+          result: `File not found to patch: '${filePath}'`,
+          isError: true,
+        };
+      }
+
+      const originalContent = await fs.readFile(filePath, "utf-8");
+      const { success, resultText, error } = applyUnifiedDiff(originalContent, patchContent);
+
+      if (!success || resultText === undefined) {
+        return {
+          result: `[PATCH FAILED]: Could not apply patch to '${path.basename(
+            filePath
+          )}'. ${error || "Hunk context matching failed."}\nAction: Use 'read' tool to inspect the latest file content before generating a new patch or edit.`,
+          isError: true,
+        };
+      }
+
+      await fs.writeFile(filePath, resultText, "utf-8");
+
+      const displayPath = path.isAbsolute(rawPath)
+        ? filePath
+        : path.relative(workspacePath, filePath);
+
+      options.onFileMutation?.({
+        id: `mut_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        stepIndex: options.stepIndex ?? 0,
+        operation: "modify",
+        absolutePath: filePath,
+        filePath: filePath,
+        targetFile: displayPath || filePath,
+        previousContent: originalContent,
+        newContent: resultText,
+        timestamp: Date.now(),
+      });
+
+      return {
+        result: `Patch applied successfully to '${displayPath}'. File updated.`,
+        isError: false,
+      };
+    }
+
+    // -----------------------------------------------------------------------
+    // Tool: manage_task (aliases: task_manager, jobs)
+    // -----------------------------------------------------------------------
+    if (
+      normalizedTool === "managetask" ||
+      normalizedTool === "taskmanager" ||
+      normalizedTool === "jobs"
+    ) {
+      const action = String(args.action || "").toLowerCase().trim();
+      const taskId = String(args.task_id || args.taskId || args.id || "").trim();
+
+      if (action === "list") {
+        const tasks = globalTaskManager.listTasks();
+        if (tasks.length === 0) {
+          return {
+            result: "(No active or recent background tasks)",
+            isError: false,
+          };
+        }
+        const formatted = tasks
+          .map(
+            (t) =>
+              `- Task ID: ${t.id} | Command: '${t.command}' | Status: ${t.status} | PID: ${
+                t.pid ?? "unknown"
+              }`
+          )
+          .join("\n");
+        return {
+          result: `Background Tasks:\n${formatted}`,
+          isError: false,
+        };
+      }
+
+      if (action === "status") {
+        if (!taskId) {
+          return {
+            result: "Error: Missing 'task_id' parameter for status action.",
+            isError: true,
+          };
+        }
+        const task = globalTaskManager.getTask(taskId);
+        if (!task) {
+          return {
+            result: `Task not found: '${taskId}'`,
+            isError: true,
+          };
+        }
+        const tailLogs = task.logs.slice(-30).join("\n");
+        return {
+          result: `Task '${task.id}' [${task.status}] (PID: ${
+            task.pid ?? "unknown"
+          }):\nCommand: ${task.command}\n\nRecent output:\n${tailLogs || "(no output yet)"}`,
+          isError: false,
+        };
+      }
+
+      if (action === "kill" || action === "stop") {
+        if (!taskId) {
+          return {
+            result: "Error: Missing 'task_id' parameter for kill action.",
+            isError: true,
+          };
+        }
+        const success = globalTaskManager.killTask(taskId);
+        if (success) {
+          options.onTaskStopped?.(taskId, null);
+          return {
+            result: `Successfully stopped task '${taskId}'.`,
+            isError: false,
+          };
+        }
+        return {
+          result: `Failed to stop task '${taskId}' or task was not found.`,
+          isError: true,
+        };
+      }
+
+      return {
+        result: `Unknown action '${action}'. Available actions: list, status, kill.`,
+        isError: true,
+      };
+    }
+
     return {
-      result: `Tool '${toolName}' is not recognized. Available tools: read, write, edit, bash, powershell, ls, find, grep, mkdir.`,
+      result: `Tool '${toolName}' is not recognized. Available tools: read, write, edit, apply_patch, bash, run_command, manage_task, powershell, ls, find, grep, mkdir, todo_write, ask_question.`,
       isError: true,
     };
   } catch (err: any) {

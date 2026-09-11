@@ -34,6 +34,8 @@ import {
 import { useQuery } from "convex/react";
 import { api } from "@const/backend/_generated/api";
 import { ImageLightbox } from "./image-lightbox";
+import { AttachedTaskBanner } from "./attached-task-banner";
+import type { BackgroundTaskItem } from "../../vite-env";
 
 function getThinkingDescription(lvl: string): string {
   switch (lvl.toLowerCase()) {
@@ -145,6 +147,9 @@ interface ChatCardProps {
   onModelChange?: (model: ModelItem) => void;
   onOpenSettings?: (tab?: string) => void;
   initialPrompt?: string;
+  runningTasks?: BackgroundTaskItem[];
+  onSelectTask?: (task: BackgroundTaskItem) => void;
+  onStopTask?: (taskId: string) => void;
 }
 
 export function ChatCard({
@@ -159,6 +164,9 @@ export function ChatCard({
   onModelChange,
   onOpenSettings,
   initialPrompt,
+  runningTasks,
+  onSelectTask,
+  onStopTask,
 }: ChatCardProps) {
   const [prompt, setPrompt] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -873,10 +881,20 @@ export function ChatCard({
         <div
           className={`w-full max-w-full bg-[#ffffff] dark:bg-[#2b2b2b] rounded-2xl ${
             compact ? "" : "border-t border-[#e2e2e4] dark:border-[#383838]"
-          } px-3 sm:px-3.5 pt-2.5 pb-2.5 flex flex-col justify-between transition-colors focus-within:border-[#a9a9a9] dark:focus-within:border-[#555555] min-w-0`}
+          } flex flex-col justify-between transition-colors focus-within:border-[#a9a9a9] dark:focus-within:border-[#555555] min-w-0 overflow-hidden`}
         >
-          {/* Attachments Shelf (Square Cards for Images, Videos, PDFs, Docs) */}
-          {attachments.length > 0 && (
+          {/* Running Tasks Banner attached above input, matching Image 3 */}
+          {runningTasks && runningTasks.length > 0 && (
+            <AttachedTaskBanner
+              tasks={runningTasks}
+              onSelectTask={onSelectTask || (() => {})}
+              onStopTask={onStopTask || (() => {})}
+            />
+          )}
+
+          <div className="w-full px-3 sm:px-3.5 pt-2.5 pb-2.5 flex flex-col justify-between min-w-0">
+            {/* Attachments Shelf (Square Cards for Images, Videos, PDFs, Docs) */}
+            {attachments.length > 0 && (
             <div className="w-full flex items-center gap-2.5 pt-1.5 pb-2.5 px-0.5 overflow-x-auto select-none scrollbar-none">
               <TooltipProvider delayDuration={150}>
                 {attachments.map((file) => {
@@ -1587,6 +1605,7 @@ export function ChatCard({
             </div>
           </div>
         </div>
+      </div>
       </div>
 
       {/* Active Conversation Footer Info Bar (Option A: Condensed, No Scrollbar) */}

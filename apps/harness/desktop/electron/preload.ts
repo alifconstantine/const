@@ -130,4 +130,14 @@ contextBridge.exposeInMainWorld("electron", {
       return () => ipcRenderer.removeListener("terminal:exit", handler);
     },
   },
+  answerQuestion: (toolCallId: string, answer: any) =>
+    ipcRenderer.invoke("agent:answer-question", { toolCallId, answer }),
+  listBackgroundTasks: () => ipcRenderer.invoke("tasks:list"),
+  killBackgroundTask: (taskId: string) => ipcRenderer.invoke("tasks:kill", taskId),
+  getBackgroundTaskLogs: (taskId: string) => ipcRenderer.invoke("tasks:get-output", taskId),
+  onBackgroundTaskEvent: (callback: (event: any) => void) => {
+    const handler = (_event: any, payload: any) => callback(payload);
+    ipcRenderer.on("task:event", handler);
+    return () => ipcRenderer.removeListener("task:event", handler);
+  },
 });
