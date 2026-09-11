@@ -113,27 +113,47 @@ export function useConversationWidth(): [ConversationWidth, (width: Conversation
   return [width, setWidth];
 }
 
-export type ZoomLevel = 80 | 90 | 100 | 110 | 125;
-
 export function getSavedZoom(): number {
   if (typeof window === "undefined") return 100;
-  const saved = localStorage.getItem("const_harness_zoom");
-  return saved ? parseInt(saved, 10) || 100 : 100;
+  const saved = localStorage.getItem("const_interface_zoom");
+  if (saved) {
+    const parsed = parseInt(saved, 10);
+    if (!isNaN(parsed) && parsed >= 50 && parsed <= 200) {
+      return parsed;
+    }
+  }
+  return 100;
 }
 
 export function applyZoom(zoom: number = 100) {
-  if (typeof document === "undefined") return;
-  (document.documentElement.style as any).zoom = `${zoom}%`;
+  if (typeof window === "undefined" || typeof document === "undefined") return;
+  const factor = zoom / 100;
+
+  // Always reset CSS zoom on documentElement/body to prevent coordinate distortion or offset bugs
+  if (document.documentElement) {
+    (document.documentElement.style as any).zoom = "";
+  }
+  if (document.body) {
+    (document.body.style as any).zoom = "";
+  }
+
+  // Use Electron's native Chromium engine zoom factor
+  if (window.electron?.setZoomFactor) {
+    window.electron.setZoomFactor(factor);
+  } else {
+    // Web fallback if running without Electron
+    (document.documentElement.style as any).zoom = `${zoom}%`;
+  }
 }
 
 export function setSavedZoom(zoom: number) {
   if (typeof window === "undefined") return;
-  localStorage.setItem("const_harness_zoom", zoom.toString());
+  localStorage.setItem("const_interface_zoom", String(zoom));
   applyZoom(zoom);
   window.dispatchEvent(new CustomEvent("const-zoom-change", { detail: zoom }));
 }
 
-export function useZoom(): [number, (zoom: number) => void] {
+export function useInterfaceZoom(): [number, (zoom: number) => void] {
   const [zoom, setZoomState] = useState<number>(getSavedZoom);
 
   useEffect(() => {
@@ -147,7 +167,7 @@ export function useZoom(): [number, (zoom: number) => void] {
     };
 
     const handleStorage = (e: StorageEvent) => {
-      if (e.key === "const_harness_zoom") {
+      if (e.key === "const_interface_zoom") {
         setZoomState(getSavedZoom());
       }
     };
@@ -177,6 +197,13 @@ export function initThemeListener() {
   const currentZoom = getSavedZoom();
   applyZoom(currentZoom);
 
+  // In Electron, preload may finish bridging right as script runs; re-apply to ensure Chromium engine factor is set
+  if (typeof window !== "undefined") {
+    setTimeout(() => {
+      applyZoom(getSavedZoom());
+    }, 50);
+  }
+
   const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
   const handleChange = () => {
     const active = getSavedTheme();
@@ -188,4 +215,3 @@ export function initThemeListener() {
   mediaQuery.addEventListener("change", handleChange);
   return () => mediaQuery.removeEventListener("change", handleChange);
 }
-

@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from "electron";
+import { contextBridge, ipcRenderer, webFrame } from "electron";
 
 // Bridge Electron APIs to the Renderer window
 contextBridge.exposeInMainWorld("electron", {
@@ -7,6 +7,19 @@ contextBridge.exposeInMainWorld("electron", {
     node: process.versions.node,
     chrome: process.versions.chrome,
     electron: process.versions.electron,
+  },
+  setZoomFactor: (factor: number) => {
+    try {
+      webFrame.setZoomFactor(factor);
+    } catch {}
+    ipcRenderer.invoke("window:set-zoom-factor", factor).catch(() => {});
+  },
+  getZoomFactor: () => {
+    try {
+      return webFrame.getZoomFactor();
+    } catch {
+      return 1.0;
+    }
   },
   openExternal: (url: string) => ipcRenderer.invoke("auth:open-external", url),
   openDirectoryDialog: () => ipcRenderer.invoke("dialog:open-directory"),

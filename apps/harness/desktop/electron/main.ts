@@ -411,6 +411,17 @@ app.whenReady().then(() => {
   ipcMain.handle("window:is-maximized", () => {
     return win?.isMaximized() ?? false;
   });
+  ipcMain.handle("window:set-zoom-factor", (_event, factor: number) => {
+    if (win && !win.isDestroyed() && typeof factor === "number" && factor > 0) {
+      win.webContents.setZoomFactor(factor);
+    }
+  });
+  ipcMain.handle("window:get-zoom-factor", () => {
+    if (win && !win.isDestroyed()) {
+      return win.webContents.getZoomFactor();
+    }
+    return 1.0;
+  });
 
   // Dialog handler
   ipcMain.handle("dialog:open-directory", async () => {

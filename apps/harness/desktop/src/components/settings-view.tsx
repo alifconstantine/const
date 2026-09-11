@@ -459,13 +459,13 @@ export function SettingsView({
   const initials = getUserInitials(user?.name, user?.email);
 
   return (
-    <div className="w-screen h-screen overflow-hidden flex bg-[#f8f8f8] dark:bg-[#161616] text-[#262626] dark:text-[#d4d4d4] select-none font-sans">
+    <div className="w-full h-full overflow-hidden flex bg-[#f8f8f8] dark:bg-[#161616] text-[#262626] dark:text-[#d4d4d4] select-none font-sans">
       {/* ------------------------------------------------------------- */}
       {/* Left Sidebar (Full height, 260px, following DESIGN.md) */}
       {/* ------------------------------------------------------------- */}
       <aside className="w-[260px] h-full flex flex-col justify-between shrink-0 bg-[#ececee] dark:bg-[#2b2b2b] text-[#262626] dark:text-[#d4d4d4] border-r border-[#dedee2] dark:border-[#383838]/40 p-3 select-none">
         {/* Top: Const Logo and Back to workspace button */}
-        <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-3 flex-1 min-h-0">
           {/* Frameless top drag handle with Const Logo */}
           <div
             className="flex items-center h-8"
@@ -490,7 +490,7 @@ export function SettingsView({
           </button>
 
           {/* Navigation Categories */}
-          <ScrollArea className="flex-1 w-full max-h-[calc(100vh-210px)] pr-1">
+          <ScrollArea className="flex-1 min-h-0 w-full pr-1">
             <div className="flex flex-col gap-4 pt-1">
               {navCategories.map((cat) => (
                 <div key={cat.label} className="flex flex-col gap-1">
@@ -991,6 +991,105 @@ export function SettingsView({
                       })}
                     </div>
                   </div>
+                </div>
+              </div>
+            </div>
+          ) : activeTab === "usage-stats" ? (
+            /* ----------------------------------------------------------- */
+            /* Usage Stats Tab (Directly opened from sidebar)             */
+            /* ----------------------------------------------------------- */
+            <div className="flex flex-col gap-6 max-w-2xl">
+              <div>
+                <h1 className="text-xl font-medium tracking-tight text-[#262626] dark:text-white">Usage stats</h1>
+                <p className="mt-1 text-xs text-[#8a8a8a] dark:text-[#888888]">
+                  Monitor your weekly token consumption and account usage limits.
+                </p>
+              </div>
+
+              {/* 3 Metric Summary Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#1e1e1e] p-4 flex flex-col gap-1">
+                  <span className="text-[11px] font-medium text-[#8a8a8a] dark:text-[#777777] uppercase tracking-wider">
+                    Remaining
+                  </span>
+                  <span className="text-xl font-semibold font-mono text-[#262626] dark:text-white mt-1">
+                    {formatTokenDisplay(quota?.remainingTokens ?? 7_000_000)}
+                  </span>
+                  <span className="text-[11px] text-[#8a8a8a] dark:text-[#888888]">
+                    {percentRemaining.toFixed(1)}% available
+                  </span>
+                </div>
+
+                <div className="rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#1e1e1e] p-4 flex flex-col gap-1">
+                  <span className="text-[11px] font-medium text-[#8a8a8a] dark:text-[#777777] uppercase tracking-wider">
+                    Weekly Quota
+                  </span>
+                  <span className="text-xl font-semibold font-mono text-[#262626] dark:text-white mt-1">
+                    {formatTokenDisplay(quota?.weeklyLimitTokens ?? 7_000_000)}
+                  </span>
+                  <span className="text-[11px] text-[#8a8a8a] dark:text-[#888888]">
+                    Included free weekly
+                  </span>
+                </div>
+
+                <div className="rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#1e1e1e] p-4 flex flex-col gap-1">
+                  <span className="text-[11px] font-medium text-[#8a8a8a] dark:text-[#777777] uppercase tracking-wider">
+                    Resets In
+                  </span>
+                  <span className="text-xl font-semibold font-mono text-[#262626] dark:text-white mt-1">
+                    {quota?.resetsInText || "7d 0h"}
+                  </span>
+                  <span className="text-[11px] text-[#8a8a8a] dark:text-[#888888]">
+                    Rolling weekly cycle
+                  </span>
+                </div>
+              </div>
+
+              {/* Quota Progress Card */}
+              <div className="rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#1e1e1e] p-4 sm:p-5 flex flex-col gap-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex flex-col">
+                    <span className="text-[13px] font-medium text-[#262626] dark:text-white">
+                      Token Allocation
+                    </span>
+                    <span className="text-[11px] text-[#8a8a8a] dark:text-[#888888] mt-0.5">
+                      {formatTokenDisplay((quota?.weeklyLimitTokens ?? 7_000_000) - (quota?.remainingTokens ?? 7_000_000))} used of {formatTokenDisplay(quota?.weeklyLimitTokens ?? 7_000_000)} limit
+                    </span>
+                  </div>
+                  <span className="font-mono text-xs font-medium px-2 py-0.5 rounded-md bg-[#dedee2]/60 dark:bg-[#282828] text-[#262626] dark:text-[#d4d4d4]">
+                    {percentRemaining.toFixed(0)}% Left
+                  </span>
+                </div>
+
+                {/* Progress bar */}
+                <div className="w-full h-2.5 rounded-full bg-[#f0f0f2] dark:bg-[#282828] overflow-hidden border border-[#dedee2] dark:border-[#333333]">
+                  <div
+                    className={cn(
+                      "h-full rounded-full transition-all duration-300",
+                      percentRemaining > 50
+                        ? "bg-[#22c55e]"
+                        : percentRemaining > 20
+                        ? "bg-[#eab308]"
+                        : "bg-[#ef4444]"
+                    )}
+                    style={{ width: `${percentRemaining}%` }}
+                  />
+                </div>
+
+                <div className="font-mono text-[11px] text-[#8a8a8a] dark:text-[#777777] flex items-center justify-between">
+                  <span>0 tokens</span>
+                  <span>{formatTokenDisplay(quota?.weeklyLimitTokens ?? 7_000_000)} max</span>
+                </div>
+              </div>
+
+              {/* Informational note */}
+              <div className="rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#f8f8f8] dark:bg-[#1a1a1a] p-3.5 flex items-start gap-2.5 text-xs text-[#8a8a8a] dark:text-[#888888]">
+                <Info className="w-4 h-4 shrink-0 mt-0.5 text-[#737373] dark:text-[#8e8e93]" />
+                <div className="flex flex-col gap-1 leading-relaxed">
+                  <span className="font-medium text-[#262626] dark:text-[#d4d4d4]">Router Native Gateway</span>
+                  <span>
+                    Your weekly quota of 7,000,000 tokens covers all queries routed through the Const native router. Custom external providers configured in Model Settings use your own API keys directly.
+                  </span>
                 </div>
               </div>
             </div>

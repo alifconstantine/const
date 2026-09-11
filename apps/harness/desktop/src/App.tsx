@@ -55,7 +55,6 @@ import {
   generateFallbackTitle,
   generateAiTitle,
   normalizeUiMessages,
-  getDefaultAgentMode,
   type ConversationItem,
 } from "./lib/conversation-store";
 import type {
@@ -173,9 +172,6 @@ function AuthenticatedContent({
             const activeConvo = await window.electron.getConversation(data.conversationId);
             if (activeConvo && activeConvo.messages) {
               setMessages(normalizeUiMessages(activeConvo.messages) as any);
-              if (activeConvo.mode) {
-                setCurrentMode(activeConvo.mode as any);
-              }
             }
           }
         }
@@ -195,24 +191,6 @@ function AuthenticatedContent({
   const [currentProject, setCurrentProject] = useState<string>(() => {
     return localStorage.getItem("const_harness_current_project") || "Outside Project";
   });
-
-  // Current conversation agent access mode (defaults to ask_before_changes or setting default)
-  const [currentMode, setCurrentMode] = useState<"ask_before_changes" | "full_access">(() => {
-    return getDefaultAgentMode();
-  });
-
-  const handleModeChange = (newMode: "ask_before_changes" | "full_access") => {
-    setCurrentMode(newMode);
-    const stored = loadConversations();
-    const target = stored.find((c) => c.id === conversationId);
-    if (target) {
-      target.mode = newMode;
-      target.updatedAt = Date.now();
-      saveConversation(target);
-      setConversations(loadConversations());
-    }
-  };
-
   const [activeModelItem, setActiveModelItem] = useState<ModelItem | null>(null);
   const [lastKnownLlmUsage, setLastKnownLlmUsage] = useState<{
     promptTokens: number;
@@ -1625,21 +1603,14 @@ function AuthenticatedContent({
       );
     }
 
-    const existingConvo = loadConversations().find((c) => c.id === conversationId);
     const updatedConvo: ConversationItem = {
       id: conversationId,
       title: titleToUse || "New task",
       project: project,
-      createdAt: existingConvo?.createdAt || Date.now(),
+      createdAt: Date.now(),
       updatedAt: Date.now(),
       messages: currentStreamMessages,
       contextUsage: contextUsage,
-      mode: mode || currentMode,
-      isPinned: existingConvo?.isPinned,
-      isArchived: existingConvo?.isArchived,
-      isScheduled: existingConvo?.isScheduled,
-      model: model || existingConvo?.model,
-      diffStats: existingConvo?.diffStats,
     };
     saveConversation(updatedConvo);
     setConversations(loadConversations());
@@ -1890,7 +1861,6 @@ function AuthenticatedContent({
     setConversationId(`session_${Date.now()}`);
     setEditingPrompt("");
     setLastKnownLlmUsage(null);
-    setCurrentMode(getDefaultAgentMode());
     if (targetProject) {
       setCurrentProject(targetProject);
       localStorage.setItem("const_harness_current_project", targetProject);
@@ -1907,7 +1877,6 @@ function AuthenticatedContent({
       setConversationId(id);
       setConversationTitle(target?.title || "Task");
       setCurrentProject(target?.project || "Outside Project");
-      setCurrentMode(target?.mode || getDefaultAgentMode());
       setMessages([...activeRunningMsgs]);
       setEditingPrompt("");
       if (target?.contextUsage?.usedTokens) {
@@ -1935,7 +1904,6 @@ function AuthenticatedContent({
       setConversationId(target.id);
       setConversationTitle(target.title);
       setCurrentProject(target.project || "Outside Project");
-      setCurrentMode(target.mode || getDefaultAgentMode());
       setMessages(normalizeUiMessages(target.messages || []));
       setEditingPrompt("");
       if (target.contextUsage?.usedTokens) {
@@ -2027,7 +1995,7 @@ function AuthenticatedContent({
   }
 
   return (
-    <div className="h-screen w-full max-w-full flex bg-[#ececee] dark:bg-[#2b2b2b] text-[#262626] dark:text-[#d4d4d4] overflow-hidden select-none">
+    <div className="h-full w-full max-w-full flex bg-[#ececee] dark:bg-[#2b2b2b] text-[#262626] dark:text-[#d4d4d4] overflow-hidden select-none">
       {/* Left Sidebar (Only visible when isSidebarOpen = true) */}
       {isSidebarOpen && (
         <Sidebar
@@ -2110,8 +2078,6 @@ function AuthenticatedContent({
               {/* Floating Chat Input Card */}
               <div className="w-full max-w-full z-10 min-w-0">
                 <ChatCard
-                  mode={currentMode}
-                  onModeChange={handleModeChange}
                   onSendMessage={handleSendMessage}
                   isExecuting={isExecuting}
                   onAbort={handleAbort}
@@ -2379,8 +2345,6 @@ function AuthenticatedContent({
                   ) : (
                     <ChatCard
                       compact
-                      mode={currentMode}
-                      onModeChange={handleModeChange}
                       isExecuting={isExecuting}
                       onSendMessage={handleSendMessage}
                       onAbort={handleAbort}
@@ -2691,7 +2655,7 @@ export default function App() {
   // 2. Unauthenticated View: Redesigned Split Login Page with @const/ui
   // -------------------------------------------------------------
   return (
-    <div className="h-screen max-h-screen w-full overflow-hidden flex bg-background text-foreground selection:bg-primary selection:text-primary-foreground">
+    <div className="h-full max-h-full w-full overflow-hidden flex bg-background text-foreground selection:bg-primary selection:text-primary-foreground">
       {/* Left Column: Sign-in Card */}
       <div className="flex h-full w-full flex-col justify-between p-6 sm:p-8 lg:p-10 lg:w-1/2 overflow-hidden">
         {/* Brand Mark */}

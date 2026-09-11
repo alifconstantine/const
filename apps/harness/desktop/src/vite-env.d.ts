@@ -187,6 +187,8 @@ declare global {
         chrome: string;
         electron: string;
       };
+      setZoomFactor?: (factor: number) => void;
+      getZoomFactor?: () => number;
       openExternal: (url: string) => Promise<boolean>;
       openDirectoryDialog: () => Promise<string | null>;
       minimize?: () => void;

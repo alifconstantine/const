@@ -63,7 +63,6 @@ import {
   Check,
 } from "lucide-react";
 import { AutoScrollTitle } from "./auto-scroll-title";
-import { useTheme, useZoom } from "../lib/theme";
 import {
   type ConversationItem,
   formatRelativeTime,
@@ -74,6 +73,7 @@ import {
   isScheduledTaskConversation,
   getCleanConversationTitle,
 } from "../lib/conversation-store";
+import { useTheme, type Theme, useInterfaceZoom } from "../lib/theme";
 
 export interface UserProfile {
   name?: string | null;
@@ -102,22 +102,6 @@ interface SidebarProps {
   isScheduledTasksActive?: boolean;
   onOpenSearch?: () => void;
 }
-
-export const SUPPORTED_LANGUAGES = [
-  { code: "en", label: "English" },
-  { code: "id", label: "Bahasa Indonesia" },
-  { code: "ja", label: "日本語" },
-  { code: "es", label: "Español" },
-  { code: "zh", label: "中文 (简体)" },
-] as const;
-
-export const ZOOM_LEVELS = [
-  { value: 80, label: "80%" },
-  { value: 90, label: "90%" },
-  { value: 100, label: "100% (Default)" },
-  { value: 110, label: "110%" },
-  { value: 125, label: "125%" },
-] as const;
 
 export function getUserInitials(name?: string | null, email?: string | null): string {
   if (name && name.trim()) {
@@ -148,6 +132,28 @@ export function getProjectDisplayName(projectName: string): string {
   return projectName.replace(/\\/g, "/").split("/").filter(Boolean).pop() || projectName;
 }
 
+export const LANGUAGE_OPTIONS = [
+  { code: "en", label: "English" },
+  { code: "id", label: "Bahasa Indonesia" },
+  { code: "ja", label: "日本語" },
+  { code: "zh", label: "简体中文" },
+  { code: "es", label: "Español" },
+];
+
+export const THEME_OPTIONS: { label: string; value: Theme }[] = [
+  { label: "Default", value: "system" },
+  { label: "Light", value: "light" },
+  { label: "Dark", value: "dark" },
+];
+
+export const ZOOM_OPTIONS = [
+  { label: "80%", value: 80 },
+  { label: "90%", value: 90 },
+  { label: "100% (Default)", value: 100 },
+  { label: "110%", value: 110 },
+  { label: "125%", value: 125 },
+];
+
 export function Sidebar({
   user,
   onSignOut,
@@ -168,6 +174,20 @@ export function Sidebar({
   isScheduledTasksActive,
   onOpenSearch,
 }: SidebarProps) {
+  const [theme, setTheme] = useTheme();
+  const [currentZoom, setCurrentZoom] = useInterfaceZoom();
+  const [currentLanguage, setCurrentLanguage] = useState<string>(() => {
+    if (typeof window === "undefined") return "en";
+    return localStorage.getItem("const_app_language") || "en";
+  });
+
+  const handleSelectLanguage = (code: string) => {
+    setCurrentLanguage(code);
+    if (typeof window !== "undefined") {
+      localStorage.setItem("const_app_language", code);
+    }
+  };
+
   const [activeTab, setActiveTab] = useState<"project" | "recent" | "design" | "outside">("project");
   const [hoveredConvoId, setHoveredConvoId] = useState<string | null>(null);
   const [collapsedFolders, setCollapsedFolders] = useState<Record<string, boolean>>({});
@@ -177,35 +197,6 @@ export function Sidebar({
   const [isConversationsCollapsed, setIsConversationsCollapsed] = useState<boolean>(() => {
     return localStorage.getItem("const_harness_conversations_collapsed") === "true";
   });
-
-  const [theme, setTheme] = useTheme();
-  const [zoom, setZoom] = useZoom();
-  const [selectedLang, setSelectedLang] = useState<string>(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem("const_harness_language") || "en";
-    }
-    return "en";
-  });
-
-  const handleSelectLanguage = (code: string) => {
-    setSelectedLang(code);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("const_harness_language", code);
-    }
-  };
-
-  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
-  const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
-  const accountMenuOpenTimeRef = React.useRef(0);
-
-  const handleAccountMenuOpenChange = (open: boolean) => {
-    if (open) {
-      accountMenuOpenTimeRef.current = Date.now();
-    }
-    setIsAccountMenuOpen(open);
-  };
-
-  const isFreshlyOpened = () => Date.now() - accountMenuOpenTimeRef.current < 250;
 
   // Project reordering state with localStorage persistence
   const [projectOrder, setProjectOrder] = useState<string[]>(() => {
@@ -1264,18 +1255,10 @@ export function Sidebar({
 
       {/* Bottom: Preserved Full Account Settings (No borders) */}
       <div className="pt-2">
-        <DropdownMenu open={isAccountMenuOpen} onOpenChange={handleAccountMenuOpenChange}>
+        <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
               type="button"
-              onPointerDown={(e) => {
-                // Prevent pointerdown from immediately opening the menu while the mouse button is pressed.
-                // This eliminates the accidental drag-select / pointerup click glitch!
-                e.preventDefault();
-              }}
-              onClick={() => {
-                handleAccountMenuOpenChange(!isAccountMenuOpen);
-              }}
               className="w-full flex items-center justify-between gap-3 p-2 rounded-xl hover:bg-[#dedee2] dark:hover:bg-[#383838] transition-colors text-left outline-none cursor-pointer group"
               aria-label="Account menu"
             >
@@ -1312,177 +1295,117 @@ export function Sidebar({
           <DropdownMenuContent
             align="start"
             side="top"
-            sideOffset={10}
-            avoidCollisions={false}
-            className="min-w-[240px] w-64 max-w-[calc(100vw-32px)] p-1.5 shadow-2xl bg-white dark:bg-[#1e1e1e] border border-[#e2e2e4] dark:border-[#333333] text-popover-foreground rounded-xl z-50 animate-in fade-in-0 duration-150"
+            sideOffset={8}
+            className="w-56 p-1.5 shadow-2xl mb-1 bg-white dark:bg-[#222222] border border-[#dedee2] dark:border-[#383838] text-[#262626] dark:text-[#d4d4d4] rounded-2xl select-none animate-in fade-in zoom-in-95 duration-100"
           >
-            {(user?.name || user?.email) && (
-              <>
-                <div className="px-3 py-2.5">
-                  {user.name && (
-                    <p className="text-xs font-semibold text-popover-foreground truncate">
-                      {user.name}
-                    </p>
-                  )}
-                  {user.email && (
-                    <p className="text-[11px] text-muted-foreground truncate mt-0.5">
-                      {user.email}
-                    </p>
-                  )}
-                </div>
-                <DropdownMenuSeparator className="my-1 bg-[#e2e2e4] dark:bg-[#2c2c2c]" />
-              </>
-            )}
-
             {/* 1. Settings (paling atas) */}
             <DropdownMenuItem
-              className="cursor-pointer flex items-center gap-3 text-xs py-2 px-3 text-muted-foreground hover:text-popover-foreground hover:bg-sidebar-accent dark:hover:bg-[#2a2a2a] rounded-lg transition-colors"
-              onClick={() => {
-                if (isFreshlyOpened()) return;
-                onOpenSettings?.("general");
-              }}
+              className="cursor-pointer flex items-center gap-2.5 text-[13px] py-2 px-2.5 text-[#262626] dark:text-[#d4d4d4] hover:text-[#111111] dark:hover:text-white hover:bg-[#f4f4f5] dark:hover:bg-[#2e2e2e] focus:bg-[#f4f4f5] dark:focus:bg-[#2e2e2e] focus:text-[#111111] dark:focus:text-white rounded-xl outline-none transition-colors"
+              onClick={() => onOpenSettings?.("general")}
             >
-              <Settings className="h-4 w-4 shrink-0 text-[#888888] dark:text-[#a0a0a0]" />
-              <span className="flex-1">Settings</span>
+              <Settings className="w-4 h-4 text-[#737373] dark:text-[#8e8e93] shrink-0" />
+              <span>Settings</span>
             </DropdownMenuItem>
 
-            {/* 2. Language */}
+            {/* 2. Language (Submenu) */}
             <DropdownMenuSub>
-              <DropdownMenuSubTrigger className="cursor-pointer flex items-center gap-3 text-xs py-2 px-3 text-muted-foreground hover:text-popover-foreground hover:bg-sidebar-accent dark:hover:bg-[#2a2a2a] rounded-lg transition-colors data-[state=open]:bg-sidebar-accent dark:data-[state=open]:bg-[#2a2a2a] data-[state=open]:text-popover-foreground">
-                <Globe className="h-4 w-4 shrink-0 text-[#888888] dark:text-[#a0a0a0]" />
-                <span className="flex-1">Language</span>
+              <DropdownMenuSubTrigger className="cursor-pointer flex items-center gap-2.5 text-[13px] py-2 px-2.5 text-[#262626] dark:text-[#d4d4d4] hover:text-[#111111] dark:hover:text-white hover:bg-[#f4f4f5] dark:hover:bg-[#2e2e2e] focus:bg-[#f4f4f5] dark:focus:bg-[#2e2e2e] focus:text-[#111111] dark:focus:text-white data-[state=open]:bg-[#f4f4f5] dark:data-[state=open]:bg-[#2e2e2e] data-[state=open]:text-[#111111] dark:data-[state=open]:text-white rounded-xl outline-none transition-colors [&>svg:last-child]:text-[#737373] dark:[&>svg:last-child]:text-[#737373] [&>svg:last-child]:w-3.5 [&>svg:last-child]:h-3.5">
+                <Globe className="w-4 h-4 text-[#737373] dark:text-[#8e8e93] shrink-0" />
+                <span>Language</span>
               </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent
-                sideOffset={8}
-                className="min-w-[200px] w-auto p-1.5 shadow-2xl bg-white dark:bg-[#1e1e1e] border border-[#e2e2e4] dark:border-[#333333] text-popover-foreground rounded-xl z-50"
-              >
-                {SUPPORTED_LANGUAGES.map((lang) => {
-                  const isSelected = selectedLang === lang.code;
-                  return (
-                    <DropdownMenuItem
-                      key={lang.code}
-                      className="cursor-pointer flex items-center justify-between gap-4 text-xs py-2 px-3 text-muted-foreground hover:text-popover-foreground hover:bg-sidebar-accent dark:hover:bg-[#2a2a2a] rounded-lg transition-colors"
-                      onClick={() => {
-                        if (isFreshlyOpened()) return;
-                        handleSelectLanguage(lang.code);
-                      }}
-                    >
-                      <span className={isSelected ? "font-medium text-popover-foreground" : ""}>
-                        {lang.label}
-                      </span>
-                      {isSelected && <Check className="h-3.5 w-3.5 text-foreground shrink-0 ml-2" />}
-                    </DropdownMenuItem>
-                  );
-                })}
+              <DropdownMenuSubContent className="min-w-[170px] p-1.5 rounded-2xl bg-white dark:bg-[#222222] border border-[#dedee2] dark:border-[#383838] text-[#262626] dark:text-[#d4d4d4] shadow-2xl select-none">
+                {LANGUAGE_OPTIONS.map((lang) => (
+                  <DropdownMenuItem
+                    key={lang.code}
+                    className="cursor-pointer flex items-center justify-between text-[13px] py-1.5 px-2.5 text-[#262626] dark:text-[#d4d4d4] hover:text-[#111111] dark:hover:text-white hover:bg-[#f4f4f5] dark:hover:bg-[#2e2e2e] focus:bg-[#f4f4f5] dark:focus:bg-[#2e2e2e] focus:text-[#111111] dark:focus:text-white rounded-xl outline-none transition-colors"
+                    onClick={() => handleSelectLanguage(lang.code)}
+                  >
+                    <span>{lang.label}</span>
+                    {currentLanguage === lang.code && (
+                      <Check className="w-3.5 h-3.5 text-[#111111] dark:text-white ml-2 shrink-0" />
+                    )}
+                  </DropdownMenuItem>
+                ))}
               </DropdownMenuSubContent>
             </DropdownMenuSub>
 
-            {/* 3. App theme */}
+            {/* 3. App theme (Submenu) */}
             <DropdownMenuSub>
-              <DropdownMenuSubTrigger className="cursor-pointer flex items-center gap-3 text-xs py-2 px-3 text-muted-foreground hover:text-popover-foreground hover:bg-sidebar-accent dark:hover:bg-[#2a2a2a] rounded-lg transition-colors data-[state=open]:bg-sidebar-accent dark:data-[state=open]:bg-[#2a2a2a] data-[state=open]:text-popover-foreground">
-                <Palette className="h-4 w-4 shrink-0 text-[#888888] dark:text-[#a0a0a0]" />
-                <span className="flex-1">App theme</span>
+              <DropdownMenuSubTrigger className="cursor-pointer flex items-center gap-2.5 text-[13px] py-2 px-2.5 text-[#262626] dark:text-[#d4d4d4] hover:text-[#111111] dark:hover:text-white hover:bg-[#f4f4f5] dark:hover:bg-[#2e2e2e] focus:bg-[#f4f4f5] dark:focus:bg-[#2e2e2e] focus:text-[#111111] dark:focus:text-white data-[state=open]:bg-[#f4f4f5] dark:data-[state=open]:bg-[#2e2e2e] data-[state=open]:text-[#111111] dark:data-[state=open]:text-white rounded-xl outline-none transition-colors [&>svg:last-child]:text-[#737373] dark:[&>svg:last-child]:text-[#737373] [&>svg:last-child]:w-3.5 [&>svg:last-child]:h-3.5">
+                <Palette className="w-4 h-4 text-[#737373] dark:text-[#8e8e93] shrink-0" />
+                <span>App theme</span>
               </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent
-                sideOffset={8}
-                className="min-w-[170px] w-auto p-1.5 shadow-2xl bg-white dark:bg-[#1e1e1e] border border-[#e2e2e4] dark:border-[#333333] text-popover-foreground rounded-xl z-50"
-              >
-                {[
-                  { value: "system", label: "Default" },
-                  { value: "light", label: "Light" },
-                  { value: "dark", label: "Dark" },
-                ].map((item) => {
-                  const isSelected = theme === item.value;
-                  return (
-                    <DropdownMenuItem
-                      key={item.value}
-                      className="cursor-pointer flex items-center justify-between gap-4 text-xs py-2 px-3 text-muted-foreground hover:text-popover-foreground hover:bg-sidebar-accent dark:hover:bg-[#2a2a2a] rounded-lg transition-colors"
-                      onClick={() => {
-                        if (isFreshlyOpened()) return;
-                        setTheme(item.value as "system" | "light" | "dark");
-                      }}
-                    >
-                      <span className={isSelected ? "font-medium text-popover-foreground" : ""}>
-                        {item.label}
-                      </span>
-                      {isSelected && <Check className="h-3.5 w-3.5 text-foreground shrink-0 ml-2" />}
-                    </DropdownMenuItem>
-                  );
-                })}
+              <DropdownMenuSubContent className="min-w-[150px] p-1.5 rounded-2xl bg-white dark:bg-[#222222] border border-[#dedee2] dark:border-[#383838] text-[#262626] dark:text-[#d4d4d4] shadow-2xl select-none">
+                {THEME_OPTIONS.map((item) => (
+                  <DropdownMenuItem
+                    key={item.value}
+                    className="cursor-pointer flex items-center justify-between text-[13px] py-1.5 px-2.5 text-[#262626] dark:text-[#d4d4d4] hover:text-[#111111] dark:hover:text-white hover:bg-[#f4f4f5] dark:hover:bg-[#2e2e2e] focus:bg-[#f4f4f5] dark:focus:bg-[#2e2e2e] focus:text-[#111111] dark:focus:text-white rounded-xl outline-none transition-colors"
+                    onClick={() => setTheme(item.value)}
+                  >
+                    <span>{item.label}</span>
+                    {theme === item.value && (
+                      <Check className="w-3.5 h-3.5 text-[#111111] dark:text-white ml-2 shrink-0" />
+                    )}
+                  </DropdownMenuItem>
+                ))}
               </DropdownMenuSubContent>
             </DropdownMenuSub>
 
-            {/* 4. Interface zoom */}
+            {/* 4. Interface zoom (Submenu) */}
             <DropdownMenuSub>
-              <DropdownMenuSubTrigger className="cursor-pointer flex items-center gap-3 text-xs py-2 px-3 text-muted-foreground hover:text-popover-foreground hover:bg-sidebar-accent dark:hover:bg-[#2a2a2a] rounded-lg transition-colors data-[state=open]:bg-sidebar-accent dark:data-[state=open]:bg-[#2a2a2a] data-[state=open]:text-popover-foreground">
-                <ZoomIn className="h-4 w-4 shrink-0 text-[#888888] dark:text-[#a0a0a0]" />
-                <span className="flex-1">Interface zoom</span>
+              <DropdownMenuSubTrigger className="cursor-pointer flex items-center gap-2.5 text-[13px] py-2 px-2.5 text-[#262626] dark:text-[#d4d4d4] hover:text-[#111111] dark:hover:text-white hover:bg-[#f4f4f5] dark:hover:bg-[#2e2e2e] focus:bg-[#f4f4f5] dark:focus:bg-[#2e2e2e] focus:text-[#111111] dark:focus:text-white data-[state=open]:bg-[#f4f4f5] dark:data-[state=open]:bg-[#2e2e2e] data-[state=open]:text-[#111111] dark:data-[state=open]:text-white rounded-xl outline-none transition-colors [&>svg:last-child]:text-[#737373] dark:[&>svg:last-child]:text-[#737373] [&>svg:last-child]:w-3.5 [&>svg:last-child]:h-3.5">
+                <ZoomIn className="w-4 h-4 text-[#737373] dark:text-[#8e8e93] shrink-0" />
+                <span>Interface zoom</span>
               </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent
-                sideOffset={8}
-                className="min-w-[190px] w-auto p-1.5 shadow-2xl bg-white dark:bg-[#1e1e1e] border border-[#e2e2e4] dark:border-[#333333] text-popover-foreground rounded-xl z-50"
-              >
-                {ZOOM_LEVELS.map((lvl) => {
-                  const isSelected = zoom === lvl.value;
-                  return (
-                    <DropdownMenuItem
-                      key={lvl.value}
-                      className="cursor-pointer flex items-center justify-between gap-4 text-xs py-2 px-3 text-muted-foreground hover:text-popover-foreground hover:bg-sidebar-accent dark:hover:bg-[#2a2a2a] rounded-lg transition-colors"
-                      onClick={() => {
-                        if (isFreshlyOpened()) return;
-                        setZoom(lvl.value);
-                      }}
-                    >
-                      <span className={isSelected ? "font-medium text-popover-foreground" : ""}>
-                        {lvl.label}
-                      </span>
-                      {isSelected && <Check className="h-3.5 w-3.5 text-foreground shrink-0 ml-2" />}
-                    </DropdownMenuItem>
-                  );
-                })}
+              <DropdownMenuSubContent className="min-w-[160px] p-1.5 rounded-2xl bg-white dark:bg-[#222222] border border-[#dedee2] dark:border-[#383838] text-[#262626] dark:text-[#d4d4d4] shadow-2xl select-none">
+                {ZOOM_OPTIONS.map((item) => (
+                  <DropdownMenuItem
+                    key={item.value}
+                    className="cursor-pointer flex items-center justify-between text-[13px] py-1.5 px-2.5 text-[#262626] dark:text-[#d4d4d4] hover:text-[#111111] dark:hover:text-white hover:bg-[#f4f4f5] dark:hover:bg-[#2e2e2e] focus:bg-[#f4f4f5] dark:focus:bg-[#2e2e2e] focus:text-[#111111] dark:focus:text-white rounded-xl outline-none transition-colors"
+                    onClick={() => setCurrentZoom(item.value)}
+                  >
+                    <span>{item.label}</span>
+                    {currentZoom === item.value && (
+                      <Check className="w-3.5 h-3.5 text-[#111111] dark:text-white ml-2 shrink-0" />
+                    )}
+                  </DropdownMenuItem>
+                ))}
               </DropdownMenuSubContent>
             </DropdownMenuSub>
 
-            <DropdownMenuSeparator className="my-1 bg-[#e2e2e4] dark:bg-[#2c2c2c]" />
+            <DropdownMenuSeparator className="my-1 bg-[#dedee2] dark:bg-[#333333]" />
 
             {/* 5. Usage stats */}
             <DropdownMenuItem
-              className="cursor-pointer flex items-center gap-3 text-xs py-2 px-3 text-muted-foreground hover:text-popover-foreground hover:bg-sidebar-accent dark:hover:bg-[#2a2a2a] rounded-lg transition-colors"
-              onClick={() => {
-                if (isFreshlyOpened()) return;
-                onOpenSettings?.("usage-stats");
-              }}
+              className="cursor-pointer flex items-center gap-2.5 text-[13px] py-2 px-2.5 text-[#262626] dark:text-[#d4d4d4] hover:text-[#111111] dark:hover:text-white hover:bg-[#f4f4f5] dark:hover:bg-[#2e2e2e] focus:bg-[#f4f4f5] dark:focus:bg-[#2e2e2e] focus:text-[#111111] dark:focus:text-white rounded-xl outline-none transition-colors"
+              onClick={() => onOpenSettings?.("usage-stats")}
             >
-              <BarChart2 className="h-4 w-4 shrink-0 text-[#888888] dark:text-[#a0a0a0]" />
-              <span className="flex-1">Usage stats</span>
+              <BarChart2 className="w-4 h-4 text-[#737373] dark:text-[#8e8e93] shrink-0" />
+              <span>Usage stats</span>
             </DropdownMenuItem>
 
-            <DropdownMenuSeparator className="my-1 bg-[#e2e2e4] dark:bg-[#2c2c2c]" />
+            {/* (Upgrade excluded as requested) */}
+
+            <DropdownMenuSeparator className="my-1 bg-[#dedee2] dark:bg-[#333333]" />
 
             {/* 6. Switch account */}
             {onSwitchAccount && (
               <DropdownMenuItem
-                className="cursor-pointer flex items-center gap-3 text-xs py-2 px-3 text-muted-foreground hover:text-popover-foreground hover:bg-sidebar-accent dark:hover:bg-[#2a2a2a] rounded-lg transition-colors"
-                onClick={() => {
-                  if (isFreshlyOpened()) return;
-                  onSwitchAccount();
-                }}
+                className="cursor-pointer flex items-center gap-2.5 text-[13px] py-2 px-2.5 text-[#262626] dark:text-[#d4d4d4] hover:text-[#111111] dark:hover:text-white hover:bg-[#f4f4f5] dark:hover:bg-[#2e2e2e] focus:bg-[#f4f4f5] dark:focus:bg-[#2e2e2e] focus:text-[#111111] dark:focus:text-white rounded-xl outline-none transition-colors"
+                onClick={onSwitchAccount}
               >
-                <ArrowLeftRight className="h-4 w-4 shrink-0 text-[#888888] dark:text-[#a0a0a0]" />
-                <span className="flex-1">Switch account</span>
+                <ArrowLeftRight className="w-4 h-4 text-[#737373] dark:text-[#8e8e93] shrink-0" />
+                <span>Switch account</span>
               </DropdownMenuItem>
             )}
 
             {/* 7. Log out */}
             <DropdownMenuItem
-              className="cursor-pointer flex items-center gap-3 text-xs py-2 px-3 text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
-              onClick={() => {
-                if (isFreshlyOpened()) return;
-                setIsLogoutModalOpen(true);
-              }}
+              className="cursor-pointer flex items-center gap-2.5 text-[13px] py-2 px-2.5 text-[#262626] dark:text-[#d4d4d4] hover:text-red-500 dark:hover:text-red-400 hover:bg-red-500/10 dark:hover:bg-red-500/10 focus:text-red-500 dark:focus:text-red-400 focus:bg-red-500/10 dark:focus:bg-red-500/10 rounded-xl outline-none transition-colors"
+              onClick={onSignOut}
             >
-              <LogOut className="h-4 w-4 shrink-0" />
-              <span className="flex-1 font-medium">Log out</span>
+              <LogOut className="w-4 h-4 text-[#737373] dark:text-[#8e8e93] shrink-0" />
+              <span>Log out</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -1490,7 +1413,7 @@ export function Sidebar({
 
       {/* 1. Archived Sessions Modal (matching const-harness) */}
       <Dialog open={isArchiveModalOpen} onOpenChange={setIsArchiveModalOpen}>
-        <DialogContent className="w-[calc(100vw-32px)] sm:w-full max-w-lg md:max-w-xl lg:max-w-2xl bg-white dark:bg-[#1e1e1e] border border-[#e2e2e4] dark:border-[#383838] text-[#262626] dark:text-[#d4d4d4] p-0 rounded-2xl shadow-2xl overflow-hidden">
+        <DialogContent className="max-w-md bg-white dark:bg-[#1e1e1e] border border-[#e2e2e4] dark:border-[#383838] text-[#262626] dark:text-[#d4d4d4] p-0 rounded-2xl shadow-2xl overflow-hidden">
           <DialogHeader className="px-5 pt-4 pb-3 border-b border-[#e2e2e4] dark:border-[#333333]">
             <DialogTitle className="text-sm font-semibold flex items-center gap-2 text-[#161616] dark:text-white">
               <Archive className="w-4 h-4 text-[#a9a9a9] dark:text-[#888888]" />
@@ -1503,9 +1426,9 @@ export function Sidebar({
             </DialogTitle>
           </DialogHeader>
 
-          <div className="p-4 flex flex-col gap-3 w-full min-w-0">
+          <div className="p-4 flex flex-col gap-3">
             {archivedSessions.length > 0 && (
-              <div className="relative w-full min-w-0">
+              <div className="relative">
                 <Search className="w-3.5 h-3.5 text-[#a9a9a9] dark:text-[#777777] absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
@@ -1526,7 +1449,7 @@ export function Sidebar({
               </div>
             )}
 
-            <div className="w-full min-w-0 max-h-80 overflow-y-auto overflow-x-hidden flex flex-col gap-1 pr-1">
+            <div className="max-h-80 overflow-y-auto flex flex-col gap-1 pr-1">
               {isArchiveLoading ? (
                 <div className="py-8 text-center text-xs text-[#a9a9a9] dark:text-[#777777]">Loading archived sessions...</div>
               ) : archivedSessions.length === 0 ? (
@@ -1540,25 +1463,22 @@ export function Sidebar({
                 filteredArchivedSessions.map((convo) => (
                   <div
                     key={convo.id}
-                    className="w-full min-w-0 flex items-center justify-between gap-3 p-2.5 rounded-xl bg-[#f4f4f6] dark:bg-[#242424] hover:bg-[#eaeaea] dark:hover:bg-[#2c2c2c] border border-transparent hover:border-[#e2e2e4] dark:hover:border-[#383838] transition-all group"
+                    className="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-[#f4f4f6] dark:bg-[#242424] hover:bg-[#eaeaea] dark:hover:bg-[#2c2c2c] border border-transparent hover:border-[#e2e2e4] dark:hover:border-[#383838] transition-all group"
                   >
-                    <div className="min-w-0 flex-1 flex flex-col gap-0.5 overflow-hidden">
-                      <span
-                        className="text-xs font-medium text-[#262626] dark:text-[#d4d4d4] truncate block"
-                        title={convo.title || "Untitled task"}
-                      >
+                    <div className="min-w-0 flex-1 flex flex-col gap-0.5">
+                      <span className="text-xs font-medium text-[#262626] dark:text-[#d4d4d4] truncate">
                         {convo.title || "Untitled task"}
                       </span>
-                      <div className="flex items-center gap-2 text-[11px] text-[#a9a9a9] dark:text-[#777777] min-w-0 overflow-hidden">
-                        <span className="truncate max-w-[140px] sm:max-w-[200px]">
+                      <div className="flex items-center gap-2 text-[11px] text-[#a9a9a9] dark:text-[#777777]">
+                        <span className="truncate max-w-[120px]">
                           {getProjectDisplayName(convo.project)}
                         </span>
-                        <span className="shrink-0">•</span>
-                        <span className="shrink-0">{formatRelativeTime(convo.updatedAt || convo.createdAt)}</span>
+                        <span>•</span>
+                        <span>{formatRelativeTime(convo.updatedAt || convo.createdAt)}</span>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                    <div className="flex items-center gap-1.5 shrink-0">
                       <Button
                         size="sm"
                         variant="outline"
@@ -1687,45 +1607,6 @@ export function Sidebar({
               className="bg-red-600 hover:bg-red-700 text-white text-xs font-medium"
             >
               Delete
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* 4. Logout Confirmation Dialog */}
-      <Dialog open={isLogoutModalOpen} onOpenChange={setIsLogoutModalOpen}>
-        <DialogContent className="max-w-sm bg-white dark:bg-[#1e1e1e] border border-[#e2e2e4] dark:border-[#383838] text-[#262626] dark:text-[#d4d4d4] p-5 rounded-2xl shadow-2xl">
-          <DialogHeader className="space-y-1.5">
-            <DialogTitle className="text-sm font-semibold text-[#161616] dark:text-white flex items-center gap-2">
-              <LogOut className="w-4 h-4 text-destructive" />
-              <span>Log out</span>
-            </DialogTitle>
-            <DialogDescription className="text-xs text-[#a9a9a9] dark:text-[#999999] pt-1 leading-relaxed">
-              Are you sure you want to log out of your account? You will need to sign in again to access your workspace and chats.
-            </DialogDescription>
-          </DialogHeader>
-
-          <DialogFooter className="flex items-center justify-end gap-2 pt-4">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setIsLogoutModalOpen(false)}
-              className="bg-transparent border-[#e2e2e4] dark:border-[#383838] text-xs hover:bg-[#eaeaea] dark:hover:bg-[#303030] text-[#262626] dark:text-[#d4d4d4]"
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              variant="destructive"
-              size="sm"
-              onClick={() => {
-                setIsLogoutModalOpen(false);
-                onSignOut();
-              }}
-              className="text-xs font-medium"
-            >
-              Log out
             </Button>
           </DialogFooter>
         </DialogContent>
