@@ -1604,7 +1604,11 @@ export function ChatCard({
               {isExecuting ? (
                 <button
                   type="button"
-                  onClick={onAbort}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onAbort?.();
+                  }}
                   className="w-7 h-7 rounded-lg bg-[#dedee2] hover:bg-[#d5d5d9] dark:bg-[#383838] dark:hover:bg-[#454545] text-[#e79737] dark:text-[#ff7a00] flex items-center justify-center cursor-pointer select-none transition-colors shrink-0"
                   title="Stop generation"
                   aria-label="Stop generation"

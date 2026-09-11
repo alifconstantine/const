@@ -677,6 +677,9 @@ export function killProcessTree(pid: number): void {
     } catch {
       // Ignore errors if taskkill fails
     }
+    try {
+      process.kill(pid, "SIGKILL");
+    } catch {}
   } else {
     // Unix: kill entire process group with negative PID
     try {
@@ -1039,6 +1042,9 @@ function runProcess(
         killProcessTree(child.pid);
       }
       try {
+        child.kill("SIGKILL");
+      } catch {}
+      try {
         child.stdout?.destroy();
       } catch {}
       try {
@@ -1049,6 +1055,10 @@ function runProcess(
     };
 
     if (options.signal) {
+      if (options.signal.aborted) {
+        onAbort();
+        return;
+      }
       options.signal.addEventListener("abort", onAbort, { once: true });
     }
 

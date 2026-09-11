@@ -219,6 +219,7 @@ declare global {
         maxOutputTokens?: number;
       }) => Promise<{
         success: boolean;
+        aborted?: boolean;
         messages?: any[];
         workspacePath?: string;
         isOutsideProject?: boolean;

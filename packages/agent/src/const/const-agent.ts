@@ -468,6 +468,7 @@ export class ConstAgent {
   private config: AgentConfig;
   private abortController: AbortController | null = null;
   private isRunning = false;
+  private _isCancelled = false;
   private pendingApprovals = new Map<string, (response: ApprovalResponseData) => void>();
   private sessionAllowedTools = new Set<string>();
 
@@ -477,6 +478,10 @@ export class ConstAgent {
       workspacePath: process.cwd(),
       ...config,
     };
+  }
+
+  public get isCancelled(): boolean {
+    return this._isCancelled;
   }
 
   public resolveApproval(approvalId: string, response: ApprovalResponseData): boolean {
@@ -494,9 +499,11 @@ export class ConstAgent {
   }
 
   public abort(): void {
+    this._isCancelled = true;
     if (this.abortController) {
-      this.abortController.abort();
-      this.abortController = null;
+      try {
+        this.abortController.abort();
+      } catch {}
     }
     for (const [id, resolver] of this.pendingApprovals.entries()) {
       try {
@@ -520,6 +527,7 @@ export class ConstAgent {
     }
 
     this.isRunning = true;
+    this._isCancelled = false;
     this.abortController = new AbortController();
     const signal = this.abortController.signal;
 
@@ -539,6 +547,9 @@ export class ConstAgent {
 
     try {
       while (currentTurn < maxTurns) {
+        if (signal.aborted || this._isCancelled) {
+          throw new Error("User cancelled agent execution.");
+        }
         currentTurn++;
         onEvent({ type: "status", status: "thinking" });
 
@@ -598,6 +609,10 @@ export class ConstAgent {
           this.config.maxOutputTokens ??
           this.config.maxTokens ??
           (is128kModel ? 128000 : DEFAULT_MAX_OUTPUT_TOKENS);
+
+        if (signal.aborted || this._isCancelled) {
+          throw new Error("User cancelled agent execution.");
+        }
 
         const response = await fetchWithRetry(
           endpoint,
@@ -1048,6 +1063,9 @@ export class ConstAgent {
         });
 
         for (const tc of toolCalls) {
+          if (signal.aborted || this._isCancelled) {
+            throw new Error("User cancelled agent execution.");
+          }
           const parsedArgs = parseToolArguments(tc.function.arguments);
           const argsHash = JSON.stringify(parsedArgs);
 
@@ -1301,6 +1319,10 @@ export class ConstAgent {
             argsHash,
             isError: Boolean(isError),
           });
+
+          if (signal.aborted || this._isCancelled) {
+            throw new Error("User cancelled agent execution.");
+          }
         }
       }
 
@@ -1330,7 +1352,15 @@ export class ConstAgent {
 
       return conversationHistory;
     } catch (err: any) {
-      if (err.name === "AbortError" || signal?.aborted) {
+      const isAborted =
+        this._isCancelled ||
+        signal?.aborted ||
+        err?.name === "AbortError" ||
+        err?.message?.includes("cancelled") ||
+        err?.message?.includes("aborted");
+
+      if (isAborted) {
+        this._isCancelled = true;
         onEvent({ type: "error", error: "User cancelled agent execution." });
         onEvent({ type: "status", status: "idle", message: "User cancelled agent execution." });
       } else {

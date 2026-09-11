@@ -163,14 +163,14 @@ function AuthenticatedContent({
         const refreshed = await refreshConversationsFromDisk();
         setConversations(refreshed);
 
-        // If the changed conversation is currently open, reload its messages ONLY if not currently executing
+        // If the changed conversation is currently open, reload its messages ONLY if currently empty in memory
         if (data?.conversationId && data.conversationId === conversationIdRef.current) {
           if (runningConvoIdsRef.current.has(data.conversationId)) {
             return;
           }
-          if (window.electron?.getConversation) {
+          if (messagesRef.current.length === 0 && window.electron?.getConversation) {
             const activeConvo = await window.electron.getConversation(data.conversationId);
-            if (activeConvo && activeConvo.messages) {
+            if (activeConvo && activeConvo.messages && activeConvo.messages.length > 0) {
               setMessages(normalizeUiMessages(activeConvo.messages) as any);
             }
           }
@@ -1440,28 +1440,52 @@ function AuthenticatedContent({
           return next;
         });
 
+        setPendingQuestions((prev) => {
+          if (!prev.has(targetConvoId)) return prev;
+          const next = new Map(prev);
+          next.delete(targetConvoId);
+          return next;
+        });
+
         const startTime = executionStartTimeMapRef.current.get(targetConvoId);
-        const finalDuration = startTime ? Date.now() - startTime : undefined;
+        const finalDuration = startTime ? Math.max(1000, Date.now() - startTime) : undefined;
         executionStartTimeMapRef.current.delete(targetConvoId);
+
+        const errorText = event.error || "Agent execution stopped";
+        const isUserCancelled =
+          errorText.toLowerCase().includes("user cancelled") ||
+          errorText.toLowerCase().includes("abort");
 
         if (targetMsgs.length > 0) {
           const lastIdx = targetMsgs.length - 1;
-          if (targetMsgs[lastIdx]?.role === "assistant") {
-            const lastMsg = targetMsgs[lastIdx];
-            const steps = (lastMsg.traceSteps || []).map((st) => {
+          const lastMsg = targetMsgs[lastIdx];
+          if (lastMsg && lastMsg.role === "assistant") {
+            const steps: TraceStep[] = (lastMsg.traceSteps || []).map((st) => {
               if (st.type === "thought" && st.startTime && !st.durationMs) {
                 return {
                   ...st,
                   durationMs: Math.max(1000, Date.now() - st.startTime),
                 };
               }
+              if (st.type === "tool" && !st.result) {
+                return {
+                  ...st,
+                  result: isUserCancelled ? "Cancelled by user." : "Tool failed due to error.",
+                  isError: true,
+                  durationMs: st.durationMs || 1000,
+                };
+              }
               return st;
             });
 
-            const errorText = event.error || "Agent execution stopped";
-            const isUserCancelled =
-              errorText.toLowerCase().includes("user cancelled") ||
-              errorText.toLowerCase().includes("abort");
+            if (steps.length === 0) {
+              steps.push({
+                id: `thought_err_${Date.now()}`,
+                type: "thought",
+                content: lastMsg.thinking || (isUserCancelled ? "Task execution stopped by user." : errorText),
+                durationMs: finalDuration || lastMsg.durationMs || 1000,
+              });
+            }
 
             let finalContent = lastMsg.content ? lastMsg.content.trim() : "";
             if (!finalContent) {
@@ -1479,13 +1503,30 @@ function AuthenticatedContent({
               id: lastMsg.id || `msg_${Date.now()}_assistant`,
               role: "assistant",
               content: finalContent,
-              durationMs: finalDuration,
+              durationMs: finalDuration || lastMsg.durationMs || 1000,
               traceSteps: steps,
             };
+          } else {
+            const newAssistantMsg: ChatMessage = {
+              id: `msg_${Date.now()}_assistant`,
+              role: "assistant",
+              content: isUserCancelled ? "User cancelled agent execution." : errorText,
+              durationMs: finalDuration || 1000,
+              timestamp: Date.now(),
+              traceSteps: [
+                {
+                  id: `thought_err_${Date.now()}`,
+                  type: "thought",
+                  content: isUserCancelled ? "Task execution stopped by user." : errorText,
+                  durationMs: finalDuration || 1000,
+                },
+              ],
+            };
+            targetMsgs = [...targetMsgs, newAssistantMsg];
           }
         }
 
-        activeSessionMessagesRef.current.delete(targetConvoId);
+        activeSessionMessagesRef.current.set(targetConvoId, targetMsgs);
 
         if (targetConvoId === conversationIdRef.current) {
           setMessages(targetMsgs);
@@ -1500,8 +1541,8 @@ function AuthenticatedContent({
           setConversations(loadConversations());
         }
 
-        if (event.error?.toLowerCase().includes("user cancelled")) {
-          toast.info("Agent execution stopped");
+        if (isUserCancelled) {
+          // Handled without error notification
         } else {
           toast.error(event.error || "Agent execution error");
         }
@@ -1621,7 +1662,9 @@ function AuthenticatedContent({
         });
 
         if (!res.success && res.error) {
-          toast.error(res.error);
+          if (!res.aborted && !res.error.toLowerCase().includes("cancelled") && !res.error.toLowerCase().includes("abort")) {
+            toast.error(res.error);
+          }
           setRunningConvoIds((prev) => {
             const next = new Set(prev);
             next.delete(conversationId);
@@ -1630,7 +1673,9 @@ function AuthenticatedContent({
           activeSessionMessagesRef.current.delete(conversationId);
         }
       } catch (err: any) {
-        toast.error(err.message || "Communication error with agent");
+        if (!err.message?.toLowerCase().includes("cancelled") && !err.message?.toLowerCase().includes("abort")) {
+          toast.error(err.message || "Communication error with agent");
+        }
         setRunningConvoIds((prev) => {
           const next = new Set(prev);
           next.delete(conversationId);
@@ -1741,40 +1786,81 @@ function AuthenticatedContent({
   };
 
   const handleAbort = async (targetId?: string) => {
-    const idToAbort = targetId || conversationId;
-    if (window.electron?.abortAgent) {
-      await window.electron.abortAgent(idToAbort);
-    }
+    const rawTarget =
+      typeof targetId === "string" && targetId.trim().length > 0
+        ? targetId.trim()
+        : null;
+    const currentId = conversationIdRef.current || conversationId;
+    const idToAbort = rawTarget || currentId;
+
+    // 1. Immediately transition UI out of executing mode
     setRunningConvoIds((prev) => {
       const next = new Set(prev);
-      next.delete(idToAbort);
+      if (rawTarget) next.delete(rawTarget);
+      if (currentId) next.delete(currentId);
+      if (idToAbort) next.delete(idToAbort);
       return next;
     });
     setPendingApprovals((prev) => {
-      if (!prev.has(idToAbort)) return prev;
       const next = new Map(prev);
-      next.delete(idToAbort);
+      if (rawTarget) next.delete(rawTarget);
+      if (currentId) next.delete(currentId);
+      if (idToAbort) next.delete(idToAbort);
+      return next;
+    });
+    setPendingQuestions((prev) => {
+      const next = new Map(prev);
+      if (rawTarget) next.delete(rawTarget);
+      if (currentId) next.delete(currentId);
+      if (idToAbort) next.delete(idToAbort);
       return next;
     });
 
-    const startTime = executionStartTimeMapRef.current.get(idToAbort);
-    const finalDuration = startTime ? Date.now() - startTime : undefined;
-    executionStartTimeMapRef.current.delete(idToAbort);
+    // 2. Capture and freeze execution duration
+    const startTime =
+      (idToAbort ? executionStartTimeMapRef.current.get(idToAbort) : undefined) ||
+      (currentId ? executionStartTimeMapRef.current.get(currentId) : undefined);
+    const finalDuration = startTime ? Math.max(1000, Date.now() - startTime) : 1000;
+    if (idToAbort) executionStartTimeMapRef.current.delete(idToAbort);
+    if (currentId) executionStartTimeMapRef.current.delete(currentId);
 
-    let sessionMsgs = activeSessionMessagesRef.current.get(idToAbort) || messagesRef.current;
+    // 3. Finalize assistant message and preserve execution trace
+    let sessionMsgs =
+      (idToAbort ? activeSessionMessagesRef.current.get(idToAbort) : undefined) ||
+      (currentId ? activeSessionMessagesRef.current.get(currentId) : undefined) ||
+      messagesRef.current ||
+      [];
     if (sessionMsgs && sessionMsgs.length > 0) {
       const lastIdx = sessionMsgs.length - 1;
       const last = sessionMsgs[lastIdx];
       if (last && last.role === "assistant") {
-        const steps = (last.traceSteps || []).map((st) => {
+        const steps: TraceStep[] = (last.traceSteps || []).map((st) => {
           if (st.type === "thought" && st.startTime && !st.durationMs) {
             return {
               ...st,
               durationMs: Math.max(1000, Date.now() - st.startTime),
             };
           }
+          if (st.type === "tool" && !st.result) {
+            return {
+              ...st,
+              result: "Command or tool cancelled by user.",
+              isError: true,
+              durationMs: st.durationMs || 1000,
+            };
+          }
           return st;
         });
+
+        // Ensure at least one trace step is present so ExecutionTrace accordion renders "Worked for Xs >"
+        if (steps.length === 0) {
+          steps.push({
+            id: `thought_cancel_${Date.now()}`,
+            type: "thought",
+            content: last.thinking || "Task execution stopped by user.",
+            durationMs: finalDuration,
+          });
+        }
 
         const cancelNote = "User cancelled agent execution.";
         const curContent = last.content ? last.content.trim() : "";
@@ -1788,26 +1874,50 @@ function AuthenticatedContent({
           id: last.id || `msg_${Date.now()}_assistant`,
           role: "assistant",
           content: finalContent,
-          durationMs: finalDuration,
+          durationMs: finalDuration || last.durationMs || 1000,
           traceSteps: steps,
         };
         sessionMsgs = updatedMsgs;
+      } else {
+        // Assistant message hasn't been added yet, add cancelled assistant message
+        const newAssistantMsg: ChatMessage = {
+          id: `msg_${Date.now()}_assistant`,
+          role: "assistant",
+          content: "User cancelled agent execution.",
+          durationMs: finalDuration,
+          timestamp: Date.now(),
+          traceSteps: [
+            {
+              id: `thought_cancel_${Date.now()}`,
+              type: "thought",
+              content: "Task execution stopped by user.",
+              durationMs: finalDuration,
+            },
+          ],
+        };
+        sessionMsgs = [...sessionMsgs, newAssistantMsg];
+      }
 
-        if (idToAbort === conversationIdRef.current) {
-          setMessages(sessionMsgs);
-        }
+      if (idToAbort) activeSessionMessagesRef.current.set(idToAbort, sessionMsgs);
+      if (currentId) activeSessionMessagesRef.current.set(currentId, sessionMsgs);
 
-        const stored = loadConversations();
-        const target = stored.find((c) => c.id === idToAbort);
-        if (target) {
-          target.messages = sessionMsgs;
-          target.updatedAt = Date.now();
-          saveConversation(target);
-          setConversations(loadConversations());
-        }
+      setMessages(sessionMsgs);
+
+      const stored = loadConversations();
+      const target = stored.find((c) => c.id === idToAbort || c.id === currentId);
+      if (target) {
+        target.messages = sessionMsgs;
+        target.updatedAt = Date.now();
+        saveConversation(target);
+        setConversations(loadConversations());
       }
     }
-    activeSessionMessagesRef.current.delete(idToAbort);
+
+    // 4. Trigger backend abort in parallel to kill process trees and terminate LLM stream
+    if (window.electron?.abortAgent) {
+      window.electron.abortAgent(idToAbort).catch(() => {});
+    }
+
     toast.info("Agent execution stopped");
   };
 
@@ -2067,7 +2177,7 @@ function AuthenticatedContent({
                 <ChatCard
                   onSendMessage={handleSendMessage}
                   isExecuting={isExecuting}
-                  onAbort={handleAbort}
+                  onAbort={() => handleAbort()}
                   showContextUsage={false}
                   project={currentProject}
                   onProjectChange={setCurrentProject}
@@ -2334,7 +2444,7 @@ function AuthenticatedContent({
                       compact
                       isExecuting={isExecuting}
                       onSendMessage={handleSendMessage}
-                      onAbort={handleAbort}
+                      onAbort={() => handleAbort()}
                       showContextUsage={true}
                       contextUsage={contextUsage}
                       metrics={conversationMetrics}

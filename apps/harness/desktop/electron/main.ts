@@ -804,7 +804,16 @@ app.whenReady().then(() => {
           }
         );
 
-        // Auto-save to SQLite conversation database
+        if ((agent as any).isCancelled) {
+          return {
+            success: false,
+            aborted: true,
+            error: "User cancelled agent execution.",
+            messages: updatedMessages,
+          };
+        }
+
+        // Auto-save to SQLite conversation database ONLY IF not cancelled
         try {
           const existingConvo = conversationDb.getConversation(convoId);
           // Preserve rich UI messages with traceSteps/durationMs if already present
@@ -857,16 +866,36 @@ app.whenReady().then(() => {
         resolver({ status: "cancelled", error: "Session aborted by user" });
       } catch {}
     }
-    if (targetConvoId) {
-      const session = activeSessions.get(targetConvoId);
-      if (session) {
-        session.agent.abort();
-        activeSessions.delete(targetConvoId);
-        if (win && !win.isDestroyed()) {
-          win.webContents.send("agent:session-ended", { conversationId: targetConvoId });
+
+    // Terminate any active background tasks
+    try {
+      const tasks = globalTaskManager.listTasks();
+      for (const t of tasks) {
+        if (t.status === "running") {
+          globalTaskManager.killTask(t.id);
         }
-        return { success: true };
       }
+    } catch {}
+
+    const safeConvoId =
+      typeof targetConvoId === "string" && targetConvoId.trim().length > 0
+        ? targetConvoId.trim()
+        : undefined;
+    let targetSession = safeConvoId ? activeSessions.get(safeConvoId) : undefined;
+    if (!targetSession && activeSessions.size === 1) {
+      targetSession = activeSessions.values().next().value;
+    }
+
+    if (targetSession) {
+      targetSession.agent.abort();
+      const sId = targetSession.conversationId || safeConvoId;
+      if (sId) {
+        activeSessions.delete(sId);
+        if (win && !win.isDestroyed()) {
+          win.webContents.send("agent:session-ended", { conversationId: sId });
+        }
+      }
+      return { success: true };
     } else {
       for (const [id, session] of activeSessions.entries()) {
         session.agent.abort();
@@ -877,7 +906,6 @@ app.whenReady().then(() => {
       activeSessions.clear();
       return { success: true };
     }
-    return { success: false, error: "No active session found" };
   });
 
   ipcMain.handle(
