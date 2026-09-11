@@ -113,11 +113,69 @@ export function useConversationWidth(): [ConversationWidth, (width: Conversation
   return [width, setWidth];
 }
 
+export type ZoomLevel = 80 | 90 | 100 | 110 | 125;
+
+export function getSavedZoom(): number {
+  if (typeof window === "undefined") return 100;
+  const saved = localStorage.getItem("const_harness_zoom");
+  return saved ? parseInt(saved, 10) || 100 : 100;
+}
+
+export function applyZoom(zoom: number = 100) {
+  if (typeof document === "undefined") return;
+  (document.documentElement.style as any).zoom = `${zoom}%`;
+}
+
+export function setSavedZoom(zoom: number) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem("const_harness_zoom", zoom.toString());
+  applyZoom(zoom);
+  window.dispatchEvent(new CustomEvent("const-zoom-change", { detail: zoom }));
+}
+
+export function useZoom(): [number, (zoom: number) => void] {
+  const [zoom, setZoomState] = useState<number>(getSavedZoom);
+
+  useEffect(() => {
+    const handleCustomChange = (e: Event) => {
+      const customEvent = e as CustomEvent<number>;
+      if (customEvent.detail) {
+        setZoomState(customEvent.detail);
+      } else {
+        setZoomState(getSavedZoom());
+      }
+    };
+
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === "const_harness_zoom") {
+        setZoomState(getSavedZoom());
+      }
+    };
+
+    window.addEventListener("const-zoom-change", handleCustomChange);
+    window.addEventListener("storage", handleStorage);
+    return () => {
+      window.removeEventListener("const-zoom-change", handleCustomChange);
+      window.removeEventListener("storage", handleStorage);
+    };
+  }, []);
+
+  const setZoom = (newZoom: number) => {
+    setZoomState(newZoom);
+    setSavedZoom(newZoom);
+  };
+
+  return [zoom, setZoom];
+}
+
 export function initThemeListener() {
   if (typeof window === "undefined") return () => {};
 
   const currentTheme = getSavedTheme();
   applyTheme(currentTheme);
+
+  const currentZoom = getSavedZoom();
+  applyZoom(currentZoom);
 
   const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
   const handleChange = () => {
@@ -130,3 +188,4 @@ export function initThemeListener() {
   mediaQuery.addEventListener("change", handleChange);
   return () => mediaQuery.removeEventListener("change", handleChange);
 }
+

@@ -2045,7 +2045,7 @@ function AuthenticatedContent({
           onRenameConversation={handleRenameConversation}
           onArchiveConversation={handleArchiveConversation}
           onUnarchiveConversation={handleUnarchiveConversation}
-          onOpenSettings={() => handleOpenSettings("general")}
+          onOpenSettings={(tab) => handleOpenSettings(tab || "general")}
           onOpenScheduledTasks={() => setIsScheduledTasksOpen(true)}
           isScheduledTasksActive={isScheduledTasksOpen}
           onOpenSearch={() => setIsSearchOpen(true)}
