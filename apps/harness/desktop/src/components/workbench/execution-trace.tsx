@@ -9,6 +9,7 @@ import {
   Layers,
   Search,
   FileSearch,
+  ShieldAlert,
 } from "lucide-react";
 import { ScrollArea, cn } from "@const/ui";
 import type { FileMutationRecord, TraceStep } from "../../vite-env";
@@ -33,6 +34,7 @@ export interface ExecutionTraceProps {
   isExecuting?: boolean;
   durationMs?: number;
   showMutationsSummary?: boolean;
+  pendingApprovalToolCallId?: string;
   onRollback?: (record: FileMutationRecord) => void;
   onRollbackAll?: (records: FileMutationRecord[]) => void;
   onOpenReview?: () => void;
@@ -75,6 +77,7 @@ export function ExecutionTrace({
   isExecuting = false,
   durationMs,
   showMutationsSummary = false,
+  pendingApprovalToolCallId,
   onRollback,
   onRollbackAll,
   onOpenReview,
@@ -204,11 +207,17 @@ export function ExecutionTrace({
                 norm === "sh" ||
                 norm === "exec"
               ) {
+                const isWaitingApproval = Boolean(
+                  pendingApprovalToolCallId &&
+                    (step.id === pendingApprovalToolCallId ||
+                      (step as any).toolCallId === pendingApprovalToolCallId)
+                );
                 return (
                   <TerminalCard
                     key={step.id || `cmd_${idx}`}
                     tool={step}
-                    isDefaultOpen={Boolean(step.isError)}
+                    isDefaultOpen={Boolean(step.isError || isWaitingApproval)}
+                    isWaitingApproval={isWaitingApproval}
                   />
                 );
               }
@@ -378,9 +387,11 @@ function ThoughtItem({
 function TerminalCard({
   tool,
   isDefaultOpen = false,
+  isWaitingApproval = false,
 }: {
   tool: TraceToolCall | TraceStep;
   isDefaultOpen?: boolean;
+  isWaitingApproval?: boolean;
 }) {
   const [isOpen, setIsOpen] = useState(isDefaultOpen);
 
@@ -437,7 +448,9 @@ function TerminalCard({
         <span className="font-mono text-xs text-[#d4d4d4] truncate flex-1 min-w-0 text-left">
           {cmd || "command"}
         </span>
-        {isFailed ? (
+        {isWaitingApproval ? (
+          <span className="w-1.5 h-1.5 rounded-full bg-[#ff7a00] animate-ping shrink-0" title="Waiting for user approval" />
+        ) : isFailed ? (
           <span className="w-1.5 h-1.5 rounded-full bg-[#ff5c5c] shrink-0" title="Failed" />
         ) : tool.result !== undefined ? (
           <span className="w-1.5 h-1.5 rounded-full bg-[#409D62] shrink-0" title="Success" />
@@ -471,7 +484,11 @@ function TerminalCard({
 
           {/* Output stdout/stderr wrapped in ScrollArea */}
           <ScrollArea className="max-h-60 w-full">
-            {tool.result === undefined ? (
+            {isWaitingApproval ? (
+              <div className="text-[#888888] flex items-center gap-1.5 text-xs py-0.5 font-sans">
+                <span>Waiting for user input.</span>
+              </div>
+            ) : tool.result === undefined ? (
               <div className="text-[#e79737] dark:text-[#ff7a00] flex items-center gap-1.5 text-xs italic py-0.5">
                 <Loader2 className="w-3 h-3 animate-spin shrink-0" />
                 <span>Running command...</span>

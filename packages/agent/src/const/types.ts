@@ -37,15 +37,40 @@ export interface ModelConfig {
 
 import type { FileMutationRecord } from "./mutation-ledger.js";
 
+export type ApprovalDecision = "allow_once" | "allow_always" | "deny" | "skip";
+
+export interface ApprovalRequestData {
+  approvalId: string;
+  id?: string;
+  toolCallId: string;
+  toolName: string;
+  args: any;
+  command?: string;
+  cwd?: string;
+  description?: string;
+  reason?: string;
+  createdAt: number;
+  timestamp?: number;
+  approval?: any;
+}
+
+export interface ApprovalResponseData {
+  approvalId: string;
+  decision: ApprovalDecision;
+  feedback?: string;
+}
+
 export interface AgentEventMap {
   token: { token: string };
   token_reset: {};
   thinking: { thinking: string };
   tool_call: { toolCallId: string; toolName: string; args: any };
   tool_result: { toolCallId: string; toolName: string; result: any; isError?: boolean };
+  approval_request: ApprovalRequestData;
+  approval_resolved: { approvalId: string; decision: ApprovalDecision };
   file_mutation: { record: FileMutationRecord };
   usage: { promptTokens: number; completionTokens: number; totalTokens: number };
-  status: { status: "idle" | "thinking" | "calling_tool" | "streaming" | "done" | "error"; message?: string };
+  status: { status: "idle" | "thinking" | "calling_tool" | "waiting_approval" | "streaming" | "done" | "error"; message?: string };
   done: { fullContent: string; messages: AgentMessage[] };
   error: { error: string };
 }

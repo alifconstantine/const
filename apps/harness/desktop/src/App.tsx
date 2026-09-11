@@ -30,6 +30,7 @@ import { ChatIndicator } from "./components/workbench/chat-indicator";
 import { ImageLightbox } from "./components/workbench/image-lightbox";
 import { MarkdownContent } from "./components/workbench/markdown-content";
 import { ExecutionTrace, MutationsSummaryCard } from "./components/workbench/execution-trace";
+import { ApprovalCard } from "./components/workbench/approval-card";
 import { ReviewDialog } from "./components/workbench/review-dialog";
 import { RenameTaskDialog } from "./components/workbench/rename-task-dialog";
 import { TrajectoryDialog } from "./components/workbench/trajectory-dialog";
@@ -54,7 +55,12 @@ import {
   normalizeUiMessages,
   type ConversationItem,
 } from "./lib/conversation-store";
-import type { FileMutationRecord, TraceStep } from "./vite-env";
+import type {
+  FileMutationRecord,
+  TraceStep,
+  ApprovalRequestData,
+  ApprovalDecision,
+} from "./vite-env";
 import authArt from "./assets/auth-art.jpg";
 
 function getGreeting(): string {
@@ -368,6 +374,9 @@ function AuthenticatedContent({
   const activeSessionMessagesRef = React.useRef<Map<string, ChatMessage[]>>(new Map());
   const executionStartTimeMapRef = React.useRef<Map<string, number>>(new Map());
   const [liveDurationMs, setLiveDurationMs] = useState<number>(0);
+  const [pendingApprovals, setPendingApprovals] = useState<Map<string, ApprovalRequestData>>(new Map());
+  const [isRespondingApproval, setIsRespondingApproval] = useState<boolean>(false);
+  const activeApproval = pendingApprovals.get(conversationId);
 
   useEffect(() => {
     if (!isExecuting) {
@@ -959,9 +968,47 @@ function AuthenticatedContent({
             saveConversation(target);
           }
         }
+      } else if (event.type === "approval_request") {
+        const approvalData: ApprovalRequestData = event.approval || {
+          id: event.id || event.approvalId,
+          approvalId: event.approvalId || event.id,
+          toolCallId: event.toolCallId,
+          toolName: event.toolName,
+          command: event.command,
+          args: event.args,
+          cwd: event.cwd,
+          description: event.description,
+          reason: event.reason,
+          createdAt: event.createdAt || event.timestamp || Date.now(),
+          timestamp: event.timestamp || event.createdAt || Date.now(),
+        };
+        if (approvalData && (approvalData.id || approvalData.approvalId)) {
+          setPendingApprovals((prev) => {
+            const next = new Map(prev);
+            next.set(targetConvoId, approvalData);
+            return next;
+          });
+          setTimeout(() => {
+            messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+          }, 60);
+        }
+      } else if (event.type === "approval_resolved") {
+        setPendingApprovals((prev) => {
+          if (!prev.has(targetConvoId)) return prev;
+          const next = new Map(prev);
+          next.delete(targetConvoId);
+          return next;
+        });
       } else if (event.type === "done") {
         setRunningConvoIds((prev) => {
           const next = new Set(prev);
+          next.delete(targetConvoId);
+          return next;
+        });
+
+        setPendingApprovals((prev) => {
+          if (!prev.has(targetConvoId)) return prev;
+          const next = new Map(prev);
           next.delete(targetConvoId);
           return next;
         });
@@ -1015,6 +1062,13 @@ function AuthenticatedContent({
       } else if (event.type === "error") {
         setRunningConvoIds((prev) => {
           const next = new Set(prev);
+          next.delete(targetConvoId);
+          return next;
+        });
+
+        setPendingApprovals((prev) => {
+          if (!prev.has(targetConvoId)) return prev;
+          const next = new Map(prev);
           next.delete(targetConvoId);
           return next;
         });
@@ -1329,6 +1383,12 @@ function AuthenticatedContent({
       next.delete(idToAbort);
       return next;
     });
+    setPendingApprovals((prev) => {
+      if (!prev.has(idToAbort)) return prev;
+      const next = new Map(prev);
+      next.delete(idToAbort);
+      return next;
+    });
 
     const startTime = executionStartTimeMapRef.current.get(idToAbort);
     const finalDuration = startTime ? Date.now() - startTime : undefined;
@@ -1382,6 +1442,36 @@ function AuthenticatedContent({
     }
     activeSessionMessagesRef.current.delete(idToAbort);
     toast.info("Agent execution stopped");
+  };
+
+  const handleRespondApproval = async (
+    approvalId: string,
+    decision: ApprovalDecision,
+    feedback?: string
+  ) => {
+    if (!window.electron?.respondApproval) return;
+    setIsRespondingApproval(true);
+    try {
+      const res = await window.electron.respondApproval({
+        conversationId,
+        approvalId,
+        decision,
+        feedback,
+      });
+      if (!res.success) {
+        toast.error(res.error || "Failed to submit approval response");
+      } else {
+        setPendingApprovals((prev) => {
+          const next = new Map(prev);
+          next.delete(conversationId);
+          return next;
+        });
+      }
+    } catch (err: any) {
+      toast.error(err?.message || "Failed to submit approval response");
+    } finally {
+      setIsRespondingApproval(false);
+    }
   };
 
   const handleNewChat = (targetProject?: string) => {
@@ -1720,6 +1810,11 @@ function AuthenticatedContent({
                           traceSteps={msg.traceSteps}
                           mutations={msg.mutations}
                           isExecuting={isExecuting && idx === messages.length - 1}
+                          pendingApprovalToolCallId={
+                            isExecuting && idx === messages.length - 1
+                              ? activeApproval?.toolCallId
+                              : undefined
+                          }
                           durationMs={
                             isExecuting && idx === messages.length - 1
                               ? liveDurationMs
@@ -1728,6 +1823,23 @@ function AuthenticatedContent({
                           onRollback={handleRollback}
                           onRollbackAll={handleRollbackAll}
                         />
+
+                        {/* Interactive Approval Card rendered inline below trace matching screenshot */}
+                        {isExecuting && idx === messages.length - 1 && activeApproval && (
+                          <div className="mt-2 w-full animate-in fade-in slide-in-from-bottom-2 duration-200">
+                            <ApprovalCard
+                              request={activeApproval}
+                              isResponding={isRespondingApproval}
+                              onDecide={(decision, feedback) =>
+                                handleRespondApproval(
+                                  activeApproval.id || activeApproval.approvalId!,
+                                  decision,
+                                  feedback
+                                )
+                              }
+                            />
+                          </div>
+                        )}
 
                         {/* Formatted Markdown Content */}
                         {msg.content ? (
@@ -1816,24 +1928,26 @@ function AuthenticatedContent({
               </div>
             )}
 
-            {/* Anchored Bottom Chat Input (No dividing line!) */}
-            <div className="w-full px-3.5 sm:px-6 md:px-8 pb-4 pt-2 flex justify-center bg-[#f8f8f8] dark:bg-[#161616] shrink-0 min-w-0">
-              <div className={cn("w-full max-w-full min-w-0", streamWidthClass)}>
-                <ChatCard
-                  compact
-                  isExecuting={isExecuting}
-                  onSendMessage={handleSendMessage}
-                  onAbort={handleAbort}
-                  contextUsage={contextUsage}
-                  metrics={conversationMetrics}
-                  project={currentProject}
-                  onProjectChange={setCurrentProject}
-                  onOpenSettings={(tab) => handleOpenSettings(tab || "model-settings")}
-                  initialPrompt={editingPrompt}
-                  onModelChange={setActiveModelItem}
-                />
+            {/* Anchored Bottom Chat Input (Hidden while awaiting approval to match screenshot) */}
+            {!activeApproval && (
+              <div className="w-full px-3.5 sm:px-6 md:px-8 pb-4 pt-2 flex justify-center bg-[#f8f8f8] dark:bg-[#161616] shrink-0 min-w-0">
+                <div className={cn("w-full max-w-full min-w-0", streamWidthClass)}>
+                  <ChatCard
+                    compact
+                    isExecuting={isExecuting}
+                    onSendMessage={handleSendMessage}
+                    onAbort={handleAbort}
+                    contextUsage={contextUsage}
+                    metrics={conversationMetrics}
+                    project={currentProject}
+                    onProjectChange={setCurrentProject}
+                    onOpenSettings={(tab) => handleOpenSettings(tab || "model-settings")}
+                    initialPrompt={editingPrompt}
+                    onModelChange={setActiveModelItem}
+                  />
+                </div>
               </div>
-            </div>
+            )}
           </div>
         )}
               </div>

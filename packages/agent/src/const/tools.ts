@@ -415,13 +415,17 @@ function extractContentArg(args: Record<string, any>): string {
   return typeof val === "string" ? val : JSON.stringify(val, null, 2);
 }
 
-function extractCommandArg(args: Record<string, any>): string {
+export function extractCommandArg(args: Record<string, any>): string {
+  if (!args || typeof args !== "object") return "";
   const val =
     args.command ??
     args.cmd ??
+    args.commandLine ??
+    args.CommandLine ??
     args.script ??
     args.instruction ??
     args.raw ??
+    args.input ??
     "";
   return typeof val === "string" ? val.trim() : "";
 }

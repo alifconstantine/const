@@ -1,8 +1,16 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import type { AgentConfig, AgentEvent, AgentMessage, ToolCall } from "./types.js";
-import { CONST_DEFAULT_TOOLS, executeNativeTool } from "./tools.js";
+import type {
+  AgentConfig,
+  AgentEvent,
+  AgentMessage,
+  ToolCall,
+  ApprovalDecision,
+  ApprovalRequestData,
+  ApprovalResponseData,
+} from "./types.js";
+import { CONST_DEFAULT_TOOLS, executeNativeTool, extractCommandArg } from "./tools.js";
 
 function parseToolArguments(rawArgs: any): Record<string, any> {
   if (!rawArgs) return {};
@@ -455,6 +463,8 @@ export class ConstAgent {
   private config: AgentConfig;
   private abortController: AbortController | null = null;
   private isRunning = false;
+  private pendingApprovals = new Map<string, (response: ApprovalResponseData) => void>();
+  private sessionAllowedTools = new Set<string>();
 
   constructor(config: AgentConfig) {
     this.config = {
@@ -462,6 +472,16 @@ export class ConstAgent {
       workspacePath: process.cwd(),
       ...config,
     };
+  }
+
+  public resolveApproval(approvalId: string, response: ApprovalResponseData): boolean {
+    const resolver = this.pendingApprovals.get(approvalId);
+    if (resolver) {
+      this.pendingApprovals.delete(approvalId);
+      resolver(response);
+      return true;
+    }
+    return false;
   }
 
   public get maxTurns(): number {
@@ -473,6 +493,16 @@ export class ConstAgent {
       this.abortController.abort();
       this.abortController = null;
     }
+    for (const [id, resolver] of this.pendingApprovals.entries()) {
+      try {
+        resolver({
+          approvalId: id,
+          decision: "deny",
+          feedback: "Agent execution was cancelled by user.",
+        });
+      } catch {}
+    }
+    this.pendingApprovals.clear();
     this.isRunning = false;
   }
 
@@ -1072,6 +1102,141 @@ export class ConstAgent {
             args: parsedArgs,
           });
 
+          // Check for Approval in "ask_before_changes" mode for terminal / shell execution
+          const toolLower = tc.function.name.toLowerCase();
+          const isTerminalTool =
+            toolLower === "bash" ||
+            toolLower === "powershell" ||
+            toolLower === "exec" ||
+            toolLower === "terminal" ||
+            toolLower === "sh" ||
+            toolLower === "run_command" ||
+            toolLower === "runcommand";
+
+          const cmd = isTerminalTool ? extractCommandArg(parsedArgs) : undefined;
+          const rawCwd = parsedArgs.cwd || parsedArgs.working_directory || parsedArgs.workdir || parsedArgs.path;
+          const targetCwd = rawCwd ? path.resolve(workspacePath, rawCwd) : workspacePath;
+
+          const isAlreadyAllowed =
+            this.sessionAllowedTools.has(toolLower) ||
+            Boolean(cmd && this.sessionAllowedTools.has(`cmd:${cmd.trim()}`));
+
+          if (this.config.mode === "ask_before_changes" && isTerminalTool && !isAlreadyAllowed) {
+            const approvalId = `appr_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+
+            onEvent({
+              type: "status",
+              status: "waiting_approval",
+              message: `Waiting for approval to execute: ${cmd || tc.function.name}`,
+            });
+
+            const approvalReq: ApprovalRequestData = {
+              approvalId,
+              toolCallId: tc.id,
+              toolName: tc.function.name,
+              args: parsedArgs,
+              command: cmd,
+              cwd: targetCwd,
+              description: `Execute terminal command: ${cmd || tc.function.name}`,
+              createdAt: Date.now(),
+            };
+
+            onEvent({
+              type: "approval_request",
+              id: approvalId,
+              approval: approvalReq,
+              ...approvalReq,
+            });
+
+            // Wait for user approval or abort signal
+            const userResponse = await new Promise<ApprovalResponseData>((resolve, reject) => {
+              const onAbort = () => {
+                this.pendingApprovals.delete(approvalId);
+                reject(new Error("Operation cancelled"));
+              };
+
+              if (signal.aborted) {
+                return reject(new Error("Operation cancelled"));
+              }
+              signal.addEventListener("abort", onAbort, { once: true });
+
+              this.pendingApprovals.set(approvalId, (res) => {
+                signal.removeEventListener("abort", onAbort);
+                resolve(res);
+              });
+            });
+
+            onEvent({
+              type: "approval_resolved",
+              approvalId,
+              decision: userResponse.decision,
+            });
+
+            if (userResponse.decision === "allow_always") {
+              if (cmd && cmd.trim()) {
+                this.sessionAllowedTools.add(`cmd:${cmd.trim()}`);
+              } else {
+                this.sessionAllowedTools.add(toolLower);
+              }
+            } else if (userResponse.decision === "deny") {
+              const feedbackText = userResponse.feedback?.trim();
+              const rejectionMessage = feedbackText
+                ? `[ACTION REJECTED BY USER]: The user denied permission to execute command: '${cmd}'. User instruction / feedback: "${feedbackText}". Adapt your plan immediately based on this instruction and proceed without running that command.`
+                : `[ACTION REJECTED BY USER]: The user denied permission to execute command: '${cmd}'. Do NOT execute this command. Choose a different approach or explain the options clearly.`;
+
+              onEvent({
+                type: "tool_result",
+                toolCallId: tc.id,
+                toolName: tc.function.name,
+                result: rejectionMessage,
+                isError: true,
+              });
+
+              conversationHistory.push({
+                role: "tool",
+                tool_call_id: tc.id,
+                name: tc.function.name,
+                content: rejectionMessage,
+                timestamp: Date.now(),
+              });
+
+              toolCallHistory.push({
+                name: tc.function.name,
+                argsHash,
+                isError: true,
+              });
+
+              continue;
+            } else if (userResponse.decision === "skip") {
+              const skipMessage = `[ACTION SKIPPED BY USER]: The user skipped execution of command: '${cmd}'. Proceed with other tasks or ask the user how to continue.`;
+
+              onEvent({
+                type: "tool_result",
+                toolCallId: tc.id,
+                toolName: tc.function.name,
+                result: skipMessage,
+                isError: true,
+              });
+
+              conversationHistory.push({
+                role: "tool",
+                tool_call_id: tc.id,
+                name: tc.function.name,
+                content: skipMessage,
+                timestamp: Date.now(),
+              });
+
+              toolCallHistory.push({
+                name: tc.function.name,
+                argsHash,
+                isError: true,
+              });
+
+              continue;
+            }
+            // If "allow_once", proceed below to executeNativeTool!
+          }
+
           const { result, isError } = await executeNativeTool(
             tc.function.name,
             parsedArgs,
@@ -1151,6 +1316,7 @@ export class ConstAgent {
     } finally {
       this.isRunning = false;
       this.abortController = null;
+      this.pendingApprovals.clear();
     }
   }
 }

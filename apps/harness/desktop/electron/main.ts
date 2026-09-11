@@ -809,6 +809,48 @@ app.whenReady().then(() => {
     return { success: false, error: "No active session found" };
   });
 
+  ipcMain.handle(
+    "agent:respond-approval",
+    async (
+      _event,
+      payload: {
+        conversationId: string;
+        approvalId: string;
+        decision: "allow_once" | "allow_always" | "deny" | "skip";
+        feedback?: string;
+      }
+    ) => {
+      let session = activeSessions.get(payload.conversationId);
+      if (!session && activeSessions.size === 1) {
+        session = activeSessions.values().next().value;
+      }
+      if (session && session.agent && typeof session.agent.resolveApproval === "function") {
+        const resolved = session.agent.resolveApproval(payload.approvalId, {
+          approvalId: payload.approvalId,
+          decision: payload.decision,
+          feedback: payload.feedback,
+        });
+        if (resolved) {
+          return { success: true };
+        }
+      }
+      // Fallback: search across all active sessions in case of ID discrepancy
+      for (const s of activeSessions.values()) {
+        if (s.agent && typeof s.agent.resolveApproval === "function") {
+          const resolved = s.agent.resolveApproval(payload.approvalId, {
+            approvalId: payload.approvalId,
+            decision: payload.decision,
+            feedback: payload.feedback,
+          });
+          if (resolved) {
+            return { success: true };
+          }
+        }
+      }
+      return { success: false, error: "Active session or approval not found" };
+    }
+  );
+
   ipcMain.handle("agent:get-running-sessions", async () => {
     return Array.from(activeSessions.keys());
   });

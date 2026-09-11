@@ -40,6 +40,12 @@ contextBridge.exposeInMainWorld("electron", {
     maxOutputTokens?: number;
   }) => ipcRenderer.invoke("agent:send-message", payload),
   abortAgent: (conversationId?: string) => ipcRenderer.invoke("agent:abort", conversationId),
+  respondApproval: (payload: {
+    conversationId: string;
+    approvalId: string;
+    decision: "allow_once" | "allow_always" | "deny" | "skip";
+    feedback?: string;
+  }) => ipcRenderer.invoke("agent:respond-approval", payload),
   getRunningSessions: () => ipcRenderer.invoke("agent:get-running-sessions"),
   onSessionStarted: (callback: (data: { conversationId: string }) => void) => {
     const handler = (_event: any, data: any) => callback(data);

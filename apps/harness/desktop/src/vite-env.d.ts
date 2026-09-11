@@ -36,12 +36,33 @@ export interface TraceStep {
   mutation?: FileMutationRecord;
 }
 
+export type ApprovalDecision = "allow_once" | "allow_always" | "deny" | "skip";
+
+export interface ApprovalRequestData {
+  id: string;
+  approvalId?: string;
+  conversationId?: string;
+  toolCallId: string;
+  toolName: string;
+  args: any;
+  command?: string;
+  cwd?: string;
+  description?: string;
+  reason?: string;
+  createdAt?: number;
+  timestamp?: number;
+}
+
 export interface AgentStreamEvent {
+  conversationId?: string;
   type:
     | "token"
+    | "token_reset"
     | "thinking"
     | "tool_call"
     | "tool_result"
+    | "approval_request"
+    | "approval_resolved"
     | "file_mutation"
     | "status"
     | "done"
@@ -53,6 +74,11 @@ export interface AgentStreamEvent {
   args?: any;
   result?: any;
   isError?: boolean;
+  approvalId?: string;
+  decision?: "allow_once" | "allow_always" | "deny" | "skip";
+  command?: string;
+  cwd?: string;
+  description?: string;
   record?: FileMutationRecord;
   status?: string;
   fullContent?: string;
@@ -136,6 +162,12 @@ declare global {
         error?: string;
       }>;
       abortAgent: (conversationId?: string) => Promise<boolean>;
+      respondApproval?: (payload: {
+        conversationId: string;
+        approvalId: string;
+        decision: "allow_once" | "allow_always" | "deny" | "skip";
+        feedback?: string;
+      }) => Promise<{ success: boolean; error?: string }>;
       getRunningSessions?: () => Promise<string[]>;
       onSessionStarted?: (callback: (data: { conversationId: string }) => void) => () => void;
       onSessionEnded?: (callback: (data: { conversationId: string }) => void) => () => void;
