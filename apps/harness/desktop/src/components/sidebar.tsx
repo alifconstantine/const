@@ -195,6 +195,17 @@ export function Sidebar({
   };
 
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
+  const [isAccountMenuOpen, setIsAccountMenuOpen] = useState(false);
+  const accountMenuOpenTimeRef = React.useRef(0);
+
+  const handleAccountMenuOpenChange = (open: boolean) => {
+    if (open) {
+      accountMenuOpenTimeRef.current = Date.now();
+    }
+    setIsAccountMenuOpen(open);
+  };
+
+  const isFreshlyOpened = () => Date.now() - accountMenuOpenTimeRef.current < 250;
 
   // Project reordering state with localStorage persistence
   const [projectOrder, setProjectOrder] = useState<string[]>(() => {
@@ -1253,10 +1264,18 @@ export function Sidebar({
 
       {/* Bottom: Preserved Full Account Settings (No borders) */}
       <div className="pt-2">
-        <DropdownMenu>
+        <DropdownMenu open={isAccountMenuOpen} onOpenChange={handleAccountMenuOpenChange}>
           <DropdownMenuTrigger asChild>
             <button
               type="button"
+              onPointerDown={(e) => {
+                // Prevent pointerdown from immediately opening the menu while the mouse button is pressed.
+                // This eliminates the accidental drag-select / pointerup click glitch!
+                e.preventDefault();
+              }}
+              onClick={() => {
+                handleAccountMenuOpenChange(!isAccountMenuOpen);
+              }}
               className="w-full flex items-center justify-between gap-3 p-2 rounded-xl hover:bg-[#dedee2] dark:hover:bg-[#383838] transition-colors text-left outline-none cursor-pointer group"
               aria-label="Account menu"
             >
@@ -1293,8 +1312,9 @@ export function Sidebar({
           <DropdownMenuContent
             align="start"
             side="top"
-            sideOffset={8}
-            className="min-w-[240px] w-64 max-w-[calc(100vw-32px)] p-1.5 shadow-2xl mb-1 bg-white dark:bg-[#1e1e1e] border border-[#e2e2e4] dark:border-[#333333] text-popover-foreground rounded-xl z-50"
+            sideOffset={10}
+            avoidCollisions={false}
+            className="min-w-[240px] w-64 max-w-[calc(100vw-32px)] p-1.5 shadow-2xl bg-white dark:bg-[#1e1e1e] border border-[#e2e2e4] dark:border-[#333333] text-popover-foreground rounded-xl z-50 animate-in fade-in-0 duration-150"
           >
             {(user?.name || user?.email) && (
               <>
@@ -1317,7 +1337,10 @@ export function Sidebar({
             {/* 1. Settings (paling atas) */}
             <DropdownMenuItem
               className="cursor-pointer flex items-center gap-3 text-xs py-2 px-3 text-muted-foreground hover:text-popover-foreground hover:bg-sidebar-accent dark:hover:bg-[#2a2a2a] rounded-lg transition-colors"
-              onClick={() => onOpenSettings?.("general")}
+              onClick={() => {
+                if (isFreshlyOpened()) return;
+                onOpenSettings?.("general");
+              }}
             >
               <Settings className="h-4 w-4 shrink-0 text-[#888888] dark:text-[#a0a0a0]" />
               <span className="flex-1">Settings</span>
@@ -1339,7 +1362,10 @@ export function Sidebar({
                     <DropdownMenuItem
                       key={lang.code}
                       className="cursor-pointer flex items-center justify-between gap-4 text-xs py-2 px-3 text-muted-foreground hover:text-popover-foreground hover:bg-sidebar-accent dark:hover:bg-[#2a2a2a] rounded-lg transition-colors"
-                      onClick={() => handleSelectLanguage(lang.code)}
+                      onClick={() => {
+                        if (isFreshlyOpened()) return;
+                        handleSelectLanguage(lang.code);
+                      }}
                     >
                       <span className={isSelected ? "font-medium text-popover-foreground" : ""}>
                         {lang.label}
@@ -1371,7 +1397,10 @@ export function Sidebar({
                     <DropdownMenuItem
                       key={item.value}
                       className="cursor-pointer flex items-center justify-between gap-4 text-xs py-2 px-3 text-muted-foreground hover:text-popover-foreground hover:bg-sidebar-accent dark:hover:bg-[#2a2a2a] rounded-lg transition-colors"
-                      onClick={() => setTheme(item.value as "system" | "light" | "dark")}
+                      onClick={() => {
+                        if (isFreshlyOpened()) return;
+                        setTheme(item.value as "system" | "light" | "dark");
+                      }}
                     >
                       <span className={isSelected ? "font-medium text-popover-foreground" : ""}>
                         {item.label}
@@ -1399,7 +1428,10 @@ export function Sidebar({
                     <DropdownMenuItem
                       key={lvl.value}
                       className="cursor-pointer flex items-center justify-between gap-4 text-xs py-2 px-3 text-muted-foreground hover:text-popover-foreground hover:bg-sidebar-accent dark:hover:bg-[#2a2a2a] rounded-lg transition-colors"
-                      onClick={() => setZoom(lvl.value)}
+                      onClick={() => {
+                        if (isFreshlyOpened()) return;
+                        setZoom(lvl.value);
+                      }}
                     >
                       <span className={isSelected ? "font-medium text-popover-foreground" : ""}>
                         {lvl.label}
@@ -1416,7 +1448,10 @@ export function Sidebar({
             {/* 5. Usage stats */}
             <DropdownMenuItem
               className="cursor-pointer flex items-center gap-3 text-xs py-2 px-3 text-muted-foreground hover:text-popover-foreground hover:bg-sidebar-accent dark:hover:bg-[#2a2a2a] rounded-lg transition-colors"
-              onClick={() => onOpenSettings?.("usage-stats")}
+              onClick={() => {
+                if (isFreshlyOpened()) return;
+                onOpenSettings?.("usage-stats");
+              }}
             >
               <BarChart2 className="h-4 w-4 shrink-0 text-[#888888] dark:text-[#a0a0a0]" />
               <span className="flex-1">Usage stats</span>
@@ -1428,7 +1463,10 @@ export function Sidebar({
             {onSwitchAccount && (
               <DropdownMenuItem
                 className="cursor-pointer flex items-center gap-3 text-xs py-2 px-3 text-muted-foreground hover:text-popover-foreground hover:bg-sidebar-accent dark:hover:bg-[#2a2a2a] rounded-lg transition-colors"
-                onClick={onSwitchAccount}
+                onClick={() => {
+                  if (isFreshlyOpened()) return;
+                  onSwitchAccount();
+                }}
               >
                 <ArrowLeftRight className="h-4 w-4 shrink-0 text-[#888888] dark:text-[#a0a0a0]" />
                 <span className="flex-1">Switch account</span>
@@ -1438,7 +1476,10 @@ export function Sidebar({
             {/* 7. Log out */}
             <DropdownMenuItem
               className="cursor-pointer flex items-center gap-3 text-xs py-2 px-3 text-destructive hover:bg-destructive/10 rounded-lg transition-colors"
-              onClick={() => setIsLogoutModalOpen(true)}
+              onClick={() => {
+                if (isFreshlyOpened()) return;
+                setIsLogoutModalOpen(true);
+              }}
             >
               <LogOut className="h-4 w-4 shrink-0" />
               <span className="flex-1 font-medium">Log out</span>
