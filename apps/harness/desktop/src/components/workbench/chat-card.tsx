@@ -140,6 +140,7 @@ interface ChatCardProps {
   isExecuting?: boolean;
   onAbort?: () => void;
   compact?: boolean;
+  showContextUsage?: boolean;
   contextUsage?: ContextUsageData;
   metrics?: ConversationMetrics;
   project?: string;
@@ -157,6 +158,7 @@ export function ChatCard({
   isExecuting = false,
   onAbort,
   compact = false,
+  showContextUsage,
   contextUsage,
   metrics,
   project: initialProject,
@@ -762,6 +764,9 @@ export function ChatCard({
   const safePercent = isFinite(rawPercentUsed) ? Math.min(100, Math.max(0, rawPercentUsed)) : 0;
   const percentUsed = safePercent >= 1 ? Math.round(safePercent) : +safePercent.toFixed(1);
 
+  // Context Message indicator should only show when ongoing chat has started (or explicitly enabled)
+  const shouldShowContextUsage = showContextUsage !== undefined ? showContextUsage : compact;
+
   const closeAllMenus = () => {
     setIsProjectOpen(false);
     setIsModeOpen(false);
@@ -1214,163 +1219,165 @@ export function ChatCard({
             {/* Right Actions: Context Window, Model Selector, Send Button */}
             <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 ml-auto">
               {/* 1. Context Windows Indicator & Detailed Popover */}
-              <div className="relative" ref={contextMenuRef}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const next = !isContextOpen;
-                    closeAllMenus();
-                    setIsContextOpen(next);
-                  }}
-                  className={`w-6 h-6 flex items-center justify-center rounded-md transition-colors cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 ${
-                    rawPercentUsed >= 90
-                      ? "text-red-500 hover:text-red-400"
-                      : rawPercentUsed >= 75
-                      ? "text-[#e79737] hover:text-[#ff9838]"
-                      : "text-[#a9a9a9] dark:text-[#777777] hover:text-[#262626] dark:hover:text-[#d4d4d4]"
-                  }`}
-                  title={`Context window: ${rawPercentUsed === 0 ? "0%" : rawPercentUsed < 0.1 ? "<0.1%" : `${percentUsed}%`} (~${formatTokenDisplay(usedTokens)} / ${formatTokenDisplay(totalTokens)})`}
-                  aria-label="Context window usage"
-                >
-                  <svg
-                    className="w-3.5 h-3.5 transform -rotate-90"
-                    viewBox="0 0 24 24"
+              {shouldShowContextUsage && (
+                <div className="relative" ref={contextMenuRef}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = !isContextOpen;
+                      closeAllMenus();
+                      setIsContextOpen(next);
+                    }}
+                    className={`w-6 h-6 flex items-center justify-center rounded-md transition-colors cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 ${
+                      rawPercentUsed >= 90
+                        ? "text-red-500 hover:text-red-400"
+                        : rawPercentUsed >= 75
+                        ? "text-[#e79737] hover:text-[#ff9838]"
+                        : "text-[#a9a9a9] dark:text-[#777777] hover:text-[#262626] dark:hover:text-[#d4d4d4]"
+                    }`}
+                    title={`Context window: ${rawPercentUsed === 0 ? "0%" : rawPercentUsed < 0.1 ? "<0.1%" : `${percentUsed}%`} (~${formatTokenDisplay(usedTokens)} / ${formatTokenDisplay(totalTokens)})`}
+                    aria-label="Context window usage"
                   >
-                    <circle
-                      cx="12"
-                      cy="12"
-                      r="9"
-                      fill="none"
-                      stroke="currentColor"
-                      className="text-[#e2e2e4] dark:text-[#383838]"
-                      strokeWidth="2.5"
-                    />
-                    <circle
-                      cx="12"
-                      cy="12"
-                      r="9"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.5"
-                      strokeDasharray={56.55}
-                      strokeDashoffset={
-                        56.55 - (56.55 * safePercent) / 100
-                      }
-                      strokeLinecap="round"
-                    />
-                  </svg>
-                </button>
+                    <svg
+                      className="w-3.5 h-3.5 transform -rotate-90"
+                      viewBox="0 0 24 24"
+                    >
+                      <circle
+                        cx="12"
+                        cy="12"
+                        r="9"
+                        fill="none"
+                        stroke="currentColor"
+                        className="text-[#e2e2e4] dark:text-[#383838]"
+                        strokeWidth="2.5"
+                      />
+                      <circle
+                        cx="12"
+                        cy="12"
+                        r="9"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        strokeDasharray={56.55}
+                        strokeDashoffset={
+                          56.55 - (56.55 * safePercent) / 100
+                        }
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                  </button>
 
-                {/* Context Window Popover */}
-                {isContextOpen && (
-                  <div className="absolute bottom-full mb-2 right-0 w-72 sm:w-80 max-w-[calc(100vw-32px)] bg-white dark:bg-[#1e1e1e] border border-[#e2e2e4] dark:border-[#383838] rounded-2xl shadow-2xl p-4 z-50 flex flex-col gap-3 text-left select-none animate-in fade-in zoom-in-95 duration-100">
-                    {/* Header: % of context used and tokens */}
-                    <div className="flex items-center justify-between text-[13px]">
-                      <span className="text-[#161616] dark:text-white font-medium">
-                        {rawPercentUsed === 0 ? "0%" : rawPercentUsed < 0.1 ? "<0.1%" : `${percentUsed}%`} of context used
-                      </span>
-                      <span className="font-mono text-[12px] text-[#a9a9a9] dark:text-[#a0a0a0]">
-                        ~{formatTokenDisplay(usedTokens)} / {formatTokenDisplay(totalTokens)}
-                      </span>
-                    </div>
-
-                    {/* Multi-segment Horizontal Progress Bar */}
-                    <div className="w-full h-2 bg-[#f0f0f2] dark:bg-[#2d2d2d] rounded-full overflow-hidden flex gap-0.5">
-                      {systemPromptTokens > 0 && (
-                        <div
-                          className="bg-[#71717a] h-full transition-all"
-                          style={{
-                            width: `${Math.max(0.5, (systemPromptTokens / totalTokens) * 100)}%`,
-                          }}
-                          title={`System prompt: ~${formatTokenDisplay(systemPromptTokens)}`}
-                        />
-                      )}
-                      {toolsTokens > 0 && (
-                        <div
-                          className="bg-[#a855f7] h-full transition-all"
-                          style={{
-                            width: `${Math.max(0.5, (toolsTokens / totalTokens) * 100)}%`,
-                          }}
-                          title={`Tools: ~${formatTokenDisplay(toolsTokens)}`}
-                        />
-                      )}
-                      {effectiveMessagesTokens > 0 && (
-                        <div
-                          className="bg-[#3b82f6] h-full transition-all"
-                          style={{
-                            width: `${Math.max(0.5, (effectiveMessagesTokens / totalTokens) * 100)}%`,
-                          }}
-                          title={`Messages: ~${formatTokenDisplay(effectiveMessagesTokens)}`}
-                        />
-                      )}
-                      {draftInputTokens > 0 && (
-                        <div
-                          className="bg-[#10b981] h-full transition-all"
-                          style={{
-                            width: `${Math.max(0.5, (draftInputTokens / totalTokens) * 100)}%`,
-                          }}
-                          title={`Current input: ~${formatTokenDisplay(draftInputTokens)}`}
-                        />
-                      )}
-                    </div>
-
-                    {/* Legend / Breakdown List */}
-                    <div className="flex flex-col gap-2 pt-1">
-                      <div className="flex items-center justify-between text-[12px]">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2.5 h-2.5 rounded-xs bg-[#71717a] shrink-0" />
-                          <span className="text-[#262626] dark:text-[#d4d4d4]">System prompt</span>
-                        </div>
-                        <span className="font-mono text-[#262626] dark:text-[#d4d4d4]">
-                          ~{formatTokenDisplay(systemPromptTokens)}
+                  {/* Context Window Popover */}
+                  {isContextOpen && (
+                    <div className="absolute bottom-full mb-2 right-0 w-72 sm:w-80 max-w-[calc(100vw-32px)] bg-white dark:bg-[#1e1e1e] border border-[#e2e2e4] dark:border-[#383838] rounded-2xl shadow-2xl p-4 z-50 flex flex-col gap-3 text-left select-none animate-in fade-in zoom-in-95 duration-100">
+                      {/* Header: % of context used and tokens */}
+                      <div className="flex items-center justify-between text-[13px]">
+                        <span className="text-[#161616] dark:text-white font-medium">
+                          {rawPercentUsed === 0 ? "0%" : rawPercentUsed < 0.1 ? "<0.1%" : `${percentUsed}%`} of context used
+                        </span>
+                        <span className="font-mono text-[12px] text-[#a9a9a9] dark:text-[#a0a0a0]">
+                          ~{formatTokenDisplay(usedTokens)} / {formatTokenDisplay(totalTokens)}
                         </span>
                       </div>
 
-                      <div className="flex items-center justify-between text-[12px]">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2.5 h-2.5 rounded-xs bg-[#a855f7] shrink-0" />
-                          <span className="text-[#262626] dark:text-[#d4d4d4]">Tools</span>
-                        </div>
-                        <span className="font-mono text-[#262626] dark:text-[#d4d4d4]">
-                          ~{formatTokenDisplay(toolsTokens)}
-                        </span>
+                      {/* Multi-segment Horizontal Progress Bar */}
+                      <div className="w-full h-2 bg-[#f0f0f2] dark:bg-[#2d2d2d] rounded-full overflow-hidden flex gap-0.5">
+                        {systemPromptTokens > 0 && (
+                          <div
+                            className="bg-[#71717a] h-full transition-all"
+                            style={{
+                              width: `${Math.max(0.5, (systemPromptTokens / totalTokens) * 100)}%`,
+                            }}
+                            title={`System prompt: ~${formatTokenDisplay(systemPromptTokens)}`}
+                          />
+                        )}
+                        {toolsTokens > 0 && (
+                          <div
+                            className="bg-[#a855f7] h-full transition-all"
+                            style={{
+                              width: `${Math.max(0.5, (toolsTokens / totalTokens) * 100)}%`,
+                            }}
+                            title={`Tools: ~${formatTokenDisplay(toolsTokens)}`}
+                          />
+                        )}
+                        {effectiveMessagesTokens > 0 && (
+                          <div
+                            className="bg-[#3b82f6] h-full transition-all"
+                            style={{
+                              width: `${Math.max(0.5, (effectiveMessagesTokens / totalTokens) * 100)}%`,
+                            }}
+                            title={`Messages: ~${formatTokenDisplay(effectiveMessagesTokens)}`}
+                          />
+                        )}
+                        {draftInputTokens > 0 && (
+                          <div
+                            className="bg-[#10b981] h-full transition-all"
+                            style={{
+                              width: `${Math.max(0.5, (draftInputTokens / totalTokens) * 100)}%`,
+                            }}
+                            title={`Current input: ~${formatTokenDisplay(draftInputTokens)}`}
+                          />
+                        )}
                       </div>
 
-                      <div className="flex items-center justify-between text-[12px]">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2.5 h-2.5 rounded-xs bg-[#3b82f6] shrink-0" />
-                          <span className="text-[#262626] dark:text-[#d4d4d4]">Messages</span>
-                        </div>
-                        <span className="font-mono text-[#262626] dark:text-[#d4d4d4]">
-                          ~{formatTokenDisplay(effectiveMessagesTokens)}
-                        </span>
-                      </div>
-
-                      {draftInputTokens > 0 && (
+                      {/* Legend / Breakdown List */}
+                      <div className="flex flex-col gap-2 pt-1">
                         <div className="flex items-center justify-between text-[12px]">
                           <div className="flex items-center gap-2">
-                            <div className="w-2.5 h-2.5 rounded-xs bg-[#10b981] shrink-0" />
-                            <span className="text-[#10b981] font-medium">Current input</span>
+                            <div className="w-2.5 h-2.5 rounded-xs bg-[#71717a] shrink-0" />
+                            <span className="text-[#262626] dark:text-[#d4d4d4]">System prompt</span>
                           </div>
-                          <span className="font-mono text-[#10b981]">
-                            ~{formatTokenDisplay(draftInputTokens)}
+                          <span className="font-mono text-[#262626] dark:text-[#d4d4d4]">
+                            ~{formatTokenDisplay(systemPromptTokens)}
                           </span>
                         </div>
-                      )}
 
-                      <div className="flex items-center justify-between text-[12px] pt-1 border-t border-[#e2e2e4] dark:border-[#383838]/60">
-                        <div className="flex items-center gap-2">
-                          <div className="w-2.5 h-2.5 rounded-xs bg-[#e2e2e4] dark:bg-[#383838] shrink-0" />
-                          <span className="text-[#777777] dark:text-[#888888]">Available context</span>
+                        <div className="flex items-center justify-between text-[12px]">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2.5 h-2.5 rounded-xs bg-[#a855f7] shrink-0" />
+                            <span className="text-[#262626] dark:text-[#d4d4d4]">Tools</span>
+                          </div>
+                          <span className="font-mono text-[#262626] dark:text-[#d4d4d4]">
+                            ~{formatTokenDisplay(toolsTokens)}
+                          </span>
                         </div>
-                        <span className="font-mono text-[#777777] dark:text-[#888888]">
-                          ~{formatTokenDisplay(Math.max(0, totalTokens - usedTokens))}
-                        </span>
+
+                        <div className="flex items-center justify-between text-[12px]">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2.5 h-2.5 rounded-xs bg-[#3b82f6] shrink-0" />
+                            <span className="text-[#262626] dark:text-[#d4d4d4]">Messages</span>
+                          </div>
+                          <span className="font-mono text-[#262626] dark:text-[#d4d4d4]">
+                            ~{formatTokenDisplay(effectiveMessagesTokens)}
+                          </span>
+                        </div>
+
+                        {draftInputTokens > 0 && (
+                          <div className="flex items-center justify-between text-[12px]">
+                            <div className="flex items-center gap-2">
+                              <div className="w-2.5 h-2.5 rounded-xs bg-[#10b981] shrink-0" />
+                              <span className="text-[#10b981] font-medium">Current input</span>
+                            </div>
+                            <span className="font-mono text-[#10b981]">
+                              ~{formatTokenDisplay(draftInputTokens)}
+                            </span>
+                          </div>
+                        )}
+
+                        <div className="flex items-center justify-between text-[12px] pt-1 border-t border-[#e2e2e4] dark:border-[#383838]/60">
+                          <div className="flex items-center gap-2">
+                            <div className="w-2.5 h-2.5 rounded-xs bg-[#e2e2e4] dark:bg-[#383838] shrink-0" />
+                            <span className="text-[#777777] dark:text-[#888888]">Available context</span>
+                          </div>
+                          <span className="font-mono text-[#777777] dark:text-[#888888]">
+                            ~{formatTokenDisplay(Math.max(0, totalTokens - usedTokens))}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
+              )}
 
               {/* 2. Model Selector Dropdown (Const ∨) */}
               <div className="relative" ref={modelMenuRef}>

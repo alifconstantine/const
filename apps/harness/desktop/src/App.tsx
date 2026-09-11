@@ -1843,7 +1843,7 @@ function AuthenticatedContent({
                   onSendMessage={handleSendMessage}
                   isExecuting={isExecuting}
                   onAbort={handleAbort}
-                  contextUsage={contextUsage}
+                  showContextUsage={false}
                   project={currentProject}
                   onProjectChange={setCurrentProject}
                   onOpenSettings={(tab) => handleOpenSettings(tab || "model-settings")}
@@ -2083,6 +2083,7 @@ function AuthenticatedContent({
                     isExecuting={isExecuting}
                     onSendMessage={handleSendMessage}
                     onAbort={handleAbort}
+                    showContextUsage={true}
                     contextUsage={contextUsage}
                     metrics={conversationMetrics}
                     project={currentProject}
