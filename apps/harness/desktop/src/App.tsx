@@ -2076,7 +2076,7 @@ function AuthenticatedContent({
 
             {/* Anchored Bottom Chat Input (Hidden while awaiting approval to match screenshot) */}
             {!activeApproval && (
-              <div className="w-full px-3.5 sm:px-6 md:px-8 pb-4 pt-2 flex justify-center bg-[#f8f8f8] dark:bg-[#161616] shrink-0 min-w-0">
+              <div className="w-full px-3.5 sm:px-6 md:px-8 pb-4 pt-2 flex justify-center bg-[#f8f8f8] dark:bg-[#161616] shrink-0 min-w-0 relative z-20">
                 <div className={cn("w-full max-w-full min-w-0", streamWidthClass)}>
                   <ChatCard
                     compact

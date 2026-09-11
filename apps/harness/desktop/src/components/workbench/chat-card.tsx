@@ -762,6 +762,17 @@ export function ChatCard({
   const safePercent = isFinite(rawPercentUsed) ? Math.min(100, Math.max(0, rawPercentUsed)) : 0;
   const percentUsed = safePercent >= 1 ? Math.round(safePercent) : +safePercent.toFixed(1);
 
+  const closeAllMenus = () => {
+    setIsProjectOpen(false);
+    setIsModeOpen(false);
+    setIsModelOpen(false);
+    setIsThinkingOpen(false);
+    setIsContextOpen(false);
+    setIsPlusOpen(false);
+  };
+
+  const isAnyBottomMenuOpen = isPlusOpen || isModeOpen || isContextOpen || isModelOpen || isThinkingOpen;
+
   return (
     <div className="w-full max-w-full flex flex-col items-center gap-2 select-none min-w-0">
       {/* Unified Card */}
@@ -772,15 +783,14 @@ export function ChatCard({
       >
         {/* Top Header Strip: Choose Project (Only visible in landing view) */}
         {!compact && (
-          <div className="w-full px-3.5 pt-2 pb-1.5 flex items-center relative min-w-0">
+          <div className={cn("w-full px-3.5 pt-2 pb-1.5 flex items-center relative min-w-0 rounded-t-2xl", isProjectOpen ? "z-30" : "z-10")}>
             <div className="relative max-w-full min-w-0" ref={projectMenuRef}>
               <button
                 type="button"
                 onClick={() => {
-                  setIsProjectOpen((prev) => !prev);
-                  setIsModeOpen(false);
-                  setIsModelOpen(false);
-                  setIsContextOpen(false);
+                  const next = !isProjectOpen;
+                  closeAllMenus();
+                  setIsProjectOpen(next);
                 }}
                 className="inline-flex items-center gap-1.5 text-[13px] text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white transition-colors cursor-pointer font-sans max-w-full"
                 title={currentProject}
@@ -879,9 +889,11 @@ export function ChatCard({
 
         {/* AI Input Box: Background is #ffffff (light) / #2b2b2b (dark) with #262626 / #d4d4d4 text */}
         <div
-          className={`w-full max-w-full bg-[#ffffff] dark:bg-[#2b2b2b] rounded-2xl ${
-            compact ? "" : "border-t border-[#e2e2e4] dark:border-[#383838]"
-          } flex flex-col justify-between transition-colors focus-within:border-[#a9a9a9] dark:focus-within:border-[#555555] min-w-0 overflow-hidden`}
+          className={cn(
+            "w-full max-w-full bg-[#ffffff] dark:bg-[#2b2b2b] flex flex-col justify-between transition-colors focus-within:border-[#a9a9a9] dark:focus-within:border-[#555555] min-w-0 relative",
+            compact ? "rounded-2xl" : "rounded-b-2xl border-t border-[#e2e2e4] dark:border-[#383838]",
+            isAnyBottomMenuOpen ? "z-30" : "z-10"
+          )}
         >
           {/* Running Tasks Banner attached above input, matching Image 3 */}
           {runningTasks && runningTasks.length > 0 && (
@@ -889,6 +901,7 @@ export function ChatCard({
               tasks={runningTasks}
               onSelectTask={onSelectTask || (() => {})}
               onStopTask={onStopTask || (() => {})}
+              className={compact ? "rounded-t-2xl" : "rounded-t-none"}
             />
           )}
 
@@ -1023,11 +1036,9 @@ export function ChatCard({
                 <button
                   type="button"
                   onClick={() => {
-                    setIsPlusOpen((prev) => !prev);
-                    setIsProjectOpen(false);
-                    setIsModeOpen(false);
-                    setIsModelOpen(false);
-                    setIsContextOpen(false);
+                    const next = !isPlusOpen;
+                    closeAllMenus();
+                    setIsPlusOpen(next);
                   }}
                   className={cn(
                     "w-6 h-6 flex items-center justify-center rounded-md transition-colors cursor-pointer",
@@ -1121,11 +1132,9 @@ export function ChatCard({
                 <button
                   type="button"
                   onClick={() => {
-                    setIsModeOpen((prev) => !prev);
-                    setIsProjectOpen(false);
-                    setIsModelOpen(false);
-                    setIsContextOpen(false);
-                    setIsPlusOpen(false);
+                    const next = !isModeOpen;
+                    closeAllMenus();
+                    setIsModeOpen(next);
                   }}
                   className={`inline-flex items-center gap-1.5 px-1.5 sm:px-2 py-1 rounded-md text-[13px] font-normal transition-colors cursor-pointer shrink-0 max-w-[155px] sm:max-w-none ${
                     mode === "full_access"
@@ -1209,11 +1218,9 @@ export function ChatCard({
                 <button
                   type="button"
                   onClick={() => {
-                    setIsContextOpen((prev) => !prev);
-                    setIsModelOpen(false);
-                    setIsModeOpen(false);
-                    setIsProjectOpen(false);
-                    setIsPlusOpen(false);
+                    const next = !isContextOpen;
+                    closeAllMenus();
+                    setIsContextOpen(next);
                   }}
                   className={`w-6 h-6 flex items-center justify-center rounded-md transition-colors cursor-pointer hover:bg-black/5 dark:hover:bg-white/5 ${
                     rawPercentUsed >= 90
@@ -1256,7 +1263,7 @@ export function ChatCard({
 
                 {/* Context Window Popover */}
                 {isContextOpen && (
-                  <div className="absolute bottom-full mb-2 right-0 w-80 bg-white dark:bg-[#1e1e1e] border border-[#e2e2e4] dark:border-[#383838] rounded-2xl shadow-2xl p-4 z-50 flex flex-col gap-3 text-left select-none animate-in fade-in zoom-in-95 duration-100">
+                  <div className="absolute bottom-full mb-2 right-0 w-72 sm:w-80 max-w-[calc(100vw-32px)] bg-white dark:bg-[#1e1e1e] border border-[#e2e2e4] dark:border-[#383838] rounded-2xl shadow-2xl p-4 z-50 flex flex-col gap-3 text-left select-none animate-in fade-in zoom-in-95 duration-100">
                     {/* Header: % of context used and tokens */}
                     <div className="flex items-center justify-between text-[13px]">
                       <span className="text-[#161616] dark:text-white font-medium">
@@ -1370,15 +1377,10 @@ export function ChatCard({
                 <button
                   type="button"
                   onClick={() => {
-                    setIsModelOpen((prev) => {
-                      if (!prev) setSearchModelQuery("");
-                      return !prev;
-                    });
-                    setIsThinkingOpen(false);
-                    setIsProjectOpen(false);
-                    setIsModeOpen(false);
-                    setIsContextOpen(false);
-                    setIsPlusOpen(false);
+                    const next = !isModelOpen;
+                    closeAllMenus();
+                    if (next) setSearchModelQuery("");
+                    setIsModelOpen(next);
                   }}
                   className="inline-flex items-center gap-1 px-1.5 py-1 rounded-md text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 text-[13px] font-normal transition-colors cursor-pointer max-w-[135px] sm:max-w-[180px] md:max-w-[240px]"
                   title={selectedModel || "Manage model"}
@@ -1521,12 +1523,9 @@ export function ChatCard({
                   <button
                     type="button"
                     onClick={() => {
-                      setIsThinkingOpen((prev) => !prev);
-                      setIsModelOpen(false);
-                      setIsProjectOpen(false);
-                      setIsModeOpen(false);
-                      setIsContextOpen(false);
-                      setIsPlusOpen(false);
+                      const next = !isThinkingOpen;
+                      closeAllMenus();
+                      setIsThinkingOpen(next);
                     }}
                     className="inline-flex items-center gap-1 px-1.5 py-1 rounded-md text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 text-[13px] font-normal transition-colors cursor-pointer shrink-0"
                     title={`Thinking effort: ${thinkingLevel}`}

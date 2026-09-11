@@ -1,5 +1,6 @@
-﻿import React, { useState } from "react";
+import React, { useState } from "react";
 import { Loader2, ChevronDown, Square } from "lucide-react";
+import { cn } from "@const/ui";
 import type { BackgroundTaskItem } from "../../vite-env";
 
 export interface AttachedTaskBannerProps {
@@ -21,7 +22,10 @@ export function AttachedTaskBanner({
 
   return (
     <div
-      className={`w-full bg-[#1e1e1e] border-b border-[#333333] px-3.5 py-2 select-none font-sans text-xs flex flex-col gap-1.5 rounded-t-2xl transition-all ${className}`}
+      className={cn(
+        "w-full bg-[#1e1e1e] border-b border-[#333333] px-3.5 py-2 select-none font-sans text-xs flex flex-col gap-1.5 rounded-t-2xl transition-all",
+        className
+      )}
     >
       {/* Header matching Image 3: "1 task running ⌄" */}
       <div
