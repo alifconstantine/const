@@ -417,19 +417,6 @@ function AuthenticatedContent({
     messagesRef.current = messages;
   }, [messages]);
 
-  // Listen for default mode changes from SettingsView
-  useEffect(() => {
-    const handleDefaultModeChanged = (e: any) => {
-      if (messages.length === 0) {
-        setCurrentMode(e.detail || getDefaultAgentMode());
-      }
-    };
-    window.addEventListener("const:default-mode-changed", handleDefaultModeChanged as EventListener);
-    return () => {
-      window.removeEventListener("const:default-mode-changed", handleDefaultModeChanged as EventListener);
-    };
-  }, [messages.length]);
-
   const [sidebarReviewMutations, setSidebarReviewMutations] = useState<FileMutationRecord[] | null>(null);
 
   const allSessionMutations = useMemo(() => {
