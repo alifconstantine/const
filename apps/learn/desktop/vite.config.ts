@@ -14,6 +14,13 @@ export default defineConfig({
           build: {
             outDir: "dist-electron",
           },
+          resolve: {
+            alias: {
+              "@const/agent/models": path.resolve(__dirname, "../../../packages/agent/src/const/models.ts"),
+              "@const/agent/types": path.resolve(__dirname, "../../../packages/agent/src/const/types.ts"),
+              "@const/agent": path.resolve(__dirname, "../../../packages/agent/src/const/index.ts"),
+            },
+          },
         },
       },
       {
@@ -32,6 +39,9 @@ export default defineConfig({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      "@const/agent/models": path.resolve(__dirname, "../../../packages/agent/src/const/models.ts"),
+      "@const/agent/types": path.resolve(__dirname, "../../../packages/agent/src/const/types.ts"),
+      "@const/agent": path.resolve(__dirname, "../../../packages/agent/src/const/index.ts"),
     },
   },
 });
