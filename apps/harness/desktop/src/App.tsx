@@ -30,7 +30,7 @@ import { ChatIndicator } from "./components/workbench/chat-indicator";
 import { ImageLightbox } from "./components/workbench/image-lightbox";
 import { MarkdownContent } from "./components/workbench/markdown-content";
 import { ExecutionTrace, MutationsSummaryCard } from "./components/workbench/execution-trace";
-import { ApprovalCard } from "./components/workbench/approval-card";
+import { ApprovalCard, SmoothCardMorph } from "./components/workbench/approval-card";
 import { ReviewDialog } from "./components/workbench/review-dialog";
 import { RenameTaskDialog } from "./components/workbench/rename-task-dialog";
 import { TrajectoryDialog } from "./components/workbench/trajectory-dialog";
@@ -2006,24 +2006,6 @@ function AuthenticatedContent({
                           onAnswerQuestion={handleAnswerQuestion}
                         />
 
-                        {/* Interactive Approval Card rendered inline below trace matching screenshot */}
-                        {isExecuting && idx === messages.length - 1 && activeApproval && (
-                          <div className="mt-2 w-full animate-in fade-in slide-in-from-bottom-2 duration-200">
-                            <ApprovalCard
-                              request={activeApproval}
-                              project={currentProject}
-                              isResponding={isRespondingApproval}
-                              onDecide={(decision, feedback) =>
-                                handleRespondApproval(
-                                  activeApproval.id || activeApproval.approvalId!,
-                                  decision,
-                                  feedback
-                                )
-                              }
-                            />
-                          </div>
-                        )}
-
                         {/* Formatted Markdown Content */}
                         {msg.content ? (
                           <div className="px-0.5">
@@ -2096,60 +2078,69 @@ function AuthenticatedContent({
               </div>
             </ScrollArea>
 
-            {/* Floating Scroll to Bottom Button when ChatCard is hidden by activeApproval */}
-            {activeApproval && showScrollBottomBtn && (
-              <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-30 pointer-events-auto">
-                <button
-                  type="button"
-                  onClick={scrollToBottom}
-                  className="w-8 h-8 rounded-full bg-white dark:bg-[#252528] hover:bg-[#f4f4f5] dark:hover:bg-[#323236] border border-[#e2e2e4] dark:border-[#383838] shadow-md text-[#555555] hover:text-[#171717] dark:text-[#d4d4d4] dark:hover:text-white transition-all flex items-center justify-center animate-in fade-in zoom-in-95 duration-150 cursor-pointer"
-                  title="Scroll to bottom"
-                  aria-label="Scroll to bottom"
+            {/* Anchored Bottom Card: Swapped with SmoothCardMorph between ChatCard and ApprovalCard */}
+            <div className="w-full px-3.5 sm:px-6 md:px-8 pb-4 pt-2 flex justify-center bg-[#f8f8f8] dark:bg-[#161616] shrink-0 min-w-0 relative z-20">
+              <div className={cn("w-full max-w-full min-w-0 relative", streamWidthClass)}>
+                {/* Floating Scroll to Bottom Button directly above Bottom Card */}
+                {showScrollBottomBtn && (
+                  <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 z-30 pointer-events-auto">
+                    <button
+                      type="button"
+                      onClick={scrollToBottom}
+                      className="w-8 h-8 rounded-full bg-white dark:bg-[#252528] hover:bg-[#f4f4f5] dark:hover:bg-[#323236] border border-[#e2e2e4] dark:border-[#383838] shadow-md text-[#555555] hover:text-[#171717] dark:text-[#d4d4d4] dark:hover:text-white transition-all flex items-center justify-center animate-in fade-in zoom-in-95 duration-150 cursor-pointer"
+                      title="Scroll to bottom"
+                      aria-label="Scroll to bottom"
+                    >
+                      <ChevronDown className="w-4 h-4 stroke-[2.5]" />
+                    </button>
+                  </div>
+                )}
+
+                <SmoothCardMorph
+                  activeKey={
+                    activeApproval
+                      ? `approval_${activeApproval.id || activeApproval.approvalId || "active"}`
+                      : "chat"
+                  }
                 >
-                  <ChevronDown className="w-4 h-4 stroke-[2.5]" />
-                </button>
-              </div>
-            )}
-
-            {/* Anchored Bottom Chat Input (Hidden while awaiting approval to match screenshot) */}
-            {!activeApproval && (
-              <div className="w-full px-3.5 sm:px-6 md:px-8 pb-4 pt-2 flex justify-center bg-[#f8f8f8] dark:bg-[#161616] shrink-0 min-w-0 relative z-20">
-                <div className={cn("w-full max-w-full min-w-0 relative", streamWidthClass)}>
-                  {/* Floating Scroll to Bottom Button directly above Chat Input */}
-                  {showScrollBottomBtn && (
-                    <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 z-30 pointer-events-auto">
-                      <button
-                        type="button"
-                        onClick={scrollToBottom}
-                        className="w-8 h-8 rounded-full bg-white dark:bg-[#252528] hover:bg-[#f4f4f5] dark:hover:bg-[#323236] border border-[#e2e2e4] dark:border-[#383838] shadow-md text-[#555555] hover:text-[#171717] dark:text-[#d4d4d4] dark:hover:text-white transition-all flex items-center justify-center animate-in fade-in zoom-in-95 duration-150 cursor-pointer"
-                        title="Scroll to bottom"
-                        aria-label="Scroll to bottom"
-                      >
-                        <ChevronDown className="w-4 h-4 stroke-[2.5]" />
-                      </button>
-                    </div>
+                  {activeApproval ? (
+                    <ApprovalCard
+                      request={activeApproval}
+                      project={currentProject}
+                      isResponding={isRespondingApproval}
+                      runningTasks={runningTasks}
+                      onSelectTask={handleSelectRunningTask}
+                      onStopTask={handleStopBackgroundTask}
+                      onDecide={(decision, feedback) =>
+                        handleRespondApproval(
+                          activeApproval.id || activeApproval.approvalId!,
+                          decision,
+                          feedback
+                        )
+                      }
+                    />
+                  ) : (
+                    <ChatCard
+                      compact
+                      isExecuting={isExecuting}
+                      onSendMessage={handleSendMessage}
+                      onAbort={handleAbort}
+                      showContextUsage={true}
+                      contextUsage={contextUsage}
+                      metrics={conversationMetrics}
+                      project={currentProject}
+                      onProjectChange={setCurrentProject}
+                      onOpenSettings={(tab) => handleOpenSettings(tab || "model-settings")}
+                      initialPrompt={editingPrompt}
+                      onModelChange={setActiveModelItem}
+                      runningTasks={runningTasks}
+                      onSelectTask={handleSelectRunningTask}
+                      onStopTask={handleStopBackgroundTask}
+                    />
                   )}
-
-                  <ChatCard
-                    compact
-                    isExecuting={isExecuting}
-                    onSendMessage={handleSendMessage}
-                    onAbort={handleAbort}
-                    showContextUsage={true}
-                    contextUsage={contextUsage}
-                    metrics={conversationMetrics}
-                    project={currentProject}
-                    onProjectChange={setCurrentProject}
-                    onOpenSettings={(tab) => handleOpenSettings(tab || "model-settings")}
-                    initialPrompt={editingPrompt}
-                    onModelChange={setActiveModelItem}
-                    runningTasks={runningTasks}
-                    onSelectTask={handleSelectRunningTask}
-                    onStopTask={handleStopBackgroundTask}
-                  />
-                </div>
+                </SmoothCardMorph>
               </div>
-            )}
+            </div>
           </div>
         )}
               </div>

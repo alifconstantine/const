@@ -23,14 +23,14 @@ export function AttachedTaskBanner({
   return (
     <div
       className={cn(
-        "w-full bg-[#1e1e1e] border-b border-[#333333] px-3.5 py-2 select-none font-sans text-xs flex flex-col gap-1.5 rounded-t-2xl transition-all",
+        "w-full bg-[#f8f8f8] dark:bg-[#252525] border-b border-[#e2e2e4] dark:border-[#383838] px-3.5 py-2 select-none font-sans text-xs flex flex-col gap-1.5 rounded-t-2xl transition-all",
         className
       )}
     >
       {/* Header matching Image 3: "1 task running ⌄" */}
       <div
         onClick={() => setIsExpanded((prev) => !prev)}
-        className="flex items-center justify-between text-neutral-400 hover:text-neutral-200 cursor-pointer py-0.5"
+        className="flex items-center justify-between text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 cursor-pointer py-0.5"
       >
         <span className="font-medium text-xs">
           {tasks.length} {tasks.length === 1 ? "task running" : "tasks running"}
@@ -51,12 +51,12 @@ export function AttachedTaskBanner({
               <div
                 key={task.id}
                 onClick={() => onSelectTask(task)}
-                className="group flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-[#252525] hover:bg-[#2e2e2e] border border-transparent hover:border-[#383838] cursor-pointer transition-colors"
+                className="group flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-white dark:bg-[#1e1e1e] hover:bg-neutral-100 dark:hover:bg-[#2b2b2b] border border-[#e2e2e4] dark:border-[#383838] cursor-pointer transition-colors"
                 title="Click to view live logs in sidebar"
               >
                 <div className="flex items-center gap-2.5 min-w-0 flex-1">
                   {isRunning ? (
-                    <Loader2 className="w-3.5 h-3.5 text-blue-400 animate-spin shrink-0" />
+                    <Loader2 className="w-3.5 h-3.5 text-blue-500 dark:text-blue-400 animate-spin shrink-0" />
                   ) : (
                     <span className="w-2 h-2 rounded-full bg-neutral-500 shrink-0" />
                   )}
