@@ -876,7 +876,13 @@ app.whenReady().then(() => {
       payload: {
         conversationId: string;
         approvalId: string;
-        decision: "allow_once" | "allow_always" | "deny" | "skip";
+        decision:
+          | "allow_once"
+          | "allow_conversation"
+          | "allow_project"
+          | "allow_always"
+          | "deny"
+          | "skip";
         feedback?: string;
       }
     ) => {

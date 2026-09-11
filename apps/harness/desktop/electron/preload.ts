@@ -43,7 +43,7 @@ contextBridge.exposeInMainWorld("electron", {
   respondApproval: (payload: {
     conversationId: string;
     approvalId: string;
-    decision: "allow_once" | "allow_always" | "deny" | "skip";
+    decision: "allow_once" | "allow_conversation" | "allow_project" | "allow_always" | "deny" | "skip";
     feedback?: string;
   }) => ipcRenderer.invoke("agent:respond-approval", payload),
   getRunningSessions: () => ipcRenderer.invoke("agent:get-running-sessions"),

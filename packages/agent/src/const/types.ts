@@ -37,7 +37,13 @@ export interface ModelConfig {
 
 import type { FileMutationRecord } from "./mutation-ledger.js";
 
-export type ApprovalDecision = "allow_once" | "allow_always" | "deny" | "skip";
+export type ApprovalDecision =
+  | "allow_once"
+  | "allow_conversation"
+  | "allow_project"
+  | "allow_always"
+  | "deny"
+  | "skip";
 
 export interface ApprovalRequestData {
   approvalId: string;

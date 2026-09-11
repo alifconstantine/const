@@ -2011,6 +2011,7 @@ function AuthenticatedContent({
                           <div className="mt-2 w-full animate-in fade-in slide-in-from-bottom-2 duration-200">
                             <ApprovalCard
                               request={activeApproval}
+                              project={currentProject}
                               isResponding={isRespondingApproval}
                               onDecide={(decision, feedback) =>
                                 handleRespondApproval(

@@ -1177,7 +1177,11 @@ export class ConstAgent {
               decision: userResponse.decision,
             });
 
-            if (userResponse.decision === "allow_always") {
+            if (
+              userResponse.decision === "allow_always" ||
+              userResponse.decision === "allow_conversation" ||
+              userResponse.decision === "allow_project"
+            ) {
               if (cmd && cmd.trim()) {
                 this.sessionAllowedTools.add(`cmd:${cmd.trim()}`);
               } else {

@@ -317,7 +317,7 @@ export function ExecutionTrace({
           })}
 
           {/* Active executing spinner */}
-          {isExecuting && (
+          {isExecuting && !pendingApprovalToolCallId && (
             <div className="flex items-center gap-2 text-xs text-[#a9a9a9] dark:text-[#777777] py-1">
               <Loader2 className="w-3 h-3 animate-spin text-[#e79737] dark:text-[#ff7a00]" />
               <span>Working...</span>
@@ -532,7 +532,7 @@ function TerminalCard({
           <ScrollArea className="max-h-60 w-full">
             {isWaitingApproval ? (
               <div className="text-[#888888] flex items-center gap-1.5 text-xs py-0.5 font-sans">
-                <span>Waiting for user input.</span>
+                <span>Waiting for user input...</span>
               </div>
             ) : tool.result === undefined ? (
               <div className="text-[#e79737] dark:text-[#ff7a00] flex items-center gap-1.5 text-xs italic py-0.5">

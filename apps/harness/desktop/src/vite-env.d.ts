@@ -36,7 +36,13 @@ export interface TraceStep {
   mutation?: FileMutationRecord;
 }
 
-export type ApprovalDecision = "allow_once" | "allow_always" | "deny" | "skip";
+export type ApprovalDecision =
+  | "allow_once"
+  | "allow_conversation"
+  | "allow_project"
+  | "allow_always"
+  | "deny"
+  | "skip";
 
 export interface ApprovalRequestData {
   id: string;
@@ -219,7 +225,7 @@ declare global {
       respondApproval?: (payload: {
         conversationId: string;
         approvalId: string;
-        decision: "allow_once" | "allow_always" | "deny" | "skip";
+        decision: ApprovalDecision;
         feedback?: string;
       }) => Promise<{ success: boolean; error?: string }>;
       getRunningSessions?: () => Promise<string[]>;
