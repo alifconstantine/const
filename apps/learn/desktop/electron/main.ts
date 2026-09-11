@@ -115,8 +115,8 @@ app.on("second-instance", (_event, commandLine) => {
       },
     });
 
-    win.webContents.on("console-message", (_event, level, message, line, sourceId) => {
-      console.log(`[Renderer Console - L${level}] ${message} (${sourceId}:${line})`);
+    win.webContents.on("console-message", (event) => {
+      console.log(`[Renderer Console - L${event.level}] ${event.message} (${event.sourceId}:${event.lineNumber})`);
     });
 
     win.webContents.on("did-fail-load", (_event, errorCode, errorDescription, validatedURL) => {
