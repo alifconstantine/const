@@ -1,9 +1,12 @@
 import React, { useRef } from "react";
-import { FileText, MessageSquare, Globe, RotateCcw } from "lucide-react";
+import { MessageSquare, Globe } from "lucide-react";
 import { TabHeader } from "./tab-header";
 import { OpenTabView } from "./open-tab-view";
 import { TerminalTab } from "./terminal-tab";
 import { TaskOutputTab } from "./task-output-tab";
+import { ReviewTab } from "./review-tab";
+import { FileDiffTab } from "./file-diff-tab";
+import { FilePreviewTab } from "./file-preview-tab";
 import type { RightPaneTab, RightPaneTabType } from "./types";
 import type { FileMutationRecord } from "../../vite-env";
 
@@ -18,9 +21,12 @@ interface RightPaneProps {
   onNewTab: () => void;
   onOpenTabType: (type: RightPaneTabType) => void;
   onReorderTabs?: (fromIndex: number, toIndex: number) => void;
+  onToggleSidebar?: () => void;
   workspacePath?: string;
   mutations?: FileMutationRecord[];
   onRollbackFile?: (record: FileMutationRecord) => Promise<any> | void;
+  onRollbackAll?: (records: FileMutationRecord[]) => Promise<any> | void;
+  onOpenFileDiff?: (record: FileMutationRecord) => void;
   onStopTask?: (taskId: string) => void;
 }
 
@@ -35,9 +41,12 @@ export function RightPane({
   onNewTab,
   onOpenTabType,
   onReorderTabs,
+  onToggleSidebar,
   workspacePath,
   mutations,
   onRollbackFile,
+  onRollbackAll,
+  onOpenFileDiff,
   onStopTask,
 }: RightPaneProps) {
   const isDraggingRef = useRef(false);
@@ -97,6 +106,7 @@ export function RightPane({
         onCloseTab={onCloseTab}
         onNewTab={onNewTab}
         onReorderTabs={onReorderTabs}
+        onToggleSidebar={onToggleSidebar}
       />
 
       {/* Main Tab Body */}
@@ -111,63 +121,27 @@ export function RightPane({
           /* Background Task Output Tab */
           <TaskOutputTab key={activeTab.id} tab={activeTab} onStopTask={onStopTask} />
         ) : activeTab.type === "review" ? (
-          /* Review Changes Tab */
-          <div className="flex-1 w-full h-full p-4 overflow-y-auto text-white flex flex-col">
-            <div className="flex items-center justify-between pb-3 mb-3 border-b border-[#282828]">
-              <div className="flex items-center gap-2">
-                <FileText className="w-4 h-4 text-neutral-400" />
-                <h3 className="text-sm font-medium text-neutral-200">Review Changes</h3>
-              </div>
-              <span className="text-xs text-neutral-500">
-                {mutations?.length || 0} modified files
-              </span>
-            </div>
-
-            {!mutations || mutations.length === 0 ? (
-              <div className="flex-1 flex flex-col items-center justify-center text-center p-6 text-neutral-500">
-                <FileText className="w-8 h-8 mb-2 opacity-40" />
-                <p className="text-xs">No pending file modifications in this session.</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {mutations.map((m, idx) => (
-                  <div
-                    key={m.id || idx}
-                    className="p-3 rounded-lg bg-[#1e1e1e] border border-[#2e2e2e] flex flex-col gap-2"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <span className="text-xs font-mono font-medium text-neutral-200 truncate">
-                          {m.filePath}
-                        </span>
-                        <span
-                          className={`text-[10px] px-1.5 py-0.5 rounded font-mono uppercase ${
-                            m.operation === "create"
-                              ? "bg-green-500/10 text-green-400 border border-green-500/20"
-                              : m.operation === "delete"
-                              ? "bg-red-500/10 text-red-400 border border-red-500/20"
-                              : "bg-blue-500/10 text-blue-400 border border-blue-500/20"
-                          }`}
-                        >
-                          {m.operation}
-                        </span>
-                      </div>
-                      {onRollbackFile && (
-                        <button
-                          type="button"
-                          onClick={() => onRollbackFile(m)}
-                          className="p-1 rounded hover:bg-white/10 text-neutral-400 hover:text-white transition-colors cursor-pointer"
-                          title="Revert file"
-                        >
-                          <RotateCcw className="w-3.5 h-3.5" />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          /* Review Changes Tab matching Image 3 */
+          <ReviewTab
+            key={activeTab.id}
+            mutations={mutations}
+            onRollbackFile={onRollbackFile}
+            onRollbackAll={onRollbackAll}
+            onOpenFileDiff={onOpenFileDiff}
+          />
+        ) : activeTab.type === "file_diff" ? (
+          /* Single File Diff Tab matching Image 1 & Image 4 */
+          <FileDiffTab
+            key={activeTab.id}
+            tab={activeTab}
+            onRollbackFile={onRollbackFile}
+          />
+        ) : activeTab.type === "file_preview" ? (
+          /* File Preview Tab (Markdown rendered / Code viewer) matching Image 2 */
+          <FilePreviewTab
+            key={activeTab.id}
+            tab={activeTab}
+          />
         ) : activeTab.type === "side_conversation" ? (
           /* Side Conversation Tab */
           <div className="flex-1 w-full h-full p-4 text-white flex flex-col items-center justify-center text-center">

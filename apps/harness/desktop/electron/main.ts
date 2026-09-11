@@ -1149,6 +1149,27 @@ app.whenReady().then(() => {
     }
   });
 
+  ipcMain.handle("workspace:read-file", async (_event, filePath: string) => {
+    if (!filePath) return { error: "Path is required" };
+    try {
+      if (!fs.existsSync(filePath)) {
+        return { error: "File not found" };
+      }
+      const stat = fs.statSync(filePath);
+      if (stat.isDirectory()) {
+        return { error: "Path is a directory" };
+      }
+      if (stat.size > 3 * 1024 * 1024) {
+        const content = fs.readFileSync(filePath, "utf-8");
+        return { content: content.slice(0, 500000), truncated: true };
+      }
+      const content = fs.readFileSync(filePath, "utf-8");
+      return { content, truncated: false };
+    } catch (err: any) {
+      return { error: err?.message || String(err) };
+    }
+  });
+
   // ---------------------------------------------------------------------------
   // Scheduled Tasks Manager & IPC Handlers
   // ---------------------------------------------------------------------------

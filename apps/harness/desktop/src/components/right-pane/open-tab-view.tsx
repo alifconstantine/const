@@ -1,9 +1,9 @@
-import React from "react";
 import {
   MessageSquare,
   FileText,
   SquareTerminal,
   Globe,
+  Layers,
 } from "lucide-react";
 import type { RightPaneTabType } from "./types";
 
@@ -19,19 +19,19 @@ interface TabOption {
 
 const TAB_OPTIONS: TabOption[] = [
   {
-    type: "side_conversation",
-    title: "Side conversation",
-    icon: MessageSquare,
-  },
-  {
     type: "review",
-    title: "Review",
-    icon: FileText,
+    title: "Review changes",
+    icon: Layers,
   },
   {
     type: "terminal",
     title: "Terminal",
     icon: SquareTerminal,
+  },
+  {
+    type: "side_conversation",
+    title: "Side chat",
+    icon: MessageSquare,
   },
   {
     type: "browser",

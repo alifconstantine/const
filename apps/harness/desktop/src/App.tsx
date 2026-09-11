@@ -452,6 +452,125 @@ function AuthenticatedContent({
     };
   }, [messages.length]);
 
+  const [sidebarReviewMutations, setSidebarReviewMutations] = useState<FileMutationRecord[] | null>(null);
+
+  const allSessionMutations = useMemo(() => {
+    const list: FileMutationRecord[] = [];
+    for (const msg of messages) {
+      if (msg.mutations) {
+        list.push(...msg.mutations);
+      }
+    }
+    return list;
+  }, [messages]);
+
+  const handleOpenFileDiff = (mutation: FileMutationRecord) => {
+    setIsRightSidebarOpen(true);
+    const filePath = mutation.filePath || mutation.targetFile;
+    const fileName =
+      filePath.replace(/\\/g, "/").split("/").filter(Boolean).pop() ||
+      filePath ||
+      "Diff";
+
+    const existing = rightPaneTabs.find(
+      (t) =>
+        t.type === "file_diff" &&
+        (t.filePath === filePath ||
+          t.mutation?.targetFile === mutation.targetFile ||
+          t.title === fileName)
+    );
+
+    if (existing) {
+      setRightPaneTabs((prev) =>
+        prev.map((t) =>
+          t.id === existing.id
+            ? {
+                ...t,
+                mutation,
+                filePath,
+                previousContent: mutation.previousContent,
+                newContent: mutation.newContent,
+              }
+            : t
+        )
+      );
+      setActiveRightPaneTabId(existing.id);
+      setIsOpeningNewTab(false);
+      return;
+    }
+
+    const newTab: RightPaneTab = {
+      id: `diff_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      type: "file_diff",
+      title: fileName,
+      filePath,
+      mutation,
+      previousContent: mutation.previousContent,
+      newContent: mutation.newContent,
+    };
+    setRightPaneTabs((prev) => [...prev, newTab]);
+    setActiveRightPaneTabId(newTab.id);
+    setIsOpeningNewTab(false);
+  };
+
+  const handleOpenFilePreview = (filePath: string, content?: string) => {
+    setIsRightSidebarOpen(true);
+    const fileName =
+      filePath.replace(/\\/g, "/").split("/").filter(Boolean).pop() ||
+      filePath ||
+      "Preview";
+
+    const existing = rightPaneTabs.find(
+      (t) => t.type === "file_preview" && (t.filePath === filePath || t.title === fileName)
+    );
+
+    if (existing) {
+      if (content !== undefined) {
+        setRightPaneTabs((prev) =>
+          prev.map((t) =>
+            t.id === existing.id ? { ...t, filePath, newContent: content } : t
+          )
+        );
+      }
+      setActiveRightPaneTabId(existing.id);
+      setIsOpeningNewTab(false);
+      return;
+    }
+
+    const newTab: RightPaneTab = {
+      id: `preview_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      type: "file_preview",
+      title: fileName,
+      filePath,
+      newContent: content,
+    };
+    setRightPaneTabs((prev) => [...prev, newTab]);
+    setActiveRightPaneTabId(newTab.id);
+    setIsOpeningNewTab(false);
+  };
+
+  const handleOpenReview = (mutationsToReview?: FileMutationRecord[]) => {
+    setIsRightSidebarOpen(true);
+    if (mutationsToReview && mutationsToReview.length > 0) {
+      setSidebarReviewMutations(mutationsToReview);
+    }
+    const existing = rightPaneTabs.find((t) => t.type === "review");
+    if (existing) {
+      setActiveRightPaneTabId(existing.id);
+      setIsOpeningNewTab(false);
+      return;
+    }
+
+    const newTab: RightPaneTab = {
+      id: `review_${Date.now()}`,
+      type: "review",
+      title: "Review",
+    };
+    setRightPaneTabs((prev) => [...prev, newTab]);
+    setActiveRightPaneTabId(newTab.id);
+    setIsOpeningNewTab(false);
+  };
+
   const conversationsRef = React.useRef(conversations);
   useEffect(() => {
     conversationsRef.current = conversations;
@@ -2129,6 +2248,9 @@ function AuthenticatedContent({
                           onRollback={handleRollback}
                           onRollbackAll={handleRollbackAll}
                           onAnswerQuestion={handleAnswerQuestion}
+                          onOpenFileDiff={handleOpenFileDiff}
+                          onOpenFilePreview={handleOpenFilePreview}
+                          onOpenReview={() => handleOpenReview(msg.mutations)}
                         />
 
                         {/* Formatted Markdown Content */}
@@ -2145,7 +2267,8 @@ function AuthenticatedContent({
                             isExecuting={false}
                             onRollback={handleRollback}
                             onRollbackAll={handleRollbackAll}
-                            onOpenReview={() => setReviewingMutations(msg.mutations || null)}
+                            onOpenReview={() => handleOpenReview(msg.mutations)}
+                            onOpenFileDiff={handleOpenFileDiff}
                           />
                         )}
 
@@ -2297,9 +2420,16 @@ function AuthenticatedContent({
                   onNewTab={handleNewTab}
                   onOpenTabType={handleOpenTabType}
                   onReorderTabs={handleReorderTabs}
+                  onToggleSidebar={handleToggleRightSidebar}
                   workspacePath={currentProject === "Outside Project" ? undefined : currentProject}
-                  mutations={reviewingMutations || undefined}
+                  mutations={
+                    sidebarReviewMutations && sidebarReviewMutations.length > 0
+                      ? sidebarReviewMutations
+                      : allSessionMutations
+                  }
                   onRollbackFile={handleRollback}
+                  onRollbackAll={handleRollbackAll}
+                  onOpenFileDiff={handleOpenFileDiff}
                   onStopTask={handleStopBackgroundTask}
                 />
               )}

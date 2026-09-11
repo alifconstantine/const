@@ -39,6 +39,8 @@ export interface ExecutionTraceProps {
   onRollback?: (record: FileMutationRecord) => void;
   onRollbackAll?: (records: FileMutationRecord[]) => void;
   onOpenReview?: () => void;
+  onOpenFileDiff?: (record: FileMutationRecord) => void;
+  onOpenFilePreview?: (filePath: string, content?: string) => void;
   onAnswerQuestion?: (toolCallId: string, answer: any) => void;
 }
 
@@ -83,6 +85,8 @@ export function ExecutionTrace({
   onRollback,
   onRollbackAll,
   onOpenReview,
+  onOpenFileDiff,
+  onOpenFilePreview,
   onAnswerQuestion,
 }: ExecutionTraceProps) {
   // Default: Open while executing to view progress live; automatically closed when worked/finished
@@ -265,6 +269,7 @@ export function ExecutionTrace({
                     key={step.id || `mut_${idx}`}
                     tool={step}
                     mutations={mutations}
+                    onOpenFileDiff={onOpenFileDiff}
                   />
                 );
               }
@@ -288,6 +293,7 @@ export function ExecutionTrace({
                     key={step.id || `exp_${idx}`}
                     tool={step}
                     mutations={mutations}
+                    onOpenFilePreview={onOpenFilePreview}
                   />
                 );
               }
@@ -317,6 +323,7 @@ export function ExecutionTrace({
           onRollback={onRollback}
           onRollbackAll={onRollbackAll}
           onOpenReview={onOpenReview}
+          onOpenFileDiff={onOpenFileDiff}
         />
       )}
     </div>
@@ -634,12 +641,12 @@ function TerminalCard({
 function FileMutationToolItem({
   tool,
   mutations,
+  onOpenFileDiff,
 }: {
   tool: TraceToolCall | TraceStep;
   mutations: FileMutationRecord[];
+  onOpenFileDiff?: (record: FileMutationRecord) => void;
 }) {
-  const [isOpen, setIsOpen] = useState(false);
-
   let targetArg = "";
   if (tool.args) {
     if (typeof tool.args === "string") {
@@ -671,17 +678,23 @@ function FileMutationToolItem({
 
   const diffStats = matched ? getMutationDiffStats(matched) : null;
 
+  const handleClick = () => {
+    if (matched && onOpenFileDiff) {
+      onOpenFileDiff(matched);
+    }
+  };
+
   return (
     <div className="w-full min-w-0 flex flex-col my-0.5">
       <div
-        onClick={() => diffStats && setIsOpen((prev) => !prev)}
+        onClick={handleClick}
         className={`flex items-center justify-between py-1 px-1.5 rounded-md hover:bg-white/5 transition-colors text-[13px] min-w-0 select-none ${
-          diffStats ? "cursor-pointer" : ""
+          matched && onOpenFileDiff ? "cursor-pointer group" : ""
         }`}
       >
         <div className="flex items-center gap-2 min-w-0 pr-2">
           <FileIcon filename={fileName} />
-          <span className="text-[#d4d4d4] truncate font-sans">{fileName}</span>
+          <span className="text-[#d4d4d4] group-hover:text-white truncate font-sans">{fileName}</span>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {diffStats && (diffStats.added > 0 || diffStats.removed > 0) && (
@@ -690,29 +703,21 @@ function FileMutationToolItem({
               <span className="text-[#ff5c5c]">-{diffStats.removed}</span>
             </div>
           )}
-          {diffStats && (
-            <ChevronDown
-              className="w-3 h-3 text-[#666666] transition-transform duration-200 ease-out"
-              style={{ transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)" }}
-            />
+          {matched && onOpenFileDiff && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenFileDiff(matched);
+              }}
+              className="flex items-center gap-1 px-2 py-0.5 rounded bg-black/5 hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10 text-[11px] text-[#555555] dark:text-[#a0a0a0] hover:text-black dark:hover:text-white border border-[#d5d5d9] dark:border-[#333333] transition-colors cursor-pointer"
+              title="Open diff in sidebar"
+            >
+              <span>Open Diff</span>
+            </button>
           )}
         </div>
       </div>
-
-      {matched && (
-        <SmoothCollapse isOpen={isOpen}>
-          <div className="mt-1 p-2 rounded-xl bg-[#0e0e10] border border-[#232328] text-xs font-mono select-text">
-            <div className="text-[#888888] text-[11px] mb-1">
-              Operation: <span className="uppercase text-[#d4d4d4]">{matched.operation}</span>
-            </div>
-            {matched.newContent && (
-              <ScrollArea className="max-h-40 w-full text-[11.5px] text-[#999999]">
-                <pre className="whitespace-pre-wrap">{matched.newContent.slice(0, 1000)}</pre>
-              </ScrollArea>
-            )}
-          </div>
-        </SmoothCollapse>
-      )}
     </div>
   );
 }
@@ -723,9 +728,11 @@ function FileMutationToolItem({
 function ExplorationItem({
   tool,
   mutations,
+  onOpenFilePreview,
 }: {
   tool: TraceToolCall | TraceStep;
   mutations: FileMutationRecord[];
+  onOpenFilePreview?: (filePath: string, content?: string) => void;
 }) {
   const [isOpen, setIsOpen] = useState(false);
   const norm = (tool.name || "").toLowerCase().replace(/[-_]/g, "");
@@ -835,20 +842,45 @@ function ExplorationItem({
   return (
     <div className="w-full min-w-0 flex flex-col my-0.5">
       <div
-        onClick={() => hasResult && setIsOpen((prev) => !prev)}
+        onClick={() => {
+          if (onOpenFilePreview && targetArg) {
+            onOpenFilePreview(
+              targetArg,
+              typeof tool.result === "string" ? tool.result : undefined
+            );
+          } else if (hasResult) {
+            setIsOpen((prev) => !prev);
+          }
+        }}
         className={`flex items-center justify-between py-1 px-1.5 rounded-md hover:bg-white/5 text-[13px] text-[#888888] min-w-0 select-none ${
-          hasResult ? "cursor-pointer" : ""
+          (onOpenFilePreview && targetArg) || hasResult ? "cursor-pointer group" : ""
         }`}
       >
         <div className="flex items-center gap-2 min-w-0 pr-2">
           <FileIcon filename={fileName} />
-          <span className="text-[#d4d4d4] truncate font-sans">{fileName}</span>
+          <span className="text-[#d4d4d4] group-hover:text-white truncate font-sans">{fileName}</span>
           {lineRange && (
             <span className="text-xs text-[#666666] shrink-0 font-mono">{lineRange}</span>
           )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          {hasResult && (
+          {onOpenFilePreview && targetArg && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenFilePreview(
+                  targetArg,
+                  typeof tool.result === "string" ? tool.result : undefined
+                );
+              }}
+              className="flex items-center gap-1 px-2 py-0.5 rounded bg-black/5 hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10 text-[11px] text-[#555555] dark:text-[#a0a0a0] hover:text-black dark:hover:text-white border border-[#d5d5d9] dark:border-[#333333] transition-colors cursor-pointer"
+              title="Preview file in sidebar"
+            >
+              <span>Preview</span>
+            </button>
+          )}
+          {!onOpenFilePreview && hasResult && (
             <ChevronDown
               className="w-3 h-3 text-[#666666] transition-transform duration-200 ease-out"
               style={{ transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)" }}
@@ -857,7 +889,7 @@ function ExplorationItem({
         </div>
       </div>
 
-      {hasResult && (
+      {!onOpenFilePreview && hasResult && (
         <SmoothCollapse isOpen={isOpen}>
           <div className="mt-1 p-2 rounded-xl bg-[#0e0e10] border border-[#232328] text-xs font-mono select-text">
             <ScrollArea className="max-h-40 w-full text-[11px] text-[#999999]">
@@ -907,12 +939,14 @@ export function MutationsSummaryCard({
   onRollback,
   onRollbackAll,
   onOpenReview,
+  onOpenFileDiff,
 }: {
   mutations: FileMutationRecord[];
   isExecuting?: boolean;
   onRollback?: (record: FileMutationRecord) => void;
   onRollbackAll?: (records: FileMutationRecord[]) => void;
   onOpenReview?: () => void;
+  onOpenFileDiff?: (record: FileMutationRecord) => void;
 }) {
   // Default: Open while executing, automatically closes when finished
   const [isOpen, setIsOpen] = useState(isExecuting);
@@ -992,14 +1026,14 @@ export function MutationsSummaryCard({
             <ScrollArea className="max-h-60 w-full pr-1" viewportClassName="[&>div[style]]:!block">
               <div className="flex flex-col gap-0.5">
                 {mutations.map((mut) => (
-                  <MutationRowItem key={mut.id} mut={mut} onRollback={onRollback} />
+                  <MutationRowItem key={mut.id} mut={mut} onRollback={onRollback} onOpenFileDiff={onOpenFileDiff} />
                 ))}
               </div>
             </ScrollArea>
           ) : (
             <div className="flex flex-col gap-0.5">
               {mutations.map((mut) => (
-                <MutationRowItem key={mut.id} mut={mut} onRollback={onRollback} />
+                <MutationRowItem key={mut.id} mut={mut} onRollback={onRollback} onOpenFileDiff={onOpenFileDiff} />
               ))}
             </div>
           )}
@@ -1012,9 +1046,11 @@ export function MutationsSummaryCard({
 function MutationRowItem({
   mut,
   onRollback,
+  onOpenFileDiff,
 }: {
   mut: FileMutationRecord;
   onRollback?: (record: FileMutationRecord) => void;
+  onOpenFileDiff?: (record: FileMutationRecord) => void;
 }) {
   const fileName =
     mut.targetFile.replace(/\\/g, "/").split("/").filter(Boolean).pop() ||
@@ -1024,7 +1060,12 @@ function MutationRowItem({
   const fileStats = getMutationDiffStats(mut);
 
   return (
-    <div className="flex items-center justify-between group py-1.5 px-2 rounded-lg hover:bg-black/[0.04] dark:hover:bg-white/[0.04] transition-colors">
+    <div
+      onClick={() => onOpenFileDiff?.(mut)}
+      className={`flex items-center justify-between group py-1.5 px-2 rounded-lg hover:bg-black/[0.04] dark:hover:bg-white/[0.04] transition-colors ${
+        onOpenFileDiff ? "cursor-pointer" : ""
+      }`}
+    >
       <div className="flex items-center gap-2 min-w-0 pr-2">
         <FileIcon filename={fileName} />
         <span
@@ -1048,6 +1089,20 @@ function MutationRowItem({
           <span className="text-[#ff5c5c]">-{fileStats.removed}</span>
         </div>
 
+        {onOpenFileDiff && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenFileDiff(mut);
+            }}
+            className="opacity-0 group-hover:opacity-100 flex items-center gap-1 px-2 py-0.5 rounded bg-black/5 hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10 text-[10px] text-[#555555] dark:text-[#a0a0a0] hover:text-black dark:hover:text-white border border-[#d5d5d9] dark:border-[#333333] transition-all cursor-pointer"
+            title="Open diff in sidebar"
+          >
+            <span>Diff</span>
+          </button>
+        )}
+
         {mut.rolledBack ? (
           <span className="text-[10px] text-[#409D62] flex items-center gap-0.5">
             <Check className="w-3 h-3 text-[#409D62]" />
@@ -1056,7 +1111,10 @@ function MutationRowItem({
         ) : onRollback ? (
           <button
             type="button"
-            onClick={() => onRollback(mut)}
+            onClick={(e) => {
+              e.stopPropagation();
+              onRollback(mut);
+            }}
             className="opacity-0 group-hover:opacity-100 flex items-center gap-1 px-2 py-0.5 rounded bg-[#f4f4f6] hover:bg-[#eaeaea] dark:bg-[#202020] dark:hover:bg-[#2e2e2e] border border-[#e2e2e4] dark:border-[#333333] text-[10px] text-[#262626] hover:text-black dark:text-[#d4d4d4] dark:hover:text-white transition-all cursor-pointer shadow-xs"
             title="Undo changes to this file"
           >

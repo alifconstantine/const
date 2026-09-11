@@ -9,7 +9,10 @@ import {
   Globe,
   Search,
   Activity,
+  Layers,
+  PanelRightClose,
 } from "lucide-react";
+import { FileIcon } from "../workbench/file-icon";
 import type { RightPaneTab, RightPaneTabType } from "./types";
 
 interface TabHeaderProps {
@@ -20,6 +23,7 @@ interface TabHeaderProps {
   onCloseTab: (tabId: string, e: React.MouseEvent) => void;
   onNewTab: () => void;
   onReorderTabs?: (fromIndex: number, toIndex: number) => void;
+  onToggleSidebar?: () => void;
 }
 
 function getTabIcon(type: RightPaneTabType) {
@@ -27,6 +31,9 @@ function getTabIcon(type: RightPaneTabType) {
     case "terminal":
       return SquareTerminal;
     case "review":
+      return Layers;
+    case "file_diff":
+    case "file_preview":
       return FileText;
     case "side_conversation":
       return MessageSquare;
@@ -47,6 +54,7 @@ export function TabHeader({
   onCloseTab,
   onNewTab,
   onReorderTabs,
+  onToggleSidebar,
 }: TabHeaderProps) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -204,7 +212,11 @@ export function TabHeader({
                       }`}
                     >
                       <div className="flex items-center gap-2 min-w-0">
-                        <Icon className="w-3.5 h-3.5 shrink-0" />
+                        {t.type === "file_diff" || t.type === "file_preview" ? (
+                          <FileIcon filename={t.filePath || t.title} className="w-3.5 h-3.5 shrink-0" />
+                        ) : (
+                          <Icon className="w-3.5 h-3.5 shrink-0" />
+                        )}
                         <span className="truncate">{t.title}</span>
                       </div>
                       <button
@@ -295,11 +307,15 @@ export function TabHeader({
                 <div className="absolute -right-[3px] top-1 bottom-1 w-[2.5px] bg-blue-500 rounded-full shadow-[0_0_8px_rgba(59,130,246,0.9)] z-30 pointer-events-none" />
               )}
 
-              <Icon
-                className={`w-3.5 h-3.5 shrink-0 pointer-events-none ${
-                  isActive ? "text-white" : "text-[#8e8e8e] group-hover:text-white"
-                }`}
-              />
+              {tab.type === "file_diff" || tab.type === "file_preview" ? (
+                <FileIcon filename={tab.filePath || tab.title} className="w-3.5 h-3.5 shrink-0 pointer-events-none" />
+              ) : (
+                <Icon
+                  className={`w-3.5 h-3.5 shrink-0 pointer-events-none ${
+                    isActive ? "text-white" : "text-[#8e8e8e] group-hover:text-white"
+                  }`}
+                />
+              )}
               <span className="truncate max-w-[120px] pointer-events-none">{tab.title}</span>
               <button
                 type="button"
@@ -352,6 +368,21 @@ export function TabHeader({
           <Plus className="w-3.5 h-3.5" />
         </button>
       </div>
+
+      {/* 4. Collapse / Close right sidebar button */}
+      {onToggleSidebar && (
+        <div className="flex items-center shrink-0 pl-1 border-l border-[#2e2e2e]/50">
+          <button
+            type="button"
+            onClick={onToggleSidebar}
+            className="w-6 h-6 rounded flex items-center justify-center text-[#8e8e8e] hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+            title="Collapse sidebar"
+            aria-label="Collapse sidebar"
+          >
+            <PanelRightClose className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

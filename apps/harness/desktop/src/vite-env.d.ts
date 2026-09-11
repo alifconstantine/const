@@ -275,6 +275,7 @@ declare global {
           type: "code" | "image" | "doc" | "generic";
         }>
       >;
+      readFile?: (filePath: string) => Promise<{ content?: string; truncated?: boolean; error?: string }>;
       openPath?: (targetPath: string) => Promise<boolean>;
       resolveWorkspacePath?: (options?: { project?: string; conversationId?: string }) => Promise<string>;
       onConversationsChanged?: (callback: (data: { conversationId?: string }) => void) => () => void;
