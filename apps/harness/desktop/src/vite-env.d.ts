@@ -77,6 +77,7 @@ export interface QuestionOption {
 
 export interface QuestionItem {
   id?: string;
+  category?: string;
   question: string;
   options?: QuestionOption[];
   is_multi_select?: boolean;

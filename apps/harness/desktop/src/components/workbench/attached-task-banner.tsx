@@ -23,7 +23,7 @@ export function AttachedTaskBanner({
   return (
     <div
       className={cn(
-        "w-full bg-[#f8f8f8] dark:bg-[#252525] border-b border-[#e2e2e4] dark:border-[#383838] px-3.5 py-2 select-none font-sans text-xs flex flex-col gap-1.5 rounded-t-2xl transition-all",
+        "w-full bg-[#f8f8f8] dark:bg-[#1e1e1e] border-b border-[#e2e2e4] dark:border-[#383838] px-3.5 py-2 select-none font-sans text-xs flex flex-col gap-1.5 rounded-t-xl transition-all",
         className
       )}
     >
@@ -51,7 +51,7 @@ export function AttachedTaskBanner({
               <div
                 key={task.id}
                 onClick={() => onSelectTask(task)}
-                className="group flex items-center justify-between px-2.5 py-1.5 rounded-lg bg-white dark:bg-[#1e1e1e] hover:bg-neutral-100 dark:hover:bg-[#2b2b2b] border border-[#e2e2e4] dark:border-[#383838] cursor-pointer transition-colors"
+                className="group flex items-center justify-between px-2.5 py-1.5 rounded bg-white dark:bg-[#282828] hover:bg-neutral-100 dark:hover:bg-[#333333] border border-[#e2e2e4] dark:border-[#383838] cursor-pointer transition-colors"
                 title="Click to view live logs in sidebar"
               >
                 <div className="flex items-center gap-2.5 min-w-0 flex-1">
@@ -60,7 +60,7 @@ export function AttachedTaskBanner({
                   ) : (
                     <span className="w-2 h-2 rounded-full bg-neutral-500 shrink-0" />
                   )}
-                  <span className="font-mono text-xs text-neutral-200 group-hover:text-white truncate">
+                  <span className="font-mono text-xs text-[#1c1c1e] dark:text-[#d4d4d4] group-hover:text-black dark:group-hover:text-white truncate">
                     {task.command}
                   </span>
                 </div>

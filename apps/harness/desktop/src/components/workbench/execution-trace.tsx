@@ -10,14 +10,13 @@ import {
   Search,
   FileSearch,
   ShieldAlert,
+  HelpCircle,
 } from "lucide-react";
 import { ScrollArea, cn } from "@const/ui";
 import type { FileMutationRecord, TraceStep } from "../../vite-env";
 import { FileIcon } from "./file-icon";
 import { MarkdownContent } from "./markdown-content";
 import { getMutationDiffStats } from "./review-dialog";
-import { TodoPill } from "./todo-pill";
-import { QuestionCard } from "./question-card";
 
 export interface TraceToolCall {
   id: string;
@@ -203,44 +202,28 @@ export function ExecutionTrace({
             if (step.type === "tool") {
               const norm = (step.name || "").toLowerCase().replace(/[-_]/g, "");
 
-              // A. Todo Write / Checklist (Image 1 & 2)
+              // A. Todo Write / Checklist (Rendered in floating card at top-right, not in working process)
               if (norm === "todowrite" || norm === "todo") {
-                let parsedArgs = step.args;
-                if (typeof parsedArgs === "string") {
-                  try {
-                    parsedArgs = JSON.parse(parsedArgs);
-                  } catch {}
-                }
-                const rawTodos =
-                  parsedArgs?.todos ||
-                  parsedArgs?.items ||
-                  (Array.isArray(parsedArgs) ? parsedArgs : []);
-                return (
-                  <div key={step.id || `todo_${idx}`} className="py-1">
-                    <TodoPill todos={rawTodos} />
-                  </div>
-                );
+                return null;
               }
 
-              // B. Ask Question (Interactive choices + write-in user instructions)
+              // B. Ask Question (Image 2: "? Asking questions" while pending, "? Asked N questions ⌄" when answered)
               if (norm === "askquestion" || norm === "question") {
-                let parsedArgs = step.args;
-                if (typeof parsedArgs === "string") {
-                  try {
-                    parsedArgs = JSON.parse(parsedArgs);
-                  } catch {}
+                if (!step.result) {
+                  return (
+                    <div
+                      key={step.id || `q_${idx}`}
+                      className="flex items-center gap-2 py-0.5 text-[13px] text-[#888888] font-sans select-none"
+                    >
+                      <HelpCircle className="w-3.5 h-3.5 text-[#777777] shrink-0" />
+                      <span>Asking questions</span>
+                    </div>
+                  );
                 }
-                const rawQuestions =
-                  parsedArgs?.questions ||
-                  (Array.isArray(parsedArgs) ? parsedArgs : [parsedArgs]);
                 return (
-                  <QuestionCard
+                  <AskedQuestionsTraceItem
                     key={step.id || `q_${idx}`}
-                    toolCallId={step.toolCallId || step.id}
-                    questions={rawQuestions}
-                    onAnswer={onAnswerQuestion || (() => {})}
-                    isAnswered={Boolean(step.result)}
-                    answeredValue={step.result}
+                    step={step}
                   />
                 );
               }
@@ -336,6 +319,92 @@ export function ExecutionTrace({
           onOpenReview={onOpenReview}
         />
       )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Asked Questions Trace Item (Matching Image 2)
+// Header: "? Asked 2 questions ⌄"
+// Body: Bold question + muted answer
+// ---------------------------------------------------------------------------
+function AskedQuestionsTraceItem({ step }: { step: TraceStep | TraceToolCall }) {
+  const [isOpen, setIsOpen] = useState(true);
+
+  let rawQuestions: any[] = [];
+  if (step.args) {
+    let parsedArgs = step.args;
+    if (typeof parsedArgs === "string") {
+      try {
+        parsedArgs = JSON.parse(parsedArgs);
+      } catch {}
+    }
+    rawQuestions =
+      parsedArgs?.questions ||
+      (Array.isArray(parsedArgs) ? parsedArgs : [parsedArgs]);
+  }
+
+  // Parse Q&A pairs
+  const qaPairs: Array<{ question: string; answer: string }> = [];
+
+  let result = step.result;
+  if (typeof result === "string") {
+    try {
+      result = JSON.parse(result);
+    } catch {}
+  }
+
+  if (Array.isArray(result)) {
+    result.forEach((item, idx) => {
+      if (item && typeof item === "object" && item.question && item.answer) {
+        qaPairs.push({ question: String(item.question), answer: String(item.answer) });
+      } else {
+        const qText = rawQuestions[idx]?.question || `Question ${idx + 1}`;
+        qaPairs.push({ question: qText, answer: String(item) });
+      }
+    });
+  } else if (result && typeof result === "object") {
+    Object.entries(result).forEach(([k, v]) => {
+      qaPairs.push({ question: k, answer: String(v) });
+    });
+  } else if (result) {
+    const qText = rawQuestions[0]?.question || "Question";
+    qaPairs.push({ question: qText, answer: String(result) });
+  }
+
+  const questionCount = qaPairs.length || rawQuestions.length || 1;
+
+  return (
+    <div className="flex flex-col w-full min-w-0 my-0.5 font-sans select-none">
+      <button
+        type="button"
+        onClick={() => setIsOpen((prev) => !prev)}
+        className="inline-flex items-center gap-1.5 text-[13px] text-[#666666] dark:text-[#888888] hover:text-[#111111] dark:hover:text-[#d4d4d4] transition-colors cursor-pointer w-fit py-0.5 select-none"
+      >
+        <HelpCircle className="w-3.5 h-3.5 text-[#777777] shrink-0" />
+        <span>
+          Asked {questionCount} question{questionCount > 1 ? "s" : ""}
+        </span>
+        <ChevronDown
+          className="w-3.5 h-3.5 text-[#777777] transition-transform duration-200 ease-out"
+          style={{ transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)" }}
+        />
+      </button>
+
+      <SmoothCollapse isOpen={isOpen}>
+        <div className="pt-1.5 pb-2 pl-5 space-y-2 select-text font-sans">
+          {qaPairs.map((pair, idx) => (
+            <div key={idx} className="space-y-0.5 text-left">
+              <div className="font-semibold text-[12.5px] text-[#1c1c1e] dark:text-[#d4d4d4] leading-snug">
+                {pair.question}
+              </div>
+              <div className="text-[12px] text-[#666666] dark:text-[#888888] leading-snug">
+                {pair.answer}
+              </div>
+            </div>
+          ))}
+        </div>
+      </SmoothCollapse>
     </div>
   );
 }

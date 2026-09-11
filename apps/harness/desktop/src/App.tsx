@@ -31,6 +31,8 @@ import { ImageLightbox } from "./components/workbench/image-lightbox";
 import { MarkdownContent } from "./components/workbench/markdown-content";
 import { ExecutionTrace, MutationsSummaryCard } from "./components/workbench/execution-trace";
 import { ApprovalCard, SmoothCardMorph } from "./components/workbench/approval-card";
+import { QuestionCard } from "./components/workbench/question-card";
+import { FloatingTodoCard } from "./components/workbench/floating-todo-card";
 import { ReviewDialog } from "./components/workbench/review-dialog";
 import { RenameTaskDialog } from "./components/workbench/rename-task-dialog";
 import { TrajectoryDialog } from "./components/workbench/trajectory-dialog";
@@ -62,6 +64,7 @@ import type {
   ApprovalDecision,
   BackgroundTaskItem,
   TodoItem,
+  QuestionItem,
 } from "./vite-env";
 import authArt from "./assets/auth-art.jpg";
 
@@ -272,12 +275,6 @@ function AuthenticatedContent({
     }
   };
 
-  const handleAnswerQuestion = async (toolCallId: string, answer: any) => {
-    if (window.electron?.answerQuestion) {
-      await window.electron.answerQuestion(toolCallId, answer);
-    }
-  };
-
   const handleOpenTerminal = async () => {
     setIsRightSidebarOpen(true);
     let resolvedCwd = currentProject === "Outside Project" ? undefined : currentProject;
@@ -437,6 +434,58 @@ function AuthenticatedContent({
   const [pendingApprovals, setPendingApprovals] = useState<Map<string, ApprovalRequestData>>(new Map());
   const [isRespondingApproval, setIsRespondingApproval] = useState<boolean>(false);
   const activeApproval = pendingApprovals.get(conversationId);
+  const [pendingQuestions, setPendingQuestions] = useState<
+    Map<string, { toolCallId: string; questions: QuestionItem[] }>
+  >(new Map());
+  const activeQuestion = pendingQuestions.get(conversationId);
+  const [conversationTodos, setConversationTodos] = useState<Map<string, TodoItem[]>>(new Map());
+
+  const activeTodos = useMemo(() => {
+    const fromMap = conversationTodos.get(conversationId);
+    if (fromMap && fromMap.length > 0) return fromMap;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const msg = messages[i];
+      if (msg && msg.role === "assistant" && msg.traceSteps) {
+        for (let j = msg.traceSteps.length - 1; j >= 0; j--) {
+          const st = msg.traceSteps[j];
+          if (st && (st.name === "todo_write" || st.name === "todo") && st.args?.todos) {
+            return st.args.todos as TodoItem[];
+          }
+        }
+      }
+    }
+    return null;
+  }, [conversationTodos, conversationId, messages]);
+
+  const handleAnswerQuestion = async (toolCallId: string, answer: any) => {
+    setPendingQuestions((prev) => {
+      const next = new Map(prev);
+      next.delete(conversationId);
+      return next;
+    });
+
+    setMessages((prev) => {
+      const lastIdx = prev.length - 1;
+      if (lastIdx < 0) return prev;
+      const last = prev[lastIdx];
+      if (!last || last.role !== "assistant") return prev;
+      const steps = (last.traceSteps || []).map((st) =>
+        st.type === "tool" && (st.toolCallId === toolCallId || st.id === toolCallId)
+          ? { ...st, result: answer }
+          : st
+      );
+      const tools = (last.toolCalls || []).map((tc) =>
+        tc.id === toolCallId ? { ...tc, result: answer } : tc
+      );
+      const next = [...prev];
+      next[lastIdx] = { ...last, traceSteps: steps, toolCalls: tools };
+      return next;
+    });
+
+    if (window.electron?.answerQuestion) {
+      await window.electron.answerQuestion(toolCallId, answer);
+    }
+  };
 
   useEffect(() => {
     if (!isExecuting) {
@@ -1005,6 +1054,14 @@ function AuthenticatedContent({
             targetMsgs[lastIdx] = updated;
           }
         }
+        if (event.toolName === "ask_question") {
+          setPendingQuestions((prev) => {
+            if (!prev.has(targetConvoId)) return prev;
+            const next = new Map(prev);
+            next.delete(targetConvoId);
+            return next;
+          });
+        }
         activeSessionMessagesRef.current.set(targetConvoId, targetMsgs);
         if (targetConvoId === conversationIdRef.current) {
           setMessages(targetMsgs);
@@ -1096,6 +1153,11 @@ function AuthenticatedContent({
           return next;
         });
       } else if (event.type === "todo_update") {
+        setConversationTodos((prev) => {
+          const next = new Map(prev);
+          next.set(targetConvoId, event.todos);
+          return next;
+        });
         if (targetMsgs.length > 0) {
           const lastIdx = targetMsgs.length - 1;
           const last = targetMsgs[lastIdx];
@@ -1131,6 +1193,14 @@ function AuthenticatedContent({
           setMessages(targetMsgs);
         }
       } else if (event.type === "ask_question") {
+        setPendingQuestions((prev) => {
+          const next = new Map(prev);
+          next.set(targetConvoId, {
+            toolCallId: event.toolCallId,
+            questions: event.questions,
+          });
+          return next;
+        });
         if (targetMsgs.length > 0) {
           const lastIdx = targetMsgs.length - 1;
           const last = targetMsgs[lastIdx];
@@ -1901,6 +1971,14 @@ function AuthenticatedContent({
               scrollContainerRef={chatScrollRef}
             />
 
+            {/* Floating Todo List Card matching Image 1 */}
+            {activeTodos && activeTodos.length > 0 && (
+              <FloatingTodoCard
+                todos={activeTodos}
+                isExecuting={isExecuting}
+              />
+            )}
+
             {/* Scrollable Message Stream with @const/ui ScrollArea */}
             <ScrollArea
               ref={chatScrollRef}
@@ -2098,12 +2176,21 @@ function AuthenticatedContent({
 
                 <SmoothCardMorph
                   activeKey={
-                    activeApproval
+                    activeQuestion
+                      ? `question_${activeQuestion.toolCallId}`
+                      : activeApproval
                       ? `approval_${activeApproval.id || activeApproval.approvalId || "active"}`
                       : "chat"
                   }
                 >
-                  {activeApproval ? (
+                  {activeQuestion ? (
+                    <QuestionCard
+                      toolCallId={activeQuestion.toolCallId}
+                      questions={activeQuestion.questions}
+                      onAnswer={handleAnswerQuestion}
+                      onDismiss={() => handleAnswerQuestion(activeQuestion.toolCallId, "Dismissed")}
+                    />
+                  ) : activeApproval ? (
                     <ApprovalCard
                       request={activeApproval}
                       project={currentProject}

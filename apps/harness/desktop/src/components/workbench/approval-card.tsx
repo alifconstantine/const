@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, useLayoutEffect } from "react";
-import { SquareTerminal, CornerDownLeft } from "lucide-react";
+import { SquareTerminal, CornerDownLeft, Info } from "lucide-react";
 import { cn, ScrollArea } from "@const/ui";
 import { AttachedTaskBanner } from "./attached-task-banner";
 import type {
@@ -194,97 +194,108 @@ export function ApprovalCard({
   return (
     <div
       className={cn(
-        "w-full rounded-2xl bg-[#ffffff] dark:bg-[#2b2b2b] border border-[#e2e2e4] dark:border-[#383838] text-[#262626] dark:text-[#d4d4d4] select-none shadow-sm dark:shadow-none font-sans overflow-hidden transition-colors",
+        "w-full max-w-full rounded-xl bg-white dark:bg-[#232323] border border-[#e2e2e4] dark:border-[#383838] p-3.5 sm:p-4 text-xs font-sans select-none shadow-md dark:shadow-none outline-none transition-colors",
         className
       )}
     >
-      {/* 0. Running Tasks Banner attached above card when tasks are active (matching Image 2) */}
+      {/* 0. Running Tasks Banner attached above card when tasks are active */}
       {runningTasks && runningTasks.length > 0 && (
         <AttachedTaskBanner
           tasks={runningTasks}
           onSelectTask={onSelectTask || (() => {})}
           onStopTask={onStopTask || (() => {})}
-          className="rounded-t-2xl border-b border-[#e2e2e4] dark:border-[#383838] bg-[#f8f8f8] dark:bg-[#252525]"
+          className="-mx-3.5 -mt-3.5 sm:-mx-4 sm:-mt-4 mb-2 rounded-t-xl border-b border-[#e2e2e4] dark:border-[#383838] bg-[#f8f8f8] dark:bg-[#1e1e1e]"
         />
       )}
 
-      <div className="p-3.5 sm:p-4">
-        {/* 1. Header: Inline SquareTerminal Icon & Title directly matching reference (Image 2) */}
-        <div className="flex items-center gap-2 min-w-0">
-          <SquareTerminal className="w-3.5 h-3.5 text-[#71717a] dark:text-[#a1a1aa] shrink-0" />
-          <h2 className="text-[13px] font-medium text-[#18181b] dark:text-[#ededed] tracking-tight truncate">
+      {/* 1. Header Row: [ Terminal ] Title matching QuestionCard */}
+      <div className="flex items-center justify-between pb-1.5 min-w-0">
+        <div className="flex items-center gap-2.5 min-w-0 flex-1 pr-3">
+          <span className="px-2.5 py-0.5 rounded bg-black/5 dark:bg-[#343434] text-[#262626] dark:text-[#d4d4d4] font-medium text-[11px] shrink-0">
+            Terminal
+          </span>
+          <span className="font-semibold text-[13px] text-[#1c1c1e] dark:text-white truncate leading-snug">
             {title}
-          </h2>
+          </span>
         </div>
+      </div>
 
-        {/* 2. Command Preview Box: Clean dark bar without borders or copy buttons */}
-        <div className="mt-2.5 w-full rounded-md bg-[#f4f4f6] dark:bg-[#202020] border border-[#e2e2e4] dark:border-[#333333] px-3 py-2">
-          <ScrollArea className="max-h-36 w-full">
-            <pre className="text-[12px] sm:text-[12.5px] font-mono text-[#262626] dark:text-[#dcdcdc] leading-relaxed select-text whitespace-pre-wrap break-all font-normal">
-              {rawCommand}
-            </pre>
-          </ScrollArea>
-        </div>
+      {/* 2. Command Preview Box: Compact, rounded, dark bar */}
+      <div className="my-1.5 w-full rounded bg-[#f4f4f6] dark:bg-[#1c1c1e] border border-[#e2e2e4] dark:border-[#303030] px-3 py-2">
+        <ScrollArea className="max-h-32 w-full">
+          <pre className="text-[12px] font-mono text-[#262626] dark:text-[#dcdcdc] leading-relaxed select-text whitespace-pre-wrap break-all font-normal">
+            {rawCommand}
+          </pre>
+        </ScrollArea>
+      </div>
 
-        {/* 3. Numbered Options List matching reference (Image 2) */}
-        <div className="mt-2.5 flex flex-col gap-0.5">
-          {options.map((opt, idx) => {
-            const isSelected = selectedOption === opt.id;
-            return (
-              <div key={opt.id} className="flex flex-col">
-                <button
-                  type="button"
-                  onClick={() => setSelectedOption(opt.id)}
+      {/* 3. Numbered Options List matching QuestionCard styling */}
+      <div className="space-y-1 py-1.5">
+        {options.map((opt, idx) => {
+          const isSelected = selectedOption === opt.id;
+          return (
+            <div key={opt.id} className="flex flex-col">
+              <div
+                onClick={() => setSelectedOption(opt.id)}
+                className={cn(
+                  "flex items-center gap-2.5 px-2 py-1.5 rounded transition-colors cursor-pointer min-w-0",
+                  isSelected
+                    ? "bg-black/[0.07] dark:bg-white/[0.08] text-[#111111] dark:text-white"
+                    : "bg-transparent hover:bg-black/[0.03] dark:hover:bg-white/[0.04] text-[#444444] dark:text-[#b0b0b0]"
+                )}
+              >
+                {/* Number: 1., 2., 3., 4., 5. */}
+                <span className="font-mono text-xs text-[#888888] dark:text-[#777777] font-medium shrink-0">
+                  {idx + 1}.
+                </span>
+
+                {/* Option Label */}
+                <span
                   className={cn(
-                    "flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-left cursor-pointer transition-colors select-none w-full",
+                    "text-xs leading-snug truncate",
                     isSelected
-                      ? "bg-[#eaeaea] dark:bg-[#383838] text-[#18181b] dark:text-[#ededed] font-medium"
-                      : "bg-transparent hover:bg-black/5 dark:hover:bg-white/5 text-[#666666] dark:text-[#8e8e93] hover:text-[#18181b] dark:hover:text-[#d4d4d8]"
+                      ? "font-semibold text-[#1c1c1e] dark:text-white"
+                      : "text-[#333333] dark:text-[#cccccc]"
                   )}
                 >
-                  <div
-                    className={cn(
-                      "w-4 h-4 rounded-sm text-[11px] font-mono flex items-center justify-center shrink-0 transition-colors",
-                      isSelected
-                        ? "bg-[#dcdcdc] dark:bg-[#484848] text-[#18181b] dark:text-[#ededed] font-medium"
-                        : "bg-transparent text-[#999999] dark:text-[#66666d]"
-                    )}
-                  >
-                    {idx + 1}
-                  </div>
-                  <span className="text-[12.5px] leading-tight truncate">
-                    {opt.label}
-                  </span>
-                </button>
-
-                {/* Conditional Feedback Textarea on Deny */}
-                {opt.id === "deny" && isSelected && (
-                  <div
-                    className="mt-1 pl-6.5 pr-1 animate-in fade-in slide-in-from-top-1 duration-150"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <textarea
-                      ref={feedbackInputRef}
-                      value={feedbackText}
-                      onChange={(e) => setFeedbackText(e.target.value)}
-                      rows={2}
-                      placeholder="Tell the agent what to do instead..."
-                      className="w-full rounded-md bg-white dark:bg-[#202020] border border-[#e2e2e4] dark:border-[#383838] focus:border-[#0066ff] dark:focus:border-[#0066ff] p-2 text-[12px] text-[#262626] dark:text-[#d4d4d4] placeholder:text-[#a9a9a9] dark:placeholder:text-[#666666] outline-none font-sans leading-relaxed resize-none transition-colors"
-                    />
-                  </div>
-                )}
+                  {opt.label}
+                </span>
               </div>
-            );
-          })}
+
+              {/* Conditional Feedback Textarea on Deny */}
+              {opt.id === "deny" && isSelected && (
+                <div
+                  className="mt-1 pl-6 pr-1 animate-in fade-in slide-in-from-top-1 duration-150"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <textarea
+                    ref={feedbackInputRef}
+                    value={feedbackText}
+                    onChange={(e) => setFeedbackText(e.target.value)}
+                    rows={2}
+                    placeholder="Tell the agent what to do instead..."
+                    className="w-full rounded bg-white dark:bg-[#1a1a1a] border border-[#e2e2e4] dark:border-[#383838] p-2 text-xs text-[#1c1c1e] dark:text-white placeholder:text-[#777777] dark:placeholder:text-[#666666] outline-none font-sans leading-relaxed resize-none transition-colors"
+                  />
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* 4. Footer Action Buttons matching QuestionCard */}
+      <div className="flex items-center justify-between pt-2 select-none min-w-0">
+        <div className="flex items-center gap-1.5 text-[#777777] dark:text-[#888888] text-[11px] min-w-0 truncate pr-2">
+          <Info className="w-3.5 h-3.5 text-[#777777] dark:text-[#888888] shrink-0" />
+          <span className="truncate">Press 1..{options.length} to choose, Enter to submit, Esc to skip</span>
         </div>
 
-        {/* 4. Footer Action Buttons: No top divider line! Matching reference (Image 2) */}
-        <div className="mt-3 flex items-center justify-end gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           <button
             type="button"
             onClick={handleSkip}
             disabled={isResponding}
-            className="px-3 py-1 rounded text-[12.5px] font-normal text-[#71717a] dark:text-[#8e8e93] hover:text-[#18181b] dark:hover:text-[#d4d4d4] transition-colors cursor-pointer mr-1 disabled:opacity-50"
+            className="px-2.5 py-1 text-xs font-medium text-[#777777] dark:text-[#999999] hover:text-[#111111] dark:hover:text-white transition-colors cursor-pointer disabled:opacity-30"
             title="Skip (Esc)"
           >
             Skip
@@ -294,11 +305,10 @@ export function ApprovalCard({
             type="button"
             onClick={handleSubmit}
             disabled={isResponding}
-            className="px-3.5 py-1.5 rounded-md bg-[#0066ff] hover:bg-[#0055d4] text-white text-[12.5px] font-medium flex items-center gap-1.5 shadow-none transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-3.5 py-1 rounded text-xs font-semibold bg-[#262626] dark:bg-white text-white dark:text-black hover:bg-black dark:hover:bg-[#e6e6e6] active:scale-[0.98] disabled:opacity-30 disabled:pointer-events-none transition-all shadow-xs cursor-pointer"
             title="Submit (Enter)"
           >
-            <span>Submit</span>
-            <CornerDownLeft className="w-3 h-3 stroke-[2.5]" />
+            Submit
           </button>
         </div>
       </div>

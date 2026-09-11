@@ -443,6 +443,10 @@ export const CONST_DEFAULT_TOOLS: NativeToolDefinition[] = [
                   type: "string",
                   description: "Unique identifier for this question.",
                 },
+                category: {
+                  type: "string",
+                  description: "Short category or topic badge (e.g. 'Tema Desain', 'Palet Warna').",
+                },
                 question: {
                   type: "string",
                   description: "The question text to present to the user.",
@@ -1878,6 +1882,7 @@ export async function executeNativeTool(
       const parsedQuestions: QuestionItem[] = rawQuestions
         .map((q: any, idx: number) => ({
           id: String(q.id || `q_${idx}_${Date.now()}`),
+          category: q.category || q.topic || q.header || undefined,
           question: String(q.question || q.prompt || q.text || ""),
           options: Array.isArray(q.options)
             ? q.options.map((opt: any) => ({
