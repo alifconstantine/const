@@ -1300,7 +1300,7 @@ export function Sidebar({
 
       {/* 1. Archived Sessions Modal (matching const-harness) */}
       <Dialog open={isArchiveModalOpen} onOpenChange={setIsArchiveModalOpen}>
-        <DialogContent className="max-w-md bg-white dark:bg-[#1e1e1e] border border-[#e2e2e4] dark:border-[#383838] text-[#262626] dark:text-[#d4d4d4] p-0 rounded-2xl shadow-2xl overflow-hidden">
+        <DialogContent className="w-[calc(100vw-32px)] sm:w-full max-w-lg md:max-w-xl lg:max-w-2xl bg-white dark:bg-[#1e1e1e] border border-[#e2e2e4] dark:border-[#383838] text-[#262626] dark:text-[#d4d4d4] p-0 rounded-2xl shadow-2xl overflow-hidden">
           <DialogHeader className="px-5 pt-4 pb-3 border-b border-[#e2e2e4] dark:border-[#333333]">
             <DialogTitle className="text-sm font-semibold flex items-center gap-2 text-[#161616] dark:text-white">
               <Archive className="w-4 h-4 text-[#a9a9a9] dark:text-[#888888]" />
@@ -1313,9 +1313,9 @@ export function Sidebar({
             </DialogTitle>
           </DialogHeader>
 
-          <div className="p-4 flex flex-col gap-3">
+          <div className="p-4 flex flex-col gap-3 w-full min-w-0">
             {archivedSessions.length > 0 && (
-              <div className="relative">
+              <div className="relative w-full min-w-0">
                 <Search className="w-3.5 h-3.5 text-[#a9a9a9] dark:text-[#777777] absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
                   type="text"
@@ -1336,7 +1336,7 @@ export function Sidebar({
               </div>
             )}
 
-            <div className="max-h-80 overflow-y-auto flex flex-col gap-1 pr-1">
+            <div className="w-full min-w-0 max-h-80 overflow-y-auto overflow-x-hidden flex flex-col gap-1 pr-1">
               {isArchiveLoading ? (
                 <div className="py-8 text-center text-xs text-[#a9a9a9] dark:text-[#777777]">Loading archived sessions...</div>
               ) : archivedSessions.length === 0 ? (
@@ -1350,22 +1350,25 @@ export function Sidebar({
                 filteredArchivedSessions.map((convo) => (
                   <div
                     key={convo.id}
-                    className="flex items-center justify-between gap-3 p-2.5 rounded-xl bg-[#f4f4f6] dark:bg-[#242424] hover:bg-[#eaeaea] dark:hover:bg-[#2c2c2c] border border-transparent hover:border-[#e2e2e4] dark:hover:border-[#383838] transition-all group"
+                    className="w-full min-w-0 flex items-center justify-between gap-3 p-2.5 rounded-xl bg-[#f4f4f6] dark:bg-[#242424] hover:bg-[#eaeaea] dark:hover:bg-[#2c2c2c] border border-transparent hover:border-[#e2e2e4] dark:hover:border-[#383838] transition-all group"
                   >
-                    <div className="min-w-0 flex-1 flex flex-col gap-0.5">
-                      <span className="text-xs font-medium text-[#262626] dark:text-[#d4d4d4] truncate">
+                    <div className="min-w-0 flex-1 flex flex-col gap-0.5 overflow-hidden">
+                      <span
+                        className="text-xs font-medium text-[#262626] dark:text-[#d4d4d4] truncate block"
+                        title={convo.title || "Untitled task"}
+                      >
                         {convo.title || "Untitled task"}
                       </span>
-                      <div className="flex items-center gap-2 text-[11px] text-[#a9a9a9] dark:text-[#777777]">
-                        <span className="truncate max-w-[120px]">
+                      <div className="flex items-center gap-2 text-[11px] text-[#a9a9a9] dark:text-[#777777] min-w-0 overflow-hidden">
+                        <span className="truncate max-w-[140px] sm:max-w-[200px]">
                           {getProjectDisplayName(convo.project)}
                         </span>
-                        <span>•</span>
-                        <span>{formatRelativeTime(convo.updatedAt || convo.createdAt)}</span>
+                        <span className="shrink-0">•</span>
+                        <span className="shrink-0">{formatRelativeTime(convo.updatedAt || convo.createdAt)}</span>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-1.5 shrink-0">
+                    <div className="flex items-center gap-1.5 shrink-0 ml-2">
                       <Button
                         size="sm"
                         variant="outline"
