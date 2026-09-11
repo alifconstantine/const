@@ -10,7 +10,7 @@ import {
   ThumbsDown,
   Play,
   FileText,
-  ArrowDown,
+  ChevronDown,
 } from "lucide-react";
 import { ConstLogoIcon, Button, toast, ScrollArea, cn } from "@const/ui";
 import { useQuery } from "convex/react";
@@ -720,6 +720,8 @@ function AuthenticatedContent({
   // Smart auto-scroll: pause when user scrolls up, resume when user is near bottom
   const isAutoScrollEnabledRef = useRef<boolean>(true);
   const [showScrollBottomBtn, setShowScrollBottomBtn] = useState<boolean>(false);
+  const lastProgrammaticScrollTimeRef = useRef<number>(0);
+  const prevScrollTopRef = useRef<number>(0);
 
   useEffect(() => {
     const scrollContainer = chatScrollRef.current;
@@ -730,18 +732,40 @@ function AuthenticatedContent({
 
     const handleScroll = () => {
       const { scrollTop, scrollHeight, clientHeight } = viewport;
+      const isScrollable = scrollHeight > clientHeight + 40;
       const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
-      // If user is within 80px from bottom, auto-scroll is kept on
-      const isNearBottom = distanceFromBottom <= 80;
-      isAutoScrollEnabledRef.current = isNearBottom;
-      setShowScrollBottomBtn(!isNearBottom);
+      const scrollTolerance = 40;
+
+      const isProgrammatic = Date.now() - lastProgrammaticScrollTimeRef.current < 150;
+
+      if (!isProgrammatic) {
+        if (scrollTop < prevScrollTopRef.current) {
+          isAutoScrollEnabledRef.current = false;
+        } else if (distanceFromBottom < scrollTolerance) {
+          isAutoScrollEnabledRef.current = true;
+        }
+      }
+
+      // Hide if not scrollable or within 180px from bottom (matches const-ai threshold)
+      if (distanceFromBottom <= 180 || !isScrollable) {
+        setShowScrollBottomBtn(false);
+      } else {
+        setShowScrollBottomBtn(true);
+      }
+
+      prevScrollTopRef.current = scrollTop;
     };
 
     const handleWheel = (e: WheelEvent) => {
       if (e.deltaY < 0) {
         // User scrolled up with mousewheel -> immediately disable auto-scroll
         isAutoScrollEnabledRef.current = false;
-        setShowScrollBottomBtn(true);
+        const { scrollTop, scrollHeight, clientHeight } = viewport;
+        const isScrollable = scrollHeight > clientHeight + 40;
+        const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+        if (isScrollable && distanceFromBottom > 80) {
+          setShowScrollBottomBtn(true);
+        }
       }
     };
 
@@ -756,7 +780,18 @@ function AuthenticatedContent({
   const scrollToBottom = () => {
     isAutoScrollEnabledRef.current = true;
     setShowScrollBottomBtn(false);
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    lastProgrammaticScrollTimeRef.current = Date.now();
+    const scrollContainer = chatScrollRef.current;
+    const viewport = (scrollContainer?.querySelector("[data-radix-scroll-area-viewport]") ||
+      scrollContainer) as HTMLElement | null;
+    if (viewport) {
+      viewport.scrollTo({
+        top: viewport.scrollHeight,
+        behavior: "smooth",
+      });
+    } else {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
   };
 
   // Auto scroll to bottom only when enabled
@@ -766,8 +801,9 @@ function AuthenticatedContent({
       const viewport = (scrollContainer?.querySelector("[data-radix-scroll-area-viewport]") ||
         scrollContainer) as HTMLElement | null;
       if (viewport) {
-        // Direct scrollTop adjustment avoids browser smooth-scroll animation locks during streaming
+        lastProgrammaticScrollTimeRef.current = Date.now();
         viewport.scrollTop = viewport.scrollHeight;
+        prevScrollTopRef.current = viewport.scrollTop;
       } else {
         messagesEndRef.current?.scrollIntoView({ behavior: "instant" as any });
       }
@@ -2059,17 +2095,17 @@ function AuthenticatedContent({
               </div>
             </ScrollArea>
 
-            {/* Floating Scroll to Bottom Button */}
-            {showScrollBottomBtn && (
-              <div className="absolute bottom-20 right-8 z-30 animate-in fade-in zoom-in-95 duration-150 pointer-events-auto">
+            {/* Floating Scroll to Bottom Button when ChatCard is hidden by activeApproval */}
+            {activeApproval && showScrollBottomBtn && (
+              <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-30 pointer-events-auto">
                 <button
                   type="button"
                   onClick={scrollToBottom}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white dark:bg-[#252528] border border-[#e2e2e4] dark:border-[#383838] text-[#262626] dark:text-[#ececec] text-xs font-medium shadow-md hover:bg-[#f4f4f5] dark:hover:bg-[#2e2e32] transition-colors cursor-pointer select-none"
+                  className="w-8 h-8 rounded-full bg-white dark:bg-[#252528] hover:bg-[#f4f4f5] dark:hover:bg-[#323236] border border-[#e2e2e4] dark:border-[#383838] shadow-md text-[#555555] hover:text-[#171717] dark:text-[#d4d4d4] dark:hover:text-white transition-all flex items-center justify-center animate-in fade-in zoom-in-95 duration-150 cursor-pointer"
                   title="Scroll to bottom"
+                  aria-label="Scroll to bottom"
                 >
-                  <ArrowDown className="w-3.5 h-3.5 text-[#e79737] dark:text-[#ff7a00]" />
-                  <span>Latest</span>
+                  <ChevronDown className="w-4 h-4 stroke-[2.5]" />
                 </button>
               </div>
             )}
@@ -2077,7 +2113,22 @@ function AuthenticatedContent({
             {/* Anchored Bottom Chat Input (Hidden while awaiting approval to match screenshot) */}
             {!activeApproval && (
               <div className="w-full px-3.5 sm:px-6 md:px-8 pb-4 pt-2 flex justify-center bg-[#f8f8f8] dark:bg-[#161616] shrink-0 min-w-0 relative z-20">
-                <div className={cn("w-full max-w-full min-w-0", streamWidthClass)}>
+                <div className={cn("w-full max-w-full min-w-0 relative", streamWidthClass)}>
+                  {/* Floating Scroll to Bottom Button directly above Chat Input */}
+                  {showScrollBottomBtn && (
+                    <div className="absolute bottom-full mb-3 left-1/2 -translate-x-1/2 z-30 pointer-events-auto">
+                      <button
+                        type="button"
+                        onClick={scrollToBottom}
+                        className="w-8 h-8 rounded-full bg-white dark:bg-[#252528] hover:bg-[#f4f4f5] dark:hover:bg-[#323236] border border-[#e2e2e4] dark:border-[#383838] shadow-md text-[#555555] hover:text-[#171717] dark:text-[#d4d4d4] dark:hover:text-white transition-all flex items-center justify-center animate-in fade-in zoom-in-95 duration-150 cursor-pointer"
+                        title="Scroll to bottom"
+                        aria-label="Scroll to bottom"
+                      >
+                        <ChevronDown className="w-4 h-4 stroke-[2.5]" />
+                      </button>
+                    </div>
+                  )}
+
                   <ChatCard
                     compact
                     isExecuting={isExecuting}

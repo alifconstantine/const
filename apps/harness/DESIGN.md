@@ -105,7 +105,7 @@ components:
     iconColor: "{colors.ink}"
     secondaryTextColor: "{colors.text-muted}"
     hoverBackground: "{colors.field-hover}"
-    width: "256px"
+    width: "224px"
 
   top-toolbar:
     height: "44px"
@@ -183,7 +183,7 @@ Harness exclusively utilizes **Inter** (`-apple-system, BlinkMacSystemFont, "Seg
 
 ### Window & Canvas Architecture
 - **Window Shell**: Bound to `100vw` by `100vh` with `bg-[#2b2b2b]`.
-- **Sidebar**: Fixed 256px (`w-64`) on the left.
+- **Sidebar**: Fixed 224px (`w-56`) on the left.
 - **Main Canvas (`<main>`)**:
   - Touches top and right window boundaries completely (`rounded-r-none`).
   - Rounds **only** on the left boundary seam against the sidebar (`rounded-l-2xl sm:rounded-l-3xl`).

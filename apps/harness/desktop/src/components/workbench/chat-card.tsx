@@ -896,7 +896,7 @@ export function ChatCard({
         <div
           className={cn(
             "w-full max-w-full bg-[#ffffff] dark:bg-[#2b2b2b] flex flex-col justify-between transition-colors focus-within:border-[#a9a9a9] dark:focus-within:border-[#555555] min-w-0 relative",
-            compact ? "rounded-2xl" : "rounded-b-2xl border-t border-[#e2e2e4] dark:border-[#383838]",
+            compact ? "rounded-2xl" : "rounded-2xl border border-[#e2e2e4] dark:border-[#383838] -mx-[1px] -mb-[1px] w-[calc(100%+2px)]",
             isAnyBottomMenuOpen ? "z-30" : "z-10"
           )}
         >
@@ -906,7 +906,7 @@ export function ChatCard({
               tasks={runningTasks}
               onSelectTask={onSelectTask || (() => {})}
               onStopTask={onStopTask || (() => {})}
-              className={compact ? "rounded-t-2xl" : "rounded-t-none"}
+              className="rounded-t-2xl"
             />
           )}
 
