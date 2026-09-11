@@ -36,6 +36,7 @@ import { api } from "@const/backend/_generated/api";
 import { ImageLightbox } from "./image-lightbox";
 import { AttachedTaskBanner } from "./attached-task-banner";
 import type { BackgroundTaskItem } from "../../vite-env";
+import { getDefaultAgentMode } from "../../lib/conversation-store";
 
 function getThinkingDescription(lvl: string): string {
   switch (lvl.toLowerCase()) {
@@ -151,6 +152,8 @@ interface ChatCardProps {
   runningTasks?: BackgroundTaskItem[];
   onSelectTask?: (task: BackgroundTaskItem) => void;
   onStopTask?: (taskId: string) => void;
+  mode?: "ask_before_changes" | "full_access";
+  onModeChange?: (mode: "ask_before_changes" | "full_access") => void;
 }
 
 export function ChatCard({
@@ -169,6 +172,8 @@ export function ChatCard({
   runningTasks,
   onSelectTask,
   onStopTask,
+  mode: controlledMode,
+  onModeChange,
 }: ChatCardProps) {
   const [prompt, setPrompt] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -255,7 +260,17 @@ export function ChatCard({
   const projectMenuRef = useRef<HTMLDivElement>(null);
 
   // 2. Access Mode State (Only 2 options: ask_before_changes & full_access)
-  const [mode, setMode] = useState<"ask_before_changes" | "full_access">("full_access");
+  const [mode, setMode] = useState<"ask_before_changes" | "full_access">(() => {
+    if (controlledMode) return controlledMode;
+    return getDefaultAgentMode();
+  });
+
+  useEffect(() => {
+    if (controlledMode !== undefined) {
+      setMode(controlledMode);
+    }
+  }, [controlledMode]);
+
   const [isModeOpen, setIsModeOpen] = useState(false);
   const modeMenuRef = useRef<HTMLDivElement>(null);
 
@@ -1173,6 +1188,7 @@ export function ChatCard({
                       type="button"
                       onClick={() => {
                         setMode("ask_before_changes");
+                        onModeChange?.("ask_before_changes");
                         setIsModeOpen(false);
                       }}
                       className="w-full p-2.5 flex items-start gap-2.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 text-left transition-colors cursor-pointer group"
@@ -1196,6 +1212,7 @@ export function ChatCard({
                       type="button"
                       onClick={() => {
                         setMode("full_access");
+                        onModeChange?.("full_access");
                         setIsModeOpen(false);
                       }}
                       className="w-full p-2.5 flex items-start gap-2.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 text-left transition-colors cursor-pointer group"

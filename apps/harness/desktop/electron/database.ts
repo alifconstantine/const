@@ -24,6 +24,7 @@ export interface ConversationRecord {
   createdAt: number;
   updatedAt: number;
   model?: string;
+  mode?: "ask_before_changes" | "full_access" | string;
   messages: StoredMessage[];
   contextUsage?: {
     usedTokens: number;
@@ -73,6 +74,7 @@ export class ConversationDatabase {
         created_at INTEGER NOT NULL,
         updated_at INTEGER NOT NULL,
         model TEXT,
+        mode TEXT,
         diff_stats TEXT,
         context_usage TEXT
       );
@@ -104,6 +106,9 @@ export class ConversationDatabase {
     // Schema migrations
     try {
       this.db.exec("ALTER TABLE conversations ADD COLUMN is_scheduled INTEGER NOT NULL DEFAULT 0;");
+    } catch {}
+    try {
+      this.db.exec("ALTER TABLE conversations ADD COLUMN mode TEXT;");
     } catch {}
 
     // Clean up legacy [Scheduled] titles in existing database
@@ -156,8 +161,8 @@ export class ConversationDatabase {
     const contextUsageJson = convo.contextUsage ? JSON.stringify(convo.contextUsage) : null;
 
     const stmt = this.db.prepare(`
-      INSERT INTO conversations (id, title, project, is_pinned, is_archived, is_scheduled, created_at, updated_at, model, diff_stats, context_usage)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO conversations (id, title, project, is_pinned, is_archived, is_scheduled, created_at, updated_at, model, mode, diff_stats, context_usage)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(id) DO UPDATE SET
         title = excluded.title,
         project = excluded.project,
@@ -166,6 +171,7 @@ export class ConversationDatabase {
         is_scheduled = excluded.is_scheduled,
         updated_at = excluded.updated_at,
         model = excluded.model,
+        mode = excluded.mode,
         diff_stats = excluded.diff_stats,
         context_usage = excluded.context_usage
     `);
@@ -180,6 +186,7 @@ export class ConversationDatabase {
       createdAt,
       updatedAt,
       convo.model || null,
+      convo.mode || null,
       diffStatsJson,
       contextUsageJson
     );
@@ -367,6 +374,7 @@ export class ConversationDatabase {
       createdAt: row.created_at,
       updatedAt: row.updated_at,
       model: row.model || undefined,
+      mode: row.mode || undefined,
       diffStats,
       contextUsage,
       messages,

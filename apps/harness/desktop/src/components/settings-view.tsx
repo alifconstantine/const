@@ -47,6 +47,7 @@ import {
   ShieldAlert,
   LogOut,
   ArrowLeftRight,
+  ChevronDown,
 } from "lucide-react";
 import { useQuery } from "convex/react";
 import { api } from "@const/backend/_generated/api";
@@ -196,11 +197,28 @@ export function SettingsView({
     );
   });
 
+  const [isPresetDropdownOpen, setIsPresetDropdownOpen] = useState(false);
+  const presetDropdownRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isPresetDropdownOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (presetDropdownRef.current && !presetDropdownRef.current.contains(e.target as Node)) {
+        setIsPresetDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [isPresetDropdownOpen]);
+
   const handleSetDefaultMode = (mode: "ask_before_changes" | "full_access") => {
     setDefaultConfirmationMode(mode);
     localStorage.setItem("const_harness_default_mode", mode);
+    window.dispatchEvent(new CustomEvent("const:default-mode-changed", { detail: mode }));
     toast.success(
-      `Default confirmation mode set to ${mode === "full_access" ? "Full access" : "Ask before changes"}`
+      `Security preset set to ${mode === "full_access" ? "Full Machine" : "Ask Before Changes"}`
     );
   };
 
@@ -703,52 +721,113 @@ export function SettingsView({
                 </div>
               </div>
 
+              {/* Agent Settings Card */}
+              <div className="flex flex-col gap-2">
+                <span className="text-[14px] font-semibold text-[#262626] dark:text-white">
+                  Agent Settings
+                </span>
+                <div className="rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#1e1e1e] p-4 flex items-center justify-between gap-4">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[13px] font-medium text-[#262626] dark:text-white">
+                      Security Preset
+                    </span>
+                    <span className="text-[12px] text-[#8a8a8a] dark:text-[#888888]">
+                      Controls the actions the agent can take.
+                    </span>
+                    <div className="flex items-center gap-1 mt-0.5 text-[11px] text-[#8a8a8a] dark:text-[#888888]">
+                      <span>
+                        Learn more about{" "}
+                        <strong className="font-medium text-[#262626] dark:text-[#d4d4d4]">
+                          {defaultConfirmationMode === "full_access" ? "Full machine" : "Ask before changes"}
+                        </strong>
+                      </span>
+                      <span
+                        className="inline-flex items-center cursor-help"
+                        title={
+                          defaultConfirmationMode === "full_access"
+                            ? "Full machine: The agent executes actions and file edits without asking for manual confirmation each time."
+                            : "Ask before changes: The agent will require manual confirmation before running terminal commands or modifying files."
+                        }
+                      >
+                        <Info className="w-3.5 h-3.5 text-[#8a8a8a] dark:text-[#888888]" />
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Dropdown Selector */}
+                  <div className="relative" ref={presetDropdownRef}>
+                    <button
+                      type="button"
+                      onClick={() => setIsPresetDropdownOpen((prev) => !prev)}
+                      className="px-3 py-1.5 rounded-lg bg-[#f0f0f2] dark:bg-[#282828] hover:bg-[#e4e4e7] dark:hover:bg-[#333333] border border-[#e2e2e4] dark:border-[#383838] text-[12px] font-medium text-[#262626] dark:text-white flex items-center gap-2 transition-colors cursor-pointer"
+                    >
+                      <span>
+                        {defaultConfirmationMode === "full_access" ? "Full Machine" : "Ask Before Changes"}
+                      </span>
+                      <ChevronDown className="w-3.5 h-3.5 text-[#8a8a8a] dark:text-[#888888]" />
+                    </button>
+
+                    {isPresetDropdownOpen && (
+                      <div className="absolute right-0 top-full mt-1.5 w-64 bg-[#ffffff] dark:bg-[#222222] border border-[#dedee2] dark:border-[#383838] rounded-xl shadow-xl p-1 z-50 flex flex-col gap-0.5 animate-in fade-in zoom-in-95 duration-100">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            handleSetDefaultMode("ask_before_changes");
+                            setIsPresetDropdownOpen(false);
+                          }}
+                          className={cn(
+                            "w-full px-2.5 py-2 rounded-lg text-left flex items-start justify-between gap-2 transition-colors cursor-pointer",
+                            defaultConfirmationMode === "ask_before_changes"
+                              ? "bg-black/5 dark:bg-white/10 text-[#262626] dark:text-white font-medium"
+                              : "hover:bg-black/5 dark:hover:bg-white/5 text-[#262626] dark:text-[#d4d4d4]"
+                          )}
+                        >
+                          <div className="flex flex-col">
+                            <span className="text-[12px]">Ask Before Changes</span>
+                            <span className="text-[10px] text-[#8a8a8a] dark:text-[#888888] font-normal">
+                              Ask before file changes & command execution.
+                            </span>
+                          </div>
+                          {defaultConfirmationMode === "ask_before_changes" && (
+                            <Check className="w-3.5 h-3.5 shrink-0 mt-0.5 text-[#262626] dark:text-white" />
+                          )}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            handleSetDefaultMode("full_access");
+                            setIsPresetDropdownOpen(false);
+                          }}
+                          className={cn(
+                            "w-full px-2.5 py-2 rounded-lg text-left flex items-start justify-between gap-2 transition-colors cursor-pointer",
+                            defaultConfirmationMode === "full_access"
+                              ? "bg-black/5 dark:bg-white/10 text-[#262626] dark:text-white font-medium"
+                              : "hover:bg-black/5 dark:hover:bg-white/5 text-[#262626] dark:text-[#d4d4d4]"
+                          )}
+                        >
+                          <div className="flex flex-col">
+                            <span className="text-[12px]">Full Machine</span>
+                            <span className="text-[10px] text-[#8a8a8a] dark:text-[#888888] font-normal">
+                              Run with full terminal & editing permissions.
+                            </span>
+                          </div>
+                          {defaultConfirmationMode === "full_access" && (
+                            <Check className="w-3.5 h-3.5 shrink-0 mt-0.5 text-[#262626] dark:text-white" />
+                          )}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               {/* Workbench Preferences Card */}
               <div className="flex flex-col gap-2">
                 <span className="text-[11px] font-medium text-[#8a8a8a] dark:text-[#777777] uppercase tracking-wider">
                   Workbench Preferences
                 </span>
                 <div className="rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#1e1e1e] divide-y divide-[#dedee2]/60 dark:divide-[#383838]/60 overflow-hidden">
-                  {/* Default confirmation mode */}
-                  <div className="px-4 py-3 sm:px-4 sm:py-3.5 flex items-center justify-between gap-4">
-                    <div className="flex flex-col">
-                      <span className="text-[13px] font-medium text-[#262626] dark:text-white">
-                        Confirmation Mode
-                      </span>
-                      <span className="text-[11px] text-[#8a8a8a] dark:text-[#888888] mt-0.5">
-                        Ask before changing files, or run with fewer confirmations.
-                      </span>
-                    </div>
-
-                    <div className="inline-flex p-0.5 rounded-lg bg-[#f0f0f2] dark:bg-[#282828] border border-[#e2e2e4] dark:border-[#383838] items-center gap-0.5 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => handleSetDefaultMode("ask_before_changes")}
-                        className={cn(
-                          "px-2.5 py-1 text-[11px] rounded-md transition-all cursor-pointer flex items-center gap-1.5",
-                          defaultConfirmationMode === "ask_before_changes"
-                            ? "bg-white dark:bg-[#383838] text-[#262626] dark:text-white font-medium"
-                            : "text-[#8a8a8a] dark:text-[#888888] hover:text-[#262626] dark:hover:text-[#d4d4d4]"
-                        )}
-                      >
-                        <Hand className="w-3.5 h-3.5" />
-                        <span>Ask before changes</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleSetDefaultMode("full_access")}
-                        className={cn(
-                          "px-2.5 py-1 text-[11px] rounded-md transition-all cursor-pointer flex items-center gap-1.5",
-                          defaultConfirmationMode === "full_access"
-                            ? "bg-white dark:bg-[#383838] text-[#e79737] font-medium"
-                            : "text-[#8a8a8a] dark:text-[#888888] hover:text-[#262626] dark:hover:text-[#d4d4d4]"
-                        )}
-                      >
-                        <ShieldAlert className="w-3.5 h-3.5" />
-                        <span>Full access</span>
-                      </button>
-                    </div>
-                  </div>
 
                   {/* Active model quick link */}
                   <div className="px-4 py-3 sm:px-4 sm:py-3.5 flex items-center justify-between gap-4">

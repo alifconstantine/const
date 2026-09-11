@@ -55,6 +55,7 @@ import {
   generateFallbackTitle,
   generateAiTitle,
   normalizeUiMessages,
+  getDefaultAgentMode,
   type ConversationItem,
 } from "./lib/conversation-store";
 import type {
@@ -172,6 +173,9 @@ function AuthenticatedContent({
             const activeConvo = await window.electron.getConversation(data.conversationId);
             if (activeConvo && activeConvo.messages) {
               setMessages(normalizeUiMessages(activeConvo.messages) as any);
+              if (activeConvo.mode) {
+                setCurrentMode(activeConvo.mode as any);
+              }
             }
           }
         }
@@ -191,6 +195,24 @@ function AuthenticatedContent({
   const [currentProject, setCurrentProject] = useState<string>(() => {
     return localStorage.getItem("const_harness_current_project") || "Outside Project";
   });
+
+  // Current conversation agent access mode (defaults to ask_before_changes or setting default)
+  const [currentMode, setCurrentMode] = useState<"ask_before_changes" | "full_access">(() => {
+    return getDefaultAgentMode();
+  });
+
+  const handleModeChange = (newMode: "ask_before_changes" | "full_access") => {
+    setCurrentMode(newMode);
+    const stored = loadConversations();
+    const target = stored.find((c) => c.id === conversationId);
+    if (target) {
+      target.mode = newMode;
+      target.updatedAt = Date.now();
+      saveConversation(target);
+      setConversations(loadConversations());
+    }
+  };
+
   const [activeModelItem, setActiveModelItem] = useState<ModelItem | null>(null);
   const [lastKnownLlmUsage, setLastKnownLlmUsage] = useState<{
     promptTokens: number;
@@ -416,6 +438,19 @@ function AuthenticatedContent({
   useEffect(() => {
     messagesRef.current = messages;
   }, [messages]);
+
+  // Listen for default mode changes from SettingsView
+  useEffect(() => {
+    const handleDefaultModeChanged = (e: any) => {
+      if (messages.length === 0) {
+        setCurrentMode(e.detail || getDefaultAgentMode());
+      }
+    };
+    window.addEventListener("const:default-mode-changed", handleDefaultModeChanged as EventListener);
+    return () => {
+      window.removeEventListener("const:default-mode-changed", handleDefaultModeChanged as EventListener);
+    };
+  }, [messages.length]);
 
   const conversationsRef = React.useRef(conversations);
   useEffect(() => {
@@ -1471,14 +1506,21 @@ function AuthenticatedContent({
       );
     }
 
+    const existingConvo = loadConversations().find((c) => c.id === conversationId);
     const updatedConvo: ConversationItem = {
       id: conversationId,
       title: titleToUse || "New task",
       project: project,
-      createdAt: Date.now(),
+      createdAt: existingConvo?.createdAt || Date.now(),
       updatedAt: Date.now(),
       messages: currentStreamMessages,
       contextUsage: contextUsage,
+      mode: mode || currentMode,
+      isPinned: existingConvo?.isPinned,
+      isArchived: existingConvo?.isArchived,
+      isScheduled: existingConvo?.isScheduled,
+      model: model || existingConvo?.model,
+      diffStats: existingConvo?.diffStats,
     };
     saveConversation(updatedConvo);
     setConversations(loadConversations());
@@ -1729,6 +1771,7 @@ function AuthenticatedContent({
     setConversationId(`session_${Date.now()}`);
     setEditingPrompt("");
     setLastKnownLlmUsage(null);
+    setCurrentMode(getDefaultAgentMode());
     if (targetProject) {
       setCurrentProject(targetProject);
       localStorage.setItem("const_harness_current_project", targetProject);
@@ -1745,6 +1788,7 @@ function AuthenticatedContent({
       setConversationId(id);
       setConversationTitle(target?.title || "Task");
       setCurrentProject(target?.project || "Outside Project");
+      setCurrentMode(target?.mode || getDefaultAgentMode());
       setMessages([...activeRunningMsgs]);
       setEditingPrompt("");
       if (target?.contextUsage?.usedTokens) {
@@ -1772,6 +1816,7 @@ function AuthenticatedContent({
       setConversationId(target.id);
       setConversationTitle(target.title);
       setCurrentProject(target.project || "Outside Project");
+      setCurrentMode(target.mode || getDefaultAgentMode());
       setMessages(normalizeUiMessages(target.messages || []));
       setEditingPrompt("");
       if (target.contextUsage?.usedTokens) {
@@ -1946,6 +1991,8 @@ function AuthenticatedContent({
               {/* Floating Chat Input Card */}
               <div className="w-full max-w-full z-10 min-w-0">
                 <ChatCard
+                  mode={currentMode}
+                  onModeChange={handleModeChange}
                   onSendMessage={handleSendMessage}
                   isExecuting={isExecuting}
                   onAbort={handleAbort}
@@ -2209,6 +2256,8 @@ function AuthenticatedContent({
                   ) : (
                     <ChatCard
                       compact
+                      mode={currentMode}
+                      onModeChange={handleModeChange}
                       isExecuting={isExecuting}
                       onSendMessage={handleSendMessage}
                       onAbort={handleAbort}

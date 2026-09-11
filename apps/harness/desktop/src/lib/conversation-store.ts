@@ -9,6 +9,7 @@ export interface ConversationItem {
   isArchived?: boolean;
   isScheduled?: boolean;
   model?: string;
+  mode?: "ask_before_changes" | "full_access";
   contextUsage?: {
     usedTokens: number;
     totalTokens: number;
@@ -20,6 +21,16 @@ export interface ConversationItem {
     additions: number;
     deletions: number;
   };
+}
+
+export function getDefaultAgentMode(): "ask_before_changes" | "full_access" {
+  try {
+    const saved = localStorage.getItem("const_harness_default_mode");
+    if (saved === "full_access" || saved === "ask_before_changes") {
+      return saved;
+    }
+  } catch {}
+  return "ask_before_changes";
 }
 
 export function getCleanConversationTitle(title?: string): string {
@@ -168,6 +179,7 @@ export function loadConversations(): ConversationItem[] {
     ...c,
     title: getCleanConversationTitle(c.title),
     isScheduled: isScheduledTaskConversation(c),
+    mode: c.mode,
     messages: normalizeUiMessages(c.messages || []),
   });
 
