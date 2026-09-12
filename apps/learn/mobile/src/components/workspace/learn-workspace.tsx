@@ -48,15 +48,15 @@ interface StudioTool {
 }
 
 const STUDIO_TOOLS: StudioTool[] = [
-  { id: "audio_summary", name: "Ringkasan Audio", icon: AudioLines, iconColor: "text-indigo-400" },
-  { id: "slides", name: "Slide Presentasi", icon: Presentation, iconColor: "text-amber-400" },
-  { id: "video_summary", name: "Ringkasan Video", icon: Video, iconColor: "text-emerald-400" },
-  { id: "mind_map", name: "Peta Pikiran", icon: GitFork, iconColor: "text-purple-400" },
-  { id: "report", name: "Laporan", icon: FileText, iconColor: "text-blue-400" },
-  { id: "flashcards", name: "Kartu tanya...", icon: HelpCircle, iconColor: "text-orange-400" },
-  { id: "quiz", name: "Kuis", icon: Award, iconColor: "text-green-400" },
-  { id: "infographic", name: "Infografis", icon: BarChart3, iconColor: "text-pink-400" },
-  { id: "data_table", name: "Tabel Data", icon: Table2, iconColor: "text-cyan-400" },
+  { id: "audio_summary", name: "Audio Overview", icon: AudioLines, iconColor: "text-indigo-400" },
+  { id: "slides", name: "Slide Deck", icon: Presentation, iconColor: "text-amber-400" },
+  { id: "video_summary", name: "Video Summary", icon: Video, iconColor: "text-emerald-400" },
+  { id: "mind_map", name: "Mind Map", icon: GitFork, iconColor: "text-purple-400" },
+  { id: "report", name: "Briefing Doc", icon: FileText, iconColor: "text-blue-400" },
+  { id: "flashcards", name: "Flashcards", icon: HelpCircle, iconColor: "text-orange-400" },
+  { id: "quiz", name: "Study Quiz", icon: Award, iconColor: "text-green-400" },
+  { id: "infographic", name: "Infographic", icon: BarChart3, iconColor: "text-pink-400" },
+  { id: "data_table", name: "Data Table", icon: Table2, iconColor: "text-cyan-400" },
 ];
 
 const MOBILE_MODELS = [
@@ -108,30 +108,27 @@ export function MobileLearnWorkspace({
     return await db.artifacts.where("learnId").equals(learnId).toArray();
   }, [learnId]);
 
-  // Tab & modal states
+  // Navigation tabs: sources, chat, tools
   const [activeTab, setActiveTab] = useState<WorkspaceTab>("chat");
-  const [isAddSourceOpen, setIsAddSourceOpen] = useState(initialSourceModalOpen);
 
-  // Search states in Sources tab
-  const [searchQuery, setSearchQuery] = useState("");
-  const [webScope, setWebScope] = useState("Web");
-  const [researchSpeed, setResearchSpeed] = useState("Riset Cepat");
-
-  // Chat states
+  // Local state
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [inputMessage, setInputMessage] = useState("");
-  const [isStreaming, setIsStreaming] = useState(false);
   const [selectedModelId, setSelectedModelId] = useState<string>("Const");
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
+  const [isAddSourceOpen, setIsAddSourceOpen] = useState(initialSourceModalOpen);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [webScope, setWebScope] = useState("Web");
+  const [researchSpeed, setResearchSpeed] = useState("Fast Research");
+  const [isStreaming, setIsStreaming] = useState(false);
   const [expandedThinkingIds, setExpandedThinkingIds] = useState<Record<string, boolean>>({});
-  const [expandedToolIds, setExpandedToolIds] = useState<Record<string, boolean>>({});
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const activeAssistantRef = useRef<DisplayMessage | null>(null);
 
   // Editable title
   const [isEditingTitle, setIsEditingTitle] = useState(false);
-  const [titleValue, setTitleValue] = useState("Notebook tanpa judul");
+  const [titleValue, setTitleValue] = useState("Untitled notebook");
 
   useEffect(() => {
     if (learn?.title) {
@@ -433,7 +430,7 @@ export function MobileLearnWorkspace({
             type="button"
             onClick={onBack}
             className="h-9 w-9 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer shrink-0"
-            aria-label="Kembali"
+            aria-label="Back"
           >
             <ArrowLeft className="h-4 w-4" />
           </button>
@@ -464,8 +461,8 @@ export function MobileLearnWorkspace({
             <button
               type="button"
               onClick={() => setIsEditingTitle(true)}
-              className="text-sm font-serif font-medium text-foreground hover:bg-muted/50 px-2.5 py-1 rounded-full transition-colors cursor-pointer text-left truncate max-w-[180px]"
-              title="Klik untuk mengubah judul"
+              className="text-sm font-sans font-semibold text-foreground hover:bg-muted/50 px-2.5 py-1 rounded-full transition-colors cursor-pointer text-left truncate max-w-[180px]"
+              title="Click to rename"
             >
               {titleValue}
             </button>
@@ -479,7 +476,7 @@ export function MobileLearnWorkspace({
               type="button"
               onClick={handleClearHistory}
               className="h-8 px-2.5 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground flex items-center gap-1 text-xs transition-colors cursor-pointer border border-border/40"
-              title="Reset Percakapan"
+              title="Clear conversation"
             >
               <RotateCcw className="h-3.5 w-3.5" />
             </button>
@@ -489,15 +486,20 @@ export function MobileLearnWorkspace({
             type="button"
             onClick={() => setIsAddSourceOpen(true)}
             className="h-8 w-8 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
-            aria-label="Tambah Sumber"
+            aria-label="Add source"
           >
             <Plus className="h-4 w-4" />
           </button>
 
           <button
             type="button"
+            onClick={() => {
+              if (navigator.share) {
+                navigator.share({ title: titleValue, url: window.location.href }).catch(() => {});
+              }
+            }}
             className="h-8 w-8 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
-            aria-label="Bagikan"
+            aria-label="Share"
           >
             <Share2 className="h-4 w-4" />
           </button>
@@ -506,24 +508,24 @@ export function MobileLearnWorkspace({
 
       {/* Main Content Area Based on Active Tab */}
       <div className="flex-1 overflow-y-auto pb-20">
-        {/* TAB 1: SUMBER */}
+        {/* TAB 1: SOURCES */}
         {activeTab === "sources" && (
           <div className="p-4 space-y-4 max-w-lg mx-auto">
             <div className="flex items-center justify-between">
-              <span className="text-base font-medium text-foreground">Sumber Belajar</span>
+              <span className="text-base font-semibold tracking-tight text-foreground">Learning Sources</span>
               <span className="text-xs px-2.5 py-0.5 rounded-full bg-muted text-muted-foreground font-mono">
-                {learn?.sourcesCount || 0} sumber
+                {learn?.sourcesCount || 0} {learn?.sourcesCount === 1 ? "source" : "sources"}
               </span>
             </div>
 
-            {/* "+ Tambahkan sumber" Button */}
+            {/* "+ Add source" Button */}
             <button
               type="button"
               onClick={() => setIsAddSourceOpen(true)}
               className="w-full py-2.5 px-4 rounded-full border border-border hover:border-border/80 bg-muted/50 hover:bg-muted text-xs font-medium text-foreground flex items-center justify-center gap-1.5 transition-all cursor-pointer"
             >
               <Plus className="h-4 w-4" />
-              <span>Tambahkan sumber</span>
+              <span>Add source</span>
             </button>
 
             {/* Search Box */}
@@ -532,14 +534,14 @@ export function MobileLearnWorkspace({
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Telusuri sumber baru di web"
+                placeholder="Search for new sources on the web"
                 className="w-full bg-transparent text-xs text-foreground placeholder:text-muted-foreground/60 outline-none px-1 py-1"
               />
               <div className="flex items-center justify-between mt-2 pt-1">
                 <div className="flex items-center gap-1.5">
                   <button
                     type="button"
-                    onClick={() => setWebScope(webScope === "Web" ? "Jurnal" : "Web")}
+                    onClick={() => setWebScope(webScope === "Web" ? "Journal" : "Web")}
                     className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-background/60 hover:bg-background text-[11px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer border border-border/40"
                   >
                     <Globe className="h-2.5 w-2.5" />
@@ -551,7 +553,7 @@ export function MobileLearnWorkspace({
                     type="button"
                     onClick={() =>
                       setResearchSpeed(
-                        researchSpeed === "Riset Cepat" ? "Riset Mendalam" : "Riset Cepat"
+                        researchSpeed === "Fast Research" ? "Deep Research" : "Fast Research"
                       )
                     }
                     className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-background/60 hover:bg-background text-[11px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer border border-border/40"
@@ -565,7 +567,7 @@ export function MobileLearnWorkspace({
                 <button
                   type="button"
                   className="h-6 w-6 rounded-full bg-background hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer border border-border/40"
-                  aria-label="Cari"
+                  aria-label="Search"
                 >
                   <Search className="h-3 w-3" />
                 </button>
@@ -578,19 +580,19 @@ export function MobileLearnWorkspace({
                 <FileText className="h-6 w-6 stroke-[1.5]" />
               </div>
               <h3 className="text-sm font-medium text-foreground mb-1">
-                Sumber yang telah disimpan akan muncul di sini
+                Saved sources will appear here
               </h3>
               <p className="text-xs text-muted-foreground leading-relaxed max-w-[260px] mb-3">
-                Tambahkan file, catatan, atau referensi web untuk melandasi pemikiran agent Anda.
+                Add files, notes, or web links to ground your AI assistant.
               </p>
               <p className="text-xs text-muted-foreground">
-                Lepaskan file di sini atau{" "}
+                Drop files here or{" "}
                 <button
                   type="button"
                   onClick={() => setIsAddSourceOpen(true)}
                   className="text-foreground underline underline-offset-2 hover:text-primary transition-colors cursor-pointer"
                 >
-                  tambahkan sumber
+                  add sources
                 </button>
               </p>
             </div>
@@ -648,21 +650,21 @@ export function MobileLearnWorkspace({
             {messages.length === 0 ? (
               <div className="my-auto py-6">
                 <div className="text-3xl mb-3 select-none">👋</div>
-                <h1 className="text-xl font-serif font-medium tracking-tight text-foreground mb-2">
-                  Ruang Belajar Socrates
+                <h1 className="text-xl font-sans font-semibold tracking-tight text-foreground mb-2">
+                  Socratic Learning Studio
                 </h1>
                 <p className="text-xs text-muted-foreground leading-relaxed mb-5">
-                  Dengan ruang belajar ini, Anda dapat memahami konsep rumit, membedah dokumen materi, atau menghasilkan simulasi bersama asisten cerdas.
+                  Explore complex concepts, dissect research materials, or generate simulations with your AI tutor.
                 </p>
                 <p className="text-xs text-muted-foreground/80 font-medium mb-3">
-                  Apa yang ingin Anda eksplorasi?
+                  What would you like to explore today?
                 </p>
 
                 <div className="flex flex-col gap-2">
                   {[
-                    "Pelajari topik baru",
-                    "Bedah materi & hipotesis",
-                    "Buat ringkasan cerdas",
+                    "Explore a new topic",
+                    "Analyze material & hypotheses",
+                    "Create a smart summary",
                   ].map((chip) => (
                     <button
                       key={chip}
@@ -696,8 +698,8 @@ export function MobileLearnWorkspace({
                               type="button"
                               onClick={() =>
                                 setExpandedThinkingIds((prev) => ({
-                                  ...prev,
-                                  [msg.id]: !prev[msg.id],
+                                   ...prev,
+                                   [msg.id]: !prev[msg.id],
                                 }))
                               }
                               className="w-full px-3 py-1.5 flex items-center justify-between text-muted-foreground hover:text-foreground transition-colors cursor-pointer select-none bg-muted/20"
@@ -754,8 +756,8 @@ export function MobileLearnWorkspace({
                   disabled={isStreaming}
                   placeholder={
                     isStreaming
-                      ? "Sedang memproses..."
-                      : `Tanyakan apa saja kepada ${currentModel.name}...`
+                      ? "Processing..."
+                      : `Ask ${currentModel.name} anything...`
                   }
                   className="flex-1 bg-transparent text-xs text-foreground placeholder:text-muted-foreground/60 outline-none px-3 disabled:opacity-50"
                 />
@@ -765,7 +767,7 @@ export function MobileLearnWorkspace({
                     type="submit"
                     disabled={!inputMessage.trim() || isStreaming}
                     className="h-8 w-8 rounded-full bg-foreground text-background hover:opacity-90 disabled:opacity-30 flex items-center justify-center transition-all cursor-pointer active:scale-95"
-                    aria-label="Kirim"
+                    aria-label="Send"
                   >
                     {isStreaming ? (
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -783,7 +785,7 @@ export function MobileLearnWorkspace({
         {activeTab === "tools" && (
           <div className="p-4 space-y-5 max-w-lg mx-auto">
             <div className="flex items-center justify-between">
-              <span className="text-base font-medium text-foreground">Studio Tools</span>
+              <span className="text-base font-semibold tracking-tight text-foreground">Studio Tools</span>
             </div>
 
             {/* 3x3 Grid of Tools */}
@@ -796,7 +798,7 @@ export function MobileLearnWorkspace({
                     type="button"
                     onClick={() => {
                       setActiveTab("chat");
-                      handleSend(`Tolong buatkan ${tool.name} untuk notebook ini.`);
+                      handleSend(`Please create a ${tool.name} for this notebook.`);
                     }}
                     className="p-2.5 rounded-2xl bg-muted/50 hover:bg-muted border border-border/50 transition-all flex flex-col justify-between h-20 text-left cursor-pointer active:scale-98"
                   >
@@ -815,12 +817,12 @@ export function MobileLearnWorkspace({
             {/* Artifacts / Downloads Section */}
             <div className="pt-2">
               <div className="flex items-center justify-between mb-2.5">
-                <span className="text-sm font-medium text-foreground">
-                  File & Artifacts Hasil Generate
+                <span className="text-sm font-semibold tracking-tight text-foreground">
+                  Generated Files & Artifacts
                 </span>
                 {artifacts && artifacts.length > 0 && (
                   <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted font-mono text-muted-foreground">
-                    {artifacts.length} file
+                    {artifacts.length} {artifacts.length === 1 ? "file" : "files"}
                   </span>
                 )}
               </div>
@@ -858,7 +860,7 @@ export function MobileLearnWorkspace({
                         className="h-8 px-3 rounded-full bg-muted hover:bg-muted/80 text-foreground text-xs flex items-center gap-1.5 transition-colors cursor-pointer border border-border/40 shrink-0"
                       >
                         <Download className="h-3 w-3" />
-                        <span>Unduh</span>
+                        <span>Download</span>
                       </button>
                     </div>
                   ))}
@@ -869,10 +871,10 @@ export function MobileLearnWorkspace({
                     <PenTool className="h-5 w-5 stroke-[1.5]" />
                   </div>
                   <h3 className="text-xs font-medium text-foreground mb-1">
-                    Belum ada artifacts atau file zip tersimpan
+                    No artifacts or zip files saved yet
                   </h3>
                   <p className="text-[11px] text-muted-foreground leading-relaxed max-w-[240px]">
-                    Setiap folder zip atau file hasil komputasi sandbox akan muncul di sini dan dapat diunduh langsung.
+                    Any zip archives or files produced in sandbox computing will appear here and can be downloaded directly.
                   </p>
                 </div>
               )}
@@ -881,9 +883,9 @@ export function MobileLearnWorkspace({
         )}
       </div>
 
-      {/* FIXED BOTTOM NAVIGATION BAR: Sumber, Chat, Tools */}
+      {/* FIXED BOTTOM NAVIGATION BAR: Sources, Chat, Tools */}
       <nav className="fixed bottom-0 left-0 right-0 h-16 bg-card/80 backdrop-blur-md border-t border-border/50 flex items-center justify-around px-4 z-20">
-        {/* Tab 1: Sumber */}
+        {/* Tab 1: Sources */}
         <button
           type="button"
           onClick={() => setActiveTab("sources")}
@@ -894,7 +896,7 @@ export function MobileLearnWorkspace({
           }`}
         >
           <FolderOpen className="h-5 w-5" />
-          <span className="text-[10px] mt-1 tracking-tight">Sumber</span>
+          <span className="text-[10px] mt-1 tracking-tight">Sources</span>
         </button>
 
         {/* Tab 2: Chat */}

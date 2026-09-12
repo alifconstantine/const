@@ -86,16 +86,16 @@ export function CreateLearnDialog({
       <DialogContent className="w-[92vw] max-w-[400px] p-5 rounded-2xl border border-border/80 bg-card text-card-foreground shadow-lg">
         <form onSubmit={handleSubmit} className="space-y-4">
           <DialogHeader>
-            <DialogTitle className="font-serif text-lg font-medium tracking-tight text-foreground flex items-center gap-2">
+            <DialogTitle className="font-sans text-lg font-semibold tracking-tight text-foreground flex items-center gap-2">
               <BookOpen className="h-5 w-5 text-primary" />
-              {isEdit ? "Ubah Detail Learn" : "Buat Learn Baru"}
+              {isEdit ? "Edit Notebook" : "New Notebook"}
             </DialogTitle>
           </DialogHeader>
 
           {/* Emoji Picker */}
           <div>
             <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
-              Pilih Ikon / Emoji
+              Choose Icon / Emoji
             </label>
             <div className="grid grid-cols-8 gap-1.5 p-2 rounded-xl bg-secondary/50 border border-border/60">
               {EMOJI_OPTIONS.map((emoji) => (
@@ -118,12 +118,12 @@ export function CreateLearnDialog({
           {/* Title input */}
           <div className="space-y-1">
             <label className="text-xs font-medium text-muted-foreground">
-              Judul Learn
+              Notebook Title
             </label>
             <Input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Contoh: Kimi K3 Architecture"
+              placeholder="e.g. Machine Learning Systems"
               className="h-10 rounded-xl bg-secondary/40 border-border/70 text-sm focus-visible:ring-1 focus-visible:ring-ring"
               autoFocus
               required
@@ -133,12 +133,12 @@ export function CreateLearnDialog({
           {/* Description input */}
           <div className="space-y-1">
             <label className="text-xs font-medium text-muted-foreground">
-              Deskripsi (Opsional)
+              Description (Optional)
             </label>
             <Input
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Catatan ringkas materi"
+              placeholder="Brief summary or topic notes"
               className="h-10 rounded-xl bg-secondary/40 border-border/70 text-sm focus-visible:ring-1 focus-visible:ring-ring"
             />
           </div>
@@ -147,7 +147,7 @@ export function CreateLearnDialog({
           {!isEdit && collections.length > 0 && (
             <div className="space-y-1">
               <label className="text-xs font-medium text-muted-foreground">
-                Kategori Koleksi (Opsional)
+                Collection (Optional)
               </label>
               <select
                 value={selectedCollectionId ?? ""}
@@ -156,7 +156,7 @@ export function CreateLearnDialog({
                 }
                 className="w-full h-10 px-3 rounded-xl bg-secondary/40 border border-border/70 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
               >
-                <option value="">Tanpa Koleksi</option>
+                <option value="">No Collection</option>
                 {collections.map((col) => (
                   <option key={col.id} value={col.id}>
                     {col.name}
@@ -173,14 +173,14 @@ export function CreateLearnDialog({
               onClick={() => onOpenChange(false)}
               className="rounded-full cursor-pointer h-9 px-4 text-xs flex-1"
             >
-              Batal
+              Cancel
             </Button>
             <Button
               type="submit"
               disabled={!title.trim() || isSubmitting}
               className="rounded-full cursor-pointer h-9 px-5 text-xs font-medium flex-1"
             >
-              {isSubmitting ? "Menyimpan..." : isEdit ? "Perbarui" : "Buat"}
+              {isSubmitting ? "Saving..." : isEdit ? "Update" : "Create"}
             </Button>
           </DialogFooter>
         </form>

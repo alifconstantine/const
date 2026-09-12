@@ -50,12 +50,12 @@ export function ManageCollectionDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[92vw] max-w-[400px] p-5 rounded-2xl border border-border/80 bg-card text-card-foreground shadow-lg">
         <DialogHeader>
-          <DialogTitle className="font-serif text-lg font-medium tracking-tight text-foreground flex items-center gap-2">
+          <DialogTitle className="font-sans text-lg font-semibold tracking-tight text-foreground flex items-center gap-2">
             <Folder className="h-5 w-5 text-primary" />
-            Kelola Koleksi
+            Manage Collections
           </DialogTitle>
           <p className="text-xs text-muted-foreground line-clamp-1 pt-1">
-            Materi: <span className="text-foreground font-medium">{learnTitle}</span>
+            Notebook: <span className="text-foreground font-medium">{learnTitle}</span>
           </p>
         </DialogHeader>
 
@@ -63,7 +63,7 @@ export function ManageCollectionDialog({
           {collections.length === 0 ? (
             <div className="text-center py-6 px-4 bg-secondary/30 rounded-xl border border-dashed border-border/70">
               <p className="text-xs text-muted-foreground">
-                Belum ada koleksi yang dibuat.
+                No collections created yet.
               </p>
               {onCreateNewCollection && (
                 <Button
@@ -75,7 +75,7 @@ export function ManageCollectionDialog({
                   }}
                   className="mt-3 rounded-full text-xs h-8 cursor-pointer"
                 >
-                  + Buat Koleksi Baru
+                  + Create New Collection
                 </Button>
               )}
             </div>
@@ -121,7 +121,7 @@ export function ManageCollectionDialog({
             onClick={() => onOpenChange(false)}
             className="rounded-full cursor-pointer h-9 px-5 text-xs font-medium w-full"
           >
-            Selesai
+            Done
           </Button>
         </DialogFooter>
       </DialogContent>

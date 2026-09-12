@@ -74,16 +74,16 @@ export function CreateCollectionDialog({
       <DialogContent className="w-[92vw] max-w-[400px] p-5 rounded-2xl border border-border/80 bg-card text-card-foreground shadow-lg">
         <form onSubmit={handleSubmit} className="space-y-4">
           <DialogHeader>
-            <DialogTitle className="font-serif text-lg font-medium tracking-tight text-foreground flex items-center gap-2">
+            <DialogTitle className="font-sans text-lg font-semibold tracking-tight text-foreground flex items-center gap-2">
               <FolderPlus className="h-5 w-5 text-primary" />
-              {isEdit ? "Ubah Koleksi" : "Buat Koleksi Baru"}
+              {isEdit ? "Edit Collection" : "New Collection"}
             </DialogTitle>
           </DialogHeader>
 
           {/* Emoji Picker */}
           <div>
             <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
-              Ikon Koleksi
+              Choose Icon / Emoji
             </label>
             <div className="grid grid-cols-6 gap-2 p-2 rounded-xl bg-secondary/50 border border-border/60">
               {COLLECTION_EMOJIS.map((emoji) => (
@@ -106,12 +106,12 @@ export function CreateCollectionDialog({
           {/* Name input */}
           <div className="space-y-1">
             <label className="text-xs font-medium text-muted-foreground">
-              Nama Koleksi
+              Collection Name
             </label>
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Contoh: Kecerdasan Buatan"
+              placeholder="e.g. Artificial Intelligence"
               className="h-10 rounded-xl bg-secondary/40 border-border/70 text-sm focus-visible:ring-1 focus-visible:ring-ring"
               autoFocus
               required
@@ -121,12 +121,12 @@ export function CreateCollectionDialog({
           {/* Description input */}
           <div className="space-y-1">
             <label className="text-xs font-medium text-muted-foreground">
-              Deskripsi (Opsional)
+              Description (Optional)
             </label>
             <Input
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Kategori topik materi"
+              placeholder="Topic or category summary"
               className="h-10 rounded-xl bg-secondary/40 border-border/70 text-sm focus-visible:ring-1 focus-visible:ring-ring"
             />
           </div>
@@ -138,14 +138,14 @@ export function CreateCollectionDialog({
               onClick={() => onOpenChange(false)}
               className="rounded-full cursor-pointer h-9 px-4 text-xs flex-1"
             >
-              Batal
+              Cancel
             </Button>
             <Button
               type="submit"
               disabled={!name.trim() || isSubmitting}
               className="rounded-full cursor-pointer h-9 px-5 text-xs font-medium flex-1"
             >
-              {isSubmitting ? "Menyimpan..." : isEdit ? "Perbarui" : "Buat"}
+              {isSubmitting ? "Saving..." : isEdit ? "Update" : "Create"}
             </Button>
           </DialogFooter>
         </form>

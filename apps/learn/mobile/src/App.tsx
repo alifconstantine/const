@@ -20,6 +20,9 @@ function AuthenticatedContent({
   const [activeLearnId, setActiveLearnId] = useState<string | null>(null);
   const [openAddSourceOnLoad, setOpenAddSourceOnLoad] = useState(false);
 
+  const [searchQuery, setSearchQuery] = useState("");
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+
   const handleOpenLearn = (learnId: string, openAddSource = false) => {
     setActiveLearnId(learnId);
     setOpenAddSourceOnLoad(openAddSource);
@@ -38,7 +41,7 @@ function AuthenticatedContent({
         onBack={handleBackToHome}
         onCreateNew={async () => {
           const id = await localDb.createLearn({
-            title: "Notebook tanpa judul",
+            title: "Untitled notebook",
             emoji: "📘",
           });
           setActiveLearnId(id);
@@ -55,8 +58,21 @@ function AuthenticatedContent({
         user={user}
         onSignOut={onSignOut}
         onSwitchAccount={onSwitchAccount}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        isSearchOpen={isSearchOpen}
+        onToggleSearch={() => {
+          setIsSearchOpen((prev) => {
+            if (prev) setSearchQuery("");
+            return !prev;
+          });
+        }}
       />
-      <LearnHome onOpenLearn={handleOpenLearn} />
+      <LearnHome
+        onOpenLearn={handleOpenLearn}
+        searchQuery={searchQuery}
+        onSearchQueryChange={setSearchQuery}
+      />
     </div>
   );
 }
@@ -168,7 +184,7 @@ export default function App() {
         <div className="flex items-center gap-2">
           <ConstLogoIcon size="sm" className="w-6 h-6 text-foreground shrink-0" />
           <div className="flex items-center gap-2">
-            <span className="font-serif text-lg font-normal tracking-tight text-foreground">
+            <span className="font-sans text-lg font-semibold tracking-tight text-foreground">
               Const
             </span>
             <span className="text-[10px] font-mono tracking-wider uppercase px-2 py-0.5 rounded-full bg-secondary text-muted-foreground border border-border/50">
@@ -180,7 +196,7 @@ export default function App() {
 
       {/* Center Card (NO Image on right for mobile as requested) */}
       <div className="my-auto mx-auto w-full max-w-sm py-8">
-        <h1 className="font-serif text-3xl font-normal tracking-tight text-foreground sm:text-4xl">
+        <h1 className="font-sans text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
           Sign in to Const Learn.
         </h1>
         <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
@@ -194,7 +210,7 @@ export default function App() {
             className="w-full h-12 rounded-xl text-sm font-medium gap-2 cursor-pointer transition-all active:scale-[0.99]"
           >
             <LogIn className="h-4 w-4" />
-            {isWaitingAuth ? "Buka Kembali Halaman Login" : "Sign in to Const Learn"}
+            {isWaitingAuth ? "Reopen Login Page" : "Sign in to Const Learn"}
           </Button>
         </div>
       </div>

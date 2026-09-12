@@ -46,7 +46,7 @@ export function DeleteConfirmDialog({
           <div className="h-10 w-10 rounded-full bg-destructive/10 text-destructive flex items-center justify-center mb-2">
             <AlertTriangle className="h-5 w-5" />
           </div>
-          <DialogTitle className="font-serif text-base font-medium tracking-tight text-foreground">
+          <DialogTitle className="font-sans text-base font-semibold tracking-tight text-foreground">
             {title}
           </DialogTitle>
           <DialogDescription className="text-xs text-muted-foreground pt-1 leading-relaxed">
@@ -62,7 +62,7 @@ export function DeleteConfirmDialog({
             disabled={isDeleting}
             className="rounded-full cursor-pointer h-9 px-4 text-xs flex-1"
           >
-            Batal
+            Cancel
           </Button>
           <Button
             type="button"
@@ -71,7 +71,7 @@ export function DeleteConfirmDialog({
             disabled={isDeleting}
             className="rounded-full cursor-pointer h-9 px-5 text-xs font-medium flex-1 bg-destructive text-destructive-foreground hover:bg-destructive/90"
           >
-            {isDeleting ? "Menghapus..." : "Hapus"}
+            {isDeleting ? "Deleting..." : "Delete"}
           </Button>
         </DialogFooter>
       </DialogContent>

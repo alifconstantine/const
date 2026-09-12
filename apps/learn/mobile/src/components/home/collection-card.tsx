@@ -23,28 +23,29 @@ interface CollectionCardProps {
 
 export function CollectionCard({
   collection,
-  viewMode = "grid",
+  viewMode = "list",
   onClick,
   onEdit,
   onDelete,
 }: CollectionCardProps) {
-  const itemCountText = `${collection.itemCount} learn`;
+  const count = collection.itemCount;
+  const itemCountText = `${count} ${count === 1 ? "notebook" : "notebooks"}`;
 
   if (viewMode === "list") {
     return (
       <div
         onClick={() => onClick?.(collection)}
-        className="w-full px-3.5 py-3 rounded-xl border border-border/70 active:bg-secondary/50 bg-card transition-all flex items-center justify-between gap-3 cursor-pointer select-none"
+        className="w-full px-4 py-3.5 rounded-2xl border border-border/80 dark:border-white/10 bg-[#1e1e22] dark:bg-[#1e1e24] hover:bg-[#25252b] active:bg-gradient-to-r active:from-[#282832] active:to-[#1e1e24] active:scale-[0.99] transition-all duration-200 flex items-center justify-between gap-3.5 cursor-pointer select-none"
       >
-        <div className="flex items-center gap-3 min-w-0 flex-1">
-          <div className="h-9 w-9 rounded-xl bg-secondary/80 flex items-center justify-center text-lg shrink-0 border border-border/50 shadow-2xs">
+        <div className="flex items-center gap-3.5 min-w-0 flex-1">
+          <div className="h-10 w-10 rounded-xl bg-secondary/80 flex items-center justify-center text-xl shrink-0 border border-white/10 shadow-2xs">
             {collection.emoji || "📁"}
           </div>
           <div className="min-w-0 flex-1">
-            <h4 className="text-xs font-medium text-foreground truncate">
+            <h4 className="text-sm font-medium text-foreground truncate leading-snug">
               {collection.name}
             </h4>
-            <span className="text-[10px] text-muted-foreground">
+            <span className="text-xs text-muted-foreground mt-0.5 block">
               {itemCountText}
             </span>
           </div>
@@ -55,7 +56,8 @@ export function CollectionCard({
             <button
               type="button"
               onClick={(e) => e.stopPropagation()}
-              className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground active:text-foreground cursor-pointer shrink-0"
+              className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground active:text-foreground cursor-pointer shrink-0 transition-colors"
+              aria-label="Collection actions"
             >
               <MoreVertical className="h-4 w-4" />
             </button>
@@ -66,14 +68,14 @@ export function CollectionCard({
               onClick={() => onClick?.(collection)}
             >
               <FolderOpen className="h-3.5 w-3.5" />
-              <span>Buka Koleksi</span>
+              <span>Open collection</span>
             </DropdownMenuItem>
             <DropdownMenuItem
               className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2"
               onClick={() => onEdit?.(collection)}
             >
               <Edit3 className="h-3.5 w-3.5" />
-              <span>Ubah Koleksi</span>
+              <span>Edit collection</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
@@ -81,7 +83,7 @@ export function CollectionCard({
               onClick={() => onDelete?.(collection)}
             >
               <Trash2 className="h-3.5 w-3.5" />
-              <span>Hapus</span>
+              <span>Delete</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -118,14 +120,14 @@ export function CollectionCard({
               onClick={() => onClick?.(collection)}
             >
               <FolderOpen className="h-3.5 w-3.5" />
-              <span>Buka Koleksi</span>
+              <span>Open collection</span>
             </DropdownMenuItem>
             <DropdownMenuItem
               className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2"
               onClick={() => onEdit?.(collection)}
             >
               <Edit3 className="h-3.5 w-3.5" />
-              <span>Ubah Koleksi</span>
+              <span>Edit collection</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
@@ -133,7 +135,7 @@ export function CollectionCard({
               onClick={() => onDelete?.(collection)}
             >
               <Trash2 className="h-3.5 w-3.5" />
-              <span>Hapus</span>
+              <span>Delete</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

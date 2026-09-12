@@ -7,7 +7,7 @@ import {
   DropdownMenuSeparator,
   Checkbox,
 } from "@const/ui";
-import { MoreVertical, FolderPlus, Edit3, Trash2, ExternalLink } from "lucide-react";
+import { MoreVertical, FolderPlus, Edit3, Trash2, ExternalLink, Sparkles } from "lucide-react";
 import { LocalLearn } from "../../lib/db";
 
 export type LearnItem = LocalLearn;
@@ -26,20 +26,20 @@ interface LearnCardProps {
 
 function formatDate(timestamp: number): string {
   try {
-    return new Intl.DateTimeFormat("id-ID", {
-      day: "numeric",
+    return new Intl.DateTimeFormat("en-US", {
       month: "short",
+      day: "numeric",
       year: "numeric",
     }).format(new Date(timestamp));
   } catch {
     const d = new Date(timestamp);
-    return `${d.getDate()} ${d.getMonth() + 1} ${d.getFullYear()}`;
+    return `${d.toLocaleDateString("en-US")}`;
   }
 }
 
 export function LearnCard({
   learn,
-  viewMode = "grid",
+  viewMode = "list",
   isSelectionMode = false,
   isSelected = false,
   onSelect,
@@ -49,7 +49,8 @@ export function LearnCard({
   onDelete,
 }: LearnCardProps) {
   const formattedDate = formatDate(learn.updatedAt);
-  const sourcesText = `${learn.sourcesCount ?? 0} sumber`;
+  const count = learn.sourcesCount ?? 0;
+  const sourcesText = `${count} ${count === 1 ? "source" : "sources"}`;
 
   const handleCardClick = (e: React.MouseEvent) => {
     if (isSelectionMode) {
@@ -64,13 +65,13 @@ export function LearnCard({
     return (
       <div
         onClick={handleCardClick}
-        className={`w-full px-3.5 py-3 rounded-xl border transition-all flex items-center justify-between gap-3 cursor-pointer select-none ${
+        className={`w-full px-4 py-3.5 rounded-2xl border transition-all duration-200 flex items-center justify-between gap-3.5 cursor-pointer select-none ${
           isSelected
-            ? "border-primary/70 bg-secondary/80"
-            : "border-border/70 active:bg-secondary/50 bg-card"
+            ? "border-primary/80 bg-secondary/90 ring-1 ring-primary/40"
+            : "border-border/80 dark:border-white/10 bg-[#1e1e22] dark:bg-[#1e1e24] hover:bg-[#25252b] active:bg-gradient-to-r active:from-[#282832] active:to-[#1e1e24] active:scale-[0.99]"
         }`}
       >
-        <div className="flex items-center gap-3 min-w-0 flex-1">
+        <div className="flex items-center gap-3.5 min-w-0 flex-1">
           {isSelectionMode ? (
             <div onClick={(e) => e.stopPropagation()} className="shrink-0 p-1">
               <Checkbox
@@ -80,16 +81,16 @@ export function LearnCard({
               />
             </div>
           ) : (
-            <div className="h-9 w-9 rounded-xl bg-secondary/80 flex items-center justify-center text-lg shrink-0 border border-border/50 shadow-2xs">
+            <div className="h-10 w-10 rounded-xl bg-secondary/80 flex items-center justify-center text-xl shrink-0 border border-white/10 shadow-2xs">
               {learn.emoji || "🚀"}
             </div>
           )}
           <div className="min-w-0 flex-1">
-            <h4 className="text-xs font-medium text-foreground truncate">
+            <h4 className="text-sm font-medium text-foreground truncate leading-snug">
               {learn.title}
             </h4>
-            <span className="text-[10px] text-muted-foreground">
-              {formattedDate} • {sourcesText}
+            <span className="text-xs text-muted-foreground mt-0.5 block">
+              {sourcesText} • {formattedDate}
             </span>
           </div>
         </div>
@@ -99,9 +100,10 @@ export function LearnCard({
             <button
               type="button"
               onClick={(e) => e.stopPropagation()}
-              className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground active:text-foreground cursor-pointer shrink-0"
+              className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground active:text-foreground cursor-pointer shrink-0 transition-colors"
+              aria-label="Notebook actions"
             >
-              <MoreVertical className="h-4 w-4" />
+              <Sparkles className="h-4 w-4" />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48 p-1.5 shadow-md mr-2">
@@ -110,21 +112,21 @@ export function LearnCard({
               onClick={() => onClick?.(learn)}
             >
               <ExternalLink className="h-3.5 w-3.5" />
-              <span>Buka Learn</span>
+              <span>Open notebook</span>
             </DropdownMenuItem>
             <DropdownMenuItem
               className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2"
               onClick={() => onManageCollections?.(learn)}
             >
               <FolderPlus className="h-3.5 w-3.5" />
-              <span>Kelola Koleksi</span>
+              <span>Manage collections</span>
             </DropdownMenuItem>
             <DropdownMenuItem
               className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2"
               onClick={() => onEdit?.(learn)}
             >
               <Edit3 className="h-3.5 w-3.5" />
-              <span>Ubah Nama</span>
+              <span>Rename</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
@@ -132,7 +134,7 @@ export function LearnCard({
               onClick={() => onDelete?.(learn)}
             >
               <Trash2 className="h-3.5 w-3.5" />
-              <span>Hapus</span>
+              <span>Delete</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -182,21 +184,21 @@ export function LearnCard({
                 onClick={() => onClick?.(learn)}
               >
                 <ExternalLink className="h-3.5 w-3.5" />
-                <span>Buka Learn</span>
+                <span>Open notebook</span>
               </DropdownMenuItem>
               <DropdownMenuItem
                 className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2"
                 onClick={() => onManageCollections?.(learn)}
               >
                 <FolderPlus className="h-3.5 w-3.5" />
-                <span>Kelola Koleksi</span>
+                <span>Manage collections</span>
               </DropdownMenuItem>
               <DropdownMenuItem
                 className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2"
                 onClick={() => onEdit?.(learn)}
               >
                 <Edit3 className="h-3.5 w-3.5" />
-                <span>Ubah Nama</span>
+                <span>Rename</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
@@ -204,7 +206,7 @@ export function LearnCard({
                 onClick={() => onDelete?.(learn)}
               >
                 <Trash2 className="h-3.5 w-3.5" />
-                <span>Hapus</span>
+                <span>Delete</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
