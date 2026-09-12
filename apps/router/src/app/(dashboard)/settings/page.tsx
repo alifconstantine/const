@@ -45,7 +45,7 @@ export default function SettingsPage() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   // Gateway preferences state (persisted locally)
-  const [defaultModel, setDefaultModel] = useState("gemini-3.6-flash");
+  const [defaultModel, setDefaultModel] = useState("gemini-3.8-flash");
   const [defaultTemperature, setDefaultTemperature] = useState(0.7);
   const [enableStreaming, setEnableStreaming] = useState(true);
   const [logPayloads, setLogPayloads] = useState(true);
@@ -124,7 +124,7 @@ export default function SettingsPage() {
   };
 
   const handleResetDefaults = () => {
-    setDefaultModel("gemini-3.6-flash");
+    setDefaultModel("gemini-3.8-flash");
     setDefaultTemperature(0.7);
     setEnableStreaming(true);
     setLogPayloads(true);
@@ -197,9 +197,8 @@ export default function SettingsPage() {
                 <SelectValue placeholder="Select model" />
               </SelectTrigger>
               <SelectContent className="rounded-xl bg-card border-none text-foreground">
-                <SelectItem value="gemini-3.6-flash">gemini-3.6-flash (Recommended)</SelectItem>
+                <SelectItem value="gemini-3.8-flash">gemini-3.8-flash (Recommended)</SelectItem>
                 <SelectItem value="gemini-3.7-flash">gemini-3.7-flash</SelectItem>
-                <SelectItem value="gemini-3.8-flash">gemini-3.8-flash</SelectItem>
                 <SelectItem value="combo/coding">combo/coding (Coding Chain)</SelectItem>
                 <SelectItem value="combo/fast">combo/fast (Low-Latency)</SelectItem>
                 <SelectItem value="combo/auto">combo/auto (Auto-Router)</SelectItem>

@@ -95,7 +95,7 @@ const PRESET_PROVIDERS: ProviderDefinition[] = [
     name: "Const",
     category: "managed",
     protocol: "openai-compatible",
-    description: "Platform Managed High-Speed infrastructure with default Gemini 3.6 Flash pool.",
+    description: "Platform Managed High-Speed infrastructure with default Gemini 3.8 Flash pool.",
     docUrl: "/endpoints",
     iconLetter: "C",
   },

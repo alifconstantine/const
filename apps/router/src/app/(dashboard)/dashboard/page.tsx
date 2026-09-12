@@ -233,7 +233,7 @@ export default function DashboardOverviewPage() {
   const userName = user?.name ? user.name.split(" ")[0] : null;
 
   const apiEndpoint = "https://router.const.web.id/v1/chat/completions";
-  const defaultModel = "gemini-3.6-flash";
+  const defaultModel = "gemini-3.8-flash";
 
   const copyToClipboard = (text: string, setter: (val: boolean) => void, label: string) => {
     navigator.clipboard.writeText(text);

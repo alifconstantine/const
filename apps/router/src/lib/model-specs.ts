@@ -25,9 +25,9 @@ export interface ModelSpec {
 // Built-in models matching exactly what is listed in /models
 export const BUILTIN_MODELS: ModelSpec[] = [
   {
-    id: "gemini-3.6-flash",
-    name: "Gemini 3.6 Flash",
-    modelId: "gemini-3.6-flash",
+    id: "gemini-3.8-flash",
+    name: "Gemini 3.8 Flash",
+    modelId: "gemini-3.8-flash",
     provider: "const",
     providerName: "Const",
     supportsThinking: true,
@@ -38,15 +38,6 @@ export const BUILTIN_MODELS: ModelSpec[] = [
     id: "gemini-3.7-flash",
     name: "Gemini 3.7 Flash",
     modelId: "gemini-3.7-flash",
-    provider: "const",
-    providerName: "Const",
-    supportsThinking: true,
-    thinkingDefault: "medium",
-  },
-  {
-    id: "gemini-3.8-flash",
-    name: "Gemini 3.8 Flash",
-    modelId: "gemini-3.8-flash",
     provider: "const",
     providerName: "Const",
     supportsThinking: true,
@@ -69,22 +60,12 @@ export function findModelSpec(modelId: string, customModels: ModelSpec[] = []): 
 
 /**
  * Normalizes any variation of Const managed model IDs to the exact OmniRoute combo model title.
- * - "gemini-3.6-flash", "gemini 3.6 flash", "Gemini 3.6 Flash" -> "Gemini 3.6 Flash"
  * - "gemini-3.7-flash", "gemini 3.7 flash", "Gemini 3.7 Flash" -> "Gemini 3.7 Flash"
  * - "gemini-3.8-flash", "gemini 3.8 flash", "Gemini 3.8 Flash" -> "Gemini 3.8 Flash"
  */
 export function normalizeConstModelName(modelId: string): string {
   if (!modelId) return modelId;
   const clean = modelId.toLowerCase().trim();
-  if (
-    clean === "const" ||
-    clean === "gemini-3.6-flash" ||
-    clean === "gemini 3.6 flash" ||
-    clean.startsWith("antigravity/gemini-3.6") ||
-    clean.startsWith("gemini-3.6")
-  ) {
-    return "Gemini 3.6 Flash";
-  }
   if (
     clean === "gemini-3.7-flash" ||
     clean === "gemini 3.7 flash" ||
@@ -112,11 +93,9 @@ export function isBuiltinModel(modelId: string, customModels: ModelSpec[] = []):
   const clean = modelId.toLowerCase().trim();
   if (clean.startsWith("antigravity/")) return true;
   if (
-    clean === "const" ||
-    clean === "gemini-3.6-flash" || clean === "gemini 3.6 flash" ||
     clean === "gemini-3.7-flash" || clean === "gemini 3.7 flash" ||
     clean === "gemini-3.8-flash" || clean === "gemini 3.8 flash" ||
-    clean.startsWith("gemini-3.")
+    clean.startsWith("gemini-3.8") || clean.startsWith("gemini-3.7")
   ) {
     return true;
   }
@@ -155,7 +134,7 @@ export function isNonGenerativeModel(modelId: string): boolean {
 
 /**
  * Checks if a model identifier/configuration already includes a preset fixed thinking tier
- * (e.g. gemini-3.8-flash-high, gemini-3.6-flash-low, ...-medium, etc.).
+ * (e.g. gemini-3.8-flash-high, gemini-3.7-flash-low, ...-medium, etc.).
  * For these models, thinking is already preconfigured in the provider configuration,
  * so the dynamic thinking UI should NOT be shown.
  */

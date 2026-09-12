@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
     const body: ChatRequestBody = await req.json();
     const {
       messages = [],
-      model = "gemini-3.6-flash",
+      model,
       systemInstruction = "",
       temperature = 0.7,
       thinkingLevel = "medium",
@@ -78,6 +78,13 @@ export async function POST(req: NextRequest) {
       providerId = "const",
       providerDocId,
     } = body;
+
+    if (!model || typeof model !== "string" || !model.trim()) {
+      return NextResponse.json(
+        { error: { message: "The 'model' field is required." } },
+        { status: 400 }
+      );
+    }
 
     // Extract authentication tokens safely
     const cookieToken = req.cookies.get("const_sso_token")?.value;
@@ -215,7 +222,7 @@ export async function POST(req: NextRequest) {
     }
 
     // ========================================================
-    // CASE A: Const (Built-in Managed Gemini 3.6 / 3.7 / 3.8 Flash)
+    // CASE A: Const (Built-in Managed Gemini 3.7 / 3.8 Flash)
     // ========================================================
     const isConstBuiltin =
       (providerId === "const" || isBuiltinModel(model)) && !providerDocId;

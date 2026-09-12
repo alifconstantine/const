@@ -98,7 +98,7 @@ export default function CombosPage() {
 
   // Stage 2 Builder State (Provider & Model Selectors)
   const [builderProviderId, setBuilderProviderId] = useState<string>("const");
-  const [builderModelId, setBuilderModelId] = useState<string>("gemini-3.6-flash");
+  const [builderModelId, setBuilderModelId] = useState<string>("gemini-3.8-flash");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Delete State
@@ -130,7 +130,7 @@ export default function CombosPage() {
     setSystemMessage("");
     setSelectedModels([]); // Starts with 0 models
     setBuilderProviderId("const");
-    setBuilderModelId("gemini-3.6-flash");
+    setBuilderModelId("gemini-3.8-flash");
     setStep(1);
     setIsWizardOpen(true);
   };
@@ -153,7 +153,7 @@ export default function CombosPage() {
       }))
     );
     setBuilderProviderId("const");
-    setBuilderModelId("gemini-3.6-flash");
+    setBuilderModelId("gemini-3.8-flash");
     setStep(1);
     setIsWizardOpen(true);
   };
@@ -180,9 +180,8 @@ export default function CombosPage() {
         name: "Const Gateway",
         status: "active",
         models: [
-          { modelId: "gemini-3.6-flash", name: "Gemini 3.6 Flash (Managed)" },
-          { modelId: "gemini-3.7-flash", name: "Gemini 3.7 Flash (Managed)" },
           { modelId: "gemini-3.8-flash", name: "Gemini 3.8 Flash (Managed)" },
+          { modelId: "gemini-3.7-flash", name: "Gemini 3.7 Flash (Managed)" },
         ],
       },
     ];

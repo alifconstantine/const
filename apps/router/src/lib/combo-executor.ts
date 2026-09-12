@@ -104,17 +104,14 @@ export async function executeComboChat(
       auto: [
         { modelId: "gemini-3.8-flash", providerId: "const", providerName: "Const Gateway", priority: 1 },
         { modelId: "gemini-3.7-flash", providerId: "const", providerName: "Const Gateway", priority: 2 },
-        { modelId: "gemini-3.6-flash", providerId: "const", providerName: "Const Gateway", priority: 3 },
       ],
       fast: [
         { modelId: "gemini-3.8-flash", providerId: "const", providerName: "Const Gateway", priority: 1 },
         { modelId: "gemini-3.7-flash", providerId: "const", providerName: "Const Gateway", priority: 2 },
-        { modelId: "gemini-3.6-flash", providerId: "const", providerName: "Const Gateway", priority: 3 },
       ],
       coding: [
         { modelId: "gemini-3.8-flash", providerId: "const", providerName: "Const Gateway", priority: 1 },
         { modelId: "gemini-3.7-flash", providerId: "const", providerName: "Const Gateway", priority: 2 },
-        { modelId: "gemini-3.6-flash", providerId: "const", providerName: "Const Gateway", priority: 3 },
       ],
     };
 

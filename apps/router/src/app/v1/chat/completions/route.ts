@@ -295,7 +295,7 @@ async function dispatchSingleModel({
   reqStartTime: number;
   signal?: AbortSignal;
 }): Promise<Response> {
-  // CASE A: Const (Built-in Managed Models, e.g. Gemini 3.6 / 3.7 / 3.8 Flash)
+  // CASE A: Const (Built-in Managed Models, e.g. Gemini 3.7 / 3.8 Flash)
   const isConstBuiltin = isBuiltinModel(targetModel) && !providerDocId;
 
   if (isConstBuiltin) {

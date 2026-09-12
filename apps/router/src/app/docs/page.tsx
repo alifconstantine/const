@@ -321,10 +321,10 @@ export default function DocsPage() {
                       onClick={() => {
                         const snippet =
                           requestTab === "curl"
-                            ? `curl -X POST "${baseUrl}/chat/completions" \\\n  -H "Content-Type: application/json" \\\n  -H "Authorization: Bearer sk-const-live-yourkey" \\\n  -d '{"model": "gemini-3.6-flash", "messages": [{"role": "user", "content": "Hello!"}]}'`
+                            ? `curl -X POST "${baseUrl}/chat/completions" \\\n  -H "Content-Type: application/json" \\\n  -H "Authorization: Bearer sk-const-live-yourkey" \\\n  -d '{"model": "gemini-3.8-flash", "messages": [{"role": "user", "content": "Hello!"}]}'`
                             : requestTab === "python"
-                            ? `from openai import OpenAI\n\nclient = OpenAI(base_url="${baseUrl}", api_key="sk-const-live-yourkey")\nresponse = client.chat.completions.create(model="gemini-3.6-flash", messages=[{"role": "user", "content": "Hello!"}])\nprint(response.choices[0].message.content)`
-                            : `import OpenAI from "openai";\n\nconst client = new OpenAI({ baseURL: "${baseUrl}", apiKey: "sk-const-live-yourkey" });\nconst response = await client.chat.completions.create({ model: "gemini-3.6-flash", messages: [{ role: "user", content: "Hello!" }] });\nconsole.log(response.choices[0].message.content);`;
+                            ? `from openai import OpenAI\n\nclient = OpenAI(base_url="${baseUrl}", api_key="sk-const-live-yourkey")\nresponse = client.chat.completions.create(model="gemini-3.8-flash", messages=[{"role": "user", "content": "Hello!"}])\nprint(response.choices[0].message.content)`
+                            : `import OpenAI from "openai";\n\nconst client = new OpenAI({ baseURL: "${baseUrl}", apiKey: "sk-const-live-yourkey" });\nconst response = await client.chat.completions.create({ model: "gemini-3.8-flash", messages: [{ role: "user", content: "Hello!" }] });\nconsole.log(response.choices[0].message.content);`;
                         handleCopy(snippet, `qs-req-${requestTab}`);
                       }}
                       className="flex items-center gap-1 hover:text-white transition-colors cursor-pointer"
@@ -349,7 +349,7 @@ export default function DocsPage() {
   -H "Content-Type: application/json" \\
   -H "Authorization: Bearer sk-const-live-yourkey" \\
   -d '{
-    "model": "gemini-3.6-flash",
+    "model": "gemini-3.8-flash",
     "messages": [
       {"role": "system", "content": "You are a precise technical writer."},
       {"role": "user", "content": "Summarize distributed consensus in one sentence."}
@@ -367,7 +367,7 @@ client = OpenAI(
 )
 
 response = client.chat.completions.create(
-    model="gemini-3.6-flash",
+    model="gemini-3.8-flash",
     messages=[
         {"role": "user", "content": "Explain quantum computing in one sentence."}
     ],
@@ -386,7 +386,7 @@ const client = new OpenAI({
 
 async function main() {
   const completion = await client.chat.completions.create({
-    model: "gemini-3.6-flash",
+    model: "gemini-3.8-flash",
     messages: [{ role: "user", content: "Explain quantum computing." }],
   });
 
@@ -404,7 +404,7 @@ main();`}</pre>
     "Authorization": "Bearer sk-const-live-yourkey",
   },
   body: JSON.stringify({
-    model: "gemini-3.6-flash",
+    model: "gemini-3.8-flash",
     messages: [{ role: "user", content: "Hello from browser fetch!" }],
   }),
 });
@@ -507,7 +507,7 @@ data: [DONE]`}</pre>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="p-4 rounded-xl bg-[#222222] border border-[#383838]/60 space-y-1.5">
                   <div className="flex items-center justify-between">
-                    <code className="text-sm font-mono font-semibold text-white">gemini-3.6-flash</code>
+                    <code className="text-sm font-mono font-semibold text-white">gemini-3.8-flash</code>
                     <Badge className="bg-[#1b1b1b] text-white text-[10px] font-mono border border-[#2e2e2e]">Default</Badge>
                   </div>
                   <p className="text-xs text-[#969696] font-light">
@@ -606,14 +606,14 @@ data: [DONE]`}</pre>
                 <div className="flex items-center justify-between text-[#969696] border-b border-[#2e2e2e] pb-2 text-[11px]">
                   <span>REASONING REQUEST PAYLOAD</span>
                   <button
-                    onClick={() => handleCopy(`{\n  "model": "gemini-3.6-flash",\n  "messages": [\n    { "role": "user", "content": "Prove that sqrt(2) is irrational." }\n  ],\n  "reasoning_effort": "high"\n}`, "reasoning-json")}
+                    onClick={() => handleCopy(`{\n  "model": "gemini-3.8-flash",\n  "messages": [\n    { "role": "user", "content": "Prove that sqrt(2) is irrational." }\n  ],\n  "reasoning_effort": "high"\n}`, "reasoning-json")}
                     className="hover:text-white transition-colors cursor-pointer"
                   >
                     {copiedCode === "reasoning-json" ? <Check className="h-3 w-3 text-white" /> : <Copy className="h-3 w-3" />}
                   </button>
                 </div>
                 <pre>{`{
-  "model": "gemini-3.6-flash",
+  "model": "gemini-3.8-flash",
   "messages": [
     { "role": "user", "content": "Prove that sqrt(2) is irrational." }
   ],
@@ -857,7 +857,7 @@ data: [DONE]`}</pre>
                 <div className="flex items-center justify-between text-[#969696] border-b border-[#2e2e2e] pb-2 text-[11px]">
                   <span>SEARCH GROUNDED COMPLETION</span>
                   <button
-                    onClick={() => handleCopy(`curl -X POST "${baseUrl}/chat/completions" \\\n  -H "Content-Type: application/json" \\\n  -H "Authorization: Bearer sk-const-live-yourkey" \\\n  -d '{\n    "model": "gemini-3.6-flash",\n    "messages": [\n      {"role": "user", "content": "What was the most significant AI announcement in the last 24 hours?"}\n    ],\n    "tools": [{ "type": "web_search" }]\n  }'`, "web-search-curl")}
+                    onClick={() => handleCopy(`curl -X POST "${baseUrl}/chat/completions" \\\n  -H "Content-Type: application/json" \\\n  -H "Authorization: Bearer sk-const-live-yourkey" \\\n  -d '{\n    "model": "gemini-3.8-flash",\n    "messages": [\n      {"role": "user", "content": "What was the most significant AI announcement in the last 24 hours?"}\n    ],\n    "tools": [{ "type": "web_search" }]\n  }'`, "web-search-curl")}
                     className="hover:text-white transition-colors cursor-pointer"
                   >
                     {copiedCode === "web-search-curl" ? <Check className="h-3 w-3 text-white" /> : <Copy className="h-3 w-3" />}
@@ -867,7 +867,7 @@ data: [DONE]`}</pre>
   -H "Content-Type: application/json" \\
   -H "Authorization: Bearer sk-const-live-yourkey" \\
   -d '{
-    "model": "gemini-3.6-flash",
+    "model": "gemini-3.8-flash",
     "messages": [
       {"role": "user", "content": "What was the most significant AI announcement in the last 24 hours?"}
     ],
@@ -1149,7 +1149,7 @@ data: [DONE]`}</pre>
                 <div className="p-4 rounded-xl bg-[#222222] border border-[#383838]/60 space-y-1">
                   <code className="text-white font-mono font-semibold">combo/coding</code>
                   <p className="text-[#969696] font-light">
-                    Cascades through Claude 3.7 Sonnet, Gemini 3.6 Flash, and DeepSeek V3 for uninterrupted coding agent pipelines.
+                    Cascades through Claude 3.7 Sonnet, Gemini 3.8 Flash, and DeepSeek V3 for uninterrupted coding agent pipelines.
                   </p>
                 </div>
 

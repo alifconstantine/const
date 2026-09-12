@@ -146,14 +146,14 @@ export default function IntegrationsPage() {
       steps: [
         { title: "Open Settings", desc: "Open Cursor Settings > Models > OpenAI API Key." },
         { title: "Configure Base URL", desc: `Enable 'Override OpenAI Base URL' and paste: ${baseUrl}` },
-        { title: "Add Const Models", desc: "Add model names: 'gemini-3.6-flash' or 'combo/coding'." },
+        { title: "Add Const Models", desc: "Add model names: 'gemini-3.8-flash' or 'combo/coding'." },
       ],
       defaultSnippet: (b, k) => `# In Cursor Settings > Models:
 OpenAI API Base URL: ${b}
 API Key: ${k}
 
 # Recommended Model IDs to add:
-gemini-3.6-flash
+gemini-3.8-flash
 combo/coding
 combo/fast`,
     },
@@ -179,7 +179,7 @@ combo/fast`,
     {
       "title": "Const - Gemini Flash",
       "provider": "openai",
-      "model": "gemini-3.6-flash",
+      "model": "gemini-3.8-flash",
       "apiBase": "${b}",
       "apiKey": "${k}"
     },
@@ -208,7 +208,7 @@ combo/fast`,
       steps: [
         { title: "Select API Provider", desc: "In Cline settings, choose 'OpenAI Compatible'." },
         { title: "Enter Credentials", desc: `Set Base URL to ${baseUrl} and enter your Const API key.` },
-        { title: "Specify Model ID", desc: "Set Model ID to 'combo/coding' or 'gemini-3.6-flash'." },
+        { title: "Specify Model ID", desc: "Set Model ID to 'combo/coding' or 'gemini-3.8-flash'." },
       ],
       defaultSnippet: (b, k) => `// Cline / Roo Code Settings:
 Provider: OpenAI Compatible
@@ -230,11 +230,11 @@ Model ID: combo/coding`,
       steps: [
         { title: "Settings", desc: "Navigate to Windsurf > Preferences > AI Model Providers." },
         { title: "Custom OpenAI Provider", desc: `Provide ${baseUrl} as the endpoint URL.` },
-        { title: "Select Model", desc: "Choose gemini-3.6-flash or your configured combo chain." },
+        { title: "Select Model", desc: "Choose gemini-3.8-flash or your configured combo chain." },
       ],
       defaultSnippet: (b, k) => `Base URL: ${b}
 API Key: ${k}
-Custom Model: gemini-3.6-flash`,
+Custom Model: gemini-3.8-flash`,
     },
     {
       id: "aider",
@@ -250,13 +250,13 @@ Custom Model: gemini-3.6-flash`,
       configType: "bash",
       steps: [
         { title: "Export Environment", desc: "Export OPENAI_API_BASE and OPENAI_API_KEY in your shell." },
-        { title: "Launch Aider", desc: "Run aider specifying openai/gemini-3.6-flash as model." },
+        { title: "Launch Aider", desc: "Run aider specifying openai/gemini-3.8-flash as model." },
       ],
       defaultSnippet: (b, k) => `export OPENAI_API_BASE="${b}"
 export OPENAI_API_KEY="${k}"
 
 # Launch Aider with Const Router
-aider --model openai/gemini-3.6-flash`,
+aider --model openai/gemini-3.8-flash`,
     },
     {
       id: "claude-code",
@@ -296,7 +296,7 @@ claude`,
   -H "Content-Type: application/json" \\
   -H "Authorization: Bearer ${k}" \\
   -d '{
-    "model": "gemini-3.6-flash",
+    "model": "gemini-3.8-flash",
     "messages": [
       {"role": "user", "content": "Hello from Const Gateway!"}
     ]
@@ -327,7 +327,7 @@ client = OpenAI(
 )
 
 response = client.chat.completions.create(
-    model="gemini-3.6-flash",
+    model="gemini-3.8-flash",
     messages=[
         {"role": "user", "content": "Explain quantum computing in one sentence."}
     ],
@@ -360,7 +360,7 @@ const openai = new OpenAI({
 
 async function main() {
   const completion = await openai.chat.completions.create({
-    model: "gemini-3.6-flash",
+    model: "gemini-3.8-flash",
     messages: [{ role: "user", content: "Write a quick Rust snippet." }],
   });
 
