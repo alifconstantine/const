@@ -8,6 +8,7 @@ import { api } from "@const/backend/_generated/api";
 import { useRouterAuth } from "@/components/providers/convex-client-provider";
 import { AccountMenu } from "./account-menu";
 import { Button, cn } from "@const/ui";
+import { calculateQuotaMetrics } from "@/lib/quota";
 import {
   LayoutGrid,
   ScrollText,
@@ -115,11 +116,9 @@ export function Sidebar({
     isAuthenticated ? {} : "skip"
   );
 
-  const sidebarPercentRemaining = useMemo(() => {
-    const limit = quota?.weeklyLimitTokens || 7_000_000;
-    const remaining = quota?.remainingTokens ?? limit;
-    return Math.max(0, Math.min(100, (remaining / limit) * 100));
-  }, [quota?.remainingTokens, quota?.weeklyLimitTokens]);
+  const metrics = useMemo(() => {
+    return calculateQuotaMetrics(quota);
+  }, [quota]);
 
   const filteredSections = useMemo(() => {
     if (!searchQuery.trim()) return navSections;
@@ -267,6 +266,7 @@ export function Sidebar({
           <Link
             href="/dashboard"
             onClick={onNavigate}
+            title={`${metrics.formattedUsed} used of ${metrics.formattedLimit} limit`}
             className="block p-3 rounded-xl bg-card hover:bg-card/90 border border-border transition-all font-mono group"
           >
             <div className="flex items-center justify-between text-xs text-foreground mb-2">
@@ -274,26 +274,27 @@ export function Sidebar({
                 FREE QUOTA
               </span>
               <span className="tabular-nums font-bold text-foreground">
-                {quota ? `${sidebarPercentRemaining.toFixed(0)}%` : "..."}
+                {quota ? `${metrics.percentRemaining.toFixed(0)}%` : "..."}
               </span>
             </div>
 
             {/* Full-width Graphical Progress Bar */}
             <div className="w-full h-2.5 rounded-full bg-secondary overflow-hidden mb-2">
               <div
-                className="h-full bg-foreground rounded-full transition-all duration-500 ease-out"
-                style={{ width: `${sidebarPercentRemaining}%` }}
+                className={cn(
+                  "h-full rounded-full transition-all duration-500 ease-out",
+                  metrics.barColor
+                )}
+                style={{ width: `${metrics.percentRemaining}%` }}
               />
             </div>
 
             <div className="flex items-center justify-between text-[11px] text-muted-foreground">
               <span className="tabular-nums font-medium text-foreground/90">
-                {quota
-                  ? `${(quota.remainingTokens / 1_000_000).toFixed(1)}M / 7M left`
-                  : "7.0M / 7M left"}
+                {quota ? `${metrics.formattedRemaining} left` : "7M left"}
               </span>
               <span className="uppercase text-muted-foreground">
-                {quota?.resetsInText ? `reset in ${quota.resetsInText}` : ""}
+                {metrics.resetsInText ? `reset in ${metrics.resetsInText}` : ""}
               </span>
             </div>
           </Link>

@@ -8,6 +8,7 @@ export async function POST(req: NextRequest) {
   try {
     // 1. Session verification
     const ssoToken =
+      req.headers.get("x-const-sso-token") ||
       req.cookies.get("const_sso_token")?.value ||
       req.headers.get("authorization")?.replace(/^Bearer\s+/i, "");
 

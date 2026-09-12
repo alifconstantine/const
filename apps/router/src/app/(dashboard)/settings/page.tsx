@@ -6,6 +6,7 @@ import { useQuery } from "convex/react";
 import { api } from "@const/backend/_generated/api";
 import { useRouterAuth } from "@/components/providers/convex-client-provider";
 import { getAppUrl } from "@/lib/auth-constants";
+import { calculateQuotaMetrics } from "@/lib/quota";
 import {
   Button,
   Badge,
@@ -133,9 +134,7 @@ export default function SettingsPage() {
     toast.info("Reset to defaults");
   };
 
-  const limitTokens = quota?.weeklyLimitTokens || 7_000_000;
-  const remainingTokens = quota?.remainingTokens ?? limitTokens;
-  const percentRemaining = Math.max(0, Math.min(100, (remainingTokens / limitTokens) * 100));
+  const metrics = calculateQuotaMetrics(quota);
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto pb-16">
@@ -278,22 +277,22 @@ export default function SettingsPage() {
               Active Balance
             </span>
             <span className="font-mono font-bold text-foreground">
-              {(remainingTokens / 1_000_000).toFixed(2)}M / {(limitTokens / 1_000_000).toFixed(0)}M tokens
+              {metrics.formattedRemaining} / {metrics.formattedLimit} tokens left
             </span>
           </div>
 
           {/* Simple Clean Progress Fill */}
           <div className="w-full h-2 rounded-full bg-secondary overflow-hidden">
             <div
-              className="h-full bg-foreground transition-all duration-500 rounded-full"
-              style={{ width: `${percentRemaining}%` }}
+              className={cn("h-full transition-all duration-500 rounded-full", metrics.barColor)}
+              style={{ width: `${metrics.percentRemaining}%` }}
             />
           </div>
 
           <div className="flex items-center justify-between text-[11px] text-muted-foreground">
-            <span>{percentRemaining.toFixed(1)}% remaining</span>
+            <span>{metrics.percentRemaining.toFixed(0)}% remaining</span>
             <span>
-              {quota?.resetsInText ? `Resets in ${quota.resetsInText}` : "Resets weekly"}
+              {metrics.resetsInText ? `Resets in ${metrics.resetsInText}` : "Resets weekly"}
             </span>
           </div>
         </div>

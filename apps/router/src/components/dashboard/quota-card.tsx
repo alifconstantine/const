@@ -7,15 +7,7 @@ import { useRouterAuth } from "@/components/providers/convex-client-provider";
 import { Card, Skeleton, cn } from "@const/ui";
 import { Zap, Clock } from "lucide-react";
 
-function formatTokenAmount(tokens: number): string {
-  if (tokens < 1000) return `${tokens.toLocaleString()}`;
-  if (tokens < 1_000_000) {
-    const k = tokens / 1000;
-    return k % 1 === 0 ? `${k}k` : `${k.toFixed(1)}k`;
-  }
-  const m = tokens / 1_000_000;
-  return m % 1 === 0 ? `${m}M` : `${m.toFixed(2)}M`;
-}
+import { calculateQuotaMetrics, formatTokenAmount } from "@/lib/quota";
 
 export function QuotaCard({ className }: { className?: string }) {
   const { isAuthenticated } = useRouterAuth();
@@ -24,17 +16,9 @@ export function QuotaCard({ className }: { className?: string }) {
     isAuthenticated ? {} : "skip"
   );
 
-  const percentRemaining = useMemo(() => {
-    if (!quota) return 100;
-    const limit = quota.weeklyLimitTokens || 7_000_000;
-    return Math.max(0, Math.min(100, (quota.remainingTokens / limit) * 100));
+  const metrics = useMemo(() => {
+    return calculateQuotaMetrics(quota);
   }, [quota]);
-
-  const barColor = useMemo(() => {
-    if (percentRemaining <= 10) return "bg-rose-500";
-    if (percentRemaining <= 30) return "bg-amber-400";
-    return "bg-foreground";
-  }, [percentRemaining]);
 
   if (!isAuthenticated) return null;
 
@@ -60,7 +44,7 @@ export function QuotaCard({ className }: { className?: string }) {
 
             <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-secondary/80 border border-border/50 text-[11px] font-sans text-muted-foreground tabular-nums shrink-0">
               <Clock className="h-3 w-3 text-muted-foreground/80" />
-              <span>Resets in {quota.resetsInText}</span>
+              <span>Resets in {metrics.resetsInText}</span>
             </div>
           </div>
 
@@ -70,7 +54,7 @@ export function QuotaCard({ className }: { className?: string }) {
             <div className="flex items-baseline justify-between gap-2">
               <div className="space-y-0.5">
                 <div className="text-3xl sm:text-4xl font-semibold tracking-tight text-foreground font-sans tabular-nums leading-none">
-                  {formatTokenAmount(quota.remainingTokens)}
+                  {metrics.formattedRemaining}
                 </div>
                 <div className="text-xs sm:text-sm text-muted-foreground font-normal font-sans pt-0.5">
                   token left
@@ -79,7 +63,7 @@ export function QuotaCard({ className }: { className?: string }) {
 
               <div className="text-right">
                 <div className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground font-sans tabular-nums leading-none">
-                  {percentRemaining.toFixed(0)}%
+                  {metrics.percentRemaining.toFixed(0)}%
                 </div>
                 <div className="text-[11px] text-muted-foreground font-light font-sans pt-1">
                   remaining
@@ -92,9 +76,9 @@ export function QuotaCard({ className }: { className?: string }) {
               <div
                 className={cn(
                   "h-full rounded-full transition-all duration-700 ease-out",
-                  barColor
+                  metrics.barColor
                 )}
-                style={{ width: `${percentRemaining}%` }}
+                style={{ width: `${metrics.percentRemaining}%` }}
               />
             </div>
 
@@ -102,14 +86,14 @@ export function QuotaCard({ className }: { className?: string }) {
             <div className="flex items-center justify-between text-xs text-muted-foreground font-sans tabular-nums">
               <span>
                 <strong className="font-medium text-foreground/90">
-                  {formatTokenAmount(quota.usedTokens)}
+                  {metrics.formattedUsed}
                 </strong>{" "}
                 used
               </span>
               <span>
                 of{" "}
                 <strong className="font-medium text-foreground/90">
-                  {formatTokenAmount(quota.weeklyLimitTokens)}
+                  {metrics.formattedLimit}
                 </strong>{" "}
                 limit
               </span>

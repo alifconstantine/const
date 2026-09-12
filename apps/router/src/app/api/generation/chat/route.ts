@@ -228,6 +228,7 @@ export async function POST(req: NextRequest) {
           if (ssoToken) client.setAuth(ssoToken);
           const quotaCheck = await client.query(api.router.quotas.checkGatewayQuota, {
             rawApiKey: providedKey || undefined,
+            ssoToken: ssoToken || undefined,
             provider: "const",
           });
 

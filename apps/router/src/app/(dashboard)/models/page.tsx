@@ -33,6 +33,7 @@ import {
   TooltipContent,
   TooltipProvider,
   toast,
+  cn,
 } from "@const/ui";
 import {
   Search,
@@ -47,6 +48,7 @@ import {
 } from "lucide-react";
 import { ModelConfigDialog } from "@/components/models/model-config-dialog";
 import { formatTokenDisplay, isReasoningModel } from "@/lib/model-specs";
+import { calculateQuotaMetrics, formatTokenAmount } from "@/lib/quota";
 
 interface ModelItem {
   id: string;
@@ -115,12 +117,6 @@ const PROVIDERS_DATA: ProviderGroup[] = [
   },
 ];
 
-function formatTokenAmount(tokens: number): string {
-  if (tokens < 1000) return `${tokens}`;
-  if (tokens < 1_000_000) return `${(tokens / 1000).toFixed(1)}k`;
-  return `${(tokens / 1_000_000).toFixed(1)}M`;
-}
-
 export default function ModelsPage() {
   const { isAuthenticated } = useRouterAuth();
   const userProviders = useQuery(
@@ -133,13 +129,9 @@ export default function ModelsPage() {
   );
   const updateSingleModelMutation = useMutation(api.router.providers.updateSingleModel);
 
-  const weeklyLimit = quota?.weeklyLimitTokens ?? 7_000_000;
-  const usedTokens = quota?.usedTokens ?? 0;
-  const percentRemaining = useMemo(() => {
-    if (!quota) return 100;
-    return Math.max(0, Math.min(100, quota.percentRemaining));
+  const metrics = useMemo(() => {
+    return calculateQuotaMetrics(quota);
   }, [quota]);
-  const resetsInText = quota?.resetsInText ?? "7d";
 
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedProvider, setSelectedProvider] = useState("all");
@@ -350,10 +342,10 @@ export default function ModelsPage() {
 
               <div className="flex items-center gap-2 text-xs font-mono tabular-nums">
                 <span className="font-semibold text-foreground">
-                  {formatTokenAmount(usedTokens)} / {formatTokenAmount(weeklyLimit)} Used
+                  {metrics.formattedUsed} / {metrics.formattedLimit} Used
                 </span>
                 <span className="text-muted-foreground">
-                  ({percentRemaining}% left)
+                  ({metrics.percentRemaining.toFixed(0)}% left)
                 </span>
               </div>
             </div>
@@ -361,13 +353,13 @@ export default function ModelsPage() {
             {/* Minimal borderless progress bar counting down from 100 to 0 */}
             <div className="w-full h-1.5 rounded-full bg-secondary overflow-hidden">
               <div
-                className="h-full bg-foreground rounded-full transition-all duration-300"
-                style={{ width: `${percentRemaining}%` }}
+                className={cn("h-full rounded-full transition-all duration-300", metrics.barColor)}
+                style={{ width: `${metrics.percentRemaining}%` }}
               />
             </div>
 
             <p className="text-[11px] text-muted-foreground font-light">
-              Shared 7M weekly token quota across all Const models. Resets in {resetsInText}.
+              Shared 7M weekly token quota across all Const models. Resets in {metrics.resetsInText}.
             </p>
           </div>
         </Card>

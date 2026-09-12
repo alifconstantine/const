@@ -259,6 +259,29 @@ export async function executeComboChat(
         target.providerId === "const" || isBuiltinModel(target.modelId);
 
       if (isConstEngine) {
+        // Preflight Quota Check: If weekly quota is exceeded, failover to next target in combo
+        if (apiKey || ssoToken) {
+          try {
+            const quotaCheck = await client.query(api.router.quotas.checkGatewayQuota, {
+              rawApiKey: apiKey || undefined,
+              ssoToken: ssoToken || undefined,
+              provider: "const",
+            });
+            if (quotaCheck && !quotaCheck.allowed && quotaCheck.reason === "weekly_quota_exceeded") {
+              fallbackCount++;
+              targetErrors.push({
+                model: target.modelId,
+                provider: "Const Gateway",
+                status: 429,
+                error: `Const weekly free token quota exceeded (7,000,000 tokens/week). Resets in ${quotaCheck.resetsInText || "this week"}.`,
+              });
+              continue;
+            }
+          } catch (quotaErr) {
+            console.warn("[Combo Executor] Non-fatal quota check error:", quotaErr);
+          }
+        }
+
         // Dispatch to Const Managed Model
         const constBaseUrl = (
           process.env.CONST_ENGINE_BASE_URL?.trim() || "https://engine.const.web.id"
