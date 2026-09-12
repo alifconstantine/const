@@ -67,14 +67,9 @@ export default function App() {
   });
   const [isWaitingAuth, setIsWaitingAuth] = useState(false);
 
-  // Set Accounts Hub URL: Default to localhost:3001 in local dev, accounts.const.web.id in production
+  // Set Accounts Hub URL: Default to production accounts.const.web.id, can be overridden via VITE_ACCOUNTS_URL in development
   const accountsBaseUrl =
-    (import.meta.env.VITE_ACCOUNTS_URL as string) ||
-    (typeof window !== "undefined" &&
-    window.location.hostname !== "localhost" &&
-    window.location.hostname !== "127.0.0.1"
-      ? "https://accounts.const.web.id"
-      : "http://localhost:3001");
+    (import.meta.env.VITE_ACCOUNTS_URL as string) || "https://accounts.const.web.id";
 
   useEffect(() => {
     // 1. Check if token returned via URL query parameter (standard web/PWA flow)
