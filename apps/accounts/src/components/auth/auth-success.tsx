@@ -169,7 +169,12 @@ export function AuthSuccess({ user: _user, forceProceed = false }: AuthSuccessPr
       const state = params.get("state") || "";
       const stateParam = state ? `&state=${encodeURIComponent(state)}` : "";
 
-      if (destination.includes("const-harness") || appName.toLowerCase().includes("harness")) {
+      if (
+        destination.includes("const-harness") ||
+        appName.toLowerCase().includes("harness") ||
+        destination.includes("const-learn") ||
+        appName.toLowerCase().includes("learn")
+      ) {
         try {
           fetch(`http://127.0.0.1:${port}/callback?token=${encodeURIComponent(activeToken)}${stateParam}`, {
             mode: "no-cors",

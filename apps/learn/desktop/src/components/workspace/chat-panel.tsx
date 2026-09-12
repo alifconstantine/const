@@ -55,17 +55,29 @@ export function ChatPanel({
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [inputMessage, setInputMessage] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
-  const [selectedModelId, setSelectedModelId] = useState<string>("Const");
+  const [selectedModelId, setSelectedModelId] = useState<string>("gemini-3.6-flash");
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
   const [expandedThinkingIds, setExpandedThinkingIds] = useState<Record<string, boolean>>({});
   const [expandedToolIds, setExpandedToolIds] = useState<Record<string, boolean>>({});
+  const [availableModels, setAvailableModels] = useState<ModelConfig[]>(DEFAULT_MODELS);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const activeAssistantRef = useRef<DisplayMessage | null>(null);
 
-  // Available models list
-  const models: ModelConfig[] = DEFAULT_MODELS;
+  // Available models list (fetched dynamically from router.const.web.id with fallback)
+  useEffect(() => {
+    const electron = (window as any).electron;
+    if (electron?.agent?.getModels) {
+      electron.agent.getModels().then((remoteModels: any[]) => {
+        if (remoteModels && Array.isArray(remoteModels) && remoteModels.length > 0) {
+          setAvailableModels(remoteModels);
+        }
+      }).catch(() => {});
+    }
+  }, []);
+
+  const models: ModelConfig[] = availableModels;
   const currentModel = models.find((m) => m.id === selectedModelId) || models[0]!;
 
   // 1. Load chat messages from local Dexie database on learnId change
@@ -302,12 +314,18 @@ export function ChatPanel({
     }
 
     if (electron?.agent?.sendMessage) {
-      // 1. Electron IPC Execution with workspacePath
+      // 1. Electron IPC Execution with workspacePath and user's SSO auth token
       try {
+        const authToken =
+          localStorage.getItem("const_learn_auth_token") ||
+          localStorage.getItem("const_sso_token") ||
+          "";
+
         const res = await electron.agent.sendMessage({
           messages: formattedMessages,
           model: selectedModelId,
           workspacePath: workspacePath,
+          authToken: authToken || undefined,
         });
 
         if (res && res.success === false) {
@@ -393,16 +411,26 @@ export function ChatPanel({
       // 2. Direct Web Fallback Execution (for web dev preview)
       try {
         const baseUrl =
+          (import.meta as any).env?.VITE_CONST_ROUTER_BASE_URL ||
+          (import.meta as any).env?.CONST_ROUTER_BASE_URL ||
           (import.meta as any).env?.VITE_CONST_ENGINE_BASE_URL ||
-          "https://engine.const.web.id/v1";
-        const apiKey = (import.meta as any).env?.VITE_CONST_ENGINE_API_KEY || "";
+          "https://router.const.web.id/v1";
+        const authToken =
+          localStorage.getItem("const_learn_auth_token") ||
+          localStorage.getItem("const_sso_token") ||
+          "";
+        const apiKey =
+          authToken ||
+          (import.meta as any).env?.VITE_CONST_ROUTER_API_KEY ||
+          (import.meta as any).env?.VITE_CONST_ENGINE_API_KEY ||
+          "";
         const endpoint = `${baseUrl.replace(/\/+$/, "")}/chat/completions`;
 
         const res = await fetch(endpoint, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${apiKey}`,
+            ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
           },
           body: JSON.stringify({
             model: selectedModelId,

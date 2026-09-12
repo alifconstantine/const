@@ -33,7 +33,7 @@ function AuthSuccessContent() {
     if (stored) {
       setToken(stored);
       // Auto-notify desktop loopback server in background
-      if (appParam === "harness") {
+      if (appParam === "harness" || appParam === "learn") {
         const port = searchParams.get("port") || "24125";
         const state = searchParams.get("state");
         const stateParam = state ? `&state=${encodeURIComponent(state)}` : "";

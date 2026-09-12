@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { LogIn, Globe } from "lucide-react";
 import { ConstLogoIcon, Button } from "@const/ui";
 import { useQuery } from "convex/react";
@@ -67,35 +67,43 @@ export default function App() {
     return localStorage.getItem("const_learn_auth_token");
   });
   const [isWaitingAuth, setIsWaitingAuth] = useState(false);
+  const isWaitingAuthRef = useRef(false);
+  isWaitingAuthRef.current = isWaitingAuth;
 
-  // Set Accounts Hub URL: Default to localhost:3001 in local dev, accounts.const.web.id in production
+  // Set Accounts Hub URL: Default to production accounts.const.web.id
   const accountsBaseUrl =
-    (import.meta.env.VITE_ACCOUNTS_URL as string) ||
-    (typeof window !== "undefined" &&
-    window.location.hostname !== "localhost" &&
-    window.location.hostname !== "127.0.0.1"
-      ? "https://accounts.const.web.id"
-      : "http://localhost:3001");
+    (import.meta.env.VITE_ACCOUNTS_URL as string) || "https://accounts.const.web.id";
 
   // Listen for deep link callback in Electron or browser redirect
   useEffect(() => {
     // 1. Electron deep-link listener
     if (window.electron?.onAuthCallback) {
-      const unsubscribe = window.electron.onAuthCallback((data) => {
-        if (data.token) {
-          localStorage.setItem("const_learn_auth_token", data.token);
-          setToken(data.token);
-          setIsWaitingAuth(false);
+      const unsubscribe = window.electron.onAuthCallback(
+        (data: { url: string; token?: string; cancelled?: boolean; error?: string }) => {
+          if (data.cancelled) {
+            setIsWaitingAuth(false);
+            isWaitingAuthRef.current = false;
+            return;
+          }
+
+          if (data.token) {
+            localStorage.setItem("const_learn_auth_token", data.token);
+            localStorage.setItem("const_sso_token", data.token);
+            setToken(data.token);
+            setIsWaitingAuth(false);
+            isWaitingAuthRef.current = false;
+          }
         }
-      });
+      );
       return () => unsubscribe();
     }
 
     // 2. Storage event listener (sync across windows or tabs)
     const handleStorage = (e: StorageEvent) => {
-      if (e.key === "const_learn_auth_token" && e.newValue) {
+      if (e.key === "const_learn_auth_token" && e.newValue && isWaitingAuthRef.current) {
         setToken(e.newValue);
         setIsWaitingAuth(false);
+        isWaitingAuthRef.current = false;
       }
     };
     window.addEventListener("storage", handleStorage);
@@ -103,10 +111,12 @@ export default function App() {
     // 3. Browser query param fallback (if tested in browser)
     const searchParams = new URLSearchParams(window.location.search);
     const urlToken = searchParams.get("token");
-    if (urlToken) {
+    if (urlToken && isWaitingAuthRef.current) {
       localStorage.setItem("const_learn_auth_token", urlToken);
+      localStorage.setItem("const_sso_token", urlToken);
       setToken(urlToken);
       setIsWaitingAuth(false);
+      isWaitingAuthRef.current = false;
       window.history.replaceState({}, document.title, window.location.pathname);
     }
 
@@ -123,24 +133,42 @@ export default function App() {
       if (saved) {
         setToken(saved);
         setIsWaitingAuth(false);
+        isWaitingAuthRef.current = false;
       }
     }, 800);
     return () => clearInterval(interval);
   }, [isWaitingAuth]);
 
   const handleSignIn = async () => {
-    const continueTarget = window.electron?.openExternal
-      ? "const-learn://callback"
-      : `${window.location.origin}${window.location.pathname}`;
-
-    const base = accountsBaseUrl.replace(/\/+$/, "");
-    const targetUrl = `${base}/?continue=${encodeURIComponent(continueTarget)}&prompt=select_account`;
     setIsWaitingAuth(true);
+    isWaitingAuthRef.current = true;
 
-    if (window.electron?.openExternal) {
-      await window.electron.openExternal(targetUrl);
+    if (window.electron?.startAuth) {
+      try {
+        const res = await window.electron.startAuth({
+          accountsUrl: accountsBaseUrl,
+        });
+        if (!res.success) {
+          setIsWaitingAuth(false);
+          isWaitingAuthRef.current = false;
+        }
+      } catch {
+        setIsWaitingAuth(false);
+        isWaitingAuthRef.current = false;
+      }
     } else {
+      const continueTarget = `${window.location.origin}${window.location.pathname}`;
+      const base = accountsBaseUrl.replace(/\/+$/, "");
+      const targetUrl = `${base}/?continue=${encodeURIComponent(continueTarget)}&prompt=select_account&app=learn`;
       window.location.href = targetUrl;
+    }
+  };
+
+  const handleCancelSignIn = async () => {
+    setIsWaitingAuth(false);
+    isWaitingAuthRef.current = false;
+    if (window.electron?.cancelAuth) {
+      await window.electron.cancelAuth();
     }
   };
 
@@ -149,6 +177,7 @@ export default function App() {
     localStorage.removeItem("const_sso_token");
     setToken(null);
     setIsWaitingAuth(false);
+    isWaitingAuthRef.current = false;
   };
 
   const handleSwitchAccount = async () => {
@@ -156,17 +185,22 @@ export default function App() {
     localStorage.removeItem("const_sso_token");
     setToken(null);
     setIsWaitingAuth(true);
+    isWaitingAuthRef.current = true;
 
-    const continueTarget = window.electron?.openExternal
-      ? "const-learn://callback"
-      : `${window.location.origin}${window.location.pathname}`;
-
-    const base = accountsBaseUrl.replace(/\/+$/, "");
-    const targetUrl = `${base}/?continue=${encodeURIComponent(continueTarget)}&action=switch_account`;
-
-    if (window.electron?.openExternal) {
-      await window.electron.openExternal(targetUrl);
+    if (window.electron?.startAuth) {
+      try {
+        await window.electron.startAuth({
+          accountsUrl: accountsBaseUrl,
+          action: "switch_account",
+        });
+      } catch {
+        setIsWaitingAuth(false);
+        isWaitingAuthRef.current = false;
+      }
     } else {
+      const continueTarget = `${window.location.origin}${window.location.pathname}`;
+      const base = accountsBaseUrl.replace(/\/+$/, "");
+      const targetUrl = `${base}/?continue=${encodeURIComponent(continueTarget)}&action=switch_account&app=learn`;
       window.location.href = targetUrl;
     }
   };
@@ -223,6 +257,16 @@ export default function App() {
               <LogIn className="h-4 w-4" />
               {isWaitingAuth ? "Buka Kembali Tab Login" : "Sign in to Const Learn"}
             </Button>
+            {isWaitingAuth && (
+              <Button
+                variant="outline"
+                onClick={handleCancelSignIn}
+                size="sm"
+                className="w-full rounded-xl text-xs text-muted-foreground"
+              >
+                Batalkan
+              </Button>
+            )}
           </div>
         </div>
 

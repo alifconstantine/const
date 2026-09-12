@@ -2,6 +2,11 @@ import { app, BrowserWindow, shell, ipcMain, dialog } from "electron";
 import path from "node:path";
 import fs from "node:fs";
 import { createConstAgent, DEFAULT_MODELS, type AgentMessage } from "@const/agent";
+import {
+  startLoopbackAuthServer,
+  stopLoopbackAuthServer,
+  registerLinuxProtocolHandler,
+} from "./auth-server.js";
 
 // Load environment variables if present
 try {
@@ -43,12 +48,15 @@ if (!app.isPackaged) {
   app.setAsDefaultProtocolClient(PROTOCOL_NAME, process.execPath, [
     mainScriptPath,
   ]);
+  registerLinuxProtocolHandler(process.execPath, mainScriptPath);
 } else {
   app.setAsDefaultProtocolClient(PROTOCOL_NAME);
+  registerLinuxProtocolHandler(process.execPath);
 }
 
 let win: BrowserWindow | null = null;
 let pendingDeepLink: string | null = null;
+let activeLoginSessionState: string | null = null;
 
 function extractTokenFromUrl(rawUrl: string): string | undefined {
   try {
@@ -141,7 +149,7 @@ app.on("second-instance", (_event, commandLine) => {
         console.error("[Electron Main] Failed to load dev URL, loading dist/index.html:", err.message);
         win?.loadFile(path.join(__dirname, "../dist/index.html"));
       });
-      if (!app.isPackaged) {
+      if (process.env.OPEN_DEVTOOLS === "true") {
         win.webContents.openDevTools();
       }
     } else {
@@ -172,10 +180,88 @@ app.on("second-instance", (_event, commandLine) => {
     return false;
   });
 
+  // Dedicated Loopback Auth Login Handlers
+  ipcMain.handle("auth:start-login", async (_event, options?: { accountsUrl?: string; action?: string }) => {
+    try {
+      const serverRes = await startLoopbackAuthServer((token, _refreshToken) => {
+        sendDeepLinkToRenderer(`const-learn://callback?token=${encodeURIComponent(token)}&state=${encodeURIComponent(serverRes.state)}`);
+      });
+
+      // Bind active session state for strict cancellation and anti-replay
+      activeLoginSessionState = serverRes.state;
+
+      const accountsBase = (options?.accountsUrl || process.env.VITE_ACCOUNTS_URL || "https://accounts.const.web.id").replace(/\/+$/, "");
+      const actionParam = options?.action ? `&action=${encodeURIComponent(options.action)}` : "&prompt=select_account";
+      const continueTarget = "const-learn://callback";
+      const targetUrl = `${accountsBase}/?continue=${encodeURIComponent(continueTarget)}${actionParam}&app=learn&port=${serverRes.port}&state=${encodeURIComponent(serverRes.state)}`;
+
+      console.log("[Electron Main] Starting auth, opening external browser:", targetUrl);
+      await shell.openExternal(targetUrl);
+
+      return {
+        success: true,
+        port: serverRes.port,
+        state: serverRes.state,
+        callbackUrl: serverRes.callbackUrl,
+        authUrl: targetUrl,
+      };
+    } catch (err: any) {
+      activeLoginSessionState = null;
+      console.error("[Electron Main] Failed to start loopback auth server:", err);
+      return {
+        success: false,
+        error: err.message || "Failed to initialize authentication server",
+      };
+    }
+  });
+
+  ipcMain.handle("auth:cancel-login", async () => {
+    activeLoginSessionState = null;
+    stopLoopbackAuthServer();
+    console.log("[Electron Main] Authentication session cancelled by user");
+    return { success: true };
+  });
+
   // Agent IPC Handlers
   let activeAgent: any = null;
 
   ipcMain.handle("agent:get-models", async () => {
+    const routerBaseUrl = (
+      process.env.CONST_ROUTER_BASE_URL ||
+      process.env.VITE_CONST_ROUTER_BASE_URL ||
+      "https://router.const.web.id/v1"
+    ).replace(/\/+$/, "");
+
+    try {
+      const endpoint = routerBaseUrl.endsWith("/models")
+        ? routerBaseUrl
+        : `${routerBaseUrl}/models`;
+      const res = await fetch(endpoint, {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+      if (res.ok) {
+        const json: any = await res.json();
+        if (json && Array.isArray(json.data) && json.data.length > 0) {
+          return json.data.map((m: any) => ({
+            id: m.id,
+            displayName: m.display_name || m.name || m.id,
+            provider: m.provider || "const",
+            supportsThinking: Boolean(
+              m.supports_thinking || m.supportsThinking || m.supports_reasoning
+            ),
+            thinkingLevels: m.thinking_levels || ["low", "medium", "high"],
+            defaultThinkingLevel: m.default_thinking_level || "medium",
+            maxOutputTokens: m.max_output_tokens || 128000,
+            contextWindow: m.context_length || 1000000,
+          }));
+        }
+      }
+    } catch (err) {
+      console.warn("[Electron Main] Failed to fetch remote models from router, using defaults:", err);
+    }
     return DEFAULT_MODELS;
   });
 
@@ -183,26 +269,27 @@ app.on("second-instance", (_event, commandLine) => {
     "agent:send-message",
     async (
       _event,
-      payload: { messages: AgentMessage[]; model?: string; workspacePath?: string }
+      payload: {
+        messages: AgentMessage[];
+        model?: string;
+        workspacePath?: string;
+        authToken?: string;
+      }
     ) => {
       const baseUrl =
-        process.env.CONST_ENGINE_BASE_URL ||
-        process.env.VITE_CONST_ENGINE_BASE_URL ||
-        "https://engine.const.web.id/v1";
-      const apiKey =
-        process.env.CONST_ENGINE_API_KEY ||
-        process.env.VITE_CONST_ENGINE_API_KEY ||
-        "";
-      const model = payload.model || process.env.CONST_DEFAULT_MODEL || "Const";
-      const workspacePath = payload.workspacePath || process.cwd();
+        process.env.CONST_ROUTER_BASE_URL ||
+        process.env.VITE_CONST_ROUTER_BASE_URL ||
+        "https://router.const.web.id/v1";
 
-      if (!apiKey) {
-        return {
-          success: false,
-          error:
-            "Engine API key is not configured. Please set CONST_ENGINE_API_KEY in your .env file.",
-        };
-      }
+      // Use user's SSO auth token as Bearer token to Const Router, or fall back to configured key
+      const apiKey =
+        payload.authToken ||
+        process.env.CONST_ROUTER_API_KEY ||
+        process.env.CONST_ENGINE_API_KEY ||
+        "const-local-dev-key";
+
+      const model = payload.model || process.env.CONST_DEFAULT_MODEL || "gemini-3.6-flash";
+      const workspacePath = payload.workspacePath || process.cwd();
 
       activeAgent = createConstAgent({
         baseUrl,

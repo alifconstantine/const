@@ -10,6 +10,9 @@ contextBridge.exposeInMainWorld("electron", {
   },
   openExternal: (url: string) => ipcRenderer.invoke("auth:open-external", url),
   openDirectoryDialog: () => ipcRenderer.invoke("dialog:open-directory"),
+  startAuth: (options?: { accountsUrl?: string; action?: string }) =>
+    ipcRenderer.invoke("auth:start-login", options),
+  cancelAuth: () => ipcRenderer.invoke("auth:cancel-login"),
   onAuthCallback: (callback: (data: { url: string; token?: string }) => void) => {
     const handler = (_event: any, data: any) => callback(data);
     ipcRenderer.on("auth:deep-link", handler);
@@ -17,8 +20,12 @@ contextBridge.exposeInMainWorld("electron", {
   },
   agent: {
     getModels: () => ipcRenderer.invoke("agent:get-models"),
-    sendMessage: (payload: { messages: any[]; model?: string; workspacePath?: string }) =>
-      ipcRenderer.invoke("agent:send-message", payload),
+    sendMessage: (payload: {
+      messages: any[];
+      model?: string;
+      workspacePath?: string;
+      authToken?: string;
+    }) => ipcRenderer.invoke("agent:send-message", payload),
     abort: () => ipcRenderer.invoke("agent:abort"),
     onStreamEvent: (callback: (event: any) => void) => {
       const handler = (_event: any, data: any) => callback(data);

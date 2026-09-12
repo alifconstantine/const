@@ -270,16 +270,26 @@ export function MobileLearnWorkspace({
 
     try {
       const baseUrl =
+        (import.meta as any).env?.VITE_CONST_ROUTER_BASE_URL ||
+        (import.meta as any).env?.CONST_ROUTER_BASE_URL ||
         (import.meta as any).env?.VITE_CONST_ENGINE_BASE_URL ||
-        "https://engine.const.web.id/v1";
-      const apiKey = (import.meta as any).env?.VITE_CONST_ENGINE_API_KEY || "";
+        "https://router.const.web.id/v1";
+      const authToken =
+        localStorage.getItem("const_learn_auth_token") ||
+        localStorage.getItem("const_sso_token") ||
+        "";
+      const apiKey =
+        authToken ||
+        (import.meta as any).env?.VITE_CONST_ROUTER_API_KEY ||
+        (import.meta as any).env?.VITE_CONST_ENGINE_API_KEY ||
+        "";
       const endpoint = `${baseUrl.replace(/\/+$/, "")}/chat/completions`;
 
       const res = await fetch(endpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
+          ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
         },
         body: JSON.stringify({
           model: selectedModelId,
