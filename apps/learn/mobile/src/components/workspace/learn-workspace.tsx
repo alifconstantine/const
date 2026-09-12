@@ -2,6 +2,15 @@ import React, { useState, useEffect, useRef } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db, localDb, type LocalMessage, type LocalArtifact } from "../../lib/db";
 import {
+  DEFAULT_MOBILE_MODELS,
+  streamChatCompletion,
+  fetchRouterModels,
+  type MobileModel,
+} from "../../lib/ai-stream";
+import { MarkdownContent } from "./markdown-content";
+import { ChatInputCard } from "./chat-input-card";
+import { AddSourceDialog } from "./add-source-dialog";
+import {
   ArrowLeft,
   Share2,
   Plus,
@@ -12,7 +21,7 @@ import {
   Globe,
   FileText,
   ChevronDown,
-  ArrowRight,
+  ChevronRight,
   AudioLines,
   Presentation,
   Video,
@@ -21,22 +30,14 @@ import {
   Award,
   BarChart3,
   Table2,
-  ChevronRight,
   PenTool,
   Check,
   RotateCcw,
   Sparkles,
   Brain,
-  Terminal,
-  Wrench,
-  CheckCircle2,
-  AlertCircle,
-  Loader2,
   Download,
   Package,
-  Square,
 } from "lucide-react";
-import { AddSourceDialog } from "./add-source-dialog";
 
 type WorkspaceTab = "sources" | "chat" | "tools";
 
@@ -59,28 +60,11 @@ const STUDIO_TOOLS: StudioTool[] = [
   { id: "data_table", name: "Data Table", icon: Table2, iconColor: "text-cyan-400" },
 ];
 
-const MOBILE_MODELS = [
-  { id: "Const", name: "Gemini 3.6 Flash" },
-  { id: "antigravity/gemini-3.6-flash-low", name: "Gemini Flash (Fast)" },
-  { id: "antigravity/claude-sonnet-4-6-medium", name: "Claude Sonnet 4.6" },
-  { id: "antigravity/claude-opus-4-6-thinking-medium", name: "Claude Opus 4.6" },
-];
-
-interface DisplayToolCall {
-  id: string;
-  name: string;
-  args: any;
-  result?: any;
-  isError?: boolean;
-  status: "running" | "completed" | "error";
-}
-
 interface DisplayMessage {
   id: string;
-  role: "user" | "assistant" | "tool";
+  role: "user" | "assistant";
   content: string;
   thinking?: string;
-  toolCalls?: DisplayToolCall[];
   isStreaming?: boolean;
 }
 
@@ -114,7 +98,10 @@ export function MobileLearnWorkspace({
   // Local state
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [inputMessage, setInputMessage] = useState("");
-  const [selectedModelId, setSelectedModelId] = useState<string>("Const");
+  const [availableModels, setAvailableModels] = useState<MobileModel[]>(DEFAULT_MOBILE_MODELS);
+  const [selectedModelId, setSelectedModelId] = useState<string>(
+    DEFAULT_MOBILE_MODELS[0]!.id
+  );
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
   const [isAddSourceOpen, setIsAddSourceOpen] = useState(initialSourceModalOpen);
   const [searchQuery, setSearchQuery] = useState("");
@@ -123,8 +110,17 @@ export function MobileLearnWorkspace({
   const [isStreaming, setIsStreaming] = useState(false);
   const [expandedThinkingIds, setExpandedThinkingIds] = useState<Record<string, boolean>>({});
 
+  // Fetch available models dynamically from router on mount
+  useEffect(() => {
+    fetchRouterModels().then((models) => {
+      if (models && models.length > 0) {
+        setAvailableModels(models);
+      }
+    });
+  }, []);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const activeAssistantRef = useRef<DisplayMessage | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Editable title
   const [isEditingTitle, setIsEditingTitle] = useState(false);
@@ -149,10 +145,9 @@ export function MobileLearnWorkspace({
         setMessages(
           saved.map((m) => ({
             id: m.id,
-            role: m.role,
+            role: m.role as "user" | "assistant",
             content: m.content || "",
             thinking: m.thinking,
-            toolCalls: m.toolCalls,
             isStreaming: false,
           }))
         );
@@ -181,15 +176,32 @@ export function MobileLearnWorkspace({
   };
 
   const handleClearHistory = async () => {
+    if (isStreaming) {
+      handleStop();
+    }
     if (learnId) {
       await localDb.clearMessages(learnId);
     }
     setMessages([]);
   };
 
+  const handleStop = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    setIsStreaming(false);
+  };
+
   const handleSend = async (customPrompt?: string) => {
     const textToSend = (customPrompt || inputMessage).trim();
     if (!textToSend || isStreaming) return;
+
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
     const userMsgId = `user_${Date.now()}`;
     const assistantMsgId = `asst_${Date.now()}`;
@@ -205,7 +217,6 @@ export function MobileLearnWorkspace({
       role: "assistant",
       content: "",
       thinking: "",
-      toolCalls: [],
       isStreaming: true,
     };
 
@@ -223,177 +234,90 @@ export function MobileLearnWorkspace({
     setMessages([...nextMessages, newAssistantMsg]);
     setInputMessage("");
     setIsStreaming(true);
-    activeAssistantRef.current = newAssistantMsg;
 
-    // Build payload for Const
-    const formattedMessages: any[] = [];
-    for (const m of nextMessages) {
-      if (m.role === "user") {
-        formattedMessages.push({ role: "user", content: m.content });
-      } else if (m.role === "assistant") {
-        if (m.toolCalls && m.toolCalls.length > 0) {
-          formattedMessages.push({
-            role: "assistant",
-            content: m.content || null,
-            tool_calls: m.toolCalls.map((tc) => ({
-              id: tc.id,
-              type: "function",
-              function: {
-                name: tc.name,
-                arguments: typeof tc.args === "string" ? tc.args : JSON.stringify(tc.args),
-              },
-            })),
-          });
-          for (const tc of m.toolCalls) {
-            if (tc.status === "completed" || tc.status === "error") {
-              formattedMessages.push({
-                role: "tool",
-                tool_call_id: tc.id,
-                content:
-                  typeof tc.result === "string"
-                    ? tc.result
-                    : JSON.stringify(tc.result || {}),
-              });
-            }
-          }
-        } else {
-          formattedMessages.push({
-            role: "assistant",
-            content: m.content,
-          });
-        }
-      }
-    }
+    const formattedMessages = nextMessages.map((m) => ({
+      role: m.role,
+      content: m.content || "",
+    }));
 
     try {
-      const baseUrl =
-        (import.meta as any).env?.VITE_CONST_ROUTER_BASE_URL ||
-        (import.meta as any).env?.CONST_ROUTER_BASE_URL ||
-        (import.meta as any).env?.VITE_CONST_ENGINE_BASE_URL ||
-        "https://router.const.web.id/v1";
-      const authToken =
-        localStorage.getItem("const_learn_auth_token") ||
-        localStorage.getItem("const_sso_token") ||
-        "";
-      const apiKey =
-        authToken ||
-        (import.meta as any).env?.VITE_CONST_ROUTER_API_KEY ||
-        (import.meta as any).env?.VITE_CONST_ENGINE_API_KEY ||
-        "";
-      const endpoint = `${baseUrl.replace(/\/+$/, "")}/chat/completions`;
-
-      const res = await fetch(endpoint, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+      await streamChatCompletion({
+        model: selectedModelId,
+        messages: formattedMessages,
+        signal: controller.signal,
+        onThinking: (chunk) => {
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === assistantMsgId
+                ? { ...msg, thinking: (msg.thinking || "") + chunk }
+                : msg
+            )
+          );
+          setExpandedThinkingIds((exp) => ({ ...exp, [assistantMsgId]: true }));
         },
-        body: JSON.stringify({
-          model: selectedModelId,
-          messages: [
-            {
-              role: "system",
-              content:
-                "You are Const Learn Agent Mobile, an expert research and educational assistant. Help users understand concepts, explore topics, and generate high-quality summaries.",
-            },
-            ...formattedMessages,
-          ],
-          stream: true,
-        }),
-      });
+        onToken: (chunk) => {
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === assistantMsgId
+                ? { ...msg, content: (msg.content || "") + chunk }
+                : msg
+            )
+          );
+        },
+        onDone: async (finalContent, finalThinking) => {
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === assistantMsgId
+                ? {
+                    ...msg,
+                    content: finalContent,
+                    thinking: finalThinking,
+                    isStreaming: false,
+                  }
+                : msg
+            )
+          );
+          setIsStreaming(false);
+          abortControllerRef.current = null;
 
-      if (!res.ok || !res.body) {
-        throw new Error(`HTTP error ${res.status}`);
-      }
-
-      const reader = res.body.getReader();
-      const decoder = new TextDecoder("utf-8");
-      let buffer = "";
-      let accumulatedContent = "";
-      let accumulatedThinking = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
-
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed.startsWith("data:")) continue;
-          const dataStr = trimmed.slice(5).trim();
-          if (dataStr === "[DONE]") continue;
-
-          try {
-            const json = JSON.parse(dataStr);
-            const delta = json.choices?.[0]?.delta;
-            if (delta?.content) {
-              accumulatedContent += delta.content;
-              setMessages((prev) =>
-                prev.map((msg) =>
-                  msg.id === assistantMsgId
-                    ? { ...msg, content: accumulatedContent }
-                    : msg
-                )
-              );
-            }
-            if (delta?.reasoning_content) {
-              accumulatedThinking += delta.reasoning_content;
-              setMessages((prev) =>
-                prev.map((msg) =>
-                  msg.id === assistantMsgId
-                    ? { ...msg, thinking: accumulatedThinking }
-                    : msg
-                )
-              );
-              setExpandedThinkingIds((exp) => ({ ...exp, [assistantMsgId]: true }));
-            }
-          } catch {
-            // ignore JSON parse error
+          if (learnId) {
+            await localDb.saveMessage({
+              id: assistantMsgId,
+              learnId,
+              role: "assistant",
+              content: finalContent,
+              thinking: finalThinking,
+            });
           }
-        }
-      }
+        },
+        onError: async (err) => {
+          const errorText = `Gagal memanggil Const Router: ${err.message}`;
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === assistantMsgId
+                ? {
+                    ...msg,
+                    content: errorText,
+                    isStreaming: false,
+                  }
+                : msg
+            )
+          );
+          setIsStreaming(false);
+          abortControllerRef.current = null;
 
-      // Save assistant message to Dexie
-      if (learnId) {
-        await localDb.saveMessage({
-          id: assistantMsgId,
-          learnId,
-          role: "assistant",
-          content: accumulatedContent,
-          thinking: accumulatedThinking,
-        });
-      }
-    } catch (err: any) {
-      const errorText = `Gagal memanggil Const: ${err.message}`;
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === assistantMsgId
-            ? {
-                ...msg,
-                content: errorText,
-                isStreaming: false,
-              }
-            : msg
-        )
-      );
-      if (learnId) {
-        await localDb.saveMessage({
-          id: assistantMsgId,
-          learnId,
-          role: "assistant",
-          content: errorText,
-        });
-      }
-    } finally {
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === assistantMsgId ? { ...msg, isStreaming: false } : msg
-        )
-      );
-      setIsStreaming(false);
+          if (learnId) {
+            await localDb.saveMessage({
+              id: assistantMsgId,
+              learnId,
+              role: "assistant",
+              content: errorText,
+            });
+          }
+        },
+      });
+    } catch {
+      // Errors handled in onError callback
     }
   };
 
@@ -419,18 +343,20 @@ export function MobileLearnWorkspace({
   };
 
   const currentModel =
-    MOBILE_MODELS.find((m) => m.id === selectedModelId) || MOBILE_MODELS[0]!;
+    availableModels.find((m) => m.id === selectedModelId) ??
+    availableModels[0] ??
+    DEFAULT_MOBILE_MODELS[0]!;
 
   return (
-    <div className="h-screen w-screen flex flex-col bg-background text-foreground overflow-hidden select-none">
-      {/* Top Mobile Header */}
-      <header className="h-14 px-4 bg-card/60 backdrop-blur-md border-b border-border/50 flex items-center justify-between shrink-0 z-10">
-        <div className="flex items-center gap-2.5 min-w-0">
+    <div className="h-screen w-screen flex flex-col bg-[#161616] text-[#d4d4d4] overflow-hidden select-none">
+      {/* Top Mobile Header (Level 1 Header Well: #222222 per DESIGN.md) */}
+      <header className="h-14 px-4 bg-[#222222] border-b border-[#383838] flex items-center justify-between shrink-0 z-10">
+        <div className="flex items-center gap-2 min-w-0">
           <button
             type="button"
             onClick={onBack}
-            className="h-9 w-9 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer shrink-0"
-            aria-label="Back"
+            className="h-8 w-8 rounded-xl hover:bg-[#2b2b2b] text-[#969696] hover:text-[#ffffff] flex items-center justify-center transition-colors cursor-pointer shrink-0 border border-transparent hover:border-[#383838]"
+            aria-label="Back to home"
           >
             <ArrowLeft className="h-4 w-4" />
           </button>
@@ -447,12 +373,12 @@ export function MobileLearnWorkspace({
                   if (e.key === "Enter") handleSaveTitle();
                   if (e.key === "Escape") setIsEditingTitle(false);
                 }}
-                className="text-sm font-medium text-foreground bg-muted/60 rounded-full px-3 py-1 outline-none border border-border/80 max-w-[170px]"
+                className="text-[13px] font-medium text-[#ffffff] bg-[#2b2b2b] rounded-xl px-2.5 py-1 outline-none border border-[#383838] max-w-[170px]"
               />
               <button
                 type="button"
                 onClick={handleSaveTitle}
-                className="h-7 w-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center cursor-pointer"
+                className="h-7 w-7 rounded-xl bg-[#0066ff] text-[#ffffff] flex items-center justify-center cursor-pointer"
               >
                 <Check className="h-3.5 w-3.5" />
               </button>
@@ -461,7 +387,7 @@ export function MobileLearnWorkspace({
             <button
               type="button"
               onClick={() => setIsEditingTitle(true)}
-              className="text-sm font-sans font-semibold text-foreground hover:bg-muted/50 px-2.5 py-1 rounded-full transition-colors cursor-pointer text-left truncate max-w-[180px]"
+              className="text-[14px] font-sans font-medium text-[#d4d4d4] hover:text-[#ffffff] hover:bg-[#2b2b2b] px-2.5 py-1 rounded-xl transition-colors cursor-pointer text-left truncate max-w-[180px]"
               title="Click to rename"
             >
               {titleValue}
@@ -475,7 +401,7 @@ export function MobileLearnWorkspace({
             <button
               type="button"
               onClick={handleClearHistory}
-              className="h-8 px-2.5 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground flex items-center gap-1 text-xs transition-colors cursor-pointer border border-border/40"
+              className="h-8 px-2 rounded-xl hover:bg-[#2b2b2b] text-[#969696] hover:text-[#ffffff] flex items-center gap-1 text-[11px] transition-colors cursor-pointer border border-[#383838]"
               title="Clear conversation"
             >
               <RotateCcw className="h-3.5 w-3.5" />
@@ -485,7 +411,7 @@ export function MobileLearnWorkspace({
           <button
             type="button"
             onClick={() => setIsAddSourceOpen(true)}
-            className="h-8 w-8 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
+            className="h-8 w-8 rounded-xl hover:bg-[#2b2b2b] text-[#969696] hover:text-[#ffffff] flex items-center justify-center transition-colors cursor-pointer border border-[#383838]"
             aria-label="Add source"
           >
             <Plus className="h-4 w-4" />
@@ -498,7 +424,7 @@ export function MobileLearnWorkspace({
                 navigator.share({ title: titleValue, url: window.location.href }).catch(() => {});
               }
             }}
-            className="h-8 w-8 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
+            className="h-8 w-8 rounded-xl hover:bg-[#2b2b2b] text-[#969696] hover:text-[#ffffff] flex items-center justify-center transition-colors cursor-pointer border border-[#383838]"
             aria-label="Share"
           >
             <Share2 className="h-4 w-4" />
@@ -512,8 +438,8 @@ export function MobileLearnWorkspace({
         {activeTab === "sources" && (
           <div className="p-4 space-y-4 max-w-lg mx-auto">
             <div className="flex items-center justify-between">
-              <span className="text-base font-semibold tracking-tight text-foreground">Learning Sources</span>
-              <span className="text-xs px-2.5 py-0.5 rounded-full bg-muted text-muted-foreground font-mono">
+              <span className="text-sm font-medium text-[#ffffff]">Learning Sources</span>
+              <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-[#222222] border border-[#383838] text-[#969696] font-mono">
                 {learn?.sourcesCount || 0} {learn?.sourcesCount === 1 ? "source" : "sources"}
               </span>
             </div>
@@ -522,27 +448,27 @@ export function MobileLearnWorkspace({
             <button
               type="button"
               onClick={() => setIsAddSourceOpen(true)}
-              className="w-full py-2.5 px-4 rounded-full border border-border hover:border-border/80 bg-muted/50 hover:bg-muted text-xs font-medium text-foreground flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+              className="w-full py-2.5 px-4 rounded-xl border border-[#383838] hover:border-[#5d5d5d] bg-[#2b2b2b] hover:bg-[#383838] text-xs font-medium text-[#d4d4d4] hover:text-[#ffffff] flex items-center justify-center gap-1.5 transition-all cursor-pointer"
             >
               <Plus className="h-4 w-4" />
               <span>Add source</span>
             </button>
 
             {/* Search Box */}
-            <div className="w-full bg-muted/60 rounded-2xl p-3 border border-border/60 focus-within:border-border transition-all text-left">
+            <div className="w-full bg-[#222222] rounded-xl p-3 border border-[#383838] focus-within:border-[#5d5d5d] transition-all text-left">
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search for new sources on the web"
-                className="w-full bg-transparent text-xs text-foreground placeholder:text-muted-foreground/60 outline-none px-1 py-1"
+                className="w-full bg-transparent text-xs text-[#d4d4d4] placeholder:text-[#5d5d5d] outline-none px-1 py-1"
               />
-              <div className="flex items-center justify-between mt-2 pt-1">
+              <div className="flex items-center justify-between mt-2 pt-1 border-t border-[#2e2e2e]">
                 <div className="flex items-center gap-1.5">
                   <button
                     type="button"
                     onClick={() => setWebScope(webScope === "Web" ? "Journal" : "Web")}
-                    className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-background/60 hover:bg-background text-[11px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer border border-border/40"
+                    className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-[#2b2b2b] hover:bg-[#383838] text-[11px] text-[#969696] hover:text-[#d4d4d4] transition-colors cursor-pointer border border-[#383838]"
                   >
                     <Globe className="h-2.5 w-2.5" />
                     <span>{webScope}</span>
@@ -556,7 +482,7 @@ export function MobileLearnWorkspace({
                         researchSpeed === "Fast Research" ? "Deep Research" : "Fast Research"
                       )
                     }
-                    className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-background/60 hover:bg-background text-[11px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer border border-border/40"
+                    className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-[#2b2b2b] hover:bg-[#383838] text-[11px] text-[#969696] hover:text-[#d4d4d4] transition-colors cursor-pointer border border-[#383838]"
                   >
                     <Search className="h-2.5 w-2.5" />
                     <span>{researchSpeed}</span>
@@ -566,7 +492,7 @@ export function MobileLearnWorkspace({
 
                 <button
                   type="button"
-                  className="h-6 w-6 rounded-full bg-background hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer border border-border/40"
+                  className="h-6 w-6 rounded-lg bg-[#2b2b2b] hover:bg-[#383838] text-[#969696] hover:text-[#ffffff] flex items-center justify-center transition-colors cursor-pointer border border-[#383838]"
                   aria-label="Search"
                 >
                   <Search className="h-3 w-3" />
@@ -575,49 +501,46 @@ export function MobileLearnWorkspace({
             </div>
 
             {/* Empty State */}
-            <div className="flex flex-col items-center justify-center text-center p-6 min-h-[220px]">
-              <div className="h-12 w-12 rounded-2xl bg-muted/50 border border-border/40 flex items-center justify-center text-muted-foreground/60 mb-3">
-                <FileText className="h-6 w-6 stroke-[1.5]" />
+            <div className="flex flex-col items-center justify-center text-center p-6 min-h-[200px] border border-[#2e2e2e] rounded-xl bg-[#1b1b1b]">
+              <div className="h-10 w-10 rounded-xl bg-[#222222] border border-[#383838] flex items-center justify-center text-[#969696] mb-3">
+                <FileText className="h-5 w-5 stroke-[1.5]" />
               </div>
-              <h3 className="text-sm font-medium text-foreground mb-1">
+              <h3 className="text-xs font-medium text-[#ffffff] mb-1">
                 Saved sources will appear here
               </h3>
-              <p className="text-xs text-muted-foreground leading-relaxed max-w-[260px] mb-3">
+              <p className="text-[11px] text-[#969696] leading-relaxed max-w-[240px] mb-3">
                 Add files, notes, or web links to ground your AI assistant.
               </p>
-              <p className="text-xs text-muted-foreground">
-                Drop files here or{" "}
-                <button
-                  type="button"
-                  onClick={() => setIsAddSourceOpen(true)}
-                  className="text-foreground underline underline-offset-2 hover:text-primary transition-colors cursor-pointer"
-                >
-                  add sources
-                </button>
-              </p>
+              <button
+                type="button"
+                onClick={() => setIsAddSourceOpen(true)}
+                className="text-xs text-[#0066ff] hover:underline transition-colors cursor-pointer"
+              >
+                + Add first source
+              </button>
             </div>
           </div>
         )}
 
-        {/* TAB 2: CHAT */}
+        {/* TAB 2: CHAT (CORE CONVERSATIONAL EXPERIENCE) */}
         {activeTab === "chat" && (
-          <div className="flex flex-col h-full justify-between p-4 max-w-lg mx-auto min-h-[calc(100vh-8.5rem)]">
+          <div className="flex flex-col h-full justify-between p-3 sm:p-4 max-w-lg mx-auto min-h-[calc(100vh-8.5rem)]">
             {/* Top Model Selector Pill */}
             <div className="flex items-center justify-between pb-3 select-none">
               <div className="relative">
                 <button
                   type="button"
                   onClick={() => setIsModelDropdownOpen(!isModelDropdownOpen)}
-                  className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-muted/60 hover:bg-muted border border-border/60 text-xs font-medium text-foreground transition-all cursor-pointer"
+                  className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-[#2b2b2b] hover:bg-[#383838] border border-[#383838] text-xs font-medium text-[#d4d4d4] transition-all cursor-pointer"
                 >
-                  <Sparkles className="h-3 w-3 text-accent" />
+                  <Sparkles className="h-3 w-3 text-[#0066ff]" />
                   <span>{currentModel.name}</span>
-                  <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                  <ChevronDown className="h-3 w-3 text-[#969696]" />
                 </button>
 
                 {isModelDropdownOpen && (
-                  <div className="absolute left-0 mt-1.5 w-56 rounded-2xl bg-card border border-border shadow-xl p-1.5 z-50">
-                    {MOBILE_MODELS.map((m) => (
+                  <div className="absolute left-0 mt-1.5 w-64 rounded-xl bg-[#222222] border border-[#383838] p-1.5 z-50 animate-in fade-in duration-100">
+                    {availableModels.map((m) => (
                       <button
                         key={m.id}
                         type="button"
@@ -625,52 +548,54 @@ export function MobileLearnWorkspace({
                           setSelectedModelId(m.id);
                           setIsModelDropdownOpen(false);
                         }}
-                        className={`w-full text-left px-2.5 py-1.5 rounded-xl text-xs flex items-center justify-between cursor-pointer ${
+                        className={`w-full text-left px-3 py-2 rounded-lg text-xs flex flex-col cursor-pointer transition-colors ${
                           selectedModelId === m.id
-                            ? "bg-muted text-foreground font-medium"
-                            : "text-muted-foreground hover:bg-muted/50"
+                            ? "bg-[#2b2b2b] text-[#ffffff] font-medium"
+                            : "text-[#969696] hover:text-[#d4d4d4] hover:bg-[#2b2b2b]/50"
                         }`}
                       >
-                        <span>{m.name}</span>
-                        {selectedModelId === m.id && (
-                          <span className="h-1.5 w-1.5 rounded-full bg-accent" />
-                        )}
+                        <div className="flex items-center justify-between w-full">
+                          <span className="font-sans">{m.name}</span>
+                          {selectedModelId === m.id && (
+                            <span className="h-1.5 w-1.5 rounded-full bg-[#0066ff]" />
+                          )}
+                        </div>
+                        <span className="text-[10px] text-[#5d5d5d] mt-0.5">
+                          {m.description}
+                        </span>
                       </button>
                     ))}
                   </div>
                 )}
               </div>
 
-              <span className="text-[10px] font-mono text-muted-foreground/70">
-                100% Native Storage
+              <span className="text-[10px] font-mono text-[#5d5d5d]">
+                Local IndexedDB
               </span>
             </div>
 
             {/* Conversation Stream or Empty Greeting */}
             {messages.length === 0 ? (
-              <div className="my-auto py-6">
-                <div className="text-3xl mb-3 select-none">👋</div>
-                <h1 className="text-xl font-sans font-semibold tracking-tight text-foreground mb-2">
-                  Socratic Learning Studio
+              <div className="my-auto py-8 text-center select-none">
+                <div className="text-3xl mb-3">📘</div>
+                <h1 className="text-lg font-sans font-medium tracking-tight text-[#ffffff] mb-1.5">
+                  Socratic Learning Tutor
                 </h1>
-                <p className="text-xs text-muted-foreground leading-relaxed mb-5">
-                  Explore complex concepts, dissect research materials, or generate simulations with your AI tutor.
-                </p>
-                <p className="text-xs text-muted-foreground/80 font-medium mb-3">
-                  What would you like to explore today?
+                <p className="text-xs text-[#969696] leading-relaxed max-w-xs mx-auto mb-6">
+                  Diskusikan materi, jelaskan konsep yang belum dipahami, atau minta analogi dan kuis latihan.
                 </p>
 
-                <div className="flex flex-col gap-2">
+                <div className="flex flex-col gap-2 max-w-sm mx-auto text-left">
                   {[
-                    "Explore a new topic",
-                    "Analyze material & hypotheses",
-                    "Create a smart summary",
+                    "Jelaskan konsep ini dengan analogi sederhana",
+                    "Buat rangkuman poin-poin penting materi ini",
+                    "Uji pemahaman saya dengan 3 pertanyaan sokratik",
                   ].map((chip) => (
                     <button
                       key={chip}
                       type="button"
                       onClick={() => handleSend(chip)}
-                      className="w-full text-left px-4 py-2.5 rounded-2xl bg-muted/50 hover:bg-muted border border-border/50 text-xs text-foreground transition-all cursor-pointer shadow-xs active:scale-98"
+                      className="w-full text-left px-3.5 py-2.5 rounded-xl bg-[#222222] hover:bg-[#2b2b2b] border border-[#383838] text-xs text-[#d4d4d4] hover:text-[#ffffff] transition-all cursor-pointer active:scale-98"
                     >
                       {chip}
                     </button>
@@ -687,49 +612,64 @@ export function MobileLearnWorkspace({
                     } w-full`}
                   >
                     {msg.role === "user" ? (
-                      <div className="max-w-[85%] rounded-3xl rounded-tr-md bg-muted text-foreground px-4 py-2 text-xs sm:text-sm border border-border/60 shadow-xs leading-relaxed whitespace-pre-wrap">
+                      <div className="max-w-[85%] rounded-2xl rounded-tr-xs bg-[#2b2b2b] text-[#d4d4d4] px-3.5 py-2 text-[13px] sm:text-[14px] border border-[#383838] leading-relaxed whitespace-pre-wrap font-sans">
                         {msg.content}
                       </div>
                     ) : (
                       <div className="w-full space-y-2">
+                        {/* Thinking Process Accordion */}
                         {msg.thinking && (
-                          <div className="w-full rounded-2xl bg-muted/30 border border-border/40 overflow-hidden text-xs">
+                          <div className="w-full rounded-xl bg-[#1b1b1b] border border-[#383838] overflow-hidden text-xs">
                             <button
                               type="button"
                               onClick={() =>
                                 setExpandedThinkingIds((prev) => ({
-                                   ...prev,
-                                   [msg.id]: !prev[msg.id],
+                                  ...prev,
+                                  [msg.id]: !prev[msg.id],
                                 }))
                               }
-                              className="w-full px-3 py-1.5 flex items-center justify-between text-muted-foreground hover:text-foreground transition-colors cursor-pointer select-none bg-muted/20"
+                              className="w-full px-3 py-1.5 flex items-center justify-between text-[#969696] hover:text-[#d4d4d4] transition-colors cursor-pointer select-none bg-[#222222]"
                             >
                               <div className="flex items-center gap-1.5">
-                                <Brain className="h-3 w-3 text-purple-400" />
-                                <span className="font-mono text-[10px] font-medium">
-                                  DeepThinking
+                                <Brain className="h-3 w-3 text-[#0066ff]" />
+                                <span className="font-mono text-[10px] font-medium text-[#d4d4d4]">
+                                  Thinking Process
                                 </span>
+                                {msg.isStreaming && !msg.content && (
+                                  <span className="inline-flex items-center gap-1 text-[10px] text-[#969696] font-mono ml-1">
+                                    <span className="h-1.5 w-1.5 rounded-full bg-[#0066ff] animate-pulse" />
+                                    reasoning...
+                                  </span>
+                                )}
                               </div>
                               <ChevronDown
-                                className={`h-3 w-3 transition-transform ${
+                                className={`h-3 w-3 transition-transform text-[#969696] ${
                                   expandedThinkingIds[msg.id] ? "rotate-180" : ""
                                 }`}
                               />
                             </button>
 
                             {expandedThinkingIds[msg.id] && (
-                              <div className="p-3 text-muted-foreground font-mono text-[10px] leading-relaxed border-t border-border/40 whitespace-pre-wrap max-h-40 overflow-y-auto bg-background/50">
+                              <div className="p-3 text-[#969696] font-mono text-[10.5px] leading-relaxed border-t border-[#383838] whitespace-pre-wrap max-h-44 overflow-y-auto bg-[#161616]">
                                 {msg.thinking}
                               </div>
                             )}
                           </div>
                         )}
 
-                        <div className="w-full rounded-3xl rounded-tl-md bg-card/60 border border-border/60 p-3.5 text-xs sm:text-sm text-foreground shadow-xs leading-relaxed whitespace-pre-wrap relative">
-                          {msg.content}
+                        {/* Assistant Output Message */}
+                        <div className="w-full rounded-2xl rounded-tl-xs bg-[#222222]/70 border border-[#383838] p-3.5 sm:p-4 text-[13px] sm:text-[14px] text-[#d4d4d4] leading-relaxed relative">
+                          {msg.content ? (
+                            <MarkdownContent content={msg.content} />
+                          ) : msg.isStreaming ? (
+                            <div className="flex items-center gap-1.5 text-xs text-[#969696] font-mono py-1">
+                              <span className="h-2 w-2 rounded-full bg-[#0066ff] animate-ping" />
+                              <span>Thinking and formulating response...</span>
+                            </div>
+                          ) : null}
 
-                          {msg.isStreaming && (
-                            <span className="inline-block w-1.5 h-3 ml-1 bg-accent animate-pulse align-middle" />
+                          {msg.isStreaming && msg.content && (
+                            <span className="inline-block w-1.5 h-3.5 ml-1 bg-[#0066ff] animate-pulse align-middle" />
                           )}
                         </div>
                       </div>
@@ -740,43 +680,17 @@ export function MobileLearnWorkspace({
               </div>
             )}
 
-            {/* Mobile Chat Input Form */}
+            {/* Mobile Chat Input Form (Adhering to DESIGN.md) */}
             <div className="pt-2">
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  handleSend();
-                }}
-                className="w-full bg-muted/40 rounded-full p-2 border border-border/70 focus-within:border-foreground/40 transition-all flex items-center justify-between gap-2 shadow-lg"
-              >
-                <input
-                  type="text"
-                  value={inputMessage}
-                  onChange={(e) => setInputMessage(e.target.value)}
-                  disabled={isStreaming}
-                  placeholder={
-                    isStreaming
-                      ? "Processing..."
-                      : `Ask ${currentModel.name} anything...`
-                  }
-                  className="flex-1 bg-transparent text-xs text-foreground placeholder:text-muted-foreground/60 outline-none px-3 disabled:opacity-50"
-                />
-
-                <div className="flex items-center gap-1.5 shrink-0 pr-1">
-                  <button
-                    type="submit"
-                    disabled={!inputMessage.trim() || isStreaming}
-                    className="h-8 w-8 rounded-full bg-foreground text-background hover:opacity-90 disabled:opacity-30 flex items-center justify-center transition-all cursor-pointer active:scale-95"
-                    aria-label="Send"
-                  >
-                    {isStreaming ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : (
-                      <ArrowRight className="h-3.5 w-3.5" />
-                    )}
-                  </button>
-                </div>
-              </form>
+              <ChatInputCard
+                inputMessage={inputMessage}
+                onChangeInput={setInputMessage}
+                onSend={handleSend}
+                onStop={handleStop}
+                isStreaming={isStreaming}
+                selectedModelName={currentModel.name}
+                showChips={messages.length === 0}
+              />
             </div>
           </div>
         )}
@@ -785,7 +699,7 @@ export function MobileLearnWorkspace({
         {activeTab === "tools" && (
           <div className="p-4 space-y-5 max-w-lg mx-auto">
             <div className="flex items-center justify-between">
-              <span className="text-base font-semibold tracking-tight text-foreground">Studio Tools</span>
+              <span className="text-sm font-medium text-[#ffffff]">Studio Tools</span>
             </div>
 
             {/* 3x3 Grid of Tools */}
@@ -800,13 +714,13 @@ export function MobileLearnWorkspace({
                       setActiveTab("chat");
                       handleSend(`Please create a ${tool.name} for this notebook.`);
                     }}
-                    className="p-2.5 rounded-2xl bg-muted/50 hover:bg-muted border border-border/50 transition-all flex flex-col justify-between h-20 text-left cursor-pointer active:scale-98"
+                    className="p-2.5 rounded-xl bg-[#222222] hover:bg-[#2b2b2b] border border-[#383838] transition-all flex flex-col justify-between h-20 text-left cursor-pointer active:scale-98"
                   >
                     <div className="flex items-center justify-between w-full">
                       <Icon className={`h-4 w-4 ${tool.iconColor}`} />
-                      <ChevronRight className="h-3 w-3 text-muted-foreground opacity-40" />
+                      <ChevronRight className="h-3 w-3 text-[#5d5d5d]" />
                     </div>
-                    <span className="text-[10px] font-normal text-foreground leading-tight line-clamp-2">
+                    <span className="text-[10px] font-normal text-[#d4d4d4] leading-tight line-clamp-2">
                       {tool.name}
                     </span>
                   </button>
@@ -817,11 +731,11 @@ export function MobileLearnWorkspace({
             {/* Artifacts / Downloads Section */}
             <div className="pt-2">
               <div className="flex items-center justify-between mb-2.5">
-                <span className="text-sm font-semibold tracking-tight text-foreground">
+                <span className="text-xs font-medium text-[#ffffff]">
                   Generated Files & Artifacts
                 </span>
                 {artifacts && artifacts.length > 0 && (
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted font-mono text-muted-foreground">
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#222222] border border-[#383838] font-mono text-[#969696]">
                     {artifacts.length} {artifacts.length === 1 ? "file" : "files"}
                   </span>
                 )}
@@ -832,23 +746,23 @@ export function MobileLearnWorkspace({
                   {artifacts.map((art) => (
                     <div
                       key={art.id}
-                      className="p-3 rounded-2xl bg-card/60 border border-border/60 flex items-center justify-between"
+                      className="p-3 rounded-xl bg-[#222222] border border-[#383838] flex items-center justify-between"
                     >
                       <div className="flex items-center gap-2.5 min-w-0">
                         {art.isZip ? (
-                          <div className="h-8 w-8 rounded-xl bg-amber-500/10 text-amber-500 flex items-center justify-center shrink-0">
+                          <div className="h-8 w-8 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center shrink-0">
                             <Package className="h-4 w-4" />
                           </div>
                         ) : (
-                          <div className="h-8 w-8 rounded-xl bg-accent/10 text-accent flex items-center justify-center shrink-0">
+                          <div className="h-8 w-8 rounded-lg bg-[#0066ff]/10 text-[#0066ff] flex items-center justify-center shrink-0">
                             <FileText className="h-4 w-4" />
                           </div>
                         )}
                         <div className="min-w-0">
-                          <div className="text-xs font-medium text-foreground truncate">
+                          <div className="text-xs font-medium text-[#d4d4d4] truncate">
                             {art.title}
                           </div>
-                          <div className="text-[10px] text-muted-foreground font-mono">
+                          <div className="text-[10px] text-[#969696] font-mono">
                             {art.isZip ? "ZIP Archive / Folder" : art.type}
                           </div>
                         </div>
@@ -857,7 +771,7 @@ export function MobileLearnWorkspace({
                       <button
                         type="button"
                         onClick={() => handleDownloadArtifact(art)}
-                        className="h-8 px-3 rounded-full bg-muted hover:bg-muted/80 text-foreground text-xs flex items-center gap-1.5 transition-colors cursor-pointer border border-border/40 shrink-0"
+                        className="h-8 px-3 rounded-lg bg-[#2b2b2b] hover:bg-[#383838] text-[#ffffff] text-xs flex items-center gap-1.5 transition-colors cursor-pointer border border-[#383838] shrink-0"
                       >
                         <Download className="h-3 w-3" />
                         <span>Download</span>
@@ -866,15 +780,15 @@ export function MobileLearnWorkspace({
                   ))}
                 </div>
               ) : (
-                <div className="flex flex-col items-center justify-center text-center p-6 rounded-2xl border border-border/40 bg-muted/20 min-h-[140px]">
-                  <div className="h-10 w-10 rounded-2xl bg-muted/50 border border-border/40 flex items-center justify-center text-muted-foreground/60 mb-2.5">
-                    <PenTool className="h-5 w-5 stroke-[1.5]" />
+                <div className="flex flex-col items-center justify-center text-center p-6 rounded-xl border border-[#2e2e2e] bg-[#1b1b1b] min-h-[140px]">
+                  <div className="h-9 w-9 rounded-xl bg-[#222222] border border-[#383838] flex items-center justify-center text-[#969696] mb-2.5">
+                    <PenTool className="h-4 w-4 stroke-[1.5]" />
                   </div>
-                  <h3 className="text-xs font-medium text-foreground mb-1">
-                    No artifacts or zip files saved yet
+                  <h3 className="text-xs font-medium text-[#ffffff] mb-1">
+                    No artifacts or files saved yet
                   </h3>
-                  <p className="text-[11px] text-muted-foreground leading-relaxed max-w-[240px]">
-                    Any zip archives or files produced in sandbox computing will appear here and can be downloaded directly.
+                  <p className="text-[11px] text-[#969696] leading-relaxed max-w-[240px]">
+                    Any files produced in learning sessions will appear here and can be downloaded directly.
                   </p>
                 </div>
               )}
@@ -883,16 +797,16 @@ export function MobileLearnWorkspace({
         )}
       </div>
 
-      {/* FIXED BOTTOM NAVIGATION BAR: Sources, Chat, Tools */}
-      <nav className="fixed bottom-0 left-0 right-0 h-16 bg-card/80 backdrop-blur-md border-t border-border/50 flex items-center justify-around px-4 z-20">
+      {/* FIXED BOTTOM NAVIGATION BAR (Sources, Chat, Studio) */}
+      <nav className="fixed bottom-0 left-0 right-0 h-16 bg-[#222222] border-t border-[#383838] flex items-center justify-around px-4 z-20">
         {/* Tab 1: Sources */}
         <button
           type="button"
           onClick={() => setActiveTab("sources")}
           className={`flex flex-col items-center justify-center flex-1 py-1.5 transition-colors cursor-pointer ${
             activeTab === "sources"
-              ? "text-accent font-medium"
-              : "text-muted-foreground hover:text-foreground"
+              ? "text-[#0066ff] font-medium"
+              : "text-[#969696] hover:text-[#d4d4d4]"
           }`}
         >
           <FolderOpen className="h-5 w-5" />
@@ -905,8 +819,8 @@ export function MobileLearnWorkspace({
           onClick={() => setActiveTab("chat")}
           className={`flex flex-col items-center justify-center flex-1 py-1.5 transition-colors cursor-pointer ${
             activeTab === "chat"
-              ? "text-accent font-medium"
-              : "text-muted-foreground hover:text-foreground"
+              ? "text-[#0066ff] font-medium"
+              : "text-[#969696] hover:text-[#d4d4d4]"
           }`}
         >
           <MessageSquare className="h-5 w-5" />
@@ -919,8 +833,8 @@ export function MobileLearnWorkspace({
           onClick={() => setActiveTab("tools")}
           className={`flex flex-col items-center justify-center flex-1 py-1.5 transition-colors cursor-pointer ${
             activeTab === "tools"
-              ? "text-accent font-medium"
-              : "text-muted-foreground hover:text-foreground"
+              ? "text-[#0066ff] font-medium"
+              : "text-[#969696] hover:text-[#d4d4d4]"
           }`}
         >
           <LayoutGrid className="h-5 w-5" />
@@ -933,7 +847,6 @@ export function MobileLearnWorkspace({
         open={isAddSourceOpen}
         onOpenChange={setIsAddSourceOpen}
         onSelectSource={(sourceType) => {
-          console.log("Selected source:", sourceType);
           setIsAddSourceOpen(false);
         }}
       />

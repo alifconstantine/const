@@ -50,6 +50,16 @@ export async function OPTIONS() {
   });
 }
 
+function corsJson(data: any, init?: { status?: number; headers?: Record<string, string> }) {
+  return NextResponse.json(data, {
+    status: init?.status ?? 200,
+    headers: {
+      ...CORS_HEADERS,
+      ...(init?.headers || {}),
+    },
+  });
+}
+
 function wrapWithTelemetry(
   response: Response,
   meta: TelemetryMetadata
@@ -585,12 +595,12 @@ async function dispatchSingleModel({
       errorMessage: errMsg,
     });
 
-    return NextResponse.json({ error: { message: errMsg } }, { status: response.status });
+    return corsJson({ error: { message: errMsg } }, { status: response.status });
   }
 
   if (stream) {
     if (!response.body) {
-      return NextResponse.json(
+      return corsJson(
         { error: { message: "No response stream from provider." } },
         { status: 502 }
       );
@@ -605,6 +615,7 @@ async function dispatchSingleModel({
         Connection: "keep-alive",
         "X-Accel-Buffering": "no",
         "X-Const-Request-Id": requestId,
+        ...CORS_HEADERS,
       },
     });
   } else {
@@ -637,7 +648,7 @@ async function dispatchSingleModel({
       delete data.usage.cache_read_input_tokens;
     }
 
-    return NextResponse.json(data, {
+    return corsJson(data, {
       headers: {
         "X-Const-Request-Id": requestId,
       },

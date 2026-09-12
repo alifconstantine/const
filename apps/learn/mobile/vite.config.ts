@@ -12,6 +12,13 @@ export default defineConfig({
   server: {
     port: 3003,
     host: true,
+    proxy: {
+      "/v1": {
+        target: "https://router.const.web.id",
+        changeOrigin: true,
+        secure: false,
+      },
+    },
   },
   define: {
     "process.env": {},
