@@ -57,7 +57,7 @@ export function getAppNameFromUrl(target: string | null | undefined): string {
     if (hostname === "router.const.web.id" || hostname.startsWith("router.") || hostname.includes("router") || port === "3002") {
       return "Const Router";
     }
-    if (hostname === "learn.const.web.id" || hostname.startsWith("learn.") || port === "5173") {
+    if (hostname === "learn.const.web.id" || hostname.startsWith("learn.") || port === "5173" || port === "3003") {
       return "Const Learn";
     }
     if (hostname === "accounts.const.web.id" || hostname.startsWith("accounts.") || port === "3001") {
@@ -129,19 +129,23 @@ export function getSafeRedirectUrl(
       return trimmed;
     }
 
-    // 5. Local development origins - STRICTLY DISABLED in production
-    const isDevEnvironment =
-      process.env.NODE_ENV !== "production" ||
-      (typeof window !== "undefined" &&
-        (window.location.hostname === "localhost" ||
-          window.location.hostname === "127.0.0.1"));
+    // 5. Local development origins & LAN testing (RFC 8252 & RFC 1918)
+    // Permitted for local developer servers, previews, and mobile testing:
+    // - localhost, 127.0.0.1, [::1], *.localhost
+    // - Private LAN IPv4 ranges: 192.168.*.*, 10.*.*.*, 172.16-31.*.*, *.local
+    const isLoopbackOrLocalhost =
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname.endsWith(".localhost") ||
+      hostname === "[::1]";
 
-    if (
-      isDevEnvironment &&
-      (hostname === "localhost" ||
-        hostname === "127.0.0.1" ||
-        hostname.endsWith(".localhost"))
-    ) {
+    const isPrivateLanIp =
+      /^192\.168\.\d{1,3}\.\d{1,3}$/.test(hostname) ||
+      /^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname) ||
+      /^172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}$/.test(hostname) ||
+      hostname.endsWith(".local");
+
+    if (isLoopbackOrLocalhost || isPrivateLanIp) {
       return trimmed;
     }
 

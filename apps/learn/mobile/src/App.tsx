@@ -63,7 +63,10 @@ function AuthenticatedContent({
 
 export default function App() {
   const [token, setToken] = useState<string | null>(() => {
-    return localStorage.getItem("const_learn_auth_token");
+    return (
+      localStorage.getItem("const_learn_auth_token") ||
+      localStorage.getItem("const_sso_token")
+    );
   });
   const [isWaitingAuth, setIsWaitingAuth] = useState(false);
 
@@ -75,8 +78,13 @@ export default function App() {
     // 1. Check if token returned via URL query parameter (standard web/PWA flow)
     const searchParams = new URLSearchParams(window.location.search);
     const urlToken = searchParams.get("token");
+    const refreshToken = searchParams.get("refreshToken");
     if (urlToken) {
       localStorage.setItem("const_learn_auth_token", urlToken);
+      localStorage.setItem("const_sso_token", urlToken);
+      if (refreshToken) {
+        localStorage.setItem("const_sso_refresh_token", refreshToken);
+      }
       setToken(urlToken);
       setIsWaitingAuth(false);
       window.history.replaceState({}, document.title, window.location.pathname);
@@ -84,7 +92,10 @@ export default function App() {
 
     // 2. Storage event listener (sync across tabs/windows)
     const handleStorage = (e: StorageEvent) => {
-      if (e.key === "const_learn_auth_token" && e.newValue) {
+      if (
+        (e.key === "const_learn_auth_token" || e.key === "const_sso_token") &&
+        e.newValue
+      ) {
         setToken(e.newValue);
         setIsWaitingAuth(false);
       }
@@ -112,6 +123,7 @@ export default function App() {
   const handleSignOut = () => {
     localStorage.removeItem("const_learn_auth_token");
     localStorage.removeItem("const_sso_token");
+    localStorage.removeItem("const_sso_refresh_token");
     setToken(null);
     setIsWaitingAuth(false);
   };
@@ -119,6 +131,7 @@ export default function App() {
   const handleSwitchAccount = () => {
     localStorage.removeItem("const_learn_auth_token");
     localStorage.removeItem("const_sso_token");
+    localStorage.removeItem("const_sso_refresh_token");
     setToken(null);
     setIsWaitingAuth(true);
 

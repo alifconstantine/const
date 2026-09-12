@@ -44,12 +44,13 @@ export const { auth, signIn, signOut, store, isAuthenticated } = convexAuth({
         const parsed = new URL(redirectTo);
         const hostname = parsed.hostname.toLowerCase();
 
-        const isProd = process.env.CONVEX_DEPLOYMENT?.startsWith("prod:");
-        if (!isProd && (hostname === "localhost" || hostname === "127.0.0.1")) {
-          return redirectTo;
-        }
-
-        if (hostname === "const.web.id" || hostname.endsWith(".const.web.id")) {
+        if (
+          hostname === "localhost" ||
+          hostname === "127.0.0.1" ||
+          hostname.endsWith(".localhost") ||
+          hostname === "const.web.id" ||
+          hostname.endsWith(".const.web.id")
+        ) {
           return redirectTo;
         }
       } catch {
