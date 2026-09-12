@@ -1,6 +1,7 @@
 export * from "./lib/utils";
 
 // Theme
+export * from "./lib/theme";
 export * from "./components/theme-provider";
 export * from "./components/const-logo";
 

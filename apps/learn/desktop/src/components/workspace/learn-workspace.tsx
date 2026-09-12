@@ -10,8 +10,28 @@ import {
   Settings,
   Grid3X3,
   Check,
+  Sun,
+  Moon,
+  Laptop,
+  LogOut,
+  ArrowLeftRight,
+  User as UserIcon,
 } from "lucide-react";
-import { ConstLogoIcon } from "@const/ui";
+import {
+  ConstLogoIcon,
+  Avatar,
+  AvatarImage,
+  AvatarFallback,
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
+  useTheme,
+} from "@const/ui";
 import { SourcesPanel } from "./sources-panel";
 import { ChatPanel } from "./chat-panel";
 import { StudioPanel } from "./studio-panel";
@@ -23,6 +43,8 @@ interface LearnWorkspaceProps {
   onBack: () => void;
   onCreateNew?: () => void;
   user?: any;
+  onSignOut?: () => void;
+  onSwitchAccount?: () => void;
 }
 
 export function LearnWorkspace({
@@ -31,7 +53,11 @@ export function LearnWorkspace({
   onBack,
   onCreateNew,
   user,
+  onSignOut,
+  onSwitchAccount,
 }: LearnWorkspaceProps) {
+  const [theme, setTheme] = useTheme();
+
   // Live notebook data from Dexie
   const learn = useLiveQuery(async () => {
     return await db.learns.get(learnId);
@@ -191,10 +217,131 @@ export function LearnWorkspace({
             <Grid3X3 className="h-4 w-4" />
           </button>
 
-          {/* User Avatar */}
-          <div className="h-7 w-7 rounded-full bg-foreground text-background flex items-center justify-center text-xs font-semibold">
-            {user?.name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || "A"}
-          </div>
+          {/* User Avatar with Account & Theme Menu */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="relative flex items-center justify-center rounded-full outline-none ring-offset-background transition-all hover:ring-2 hover:ring-ring/20 focus-visible:ring-2 focus-visible:ring-ring cursor-pointer select-none"
+                aria-label="Account menu"
+              >
+                <Avatar className="h-7 w-7 rounded-full border border-border/70 transition-transform active:scale-95">
+                  {user?.image ? (
+                    <AvatarImage
+                      src={user.image}
+                      alt={user.name || "Avatar"}
+                      referrerPolicy="no-referrer"
+                    />
+                  ) : null}
+                  <AvatarFallback className="bg-foreground text-background font-sans text-xs font-semibold">
+                    {user === undefined ? (
+                      <UserIcon className="h-3.5 w-3.5 text-muted-foreground animate-pulse" />
+                    ) : (
+                      user?.name?.[0]?.toUpperCase() || user?.email?.[0]?.toUpperCase() || "U"
+                    )}
+                  </AvatarFallback>
+                </Avatar>
+              </button>
+            </DropdownMenuTrigger>
+
+            <DropdownMenuContent align="end" className="w-56 p-1.5 shadow-md">
+              {(user?.name || user?.email) && (
+                <>
+                  <div className="px-2.5 py-2">
+                    {user.name && (
+                      <p className="text-xs font-semibold text-foreground truncate">
+                        {user.name}
+                      </p>
+                    )}
+                    {user.email && (
+                      <p className="text-[11px] text-muted-foreground truncate">
+                        {user.email}
+                      </p>
+                    )}
+                  </div>
+                  <DropdownMenuSeparator />
+                </>
+              )}
+
+              {/* Tema Aplikasi (Submenu) */}
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger className="cursor-pointer flex items-center gap-2 text-xs py-2 px-2.5 text-muted-foreground hover:text-foreground">
+                  {theme === "dark" ? (
+                    <Moon className="h-4 w-4" />
+                  ) : theme === "light" ? (
+                    <Sun className="h-4 w-4" />
+                  ) : (
+                    <Laptop className="h-4 w-4" />
+                  )}
+                  <span>Tema aplikasi</span>
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent className="min-w-[140px] p-1.5 shadow-md">
+                  <DropdownMenuItem
+                    className="cursor-pointer flex items-center justify-between text-xs py-1.5 px-2.5 text-muted-foreground hover:text-foreground"
+                    onClick={() => setTheme("system")}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Laptop className="h-3.5 w-3.5" />
+                      <span>Sistem</span>
+                    </div>
+                    {theme === "system" && <Check className="h-3.5 w-3.5 ml-2" />}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="cursor-pointer flex items-center justify-between text-xs py-1.5 px-2.5 text-muted-foreground hover:text-foreground"
+                    onClick={() => setTheme("light")}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Sun className="h-3.5 w-3.5" />
+                      <span>Terang</span>
+                    </div>
+                    {theme === "light" && <Check className="h-3.5 w-3.5 ml-2" />}
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="cursor-pointer flex items-center justify-between text-xs py-1.5 px-2.5 text-muted-foreground hover:text-foreground"
+                    onClick={() => setTheme("dark")}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Moon className="h-3.5 w-3.5" />
+                      <span>Gelap</span>
+                    </div>
+                    {theme === "dark" && <Check className="h-3.5 w-3.5 ml-2" />}
+                  </DropdownMenuItem>
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
+
+              <DropdownMenuItem
+                className="cursor-pointer flex items-center gap-2 text-xs py-2 px-2.5 text-muted-foreground hover:text-foreground"
+                onClick={() => {
+                  // Settings placeholder: intentionally does nothing
+                }}
+              >
+                <Settings className="h-4 w-4" />
+                <span>Settings</span>
+              </DropdownMenuItem>
+
+              <DropdownMenuSeparator />
+
+              {onSwitchAccount && (
+                <DropdownMenuItem
+                  className="cursor-pointer flex items-center gap-2 text-xs py-2 px-2.5 text-muted-foreground hover:text-foreground"
+                  onClick={onSwitchAccount}
+                >
+                  <ArrowLeftRight className="h-4 w-4" />
+                  <span>Switch account</span>
+                </DropdownMenuItem>
+              )}
+
+              {onSignOut && (
+                <DropdownMenuItem
+                  className="cursor-pointer flex items-center gap-2 text-xs py-2 px-2.5 text-destructive focus:text-destructive"
+                  onClick={onSignOut}
+                >
+                  <LogOut className="h-4 w-4" />
+                  <span>Log out</span>
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </header>
 

@@ -735,7 +735,7 @@ export function LearnHome({ onOpenLearn }: LearnHomeProps) {
           }}
           className={`flex flex-col items-center justify-center flex-1 py-1 px-1 transition-colors cursor-pointer ${
             activeTab === "all"
-              ? "text-[#0066ff] font-medium"
+              ? "text-foreground font-semibold"
               : "text-muted-foreground hover:text-foreground"
           }`}
         >
@@ -752,7 +752,7 @@ export function LearnHome({ onOpenLearn }: LearnHomeProps) {
           }}
           className={`flex flex-col items-center justify-center flex-1 py-1 px-1 transition-colors cursor-pointer relative ${
             activeTab === "my_learn"
-              ? "text-[#0066ff] font-medium"
+              ? "text-foreground font-semibold"
               : "text-muted-foreground hover:text-foreground"
           }`}
         >
@@ -773,18 +773,18 @@ export function LearnHome({ onOpenLearn }: LearnHomeProps) {
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
-                className="h-12 w-12 -mt-5 rounded-full bg-[#0066ff] text-white shadow-lg hover:bg-[#0052cc] active:scale-95 transition-all flex items-center justify-center cursor-pointer border-2 border-background"
+                className="h-12 w-12 -mt-5 rounded-full bg-primary text-primary-foreground hover:opacity-90 active:scale-95 transition-all flex items-center justify-center cursor-pointer border-2 border-background"
                 aria-label="Buat Baru"
               >
                 <Plus className="h-6 w-6 stroke-[2.5]" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="center" side="top" className="w-52 p-1.5 shadow-xl mb-2">
+            <DropdownMenuContent align="center" side="top" className="w-52 p-1.5 border border-border bg-popover mb-2">
               <DropdownMenuItem
                 onClick={() => handleCreateNewLearn()}
                 className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2.5 rounded-lg"
               >
-                <div className="h-7 w-7 rounded-md bg-[#0066ff]/10 text-[#0066ff] flex items-center justify-center shrink-0">
+                <div className="h-7 w-7 rounded-md bg-secondary text-foreground flex items-center justify-center shrink-0">
                   <BookOpen className="h-4 w-4" />
                 </div>
                 <div className="flex flex-col text-left">
@@ -800,7 +800,7 @@ export function LearnHome({ onOpenLearn }: LearnHomeProps) {
                 }}
                 className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2.5 rounded-lg"
               >
-                <div className="h-7 w-7 rounded-md bg-[#0066ff]/10 text-[#0066ff] flex items-center justify-center shrink-0">
+                <div className="h-7 w-7 rounded-md bg-secondary text-foreground flex items-center justify-center shrink-0">
                   <Folder className="h-4 w-4" />
                 </div>
                 <div className="flex flex-col text-left">
@@ -821,7 +821,7 @@ export function LearnHome({ onOpenLearn }: LearnHomeProps) {
           }}
           className={`flex flex-col items-center justify-center flex-1 py-1 px-1 transition-colors cursor-pointer relative ${
             activeTab === "collections"
-              ? "text-[#0066ff] font-medium"
+              ? "text-foreground font-semibold"
               : "text-muted-foreground hover:text-foreground"
           }`}
         >
@@ -845,7 +845,7 @@ export function LearnHome({ onOpenLearn }: LearnHomeProps) {
           }}
           className={`flex flex-col items-center justify-center flex-1 py-1 px-1 transition-colors cursor-pointer relative ${
             activeTab === "artifacts"
-              ? "text-[#0066ff] font-medium"
+              ? "text-foreground font-semibold"
               : "text-muted-foreground hover:text-foreground"
           }`}
         >

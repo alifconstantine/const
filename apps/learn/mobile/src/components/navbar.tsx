@@ -1,4 +1,3 @@
-import React from "react";
 import {
   ConstLogoIcon,
   Avatar,
@@ -9,8 +8,17 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  useTheme,
 } from "@const/ui";
-import { Settings, LogOut, User as UserIcon, ArrowLeftRight } from "lucide-react";
+import {
+  Settings,
+  LogOut,
+  User as UserIcon,
+  ArrowLeftRight,
+  Sun,
+  Moon,
+  Laptop,
+} from "lucide-react";
 
 export interface UserProfile {
   name?: string | null;
@@ -49,6 +57,7 @@ export function getUserInitials(name?: string | null, email?: string | null): st
 
 export function Navbar({ user, onSignOut, onSwitchAccount }: NavbarProps) {
   const initials = getUserInitials(user?.name, user?.email);
+  const [theme, setTheme] = useTheme();
 
   return (
     <header className="w-full h-14 border-b border-border/70 bg-background/95 backdrop-blur-md px-4 flex items-center justify-between select-none z-40">
@@ -96,7 +105,7 @@ export function Navbar({ user, onSignOut, onSwitchAccount }: NavbarProps) {
             </button>
           </DropdownMenuTrigger>
 
-          <DropdownMenuContent align="end" className="w-52 p-1.5 shadow-md mr-1">
+          <DropdownMenuContent align="end" className="w-56 p-1.5 shadow-md mr-1">
             {(user?.name || user?.email) && (
               <>
                 <div className="px-2 py-1.5">
@@ -114,6 +123,58 @@ export function Navbar({ user, onSignOut, onSwitchAccount }: NavbarProps) {
                 <DropdownMenuSeparator />
               </>
             )}
+
+            {/* Tema Aplikasi (Touch-friendly Segmented Control) */}
+            <div className="px-2 py-1.5 flex flex-col gap-1.5">
+              <span className="text-[11px] text-muted-foreground font-medium flex items-center gap-1.5">
+                {theme === "dark" ? (
+                  <Moon className="h-3.5 w-3.5" />
+                ) : theme === "light" ? (
+                  <Sun className="h-3.5 w-3.5" />
+                ) : (
+                  <Laptop className="h-3.5 w-3.5" />
+                )}
+                Tema aplikasi
+              </span>
+              <div className="flex items-center gap-1 p-0.5 rounded-lg bg-secondary/80 border border-border/50">
+                <button
+                  type="button"
+                  onClick={() => setTheme("system")}
+                  className={`flex-1 flex items-center justify-center gap-1 py-1 rounded-md text-[11px] font-medium transition-all cursor-pointer ${
+                    theme === "system"
+                      ? "bg-background text-foreground shadow-2xs"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Laptop className="h-3 w-3" />
+                  <span>Sistem</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTheme("light")}
+                  className={`flex-1 flex items-center justify-center gap-1 py-1 rounded-md text-[11px] font-medium transition-all cursor-pointer ${
+                    theme === "light"
+                      ? "bg-background text-foreground shadow-2xs"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Sun className="h-3 w-3" />
+                  <span>Terang</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTheme("dark")}
+                  className={`flex-1 flex items-center justify-center gap-1 py-1 rounded-md text-[11px] font-medium transition-all cursor-pointer ${
+                    theme === "dark"
+                      ? "bg-background text-foreground shadow-2xs"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  <Moon className="h-3 w-3" />
+                  <span>Gelap</span>
+                </button>
+              </div>
+            </div>
 
             <DropdownMenuItem
               className="cursor-pointer flex items-center gap-2 text-xs py-2 px-2 text-muted-foreground hover:text-foreground"

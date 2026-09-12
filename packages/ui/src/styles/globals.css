@@ -6,66 +6,66 @@
 
 @layer base {
   :root {
-    /* Const Design System (Mobbin-inspired Monochrome Palette) */
-    --background: 0 0% 100%;             /* Canvas #ffffff */
-    --foreground: 0 0% 8%;               /* Ink Black #141414 */
-    --card: 0 0% 100%;                   /* Canvas Card #ffffff */
-    --card-foreground: 0 0% 8%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 8%;
-    --primary: 0 0% 8%;                  /* Ink Black Primary #141414 */
-    --primary-foreground: 0 0% 100%;
-    --secondary: 0 0% 95.3%;             /* Soft Canvas #f3f3f3 */
-    --secondary-foreground: 0 0% 8%;
-    --muted: 0 0% 94.1%;                 /* Field Tint #f0f0f0 */
-    --muted-foreground: 0 0% 43.9%;      /* Text Muted #707070 */
-    --accent: 0 0% 93%;                  /* Soft Neutral Hover Tint */
-    --accent-foreground: 0 0% 8%;
+    /* Const Design System — Studio Light Palette */
+    --background: 0 0% 97.3%;             /* Canvas #f8f8f8 */
+    --foreground: 0 0% 8.6%;              /* Primary Ink #161616 */
+    --card: 0 0% 100%;                   /* Card Surface #ffffff */
+    --card-foreground: 0 0% 8.6%;
+    --popover: 0 0% 100%;                /* Popover Surface #ffffff */
+    --popover-foreground: 0 0% 8.6%;
+    --primary: 0 0% 8.6%;                /* Primary Button / Ink #161616 */
+    --primary-foreground: 0 0% 100%;     /* White #ffffff */
+    --secondary: 240 5% 96.1%;           /* Field Fill #f4f4f6 */
+    --secondary-foreground: 0 0% 8.6%;
+    --muted: 240 4% 94.5%;               /* Muted Track #f0f0f2 */
+    --muted-foreground: 0 0% 45.1%;      /* Text Muted #737373 */
+    --accent: 240 5% 94%;                /* Hover Tint #f0f0f3 */
+    --accent-foreground: 0 0% 8.6%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 87.8%;                /* Hairline #e0e0e0 */
-    --input: 0 0% 94.1%;                 /* Field Fill #f0f0f0 */
-    --ring: 0 0% 8%;                     /* Ink Ring */
-    --radius: 1.5rem;                    /* 24px Container Geometry */
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 0 0% 15%;
-    --sidebar-primary: 0 0% 8%;
+    --border: 240 3% 89%;                /* Hairline #e2e2e4 */
+    --input: 240 5% 96.1%;               /* Field Fill #f4f4f6 */
+    --ring: 0 0% 8.6%;
+    --radius: 1rem;
+    --sidebar-background: 0 0% 100%;
+    --sidebar-foreground: 0 0% 8.6%;
+    --sidebar-primary: 0 0% 8.6%;
     --sidebar-primary-foreground: 0 0% 100%;
-    --sidebar-accent: 0 0% 95.3%;
-    --sidebar-accent-foreground: 0 0% 8%;
-    --sidebar-border: 0 0% 87.8%;
-    --sidebar-ring: 0 0% 8%;
+    --sidebar-accent: 240 5% 96.1%;
+    --sidebar-accent-foreground: 0 0% 8.6%;
+    --sidebar-border: 240 3% 89%;
+    --sidebar-ring: 0 0% 8.6%;
   }
 
   .dark {
-    /* Dark Mode Inversion (Deep Obsidian & Charcoal) */
-    --background: 0 0% 4.7%;             /* #0c0c0c */
-    --foreground: 0 0% 98%;              /* White */
-    --card: 0 0% 8.6%;                   /* #161616 Deep Soft Ink */
-    --card-foreground: 0 0% 98%;
-    --popover: 0 0% 8.6%;
-    --popover-foreground: 0 0% 98%;
-    --primary: 0 0% 98%;                 /* Inverted Ink White */
-    --primary-foreground: 0 0% 8%;
-    --secondary: 0 0% 14.5%;             /* #252525 */
-    --secondary-foreground: 0 0% 98%;
-    --muted: 0 0% 13%;                   /* #212121 Field Tint */
-    --muted-foreground: 0 0% 64%;        /* #a3a3a3 */
-    --accent: 0 0% 16%;                  /* Soft Neutral Dark Hover Tint */
-    --accent-foreground: 0 0% 98%;
+    /* Const Design System — Studio Dark Palette (per DESIGN.md) */
+    --background: 0 0% 8.6%;             /* Level 0 Canvas #161616 */
+    --foreground: 0 0% 83.1%;            /* Primary Ink #d4d4d4 */
+    --card: 0 0% 13.3%;                  /* Level 1 Header / Card #222222 */
+    --card-foreground: 0 0% 83.1%;
+    --popover: 0 0% 13.3%;               /* Level 1 Surface #222222 */
+    --popover-foreground: 0 0% 83.1%;
+    --primary: 0 0% 83.1%;               /* Primary Action Fill #d4d4d4 */
+    --primary-foreground: 0 0% 8.6%;     /* Button Ink #161616 */
+    --secondary: 0 0% 16.9%;             /* Level 2 Field / Sidebar #2b2b2b */
+    --secondary-foreground: 0 0% 83.1%;
+    --muted: 0 0% 13.3%;                 /* Level 1 Chip / Track #1b1b1b / #222222 */
+    --muted-foreground: 0 0% 58.8%;      /* Text Muted #969696 */
+    --accent: 0 0% 22%;                  /* Level 3 Field Hover #383838 */
+    --accent-foreground: 0 0% 100%;      /* Ink Bright #ffffff */
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 16.5%;                /* #2a2a2a Hairline */
-    --input: 0 0% 14.5%;                 /* #252525 */
-    --ring: 0 0% 80%;
-    --sidebar-background: 0 0% 8%;
-    --sidebar-foreground: 0 0% 98%;
-    --sidebar-primary: 0 0% 98%;
-    --sidebar-primary-foreground: 0 0% 8%;
-    --sidebar-accent: 0 0% 14.5%;
-    --sidebar-accent-foreground: 0 0% 98%;
-    --sidebar-border: 0 0% 16.5%;
-    --sidebar-ring: 0 0% 80%;
+    --border: 0 0% 22%;                  /* Hairline #383838 */
+    --input: 0 0% 16.9%;                 /* Level 2 Field #2b2b2b */
+    --ring: 0 0% 83.1%;
+    --sidebar-background: 0 0% 16.9%;    /* Studio Sidebar #2b2b2b */
+    --sidebar-foreground: 0 0% 83.1%;
+    --sidebar-primary: 0 0% 83.1%;
+    --sidebar-primary-foreground: 0 0% 8.6%;
+    --sidebar-accent: 0 0% 22%;          /* Sidebar Hover #383838 */
+    --sidebar-accent-foreground: 0 0% 100%; /* Pure White #ffffff on hover */
+    --sidebar-border: 0 0% 22%;          /* Hairline #383838 */
+    --sidebar-ring: 0 0% 83.1%;
   }
 }
 

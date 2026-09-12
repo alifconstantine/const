@@ -46,6 +46,8 @@ function AuthenticatedContent({
           setOpenAddSourceOnLoad(true);
         }}
         user={user}
+        onSignOut={onSignOut}
+        onSwitchAccount={onSwitchAccount}
       />
     );
   }

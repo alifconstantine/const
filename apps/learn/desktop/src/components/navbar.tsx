@@ -1,4 +1,3 @@
-import React from "react";
 import {
   ConstLogoIcon,
   Avatar,
@@ -9,8 +8,21 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
+  useTheme,
 } from "@const/ui";
-import { Settings, LogOut, User as UserIcon, ArrowLeftRight } from "lucide-react";
+import {
+  Settings,
+  LogOut,
+  User as UserIcon,
+  ArrowLeftRight,
+  Sun,
+  Moon,
+  Laptop,
+  Check,
+} from "lucide-react";
 
 export interface UserProfile {
   name?: string | null;
@@ -49,6 +61,7 @@ export function getUserInitials(name?: string | null, email?: string | null): st
 
 export function Navbar({ user, onSignOut, onSwitchAccount }: NavbarProps) {
   const initials = getUserInitials(user?.name, user?.email);
+  const [theme, setTheme] = useTheme();
 
   return (
     <header className="w-full h-14 border-b border-border/70 bg-background/95 backdrop-blur-md px-6 flex items-center justify-between select-none z-40">
@@ -114,6 +127,52 @@ export function Navbar({ user, onSignOut, onSwitchAccount }: NavbarProps) {
                 <DropdownMenuSeparator />
               </>
             )}
+
+            {/* Tema Aplikasi (Submenu) */}
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger className="cursor-pointer flex items-center gap-2 text-xs py-2 px-2.5 text-muted-foreground hover:text-foreground">
+                {theme === "dark" ? (
+                  <Moon className="h-4 w-4" />
+                ) : theme === "light" ? (
+                  <Sun className="h-4 w-4" />
+                ) : (
+                  <Laptop className="h-4 w-4" />
+                )}
+                <span>Tema aplikasi</span>
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent className="min-w-[140px] p-1.5 shadow-md">
+                <DropdownMenuItem
+                  className="cursor-pointer flex items-center justify-between text-xs py-1.5 px-2.5 text-muted-foreground hover:text-foreground"
+                  onClick={() => setTheme("system")}
+                >
+                  <div className="flex items-center gap-2">
+                    <Laptop className="h-3.5 w-3.5" />
+                    <span>Sistem</span>
+                  </div>
+                  {theme === "system" && <Check className="h-3.5 w-3.5 ml-2" />}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="cursor-pointer flex items-center justify-between text-xs py-1.5 px-2.5 text-muted-foreground hover:text-foreground"
+                  onClick={() => setTheme("light")}
+                >
+                  <div className="flex items-center gap-2">
+                    <Sun className="h-3.5 w-3.5" />
+                    <span>Terang</span>
+                  </div>
+                  {theme === "light" && <Check className="h-3.5 w-3.5 ml-2" />}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="cursor-pointer flex items-center justify-between text-xs py-1.5 px-2.5 text-muted-foreground hover:text-foreground"
+                  onClick={() => setTheme("dark")}
+                >
+                  <div className="flex items-center gap-2">
+                    <Moon className="h-3.5 w-3.5" />
+                    <span>Gelap</span>
+                  </div>
+                  {theme === "dark" && <Check className="h-3.5 w-3.5 ml-2" />}
+                </DropdownMenuItem>
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
 
             <DropdownMenuItem
               className="cursor-pointer flex items-center gap-2 text-xs py-2 px-2.5 text-muted-foreground hover:text-foreground"
