@@ -9,6 +9,9 @@ interface Window {
       electron: string;
     };
     openExternal: (url: string) => Promise<boolean>;
+    openPath?: (targetPath: string) => Promise<boolean>;
+    readFile?: (filePath: string) => Promise<string | null>;
+    readMedia?: (filePath: string) => Promise<string | null>;
     openDirectoryDialog: () => Promise<string | null>;
     startAuth?: (options?: {
       accountsUrl?: string;
@@ -32,9 +35,18 @@ interface Window {
         model?: string;
         workspacePath?: string;
         authToken?: string;
+        mode?: "ask_before_changes" | "full_access";
+        thinkingLevel?: string;
+        maxOutputTokens?: number;
       }) => Promise<{ success: boolean; messages?: any[]; error?: string }>;
       abort: () => Promise<boolean>;
+      answerQuestion?: (toolCallId: string, answer: any) => Promise<boolean>;
+      generateTitle?: (prompt: string, authToken?: string) => Promise<string | null>;
       onStreamEvent: (callback: (event: any) => void) => () => void;
+    };
+    config?: {
+      get: () => Promise<any>;
+      save: (newConfig: any) => Promise<any>;
     };
   };
 }

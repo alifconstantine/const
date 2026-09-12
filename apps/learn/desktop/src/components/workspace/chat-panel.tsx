@@ -4,21 +4,20 @@ import {
   ArrowRight,
   Square,
   ChevronDown,
-  Wrench,
-  CheckCircle2,
-  AlertCircle,
-  Loader2,
   Brain,
-  Terminal,
-  FileText,
-  FilePlus,
-  Code,
   RotateCcw,
   SlidersHorizontal,
 } from "lucide-react";
 import { DEFAULT_MODELS } from "@const/agent/models";
 import type { ModelConfig, AgentMessage } from "@const/agent/types";
 import { localDb } from "../../lib/db";
+import {
+  SocraticQuestionCard,
+  PythonRunnerCard,
+  TodoWriteCard,
+  GenericToolCard,
+  type DisplayToolCall,
+} from "./tool-cards";
 
 interface ChatPanelProps {
   learnId?: string;
@@ -26,15 +25,6 @@ interface ChatPanelProps {
   sourcesCount?: number;
   onSelectPromptChip?: (prompt: string) => void;
   onSendMessage?: (message: string) => void;
-}
-
-interface DisplayToolCall {
-  id: string;
-  name: string;
-  args: any;
-  result?: any;
-  isError?: boolean;
-  status: "running" | "completed" | "error";
 }
 
 interface DisplayMessage {
@@ -162,6 +152,39 @@ export function ChatPanel({
               id: event.toolCallId,
               name: event.toolName,
               args: event.args,
+              status: "running",
+            });
+          }
+          updated.toolCalls = toolCalls;
+        } else if (event.type === "ask_question") {
+          const toolCalls = [...(updated.toolCalls || [])];
+          const existingIdx = toolCalls.findIndex((tc) => tc.id === event.toolCallId);
+          const qArgs = {
+            question:
+              event.question ||
+              event.questionData?.question ||
+              event.questions?.[0]?.question ||
+              "Bagaimana kita ingin melanjutkan?",
+            options:
+              event.options ||
+              event.questionData?.options ||
+              event.questions?.[0]?.options ||
+              [],
+            allow_custom:
+              event.allow_custom ?? event.questionData?.allow_custom ?? true,
+          };
+          if (existingIdx >= 0) {
+            toolCalls[existingIdx] = {
+              ...toolCalls[existingIdx]!,
+              name: "ask_question",
+              args: qArgs,
+              status: "running",
+            };
+          } else {
+            toolCalls.push({
+              id: event.toolCallId,
+              name: "ask_question",
+              args: qArgs,
               status: "running",
             });
           }
@@ -559,6 +582,31 @@ export function ChatPanel({
     setMessages([]);
   };
 
+  const handleAnswerQuestion = async (toolCallId: string, answer: any) => {
+    const stringified = typeof answer === "string" ? answer : JSON.stringify(answer);
+    setMessages((prev) => {
+      return prev.map((msg) => {
+        if (!msg.toolCalls || msg.toolCalls.length === 0) return msg;
+        const updatedTc = msg.toolCalls.map((tc) => {
+          if (tc.id === toolCallId) {
+            return {
+              ...tc,
+              status: "completed" as const,
+              result: stringified,
+            };
+          }
+          return tc;
+        });
+        return { ...msg, toolCalls: updatedTc };
+      });
+    });
+
+    const electron = (window as any).electron;
+    if (electron?.agent?.answerQuestion) {
+      await electron.agent.answerQuestion(toolCallId, answer);
+    }
+  };
+
   const toggleThinking = (msgId: string) => {
     setExpandedThinkingIds((prev) => ({ ...prev, [msgId]: !prev[msgId] }));
   };
@@ -736,101 +784,45 @@ export function ChatPanel({
                   {/* Tool Calls Visual Cards (if any) */}
                   {msg.toolCalls && msg.toolCalls.length > 0 && (
                     <div className="space-y-2 w-full">
-                      {msg.toolCalls.map((tc) => (
-                        <div
-                          key={tc.id}
-                          className="rounded-2xl border border-border/60 bg-muted/30 p-3 text-xs overflow-hidden shadow-xs"
-                        >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              {tc.name === "bash" || tc.name === "run_command" ? (
-                                <Terminal className="h-3.5 w-3.5 text-amber-500" />
-                              ) : tc.name === "read" || tc.name === "read_file" ? (
-                                <FileText className="h-3.5 w-3.5 text-blue-400" />
-                              ) : tc.name === "write" || tc.name === "write_file" ? (
-                                <FilePlus className="h-3.5 w-3.5 text-emerald-400" />
-                              ) : tc.name === "edit" || tc.name === "edit_file" ? (
-                                <Code className="h-3.5 w-3.5 text-purple-400" />
-                              ) : (
-                                <Wrench className="h-3.5 w-3.5 text-accent" />
-                              )}
-                              <span className="font-mono font-medium text-foreground">
-                                {tc.name}
-                              </span>
-                              <span
-                                className="text-[10px] text-muted-foreground font-mono truncate max-w-[200px] sm:max-w-xs"
-                                title={
-                                  tc.args?.path ||
-                                  tc.args?.command ||
-                                  Object.keys(tc.args || {}).join(", ")
-                                }
-                              >
-                                (
-                                {tc.args?.path
-                                  ? tc.args.path.split(/[\\/]/).slice(-2).join("/")
-                                  : tc.args?.command
-                                    ? tc.args.command.length > 30
-                                      ? tc.args.command.slice(0, 30) + "..."
-                                      : tc.args.command
-                                    : Object.keys(tc.args || {}).join(", ")}
-                                )
-                              </span>
-                            </div>
-
-                            <div className="flex items-center gap-2">
-                              {tc.status === "running" ? (
-                                <span className="inline-flex items-center gap-1 text-[11px] text-accent font-mono">
-                                  <Loader2 className="h-3 w-3 animate-spin" />
-                                  Menjalankan...
-                                </span>
-                              ) : tc.status === "completed" ? (
-                                <span className="inline-flex items-center gap-1 text-[11px] text-emerald-500 font-mono">
-                                  <CheckCircle2 className="h-3 w-3" />
-                                  Selesai
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center gap-1 text-[11px] text-destructive font-mono">
-                                  <AlertCircle className="h-3 w-3" />
-                                  Gagal
-                                </span>
-                              )}
-
-                              <button
-                                type="button"
-                                onClick={() => toggleTool(tc.id)}
-                                className="h-6 px-2.5 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground text-[10px] transition-colors cursor-pointer border border-border/40"
-                              >
-                                {expandedToolIds[tc.id] ? "Tutup" : "Detail"}
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* Expanded Tool Output */}
-                          {expandedToolIds[tc.id] && (
-                            <div className="mt-2.5 pt-2.5 border-t border-border/40 space-y-1.5 font-mono text-[11px]">
-                              <div className="text-muted-foreground text-[10px]">
-                                Parameter Input:
-                              </div>
-                              <pre className="p-2.5 rounded-xl bg-background/80 border border-border/30 overflow-x-auto text-foreground/90">
-                                {JSON.stringify(tc.args, null, 2)}
-                              </pre>
-
-                              {tc.result && (
-                                <>
-                                  <div className="text-muted-foreground text-[10px] mt-2">
-                                    Hasil Eksekusi:
-                                  </div>
-                                  <pre className="p-2.5 rounded-xl bg-background/80 border border-border/30 overflow-x-auto text-emerald-500/90 whitespace-pre-wrap max-h-60 overflow-y-auto">
-                                    {typeof tc.result === "string"
-                                      ? tc.result
-                                      : JSON.stringify(tc.result, null, 2)}
-                                  </pre>
-                                </>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      ))}
+                      {msg.toolCalls.map((tc) => {
+                        if (tc.name === "ask_question") {
+                          return (
+                            <SocraticQuestionCard
+                              key={tc.id}
+                              toolCall={tc}
+                              onAnswer={handleAnswerQuestion}
+                            />
+                          );
+                        }
+                        if (tc.name === "run_python") {
+                          return (
+                            <PythonRunnerCard
+                              key={tc.id}
+                              toolCall={tc}
+                              isExpanded={Boolean(expandedToolIds[tc.id])}
+                              onToggle={() => toggleTool(tc.id)}
+                            />
+                          );
+                        }
+                        if (tc.name === "todo_write") {
+                          return (
+                            <TodoWriteCard
+                              key={tc.id}
+                              toolCall={tc}
+                              isExpanded={Boolean(expandedToolIds[tc.id])}
+                              onToggle={() => toggleTool(tc.id)}
+                            />
+                          );
+                        }
+                        return (
+                          <GenericToolCard
+                            key={tc.id}
+                            toolCall={tc}
+                            isExpanded={Boolean(expandedToolIds[tc.id])}
+                            onToggle={() => toggleTool(tc.id)}
+                          />
+                        );
+                      })}
                     </div>
                   )}
 

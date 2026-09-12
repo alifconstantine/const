@@ -121,10 +121,21 @@ export type AgentEvent = {
   [K in keyof AgentEventMap]: { type: K } & AgentEventMap[K];
 }[keyof AgentEventMap];
 
+export interface NativeToolDefinition {
+  type: "function";
+  function: {
+    name: string;
+    description: string;
+    parameters: Record<string, any>;
+  };
+}
+
 export interface AgentConfig {
   baseUrl: string;
   apiKey: string;
   model: string;
+  preset?: "harness" | "learn";
+  tools?: NativeToolDefinition[];
   systemPrompt?: string;
   workspacePath?: string;
   maxTurns?: number;

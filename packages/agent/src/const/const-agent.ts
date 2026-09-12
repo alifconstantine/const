@@ -10,7 +10,7 @@ import type {
   ApprovalRequestData,
   ApprovalResponseData,
 } from "./types.js";
-import { CONST_DEFAULT_TOOLS, executeNativeTool, extractCommandArg } from "./tools.js";
+import { CONST_DEFAULT_TOOLS, CONST_LEARN_TOOLS, executeNativeTool, extractCommandArg } from "./tools.js";
 
 function parseToolArguments(rawArgs: any): Record<string, any> {
   if (!rawArgs) return {};
@@ -379,6 +379,68 @@ CRITICAL LOOP PREVENTION & ERROR RECOVERY PROTOCOL:
   4. If an operation is blocked or impossible, explain the blocker clearly to the user rather than repeating failing tool calls.${projectContext ? `\n\n<project_context>${projectContext}</project_context>` : ""}`;
 }
 
+export function buildLearnSystemPrompt(workspacePath: string, customPrompt?: string): string {
+  if (customPrompt) return customPrompt;
+
+  const normalizedCwd = workspacePath.replace(/\\/g, "/");
+
+  // Check for learning context files
+  let projectContext = "";
+  const contextCandidates = [
+    path.join(workspacePath, "AGENTS.md"),
+    path.join(workspacePath, ".const", "instructions.md"),
+    path.join(workspacePath, "SYLLABUS.md"),
+    path.join(workspacePath, "README.md"),
+  ];
+
+  for (const candidate of contextCandidates) {
+    try {
+      if (fs.existsSync(candidate)) {
+        const content = fs.readFileSync(candidate, "utf-8").trim();
+        if (content) {
+          projectContext += `\n<learning_context path="${path.basename(candidate)}">\n${content.slice(0, 5000)}\n</learning_context>\n`;
+          break;
+        }
+      }
+    } catch {
+      // ignore read error
+    }
+  }
+
+  return `You are Const Learn Agent, an expert adaptive educational research tutor, academic mentor, and interactive learning producer operating inside Const Learn.
+
+Current learning workspace directory: ${normalizedCwd}
+
+Available tools:
+- read: Read source materials, textbooks, PDFs (with automated high-speed text extraction), markdown notes, and research data.
+- write: Create new study files, slide presentations (e.g. slides.html for Hyperframe Canvas), interactive HTML/JS simulators, markdown summaries, quizzes, and scripts. Parent folders are auto-created.
+- edit: Surgically modify or refine specific sections of existing notes, slides, or files.
+- run_python: Execute Python code locally for scientific calculation, mathematics (calculus, algebra), physics simulations, data analysis (pandas, numpy), and plotting charts (matplotlib, seaborn).
+- run_command: Execute safe terminal commands (PowerShell/Bash) in the workspace directory.
+- ls: List files and folders in the workspace.
+- find: Search for files by pattern or glob (e.g. '*.pdf', '*.py', '*.md').
+- grep: Search for key terms, theories, definitions, or equations across documents.
+- ask_question: Ask the student a clarifying question or Socratic inquiry with interactive structured choices (active recall).
+- todo_write: Track learning path milestones and study goals.
+
+PEDAGOGICAL & INTERACTION PRINCIPLES (SOCRATIC METHOD):
+1. Guided Discovery & Active Recall:
+   - When a student asks to learn a complex concept, do not simply dump an overwhelming encyclopedia entry.
+   - Break down difficult concepts into intuitive analogies, first principles, and guided steps.
+   - Use 'ask_question' periodically to check understanding, challenge misconceptions, or let the student choose which subtopic to dive into next.
+2. Actionable Learning & Artifact Creation (Hyperframe Studio):
+   - When asked to generate slides, summaries, or simulations (e.g. "buatkan slide", "buat simulator", "rangkum bab ini"):
+     You MUST invoke the 'write' tool to produce the actual, complete files (e.g., 'slides.html', 'simulator.html', 'summary.md') in the workspace.
+   - For slides, generate modern, self-contained HTML presentations using clean typography, smooth transitions, and responsive layout.
+   - For simulators, generate clean HTML5 Canvas or SVG/JS mini-apps that allow the student to tweak variables and see real-time visual feedback.
+   - Never output massive multi-page HTML or raw code dumps in chat text tokens. Write them directly to files with 'write'!
+3. Empirical Science & Calculation (run_python):
+   - When the student asks to solve math, plot graphs, or analyze data, write Python code with 'run_python' to calculate exact numbers and generate visual plots (using matplotlib/seaborn).
+   - Explain the output clearly to the student in conversation.
+4. Error Recovery:
+   - If a tool call fails, read error details and adjust. Do not blindly repeat failing arguments.${projectContext ? `\n\n<learning_context>${projectContext}</learning_context>` : ""}`;
+}
+
 // ---------------------------------------------------------------------------
 // Resilient Fetch with Exponential Backoff & Keep-Alive Recovery
 // ---------------------------------------------------------------------------
@@ -553,10 +615,14 @@ export class ConstAgent {
         currentTurn++;
         onEvent({ type: "status", status: "thinking" });
 
-        const systemPrompt = buildConstSystemPrompt(
-          workspacePath,
-          this.config.systemPrompt
-        );
+        const activeTools =
+          this.config.tools ??
+          (this.config.preset === "learn" ? CONST_LEARN_TOOLS : CONST_DEFAULT_TOOLS);
+
+        const systemPrompt =
+          this.config.preset === "learn"
+            ? buildLearnSystemPrompt(workspacePath, this.config.systemPrompt)
+            : buildConstSystemPrompt(workspacePath, this.config.systemPrompt);
 
         let effectiveSystemPrompt = systemPrompt;
         if (consecutivePlanningTurns >= 2) {
@@ -625,7 +691,7 @@ export class ConstAgent {
             body: JSON.stringify({
               model: this.config.model,
               messages: formattedMessages,
-              tools: CONST_DEFAULT_TOOLS,
+              tools: activeTools,
               stream: true,
               stream_options: { include_usage: true },
               max_tokens: resolvedMaxTokens,

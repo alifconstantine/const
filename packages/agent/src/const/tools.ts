@@ -4,7 +4,7 @@ import path from "node:path";
 import os from "node:os";
 import { spawn, type ChildProcess } from "node:child_process";
 import type { FileMutationRecord } from "./mutation-ledger.js";
-import type { TodoItem, QuestionItem, BackgroundTaskItem } from "./types.js";
+import type { TodoItem, QuestionItem, BackgroundTaskItem, NativeToolDefinition } from "./types.js";
 
 export interface ExecuteToolOptions {
   signal?: AbortSignal;
@@ -93,6 +93,58 @@ export function getShellConfig(): ShellConfig {
 }
 
 // ---------------------------------------------------------------------------
+// Python Configuration & Discovery (supports local .venv, uv, and system Python)
+// ---------------------------------------------------------------------------
+
+export interface PythonConfig {
+  command: string;
+  args: string[];
+}
+
+let cachedPythonConfig: PythonConfig | null = null;
+
+export function resolvePythonConfig(): PythonConfig {
+  if (cachedPythonConfig) return cachedPythonConfig;
+
+  // 1. Check local virtual environments (AppData/ConstLearn/.venv, .const/.venv, workspace .venv)
+  const venvCandidates = [
+    path.join(os.homedir(), "AppData", "Roaming", "ConstLearn", ".venv", "Scripts", "python.exe"),
+    path.join(os.homedir(), ".const", ".venv", "Scripts", "python.exe"),
+    path.join(process.cwd(), ".venv", "Scripts", "python.exe"),
+    path.join(process.cwd(), ".venv", "bin", "python"),
+  ];
+
+  for (const candidate of venvCandidates) {
+    if (fsSync.existsSync(candidate)) {
+      cachedPythonConfig = { command: candidate, args: [] };
+      return cachedPythonConfig;
+    }
+  }
+
+  // 2. Check uv executable in standard locations or PATH
+  const localAppData = process.env.LOCALAPPDATA || "";
+  const uvCandidates = [
+    localAppData ? path.join(localAppData, "hermes", "bin", "uv.exe") : "",
+    path.join(os.homedir(), ".cargo", "bin", "uv.exe"),
+    path.join(process.env.ProgramFiles || "C:\\Program Files", "uv", "uv.exe"),
+  ].filter(Boolean);
+
+  for (const candidate of uvCandidates) {
+    if (fsSync.existsSync(candidate)) {
+      cachedPythonConfig = { command: candidate, args: ["run", "python"] };
+      return cachedPythonConfig;
+    }
+  }
+
+  // Check if uv is available directly in PATH
+  cachedPythonConfig = {
+    command: "uv",
+    args: ["run", "python"],
+  };
+  return cachedPythonConfig;
+}
+
+// ---------------------------------------------------------------------------
 // Path Normalization (supports Windows drive formats, Git Bash paths, & ~)
 // ---------------------------------------------------------------------------
 
@@ -163,15 +215,6 @@ export function isAllowedInternalPath(targetPath: string): boolean {
 // ---------------------------------------------------------------------------
 // Native Tool Definitions (Pi Standard 4 Core Tools + Aliases)
 // ---------------------------------------------------------------------------
-
-export interface NativeToolDefinition {
-  type: "function";
-  function: {
-    name: string;
-    description: string;
-    parameters: Record<string, any>;
-  };
-}
 
 export const CONST_DEFAULT_TOOLS: NativeToolDefinition[] = [
   {
@@ -557,6 +600,308 @@ export const CONST_DEFAULT_TOOLS: NativeToolDefinition[] = [
           },
         },
         required: ["action"],
+      },
+    },
+  },
+];
+
+// ---------------------------------------------------------------------------
+// Const Learn Educational Tool Definitions (Socratic, Artifacts & Python)
+// ---------------------------------------------------------------------------
+
+export const CONST_LEARN_TOOLS: NativeToolDefinition[] = [
+  {
+    type: "function",
+    function: {
+      name: "read",
+      description:
+        "Read the contents of a file. Supports source code, text files, markdown, JSON, images (metadata), and PDF documents with automated text extraction. Optionally specify offset and limit to read specific line ranges.",
+      parameters: {
+        type: "object",
+        properties: {
+          path: {
+            type: "string",
+            description: "Path to the file to read (relative to workspace or absolute).",
+          },
+          offset: {
+            type: "number",
+            description: "Line number to start reading from (1-indexed, optional).",
+          },
+          limit: {
+            type: "number",
+            description: "Maximum number of lines to read (optional).",
+          },
+        },
+        required: ["path"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "write",
+      description:
+        "Create or overwrite a file with the specified content. Automatically creates any parent directories if they do not exist. Essential for generating learning artifacts such as slides (slides.html), interactive simulators (simulator.html), study summaries, notes, and calculation scripts.",
+      parameters: {
+        type: "object",
+        properties: {
+          path: {
+            type: "string",
+            description: "Path to the file to write (relative to workspace or absolute).",
+          },
+          content: {
+            type: "string",
+            description: "The complete content to write into the file.",
+          },
+        },
+        required: ["path", "content"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "edit",
+      description:
+        "Edit an existing file by replacing an exact existing text substring (old_content) with new content (new_content). Automatically normalizes CRLF/LF line endings and whitespace.",
+      parameters: {
+        type: "object",
+        properties: {
+          path: {
+            type: "string",
+            description: "Path to the file to edit.",
+          },
+          old_content: {
+            type: "string",
+            description: "The exact existing text chunk to find and replace.",
+          },
+          new_content: {
+            type: "string",
+            description: "The new text chunk to insert as replacement.",
+          },
+        },
+        required: ["path", "old_content", "new_content"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "run_python",
+      description:
+        "Execute Python code locally for scientific calculation, mathematics (calculus, algebra), physics simulations, data analysis (pandas, numpy), and plotting charts (matplotlib, seaborn). Any generated plot or image will be automatically preserved for visual display.",
+      parameters: {
+        type: "object",
+        properties: {
+          code: {
+            type: "string",
+            description: "The complete Python code script to execute.",
+          },
+          timeout: {
+            type: "number",
+            description: "Execution timeout in seconds (default: 30).",
+          },
+        },
+        required: ["code"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "run_command",
+      description:
+        "Execute a safe terminal shell command in the workspace directory. Automatically uses PowerShell on Windows or Bash on Unix. Returns standard output, standard error, and exit status.",
+      parameters: {
+        type: "object",
+        properties: {
+          command: {
+            type: "string",
+            description: "The shell command line to execute.",
+          },
+          timeout: {
+            type: "number",
+            description: "Optional timeout in seconds (default: 60).",
+          },
+        },
+        required: ["command"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "ls",
+      description:
+        "List directory contents. Returns entries sorted alphabetically with '/' suffix for directories. Essential for inspecting workspace and folder structures.",
+      parameters: {
+        type: "object",
+        properties: {
+          path: {
+            type: "string",
+            description: "Directory to list (defaults to workspace root).",
+          },
+          limit: {
+            type: "number",
+            description: "Maximum number of entries to return (default: 500).",
+          },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "find",
+      description:
+        "Search for files and directories matching a pattern or glob (e.g. '*.pdf', '*.py', '*.md', 'notes/**/*.txt').",
+      parameters: {
+        type: "object",
+        properties: {
+          pattern: {
+            type: "string",
+            description: "Glob pattern or name to match.",
+          },
+          path: {
+            type: "string",
+            description: "Directory to search in (defaults to workspace root).",
+          },
+          limit: {
+            type: "number",
+            description: "Maximum number of results to return (default: 1000).",
+          },
+        },
+        required: ["pattern"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "grep",
+      description:
+        "Search file contents for regex or text patterns across files in the workspace.",
+      parameters: {
+        type: "object",
+        properties: {
+          pattern: {
+            type: "string",
+            description: "Search pattern (regex or literal text).",
+          },
+          path: {
+            type: "string",
+            description: "Directory or file to search in (defaults to workspace root).",
+          },
+          glob: {
+            type: "string",
+            description: "Optional glob pattern to filter files (e.g. '*.md', '*.py').",
+          },
+          ignore_case: {
+            type: "boolean",
+            description: "Case-insensitive search (default: false).",
+          },
+          limit: {
+            type: "number",
+            description: "Maximum number of matches to return (default: 100).",
+          },
+        },
+        required: ["pattern"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "ask_question",
+      description:
+        "Present an interactive clarifying question or Socratic inquiry to the user with structured choices. Crucial for Socratic method, testing student comprehension (active recall), or confirming learning paths. Execution pauses until the user responds.",
+      parameters: {
+        type: "object",
+        properties: {
+          questions: {
+            type: "array",
+            description: "Array of questions to ask the user.",
+            items: {
+              type: "object",
+              properties: {
+                id: {
+                  type: "string",
+                  description: "Unique identifier for this question.",
+                },
+                category: {
+                  type: "string",
+                  description: "Short category or topic badge (e.g. 'Konsep Dasar', 'Cek Pemahaman').",
+                },
+                question: {
+                  type: "string",
+                  description: "The question text to present to the user.",
+                },
+                options: {
+                  type: "array",
+                  description:
+                    "Predefined choices for the user. Place the most recommended option first with recommended: true.",
+                  items: {
+                    type: "object",
+                    properties: {
+                      label: {
+                        type: "string",
+                        description: "Option label.",
+                      },
+                      description: {
+                        type: "string",
+                        description: "Brief rationale or explanation for this choice.",
+                      },
+                      recommended: {
+                        type: "boolean",
+                        description: "Set true if this is the AI's top recommended choice.",
+                      },
+                    },
+                    required: ["label"],
+                  },
+                },
+                is_multi_select: {
+                  type: "boolean",
+                  description: "Whether the user can select multiple options.",
+                },
+              },
+              required: ["question"],
+            },
+          },
+        },
+        required: ["questions"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "todo_write",
+      description:
+        "Update the active study plan and learning milestones checklist to track progress. Replace the entire list on each update. Set status as 'pending', 'in_progress', or 'completed'.",
+      parameters: {
+        type: "object",
+        properties: {
+          todos: {
+            type: "array",
+            description: "The complete updated list of todos or learning milestones.",
+            items: {
+              type: "object",
+              properties: {
+                content: {
+                  type: "string",
+                  description: "Concise description of the study milestone or step.",
+                },
+                status: {
+                  type: "string",
+                  enum: ["pending", "in_progress", "completed"],
+                  description: "Status of this item.",
+                },
+              },
+              required: ["content", "status"],
+            },
+          },
+        },
+        required: ["todos"],
       },
     },
   },
@@ -2082,8 +2427,101 @@ export async function executeNativeTool(
       };
     }
 
+    // -----------------------------------------------------------------------
+    // Tool: run_python (aliases: python, runpython, py, python_eval)
+    // -----------------------------------------------------------------------
+    if (
+      normalizedTool === "runpython" ||
+      normalizedTool === "python" ||
+      normalizedTool === "py" ||
+      normalizedTool === "pythoneval"
+    ) {
+      const code =
+        (typeof args.code === "string" ? args.code : "") ||
+        (typeof args.script === "string" ? args.script : "") ||
+        (typeof args.python_code === "string" ? args.python_code : "") ||
+        extractContentArg(args);
+
+      if (!code || !code.trim()) {
+        return {
+          result: "Error: Missing Python code to execute. Please provide the 'code' parameter.",
+          isError: true,
+        };
+      }
+
+      const pyCfg = resolvePythonConfig();
+      const tempFileName = `_const_script_${Date.now()}_${Math.random().toString(36).slice(2, 6)}.py`;
+      const tempScriptPath = path.join(workspacePath, tempFileName);
+
+      const beforeRunTime = Date.now();
+
+      try {
+        await fs.writeFile(tempScriptPath, code, "utf-8");
+
+        const timeoutSec = typeof args.timeout === "number" ? args.timeout : 30;
+        const timeoutMs = timeoutSec * 1000;
+
+        const { stdout, stderr, exitCode } = await runProcess(
+          pyCfg.command,
+          [...pyCfg.args, tempFileName],
+          {
+            cwd: workspacePath,
+            signal,
+            timeoutMs,
+            rawCommand: `python ${tempFileName}`,
+          }
+        );
+
+        let output = "";
+        if (stdout) output += stdout;
+        if (stderr) output += (output ? "\n" : "") + stderr;
+
+        const isFailed = exitCode !== 0 && exitCode !== null;
+        if (isFailed) {
+          output = `[Python execution failed with exit code ${exitCode}]\n${output}`.trim();
+        }
+
+        // Check if any visual charts/plots or html was generated during script execution
+        const generatedVisuals: string[] = [];
+        try {
+          const files = await fs.readdir(workspacePath);
+          for (const file of files) {
+            if (file === tempFileName) continue;
+            const ext = path.extname(file).toLowerCase();
+            if ([".png", ".svg", ".jpg", ".jpeg", ".html"].includes(ext)) {
+              try {
+                const s = await fs.stat(path.join(workspacePath, file));
+                if (s.mtimeMs >= beforeRunTime - 1000) {
+                  generatedVisuals.push(file);
+                }
+              } catch {}
+            }
+          }
+        } catch {}
+
+        if (generatedVisuals.length > 0) {
+          output += `\n\n[Visual Artifact Created]: ${generatedVisuals.map((f) => `\`${f}\``).join(", ")} (Available in workspace for Studio Preview).`;
+        }
+
+        if (!output.trim()) {
+          output = isFailed
+            ? `[Python script exited with code ${exitCode} and produced no output]`
+            : "(Python script completed with no output)";
+        }
+
+        return {
+          result: output.trim(),
+          isError: isFailed,
+        };
+      } finally {
+        try {
+          await fs.unlink(tempScriptPath);
+        } catch {}
+      }
+    }
+
     return {
-      result: `Tool '${toolName}' is not recognized. Available tools: read, write, edit, apply_patch, bash, run_command, manage_task, powershell, ls, find, grep, mkdir, todo_write, ask_question.`,
+      result: `Tool '${toolName}' is not recognized. Available tools: read, write, edit, run_python, run_command, bash, powershell, ls, find, grep, mkdir, todo_write, ask_question, apply_patch, manage_task.`,
       isError: true,
     };
   } catch (err: any) {
