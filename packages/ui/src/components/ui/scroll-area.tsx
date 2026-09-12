@@ -10,18 +10,22 @@ interface ScrollAreaProps
   scrollBarClassName?: string;
   thumbClassName?: string;
   viewportClassName?: string;
+  viewportRef?: React.Ref<HTMLDivElement>;
+  onScroll?: React.UIEventHandler<HTMLDivElement>;
 }
 
 const ScrollArea = React.forwardRef<
   React.ElementRef<typeof ScrollAreaPrimitive.Root>,
   ScrollAreaProps
->(({ className, children, scrollBarClassName, thumbClassName, viewportClassName, ...props }, ref) => (
+>(({ className, children, scrollBarClassName, thumbClassName, viewportClassName, viewportRef, onScroll, ...props }, ref) => (
   <ScrollAreaPrimitive.Root
     ref={ref}
     className={cn("relative overflow-hidden flex flex-col", className)}
     {...props}
   >
     <ScrollAreaPrimitive.Viewport
+      ref={viewportRef}
+      onScroll={onScroll}
       className={cn("h-full w-full rounded-[inherit] max-h-[inherit] [&>div]:!block", viewportClassName)}
     >
       {children}

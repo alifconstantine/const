@@ -6,6 +6,7 @@ import {
   DialogTitle,
   DialogFooter,
   Button,
+  ScrollArea,
 } from "@const/ui";
 import { Folder, Check } from "lucide-react";
 interface ManageCollectionDialogProps {
@@ -59,7 +60,8 @@ export function ManageCollectionDialog({
           </p>
         </DialogHeader>
 
-        <div className="py-2 space-y-1.5 max-h-[300px] overflow-y-auto">
+        <ScrollArea className="max-h-[300px] py-2 pr-2.5">
+          <div className="space-y-1.5">
           {collections.length === 0 ? (
             <div className="text-center py-6 px-4 bg-secondary/30 rounded-xl border border-dashed border-border/70">
               <p className="text-xs text-muted-foreground">
@@ -113,7 +115,8 @@ export function ManageCollectionDialog({
               );
             })
           )}
-        </div>
+          </div>
+        </ScrollArea>
 
         <DialogFooter className="pt-2">
           <Button

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db, localDb, LocalLearn, LocalCollection, LocalArtifact } from "../../lib/db";
 import {
@@ -9,6 +9,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  ScrollArea,
 } from "@const/ui";
 import {
   Search,
@@ -50,6 +51,72 @@ interface LearnHomeProps {
 
 export function LearnHome({ onOpenLearn }: LearnHomeProps) {
   // Navigation & View state
+  const lastScrollTopRef = useRef(0);
+  const scrollAccumulatorRef = useRef(0);
+  const isTransitioningRef = useRef(false);
+  const transitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [isHeaderVisible, setIsHeaderVisible] = useState(true);
+
+  const setHeaderVisibleWithLock = (visible: boolean) => {
+    setIsHeaderVisible((prev) => {
+      if (prev === visible) return prev;
+      isTransitioningRef.current = true;
+      if (transitionTimerRef.current) clearTimeout(transitionTimerRef.current);
+      transitionTimerRef.current = setTimeout(() => {
+        isTransitioningRef.current = false;
+      }, 350);
+      return visible;
+    });
+  };
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const target = e.currentTarget;
+    const currentScrollTop = target.scrollTop;
+    const clientHeight = target.clientHeight;
+    const scrollHeight = target.scrollHeight;
+
+    // 1. Ignore reflow / resize scroll events during CSS animation
+    if (isTransitioningRef.current) {
+      lastScrollTopRef.current = currentScrollTop;
+      return;
+    }
+
+    // 2. Mentok Atas: Always show toolbar when near top (<= 20px)
+    if (currentScrollTop <= 20) {
+      scrollAccumulatorRef.current = 0;
+      setHeaderVisibleWithLock(true);
+      lastScrollTopRef.current = currentScrollTop;
+      return;
+    }
+
+    // 3. Mentok Bawah: Check if at or very close to bottom
+    const isAtBottom = currentScrollTop + clientHeight >= scrollHeight - 20;
+    const delta = currentScrollTop - lastScrollTopRef.current;
+    lastScrollTopRef.current = currentScrollTop;
+
+    // If at bottom and continuing to scroll down or bounce, ignore to prevent flicker
+    if (isAtBottom && delta >= 0) {
+      scrollAccumulatorRef.current = 0;
+      return;
+    }
+
+    // 4. Directional delta accumulation with hysteresis
+    if (delta > 0) {
+      // Scrolling down: accumulate positive delta
+      scrollAccumulatorRef.current = Math.max(0, scrollAccumulatorRef.current) + delta;
+      if (scrollAccumulatorRef.current > 25 && currentScrollTop > 40) {
+        setHeaderVisibleWithLock(false);
+        scrollAccumulatorRef.current = 0;
+      }
+    } else if (delta < 0) {
+      // Scrolling up: accumulate negative delta ("sedikit saja" = 8px)
+      scrollAccumulatorRef.current = Math.min(0, scrollAccumulatorRef.current) + delta;
+      if (scrollAccumulatorRef.current < -8) {
+        setHeaderVisibleWithLock(true);
+        scrollAccumulatorRef.current = 0;
+      }
+    }
+  };
   const [activeTab, setActiveTab] = useState<TabKey>("all");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [searchQuery, setSearchQuery] = useState("");
@@ -205,11 +272,17 @@ export function LearnHome({ onOpenLearn }: LearnHomeProps) {
   };
 
   return (
-    <div className="w-full flex-1 flex flex-col bg-background text-foreground min-h-screen">
+    <div className="w-full flex-1 flex flex-col min-h-0 bg-background text-foreground overflow-hidden">
       {/* -------------------------------------------------------------
           TOP BAR: Filter Pills on Left, Tools on Right (Ref: Gemini Notebook)
           ------------------------------------------------------------- */}
-      <div className="sticky top-0 z-30 w-full bg-background/95 backdrop-blur-md px-6 py-3 flex items-center justify-between gap-4 select-none">
+      <div
+        className={`shrink-0 w-full bg-background px-6 flex items-center justify-between gap-4 select-none border-b border-border/40 z-20 transition-all duration-300 ease-in-out overflow-hidden ${
+          isHeaderVisible
+            ? "max-h-16 py-3 opacity-100 translate-y-0"
+            : "max-h-0 py-0 opacity-0 -translate-y-full border-b-transparent pointer-events-none"
+        }`}
+      >
         {/* Left: Filter Tabs (All, My Learn, Koleksi, Artifact) */}
         <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
           <button
@@ -389,10 +462,12 @@ export function LearnHome({ onOpenLearn }: LearnHomeProps) {
         </div>
       </div>
 
-      {/* -------------------------------------------------------------
-          MAIN CONTENT AREA
-          ------------------------------------------------------------- */}
-      <main className="flex-1 w-full max-w-7xl mx-auto px-6 py-6 space-y-10">
+      <ScrollArea
+        onScroll={handleScroll}
+        className="flex-1 w-full h-full min-h-0"
+        scrollBarClassName="py-1.5"
+      >
+        <main className="w-full max-w-7xl mx-auto px-6 py-6 space-y-10">
         {/* =========================================================
             TAB: ALL (Shows "My Learn" AND "Koleksi")
             ========================================================= */}
@@ -841,10 +916,11 @@ export function LearnHome({ onOpenLearn }: LearnHomeProps) {
           </section>
         )}
       </main>
+    </ScrollArea>
 
-      {/* -------------------------------------------------------------
-          MODALS & DIALOGS
-          ------------------------------------------------------------- */}
+    {/* -------------------------------------------------------------
+        MODALS & DIALOGS
+        ------------------------------------------------------------- */}
       {/* Create / Edit Learn Dialog */}
       <CreateLearnDialog
         open={isCreateLearnOpen}
