@@ -10,7 +10,15 @@ import {
   BookOpen,
   HardDrive,
   Clipboard,
+  X,
+  Check,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@const/ui";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db, localDb, type LocalSource } from "@/lib/db";
 import { useI18n } from "../../lib/i18n";
@@ -18,7 +26,10 @@ import { useI18n } from "../../lib/i18n";
 interface SourcesPanelProps {
   learnId?: string;
   sourcesCount?: number;
+  width?: number;
   onAddSource: () => void;
+  onSelectSource?: (sourceType: string) => void;
+  onDropFiles?: (files: File[]) => void;
   onToggleCollapse?: () => void;
   isCollapsed?: boolean;
 }
@@ -33,23 +44,46 @@ function formatFileSize(bytes?: number): string {
 function getSourceIcon(type: LocalSource["type"]) {
   switch (type) {
     case "url":
-      return <Globe className="h-3.5 w-3.5 text-blue-400 shrink-0" />;
+      return (
+        <div className="h-7 w-7 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center shrink-0">
+          <Globe className="h-3.5 w-3.5" />
+        </div>
+      );
     case "book":
-      return <BookOpen className="h-3.5 w-3.5 text-amber-400 shrink-0" />;
+      return (
+        <div className="h-7 w-7 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
+          <BookOpen className="h-3.5 w-3.5" />
+        </div>
+      );
     case "drive":
-      return <HardDrive className="h-3.5 w-3.5 text-emerald-400 shrink-0" />;
+      return (
+        <div className="h-7 w-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
+          <HardDrive className="h-3.5 w-3.5" />
+        </div>
+      );
     case "text":
-      return <Clipboard className="h-3.5 w-3.5 text-purple-400 shrink-0" />;
+      return (
+        <div className="h-7 w-7 rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-400 flex items-center justify-center shrink-0">
+          <Clipboard className="h-3.5 w-3.5" />
+        </div>
+      );
     case "file":
     default:
-      return <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0" />;
+      return (
+        <div className="h-7 w-7 rounded-lg bg-muted border border-border/50 text-muted-foreground flex items-center justify-center shrink-0">
+          <FileText className="h-3.5 w-3.5" />
+        </div>
+      );
   }
 }
 
 export function SourcesPanel({
   learnId,
   sourcesCount: fallbackCount = 0,
+  width,
   onAddSource,
+  onSelectSource,
+  onDropFiles,
   onToggleCollapse,
   isCollapsed = false,
 }: SourcesPanelProps) {
@@ -57,6 +91,7 @@ export function SourcesPanel({
   const [searchQuery, setSearchQuery] = useState("");
   const [webScope, setWebScope] = useState("Web");
   const [researchSpeed, setResearchSpeed] = useState("Fast");
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
 
   // Query sources live from Dexie database
   const sources =
@@ -76,6 +111,28 @@ export function SourcesPanel({
         s.title.toLowerCase().includes(searchQuery.toLowerCase().trim())
       )
     : sources;
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOver(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOver(false);
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length > 0 && onDropFiles) {
+      onDropFiles(files);
+    }
+  };
 
   if (isCollapsed) {
     return (
@@ -104,13 +161,21 @@ export function SourcesPanel({
   }
 
   return (
-    <aside className="w-[300px] xl:w-[320px] h-full flex flex-col bg-card rounded-2xl border border-border/50 text-foreground p-3.5 sm:p-4 shrink-0 select-none overflow-hidden shadow-xs font-sans">
+    <aside
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+      style={{ width: isCollapsed ? undefined : width ? `${width}px` : undefined }}
+      className={`w-[250px] sm:w-[280px] lg:w-[320px] xl:w-[360px] 2xl:w-[400px] h-full flex flex-col bg-card rounded-2xl border ${
+        isDraggingOver ? "border-primary/80 ring-2 ring-primary/20" : "border-border/50"
+      } text-foreground p-3 sm:p-3.5 shrink-0 select-none overflow-hidden shadow-xs font-sans transition-colors`}
+    >
       {/* Header */}
       <div className="flex items-center justify-between mb-3 px-1">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-foreground">{t("sourcesPanelTitle")}</span>
+          <span className="text-sm font-semibold tracking-tight text-foreground">{t("sourcesPanelTitle")}</span>
           {displayCount > 0 && (
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground font-mono">
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border/40">
               {displayCount}
             </span>
           )}
@@ -120,7 +185,7 @@ export function SourcesPanel({
           <button
             type="button"
             onClick={onToggleCollapse}
-            className="h-7 w-7 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
+            className="h-7 w-7 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
             title={t("hidePanel")}
           >
             <PanelLeft className="h-4 w-4" />
@@ -132,51 +197,106 @@ export function SourcesPanel({
       <button
         type="button"
         onClick={onAddSource}
-        className="w-full py-2 px-3 rounded-full border border-border hover:border-border/80 bg-muted/50 hover:bg-muted text-xs font-medium text-foreground flex items-center justify-center gap-1.5 transition-all cursor-pointer mb-3 shrink-0"
+        className="w-full py-2.5 px-4 rounded-full bg-secondary/80 hover:bg-secondary border border-border/70 hover:border-border text-xs font-medium text-foreground flex items-center justify-center gap-2 transition-all cursor-pointer mb-3 shrink-0 shadow-2xs hover:shadow-xs active:scale-[0.99] group"
       >
-        <Plus className="h-3.5 w-3.5" />
+        <Plus className="h-3.5 w-3.5 stroke-[2.5] text-muted-foreground group-hover:text-foreground transition-colors" />
         <span>{t("addSource")}</span>
       </button>
 
       {/* Search & Web Research Box */}
-      <div className="w-full bg-muted/60 rounded-2xl p-2.5 border border-border/60 focus-within:border-border transition-all text-left mb-3 shrink-0">
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder={t("searchWebSources")}
-          className="w-full bg-transparent text-xs text-foreground placeholder:text-muted-foreground/60 outline-none px-1 py-1"
-        />
-        <div className="flex items-center justify-between mt-2 pt-1">
-          <div className="flex items-center gap-1.5">
+      <div className="w-full bg-muted/40 hover:bg-muted/50 focus-within:bg-muted/60 rounded-2xl p-2.5 sm:p-3 border border-border/60 focus-within:border-primary/40 focus-within:ring-1 focus-within:ring-primary/20 transition-all text-left mb-3 shrink-0">
+        <div className="relative flex items-center">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder={t("searchWebSources")}
+            className="w-full bg-transparent text-xs text-foreground placeholder:text-muted-foreground/60 outline-none pr-6 pl-1 py-0.5"
+          />
+          {searchQuery && (
             <button
               type="button"
-              onClick={() => setWebScope(webScope === "Web" ? "Journal" : "Web")}
-              className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-background/60 hover:bg-background text-[11px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer border border-border/40"
+              onClick={() => setSearchQuery("")}
+              className="absolute right-0 text-muted-foreground hover:text-foreground p-0.5 rounded-full hover:bg-muted transition-colors cursor-pointer"
+              title="Clear"
             >
-              <Globe className="h-2.5 w-2.5" />
-              <span>{webScope === "Journal" ? t("webScopeJournal") : t("webScopeWeb")}</span>
-              <ChevronDown className="h-2.5 w-2.5 opacity-60" />
+              <X className="h-3 w-3" />
             </button>
+          )}
+        </div>
 
-            <button
-              type="button"
-              onClick={() =>
-                setResearchSpeed(
-                  researchSpeed === "Fast" ? "Deep" : "Fast"
-                )
-              }
-              className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-background/60 hover:bg-background text-[11px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer border border-border/40"
-            >
-              <Search className="h-2.5 w-2.5" />
-              <span>{researchSpeed === "Deep" ? t("speedDeep") : t("speedFast")}</span>
-              <ChevronDown className="h-2.5 w-2.5 opacity-60" />
-            </button>
+        <div className="flex items-center justify-between mt-2 pt-1">
+          <div className="flex items-center gap-1.5 flex-nowrap">
+            {/* Web Scope Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-background/80 hover:bg-background text-[10.5px] font-medium text-muted-foreground hover:text-foreground transition-all cursor-pointer border border-border/50 shadow-2xs"
+                >
+                  <Globe className="h-2.5 w-2.5 text-muted-foreground/80" />
+                  <span>{webScope === "Journal" ? t("webScopeJournal") : t("webScopeWeb")}</span>
+                  <ChevronDown className="h-2.5 w-2.5 opacity-60" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-36 p-1 text-xs shadow-md">
+                <DropdownMenuItem
+                  onClick={() => setWebScope("Web")}
+                  className="flex items-center justify-between text-xs cursor-pointer py-1.5"
+                >
+                  <span className="flex items-center gap-2">
+                    <Globe className="h-3.5 w-3.5 text-blue-400" />
+                    {t("webScopeWeb")}
+                  </span>
+                  {webScope === "Web" && <Check className="h-3.5 w-3.5 text-primary" />}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setWebScope("Journal")}
+                  className="flex items-center justify-between text-xs cursor-pointer py-1.5"
+                >
+                  <span className="flex items-center gap-2">
+                    <BookOpen className="h-3.5 w-3.5 text-amber-400" />
+                    {t("webScopeJournal")}
+                  </span>
+                  {webScope === "Journal" && <Check className="h-3.5 w-3.5 text-primary" />}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            {/* Research Speed Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-background/80 hover:bg-background text-[10.5px] font-medium text-muted-foreground hover:text-foreground transition-all cursor-pointer border border-border/50 shadow-2xs"
+                >
+                  <Search className="h-2.5 w-2.5 text-muted-foreground/80" />
+                  <span>{researchSpeed === "Deep" ? t("speedDeep") : t("speedFast")}</span>
+                  <ChevronDown className="h-2.5 w-2.5 opacity-60" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-44 p-1 text-xs shadow-md">
+                <DropdownMenuItem
+                  onClick={() => setResearchSpeed("Fast")}
+                  className="flex items-center justify-between text-xs cursor-pointer py-1.5"
+                >
+                  <span>{t("speedFast")}</span>
+                  {researchSpeed === "Fast" && <Check className="h-3.5 w-3.5 text-primary" />}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setResearchSpeed("Deep")}
+                  className="flex items-center justify-between text-xs cursor-pointer py-1.5"
+                >
+                  <span>{t("speedDeep")}</span>
+                  {researchSpeed === "Deep" && <Check className="h-3.5 w-3.5 text-primary" />}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
 
           <button
             type="button"
-            className="h-6 w-6 rounded-full bg-background hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer border border-border/40"
+            className="h-6 w-6 rounded-full bg-background hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-all cursor-pointer border border-border/50 shadow-2xs shrink-0"
             aria-label={t("search")}
           >
             <Search className="h-3 w-3" />
@@ -207,82 +327,109 @@ export function SourcesPanel({
           </div>
 
           {/* Scrollable list of source cards */}
-          <div className="flex-1 overflow-y-auto space-y-1.5 pr-0.5">
-            {filteredSources.map((source) => {
-              const isCarried = source.includedInChat !== false;
-              return (
-                <div
-                  key={source.id}
-                  className={`group relative flex items-center gap-2.5 p-2 rounded-xl border transition-all cursor-pointer ${
-                    isCarried
-                      ? "bg-secondary/60 hover:bg-secondary border-border/70 text-foreground"
-                      : "bg-muted/20 hover:bg-muted/40 border-border/30 text-muted-foreground opacity-70 hover:opacity-100"
-                  }`}
-                  onClick={() => {
-                    localDb.toggleSourceInChat(source.id, !isCarried);
-                  }}
-                >
-                  <input
-                    type="checkbox"
-                    checked={isCarried}
-                    onChange={() => {}}
-                    className="rounded border-border h-3.5 w-3.5 text-primary focus:ring-0 cursor-pointer pointer-events-none shrink-0"
-                  />
-
-                  <div className="shrink-0">{getSourceIcon(source.type)}</div>
-
-                  <div className="flex-1 min-w-0 pr-6">
-                    <p
-                      className="text-xs font-medium text-foreground truncate leading-tight"
-                      title={source.title}
-                    >
-                      {source.title}
-                    </p>
-                    <p className="text-[10px] text-muted-foreground/70 font-mono mt-0.5 truncate flex items-center gap-1">
-                      <span className="capitalize">{source.type}</span>
-                      {source.size ? `• ${formatFileSize(source.size)}` : null}
-                    </p>
-                  </div>
-
-                  {/* Delete Button */}
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      localDb.deleteSource(source.id);
+          {filteredSources.length === 0 ? (
+            <div className="flex-1 flex flex-col items-center justify-center text-center p-4 text-muted-foreground">
+              <p className="text-xs">No sources matching &quot;{searchQuery}&quot;</p>
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="mt-2 text-[11px] text-primary hover:underline cursor-pointer"
+              >
+                Clear filter
+              </button>
+            </div>
+          ) : (
+            <div className="flex-1 overflow-y-auto space-y-1.5 pr-0.5">
+              {filteredSources.map((source) => {
+                const isCarried = source.includedInChat !== false;
+                return (
+                  <div
+                    key={source.id}
+                    className={`group relative flex items-center gap-2.5 p-2 rounded-xl border transition-all cursor-pointer ${
+                      isCarried
+                        ? "bg-secondary/60 hover:bg-secondary border-border/70 text-foreground"
+                        : "bg-muted/20 hover:bg-muted/40 border-border/30 text-muted-foreground opacity-70 hover:opacity-100"
+                    }`}
+                    onClick={() => {
+                      localDb.toggleSourceInChat(source.id, !isCarried);
                     }}
-                    className="absolute right-2 opacity-0 group-hover:opacity-100 h-6 w-6 rounded-lg hover:bg-destructive/20 text-muted-foreground hover:text-destructive flex items-center justify-center transition-all cursor-pointer"
-                    title={t("removeSource")}
-                    aria-label={t("removeSource")}
                   >
-                    <Trash2 className="h-3 w-3" />
-                  </button>
-                </div>
-              );
-            })}
-          </div>
+                    <input
+                      type="checkbox"
+                      checked={isCarried}
+                      onChange={() => {}}
+                      className="rounded border-border h-3.5 w-3.5 text-primary focus:ring-0 cursor-pointer pointer-events-none shrink-0"
+                    />
+
+                    {getSourceIcon(source.type)}
+
+                    <div className="flex-1 min-w-0 pr-6">
+                      <p
+                        className="text-xs font-medium text-foreground truncate leading-tight"
+                        title={source.title}
+                      >
+                        {source.title}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground/70 font-mono mt-0.5 truncate flex items-center gap-1">
+                        <span className="capitalize">{source.type}</span>
+                        {source.size ? `• ${formatFileSize(source.size)}` : null}
+                      </p>
+                    </div>
+
+                    {/* Delete Button */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        localDb.deleteSource(source.id);
+                      }}
+                      className="absolute right-2 opacity-0 group-hover:opacity-100 h-6 w-6 rounded-lg hover:bg-destructive/20 text-muted-foreground hover:text-destructive flex items-center justify-center transition-all cursor-pointer"
+                      title={t("removeSource")}
+                      aria-label={t("removeSource")}
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       ) : (
-        /* Empty State (Zero Dummy Data) */
-        <div className="flex-1 flex flex-col items-center justify-center text-center p-4 min-h-[220px]">
-          <div className="h-10 w-10 rounded-2xl bg-muted/50 border border-border/40 flex items-center justify-center text-muted-foreground/60 mb-3">
-            <FileText className="h-5 w-5 stroke-[1.5]" />
+        /* Empty State / Interactive Dropzone */
+        <div
+          onClick={onAddSource}
+          className={`flex-1 flex flex-col items-center justify-center text-center p-6 rounded-2xl border-2 border-dashed transition-all duration-200 cursor-pointer group ${
+            isDraggingOver
+              ? "border-primary bg-primary/5 scale-[0.99]"
+              : "border-border/60 hover:border-border/90 bg-muted/15 hover:bg-muted/25"
+          }`}
+        >
+          <div className="h-12 w-12 rounded-2xl bg-secondary/80 border border-border/60 flex items-center justify-center text-muted-foreground mb-3.5 shadow-2xs group-hover:scale-105 group-hover:text-foreground transition-all">
+            <FileText className="h-6 w-6 stroke-[1.5] text-muted-foreground/80 group-hover:text-foreground transition-colors" />
           </div>
-          <h3 className="text-xs font-medium text-foreground mb-1">
+          <h3 className="text-xs font-semibold text-foreground mb-1.5 tracking-tight">
             {t("emptySourcesTitle")}
           </h3>
-          <p className="text-[11px] text-muted-foreground leading-relaxed max-w-[240px] mb-3">
+          <p className="text-[11px] text-muted-foreground/80 leading-relaxed max-w-[260px] mb-5">
             {t("emptySourcesDescription")}
           </p>
-          <p className="text-[11px] text-muted-foreground">
-            {t("dropFilesHere")}{" "}
-            <button
-              type="button"
-              onClick={onAddSource}
-              className="text-foreground underline underline-offset-2 hover:text-primary transition-colors cursor-pointer"
-            >
-              {t("addSourceAction")}
-            </button>
+
+          {/* Simple "+ Add Source" Button */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onAddSource();
+            }}
+            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-secondary hover:bg-muted border border-border/70 text-xs font-medium text-foreground transition-all cursor-pointer shadow-2xs hover:shadow-xs active:scale-95 group-hover:border-border"
+          >
+            <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
+            <span>{t("addSource")}</span>
+          </button>
+
+          <p className="text-[11px] text-muted-foreground/60 mt-3.5">
+            {t("orDropFiles")}
           </p>
         </div>
       )}

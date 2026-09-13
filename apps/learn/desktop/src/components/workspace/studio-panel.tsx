@@ -38,6 +38,7 @@ const STUDIO_TOOLS: StudioTool[] = [
 ];
 
 interface StudioPanelProps {
+  width?: number;
   onSelectTool?: (toolId: string) => void;
   onAddNote?: () => void;
   onToggleCollapse?: () => void;
@@ -45,6 +46,7 @@ interface StudioPanelProps {
 }
 
 export function StudioPanel({
+  width,
   onSelectTool,
   onAddNote,
   onToggleCollapse,
@@ -101,15 +103,18 @@ export function StudioPanel({
   }
 
   return (
-    <aside className="w-[340px] xl:w-[360px] h-full flex flex-col bg-card rounded-2xl border border-border/50 text-foreground p-3.5 sm:p-4 shrink-0 select-none overflow-y-auto shadow-xs">
+    <aside
+      style={{ width: isCollapsed ? undefined : width ? `${width}px` : undefined }}
+      className="w-[285px] sm:w-[310px] lg:w-[360px] xl:w-[420px] 2xl:w-[480px] h-full flex flex-col bg-card rounded-2xl border border-border/50 text-foreground p-3 sm:p-3.5 shrink-0 select-none overflow-y-auto shadow-xs font-sans"
+    >
       {/* Header */}
       <div className="flex items-center justify-between mb-3 px-1">
-        <span className="text-sm font-medium text-foreground">{t("studioTitle")}</span>
+        <span className="text-sm font-semibold tracking-tight text-foreground">{t("studioTitle")}</span>
         {onToggleCollapse && (
           <button
             type="button"
             onClick={onToggleCollapse}
-            className="h-7 w-7 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
+            className="h-7 w-7 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
             title={t("hidePanel")}
           >
             <PanelRight className="h-4 w-4" />
@@ -118,7 +123,7 @@ export function StudioPanel({
       </div>
 
       {/* 3x3 Grid of Studio Tools */}
-      <div className="grid grid-cols-3 gap-2 mb-6">
+      <div className="grid grid-cols-3 gap-1.5 mb-6">
         {STUDIO_TOOLS.map((tool) => {
           const Icon = tool.icon;
           const toolName = t(tool.translationKey);
@@ -127,13 +132,15 @@ export function StudioPanel({
               key={tool.id}
               type="button"
               onClick={() => onSelectTool?.(tool.id)}
-              className="p-2.5 rounded-2xl bg-muted/50 hover:bg-muted border border-border/50 transition-all flex flex-col justify-between h-20 text-left group cursor-pointer"
+              className="p-2.5 rounded-xl bg-muted/40 hover:bg-muted/70 border border-border/50 hover:border-border/80 transition-all flex flex-col justify-between h-[84px] text-left group cursor-pointer shadow-2xs hover:shadow-xs active:scale-[0.98]"
             >
               <div className="flex items-center justify-between w-full">
-                <Icon className={`h-4 w-4 ${tool.iconColor}`} />
-                <ChevronRight className="h-3 w-3 text-muted-foreground opacity-40 group-hover:opacity-100 transition-opacity" />
+                <div className="h-6 w-6 rounded-lg bg-background/70 border border-border/40 flex items-center justify-center group-hover:bg-background group-hover:border-border/70 transition-all shrink-0">
+                  <Icon className={`h-3.5 w-3.5 ${tool.iconColor}`} />
+                </div>
+                <ChevronRight className="h-3 w-3 text-muted-foreground/30 group-hover:text-muted-foreground group-hover:translate-x-0.5 transition-all" />
               </div>
-              <span className="text-[11px] font-normal text-foreground leading-tight line-clamp-2">
+              <span className="text-[11px] sm:text-xs font-medium text-foreground tracking-tight leading-snug line-clamp-2 mt-1">
                 {toolName}
               </span>
             </button>
@@ -143,13 +150,13 @@ export function StudioPanel({
 
       {/* Empty State Studio Output (Zero Dummy Data) */}
       <div className="flex-1 flex flex-col items-center justify-center text-center p-4 min-h-[180px]">
-        <div className="h-10 w-10 rounded-2xl bg-muted/50 border border-border/40 flex items-center justify-center text-muted-foreground/60 mb-3">
-          <PenTool className="h-5 w-5 stroke-[1.5]" />
+        <div className="h-12 w-12 rounded-2xl bg-secondary/80 border border-border/50 flex items-center justify-center text-muted-foreground/80 mb-3 shadow-2xs">
+          <PenTool className="h-6 w-6 stroke-[1.5]" />
         </div>
-        <h3 className="text-xs font-medium text-foreground mb-1">
+        <h3 className="text-xs font-semibold text-foreground mb-1.5 tracking-tight">
           {t("studioEmptyTitle")}
         </h3>
-        <p className="text-[11px] text-muted-foreground leading-relaxed max-w-[260px]">
+        <p className="text-[11px] text-muted-foreground/80 leading-relaxed max-w-[280px]">
           {t("studioEmptyDesc")}
         </p>
       </div>
@@ -159,7 +166,7 @@ export function StudioPanel({
         <button
           type="button"
           onClick={onAddNote}
-          className="inline-flex items-center gap-1.5 px-5 py-2 rounded-full bg-foreground hover:bg-foreground/90 text-background text-xs font-medium transition-all shadow-xs active:scale-98 cursor-pointer"
+          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-foreground hover:bg-foreground/90 text-background text-xs font-medium transition-all shadow-xs active:scale-98 cursor-pointer"
         >
           <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
           <span>{t("addNote")}</span>

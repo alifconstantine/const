@@ -1041,7 +1041,7 @@ export function MobileLearnWorkspace({
                   placeholder={t("searchWebSources")}
                   className="w-full bg-transparent text-xs text-[#d4d4d4] placeholder:text-[#5d5d5d] outline-none px-1 py-1"
                 />
-                <div className="flex items-center justify-between mt-2 pt-1 border-t border-[#2e2e2e]">
+                <div className="flex items-center justify-between mt-2 pt-1">
                   <div className="flex items-center gap-1.5">
                     <button
                       type="button"

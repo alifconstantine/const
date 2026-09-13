@@ -65,6 +65,92 @@ export function LearnWorkspace({
   const [isSourcesCollapsed, setIsSourcesCollapsed] = useState(false);
   const [isStudioCollapsed, setIsStudioCollapsed] = useState(false);
 
+  // Dynamic responsive default widths
+  const getResponsiveWidths = () => {
+    if (typeof window === "undefined") {
+      return { sources: 330, studio: 400 };
+    }
+    const w = window.innerWidth;
+    if (w >= 1800) {
+      // Large 1080p full-screen or 2K/4K: Keep Ask AI comfortably proportioned (~950-1040px max)
+      // by giving generous breathing room to Sources (400px) and Studio (480px)
+      return { sources: 400, studio: 480 };
+    }
+    if (w >= 1500) {
+      // Standard laptop / scaled 1080p: Ask AI stays balanced (~750-820px)
+      return { sources: 350, studio: 420 };
+    }
+    if (w >= 1300) {
+      return { sources: 315, studio: 370 };
+    }
+    if (w >= 1100) {
+      // Medium/compact desktop: Ask AI remains dominant (~520-580px, ~50% width)
+      return { sources: 280, studio: 320 };
+    }
+    // Small desktop window (< 1100px): compact side panels so Ask AI has space
+    return { sources: 250, studio: 285 };
+  };
+
+  const [sourcesWidth, setSourcesWidth] = useState<number>(() => getResponsiveWidths().sources);
+  const [studioWidth, setStudioWidth] = useState<number>(() => getResponsiveWidths().studio);
+  const [isManualWidth, setIsManualWidth] = useState(false);
+
+  useEffect(() => {
+    const handleResize = () => {
+      if (!isManualWidth) {
+        const { sources, studio } = getResponsiveWidths();
+        setSourcesWidth(sources);
+        setStudioWidth(studio);
+      }
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [isManualWidth]);
+
+  // Drag resizing for Sources panel
+  const handleSourcesMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsManualWidth(true);
+    const startX = e.clientX;
+    const startWidth = sourcesWidth;
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      const delta = moveEvent.clientX - startX;
+      const newWidth = Math.min(Math.max(startWidth + delta, 230), 520);
+      setSourcesWidth(newWidth);
+    };
+
+    const onMouseUp = () => {
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    };
+
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+  };
+
+  // Drag resizing for Studio panel
+  const handleStudioMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsManualWidth(true);
+    const startX = e.clientX;
+    const startWidth = studioWidth;
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      const delta = startX - moveEvent.clientX;
+      const newWidth = Math.min(Math.max(startWidth + delta, 260), 580);
+      setStudioWidth(newWidth);
+    };
+
+    const onMouseUp = () => {
+      window.removeEventListener("mousemove", onMouseMove);
+      window.removeEventListener("mouseup", onMouseUp);
+    };
+
+    window.addEventListener("mousemove", onMouseMove);
+    window.addEventListener("mouseup", onMouseUp);
+  };
+
   // Editable title state
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleValue, setTitleValue] = useState(t("untitledNotebook"));
@@ -88,6 +174,67 @@ export function LearnWorkspace({
     } else if (e.key === "Escape") {
       setTitleValue(learn?.title || t("untitledNotebook"));
       setIsEditingTitle(false);
+    }
+  };
+
+  const handleSelectSource = async (sourceType: string) => {
+    setIsAddSourceOpen(false);
+    if (!learnId) return;
+
+    if (sourceType === "upload") {
+      const filePaths = await window.electron?.openFileDialog?.({ multiple: true });
+      if (filePaths && filePaths.length > 0) {
+        for (const filePath of filePaths) {
+          const fileName = filePath.split(/[\\/]/).pop() || t("sourceFileFallback");
+          await localDb.createSource({
+            learnId,
+            title: fileName,
+            type: "file",
+            path: filePath,
+            includedInChat: true,
+          });
+        }
+      }
+    } else if (sourceType === "paste") {
+      const text = await navigator.clipboard.readText().catch(() => "");
+      if (text && text.trim()) {
+        const snippet = text.trim().slice(0, 30);
+        await localDb.createSource({
+          learnId,
+          title: t("copiedQuote", { snippet }),
+          type: "text",
+          content: text,
+          size: new Blob([text]).size,
+          includedInChat: true,
+        });
+      }
+    } else if (sourceType === "url") {
+      const url = window.prompt(t("enterUrlPrompt"));
+      if (url && url.trim()) {
+        await localDb.createSource({
+          learnId,
+          title: url.replace(/^https?:\/\//, "").replace(/\/$/, ""),
+          type: "url",
+          url: url.trim(),
+          includedInChat: true,
+        });
+      }
+    }
+  };
+
+  const handleDropFiles = async (files: File[]) => {
+    if (!learnId || !files || files.length === 0) return;
+    for (const file of files) {
+      const filePath = (file as any).path || file.name;
+      const fileName = file.name || filePath.split(/[\\/]/).pop() || t("sourceFileFallback");
+      await localDb.createSource({
+        learnId,
+        title: fileName,
+        type: "file",
+        path: filePath,
+        size: file.size,
+        includedInChat: true,
+      });
     }
   };
 
@@ -299,15 +446,33 @@ export function LearnWorkspace({
       </header>
 
       {/* 3-Column Floating Cards Body Layout */}
-      <div className="flex-1 flex overflow-hidden p-2 sm:p-2.5 gap-2 sm:gap-2.5 bg-background">
+      <div className="flex-1 flex overflow-hidden p-2 sm:p-2.5 gap-1.5 sm:gap-2 bg-background">
         {/* Left Column: Sumber */}
         <SourcesPanel
           learnId={learnId}
           sourcesCount={learn?.sourcesCount || 0}
+          width={sourcesWidth}
           onAddSource={() => setIsAddSourceOpen(true)}
+          onSelectSource={handleSelectSource}
+          onDropFiles={handleDropFiles}
           isCollapsed={isSourcesCollapsed}
           onToggleCollapse={() => setIsSourcesCollapsed(!isSourcesCollapsed)}
         />
+
+        {/* Left Resize Handle */}
+        {!isSourcesCollapsed && (
+          <div
+            onMouseDown={handleSourcesMouseDown}
+            onDoubleClick={() => {
+              setIsManualWidth(false);
+              setSourcesWidth(getResponsiveWidths().sources);
+            }}
+            className="w-1.5 hover:w-2 -mx-1 sm:-mx-1.5 h-full cursor-col-resize z-20 group flex items-center justify-center transition-all select-none shrink-0"
+            title="Drag to resize / Double-click to reset"
+          >
+            <div className="w-0.5 h-7 rounded-full bg-border/40 group-hover:bg-primary/70 group-hover:h-12 transition-all" />
+          </div>
+        )}
 
         {/* Center Column: Socratic Chat */}
         <ChatPanel
@@ -320,8 +485,24 @@ export function LearnWorkspace({
           }}
         />
 
+        {/* Right Resize Handle */}
+        {!isStudioCollapsed && (
+          <div
+            onMouseDown={handleStudioMouseDown}
+            onDoubleClick={() => {
+              setIsManualWidth(false);
+              setStudioWidth(getResponsiveWidths().studio);
+            }}
+            className="w-1.5 hover:w-2 -mx-1 sm:-mx-1.5 h-full cursor-col-resize z-20 group flex items-center justify-center transition-all select-none shrink-0"
+            title="Drag to resize / Double-click to reset"
+          >
+            <div className="w-0.5 h-7 rounded-full bg-border/40 group-hover:bg-primary/70 group-hover:h-12 transition-all" />
+          </div>
+        )}
+
         {/* Right Column: Studio Tools */}
         <StudioPanel
+          width={studioWidth}
           onSelectTool={(toolId) => {
             console.log("Selected studio tool:", toolId);
           }}
@@ -337,50 +518,7 @@ export function LearnWorkspace({
       <AddSourceDialog
         open={isAddSourceOpen}
         onOpenChange={setIsAddSourceOpen}
-        onSelectSource={async (sourceType) => {
-          setIsAddSourceOpen(false);
-          if (!learnId) return;
-
-          if (sourceType === "upload") {
-            const filePaths = await window.electron?.openFileDialog?.({ multiple: true });
-            if (filePaths && filePaths.length > 0) {
-              for (const filePath of filePaths) {
-                const fileName = filePath.split(/[\\/]/).pop() || t("sourceFileFallback");
-                await localDb.createSource({
-                  learnId,
-                  title: fileName,
-                  type: "file",
-                  path: filePath,
-                  includedInChat: true,
-                });
-              }
-            }
-          } else if (sourceType === "paste") {
-            const text = await navigator.clipboard.readText().catch(() => "");
-            if (text && text.trim()) {
-              const snippet = text.trim().slice(0, 30);
-              await localDb.createSource({
-                learnId,
-                title: t("copiedQuote", { snippet }),
-                type: "text",
-                content: text,
-                size: new Blob([text]).size,
-                includedInChat: true,
-              });
-            }
-          } else if (sourceType === "url") {
-            const url = window.prompt(t("enterUrlPrompt"));
-            if (url && url.trim()) {
-              await localDb.createSource({
-                learnId,
-                title: url.replace(/^https?:\/\//, "").replace(/\/$/, ""),
-                type: "url",
-                url: url.trim(),
-                includedInChat: true,
-              });
-            }
-          }
-        }}
+        onSelectSource={handleSelectSource}
       />
     </div>
   );
