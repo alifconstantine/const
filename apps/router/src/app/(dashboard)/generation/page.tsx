@@ -53,7 +53,7 @@ import { ModelSelectorPanel } from "@/components/generation/model-selector-panel
 import { HistoryPanel, type ChatSessionMeta } from "@/components/generation/history-panel";
 import { SystemInstructionPanel } from "@/components/generation/system-instruction-panel";
 import { ViewCodeDialog } from "@/components/generation/view-code-dialog";
-import { ChatMessageItem, type ChatMessage, type ChatAttachment } from "@/components/generation/chat-message-item";
+import { ChatMessageItem, type ChatMessage, type ChatAttachment, type SearchResultItem } from "@/components/generation/chat-message-item";
 
 export default function GenerationPage() {
   const { isAuthenticated, token } = useRouterAuth();
@@ -403,12 +403,16 @@ export default function GenerationPage() {
       createdAt: Date.now(),
     };
 
+    const isSearchActive = webSearch === "auto" || selectedModel.modelId === "const-search";
+
     const assistantPlaceholderId = crypto.randomUUID();
     const assistantMessage: ChatMessage = {
       id: assistantPlaceholderId,
       role: "assistant",
       content: "",
       thinkingContent: "",
+      isSearching: isSearchActive,
+      searchQuery: isSearchActive ? trimmedPrompt : undefined,
       createdAt: Date.now(),
     };
 
@@ -436,6 +440,8 @@ export default function GenerationPage() {
 
     let accumulatedContent = "";
     let accumulatedThinking = "";
+    let activeSearchQuery: string | undefined = isSearchActive ? trimmedPrompt : undefined;
+    let activeSearchResults: SearchResultItem[] | undefined = undefined;
 
     try {
       const response = await fetch("/api/generation/chat", {
@@ -499,6 +505,52 @@ export default function GenerationPage() {
 
           try {
             const parsed = JSON.parse(dataPayload);
+
+            // Handle Web Search Tool Call Events
+            if (parsed.type === "search_start") {
+              if (parsed.query) {
+                activeSearchQuery = parsed.query;
+              }
+              setMessages((prev) =>
+                prev.map((msg) =>
+                  msg.id === assistantPlaceholderId
+                    ? {
+                        ...msg,
+                        isSearching: true,
+                        searchQuery: activeSearchQuery,
+                      }
+                    : msg
+                )
+              );
+              continue;
+            }
+
+            if (parsed.type === "search_results") {
+              if (parsed.query) {
+                activeSearchQuery = parsed.query;
+              }
+              if (Array.isArray(parsed.results)) {
+                activeSearchResults = parsed.results;
+              }
+              setMessages((prev) =>
+                prev.map((msg) =>
+                  msg.id === assistantPlaceholderId
+                    ? {
+                        ...msg,
+                        isSearching: false,
+                        searchQuery: activeSearchQuery,
+                        searchResults: activeSearchResults,
+                      }
+                    : msg
+                )
+              );
+              continue;
+            }
+
+            if (parsed.error?.message) {
+              throw new Error(parsed.error.message);
+            }
+
             const delta = parsed.choices?.[0]?.delta;
             if (!delta) continue;
 
@@ -518,13 +570,20 @@ export default function GenerationPage() {
                 msg.id === assistantPlaceholderId
                   ? {
                       ...msg,
+                      isSearching: false,
+                      searchQuery: activeSearchQuery,
+                      searchResults: activeSearchResults,
                       content: accumulatedContent,
                       thinkingContent: accumulatedThinking,
                     }
                   : msg
               )
             );
-          } catch {}
+          } catch (pErr) {
+            if (pErr instanceof Error && pErr.message && !pErr.message.includes("JSON")) {
+              throw pErr;
+            }
+          }
         }
       }
 
@@ -534,6 +593,9 @@ export default function GenerationPage() {
         role: "assistant",
         content: accumulatedContent,
         thinkingContent: accumulatedThinking || undefined,
+        isSearching: false,
+        searchQuery: activeSearchQuery,
+        searchResults: activeSearchResults && activeSearchResults.length > 0 ? activeSearchResults : undefined,
         createdAt: Date.now(),
       };
 
@@ -543,6 +605,28 @@ export default function GenerationPage() {
       // Persist to Convex database
       if (isAuthenticated) {
         try {
+          const sanitizedMessages = finalMessagesList.map((m) => {
+            const clean: Record<string, unknown> = {
+              id: m.id,
+              role: m.role,
+              content: m.content,
+              createdAt: m.createdAt,
+            };
+            if (m.thinkingContent) clean.thinkingContent = m.thinkingContent;
+            if (m.searchQuery) clean.searchQuery = m.searchQuery;
+            if (m.searchResults && m.searchResults.length > 0) {
+              clean.searchResults = m.searchResults.map((s) => ({
+                title: s.title,
+                url: s.url,
+                snippet: s.snippet,
+              }));
+            }
+            if (m.attachments && m.attachments.length > 0) {
+              clean.attachments = m.attachments;
+            }
+            return clean;
+          });
+
           if (!activeChatId) {
             const res = await createChatMutation({
               title: effectiveTitle,
@@ -551,7 +635,7 @@ export default function GenerationPage() {
               systemInstruction,
               temperature,
               thinkingLevel: supportsThinking ? thinkingLevel : undefined,
-              messages: finalMessagesList,
+              messages: sanitizedMessages as any,
             });
             setActiveChatId(res.chatId);
           } else {
@@ -563,7 +647,7 @@ export default function GenerationPage() {
               systemInstruction,
               temperature,
               thinkingLevel: supportsThinking ? thinkingLevel : undefined,
-              messages: finalMessagesList,
+              messages: sanitizedMessages as any,
             });
           }
         } catch (dbErr) {

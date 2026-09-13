@@ -78,6 +78,16 @@ export const routerTables = {
             })
           )
         ),
+        searchQuery: v.optional(v.string()),
+        searchResults: v.optional(
+          v.array(
+            v.object({
+              title: v.string(),
+              url: v.string(),
+              snippet: v.optional(v.string()),
+            })
+          )
+        ),
         createdAt: v.number(),
       })
     ),

@@ -44,12 +44,84 @@ interface ChatRequestBody {
   providerDocId?: string;
 }
 
+function extractSearchQueries(rawPrompt: string): string[] {
+  const text = rawPrompt.trim();
+  if (!text) return [];
+
+  const majorSplitPattern =
+    /(?:\?+|\n+|;\s*|,\s*(?:dan|and|serta)\s+(?:temukan|carikan|cari|siapa|apa|bagaimana|find|who|what|tell)|\s+(?:dan|and|serta)\s+(?:temukan|carikan|cari|siapa|apa|bagaimana|find|who|what|tell))/i;
+
+  let clauses = text.split(majorSplitPattern).map((c) => c.trim()).filter(Boolean);
+
+  if (clauses.length === 1 && /,\s*(?:dan|and|serta)\s+/i.test(text)) {
+    clauses = text.split(/,\s*(?:dan|and|serta)\s+/i).map((c) => c.trim()).filter(Boolean);
+  }
+
+  const cleanClause = (clause: string): string => {
+    return clause
+      .replace(
+        /^(temukan|carikan|cari|siapa|siapakah|apa|apakah|bagaimana|jelaskan|tolong cari|search for|find|who is|what is|tell me about|explain)\s+(itu\s+|tentang\s+|mengenai\s+|siapa\s+|apa\s+)?/i,
+        ""
+      )
+      .replace(/[?!.]+$/, "")
+      .trim();
+  };
+
+  const queries = clauses
+    .map(cleanClause)
+    .filter((q) => q.length >= 3);
+
+  if (queries.length > 1 && queries.length <= 3) {
+    return Array.from(new Set(queries));
+  }
+
+  const singleCleaned = cleanClause(text);
+  return [singleCleaned || text];
+}
+
+function prependSseEvents(
+  initialEvents: string[],
+  upstreamBody: ReadableStream<Uint8Array> | null
+): ReadableStream<Uint8Array> | null {
+  if (!upstreamBody || initialEvents.length === 0) return upstreamBody;
+
+  const encoder = new TextEncoder();
+  const reader = upstreamBody.getReader();
+
+  return new ReadableStream<Uint8Array>({
+    async start(controller) {
+      for (const evt of initialEvents) {
+        controller.enqueue(encoder.encode(evt));
+      }
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          controller.enqueue(value);
+        }
+        controller.close();
+      } catch (err) {
+        controller.error(err);
+      }
+    },
+    async cancel(reason) {
+      await reader.cancel(reason);
+    },
+  });
+}
+
 function wrapWithTelemetry(
   response: Response,
-  meta: TelemetryMetadata
+  meta: TelemetryMetadata,
+  initialEvents?: string[]
 ): Response {
   if (!response.body) return response;
-  const { stream } = createTelemetryStream(response.body, meta);
+  const prependedStream =
+    initialEvents && initialEvents.length > 0
+      ? prependSseEvents(initialEvents, response.body)
+      : response.body;
+  if (!prependedStream) return response;
+  const { stream } = createTelemetryStream(prependedStream, meta);
   return new Response(stream, {
     headers: {
       ...Object.fromEntries(response.headers.entries()),
@@ -119,7 +191,7 @@ export async function POST(req: NextRequest) {
       "- In this web environment, you operate purely in chat mode; you do not possess direct terminal execution, shell access, or local file reading/writing tools.\n" +
       "- When asked to provide code, commands, or file edits, provide complete explanations and instructions directly within clear markdown code blocks.";
 
-    const effectiveSystemInstruction = systemInstruction.trim() || DEFAULT_PLAYGROUND_SYSTEM_INSTRUCTION;
+    let effectiveSystemInstruction = systemInstruction.trim() || DEFAULT_PLAYGROUND_SYSTEM_INSTRUCTION;
 
     // Prepare OpenAI-format messages
     const formattedMessages: Array<{ role: string; content: unknown }> = [];
@@ -193,6 +265,131 @@ export async function POST(req: NextRequest) {
     }
 
     // ========================================================
+    // Real-Time Web Search Grounding (Const Search / Web Search: auto)
+    // ========================================================
+    const shouldSearch =
+      webSearch === "auto" ||
+      model === "const-search" ||
+      model === "Const Search";
+
+    const searchSseEvents: string[] = [];
+
+    if (shouldSearch) {
+      const lastUser = [...formattedMessages].reverse().find((m: any) => m.role === "user");
+      let queryText = "";
+      if (typeof lastUser?.content === "string") {
+        queryText = lastUser.content;
+      } else if (Array.isArray(lastUser?.content)) {
+        const textPart = lastUser.content.find(
+          (p: any) => p && typeof p === "object" && p.type === "text"
+        );
+        if (textPart && typeof textPart.text === "string") {
+          queryText = textPart.text;
+        }
+      }
+
+      if (queryText.trim()) {
+        const subQueries = extractSearchQueries(queryText);
+        const displayQuery = subQueries.join(", ");
+
+        searchSseEvents.push(`data: ${JSON.stringify({ type: "search_start", query: displayQuery })}\n\n`);
+
+        const constBaseUrl = (
+          process.env.CONST_ENGINE_BASE_URL?.trim() || "https://engine.const.web.id"
+        ).replace(/\/+$/, "");
+        const constEngineKey = process.env.CONST_ENGINE_API_KEY?.trim() || "";
+
+        try {
+          const fetchSubQuery = async (sq: string) => {
+            try {
+              const searchController = new AbortController();
+              const searchTimeout = setTimeout(() => searchController.abort(), 8000);
+              const searchHeaders: Record<string, string> = { "Content-Type": "application/json" };
+              if (constEngineKey) {
+                searchHeaders["Authorization"] = `Bearer ${constEngineKey}`;
+              } else if (providedKey && !providedKey.includes("...")) {
+                searchHeaders["Authorization"] = `Bearer ${providedKey}`;
+              }
+
+              const res = await fetch(`${constBaseUrl}/v1/search`, {
+                method: "POST",
+                headers: searchHeaders,
+                body: JSON.stringify({ query: sq }),
+                signal: searchController.signal,
+              }).finally(() => clearTimeout(searchTimeout));
+
+              if (!res.ok) return [];
+              const data = await res.json();
+              return Array.isArray(data?.results) ? data.results : [];
+            } catch (sqErr) {
+              console.warn("Sub-query search error:", sq, sqErr);
+              return [];
+            }
+          };
+
+          const resultsByQuery = await Promise.all(subQueries.map(fetchSubQuery));
+          const seenUrls = new Set<string>();
+          const searchResults: Array<{ title: string; url: string; snippet?: string }> = [];
+
+          for (const list of resultsByQuery) {
+            for (const item of list) {
+              if (item?.url && !seenUrls.has(item.url)) {
+                seenUrls.add(item.url);
+                searchResults.push({
+                  title: item.title || item.url,
+                  url: item.url,
+                  snippet: item.snippet || item.content || undefined,
+                });
+              }
+            }
+          }
+
+          searchSseEvents.push(
+            `data: ${JSON.stringify({
+              type: "search_results",
+              query: displayQuery,
+              results: searchResults.slice(0, 10),
+            })}\n\n`
+          );
+
+          if (searchResults.length > 0) {
+            const searchSnippet = searchResults.slice(0, 10).map((r, idx) =>
+              `[Source ${idx + 1}]: ${r.title}\nURL: ${r.url}\nSummary / Content: ${r.snippet || "No snippet available."}`
+            ).join("\n\n");
+
+            const groundingPrompt =
+              `[REAL-TIME LIVE WEB SEARCH RESULTS]\n` +
+              `The user's query triggered live real-time web search. The following verified information was retrieved:\n\n` +
+              `${searchSnippet}\n\n` +
+              `CRITICAL GROUNDING INSTRUCTIONS:\n` +
+              `1. You MUST ground your answer with the facts, entities, names, and recent information provided in the live search results above.\n` +
+              `2. Answer all aspects of the user's inquiry thoroughly (e.g. if the user asks about multiple individuals, products, models, or topics, answer each using the corresponding search sources).\n` +
+              `3. Mention or cite relevant source URLs or names in your response.\n` +
+              `4. Do NOT say you cannot browse the internet or that knowledge cutoff prevents you from answering, because the live web search results have already been provided to you above.`;
+
+            // Insert into formattedMessages right before the last user message
+            formattedMessages.splice(formattedMessages.length - 1, 0, {
+              role: "system",
+              content: groundingPrompt,
+            });
+
+            // Also enrich effectiveSystemInstruction for models with dedicated system instruction parameter
+            effectiveSystemInstruction += `\n\n[LIVE SEARCH GROUNDING CONTEXT]\n${searchSnippet}\n\nAnswer using the live web search results above. Do not claim you cannot browse or that knowledge cutoff prevents you from answering.`;
+          }
+        } catch (searchErr) {
+          console.warn("Non-fatal web search grounding error:", searchErr);
+          searchSseEvents.push(
+            `data: ${JSON.stringify({
+              type: "search_results",
+              query: displayQuery,
+              results: [],
+            })}\n\n`
+          );
+        }
+      }
+    }
+
+    // ========================================================
     // CASE 0: Virtual Combo Request (combo/* or auto/fast/coding)
     // ========================================================
     const isCombo =
@@ -220,7 +417,7 @@ export async function POST(req: NextRequest) {
         signal: req.signal,
       });
 
-      return wrapWithTelemetry(comboResponse, telemetryMeta);
+      return wrapWithTelemetry(comboResponse, telemetryMeta, searchSseEvents);
     }
 
     // ========================================================
@@ -264,43 +461,6 @@ export async function POST(req: NextRequest) {
       let targetModel = normalizeConstModelName(model);
       if (targetModel === "Const Search" || model === "const-search") {
         targetModel = "Gemini 3.8 Flash";
-      }
-
-      // If webSearch === "auto" or model is const-search, perform search grounding via OmniRoute
-      if (webSearch === "auto" || model === "const-search" || model === "Const Search") {
-        const lastUser = [...formattedMessages].reverse().find((m: any) => m.role === "user");
-        const queryText = typeof lastUser?.content === "string" ? lastUser.content : "";
-        if (queryText.trim()) {
-          try {
-            const searchController = new AbortController();
-            const searchTimeout = setTimeout(() => searchController.abort(), 8000);
-            const searchHeaders: Record<string, string> = { "Content-Type": "application/json" };
-            if (constEngineKey) searchHeaders["Authorization"] = `Bearer ${constEngineKey}`;
-
-            const searchRes = await fetch(`${constBaseUrl}/v1/search`, {
-              method: "POST",
-              headers: searchHeaders,
-              body: JSON.stringify({ query: queryText }),
-              signal: searchController.signal,
-            }).finally(() => clearTimeout(searchTimeout));
-
-            if (searchRes.ok) {
-              const searchData = await searchRes.json();
-              if (Array.isArray(searchData?.results) && searchData.results.length > 0) {
-                const searchSnippet = searchData.results.slice(0, 5).map((r: any, idx: number) =>
-                  `[Source ${idx + 1}]: ${r.title}\nURL: ${r.url}\nSnippet: ${r.snippet || r.content || ""}`
-                ).join("\n\n");
-
-                formattedMessages.splice(formattedMessages.length - 1, 0, {
-                  role: "system",
-                  content: `[Real-Time Web Search Grounding Context from Const Search]\n${searchSnippet}\n\nPlease ground your response with facts from these live web search results whenever relevant, and cite source titles or URLs.`,
-                });
-              }
-            }
-          } catch (searchErr) {
-            console.warn("Non-fatal web search grounding error:", searchErr);
-          }
-        }
       }
 
       const headers: Record<string, string> = {
@@ -354,7 +514,8 @@ export async function POST(req: NextRequest) {
             Connection: "keep-alive",
           },
         }),
-        telemetryMeta
+        telemetryMeta,
+        searchSseEvents
       );
     }
 
@@ -448,7 +609,11 @@ export async function POST(req: NextRequest) {
             }
 
             telemetryMeta.provider = "Google AI (BYOK)";
-            return wrapWithTelemetry(convertGoogleSseToOpenAiSse(response.body), telemetryMeta);
+            return wrapWithTelemetry(
+              convertGoogleSseToOpenAiSse(response.body),
+              telemetryMeta,
+              searchSseEvents
+            );
           }
 
           // 2. Anthropic BYOK
@@ -542,7 +707,11 @@ export async function POST(req: NextRequest) {
             }
 
             telemetryMeta.provider = "Anthropic (BYOK)";
-            return wrapWithTelemetry(convertAnthropicSseToOpenAiSse(response.body), telemetryMeta);
+            return wrapWithTelemetry(
+              convertAnthropicSseToOpenAiSse(response.body),
+              telemetryMeta,
+              searchSseEvents
+            );
           }
 
           // 3. OpenAI & OpenAI-Compatible (OpenRouter, DeepSeek, Groq, Custom)
@@ -617,7 +786,8 @@ export async function POST(req: NextRequest) {
                 Connection: "keep-alive",
               },
             }),
-            telemetryMeta
+            telemetryMeta,
+            searchSseEvents
           );
         }
       } catch (err: unknown) {
@@ -688,7 +858,11 @@ export async function POST(req: NextRequest) {
       }
 
       telemetryMeta.provider = "Google AI (Direct Key)";
-      return wrapWithTelemetry(convertGoogleSseToOpenAiSse(response.body), telemetryMeta);
+      return wrapWithTelemetry(
+        convertGoogleSseToOpenAiSse(response.body),
+        telemetryMeta,
+        searchSseEvents
+      );
     }
 
     return NextResponse.json(

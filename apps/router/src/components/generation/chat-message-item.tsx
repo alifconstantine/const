@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button, cn, toast } from "@const/ui";
-import { Copy, Check, ChevronDown, ChevronRight, Pencil, FileText, Film, Music, File } from "lucide-react";
+import { Copy, Check, ChevronDown, ChevronRight, Pencil, FileText, Film, Music, File, Globe, ExternalLink } from "lucide-react";
 import { MarkdownContent } from "./markdown-content";
 
 export interface ChatAttachment {
@@ -13,11 +13,20 @@ export interface ChatAttachment {
   dataUrl?: string;
 }
 
+export interface SearchResultItem {
+  title: string;
+  url: string;
+  snippet?: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant" | "system";
   content: string;
   thinkingContent?: string;
+  isSearching?: boolean;
+  searchQuery?: string;
+  searchResults?: SearchResultItem[];
   attachments?: ChatAttachment[];
   createdAt: number;
 }
@@ -43,10 +52,13 @@ export function ChatMessageItem({
 }: ChatMessageItemProps) {
   const [copied, setCopied] = useState(false);
   const [isThinkingOpen, setIsThinkingOpen] = useState(false);
+  const [isSourcesOpen, setIsSourcesOpen] = useState(false);
 
   const isUser = message.role === "user";
   const hasThinking = Boolean(message.thinkingContent && message.thinkingContent.trim().length > 0);
   const hasAttachments = Boolean(message.attachments && message.attachments.length > 0);
+  const hasSources = Boolean(message.searchResults && message.searchResults.length > 0);
+  const isSearching = Boolean(message.isSearching);
 
   const handleCopy = () => {
     if (!message.content) return;
@@ -149,6 +161,84 @@ export function ChatMessageItem({
   // 2. Assistant Message Layout (Matching Image 1: pure text flow, borderless, non-card Thought Process)
   return (
     <div className="w-full my-4 space-y-2.5 select-text">
+      {/* Real-time Tool Call / Web Searching Indicator */}
+      {isSearching && (
+        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-secondary/80 border border-blue-500/30 text-xs font-sans text-muted-foreground animate-pulse select-none my-1">
+          <Globe className="h-3.5 w-3.5 text-blue-500 animate-spin shrink-0" />
+          <span>Searching the web {message.searchQuery ? <>for <strong className="text-foreground font-medium">"{message.searchQuery}"</strong></> : "..."}</span>
+        </div>
+      )}
+
+      {/* Grounded Sources Accordion / Pill */}
+      {hasSources && message.searchResults && (
+        <div className="py-1 my-0.5 select-none">
+          <button
+            type="button"
+            onClick={() => setIsSourcesOpen(!isSourcesOpen)}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-secondary/60 hover:bg-secondary border border-border/70 text-xs font-sans text-muted-foreground hover:text-foreground transition-all cursor-pointer group"
+          >
+            <Globe className="h-3.5 w-3.5 text-blue-500 shrink-0" />
+            <span className="font-medium text-foreground/90">
+              Searched {message.searchResults.length} {message.searchResults.length === 1 ? "source" : "sources"}
+            </span>
+            {message.searchQuery && (
+              <span className="text-muted-foreground text-[11px] truncate max-w-[200px] hidden sm:inline">
+                • "{message.searchQuery}"
+              </span>
+            )}
+            {isSourcesOpen ? (
+              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground group-hover:text-foreground ml-0.5" />
+            ) : (
+              <ChevronRight className="h-3.5 w-3.5 text-muted-foreground group-hover:text-foreground ml-0.5" />
+            )}
+          </button>
+
+          {isSourcesOpen && (
+            <div className="mt-2.5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 animate-in fade-in zoom-in-95 duration-150">
+              {message.searchResults.map((source, sIdx) => {
+                let hostname = "";
+                try {
+                  hostname = new URL(source.url).hostname.replace(/^www\./, "");
+                } catch {
+                  hostname = source.url;
+                }
+                return (
+                  <a
+                    key={sIdx}
+                    href={source.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex flex-col p-2.5 rounded-xl bg-secondary/40 hover:bg-secondary/80 border border-border/60 hover:border-blue-500/40 transition-all text-xs group"
+                  >
+                    <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground mb-1">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={`https://www.google.com/s2/favicons?domain=${hostname}&sz=32`}
+                        alt=""
+                        className="h-3.5 w-3.5 rounded shrink-0"
+                        onError={(e) => {
+                          (e.target as HTMLElement).style.display = "none";
+                        }}
+                      />
+                      <span className="truncate max-w-[150px]">{hostname}</span>
+                      <ExternalLink className="h-2.5 w-2.5 ml-auto opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground" />
+                    </div>
+                    <span className="font-medium text-foreground group-hover:text-primary line-clamp-2 leading-snug">
+                      {source.title || source.url}
+                    </span>
+                    {source.snippet && (
+                      <span className="text-[11px] text-muted-foreground/80 line-clamp-2 mt-1 leading-normal">
+                        {source.snippet}
+                      </span>
+                    )}
+                  </a>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Thinking Process (Non-card, inline minimal layout) */}
       {isStreaming && isLast && !message.content && hasThinking && (
         <div className="flex items-center gap-2 text-xs sm:text-sm font-sans text-muted-foreground py-1 animate-pulse select-none">
