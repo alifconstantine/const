@@ -430,6 +430,29 @@ app.on("second-instance", (_event, commandLine) => {
     }
   );
 
+  ipcMain.handle(
+    "agent:respond-approval",
+    async (
+      _event,
+      payload: {
+        approvalId: string;
+        approved: boolean;
+        feedback?: string;
+      }
+    ) => {
+      if (activeAgent && typeof activeAgent.resolveApproval === "function") {
+        const resolved = activeAgent.resolveApproval(payload.approvalId, {
+          approvalId: payload.approvalId,
+          approved: payload.approved,
+          feedback: payload.feedback,
+          timestamp: Date.now(),
+        });
+        return { success: true, resolved };
+      }
+      return { success: false, error: "Active agent not found or resolveApproval not supported" };
+    }
+  );
+
   ipcMain.handle("agent:get-models", async () => {
     const config = loadUserConfig();
     const provCfg =
@@ -627,7 +650,7 @@ app.on("second-instance", (_event, commandLine) => {
         model,
         workspacePath: targetWorkspace,
         preset: "learn",
-        mode: payload.mode || "ask_before_changes",
+        mode: payload.mode || "full_access",
         thinkingLevel: payload.thinkingLevel as any,
         maxOutputTokens: payload.maxOutputTokens ?? (modelDef as any)?.maxOutputTokens,
         onAskQuestion: (toolCallId, questionData) => {

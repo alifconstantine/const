@@ -44,6 +44,11 @@ interface Window {
       }) => Promise<{ success: boolean; messages?: any[]; error?: string }>;
       abort: () => Promise<boolean>;
       answerQuestion?: (toolCallId: string, answer: any) => Promise<boolean>;
+      respondApproval?: (payload: {
+        approvalId: string;
+        approved: boolean;
+        feedback?: string;
+      }) => Promise<{ success: boolean; resolved?: boolean; error?: string }>;
       generateTitle?: (prompt: string, authToken?: string) => Promise<string | null>;
       onStreamEvent: (callback: (event: any) => void) => () => void;
     };

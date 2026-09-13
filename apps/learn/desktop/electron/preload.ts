@@ -40,6 +40,11 @@ contextBridge.exposeInMainWorld("electron", {
     abort: () => ipcRenderer.invoke("agent:abort"),
     answerQuestion: (toolCallId: string, answer: any) =>
       ipcRenderer.invoke("agent:answer-question", { toolCallId, answer }),
+    respondApproval: (payload: {
+      approvalId: string;
+      approved: boolean;
+      feedback?: string;
+    }) => ipcRenderer.invoke("agent:respond-approval", payload),
     generateTitle: (prompt: string, authToken?: string) =>
       ipcRenderer.invoke("agent:generate-title", prompt, authToken),
     onStreamEvent: (callback: (event: any) => void) => {

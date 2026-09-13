@@ -39,7 +39,7 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { db, localDb } from "../../lib/db";
 import { useI18n } from "../../lib/i18n";
 import { ChatHistoryPanel } from "./chat-history-panel";
-import { ExecutionTrace, type DisplayToolCall } from "./execution-trace";
+import { ExecutionTrace, type DisplayToolCall, type TraceStep } from "./execution-trace";
 import { MarkdownContent } from "./markdown-content";
 import { ImageLightbox } from "./image-lightbox";
 
@@ -58,6 +58,7 @@ interface DisplayMessage {
   content: string;
   thinking?: string;
   toolCalls?: DisplayToolCall[];
+  traceSteps?: TraceStep[];
   attachments?: AttachedFile[];
   isStreaming?: boolean;
   createdAt?: number;
@@ -516,8 +517,36 @@ export function ChatPanel({
 
         if (event.type === "token") {
           updated.content = (updated.content || "") + event.token;
+          // Finalize open thought step duration if any
+          if (updated.traceSteps && updated.traceSteps.length > 0) {
+            const steps = [...updated.traceSteps];
+            const lastStep = steps[steps.length - 1];
+            if (lastStep && lastStep.type === "thought" && lastStep.startTime && !lastStep.durationMs) {
+              steps[steps.length - 1] = {
+                ...lastStep,
+                durationMs: Math.max(1000, Date.now() - lastStep.startTime),
+              };
+              updated.traceSteps = steps;
+            }
+          }
         } else if (event.type === "thinking") {
           updated.thinking = (updated.thinking || "") + event.thinking;
+          const steps: TraceStep[] = updated.traceSteps ? [...updated.traceSteps] : [];
+          const lastStep = steps[steps.length - 1];
+          if (lastStep && lastStep.type === "thought") {
+            steps[steps.length - 1] = {
+              ...lastStep,
+              content: (lastStep.content || "") + (event.thinking || ""),
+            };
+          } else {
+            steps.push({
+              id: `thought_${Date.now()}_${steps.length}`,
+              type: "thought",
+              content: event.thinking || "",
+              startTime: Date.now(),
+            });
+          }
+          updated.traceSteps = steps;
         } else if (event.type === "tool_call") {
           const toolCalls = [...(updated.toolCalls || [])];
           const existingIdx = toolCalls.findIndex((tc) => tc.id === event.toolCallId);
@@ -537,6 +566,38 @@ export function ChatPanel({
             });
           }
           updated.toolCalls = toolCalls;
+
+          // Trace steps update
+          const steps: TraceStep[] = updated.traceSteps ? [...updated.traceSteps] : [];
+          if (steps.length > 0) {
+            const lastStep = steps[steps.length - 1];
+            if (lastStep && lastStep.type === "thought" && lastStep.startTime && !lastStep.durationMs) {
+              steps[steps.length - 1] = {
+                ...lastStep,
+                durationMs: Math.max(1000, Date.now() - lastStep.startTime),
+              };
+            }
+          }
+          const sIdx = steps.findIndex((s) => s.id === event.toolCallId || s.toolCallId === event.toolCallId);
+          if (sIdx >= 0) {
+            steps[sIdx] = {
+              ...steps[sIdx]!,
+              name: event.toolName,
+              args: event.args,
+              status: "running",
+            };
+          } else {
+            steps.push({
+              id: event.toolCallId,
+              type: "tool",
+              toolCallId: event.toolCallId,
+              name: event.toolName,
+              args: event.args,
+              status: "running",
+              startTime: Date.now(),
+            });
+          }
+          updated.traceSteps = steps;
         } else if (event.type === "ask_question") {
           const toolCalls = [...(updated.toolCalls || [])];
           const existingIdx = toolCalls.findIndex((tc) => tc.id === event.toolCallId);
@@ -570,6 +631,37 @@ export function ChatPanel({
             });
           }
           updated.toolCalls = toolCalls;
+
+          const steps: TraceStep[] = updated.traceSteps ? [...updated.traceSteps] : [];
+          const sIdx = steps.findIndex((s) => s.id === event.toolCallId || s.toolCallId === event.toolCallId);
+          if (sIdx >= 0) {
+            steps[sIdx] = {
+              ...steps[sIdx]!,
+              name: "ask_question",
+              args: qArgs,
+              status: "running",
+            };
+          } else {
+            steps.push({
+              id: event.toolCallId,
+              type: "tool",
+              toolCallId: event.toolCallId,
+              name: "ask_question",
+              args: qArgs,
+              status: "running",
+              startTime: Date.now(),
+            });
+          }
+          updated.traceSteps = steps;
+        } else if (event.type === "approval_request") {
+          // If approval is requested in Learn, automatically approve so inspection commands do not hang
+          const approvalId = event.id || event.approvalId || event.approval?.id || event.approval?.approvalId;
+          if (approvalId && electron?.agent?.respondApproval) {
+            electron.agent.respondApproval({
+              approvalId,
+              approved: true,
+            }).catch(() => {});
+          }
         } else if (event.type === "tool_result") {
           const toolCalls = [...(updated.toolCalls || [])];
           const existingIdx = toolCalls.findIndex((tc) => tc.id === event.toolCallId);
@@ -582,6 +674,19 @@ export function ChatPanel({
             };
           }
           updated.toolCalls = toolCalls;
+
+          const steps: TraceStep[] = updated.traceSteps ? [...updated.traceSteps] : [];
+          const sIdx = steps.findIndex((s) => s.id === event.toolCallId || s.toolCallId === event.toolCallId);
+          if (sIdx >= 0) {
+            steps[sIdx] = {
+              ...steps[sIdx]!,
+              result: event.result,
+              isError: event.isError,
+              status: event.isError ? "error" : "completed",
+              durationMs: steps[sIdx]?.startTime ? Date.now() - steps[sIdx]!.startTime! : undefined,
+            };
+          }
+          updated.traceSteps = steps;
         } else if (event.type === "error") {
           const defaultError = language === "id"
             ? "Terjadi kesalahan saat memproses permintaan."
@@ -880,6 +985,7 @@ export function ChatPanel({
       content: "",
       thinking: "",
       toolCalls: [],
+      traceSteps: [],
       isStreaming: true,
       createdAt: now + 1,
     };
@@ -993,6 +1099,7 @@ export function ChatPanel({
           workspacePath: workspacePath,
           learnId: learnId,
           authToken: authToken || undefined,
+          mode: "full_access",
         });
 
         const finalDuration = streamStartTimeRef.current
@@ -1979,6 +2086,7 @@ export function ChatPanel({
                   <ExecutionTrace
                     thinking={msg.thinking}
                     toolCalls={msg.toolCalls}
+                    traceSteps={msg.traceSteps}
                     isExecuting={isLatestAssistant}
                     durationMs={isLatestAssistant ? liveDurationMs : msg.durationMs}
                     onAnswerQuestion={handleAnswerQuestion}

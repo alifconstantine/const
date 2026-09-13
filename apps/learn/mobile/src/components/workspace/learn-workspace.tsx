@@ -12,7 +12,7 @@ import { MarkdownContent } from "./markdown-content";
 import { ChatInputCard, type AttachedMedia } from "./chat-input-card";
 import { AddSourceDialog } from "./add-source-dialog";
 import { HistoryPanel } from "./history-panel";
-import { WorkingProcess } from "./working-process";
+import { ThinkingProcess } from "./working-process";
 import { ImageLightbox } from "./image-lightbox";
 import { ScrollArea, cn } from "@const/ui";
 import { useI18n } from "../../lib/i18n";
@@ -93,6 +93,7 @@ interface DisplayMessage {
   role: "user" | "assistant";
   content: string;
   thinking?: string;
+  thinkingDurationMs?: number;
   isStreaming?: boolean;
   toolCalls?: any[];
   durationMs?: number;
@@ -571,11 +572,17 @@ export function MobileLearnWorkspace({
         },
         onToken: (chunk) => {
           setMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === assistantMsgId
-                ? { ...msg, content: (msg.content || "") + chunk }
-                : msg
-            )
+            prev.map((msg) => {
+              if (msg.id !== assistantMsgId) return msg;
+              const hasThinking = Boolean(msg.thinking && msg.thinking.trim().length > 0);
+              const thinkingDur =
+                msg.thinkingDurationMs ?? (hasThinking ? Math.max(1000, Date.now() - now) : undefined);
+              return {
+                ...msg,
+                content: (msg.content || "") + chunk,
+                thinkingDurationMs: thinkingDur,
+              };
+            })
           );
         },
         onDone: async (finalContent, finalThinking) => {
@@ -588,6 +595,11 @@ export function MobileLearnWorkspace({
                     ...msg,
                     content: resolvedContent,
                     thinking: finalThinking,
+                    thinkingDurationMs:
+                      msg.thinkingDurationMs ??
+                      (finalThinking && finalThinking.trim().length > 0
+                        ? Math.max(1000, Date.now() - now)
+                        : undefined),
                     durationMs: finalDuration,
                     isStreaming: false,
                   }
@@ -934,12 +946,14 @@ export function MobileLearnWorkspace({
                   </div>
                 ) : (
                   <div className="w-full flex flex-col gap-2 group select-text">
-                    {/* Working Process (Thinking, Live Timer, Tool Calls) */}
-                    <WorkingProcess
+                    {/* Thinking Process (Minimalist, auto-collapses once content begins) */}
+                    <ThinkingProcess
                       thinking={msg.thinking}
-                      toolCalls={msg.toolCalls}
-                      isExecuting={Boolean(msg.isStreaming)}
-                      durationMs={msg.isStreaming ? liveDurationMs : msg.durationMs}
+                      isExecuting={Boolean(msg.isStreaming && !msg.content)}
+                      durationMs={
+                        msg.thinkingDurationMs ||
+                        (msg.isStreaming && !msg.content ? liveDurationMs : undefined)
+                      }
                     />
 
                     {/* Assistant Output Message (Pure clean MarkdownContent, NO card wrapper, matching apps/harness/desktop!) */}
