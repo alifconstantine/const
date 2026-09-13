@@ -28,14 +28,15 @@ interface ModelResponseItem {
   owned_by: string;
   provider?: string;
   provider_name?: string;
-  context_length?: number;
-  max_input_tokens?: number;
-  max_output_tokens?: number;
+  context_length?: number | null;
+  max_input_tokens?: number | null;
+  max_output_tokens?: number | null;
   supports_thinking?: boolean;
   supports_reasoning?: boolean;
   supportsThinking?: boolean;
   supportsReasoningEffort?: boolean;
   capabilities?: Record<string, boolean>;
+  modes?: string[];
   thinking_levels?: string[];
   reasoning_effort?: string[];
   default_thinking_level?: string;
@@ -116,9 +117,9 @@ export async function GET(req: NextRequest) {
       owned_by: "const",
       provider: "const",
       provider_name: "Const",
-      context_length: 1000000,
-      max_input_tokens: 1000000,
-      max_output_tokens: 32000,
+      context_length: null,
+      max_input_tokens: null,
+      max_output_tokens: null,
       supports_thinking: false,
       supports_reasoning: false,
       supportsThinking: false,
@@ -126,7 +127,10 @@ export async function GET(req: NextRequest) {
       capabilities: {
         search: true,
         web_search: true,
+        research: true,
+        deep_research: true,
       },
+      modes: ["research", "deep-research"],
       input_modalities: ["text", "search"],
       output_modalities: ["text"],
     },

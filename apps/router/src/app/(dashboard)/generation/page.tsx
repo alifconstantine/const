@@ -248,7 +248,7 @@ export default function GenerationPage() {
   const [systemInstruction, setSystemInstruction] = useState("");
   const [temperature, setTemperature] = useState<number>(1.0);
   const [thinkingLevel, setThinkingLevel] = useState<"low" | "medium" | "high">("medium");
-  const [webSearch, setWebSearch] = useState<"off" | "auto">("off");
+  const [webSearch, setWebSearch] = useState<"off" | "auto" | "research" | "deep-research">("off");
 
   // API Key Selection & Custom Paste (defaults to logged in session)
   const [selectedKeyId, setSelectedKeyId] = useState<string>("account-session");
@@ -403,7 +403,10 @@ export default function GenerationPage() {
       createdAt: Date.now(),
     };
 
-    const isSearchActive = webSearch === "auto" || selectedModel.modelId === "const-search";
+    const isSearchActive =
+      webSearch !== "off" || selectedModel.modelId === "const-search";
+    const activeSearchMode: "research" | "deep-research" =
+      webSearch === "deep-research" ? "deep-research" : "research";
 
     const assistantPlaceholderId = crypto.randomUUID();
     const assistantMessage: ChatMessage = {
@@ -413,6 +416,7 @@ export default function GenerationPage() {
       thinkingContent: "",
       isSearching: isSearchActive,
       searchQuery: isSearchActive ? trimmedPrompt : undefined,
+      searchMode: isSearchActive ? activeSearchMode : undefined,
       createdAt: Date.now(),
     };
 
@@ -487,6 +491,7 @@ export default function GenerationPage() {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
+      let activeSearchQueries: string[] = [];
 
       while (true) {
         const { done, value } = await reader.read();
@@ -511,6 +516,12 @@ export default function GenerationPage() {
               if (parsed.query) {
                 activeSearchQuery = parsed.query;
               }
+              if (Array.isArray(parsed.queries)) {
+                activeSearchQueries = parsed.queries;
+              } else if (parsed.query) {
+                activeSearchQueries = [parsed.query];
+              }
+              const mode = parsed.mode || activeSearchMode;
               setMessages((prev) =>
                 prev.map((msg) =>
                   msg.id === assistantPlaceholderId
@@ -518,6 +529,8 @@ export default function GenerationPage() {
                         ...msg,
                         isSearching: true,
                         searchQuery: activeSearchQuery,
+                        searchQueries: activeSearchQueries,
+                        searchMode: mode,
                       }
                     : msg
                 )
@@ -529,9 +542,13 @@ export default function GenerationPage() {
               if (parsed.query) {
                 activeSearchQuery = parsed.query;
               }
+              if (Array.isArray(parsed.queries)) {
+                activeSearchQueries = parsed.queries;
+              }
               if (Array.isArray(parsed.results)) {
                 activeSearchResults = parsed.results;
               }
+              const mode = parsed.mode || activeSearchMode;
               setMessages((prev) =>
                 prev.map((msg) =>
                   msg.id === assistantPlaceholderId
@@ -539,7 +556,9 @@ export default function GenerationPage() {
                         ...msg,
                         isSearching: false,
                         searchQuery: activeSearchQuery,
+                        searchQueries: activeSearchQueries,
                         searchResults: activeSearchResults,
+                        searchMode: mode,
                       }
                     : msg
                 )
@@ -1163,7 +1182,7 @@ export default function GenerationPage() {
               </div>
             )}
 
-            {/* 6. Web Search: Off | Auto */}
+            {/* 6. Web Search: Off | Research | DeepResearch */}
             <div className="space-y-2.5 pt-3">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
@@ -1171,21 +1190,25 @@ export default function GenerationPage() {
                   <span className="text-xs font-medium text-foreground">Web search</span>
                 </div>
                 <Badge
-                  variant={webSearch === "auto" ? "default" : "secondary"}
+                  variant={webSearch !== "off" ? "default" : "secondary"}
                   className={cn(
                     "text-xs px-2 py-0.5 font-sans font-medium",
-                    webSearch === "auto"
+                    webSearch !== "off"
                       ? "bg-primary text-primary-foreground"
                       : "text-muted-foreground"
                   )}
                 >
-                  {webSearch === "auto" ? "Auto" : "Off"}
+                  {webSearch === "deep-research"
+                    ? "DeepResearch"
+                    : webSearch !== "off"
+                      ? "Research"
+                      : "Off"}
                 </Badge>
               </div>
 
               <Select
                 value={webSearch}
-                onValueChange={(val: "off" | "auto") => setWebSearch(val)}
+                onValueChange={(val: "off" | "auto" | "research" | "deep-research") => setWebSearch(val)}
               >
                 <SelectTrigger className="w-full h-9 rounded-full text-xs font-sans border-border/70 bg-secondary/50 text-foreground">
                   <SelectValue placeholder="Web Search" />
@@ -1194,13 +1217,16 @@ export default function GenerationPage() {
                   <SelectItem value="off" className="cursor-pointer text-foreground">
                     Off (Standard inference)
                   </SelectItem>
-                  <SelectItem value="auto" className="cursor-pointer text-foreground">
-                    Auto (Ground with Const Search)
+                  <SelectItem value="research" className="cursor-pointer text-foreground">
+                    Research (Fast live search)
+                  </SelectItem>
+                  <SelectItem value="deep-research" className="cursor-pointer text-foreground">
+                    DeepResearch (In-depth multi-source)
                   </SelectItem>
                 </SelectContent>
               </Select>
               <p className="text-xs text-muted-foreground font-normal leading-relaxed">
-                Automatically grounds answers with live web results via Const Search.
+                Grounds answers with live web research or deep multi-source synthesis via Const Search.
               </p>
             </div>
           </div>
@@ -1215,7 +1241,7 @@ export default function GenerationPage() {
         onSelectModel={(model) => {
           setSelectedModel(model);
           if (model.modelId === "const-search") {
-            setWebSearch("auto");
+            setWebSearch("research");
           }
         }}
         customModels={customModels}

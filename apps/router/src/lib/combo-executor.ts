@@ -283,7 +283,8 @@ export async function executeComboChat(
         const constBaseUrl = (
           process.env.CONST_ENGINE_BASE_URL?.trim() || "https://engine.const.web.id"
         ).replace(/\/+$/, "");
-        const constEngineKey = process.env.CONST_ENGINE_API_KEY?.trim() || "";
+        const constEngineKey =
+          process.env.CONST_ENGINE_API_KEY?.trim() || "sk-f5ee326335f0dff1-c30518-93814e47";
 
         const targetModel = normalizeConstModelName(target.modelId);
 

@@ -43,18 +43,11 @@ export async function POST(req: NextRequest) {
     // CASE A: Const (Built-in Managed)
     // ========================================================
     if (providerId === "const" || isBuiltinModel(model) || (!providerDocId && !baseUrl && !apiKey && !providerId)) {
-      const constBaseUrl = process.env.CONST_ENGINE_BASE_URL?.trim();
-      if (!constBaseUrl) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: "CONST_ENGINE_BASE_URL is not configured in environment.",
-          },
-          { status: 500 }
-        );
-      }
-
-      const constApiKey = process.env.CONST_ENGINE_API_KEY?.trim() || "";
+      const constBaseUrl = (
+        process.env.CONST_ENGINE_BASE_URL?.trim() || "https://engine.const.web.id"
+      ).replace(/\/+$/, "");
+      const constApiKey =
+        process.env.CONST_ENGINE_API_KEY?.trim() || "sk-f5ee326335f0dff1-c30518-93814e47";
       const mappedModel = normalizeConstModelName(model);
 
       const headers: Record<string, string> = {
@@ -71,6 +64,8 @@ export async function POST(req: NextRequest) {
           headers,
           body: JSON.stringify({
             query: "ping test",
+            num_results: 3,
+            max_results: 3,
           }),
           signal: controller.signal,
         }).finally(() => clearTimeout(timeoutId));
@@ -90,10 +85,11 @@ export async function POST(req: NextRequest) {
         }
 
         const count = Array.isArray(data?.results) ? data.results.length : 0;
+        const providerName = "const-search";
         return NextResponse.json({
           success: true,
           latency,
-          reply: `Search engine connected successfully (${count} results)`,
+          reply: `Search engine connected successfully (${providerName}: ${count} results)`,
           model: "const-search",
         });
       }

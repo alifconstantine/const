@@ -58,11 +58,10 @@ export const BUILTIN_MODELS: ModelSpec[] = [
     provider: "const",
     providerName: "Const",
     supportsThinking: false,
-    contextWindow: "1000000",
-    maxOutputTokens: "32000",
+    contextWindow: "-",
+    maxOutputTokens: "-",
     inputTypes: ["text", "search"],
     outputTypes: ["text"],
-    description: "Real-time intelligent web search engine powered by OmniRoute & Tavily",
   },
 ];
 
@@ -220,6 +219,7 @@ export function formatTokenDisplay(tokens?: number | string | null, fallback: st
   if (!tokens) return fallback;
   if (typeof tokens === "string") {
     const trimmed = tokens.trim();
+    if (trimmed === "-") return "-";
     if (/^\d+[KMGTkmgt]?$/.test(trimmed)) return trimmed.toUpperCase();
     const parsed = parseInt(trimmed.replace(/,/g, ""), 10);
     if (!isNaN(parsed) && parsed > 0) tokens = parsed;

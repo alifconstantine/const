@@ -26,6 +26,8 @@ export interface ChatMessage {
   thinkingContent?: string;
   isSearching?: boolean;
   searchQuery?: string;
+  searchQueries?: string[];
+  searchMode?: "research" | "deep-research";
   searchResults?: SearchResultItem[];
   attachments?: ChatAttachment[];
   createdAt: number;
@@ -165,7 +167,20 @@ export function ChatMessageItem({
       {isSearching && (
         <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-secondary/80 border border-blue-500/30 text-xs font-sans text-muted-foreground animate-pulse select-none my-1">
           <Globe className="h-3.5 w-3.5 text-blue-500 animate-spin shrink-0" />
-          <span>Searching the web {message.searchQuery ? <>for <strong className="text-foreground font-medium">"{message.searchQuery}"</strong></> : "..."}</span>
+          <span>
+            {message.searchMode === "deep-research" ? "DeepResearch in progress" : "Searching the web"}{" "}
+            {message.searchQueries && message.searchQueries.length > 1 ? (
+              <>
+                ({message.searchQueries.length} parallel queries)
+              </>
+            ) : message.searchQuery ? (
+              <>
+                for <strong className="text-foreground font-medium">&quot;{message.searchQuery}&quot;</strong>
+              </>
+            ) : (
+              "..."
+            )}
+          </span>
         </div>
       )}
 
@@ -179,13 +194,19 @@ export function ChatMessageItem({
           >
             <Globe className="h-3.5 w-3.5 text-blue-500 shrink-0" />
             <span className="font-medium text-foreground/90">
-              Searched {message.searchResults.length} {message.searchResults.length === 1 ? "source" : "sources"}
+              {message.searchMode === "deep-research" ? "DeepResearch" : "Searched"}{" "}
+              {message.searchResults.length}{" "}
+              {message.searchResults.length === 1 ? "source" : "sources"}
             </span>
-            {message.searchQuery && (
-              <span className="text-muted-foreground text-[11px] truncate max-w-[200px] hidden sm:inline">
-                • "{message.searchQuery}"
+            {message.searchQueries && message.searchQueries.length > 1 ? (
+              <span className="text-muted-foreground text-[11px] truncate max-w-[240px] hidden sm:inline">
+                • {message.searchQueries.length} queries
               </span>
-            )}
+            ) : message.searchQuery ? (
+              <span className="text-muted-foreground text-[11px] truncate max-w-[200px] hidden sm:inline">
+                • &quot;{message.searchQuery}&quot;
+              </span>
+            ) : null}
             {isSourcesOpen ? (
               <ChevronDown className="h-3.5 w-3.5 text-muted-foreground group-hover:text-foreground ml-0.5" />
             ) : (
@@ -194,7 +215,24 @@ export function ChatMessageItem({
           </button>
 
           {isSourcesOpen && (
-            <div className="mt-2.5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 animate-in fade-in zoom-in-95 duration-150">
+            <div className="mt-2.5 space-y-2 animate-in fade-in zoom-in-95 duration-150">
+              {/* Multi-Tool Call Sub-Queries Chips */}
+              {message.searchQueries && message.searchQueries.length > 1 && (
+                <div className="flex flex-wrap items-center gap-1.5 pb-1">
+                  <span className="text-[11px] text-muted-foreground mr-1">Parallel queries:</span>
+                  {message.searchQueries.map((q, qIdx) => (
+                    <span
+                      key={qIdx}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-secondary border border-border/80 text-[11px] font-sans text-foreground/90"
+                    >
+                      <Globe className="h-2.5 w-2.5 text-blue-500 shrink-0" />
+                      &quot;{q}&quot;
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
               {message.searchResults.map((source, sIdx) => {
                 let hostname = "";
                 try {
@@ -234,6 +272,7 @@ export function ChatMessageItem({
                   </a>
                 );
               })}
+              </div>
             </div>
           )}
         </div>

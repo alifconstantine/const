@@ -15,6 +15,7 @@ import {
   convertGoogleSseToOpenAiSse,
   convertAnthropicSseToOpenAiSse,
 } from "@/lib/sse-converters";
+import { decomposeSearchQueries } from "@/lib/search-decomposer";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -38,45 +39,14 @@ interface ChatRequestBody {
   systemInstruction?: string;
   temperature?: number;
   thinkingLevel?: "low" | "medium" | "high";
-  webSearch?: "off" | "auto";
+  webSearch?: "off" | "auto" | "research" | "deep-research";
   apiKey?: string;
   providerId?: string;
   providerDocId?: string;
 }
 
-function extractSearchQueries(rawPrompt: string): string[] {
-  const text = rawPrompt.trim();
-  if (!text) return [];
-
-  const majorSplitPattern =
-    /(?:\?+|\n+|;\s*|,\s*(?:dan|and|serta)\s+(?:temukan|carikan|cari|siapa|apa|bagaimana|find|who|what|tell)|\s+(?:dan|and|serta)\s+(?:temukan|carikan|cari|siapa|apa|bagaimana|find|who|what|tell))/i;
-
-  let clauses = text.split(majorSplitPattern).map((c) => c.trim()).filter(Boolean);
-
-  if (clauses.length === 1 && /,\s*(?:dan|and|serta)\s+/i.test(text)) {
-    clauses = text.split(/,\s*(?:dan|and|serta)\s+/i).map((c) => c.trim()).filter(Boolean);
-  }
-
-  const cleanClause = (clause: string): string => {
-    return clause
-      .replace(
-        /^(temukan|carikan|cari|siapa|siapakah|apa|apakah|bagaimana|jelaskan|tolong cari|search for|find|who is|what is|tell me about|explain)\s+(itu\s+|tentang\s+|mengenai\s+|siapa\s+|apa\s+)?/i,
-        ""
-      )
-      .replace(/[?!.]+$/, "")
-      .trim();
-  };
-
-  const queries = clauses
-    .map(cleanClause)
-    .filter((q) => q.length >= 3);
-
-  if (queries.length > 1 && queries.length <= 3) {
-    return Array.from(new Set(queries));
-  }
-
-  const singleCleaned = cleanClause(text);
-  return [singleCleaned || text];
+function extractSearchQueries(rawPrompt: string, isDeepResearch = false): string[] {
+  return decomposeSearchQueries(rawPrompt, isDeepResearch);
 }
 
 function prependSseEvents(
@@ -265,13 +235,20 @@ export async function POST(req: NextRequest) {
     }
 
     // ========================================================
-    // Real-Time Web Search Grounding (Const Search / Web Search: auto)
+    // Real-Time Web Search Grounding (Const Search / Research / DeepResearch)
     // ========================================================
+    const isDeepResearch =
+      webSearch === "deep-research" ||
+      (typeof webSearch === "string" && webSearch.includes("deep"));
+
     const shouldSearch =
       webSearch === "auto" ||
+      webSearch === "research" ||
+      webSearch === "deep-research" ||
       model === "const-search" ||
       model === "Const Search";
 
+    const searchMode = isDeepResearch ? "deep-research" : "research";
     const searchSseEvents: string[] = [];
 
     if (shouldSearch) {
@@ -289,21 +266,29 @@ export async function POST(req: NextRequest) {
       }
 
       if (queryText.trim()) {
-        const subQueries = extractSearchQueries(queryText);
+        const subQueries = extractSearchQueries(queryText, isDeepResearch);
         const displayQuery = subQueries.join(", ");
 
-        searchSseEvents.push(`data: ${JSON.stringify({ type: "search_start", query: displayQuery })}\n\n`);
+        searchSseEvents.push(
+          `data: ${JSON.stringify({
+            type: "search_start",
+            query: displayQuery,
+            queries: subQueries,
+            mode: searchMode,
+          })}\n\n`
+        );
 
         const constBaseUrl = (
           process.env.CONST_ENGINE_BASE_URL?.trim() || "https://engine.const.web.id"
         ).replace(/\/+$/, "");
-        const constEngineKey = process.env.CONST_ENGINE_API_KEY?.trim() || "";
+        const constEngineKey =
+          process.env.CONST_ENGINE_API_KEY?.trim() || "sk-f5ee326335f0dff1-c30518-93814e47";
 
         try {
           const fetchSubQuery = async (sq: string) => {
             try {
               const searchController = new AbortController();
-              const searchTimeout = setTimeout(() => searchController.abort(), 8000);
+              const searchTimeout = setTimeout(() => searchController.abort(), 12000);
               const searchHeaders: Record<string, string> = { "Content-Type": "application/json" };
               if (constEngineKey) {
                 searchHeaders["Authorization"] = `Bearer ${constEngineKey}`;
@@ -311,10 +296,17 @@ export async function POST(req: NextRequest) {
                 searchHeaders["Authorization"] = `Bearer ${providedKey}`;
               }
 
+              const numResults = isDeepResearch ? 8 : 5;
               const res = await fetch(`${constBaseUrl}/v1/search`, {
                 method: "POST",
                 headers: searchHeaders,
-                body: JSON.stringify({ query: sq }),
+                body: JSON.stringify({
+                  query: sq,
+                  num_results: numResults,
+                  max_results: numResults,
+                  search_depth: isDeepResearch ? "deep" : "basic",
+                  mode: searchMode,
+                }),
                 signal: searchController.signal,
               }).finally(() => clearTimeout(searchTimeout));
 
@@ -335,10 +327,23 @@ export async function POST(req: NextRequest) {
             for (const item of list) {
               if (item?.url && !seenUrls.has(item.url)) {
                 seenUrls.add(item.url);
+                const rawSnippet =
+                  typeof item.snippet === "string" && item.snippet.trim()
+                    ? item.snippet.trim()
+                    : typeof item.content === "string"
+                      ? item.content.trim()
+                      : item.content?.text?.trim() || undefined;
+
+                const cleanSnippet = rawSnippet
+                  ? rawSnippet.replace(/(?:\s*\n\.\.\.\n\s*)+/g, " ... ").replace(/\s{2,}/g, " ")
+                  : undefined;
+
+                const cleanTitle = item.title?.trim() || item.display_url || item.url;
+
                 searchResults.push({
-                  title: item.title || item.url,
+                  title: cleanTitle,
                   url: item.url,
-                  snippet: item.snippet || item.content || undefined,
+                  snippet: cleanSnippet,
                 });
               }
             }
@@ -348,22 +353,24 @@ export async function POST(req: NextRequest) {
             `data: ${JSON.stringify({
               type: "search_results",
               query: displayQuery,
-              results: searchResults.slice(0, 10),
+              queries: subQueries,
+              mode: searchMode,
+              results: searchResults.slice(0, isDeepResearch ? 15 : 10),
             })}\n\n`
           );
 
           if (searchResults.length > 0) {
-            const searchSnippet = searchResults.slice(0, 10).map((r, idx) =>
+            const searchSnippet = searchResults.slice(0, isDeepResearch ? 15 : 10).map((r, idx) =>
               `[Source ${idx + 1}]: ${r.title}\nURL: ${r.url}\nSummary / Content: ${r.snippet || "No snippet available."}`
             ).join("\n\n");
 
             const groundingPrompt =
-              `[REAL-TIME LIVE WEB SEARCH RESULTS]\n` +
-              `The user's query triggered live real-time web search. The following verified information was retrieved:\n\n` +
+              `[REAL-TIME LIVE WEB SEARCH RESULTS via Const Search (${isDeepResearch ? "DeepResearch" : "Research"})]\n` +
+              `The user's query triggered live real-time web search via Const Search. The following verified information was retrieved:\n\n` +
               `${searchSnippet}\n\n` +
               `CRITICAL GROUNDING INSTRUCTIONS:\n` +
-              `1. You MUST ground your answer with the facts, entities, names, and recent information provided in the live search results above.\n` +
-              `2. Answer all aspects of the user's inquiry thoroughly (e.g. if the user asks about multiple individuals, products, models, or topics, answer each using the corresponding search sources).\n` +
+              `1. You MUST ground your answer with the facts, entities, model names, and recent information provided in the live search results above.\n` +
+              `2. Answer all aspects of the user's inquiry thoroughly (e.g. if the user asks about multiple models, providers, or topics like Claude, OpenAI, DeepSeek, and Gemini, answer each completely using the live search sources).\n` +
               `3. Mention or cite relevant source URLs or names in your response.\n` +
               `4. Do NOT say you cannot browse the internet or that knowledge cutoff prevents you from answering, because the live web search results have already been provided to you above.`;
 
@@ -374,7 +381,7 @@ export async function POST(req: NextRequest) {
             });
 
             // Also enrich effectiveSystemInstruction for models with dedicated system instruction parameter
-            effectiveSystemInstruction += `\n\n[LIVE SEARCH GROUNDING CONTEXT]\n${searchSnippet}\n\nAnswer using the live web search results above. Do not claim you cannot browse or that knowledge cutoff prevents you from answering.`;
+            effectiveSystemInstruction += `\n\n[LIVE SEARCH GROUNDING CONTEXT via Const Search]\n${searchSnippet}\n\nAnswer using the live web search results above. Do not claim you cannot browse or that knowledge cutoff prevents you from answering.`;
           }
         } catch (searchErr) {
           console.warn("Non-fatal web search grounding error:", searchErr);
@@ -456,7 +463,8 @@ export async function POST(req: NextRequest) {
       }
 
       const constBaseUrl = (process.env.CONST_ENGINE_BASE_URL?.trim() || "https://engine.const.web.id").replace(/\/+$/, "");
-      const constEngineKey = process.env.CONST_ENGINE_API_KEY?.trim() || "";
+      const constEngineKey =
+        process.env.CONST_ENGINE_API_KEY?.trim() || "sk-f5ee326335f0dff1-c30518-93814e47";
 
       let targetModel = normalizeConstModelName(model);
       if (targetModel === "Const Search" || model === "const-search") {

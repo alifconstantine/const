@@ -11,6 +11,7 @@ import {
 } from "@/lib/telemetry";
 import { executeComboChat } from "@/lib/combo-executor";
 import { isBuiltinModel, normalizeConstModelName } from "@/lib/model-specs";
+import { decomposeSearchQueries } from "@/lib/search-decomposer";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,8 +36,8 @@ interface OpenAIChatRequestBody {
   max_completion_tokens?: number;
   tools?: any[];
   tool_choice?: any;
-  web_search?: "off" | "auto" | boolean;
-  webSearch?: "off" | "auto" | boolean;
+  web_search?: "off" | "auto" | "research" | "deep-research" | boolean | string;
+  webSearch?: "off" | "auto" | "research" | "deep-research" | boolean | string;
 }
 
 const CORS_HEADERS = {
@@ -257,6 +258,7 @@ export async function POST(req: NextRequest) {
       tools,
       tool_choice,
       webSearch: body.web_search ?? body.webSearch,
+      searchModeHeader: req.headers.get("x-const-search-mode"),
       providedKey,
       ssoToken,
       convexUrl,
@@ -283,6 +285,7 @@ async function dispatchSingleModel({
   tools,
   tool_choice,
   webSearch,
+  searchModeHeader,
   providedKey,
   ssoToken,
   convexUrl,
@@ -301,7 +304,8 @@ async function dispatchSingleModel({
   max_completion_tokens?: number;
   tools?: any[];
   tool_choice?: any;
-  webSearch?: "off" | "auto" | boolean;
+  webSearch?: "off" | "auto" | "research" | "deep-research" | boolean | string;
+  searchModeHeader?: string | null;
   providedKey?: string;
   ssoToken?: string | null;
   convexUrl: string;
@@ -347,7 +351,8 @@ async function dispatchSingleModel({
     const constBaseUrl = (
       process.env.CONST_ENGINE_BASE_URL?.trim() || "https://engine.const.web.id"
     ).replace(/\/+$/, "");
-    const constEngineKey = process.env.CONST_ENGINE_API_KEY?.trim() || "";
+    const constEngineKey =
+      process.env.CONST_ENGINE_API_KEY?.trim() || "sk-f5ee326335f0dff1-c30518-93814e47";
 
     let resolvedModel = normalizeConstModelName(targetModel);
     if (resolvedModel === "Const Search" || targetModel === "const-search") {
@@ -355,9 +360,17 @@ async function dispatchSingleModel({
     }
 
     let searchAugmentedMessages = messages;
+
+    const isDeepResearch =
+      webSearch === "deep-research" ||
+      (typeof webSearch === "string" && webSearch.includes("deep")) ||
+      searchModeHeader === "deep-research";
+
     const isSearchRequested =
       webSearch === "auto" ||
       webSearch === true ||
+      webSearch === "research" ||
+      webSearch === "deep-research" ||
       targetModel === "const-search" ||
       targetModel === "Const Search";
 
@@ -366,34 +379,75 @@ async function dispatchSingleModel({
       const queryText = typeof lastUser?.content === "string" ? lastUser.content : "";
       if (queryText.trim()) {
         try {
-          const searchController = new AbortController();
-          const searchTimeout = setTimeout(() => searchController.abort(), 8000);
+          const subQueries = decomposeSearchQueries(queryText, isDeepResearch);
           const searchHeaders: Record<string, string> = { "Content-Type": "application/json" };
           if (constEngineKey) searchHeaders["Authorization"] = `Bearer ${constEngineKey}`;
 
-          const searchRes = await fetch(`${constBaseUrl}/v1/search`, {
-            method: "POST",
-            headers: searchHeaders,
-            body: JSON.stringify({ query: queryText }),
-            signal: searchController.signal,
-          }).finally(() => clearTimeout(searchTimeout));
+          const fetchSubQuery = async (sq: string) => {
+            try {
+              const searchController = new AbortController();
+              const searchTimeout = setTimeout(() => searchController.abort(), 12000);
+              const numResults = isDeepResearch ? 8 : 5;
+              const searchRes = await fetch(`${constBaseUrl}/v1/search`, {
+                method: "POST",
+                headers: searchHeaders,
+                body: JSON.stringify({
+                  query: sq,
+                  num_results: numResults,
+                  max_results: numResults,
+                  search_depth: isDeepResearch ? "deep" : "basic",
+                  mode: isDeepResearch ? "deep-research" : "research",
+                }),
+                signal: searchController.signal,
+              }).finally(() => clearTimeout(searchTimeout));
 
-          if (searchRes.ok) {
-            const searchData = await searchRes.json();
-            if (Array.isArray(searchData?.results) && searchData.results.length > 0) {
-              const searchSnippet = searchData.results.slice(0, 5).map((r: any, idx: number) =>
-                `[Source ${idx + 1}]: ${r.title}\nURL: ${r.url}\nSnippet: ${r.snippet || r.content || ""}`
-              ).join("\n\n");
-
-              searchAugmentedMessages = [
-                ...messages.slice(0, -1),
-                {
-                  role: "system",
-                  content: `[Real-Time Web Search Grounding Context from Const Search]\n${searchSnippet}\n\nPlease ground your response with facts from these live web search results whenever relevant, and cite source titles or URLs.`,
-                },
-                messages[messages.length - 1]!,
-              ];
+              if (!searchRes.ok) return [];
+              const searchData = await searchRes.json();
+              return Array.isArray(searchData?.results) ? searchData.results : [];
+            } catch (sqErr) {
+              console.warn("Sub-query search error in v1/chat:", sq, sqErr);
+              return [];
             }
+          };
+
+          const resultsByQuery = await Promise.all(subQueries.map(fetchSubQuery));
+          const seenUrls = new Set<string>();
+          const searchResults: Array<{ title: string; url: string; snippet?: string }> = [];
+
+          for (const list of resultsByQuery) {
+            for (const r of list) {
+              if (r?.url && !seenUrls.has(r.url)) {
+                seenUrls.add(r.url);
+                const textSnippet =
+                  typeof r.snippet === "string" && r.snippet.trim()
+                    ? r.snippet.trim()
+                    : typeof r.content === "string"
+                      ? r.content.trim()
+                      : r.content?.text?.trim() || "";
+                const title = r.title?.trim() || r.display_url || r.url;
+                searchResults.push({
+                  title,
+                  url: r.url,
+                  snippet: textSnippet,
+                });
+              }
+            }
+          }
+
+          if (searchResults.length > 0) {
+            const maxSources = isDeepResearch ? 15 : 10;
+            const searchSnippet = searchResults.slice(0, maxSources).map((r, idx) => {
+              return `[Source ${idx + 1}]: ${r.title}\nURL: ${r.url}\nSnippet: ${r.snippet?.slice(0, 1500) || "No snippet available."}`;
+            }).join("\n\n");
+
+            searchAugmentedMessages = [
+              ...messages.slice(0, -1),
+              {
+                role: "system",
+                content: `[Real-Time Web Search Grounding Context from Const Search (${isDeepResearch ? "DeepResearch" : "Research"})]\n${searchSnippet}\n\nPlease ground your response with facts from these live web search results whenever relevant, and cite source titles or URLs.`,
+              },
+              messages[messages.length - 1]!,
+            ];
           }
         } catch (searchErr) {
           console.warn("Non-fatal web search grounding error in v1/chat:", searchErr);
