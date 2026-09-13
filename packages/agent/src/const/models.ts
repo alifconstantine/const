@@ -2,13 +2,13 @@ import type { ModelConfig } from "./types.js";
 
 export const DEFAULT_MODELS: ModelConfig[] = [
   {
-    id: "gemini-3.6-flash",
-    displayName: "Gemini 3.6 Flash",
+    id: "gemini-3.8-flash",
+    displayName: "Gemini 3.8 Flash",
     provider: "const",
     baseUrl: "https://router.const.web.id/v1",
     supportsThinking: true,
     supportsTools: true,
-    thinkingLevels: ["low", "medium", "high"],
+    thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
     defaultThinkingLevel: "medium",
     maxOutputTokens: 128000,
     contextWindow: 1048576,
@@ -26,13 +26,13 @@ export const DEFAULT_MODELS: ModelConfig[] = [
     contextWindow: 1048576,
   },
   {
-    id: "gemini-3.8-flash",
-    displayName: "Gemini 3.8 Flash",
+    id: "gemini-3.6-flash",
+    displayName: "Gemini 3.6 Flash",
     provider: "const",
     baseUrl: "https://router.const.web.id/v1",
     supportsThinking: true,
     supportsTools: true,
-    thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
+    thinkingLevels: ["low", "medium", "high"],
     defaultThinkingLevel: "medium",
     maxOutputTokens: 128000,
     contextWindow: 1048576,
@@ -73,5 +73,5 @@ export const DEFAULT_MODELS: ModelConfig[] = [
   },
 ];
 
-export const DEFAULT_MODEL_ID = "gemini-3.6-flash";
-export const DEFAULT_MODEL_DISPLAY_NAME = "Gemini 3.6 Flash";
+export const DEFAULT_MODEL_ID = "gemini-3.8-flash";
+export const DEFAULT_MODEL_DISPLAY_NAME = "Gemini 3.8 Flash";

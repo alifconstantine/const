@@ -11,12 +11,16 @@ import {
 import { ScrollArea, cn } from "@const/ui";
 import { useI18n } from "../../lib/i18n";
 
+export const MAX_ATTACHMENTS = 5;
+
 export interface AttachedMedia {
   id: string;
   name: string;
   size: number;
   type: "image" | "video" | "document" | "other";
   url?: string;
+  base64?: string;
+  imageIndex?: number;
   file?: File;
 }
 
@@ -31,6 +35,12 @@ interface ChatInputCardProps {
   onOpenSources?: () => void;
   attachments?: AttachedMedia[];
   onAttachmentsChange?: (attachments: AttachedMedia[]) => void;
+  onPreviewMedia?: (media: {
+    src: string;
+    alt: string;
+    type?: AttachedMedia["type"];
+    fileSize?: number;
+  }) => void;
 }
 
 function formatFileSize(bytes: number): string {
@@ -50,6 +60,7 @@ export function ChatInputCard({
   onOpenSources,
   attachments: externalAttachments,
   onAttachmentsChange,
+  onPreviewMedia,
 }: ChatInputCardProps) {
   const { t } = useI18n();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -123,13 +134,30 @@ export function ChatInputCard({
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
+    const remainingSlots = MAX_ATTACHMENTS - attachments.length;
+    if (remainingSlots <= 0) {
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+      return;
+    }
+
+    const filesToProcess = Array.from(files).slice(0, remainingSlots);
+
+    const readBase64 = (file: File): Promise<string> =>
+      new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = () => resolve("");
+        reader.readAsDataURL(file);
+      });
+
     const newItems: AttachedMedia[] = [];
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
+    for (const file of filesToProcess) {
       if (!file) continue;
 
       let type: AttachedMedia["type"] = "other";
@@ -147,6 +175,7 @@ export function ChatInputCard({
 
       const url =
         type === "image" || type === "video" ? URL.createObjectURL(file) : undefined;
+      const base64 = type === "image" ? await readBase64(file) : undefined;
 
       newItems.push({
         id: `att_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
@@ -154,6 +183,7 @@ export function ChatInputCard({
         size: file.size,
         type,
         url,
+        base64,
         file,
       });
     }
@@ -172,6 +202,7 @@ export function ChatInputCard({
     updateAttachments(attachments.filter((a) => a.id !== id));
   };
 
+  const isMaxReached = attachments.length >= MAX_ATTACHMENTS;
   const canSend = inputMessage.trim().length > 0 || attachments.length > 0;
 
   // Render file input for attachments
@@ -180,6 +211,7 @@ export function ChatInputCard({
       ref={fileInputRef}
       type="file"
       multiple
+      disabled={isMaxReached}
       onChange={handleFileChange}
       accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt,.md"
       className="hidden"
@@ -245,9 +277,23 @@ export function ChatInputCard({
           {/* Left Plus icon button */}
           <button
             type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="w-7 h-7 rounded-full hover:bg-[#2b2b2b] text-[#888888] hover:text-[#e0e0e0] flex items-center justify-center transition-colors cursor-pointer shrink-0"
-            title={t("addMediaOrDoc")}
+            disabled={isMaxReached}
+            onClick={() => {
+              if (!isMaxReached) {
+                fileInputRef.current?.click();
+              }
+            }}
+            className={cn(
+              "w-7 h-7 rounded-full flex items-center justify-center transition-colors shrink-0",
+              isMaxReached
+                ? "opacity-35 cursor-not-allowed text-[#666666]"
+                : "hover:bg-[#2b2b2b] text-[#888888] hover:text-[#e0e0e0] cursor-pointer"
+            )}
+            title={
+              isMaxReached
+                ? t("maxAttachmentsReached", { count: MAX_ATTACHMENTS })
+                : t("addMediaOrDoc")
+            }
             aria-label={t("addMediaOrDoc")}
           >
             <Plus className="w-4 h-4" />
@@ -279,60 +325,118 @@ export function ChatInputCard({
         <div className="w-full bg-[#1e1e1e] rounded-[24px] border border-[#333333] p-2.5 sm:p-3 flex flex-col gap-2 transition-colors duration-150 focus-within:border-[#555555] shadow-xs">
           {/* Attachments Shelf */}
           {attachments.length > 0 && (
-            <div className="flex items-center gap-2 overflow-x-auto px-1 pt-0.5 pb-1 scrollbar-none select-none">
-              {attachments.map((att) => {
-                const ext = (att.name.split(".").pop() || "FILE").toUpperCase();
-                return (
-                  <div
-                    key={att.id}
-                    className="relative group shrink-0 rounded-xl border border-[#383838] bg-[#1a1917] p-1 shadow-xs"
-                  >
-                    {att.type === "image" && att.url ? (
-                      <div className="w-14 h-14 rounded-lg overflow-hidden relative">
-                        <img
-                          src={att.url}
-                          alt={att.name}
-                          className="w-full h-full object-cover block"
-                        />
-                      </div>
-                    ) : att.type === "video" && att.url ? (
-                      <div className="w-14 h-14 rounded-lg overflow-hidden bg-black relative flex items-center justify-center">
-                        <Video className="w-5 h-5 text-[#969696]" />
-                        <span className="absolute bottom-1 right-1 text-[7px] font-mono bg-black/70 text-white px-1 rounded">
-                          VID
-                        </span>
-                      </div>
-                    ) : (
-                      <div className="w-24 h-14 p-1.5 flex flex-col justify-between rounded-lg bg-[#262626]/80 text-left">
-                        <div className="flex items-center justify-between">
-                          <span className="text-[8px] font-bold text-[#888888] font-mono uppercase">
-                            {ext}
-                          </span>
-                          <FileText className="w-3 h-3 text-[#888888]" />
-                        </div>
-                        <span className="text-[10px] font-medium text-[#d4d4d4] truncate block">
-                          {att.name}
-                        </span>
-                        <span className="text-[8px] text-[#777777] font-mono">
-                          {formatFileSize(att.size)}
-                        </span>
-                      </div>
-                    )}
+            <ScrollArea orientation="horizontal" className="w-full">
+              <div className="flex items-center gap-2 px-1 pt-1.5 pb-2 select-none w-max">
+                {attachments.map((att) => {
+                  const ext = (att.name.split(".").pop() || "FILE").toUpperCase();
+                  const isImage = att.type === "image";
+                  const isVideo = att.type === "video";
+                  const isMedia = isImage || isVideo;
 
-                    {/* Remove attachment button */}
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveAttachment(att.id)}
-                      className="absolute -top-1.5 -right-1.5 w-4.5 h-4.5 rounded-full bg-[#2b2b2b] hover:bg-[#e11d48] border border-[#444444] text-[#a9a9a9] hover:text-white flex items-center justify-center transition-colors cursor-pointer shadow-sm z-10"
-                      title={t("removeAttachment")}
-                      aria-label={t("removeAttachment")}
+                  return (
+                    <div
+                      key={att.id}
+                      title={`${att.name} (${formatFileSize(att.size)})`}
+                      onClick={() => {
+                        if (onPreviewMedia && (att.url || att.base64)) {
+                          onPreviewMedia({
+                            src: att.url || att.base64 || "",
+                            alt: att.name,
+                            type: att.type,
+                            fileSize: att.size,
+                          });
+                        }
+                      }}
+                      className={cn(
+                        "relative group shrink-0 rounded-xl border border-[#383838] bg-[#1a1917] overflow-hidden shadow-xs select-none",
+                        isMedia
+                          ? "w-16 h-16 sm:w-20 sm:h-20 cursor-pointer active:scale-95 transition-transform"
+                          : "w-32 sm:w-36 h-16 sm:h-20"
+                      )}
                     >
-                      <X className="w-2.5 h-2.5 stroke-[2.5]" />
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
+                      {isImage && (att.url || att.base64) ? (
+                        <div className="w-full h-full rounded-xl overflow-hidden relative">
+                          <img
+                            src={att.url || att.base64}
+                            alt={att.name}
+                            className="w-full h-full object-cover block"
+                          />
+                          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-1 pt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <p className="text-[8.5px] text-white font-medium truncate leading-tight px-0.5">
+                              {att.name}
+                            </p>
+                          </div>
+                        </div>
+                      ) : isVideo && att.url ? (
+                        <div className="w-full h-full rounded-xl overflow-hidden bg-black relative flex items-center justify-center">
+                          <Video className="w-5 h-5 text-[#969696]" />
+                          <span className="absolute bottom-1 right-1 text-[7px] font-mono bg-black/70 text-white px-1 rounded uppercase font-bold">
+                            VID
+                          </span>
+                          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-1 pt-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <p className="text-[8.5px] text-white font-medium truncate leading-tight px-0.5">
+                              {att.name}
+                            </p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="w-full h-full p-1.5 flex flex-col justify-between rounded-xl bg-[#262626]/80 text-left">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[8px] font-bold text-[#888888] font-mono uppercase">
+                              {ext}
+                            </span>
+                            <FileText className="w-3 h-3 text-[#0066ff] shrink-0" />
+                          </div>
+                          <div className="w-full flex-1 my-0.5 min-h-0 overflow-hidden">
+                            <ScrollArea className="w-full h-full max-h-[30px] sm:max-h-[36px]">
+                              <span className="text-[9.5px] font-medium text-[#d4d4d4] leading-tight break-words block pr-1">
+                                {att.name}
+                              </span>
+                            </ScrollArea>
+                          </div>
+                          <span className="text-[7.5px] text-[#777777] font-mono block truncate">
+                            {formatFileSize(att.size)}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Hover tooltip tag showing filename */}
+                      <div className="pointer-events-none absolute -top-7 left-1/2 -translate-x-1/2 z-30 px-2 py-0.5 bg-[#2a2a2a] text-[#ededed] text-[9.5px] font-sans rounded-md shadow-lg border border-[#444444] opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap max-w-[180px] truncate">
+                        {att.name}
+                      </div>
+
+                      {/* Remove attachment button */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRemoveAttachment(att.id);
+                        }}
+                        className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-[#2b2b2b] hover:bg-[#e11d48] border border-[#444444] text-[#a9a9a9] hover:text-white flex items-center justify-center transition-all cursor-pointer shadow-sm z-20"
+                        title={t("removeAttachment")}
+                        aria-label={t("removeAttachment")}
+                      >
+                        <X className="w-2.5 h-2.5 stroke-[2.5]" />
+                      </button>
+                    </div>
+                  );
+                })}
+
+                {attachments.length < MAX_ATTACHMENTS && (
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="w-16 h-16 sm:w-20 sm:h-20 shrink-0 rounded-xl border border-dashed border-[#383838] hover:border-[#666666] text-[#888888] hover:text-[#d4d4d4] flex flex-col items-center justify-center gap-1 transition-colors cursor-pointer text-[10px] select-none"
+                    title={t("addMediaWithCount", { count: attachments.length, max: MAX_ATTACHMENTS })}
+                  >
+                    <Plus className="w-4 h-4 text-[#888888]" />
+                    <span className="font-mono text-[8px] text-[#777777]">
+                      {attachments.length}/{MAX_ATTACHMENTS}
+                    </span>
+                  </button>
+                )}
+              </div>
+            </ScrollArea>
           )}
 
           {/* Auto-growing Textarea bounded by ScrollArea */}
@@ -357,9 +461,23 @@ export function ChatInputCard({
           <div className="flex items-center justify-between pt-0.5 px-0.5 min-w-0">
             <button
               type="button"
-              onClick={() => fileInputRef.current?.click()}
-              className="w-8 h-8 rounded-full hover:bg-[#2b2b2b] text-[#888888] hover:text-[#e0e0e0] flex items-center justify-center transition-colors cursor-pointer shrink-0"
-              title={t("addMediaOrDoc")}
+              disabled={isMaxReached}
+              onClick={() => {
+                if (!isMaxReached) {
+                  fileInputRef.current?.click();
+                }
+              }}
+              className={cn(
+                "w-8 h-8 rounded-full flex items-center justify-center transition-colors shrink-0",
+                isMaxReached
+                  ? "opacity-35 cursor-not-allowed text-[#666666]"
+                  : "hover:bg-[#2b2b2b] text-[#888888] hover:text-[#e0e0e0] cursor-pointer"
+              )}
+              title={
+                isMaxReached
+                  ? t("maxAttachmentsReached", { count: MAX_ATTACHMENTS })
+                  : t("addMediaOrDoc")
+              }
               aria-label={t("addMediaOrDoc")}
             >
               <Plus className="w-4 h-4" />

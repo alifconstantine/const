@@ -579,7 +579,10 @@ app.on("second-instance", (_event, commandLine) => {
       }
     ) => {
       const config = loadUserConfig();
-      const model = payload.model || config.activeModel || "gemini-3.6-flash";
+      let model = payload.model || config.activeModel || "gemini-3.8-flash";
+      if (model === "gemini-3.6-flash") {
+        model = "gemini-3.8-flash";
+      }
 
       if (payload.authToken) {
         lastAuthToken = payload.authToken;

@@ -156,7 +156,7 @@ function mapRouterModels(rawModels: any[]): MobileModel[] {
 
 export interface StreamChatParams {
   model: string;
-  messages: Array<{ role: "system" | "user" | "assistant"; content: string }>;
+  messages: Array<{ role: "system" | "user" | "assistant"; content: string | any[] }>;
   signal?: AbortSignal;
   onToken?: (token: string) => void;
   onThinking?: (thinking: string) => void;

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
   Sparkles,
   ArrowRight,
@@ -28,6 +28,10 @@ import {
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+  TooltipProvider,
 } from "@const/ui";
 import { DEFAULT_MODELS } from "@const/agent/models";
 import type { ModelConfig, AgentMessage } from "@const/agent/types";
@@ -37,6 +41,7 @@ import { useI18n } from "../../lib/i18n";
 import { ChatHistoryPanel } from "./chat-history-panel";
 import { ExecutionTrace, type DisplayToolCall } from "./execution-trace";
 import { MarkdownContent } from "./markdown-content";
+import { ImageLightbox } from "./image-lightbox";
 
 interface ChatPanelProps {
   learnId?: string;
@@ -53,6 +58,7 @@ interface DisplayMessage {
   content: string;
   thinking?: string;
   toolCalls?: DisplayToolCall[];
+  attachments?: AttachedFile[];
   isStreaming?: boolean;
   createdAt?: number;
   durationMs?: number;
@@ -64,7 +70,21 @@ interface AttachedFile {
   size: number;
   type: "image" | "video" | "pdf" | "code" | "document" | "other";
   url?: string;
+  base64?: string;
   path?: string;
+  imageIndex?: number;
+}
+
+function cleanUserMessageContent(content: string): string {
+  if (!content) return "";
+  let cleaned = content;
+  cleaned = cleaned.replace(/\n\n\[(?:Lampiran [Mm]edia|Attached [Mm]edia)[\s\S]*$/, "");
+  cleaned = cleaned.replace(/\n\n\[Attached media \/ Lampiran media:[\s\S]*$/, "");
+  cleaned = cleaned.replace(/\n\n\[(?:Referensi Sumber Dibawa|Carried Source References)[\s\S]*$/, "");
+  cleaned = cleaned.replace(/\n\n- \[(?:Lampiran|Attachment):[\s\S]*$/, "");
+  cleaned = cleaned.replace(/\n\n- \[(?:Sumber|Source):[\s\S]*$/, "");
+  cleaned = cleaned.replace(/^\[(?:Attached media \/ Lampiran media|Lampiran [Mm]edia|Attached [Mm]edia)[\s\S]*?\]\n*/, "");
+  return cleaned.trim();
 }
 
 function formatMessageTimestamp(ts?: number): string {
@@ -98,17 +118,26 @@ export function ChatPanel({
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [inputMessage, setInputMessage] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
-  const [selectedModelId, setSelectedModelId] = useState<string>("gemini-3.6-flash");
+  const [selectedModelId, setSelectedModelId] = useState<string>("gemini-3.8-flash");
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
   const [availableModels, setAvailableModels] = useState<ModelConfig[]>(DEFAULT_MODELS);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
-  // Attachments state
+  // Attachments state (max 5 media/files)
+  const MAX_ATTACHMENTS = 5;
   const [attachments, setAttachments] = useState<AttachedFile[]>([]);
+  const [lightboxItem, setLightboxItem] = useState<{
+    src: string;
+    alt: string;
+    type?: AttachedFile["type"];
+    fileSize?: number;
+    imageIndex?: number;
+  } | null>(null);
   const [isMultiline, setIsMultiline] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const modelDropdownRef = useRef<HTMLDivElement>(null);
+  const activeAssistantIdRef = useRef<string | null>(null);
 
   // Input change handler ensuring reliable return to single-line pill when empty
   const handleInputChange = (val: string) => {
@@ -387,6 +416,7 @@ export function ChatPanel({
             content: m.content || "",
             thinking: m.thinking,
             toolCalls: m.toolCalls,
+            attachments: m.attachments,
             createdAt: m.createdAt || Date.now(),
             durationMs: m.durationMs,
             isStreaming: false,
@@ -401,6 +431,23 @@ export function ChatPanel({
       isMounted = false;
     };
   }, [learnId, activeSessionId]);
+
+  // Calculate chronological session image indices (Image 1, Image 2, Image 3...) across the entire session
+  const sessionImageMap = useMemo(() => {
+    const map = new Map<string, number>();
+    let counter = 0;
+    for (const msg of messages) {
+      if (msg.role === "user" && msg.attachments) {
+        for (const att of msg.attachments) {
+          if (att.type === "image") {
+            counter++;
+            map.set(att.id, counter);
+          }
+        }
+      }
+    }
+    return map;
+  }, [messages]);
 
   const handleNewChat = async () => {
     if (!learnId) return;
@@ -448,13 +495,24 @@ export function ChatPanel({
 
     const unsubscribe = electron.agent.onStreamEvent((event: any) => {
       setMessages((prev) => {
-        if (prev.length === 0) return prev;
-        const lastIndex = prev.length - 1;
-        const lastMsg = prev[lastIndex];
+        let targetIndex = -1;
+        if (activeAssistantIdRef.current) {
+          targetIndex = prev.findIndex((m) => m.id === activeAssistantIdRef.current);
+        }
+        if (targetIndex === -1) {
+          for (let i = prev.length - 1; i >= 0; i--) {
+            if (prev[i]?.role === "assistant") {
+              targetIndex = i;
+              break;
+            }
+          }
+        }
 
-        if (!lastMsg || lastMsg.role !== "assistant") return prev;
+        if (targetIndex === -1) return prev;
+        const targetMsg = prev[targetIndex];
+        if (!targetMsg) return prev;
 
-        const updated: DisplayMessage = { ...lastMsg };
+        const updated: DisplayMessage = { ...targetMsg };
 
         if (event.type === "token") {
           updated.content = (updated.content || "") + event.token;
@@ -562,6 +620,8 @@ export function ChatPanel({
             updated.content = language === "id"
               ? `Selesai menjalankan langkah-langkah tugas:\n\n${toolSummary}`
               : `Completed running task steps:\n\n${toolSummary}`;
+          } else if (!updated.content) {
+            updated.content = t("noResponseReceived");
           }
 
           if (streamStartTimeRef.current) {
@@ -587,7 +647,7 @@ export function ChatPanel({
 
         activeAssistantRef.current = updated;
         const newArr = [...prev];
-        newArr[lastIndex] = updated;
+        newArr[targetIndex] = updated;
         return newArr;
       });
     });
@@ -605,13 +665,21 @@ export function ChatPanel({
     } catch {}
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
 
+    const remaining = MAX_ATTACHMENTS - attachments.length;
+    if (remaining <= 0) {
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+
+    const filesToProcess = Array.from(files).slice(0, remaining);
     const newAttached: AttachedFile[] = [];
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i]!;
+
+    for (let i = 0; i < filesToProcess.length; i++) {
+      const file = filesToProcess[i]!;
       const fileType = file.type;
       let kind: AttachedFile["type"] = "other";
 
@@ -630,17 +698,36 @@ export function ChatPanel({
         kind = "document";
       }
 
+      let base64: string | undefined = undefined;
+      let url: string | undefined = undefined;
+
+      if (kind === "image" || kind === "video") {
+        url = URL.createObjectURL(file);
+      }
+
+      if (kind === "image") {
+        try {
+          base64 = await new Promise<string>((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(file);
+          });
+        } catch {}
+      }
+
       newAttached.push({
-        id: `att_${Date.now()}_${i}`,
+        id: `att_${Date.now()}_${i}_${Math.random().toString(36).slice(2, 6)}`,
         name: file.name,
         size: file.size,
         type: kind,
-        url: kind === "image" || kind === "video" ? URL.createObjectURL(file) : undefined,
+        url: url || base64,
+        base64,
         path: (file as any).path,
       });
     }
 
-    setAttachments((prev) => [...prev, ...newAttached]);
+    setAttachments((prev) => [...prev, ...newAttached].slice(0, MAX_ATTACHMENTS));
     setIsMultiline(true);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
@@ -665,8 +752,14 @@ export function ChatPanel({
   };
 
   const handleSend = async (customPrompt?: string) => {
-    const textToSend = (customPrompt || inputMessage).trim();
-    if (!textToSend || isStreaming) return;
+    let textToSend = (customPrompt || inputMessage).trim();
+    const currentAttachmentsRaw = [...attachments];
+
+    if ((!textToSend && currentAttachmentsRaw.length === 0) || isStreaming) return;
+
+    if (!textToSend && currentAttachmentsRaw.length > 0) {
+      textToSend = t("analyzeAttachedMediaPrompt");
+    }
 
     // 1. Ensure we have an active session
     let currentSessionId = activeSessionId;
@@ -675,7 +768,31 @@ export function ChatPanel({
       setActiveSessionId(currentSessionId);
     }
 
-    // 2. Auto-generate title if this is the first message in the session
+    // 2. Count prior images in this session to maintain chronological session index (Image 1, Image 2, Image 3...)
+    let priorImagesCount = 0;
+    for (const msg of messages) {
+      if (msg.role === "user" && msg.attachments) {
+        for (const att of msg.attachments) {
+          if (att.type === "image") {
+            priorImagesCount++;
+          }
+        }
+      }
+    }
+
+    let currentImgCounter = priorImagesCount;
+    const currentAttachments: AttachedFile[] = currentAttachmentsRaw.map((att) => {
+      if (att.type === "image") {
+        currentImgCounter++;
+        return {
+          ...att,
+          imageIndex: currentImgCounter,
+        };
+      }
+      return att;
+    });
+
+    // 3. Auto-generate title if this is the first message in the session
     if (currentSessionId) {
       const currentSession = sessions.find((s) => s.id === currentSessionId);
       const isDefaultTitle =
@@ -716,14 +833,27 @@ export function ChatPanel({
     const userMsgId = `user_${now}`;
     const assistantMsgId = `asst_${now + 1}`;
 
-    // Append attachments summary to user prompt if any were added
+    // 4. Build prompt with numbered image references for the AI
     let promptWithAttachments = textToSend;
-    if (attachments.length > 0) {
-      const attLabel = language === "id" ? "Lampiran" : "Attachment";
-      const attList = attachments
-        .map((a) => `- [${attLabel}: ${a.name} (${formatFileSize(a.size)})]`)
-        .join("\n");
-      promptWithAttachments = `${promptWithAttachments}\n\n${attList}`;
+    if (currentAttachments.length > 0) {
+      const attLines: string[] = [];
+      for (const att of currentAttachments) {
+        if (att.type === "image" && att.imageIndex) {
+          attLines.push(
+            `- Image ${att.imageIndex} (Gambar ${att.imageIndex}): "${att.name}" (${formatFileSize(att.size)})`
+          );
+        } else {
+          attLines.push(
+            `- File (${att.type}): "${att.name}" (${formatFileSize(att.size)})`
+          );
+        }
+      }
+      const attHeader = language === "id" ? "Lampiran Media" : "Attached Media";
+      const attInstruction =
+        language === "id"
+          ? "Catatan AI: Jika pengguna menyebut 'image 1', 'image 2', 'gambar 1', 'foto 2', dsb., kenali dan rujuk gambar sesuai urutan nomor kronologis sesi di atas."
+          : "AI Note: When the user refers to 'image 1', 'image 2', etc., refer to the images according to their chronological session order above.";
+      promptWithAttachments = `${promptWithAttachments}\n\n[${attHeader}:\n${attLines.join("\n")}\n${attInstruction}]`;
     }
 
     // Append active/carried sources summary if any
@@ -739,7 +869,8 @@ export function ChatPanel({
     const newUserMsg: DisplayMessage = {
       id: userMsgId,
       role: "user",
-      content: promptWithAttachments,
+      content: textToSend,
+      attachments: currentAttachments,
       createdAt: now,
     };
 
@@ -753,14 +884,15 @@ export function ChatPanel({
       createdAt: now + 1,
     };
 
-    // 3. Persist user message to Dexie
+    // 5. Persist user message to Dexie
     if (learnId) {
       await localDb.saveMessage({
         id: userMsgId,
         learnId,
         sessionId: currentSessionId || undefined,
         role: "user",
-        content: promptWithAttachments,
+        content: textToSend,
+        attachments: currentAttachments,
         createdAt: now,
       });
     }
@@ -776,14 +908,42 @@ export function ChatPanel({
     setIsStreaming(true);
     streamStartTimeRef.current = Date.now();
     activeAssistantRef.current = newAssistantMsg;
+    activeAssistantIdRef.current = assistantMsgId;
 
     const electron = (window as any).electron;
 
-    // 4. Build high-fidelity multi-turn message payload matching OpenAPI / Const specification
+    // 6. Build high-fidelity multi-turn message payload with vision multimodal support
     const formattedMessages: any[] = [];
     for (const m of nextMessages) {
       if (m.role === "user") {
-        formattedMessages.push({ role: "user", content: m.content });
+        const isCurrentSendingMsg = m.id === userMsgId;
+        const textForAI = isCurrentSendingMsg ? promptWithAttachments : m.content;
+        const imageAttachments = (m.attachments || []).filter(
+          (a) => a.type === "image" && (a.base64 || a.url?.startsWith("data:"))
+        );
+
+        if (imageAttachments.length > 0) {
+          const contentParts: any[] = [
+            { type: "text", text: textForAI || "Analyze the attached image(s)." },
+          ];
+          for (const img of imageAttachments) {
+            const dataUrl = img.base64 || img.url;
+            if (dataUrl) {
+              contentParts.push({
+                type: "image_url",
+                image_url: {
+                  url: dataUrl,
+                },
+              });
+            }
+          }
+          formattedMessages.push({
+            role: "user",
+            content: contentParts,
+          });
+        } else {
+          formattedMessages.push({ role: "user", content: textForAI });
+        }
       } else if (m.role === "assistant") {
         if (m.toolCalls && m.toolCalls.length > 0) {
           formattedMessages.push({
@@ -883,6 +1043,8 @@ export function ChatPanel({
                   finalContent = language === "id"
                     ? `Selesai menjalankan langkah-langkah tugas:\n\n${toolSummary}`
                     : `Completed running task steps:\n\n${toolSummary}`;
+                } else if (!finalContent) {
+                  finalContent = t("noResponseReceived");
                 }
                 const finalized = {
                   ...msg,
@@ -1374,59 +1536,181 @@ export function ChatPanel({
     );
   };
 
-  const renderPlusButton = () => (
-    <>
-      <button
-        type="button"
-        onClick={() => fileInputRef.current?.click()}
-        className="h-8 w-8 rounded-full hover:bg-muted/70 text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer shrink-0"
-        title={t("attachFileMedia")}
-        aria-label={t("attachFileMedia")}
-      >
-        <Plus className="h-4 w-4 stroke-[2]" />
-      </button>
+  const renderPlusButton = () => {
+    const isMaxReached = attachments.length >= MAX_ATTACHMENTS;
+    return (
+      <>
+        <button
+          type="button"
+          onClick={() => {
+            if (!isMaxReached) {
+              fileInputRef.current?.click();
+            }
+          }}
+          disabled={isMaxReached}
+          className={cn(
+            "h-8 w-8 rounded-full flex items-center justify-center transition-colors shrink-0",
+            isMaxReached
+              ? "opacity-35 cursor-not-allowed text-muted-foreground"
+              : "hover:bg-muted/70 text-muted-foreground hover:text-foreground cursor-pointer"
+          )}
+          title={
+            isMaxReached
+              ? language === "id"
+                ? `Maksimal ${MAX_ATTACHMENTS} media telah tercapai`
+                : `Maximum ${MAX_ATTACHMENTS} attachments reached`
+              : t("attachFileMedia")
+          }
+          aria-label={t("attachFileMedia")}
+        >
+          <Plus className="h-4 w-4 stroke-[2]" />
+        </button>
 
-      <input
-        ref={fileInputRef}
-        type="file"
-        multiple
-        className="hidden"
-        onChange={handleFileChange}
-        accept="image/*,video/*,audio/*,.pdf,.md,.txt,.py,.json,.csv,.doc,.docx"
-      />
-    </>
-  );
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          className="hidden"
+          onChange={handleFileChange}
+          accept="image/*,video/*,audio/*,.pdf,.md,.txt,.py,.json,.csv,.doc,.docx"
+        />
+      </>
+    );
+  };
 
   const renderAttachmentsShelf = () => {
     if (attachments.length === 0) return null;
     return (
-      <div className="flex items-center gap-2 px-1 pt-1 pb-1.5 overflow-x-auto select-none border-b border-border/40">
-        {attachments.map((file) => (
-          <div
-            key={file.id}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted/60 border border-border/60 text-xs text-foreground shrink-0"
-          >
-            {file.type === "image" ? (
-              <ImageIcon className="w-3 h-3 text-primary shrink-0" />
-            ) : (
-              <FileText className="w-3 h-3 text-primary shrink-0" />
-            )}
-            <span className="truncate max-w-[120px] font-medium text-[11px]">
-              {file.name}
-            </span>
-            <span className="text-[10px] text-muted-foreground font-mono">
-              ({formatFileSize(file.size)})
-            </span>
+      <ScrollArea orientation="horizontal" className="w-full">
+        <div className="flex items-center gap-2.5 pt-2 pb-2.5 px-1.5 w-max select-none">
+          <TooltipProvider delayDuration={150}>
+            {attachments.map((file) => {
+              const isImage = file.type === "image";
+              const isVideo = file.type === "video";
+              const isMedia = isImage || isVideo;
+              const ext = (file.name.split(".").pop() || "FILE").toUpperCase();
+
+              return (
+                <Tooltip key={file.id}>
+                  <TooltipTrigger asChild>
+                    <div
+                      title={`${file.name} (${formatFileSize(file.size)})`}
+                      onClick={() => {
+                        if (file.url || file.base64) {
+                          setLightboxItem({
+                            src: file.url || file.base64 || "",
+                            alt: file.name,
+                            type: file.type,
+                            fileSize: file.size,
+                          });
+                        }
+                      }}
+                      className={cn(
+                        "relative group shrink-0 rounded-xl border border-border/70 shadow-xs animate-in fade-in zoom-in-95 duration-100 bg-muted/60 select-none cursor-pointer transition-all",
+                        isMedia
+                          ? "w-20 h-20 hover:opacity-90 active:scale-[0.98]"
+                          : "w-36 sm:w-40 h-20 hover:border-foreground/30"
+                      )}
+                    >
+                      {isImage && (file.url || file.base64) ? (
+                        <div className="w-full h-full rounded-xl overflow-hidden relative">
+                          <img
+                            src={file.url || file.base64}
+                            alt={file.name}
+                            className="w-full h-full object-cover block"
+                          />
+                          {/* Subtle bottom gradient on hover */}
+                          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-1 pt-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <p className="text-[9.5px] text-white font-medium truncate leading-tight px-0.5">
+                              {file.name}
+                            </p>
+                          </div>
+                        </div>
+                      ) : isVideo && file.url ? (
+                        <div className="w-full h-full rounded-xl overflow-hidden bg-black relative flex items-center justify-center">
+                          <video
+                            src={file.url}
+                            className="w-full h-full object-cover block pointer-events-none"
+                            muted
+                            playsInline
+                            autoPlay
+                            loop
+                          />
+                          <span className="absolute bottom-1 right-1 text-[8px] font-bold text-white bg-black/60 px-1 py-0.5 rounded uppercase tracking-wider font-mono">
+                            Video
+                          </span>
+                          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-1 pt-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <p className="text-[9.5px] text-white font-medium truncate leading-tight px-0.5">
+                              {file.name}
+                            </p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="w-full h-full p-2 flex flex-col justify-between items-start text-left bg-muted/40 rounded-xl">
+                          <div className="flex items-center justify-between w-full">
+                            <span className="text-[9px] font-bold text-muted-foreground tracking-wider uppercase font-mono">
+                              {ext}
+                            </span>
+                            <FileText className="w-3.5 h-3.5 text-primary shrink-0" />
+                          </div>
+                          {/* Scrollable title with ScrollArea so long titles aren't truncated */}
+                          <div className="w-full flex-1 my-1 min-h-0 overflow-hidden">
+                            <ScrollArea className="w-full h-full max-h-[34px]">
+                              <span className="text-[11px] font-medium text-foreground leading-snug break-words block pr-1">
+                                {file.name}
+                              </span>
+                            </ScrollArea>
+                          </div>
+                          <div className="w-full flex items-center justify-between">
+                            <span className="text-[8.5px] text-muted-foreground font-mono truncate">
+                              {formatFileSize(file.size)}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Close / Remove button */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeAttachment(file.id);
+                        }}
+                        className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-card shadow-md border border-border flex items-center justify-center cursor-pointer text-muted-foreground hover:bg-destructive hover:text-white hover:border-destructive hover:scale-105 active:scale-95 transition-all z-20"
+                        title={t("removeAttachment")}
+                        aria-label={t("removeAttachment")}
+                      >
+                        <X className="w-3 h-3 stroke-[2.5]" />
+                      </button>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent
+                    side="top"
+                    sideOffset={6}
+                    className="text-[11px] max-w-[260px] truncate bg-popover text-popover-foreground shadow-md border border-border"
+                  >
+                    {file.name} ({formatFileSize(file.size)})
+                  </TooltipContent>
+                </Tooltip>
+              );
+            })}
+          </TooltipProvider>
+
+          {attachments.length < MAX_ATTACHMENTS && (
             <button
               type="button"
-              onClick={() => removeAttachment(file.id)}
-              className="p-0.5 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground cursor-pointer"
+              onClick={() => fileInputRef.current?.click()}
+              className="w-20 h-20 shrink-0 rounded-xl border border-dashed border-border/70 hover:border-primary/50 text-muted-foreground hover:text-foreground flex flex-col items-center justify-center gap-1 transition-colors cursor-pointer text-[10px] select-none group"
+              title={t("addMediaWithCount", { count: attachments.length, max: MAX_ATTACHMENTS })}
             >
-              <X className="w-3 h-3" />
+              <Plus className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
+              <span className="font-mono text-[9px] text-muted-foreground/80">
+                {attachments.length}/{MAX_ATTACHMENTS}
+              </span>
             </button>
-          </div>
-        ))}
-      </div>
+          )}
+        </div>
+      </ScrollArea>
     );
   };
 
@@ -1521,7 +1805,7 @@ export function ChatPanel({
                   className="flex items-center gap-2 px-2.5 py-2 rounded-xl text-xs cursor-pointer hover:bg-muted"
                 >
                   <Folder className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span>Buka Folder Workspace</span>
+                  <span>{t("openWorkspaceFolder")}</span>
                 </DropdownMenuItem>
               )}
             </DropdownMenuContent>
@@ -1576,11 +1860,94 @@ export function ChatPanel({
               const isLatestAssistant = isAssistant && isStreaming && idx === messages.length - 1;
 
               if (isUser) {
+                const cleanedContent = cleanUserMessageContent(msg.content);
+                const hasAttachments = msg.attachments && msg.attachments.length > 0;
+
                 return (
                   <div key={msg.id} className="flex flex-col items-end w-full group">
-                    <div className="max-w-[85%] rounded-3xl rounded-tr-md bg-muted/80 text-foreground px-4 py-2.5 text-[13.5px] border border-border/60 shadow-xs leading-relaxed whitespace-pre-wrap font-sans">
-                      {msg.content}
-                    </div>
+                    {/* User Attachments Thumbnails (Compact) */}
+                    {hasAttachments && (
+                      <div className="flex flex-wrap items-center justify-end gap-2 mb-1.5 max-w-[85%]">
+                        {msg.attachments!.map((att) => {
+                          const isImage = att.type === "image";
+                          const isVideo = att.type === "video";
+                          const isMedia = isImage || isVideo;
+                          const imgIdx = sessionImageMap.get(att.id) ?? att.imageIndex;
+                          const ext = (att.name.split(".").pop() || "FILE").toUpperCase();
+
+                          return (
+                            <div
+                              key={att.id}
+                              onClick={() => {
+                                if (att.url || att.base64) {
+                                  setLightboxItem({
+                                    src: att.url || att.base64 || "",
+                                    alt: att.name,
+                                    type: att.type,
+                                    fileSize: att.size,
+                                    imageIndex: imgIdx,
+                                  });
+                                }
+                              }}
+                              className={cn(
+                                "relative rounded-xl border border-border/70 overflow-hidden shadow-xs bg-muted/60 select-none",
+                                isMedia
+                                  ? "w-20 h-20 sm:w-24 sm:h-24 cursor-pointer hover:opacity-90 active:scale-[0.98] transition-all"
+                                  : "w-32 sm:w-36 h-20 sm:h-24 p-2 flex flex-col justify-between items-start text-left bg-muted/50"
+                              )}
+                              title={`${att.name} (${formatFileSize(att.size)})`}
+                            >
+                              {isImage && (att.url || att.base64) ? (
+                                <img
+                                  src={att.url || att.base64}
+                                  alt={att.name}
+                                  className="w-full h-full object-cover block"
+                                />
+                              ) : isVideo && att.url ? (
+                                <div className="w-full h-full relative flex items-center justify-center bg-black">
+                                  <video
+                                    src={att.url}
+                                    className="w-full h-full object-cover pointer-events-none"
+                                    muted
+                                    playsInline
+                                  />
+                                  <span className="absolute bottom-1 right-1 text-[8px] font-bold text-white bg-black/60 px-1 py-0.5 rounded uppercase tracking-wider font-mono">
+                                    Video
+                                  </span>
+                                </div>
+                              ) : (
+                                <div className="w-full h-full flex flex-col justify-between items-start text-left">
+                                  <div className="flex items-center justify-between w-full">
+                                    <span className="text-[9px] font-bold text-muted-foreground uppercase font-mono">
+                                      {ext}
+                                    </span>
+                                    <FileText className="w-3.5 h-3.5 text-primary shrink-0" />
+                                  </div>
+                                  <div className="w-full flex-1 my-1 min-h-0 overflow-hidden">
+                                    <ScrollArea className="w-full h-full max-h-[36px]">
+                                      <span className="text-[10.5px] font-medium text-foreground leading-tight break-words block pr-1">
+                                        {att.name}
+                                      </span>
+                                    </ScrollArea>
+                                  </div>
+                                  <div className="w-full">
+                                    <span className="text-[8.5px] text-muted-foreground font-mono block truncate">
+                                      {formatFileSize(att.size)}
+                                    </span>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {cleanedContent ? (
+                      <div className="max-w-[85%] rounded-3xl rounded-tr-md bg-muted/80 text-foreground px-4 py-2.5 text-[13.5px] border border-border/60 shadow-xs leading-relaxed whitespace-pre-wrap font-sans">
+                        {cleanedContent}
+                      </div>
+                    ) : null}
 
                     {/* User hover action bar: Timestamp and Copy */}
                     <div className="flex items-center gap-2 pt-1.5 pr-1 opacity-0 group-hover:opacity-100 transition-opacity text-xs text-muted-foreground select-none font-sans">
@@ -1591,7 +1958,7 @@ export function ChatPanel({
                       )}
                       <button
                         type="button"
-                        onClick={() => handleCopyMessage(msg.id, msg.content)}
+                        onClick={() => handleCopyMessage(msg.id, cleanedContent || msg.content)}
                         className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
                         title={t("copyMessage")}
                       >
@@ -1780,6 +2147,18 @@ export function ChatPanel({
         onDeleteSession={handleDeleteSession}
         onNewChat={handleNewChat}
       />
+
+      {/* Media Lightbox */}
+      {lightboxItem && (
+        <ImageLightbox
+          src={lightboxItem.src}
+          alt={lightboxItem.alt}
+          type={lightboxItem.type}
+          fileSize={lightboxItem.fileSize}
+          imageIndex={lightboxItem.imageIndex}
+          onClose={() => setLightboxItem(null)}
+        />
+      )}
     </main>
   );
 }

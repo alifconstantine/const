@@ -1432,6 +1432,7 @@ export class ConstAgent {
       } else {
         onEvent({ type: "error", error: err.message });
         onEvent({ type: "status", status: "error", message: err.message });
+        throw err;
       }
       return conversationHistory;
     } finally {

@@ -13,8 +13,27 @@ import { ChatInputCard, type AttachedMedia } from "./chat-input-card";
 import { AddSourceDialog } from "./add-source-dialog";
 import { HistoryPanel } from "./history-panel";
 import { WorkingProcess } from "./working-process";
+import { ImageLightbox } from "./image-lightbox";
 import { ScrollArea, cn } from "@const/ui";
 import { useI18n } from "../../lib/i18n";
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function cleanUserMessageContent(content: string): string {
+  if (!content) return "";
+  let cleaned = content;
+  cleaned = cleaned.replace(/\n\n\[(?:Lampiran [Mm]edia|Attached [Mm]edia)[\s\S]*$/, "");
+  cleaned = cleaned.replace(/\n\n\[Attached media \/ Lampiran media:[\s\S]*$/, "");
+  cleaned = cleaned.replace(/\n\n\[(?:Referensi Sumber Dibawa|Carried Source References)[\s\S]*$/, "");
+  cleaned = cleaned.replace(/\n\n- \[(?:Lampiran|Attachment):[\s\S]*$/, "");
+  cleaned = cleaned.replace(/\n\n- \[(?:Sumber|Source):[\s\S]*$/, "");
+  cleaned = cleaned.replace(/^\[(?:Attached media \/ Lampiran media|Lampiran [Mm]edia|Attached [Mm]edia)[\s\S]*?\]\n*/, "");
+  return cleaned.trim();
+}
 import {
   ArrowLeft,
   Share2,
@@ -140,10 +159,34 @@ export function MobileLearnWorkspace({
   const [researchSpeed, setResearchSpeed] = useState("Fast Research");
   const [isStreaming, setIsStreaming] = useState(false);
   const [attachedFiles, setAttachedFiles] = useState<AttachedMedia[]>([]);
+  const [lightboxItem, setLightboxItem] = useState<{
+    src: string;
+    alt: string;
+    type?: AttachedMedia["type"];
+    fileSize?: number;
+    imageIndex?: number;
+  } | null>(null);
   const [expandedUserMessageId, setExpandedUserMessageId] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [streamStartTime, setStreamStartTime] = useState<number>(0);
   const [liveDurationMs, setLiveDurationMs] = useState<number>(0);
+
+  // Calculate chronological session image indices (Image 1, Image 2, Image 3...) across the entire session
+  const sessionImageMap = useMemo(() => {
+    const map = new Map<string, number>();
+    let counter = 0;
+    for (const msg of messages) {
+      if (msg.role === "user" && msg.attachments) {
+        for (const att of msg.attachments) {
+          if (att.type === "image") {
+            counter++;
+            map.set(att.id, counter);
+          }
+        }
+      }
+    }
+    return map;
+  }, [messages]);
 
   // Reactively query chat sessions for this learn/notebook
   const sessions = useLiveQuery(async () => {
@@ -347,9 +390,13 @@ export function MobileLearnWorkspace({
   };
 
   const handleSend = async (customPrompt?: string, attachmentsToSend?: AttachedMedia[]) => {
-    const textToSend = (customPrompt || inputMessage).trim();
+    let textToSend = (customPrompt || inputMessage).trim();
     const currentAttachments = attachmentsToSend || attachedFiles;
     if ((!textToSend && currentAttachments.length === 0) || isStreaming) return;
+
+    if (!textToSend && currentAttachments.length > 0) {
+      textToSend = t("analyzeAttachedMediaPrompt");
+    }
 
     let targetSessionId = activeSessionId;
     if (!targetSessionId) {
@@ -371,19 +418,58 @@ export function MobileLearnWorkspace({
     const userMsgId = `user_${now}`;
     const assistantMsgId = `asst_${now}`;
 
-    const serializedAttachments = currentAttachments.map((a) => ({
-      id: a.id,
-      name: a.name,
-      size: a.size,
-      type: a.type,
-      url: a.url,
-    }));
+    // Count prior images in the session
+    let priorImagesCount = 0;
+    for (const m of messages) {
+      if (m.role === "user" && m.attachments) {
+        for (const a of m.attachments) {
+          if (a.type === "image") {
+            priorImagesCount++;
+          }
+        }
+      }
+    }
+
+    let currentSessionImageCounter = 0;
+    const processedAttachments = currentAttachments.map((a) => {
+      let imageIndex: number | undefined = undefined;
+      if (a.type === "image") {
+        currentSessionImageCounter++;
+        imageIndex = priorImagesCount + currentSessionImageCounter;
+      }
+      return {
+        id: a.id,
+        name: a.name,
+        size: a.size,
+        type: a.type,
+        url: a.url,
+        base64: a.base64,
+        imageIndex,
+      };
+    });
+
+    // Format prompt text with chronological image numbers for AI context
+    let promptWithAttachments = textToSend;
+    if (processedAttachments.length > 0) {
+      const imageLines = processedAttachments
+        .filter((a) => a.type === "image")
+        .map(
+          (a) =>
+            `- Image ${a.imageIndex} (Gambar ${a.imageIndex}): "${a.name}"`
+        );
+      const otherLines = processedAttachments
+        .filter((a) => a.type !== "image")
+        .map((a) => `- Document/File: "${a.name}" (${formatFileSize(a.size)})`);
+
+      const mediaList = [...imageLines, ...otherLines].join("\n");
+      promptWithAttachments = `${textToSend ? textToSend + "\n\n" : ""}[Attached media / Lampiran media:\n${mediaList}\n\nNote for AI: The images above are provided in chronological order as Image 1, Image 2, etc. When the user refers to "image 1", "image 2", "gambar 1", "foto 1", etc., refer to the corresponding image listed above.]`;
+    }
 
     const newUserMsg: DisplayMessage = {
       id: userMsgId,
       role: "user",
       content: textToSend,
-      attachments: serializedAttachments,
+      attachments: processedAttachments,
       createdAt: now,
     };
 
@@ -404,7 +490,7 @@ export function MobileLearnWorkspace({
         sessionId: targetSessionId,
         role: "user",
         content: textToSend,
-        attachments: serializedAttachments,
+        attachments: processedAttachments,
         createdAt: now,
       });
     }
@@ -433,10 +519,41 @@ export function MobileLearnWorkspace({
     setAttachedFiles([]);
     setIsStreaming(true);
 
-    const formattedMessages = nextMessages.map((m) => ({
-      role: m.role,
-      content: m.content || "",
-    }));
+    const formattedMessages = nextMessages.map((m, idx) => {
+      const isLatest = idx === nextMessages.length - 1;
+      if (isLatest) {
+        if (
+          processedAttachments.some((a) => a.type === "image" && (a.base64 || a.url))
+        ) {
+          const parts: any[] = [];
+          if (promptWithAttachments) {
+            parts.push({ type: "text", text: promptWithAttachments });
+          }
+          for (const a of processedAttachments) {
+            if (a.type === "image" && (a.base64 || a.url)) {
+              parts.push({
+                type: "image_url",
+                image_url: {
+                  url: a.base64 || a.url,
+                },
+              });
+            }
+          }
+          return {
+            role: m.role,
+            content: parts,
+          };
+        }
+        return {
+          role: m.role,
+          content: promptWithAttachments || m.content || "",
+        };
+      }
+      return {
+        role: m.role,
+        content: m.content || "",
+      };
+    });
 
     try {
       await streamChatCompletion({
@@ -462,13 +579,14 @@ export function MobileLearnWorkspace({
           );
         },
         onDone: async (finalContent, finalThinking) => {
+          const resolvedContent = finalContent || t("noResponseReceived");
           const finalDuration = Date.now() - now;
           setMessages((prev) =>
             prev.map((msg) =>
               msg.id === assistantMsgId
                 ? {
                     ...msg,
-                    content: finalContent,
+                    content: resolvedContent,
                     thinking: finalThinking,
                     durationMs: finalDuration,
                     isStreaming: false,
@@ -485,7 +603,7 @@ export function MobileLearnWorkspace({
               learnId,
               sessionId: targetSessionId,
               role: "assistant",
-              content: finalContent,
+              content: resolvedContent,
               thinking: finalThinking,
               durationMs: finalDuration,
               createdAt: Date.now(),
@@ -688,35 +806,84 @@ export function MobileLearnWorkspace({
               >
                 {msg.role === "user" ? (
                   <div className="w-full flex flex-col items-end group">
-                    {/* Attached Media / Files Preview */}
+                    {/* Attached Media / Files Preview (Compact) */}
                     {msg.attachments && msg.attachments.length > 0 && (
                       <div className="flex flex-wrap gap-1.5 mb-1.5 justify-end max-w-[88%]">
-                        {msg.attachments.map((att: any, attIdx: number) => (
-                          <div
-                            key={att.id || attIdx}
-                            className="rounded-xl border border-[#383838] bg-[#1a1917] p-1 shadow-xs"
-                          >
-                            {att.type === "image" && att.url ? (
-                              <img
-                                src={att.url}
-                                alt={att.name}
-                                className="w-16 h-16 rounded-lg object-cover block"
-                              />
-                            ) : (
-                              <div className="px-2.5 py-1.5 rounded-lg bg-[#262626] flex items-center gap-2 text-xs text-[#d4d4d4]">
-                                <FileText className="w-3.5 h-3.5 text-[#0066ff]" />
-                                <span className="truncate max-w-[120px]">{att.name}</span>
-                              </div>
-                            )}
-                          </div>
-                        ))}
+                        {msg.attachments.map((att: any, attIdx: number) => {
+                          const isImage = att.type === "image";
+                          const isVideo = att.type === "video";
+                          const isMedia = isImage || isVideo;
+                          const imgIdx = sessionImageMap.get(att.id) ?? att.imageIndex;
+                          const ext = (att.name.split(".").pop() || "FILE").toUpperCase();
+
+                          return (
+                            <div
+                              key={att.id || attIdx}
+                              onClick={() => {
+                                if (att.url || att.base64) {
+                                  setLightboxItem({
+                                    src: att.url || att.base64 || "",
+                                    alt: att.name,
+                                    type: att.type,
+                                    fileSize: att.size,
+                                    imageIndex: imgIdx,
+                                  });
+                                }
+                              }}
+                              className={cn(
+                                "relative rounded-xl border border-[#383838] bg-[#1a1917] overflow-hidden shadow-xs select-none",
+                                isMedia
+                                  ? "w-16 h-16 sm:w-20 sm:h-20 cursor-pointer active:scale-95 transition-transform"
+                                  : "w-28 sm:w-32 h-16 sm:h-20"
+                              )}
+                              title={`${att.name} (${formatFileSize(att.size)})`}
+                            >
+                              {isImage && (att.url || att.base64) ? (
+                                <img
+                                  src={att.url || att.base64}
+                                  alt={att.name}
+                                  className="w-full h-full object-cover block"
+                                />
+                              ) : isVideo && att.url ? (
+                                <div className="w-full h-full relative flex items-center justify-center bg-black">
+                                  <Video className="w-5 h-5 text-[#969696]" />
+                                  <span className="absolute bottom-1 right-1 text-[7px] font-mono bg-black/70 text-white px-1 rounded uppercase font-bold">
+                                    VID
+                                  </span>
+                                </div>
+                              ) : (
+                                <div className="w-full h-full p-1.5 flex flex-col justify-between rounded-xl bg-[#262626]/80 text-left">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-[8px] font-bold text-[#888888] font-mono uppercase">
+                                      {ext}
+                                    </span>
+                                    <FileText className="w-3 h-3 text-[#0066ff] shrink-0" />
+                                  </div>
+                                  <div className="w-full flex-1 my-0.5 min-h-0 overflow-hidden">
+                                    <ScrollArea className="w-full h-full max-h-[30px] sm:max-h-[34px]">
+                                      <span className="text-[9px] font-medium text-[#d4d4d4] leading-tight break-words block pr-1">
+                                        {att.name}
+                                      </span>
+                                    </ScrollArea>
+                                  </div>
+                                  <span className="text-[7.5px] text-[#777777] font-mono block truncate">
+                                    {formatFileSize(att.size)}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
 
                     {/* User Message Bubble with ScrollArea when long */}
                     {(() => {
+                      const cleanedContent = cleanUserMessageContent(msg.content);
+                      if (!cleanedContent) return null;
+
                       const isLongPrompt =
-                        msg.content.length > 250 || msg.content.split("\n").length > 4;
+                        cleanedContent.length > 250 || cleanedContent.split("\n").length > 4;
                       const isExpanded = expandedUserMessageId === msg.id;
 
                       return (
@@ -739,10 +906,10 @@ export function MobileLearnWorkspace({
                               )}
                               viewportClassName="[&>div[style]]:!block"
                             >
-                              <div className="pr-1.5">{msg.content}</div>
+                              <div className="pr-1.5">{cleanedContent}</div>
                             </ScrollArea>
                           ) : (
-                            <div>{msg.content}</div>
+                            <div>{cleanedContent}</div>
                           )}
                         </div>
                       );
@@ -753,7 +920,7 @@ export function MobileLearnWorkspace({
                       {msg.createdAt && <span>{formatTimestamp(msg.createdAt)}</span>}
                       <button
                         type="button"
-                        onClick={() => handleCopy(msg.id, msg.content)}
+                        onClick={() => handleCopy(msg.id, cleanUserMessageContent(msg.content) || msg.content)}
                         className="p-1 rounded hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
                         title={t("copyMessage")}
                       >
@@ -823,6 +990,7 @@ export function MobileLearnWorkspace({
               onOpenSources={() => setIsAddSourceOpen(true)}
               attachments={attachedFiles}
               onAttachmentsChange={setAttachedFiles}
+              onPreviewMedia={setLightboxItem}
             />
           </div>
         </div>
@@ -1095,6 +1263,18 @@ export function MobileLearnWorkspace({
         onRenameChat={handleRenameChat}
         onTogglePinChat={handleTogglePinChat}
       />
+
+      {/* Media Lightbox */}
+      {lightboxItem && (
+        <ImageLightbox
+          src={lightboxItem.src}
+          alt={lightboxItem.alt}
+          type={lightboxItem.type}
+          fileSize={lightboxItem.fileSize}
+          imageIndex={lightboxItem.imageIndex}
+          onClose={() => setLightboxItem(null)}
+        />
+      )}
     </div>
   );
 }
