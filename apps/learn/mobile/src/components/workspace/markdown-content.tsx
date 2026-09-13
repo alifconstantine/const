@@ -2,6 +2,14 @@ import React, { useState } from "react";
 import { marked, type Token, type Tokens } from "marked";
 import { Check, Copy, Download, Maximize2, X } from "lucide-react";
 import { cn } from "@const/ui";
+import { createMarkedLatexExtension, renderKatex, type MathToken } from "../../lib/marked-latex";
+
+// Configure marked globally once with GitHub Flavored Markdown and LaTeX extensions
+marked.use(createMarkedLatexExtension());
+marked.setOptions({
+  gfm: true,
+  breaks: true,
+});
 
 interface MarkdownContentProps {
   content: string;
@@ -10,11 +18,6 @@ interface MarkdownContentProps {
 
 export function MarkdownContent({ content, className = "" }: MarkdownContentProps) {
   if (!content) return null;
-
-  marked.setOptions({
-    gfm: true,
-    breaks: true,
-  });
 
   // Normalize single-space indented list items so they parse cleanly into nested lists
   const normalizedContent = content.replace(/\n( +)([*+-]) /g, (match, spaces, bullet) => {
@@ -77,9 +80,18 @@ function TokenRenderer({ token, isNested }: { token: Token; isNested?: boolean }
       );
     }
 
+    case "blockMath": {
+      const mathToken = token as unknown as MathToken;
+      return <MathBlock math={mathToken.text} displayMode={true} />;
+    }
+
     case "code": {
       const code = token as Tokens.Code;
-      return <CodeBlock code={code.text} language={code.lang || "text"} />;
+      const lang = (code.lang || "text").toLowerCase().trim();
+      if (lang === "math" || lang === "latex" || lang === "katex") {
+        return <MathBlock math={code.text} displayMode={true} />;
+      }
+      return <CodeBlock code={code.text} language={lang} />;
     }
 
     case "list": {
@@ -420,6 +432,77 @@ function CodeBlock({ code, language }: { code: string; language: string }) {
       <pre className="p-3 overflow-x-auto text-[12px] leading-relaxed font-mono text-[#d4d4d4] select-text">
         <code>{code}</code>
       </pre>
+    </div>
+  );
+}
+
+function MathBlock({
+  math,
+  displayMode = true,
+}: {
+  math: string;
+  displayMode?: boolean;
+}) {
+  const [copied, setCopied] = useState(false);
+  const [showSource, setShowSource] = useState(false);
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(math);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // ignore
+    }
+  };
+
+  const html = renderKatex(math, displayMode);
+
+  return (
+    <div className="rounded-xl overflow-hidden bg-[#1b1b1b] border border-[#2e2e2e] my-2.5 select-none">
+      <div className="flex items-center justify-between px-3 py-1.5 bg-[#222222] border-b border-[#2e2e2e] text-xs">
+        <span className="font-mono text-[10px] text-[#969696] uppercase tracking-wider">
+          LaTeX
+        </span>
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setShowSource(!showSource)}
+            className="text-[11px] text-[#969696] hover:text-[#ffffff] transition-colors cursor-pointer py-0.5 px-1.5 rounded hover:bg-white/5"
+          >
+            {showSource ? "Rendered" : "TeX"}
+          </button>
+          <button
+            type="button"
+            onClick={handleCopy}
+            className="flex items-center gap-1 text-[11px] text-[#969696] hover:text-[#ffffff] transition-colors cursor-pointer py-0.5 px-1.5 rounded hover:bg-white/5"
+            title="Copy LaTeX"
+          >
+            {copied ? (
+              <>
+                <Check className="w-3 h-3 text-[#4ade80]" />
+                <span className="text-[#4ade80]">Copied</span>
+              </>
+            ) : (
+              <>
+                <Copy className="w-3 h-3" />
+                <span>Copy</span>
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {showSource ? (
+        <pre className="p-3 overflow-x-auto text-[12px] leading-relaxed font-mono text-[#d4d4d4] select-text bg-black/20">
+          <code>{math}</code>
+        </pre>
+      ) : (
+        <div
+          className="p-3 overflow-x-auto text-center leading-normal text-[#e4e4e4] select-text font-sans touch-pan-x [&_.katex-display]:my-0"
+          dangerouslySetInnerHTML={{ __html: html }}
+        />
+      )}
     </div>
   );
 }

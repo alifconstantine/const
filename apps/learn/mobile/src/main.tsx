@@ -4,6 +4,7 @@ import { SonnerToaster, initThemeListener } from "@const/ui";
 import { I18nProvider } from "./lib/i18n";
 import App from "./App";
 import "./index.css";
+import "katex/dist/katex.min.css";
 
 // Initialize reactive theme listener (respecting saved theme or system preference)
 initThemeListener();
