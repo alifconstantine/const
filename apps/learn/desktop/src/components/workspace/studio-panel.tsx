@@ -1,7 +1,6 @@
 import React from "react";
 import {
-  PanelRightClose,
-  PanelRightOpen,
+  PanelRight,
   AudioLines,
   Presentation,
   Video,
@@ -64,7 +63,7 @@ export function StudioPanel({
           title={t("openStudioPanel")}
           aria-label={t("studioTitle")}
         >
-          <PanelRightOpen className="h-4 w-4" />
+          <PanelRight className="h-4 w-4" />
         </button>
 
         {/* Top-aligned: Vertical Stack of Studio Tools Icons (Image 3) */}
@@ -113,7 +112,7 @@ export function StudioPanel({
             className="h-7 w-7 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
             title={t("hidePanel")}
           >
-            <PanelRightClose className="h-4 w-4" />
+            <PanelRight className="h-4 w-4" />
           </button>
         )}
       </div>

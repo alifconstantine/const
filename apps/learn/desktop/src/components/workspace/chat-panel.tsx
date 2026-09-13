@@ -19,8 +19,16 @@ import {
   Folder,
   History,
   Brain,
+  MessageCirclePlus,
 } from "lucide-react";
-import { ScrollArea, cn } from "@const/ui";
+import {
+  ScrollArea,
+  cn,
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@const/ui";
 import { DEFAULT_MODELS } from "@const/agent/models";
 import type { ModelConfig, AgentMessage } from "@const/agent/types";
 import { useLiveQuery } from "dexie-react-hooks";
@@ -1126,16 +1134,16 @@ export function ChatPanel({
           setIsSourcesDropdownOpen(!isSourcesDropdownOpen);
         }}
         className={cn(
-          "flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer select-none shrink-0 border",
+          "h-8 px-2.5 rounded-xl text-xs font-medium transition-all cursor-pointer select-none flex items-center gap-1.5 border shrink-0 shadow-xs active:scale-98",
           carriedSourcesCount > 0
-            ? "bg-secondary/70 hover:bg-secondary border-border/70 text-foreground"
-            : "hover:bg-muted/60 text-muted-foreground border-transparent hover:border-border/50"
+            ? "bg-muted/60 hover:bg-muted border-border/70 text-foreground"
+            : "bg-muted/40 hover:bg-muted text-muted-foreground border-border/50"
         )}
         aria-label={t("manageCarriedSources")}
         title={t("manageCarriedSources")}
       >
-        <FileText className="h-3 w-3 text-muted-foreground shrink-0" />
-        <span className="font-mono text-[11px] sm:text-[12px] text-foreground/85 font-medium">
+        <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+        <span className="font-mono text-[11px] text-foreground/90 font-medium">
           {carriedSourcesCount > 1
             ? t("carriedSourcesPill", { count: carriedSourcesCount })
             : carriedSourcesCount === 1
@@ -1152,7 +1160,7 @@ export function ChatPanel({
 
       {isSourcesDropdownOpen && (
         <div
-          className="absolute bottom-full right-0 mb-2 w-72 sm:w-80 rounded-2xl bg-card border border-border shadow-2xl p-2.5 z-50 animate-in fade-in zoom-in-95 duration-100 font-sans"
+          className="absolute top-full right-0 mt-1.5 w-72 sm:w-80 rounded-2xl bg-card border border-border shadow-2xl p-2.5 z-50 animate-in fade-in zoom-in-95 duration-100 font-sans"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
@@ -1239,6 +1247,69 @@ export function ChatPanel({
               </button>
             </div>
           )}
+        </div>
+      )}
+    </div>
+  );
+
+  const renderModelDropdown = () => (
+    <div className="relative" ref={dropdownRef}>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsModelDropdownOpen(!isModelDropdownOpen);
+        }}
+        className="flex items-center gap-1 px-2.5 py-1 rounded-full hover:bg-muted/70 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer select-none shrink-0"
+        aria-label={t("selectAiModel")}
+        title={t("selectAiModel")}
+      >
+        <span className="text-[12px] font-medium text-foreground/80">
+          {currentModel.displayName.split("(")[0]?.trim() || "Const"}
+        </span>
+        <ChevronDown
+          className={cn(
+            "h-3 w-3 text-muted-foreground/70 transition-transform duration-150 ml-0.5",
+            isModelDropdownOpen && "rotate-180"
+          )}
+        />
+      </button>
+
+      {isModelDropdownOpen && (
+        <div
+          className="absolute bottom-full right-0 mb-2 w-64 rounded-2xl bg-card border border-border shadow-2xl p-1.5 z-50 animate-in fade-in zoom-in-95 duration-100 font-sans"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="px-2.5 py-1.5 text-[10px] uppercase font-semibold text-muted-foreground tracking-wider border-b border-border/40 mb-1">
+            {t("selectAiModel")}
+          </div>
+          <div className="max-h-56 overflow-y-auto space-y-0.5">
+            {models.map((m) => (
+              <button
+                key={m.id}
+                type="button"
+                onClick={() => {
+                  setSelectedModelId(m.id);
+                  setIsModelDropdownOpen(false);
+                }}
+                className={`w-full text-left px-2.5 py-2 rounded-xl text-xs flex items-center justify-between transition-colors cursor-pointer ${
+                  selectedModelId === m.id
+                    ? "bg-muted text-foreground font-medium"
+                    : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                }`}
+              >
+                <div>
+                  <div className="font-medium text-foreground">{m.displayName}</div>
+                  <div className="text-[10px] text-muted-foreground/70 font-mono">
+                    {m.id}
+                  </div>
+                </div>
+                {selectedModelId === m.id && (
+                  <span className="h-1.5 w-1.5 rounded-full bg-accent shrink-0" />
+                )}
+              </button>
+            ))}
+          </div>
         </div>
       )}
     </div>
@@ -1363,7 +1434,7 @@ export function ChatPanel({
     <main className="flex-1 h-full flex flex-col bg-card rounded-2xl border border-border/50 text-foreground min-w-0 relative select-text overflow-hidden shadow-xs">
       {/* Top Header Bar */}
       <div className="h-12 px-4 sm:px-5 border-b border-border/50 flex items-center justify-between shrink-0 select-none bg-card/30">
-        {/* Left: Project / Workspace Folder Indicator + Model Selector Pill */}
+        {/* Left: Project / Workspace Folder Indicator */}
         <div className="flex items-center gap-2.5 min-w-0">
           <button
             type="button"
@@ -1372,7 +1443,7 @@ export function ChatPanel({
                 (window as any).electron.openPath(workspacePath);
               }
             }}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-muted/60 hover:bg-muted text-xs font-medium text-foreground transition-all cursor-pointer border border-border/60 max-w-[180px] sm:max-w-[260px] truncate group select-none shadow-xs active:scale-98 shrink-0"
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-muted/60 hover:bg-muted text-xs font-medium text-foreground transition-all cursor-pointer border border-border/60 max-w-[200px] sm:max-w-[280px] truncate group select-none shadow-xs active:scale-98 shrink-0"
             title={
               workspacePath
                 ? t("openInExplorer", { path: workspacePath })
@@ -1386,93 +1457,75 @@ export function ChatPanel({
                 : t("defaultWorkspace")}
             </span>
           </button>
-
-          {/* Model Selector Dropdown */}
-          <div className="relative" ref={dropdownRef}>
-            <button
-              type="button"
-              onClick={() => setIsModelDropdownOpen(!isModelDropdownOpen)}
-              className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-muted/60 hover:bg-muted border border-border/60 text-xs font-medium text-foreground transition-all cursor-pointer shadow-xs active:scale-98"
-              aria-label={t("selectAiModel")}
-            >
-              <Sparkles className="h-3 w-3 text-accent" />
-              <span>{currentModel.displayName.split("(")[0]?.trim() || "Const"}</span>
-              <ChevronDown className="h-3 w-3 text-muted-foreground ml-0.5" />
-            </button>
-
-            {isModelDropdownOpen && (
-              <div className="absolute left-0 mt-1.5 w-64 rounded-2xl bg-card border border-border shadow-2xl p-1.5 z-50 animate-in fade-in zoom-in-95 duration-100">
-                <div className="px-2.5 py-1.5 text-[10px] uppercase font-semibold text-muted-foreground tracking-wider border-b border-border/40 mb-1">
-                  {t("selectAiModel")}
-                </div>
-                {models.map((m) => (
-                  <button
-                    key={m.id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedModelId(m.id);
-                      setIsModelDropdownOpen(false);
-                    }}
-                    className={`w-full text-left px-2.5 py-2 rounded-xl text-xs flex items-center justify-between transition-colors cursor-pointer ${
-                      selectedModelId === m.id
-                        ? "bg-muted text-foreground font-medium"
-                        : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-                    }`}
-                  >
-                    <div>
-                      <div className="font-medium text-foreground">{m.displayName}</div>
-                      <div className="text-[10px] text-muted-foreground/70 font-mono">
-                        {m.id}
-                      </div>
-                    </div>
-                    {selectedModelId === m.id && (
-                      <span className="h-1.5 w-1.5 rounded-full bg-accent shrink-0" />
-                    )}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
         </div>
 
-        {/* Right Header Actions: New Chat, History */}
-        <div className="flex items-center gap-2 shrink-0">
+        {/* Right Header Actions: Sources Indicator, New Chat, History, More Options */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          {/* Sources Dropdown Indicator */}
+          {renderSourcesDropdown()}
+
           {/* New Chat Button */}
           <button
             type="button"
             onClick={handleNewChat}
-            className="h-8 px-3 rounded-xl hover:bg-muted text-foreground text-xs flex items-center gap-1.5 transition-all cursor-pointer border border-border/60 bg-muted/40 font-medium shadow-xs active:scale-98"
+            className="h-8 w-8 rounded-xl hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-all cursor-pointer border border-border/60 bg-muted/40 shadow-xs active:scale-98 shrink-0"
             title={t("startConversationNew")}
+            aria-label={t("newChat")}
           >
-            <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
-            <span>{t("newChat")}</span>
+            <MessageCirclePlus className="h-4 w-4 stroke-[1.8]" />
           </button>
 
           {/* History Button */}
           <button
             type="button"
             onClick={() => setIsHistoryOpen(true)}
-            className="h-8 px-2.5 rounded-xl hover:bg-muted text-muted-foreground hover:text-foreground text-xs flex items-center gap-1.5 transition-all cursor-pointer border border-border/60 bg-muted/40 shadow-xs active:scale-98"
+            className="relative h-8 w-8 rounded-xl hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-all cursor-pointer border border-border/60 bg-muted/40 shadow-xs active:scale-98 shrink-0"
             title={t("chatHistory")}
             aria-label={t("chatHistory")}
           >
-            <History className="h-4 w-4" />
-            <span className="hidden sm:inline font-sans">{t("chatHistory")}</span>
+            <History className="h-4 w-4 stroke-[1.8]" />
             {sessions.length > 0 && (
-              <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-secondary text-foreground">
-                {sessions.length}
+              <span className="absolute -top-1 -right-1 min-w-[15px] h-3.5 px-1 rounded-full bg-secondary text-[9px] font-mono font-medium text-foreground flex items-center justify-center border border-border/60">
+                {sessions.length > 99 ? "99+" : sessions.length}
               </span>
             )}
           </button>
 
-          <button
-            type="button"
-            className="h-8 w-8 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
-            aria-label={t("moreOptions")}
-            title={t("moreOptions")}
-          >
-            <MoreVertical className="h-4 w-4" />
-          </button>
+          {/* More Options Dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="h-8 w-8 rounded-xl hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-all cursor-pointer border border-border/60 bg-muted/40 shadow-xs active:scale-98 shrink-0"
+                aria-label={t("moreOptions")}
+                title={t("moreOptions")}
+              >
+                <MoreVertical className="h-4 w-4 stroke-[1.8]" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52 rounded-2xl p-1.5 shadow-xl bg-card border border-border z-50">
+              <DropdownMenuItem
+                onClick={handleNewChat}
+                className="flex items-center gap-2 px-2.5 py-2 rounded-xl text-xs cursor-pointer hover:bg-muted"
+              >
+                <RotateCcw className="h-3.5 w-3.5 text-muted-foreground" />
+                <span>{t("clearConversation")}</span>
+              </DropdownMenuItem>
+              {workspacePath && (
+                <DropdownMenuItem
+                  onClick={() => {
+                    if ((window as any).electron?.openPath) {
+                      (window as any).electron.openPath(workspacePath);
+                    }
+                  }}
+                  className="flex items-center gap-2 px-2.5 py-2 rounded-xl text-xs cursor-pointer hover:bg-muted"
+                >
+                  <Folder className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span>Buka Folder Workspace</span>
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -1651,14 +1704,14 @@ export function ChatPanel({
               />
             </ScrollArea>
 
-            {/* Bottom Row: Plus on left, Sources Dropdown + Send button on right */}
+            {/* Bottom Row: Plus on left, Model Dropdown + Send button on right */}
             <div className="flex items-center justify-between pt-1">
               <div className="flex items-center gap-2 shrink-0">
                 {renderPlusButton()}
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
-                {renderSourcesDropdown()}
+                {renderModelDropdown()}
                 {renderSendButton()}
               </div>
             </div>
@@ -1710,7 +1763,7 @@ export function ChatPanel({
             />
 
             <div className="flex items-center gap-2 shrink-0">
-              {renderSourcesDropdown()}
+              {renderModelDropdown()}
               {renderSendButton()}
             </div>
           </form>

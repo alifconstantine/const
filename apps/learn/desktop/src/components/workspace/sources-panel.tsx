@@ -4,8 +4,7 @@ import {
   Search,
   Globe,
   FileText,
-  PanelLeftClose,
-  PanelLeftOpen,
+  PanelLeft,
   ChevronDown,
   Trash2,
   BookOpen,
@@ -88,7 +87,7 @@ export function SourcesPanel({
           title={t("openSourcesPanel")}
           aria-label={t("sourcesPanelTitle")}
         >
-          <PanelLeftOpen className="h-4 w-4" />
+          <PanelLeft className="h-4 w-4" />
         </button>
 
         <button
@@ -124,7 +123,7 @@ export function SourcesPanel({
             className="h-7 w-7 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
             title={t("hidePanel")}
           >
-            <PanelLeftClose className="h-4 w-4" />
+            <PanelLeft className="h-4 w-4" />
           </button>
         )}
       </div>

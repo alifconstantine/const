@@ -402,11 +402,13 @@ export function LearnHome({
                         : "space-y-2"
                     }
                   >
-                    {/* First Card: Quick Create Learn Card */}
-                    <CreateCard
-                      type="learn"
-                      onClick={() => handleCreateNewLearn()}
-                    />
+                    {/* First Card: Quick Create Learn Card (Grid view mode only) */}
+                    {viewMode === "grid" && (
+                      <CreateCard
+                        type="learn"
+                        onClick={() => handleCreateNewLearn()}
+                      />
+                    )}
 
                     {/* All User Learn Cards */}
                     {filteredLearns.map((learn) => (
@@ -432,11 +434,23 @@ export function LearnHome({
                     ))}
                   </div>
 
-                  {filteredLearns.length === 0 && searchQuery && (
+                  {filteredLearns.length === 0 && (
                     <div className="text-center py-14 px-4 rounded-2xl border border-dashed border-[#dedee2] dark:border-[#383838] bg-white/40 dark:bg-[#1e1e1e]/40">
                       <p className="text-xs text-[#8a8a8a] dark:text-[#888888]">
-                        {t("noLearnsMatchSearch", { query: searchQuery })}
+                        {searchQuery ? t("noLearnsMatchSearch", { query: searchQuery }) : "Belum ada notebook tersimpan"}
                       </p>
+                      {!searchQuery && (
+                        <div className="mt-3">
+                          <Button
+                            size="sm"
+                            onClick={() => handleCreateNewLearn()}
+                            className="h-8 px-3.5 rounded-xl text-xs font-medium gap-1.5 cursor-pointer"
+                          >
+                            <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                            <span>{t("newLearn")}</span>
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   )}
                 </section>
@@ -526,10 +540,12 @@ export function LearnHome({
                           : "space-y-2"
                       }
                     >
-                      <CreateCard
-                        type="learn"
-                        onClick={() => handleCreateNewLearn(activeCollectionId || undefined)}
-                      />
+                      {viewMode === "grid" && (
+                        <CreateCard
+                          type="learn"
+                          onClick={() => handleCreateNewLearn(activeCollectionId || undefined)}
+                        />
+                      )}
 
                       {collectionLearns.map((learn) => (
                         <LearnCard
@@ -584,13 +600,15 @@ export function LearnHome({
                           : "space-y-2"
                       }
                     >
-                      <CreateCard
-                        type="collection"
-                        onClick={() => {
-                          setEditingCollection(null);
-                          setIsCreateCollectionOpen(true);
-                        }}
-                      />
+                      {viewMode === "grid" && (
+                        <CreateCard
+                          type="collection"
+                          onClick={() => {
+                            setEditingCollection(null);
+                            setIsCreateCollectionOpen(true);
+                          }}
+                        />
+                      )}
 
                       {collections.map((col) => (
                         <CollectionCard
