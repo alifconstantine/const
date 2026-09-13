@@ -64,6 +64,40 @@ export async function POST(req: NextRequest) {
         headers["Authorization"] = `Bearer ${constApiKey}`;
       }
 
+      // Const Search tests against /v1/search
+      if (model === "const-search" || model === "Const Search" || mappedModel === "Const Search") {
+        const res = await fetch(`${constBaseUrl}/v1/search`, {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            query: "ping test",
+          }),
+          signal: controller.signal,
+        }).finally(() => clearTimeout(timeoutId));
+
+        const latency = Date.now() - startTime;
+        const data = await res.json().catch(() => null);
+
+        if (!res.ok) {
+          const errorMsg =
+            data?.error?.message ||
+            data?.message ||
+            `Search upstream error (HTTP ${res.status} ${res.statusText})`;
+          return NextResponse.json(
+            { success: false, error: errorMsg, status: res.status, latency },
+            { status: res.status }
+          );
+        }
+
+        const count = Array.isArray(data?.results) ? data.results.length : 0;
+        return NextResponse.json({
+          success: true,
+          latency,
+          reply: `Search engine connected successfully (${count} results)`,
+          model: "const-search",
+        });
+      }
+
       const res = await fetch(`${constBaseUrl}/v1/chat/completions`, {
         method: "POST",
         headers,

@@ -20,6 +20,10 @@ export interface ModelSpec {
   modelsCount?: number;
   description?: string;
   contextLength?: number;
+  contextWindow?: string;
+  maxOutputTokens?: string;
+  inputTypes?: string[];
+  outputTypes?: string[];
 }
 
 // Built-in models matching exactly what is listed in /models
@@ -33,6 +37,8 @@ export const BUILTIN_MODELS: ModelSpec[] = [
     supportsThinking: true,
     thinkingDefault: "medium",
     isDefault: true,
+    inputTypes: ["text", "image", "video"],
+    outputTypes: ["text"],
   },
   {
     id: "gemini-3.7-flash",
@@ -42,6 +48,21 @@ export const BUILTIN_MODELS: ModelSpec[] = [
     providerName: "Const",
     supportsThinking: true,
     thinkingDefault: "medium",
+    inputTypes: ["text", "image", "video"],
+    outputTypes: ["text"],
+  },
+  {
+    id: "const-search",
+    name: "Const Search",
+    modelId: "const-search",
+    provider: "const",
+    providerName: "Const",
+    supportsThinking: false,
+    contextWindow: "1000000",
+    maxOutputTokens: "32000",
+    inputTypes: ["text", "search"],
+    outputTypes: ["text"],
+    description: "Real-time intelligent web search engine powered by OmniRoute & Tavily",
   },
 ];
 
@@ -82,6 +103,13 @@ export function normalizeConstModelName(modelId: string): string {
   ) {
     return "Gemini 3.8 Flash";
   }
+  if (
+    clean === "const-search" ||
+    clean === "const search" ||
+    clean === "search"
+  ) {
+    return "Const Search";
+  }
   return modelId;
 }
 
@@ -92,6 +120,7 @@ export function isBuiltinModel(modelId: string, customModels: ModelSpec[] = []):
   if (!modelId) return false;
   const clean = modelId.toLowerCase().trim();
   if (clean.startsWith("antigravity/")) return true;
+  if (clean === "const-search" || clean === "const search") return true;
   if (
     clean === "gemini-3.7-flash" || clean === "gemini 3.7 flash" ||
     clean === "gemini-3.8-flash" || clean === "gemini 3.8 flash" ||

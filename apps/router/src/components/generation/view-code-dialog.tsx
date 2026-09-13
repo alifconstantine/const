@@ -26,6 +26,7 @@ interface ViewCodeDialogProps {
   systemInstruction?: string;
   temperature: number;
   thinkingLevel?: string;
+  webSearch?: "off" | "auto";
 }
 
 export function ViewCodeDialog({
@@ -37,6 +38,7 @@ export function ViewCodeDialog({
   systemInstruction,
   temperature,
   thinkingLevel,
+  webSearch = "off",
 }: ViewCodeDialogProps) {
   const [copied, setCopied] = useState(false);
   const [activeTab, setActiveTab] = useState("curl");
@@ -69,6 +71,7 @@ export function ViewCodeDialog({
       messages: payloadMessages,
       temperature,
       ...(thinkingLevel ? { reasoning: thinkingLevel } : {}),
+      ...(webSearch === "auto" ? { web_search: "auto" } : {}),
       stream: true,
     },
     null,
@@ -88,6 +91,8 @@ response = client.chat.completions.create(
     messages=${JSON.stringify(payloadMessages, null, 4)},
     temperature=${temperature},${
     thinkingLevel ? `\n    reasoning_effort="${thinkingLevel}",` : ""
+  }${
+    webSearch === "auto" ? `\n    extra_body={"web_search": "auto"},` : ""
   }
     stream=True,
 )
@@ -111,6 +116,8 @@ async function main() {
     messages: ${JSON.stringify(payloadMessages, null, 4)},
     temperature: ${temperature},${
     thinkingLevel ? `\n    reasoning_effort: "${thinkingLevel}",` : ""
+  }${
+    webSearch === "auto" ? `\n    // @ts-ignore - custom grounding parameter\n    web_search: "auto",` : ""
   }
     stream: true,
   });

@@ -38,6 +38,7 @@ interface ChatRequestBody {
   systemInstruction?: string;
   temperature?: number;
   thinkingLevel?: "low" | "medium" | "high";
+  webSearch?: "off" | "auto";
   apiKey?: string;
   providerId?: string;
   providerDocId?: string;
@@ -74,6 +75,7 @@ export async function POST(req: NextRequest) {
       systemInstruction = "",
       temperature = 0.7,
       thinkingLevel = "medium",
+      webSearch = "off",
       apiKey: customKey,
       providerId = "const",
       providerDocId,
@@ -259,7 +261,47 @@ export async function POST(req: NextRequest) {
       const constBaseUrl = (process.env.CONST_ENGINE_BASE_URL?.trim() || "https://engine.const.web.id").replace(/\/+$/, "");
       const constEngineKey = process.env.CONST_ENGINE_API_KEY?.trim() || "";
 
-      const targetModel = normalizeConstModelName(model);
+      let targetModel = normalizeConstModelName(model);
+      if (targetModel === "Const Search" || model === "const-search") {
+        targetModel = "Gemini 3.8 Flash";
+      }
+
+      // If webSearch === "auto" or model is const-search, perform search grounding via OmniRoute
+      if (webSearch === "auto" || model === "const-search" || model === "Const Search") {
+        const lastUser = [...formattedMessages].reverse().find((m: any) => m.role === "user");
+        const queryText = typeof lastUser?.content === "string" ? lastUser.content : "";
+        if (queryText.trim()) {
+          try {
+            const searchController = new AbortController();
+            const searchTimeout = setTimeout(() => searchController.abort(), 8000);
+            const searchHeaders: Record<string, string> = { "Content-Type": "application/json" };
+            if (constEngineKey) searchHeaders["Authorization"] = `Bearer ${constEngineKey}`;
+
+            const searchRes = await fetch(`${constBaseUrl}/v1/search`, {
+              method: "POST",
+              headers: searchHeaders,
+              body: JSON.stringify({ query: queryText }),
+              signal: searchController.signal,
+            }).finally(() => clearTimeout(searchTimeout));
+
+            if (searchRes.ok) {
+              const searchData = await searchRes.json();
+              if (Array.isArray(searchData?.results) && searchData.results.length > 0) {
+                const searchSnippet = searchData.results.slice(0, 5).map((r: any, idx: number) =>
+                  `[Source ${idx + 1}]: ${r.title}\nURL: ${r.url}\nSnippet: ${r.snippet || r.content || ""}`
+                ).join("\n\n");
+
+                formattedMessages.splice(formattedMessages.length - 1, 0, {
+                  role: "system",
+                  content: `[Real-Time Web Search Grounding Context from Const Search]\n${searchSnippet}\n\nPlease ground your response with facts from these live web search results whenever relevant, and cite source titles or URLs.`,
+                });
+              }
+            }
+          } catch (searchErr) {
+            console.warn("Non-fatal web search grounding error:", searchErr);
+          }
+        }
+      }
 
       const headers: Record<string, string> = {
         "Content-Type": "application/json",

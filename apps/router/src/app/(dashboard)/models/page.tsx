@@ -102,6 +102,17 @@ const PROVIDERS_DATA: ProviderGroup[] = [
         outputTypes: ["text"],
         supportsThinking: true,
       },
+      {
+        id: "const-search",
+        name: "Const Search",
+        modelId: "const-search",
+        provider: "const",
+        contextWindow: "1000000",
+        maxOutputTokens: "32000",
+        inputTypes: ["text", "search"],
+        outputTypes: ["text"],
+        supportsThinking: false,
+      },
     ],
   },
 ];
@@ -540,6 +551,12 @@ export default function ModelsPage() {
                               {model.inputTypes?.includes("video") && (
                                 <span className="text-[10px] font-sans px-1.5 py-0.5 rounded-md bg-secondary border border-border text-foreground">
                                   Video
+                                </span>
+                              )}
+                              {model.inputTypes?.includes("search") && (
+                                <span className="text-[10px] font-sans px-1.5 py-0.5 rounded-md bg-secondary border border-border text-foreground flex items-center gap-1">
+                                  <Search className="h-2.5 w-2.5 text-muted-foreground" />
+                                  Search
                                 </span>
                               )}
                               {model.supportsThinking && (

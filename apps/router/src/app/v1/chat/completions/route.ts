@@ -35,6 +35,8 @@ interface OpenAIChatRequestBody {
   max_completion_tokens?: number;
   tools?: any[];
   tool_choice?: any;
+  web_search?: "off" | "auto" | boolean;
+  webSearch?: "off" | "auto" | boolean;
 }
 
 const CORS_HEADERS = {
@@ -254,6 +256,7 @@ export async function POST(req: NextRequest) {
       max_completion_tokens,
       tools,
       tool_choice,
+      webSearch: body.web_search ?? body.webSearch,
       providedKey,
       ssoToken,
       convexUrl,
@@ -279,6 +282,7 @@ async function dispatchSingleModel({
   max_completion_tokens,
   tools,
   tool_choice,
+  webSearch,
   providedKey,
   ssoToken,
   convexUrl,
@@ -297,6 +301,7 @@ async function dispatchSingleModel({
   max_completion_tokens?: number;
   tools?: any[];
   tool_choice?: any;
+  webSearch?: "off" | "auto" | boolean;
   providedKey?: string;
   ssoToken?: string | null;
   convexUrl: string;
@@ -344,7 +349,57 @@ async function dispatchSingleModel({
     ).replace(/\/+$/, "");
     const constEngineKey = process.env.CONST_ENGINE_API_KEY?.trim() || "";
 
-    const resolvedModel = normalizeConstModelName(targetModel);
+    let resolvedModel = normalizeConstModelName(targetModel);
+    if (resolvedModel === "Const Search" || targetModel === "const-search") {
+      resolvedModel = "Gemini 3.8 Flash";
+    }
+
+    let searchAugmentedMessages = messages;
+    const isSearchRequested =
+      webSearch === "auto" ||
+      webSearch === true ||
+      targetModel === "const-search" ||
+      targetModel === "Const Search";
+
+    if (isSearchRequested) {
+      const lastUser = [...messages].reverse().find((m) => m.role === "user");
+      const queryText = typeof lastUser?.content === "string" ? lastUser.content : "";
+      if (queryText.trim()) {
+        try {
+          const searchController = new AbortController();
+          const searchTimeout = setTimeout(() => searchController.abort(), 8000);
+          const searchHeaders: Record<string, string> = { "Content-Type": "application/json" };
+          if (constEngineKey) searchHeaders["Authorization"] = `Bearer ${constEngineKey}`;
+
+          const searchRes = await fetch(`${constBaseUrl}/v1/search`, {
+            method: "POST",
+            headers: searchHeaders,
+            body: JSON.stringify({ query: queryText }),
+            signal: searchController.signal,
+          }).finally(() => clearTimeout(searchTimeout));
+
+          if (searchRes.ok) {
+            const searchData = await searchRes.json();
+            if (Array.isArray(searchData?.results) && searchData.results.length > 0) {
+              const searchSnippet = searchData.results.slice(0, 5).map((r: any, idx: number) =>
+                `[Source ${idx + 1}]: ${r.title}\nURL: ${r.url}\nSnippet: ${r.snippet || r.content || ""}`
+              ).join("\n\n");
+
+              searchAugmentedMessages = [
+                ...messages.slice(0, -1),
+                {
+                  role: "system",
+                  content: `[Real-Time Web Search Grounding Context from Const Search]\n${searchSnippet}\n\nPlease ground your response with facts from these live web search results whenever relevant, and cite source titles or URLs.`,
+                },
+                messages[messages.length - 1]!,
+              ];
+            }
+          }
+        } catch (searchErr) {
+          console.warn("Non-fatal web search grounding error in v1/chat:", searchErr);
+        }
+      }
+    }
 
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
@@ -357,7 +412,7 @@ async function dispatchSingleModel({
 
     const constPayload: Record<string, unknown> = {
       model: resolvedModel,
-      messages,
+      messages: searchAugmentedMessages,
       temperature,
       stream,
     };

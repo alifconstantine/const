@@ -41,6 +41,7 @@ import {
   Music,
   Maximize2,
   Minimize2,
+  Globe,
 } from "lucide-react";
 import {
   BUILTIN_MODELS,
@@ -247,6 +248,7 @@ export default function GenerationPage() {
   const [systemInstruction, setSystemInstruction] = useState("");
   const [temperature, setTemperature] = useState<number>(1.0);
   const [thinkingLevel, setThinkingLevel] = useState<"low" | "medium" | "high">("medium");
+  const [webSearch, setWebSearch] = useState<"off" | "auto">("off");
 
   // API Key Selection & Custom Paste (defaults to logged in session)
   const [selectedKeyId, setSelectedKeyId] = useState<string>("account-session");
@@ -290,6 +292,9 @@ export default function GenerationPage() {
         } else {
           setThinkingLevel("medium");
         }
+      }
+      if ((activeChatQuery as any).webSearch) {
+        setWebSearch((activeChatQuery as any).webSearch === "auto" ? "auto" : "off");
       }
       const matched =
         comboModels.find((m) => m.modelId === activeChatQuery.modelId || m.id === activeChatQuery.modelId) ||
@@ -452,6 +457,7 @@ export default function GenerationPage() {
           systemInstruction,
           temperature,
           thinkingLevel: supportsThinking ? thinkingLevel : "off",
+          webSearch: webSearch,
           apiKey: effectiveKey,
         }),
         signal: controller.signal,
@@ -1072,6 +1078,47 @@ export default function GenerationPage() {
                 </p>
               </div>
             )}
+
+            {/* 6. Web Search: Off | Auto */}
+            <div className="space-y-2.5 pt-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5">
+                  <Globe className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="text-xs font-medium text-foreground">Web search</span>
+                </div>
+                <Badge
+                  variant={webSearch === "auto" ? "default" : "secondary"}
+                  className={cn(
+                    "text-xs px-2 py-0.5 font-sans font-medium",
+                    webSearch === "auto"
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground"
+                  )}
+                >
+                  {webSearch === "auto" ? "Auto" : "Off"}
+                </Badge>
+              </div>
+
+              <Select
+                value={webSearch}
+                onValueChange={(val: "off" | "auto") => setWebSearch(val)}
+              >
+                <SelectTrigger className="w-full h-9 rounded-full text-xs font-sans border-border/70 bg-secondary/50 text-foreground">
+                  <SelectValue placeholder="Web Search" />
+                </SelectTrigger>
+                <SelectContent className="bg-card border-border/70 text-xs font-sans">
+                  <SelectItem value="off" className="cursor-pointer text-foreground">
+                    Off (Standard inference)
+                  </SelectItem>
+                  <SelectItem value="auto" className="cursor-pointer text-foreground">
+                    Auto (Ground with Const Search)
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground font-normal leading-relaxed">
+                Automatically grounds answers with live web results via Const Search.
+              </p>
+            </div>
           </div>
         </div>
       )}
@@ -1081,7 +1128,12 @@ export default function GenerationPage() {
         open={isModelSelectorOpen}
         onClose={() => setIsModelSelectorOpen(false)}
         selectedModelId={selectedModel.modelId}
-        onSelectModel={(model) => setSelectedModel(model)}
+        onSelectModel={(model) => {
+          setSelectedModel(model);
+          if (model.modelId === "const-search") {
+            setWebSearch("auto");
+          }
+        }}
         customModels={customModels}
         comboModels={comboModels}
       />
@@ -1114,6 +1166,7 @@ export default function GenerationPage() {
         systemInstruction={systemInstruction}
         temperature={temperature}
         thinkingLevel={supportsThinking ? thinkingLevel : undefined}
+        webSearch={webSearch}
       />
     </div>
   );
