@@ -17,6 +17,7 @@ import {
   X,
   Folder,
   Clock,
+  Layers,
 } from "lucide-react";
 
 import { LearnCard, LearnItem } from "./learn-card";
@@ -695,8 +696,8 @@ export function LearnHome({
                   </div>
                 ) : (
                   <div className="text-center py-16 px-4 rounded-2xl border border-dashed border-[#dedee2] dark:border-[#383838] bg-white/40 dark:bg-[#1e1e1e]/40">
-                    <div className="h-12 w-12 rounded-2xl bg-[#f4f4f6] dark:bg-[#2b2b2b] border border-[#dedee2] dark:border-[#383838] flex items-center justify-center text-2xl mx-auto mb-3">
-                      🎨
+                    <div className="h-12 w-12 rounded-2xl bg-[#f4f4f6] dark:bg-[#2b2b2b] border border-[#dedee2] dark:border-[#383838] flex items-center justify-center mx-auto mb-3">
+                      <Layers className="w-5 h-5 text-[#737373] dark:text-[#a3a3a3]" />
                     </div>
                     <h3 className="font-serif text-lg text-[#262626] dark:text-white font-medium">
                       {t("noArtifactsTitle")}

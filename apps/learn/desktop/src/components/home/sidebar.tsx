@@ -20,7 +20,7 @@ import {
   BookOpen,
   FileText,
   Folder,
-  Sparkles,
+  Layers,
   Settings,
   Plus,
   ChevronsUpDown,
@@ -83,7 +83,7 @@ export function Sidebar({
     { id: "learns", label: t("learns"), icon: BookOpen, count: learnsCount },
     { id: "sources", label: t("sources"), icon: FileText, count: sourcesCount },
     { id: "collections", label: t("collections"), icon: Folder, count: collectionsCount },
-    { id: "artifacts", label: t("artifacts"), icon: Sparkles, count: artifactsCount },
+    { id: "artifacts", label: t("artifacts"), icon: Layers, count: artifactsCount },
   ];
 
   return (
