@@ -36,10 +36,21 @@ export interface LocalArtifact {
 export interface LocalMessage {
   id: string;
   learnId: string;
+  sessionId?: string;
   role: "user" | "assistant" | "tool";
   content: string;
   thinking?: string;
   toolCalls?: any[];
+  createdAt: number;
+}
+
+export interface LocalChatSession {
+  id: string;
+  learnId: string;
+  title: string;
+  lastMessageSnippet?: string;
+  messageCount: number;
+  updatedAt: number;
   createdAt: number;
 }
 
@@ -48,6 +59,7 @@ export const db = new Dexie("ConstLearnDatabase") as Dexie & {
   collections: EntityTable<LocalCollection, "id">;
   artifacts: EntityTable<LocalArtifact, "id">;
   messages: EntityTable<LocalMessage, "id">;
+  sessions: EntityTable<LocalChatSession, "id">;
 };
 
 db.version(1).stores({
@@ -62,6 +74,47 @@ db.version(2).stores({
   artifacts: "id, learnId, title, type, updatedAt, createdAt",
   messages: "id, learnId, role, createdAt",
 });
+
+db.version(3)
+  .stores({
+    learns: "id, title, updatedAt, createdAt, *collectionIds, projectPath",
+    collections: "id, name, updatedAt, createdAt",
+    artifacts: "id, learnId, title, type, updatedAt, createdAt",
+    messages: "id, learnId, sessionId, role, createdAt",
+    sessions: "id, learnId, title, updatedAt, createdAt",
+  })
+  .upgrade(async (tx) => {
+    // Migration: Any existing messages without sessionId are grouped into an initial session
+    const messages = await tx.table("messages").toArray();
+    const learnMap = new Map<string, typeof messages>();
+    for (const m of messages) {
+      if (!m.sessionId && m.learnId) {
+        const list = learnMap.get(m.learnId) || [];
+        list.push(m);
+        learnMap.set(m.learnId, list);
+      }
+    }
+    for (const [learnId, msgs] of learnMap.entries()) {
+      const sessionId =
+        "session_" + Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
+      const firstMsg = msgs[0]?.content || "Sesi Utama";
+      const snippet = msgs[msgs.length - 1]?.content?.slice(0, 80) || "";
+      const createdAt = msgs[0]?.createdAt || Date.now();
+      const updatedAt = msgs[msgs.length - 1]?.createdAt || Date.now();
+      await tx.table("sessions").add({
+        id: sessionId,
+        learnId,
+        title: typeof firstMsg === "string" ? firstMsg.slice(0, 35) : "Sesi Utama",
+        lastMessageSnippet: typeof snippet === "string" ? snippet : "",
+        messageCount: msgs.length,
+        createdAt,
+        updatedAt,
+      });
+      for (const m of msgs) {
+        await tx.table("messages").update(m.id, { sessionId });
+      }
+    }
+  });
 
 // Helper functions for CRUD operations
 export const localDb = {
@@ -220,8 +273,47 @@ export const localDb = {
     await db.artifacts.delete(id);
   },
 
+  // Sessions (Multi-Session Chat Threads)
+  async createSession(learnId: string, initialTitle?: string): Promise<string> {
+    const id = "session_" + Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
+    const now = Date.now();
+    await db.sessions.add({
+      id,
+      learnId,
+      title: initialTitle?.trim() || "Percakapan Baru",
+      lastMessageSnippet: "",
+      messageCount: 0,
+      createdAt: now,
+      updatedAt: now,
+    });
+    return id;
+  },
+
+  async getSessions(learnId: string): Promise<LocalChatSession[]> {
+    return await db.sessions.where("learnId").equals(learnId).reverse().sortBy("updatedAt");
+  },
+
+  async getSession(sessionId: string): Promise<LocalChatSession | null> {
+    return (await db.sessions.get(sessionId)) || null;
+  },
+
+  async updateSessionTitle(sessionId: string, title: string): Promise<void> {
+    await db.sessions.update(sessionId, {
+      title: title.trim(),
+      updatedAt: Date.now(),
+    });
+  },
+
+  async deleteSession(sessionId: string): Promise<void> {
+    await db.messages.where("sessionId").equals(sessionId).delete();
+    await db.sessions.delete(sessionId);
+  },
+
   // Messages (Chat History persistence)
-  async getMessages(learnId: string): Promise<LocalMessage[]> {
+  async getMessages(learnId: string, sessionId?: string): Promise<LocalMessage[]> {
+    if (sessionId) {
+      return await db.messages.where("sessionId").equals(sessionId).sortBy("createdAt");
+    }
     return await db.messages.where("learnId").equals(learnId).sortBy("createdAt");
   },
 
@@ -231,11 +323,34 @@ export const localDb = {
       ...data,
       createdAt: now,
     });
+
+    // If message is linked to a session, update session snippet, count, and updatedAt
+    if (data.sessionId) {
+      const session = await db.sessions.get(data.sessionId);
+      if (session) {
+        const snippet = typeof data.content === "string" ? data.content.slice(0, 100) : "";
+        await db.sessions.update(data.sessionId, {
+          lastMessageSnippet: snippet,
+          messageCount: (session.messageCount || 0) + 1,
+          updatedAt: now,
+        });
+      }
+    }
+
     return data.id;
   },
 
-  async clearMessages(learnId: string): Promise<void> {
-    await db.messages.where("learnId").equals(learnId).delete();
+  async clearMessages(learnId: string, sessionId?: string): Promise<void> {
+    if (sessionId) {
+      await db.messages.where("sessionId").equals(sessionId).delete();
+      await db.sessions.update(sessionId, {
+        lastMessageSnippet: "",
+        messageCount: 0,
+        updatedAt: Date.now(),
+      });
+    } else {
+      await db.messages.where("learnId").equals(learnId).delete();
+    }
   },
 };
 

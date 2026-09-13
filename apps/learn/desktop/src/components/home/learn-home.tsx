@@ -127,18 +127,9 @@ export function LearnHome({
   }, [allLearns]);
 
   // Action handlers
-  const handleCreateNewLearn = async (collectionId?: string) => {
-    if (onOpenLearn) {
-      const id = await localDb.createLearn({
-        title: "Notebook tanpa judul",
-        emoji: "📘",
-        collectionId: collectionId || activeCollectionId || undefined,
-      });
-      onOpenLearn(id, true);
-    } else {
-      setEditingLearn(null);
-      setIsCreateLearnOpen(true);
-    }
+  const handleCreateNewLearn = async (_collectionId?: string) => {
+    setEditingLearn(null);
+    setIsCreateLearnOpen(true);
   };
 
   const handleSaveLearn = async (data: {
@@ -157,13 +148,18 @@ export function LearnHome({
         projectPath: data.projectPath,
       });
     } else {
-      await localDb.createLearn({
+      const newId = await localDb.createLearn({
         title: data.title,
         description: data.description,
         emoji: data.emoji,
         collectionId: data.collectionId || (activeCollectionId ?? undefined),
         projectPath: data.projectPath,
       });
+      // Create initial chat session
+      await localDb.createSession(newId, "Sesi Awal");
+      if (onOpenLearn) {
+        onOpenLearn(newId, false);
+      }
     }
   };
 

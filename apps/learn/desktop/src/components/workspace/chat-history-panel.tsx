@@ -1,0 +1,280 @@
+import React, { useState, useMemo } from "react";
+import {
+  Button,
+  Input,
+  cn,
+  Sheet,
+  SheetContent,
+  SheetClose,
+  SheetTitle,
+} from "@const/ui";
+import {
+  X,
+  Search,
+  History,
+  MessageSquare,
+  Trash2,
+  Plus,
+  Clock,
+} from "lucide-react";
+import type { LocalChatSession } from "../../lib/db";
+
+interface ChatHistoryPanelProps {
+  open: boolean;
+  onClose: () => void;
+  sessions: LocalChatSession[];
+  activeSessionId: string | null;
+  onSelectSession: (sessionId: string) => void;
+  onDeleteSession: (sessionId: string) => void;
+  onNewChat: () => void;
+}
+
+export function ChatHistoryPanel({
+  open,
+  onClose,
+  sessions,
+  activeSessionId,
+  onSelectSession,
+  onDeleteSession,
+  onNewChat,
+}: ChatHistoryPanelProps) {
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const filteredSessions = useMemo(() => {
+    if (!searchQuery.trim()) return sessions;
+    const q = searchQuery.toLowerCase();
+    return sessions.filter(
+      (s) =>
+        s.title.toLowerCase().includes(q) ||
+        (s.lastMessageSnippet && s.lastMessageSnippet.toLowerCase().includes(q))
+    );
+  }, [sessions, searchQuery]);
+
+  // Group sessions by date
+  const groupedSessions = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+
+    const lastWeek = new Date(today);
+    lastWeek.setDate(lastWeek.getDate() - 7);
+
+    const groups = {
+      "Hari Ini": [] as LocalChatSession[],
+      Kemarin: [] as LocalChatSession[],
+      "7 Hari Terakhir": [] as LocalChatSession[],
+      "Lebih Lama": [] as LocalChatSession[],
+    };
+
+    filteredSessions.forEach((session) => {
+      const sessionDate = new Date(session.updatedAt);
+      if (sessionDate >= today) {
+        groups["Hari Ini"].push(session);
+      } else if (sessionDate >= yesterday) {
+        groups.Kemarin.push(session);
+      } else if (sessionDate >= lastWeek) {
+        groups["7 Hari Terakhir"].push(session);
+      } else {
+        groups["Lebih Lama"].push(session);
+      }
+    });
+
+    return groups;
+  }, [filteredSessions]);
+
+  if (!open) return null;
+
+  return (
+    <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
+      <SheetContent
+        side="right"
+        showCloseButton={false}
+        className="w-full sm:max-w-[400px] p-0 flex flex-col bg-card border-l border-border/70 shadow-2xl z-50 gap-0 select-none"
+      >
+        {/* Header */}
+        <div className="p-4 sm:p-5 pb-3 flex items-center justify-between border-b border-border/40">
+          <div className="flex items-center gap-2.5">
+            <div className="h-7 w-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+              <History className="h-4 w-4" />
+            </div>
+            <div>
+              <SheetTitle className="font-serif text-base font-semibold text-foreground">
+                Riwayat Chat
+              </SheetTitle>
+              <p className="text-[11px] text-muted-foreground">
+                Sesi diskusi di notebook ini
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                onNewChat();
+                onClose();
+              }}
+              className="h-8 px-2.5 rounded-xl text-xs gap-1.5 font-medium cursor-pointer border-border/70 hover:bg-muted"
+              title="Mulai percakapan baru"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              <span>New Chat</span>
+            </Button>
+
+            <SheetClose asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+                aria-label="Tutup panel riwayat"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </SheetClose>
+          </div>
+        </div>
+
+        {/* Search Input */}
+        <div className="p-3 px-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
+            <Input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Cari topik atau riwayat percakapan..."
+              className="pl-9 pr-7 h-9 rounded-xl text-xs font-sans border-border/70 bg-secondary/30 text-foreground placeholder:text-muted-foreground/70 focus-visible:ring-1 focus-visible:ring-ring"
+              autoFocus
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Sessions List */}
+        <div className="flex-1 overflow-y-auto px-3 py-1 space-y-4">
+          {filteredSessions.length === 0 ? (
+            <div className="py-16 text-center text-xs text-muted-foreground">
+              <MessageSquare className="h-8 w-8 mx-auto mb-2 text-muted-foreground/40 stroke-[1.5]" />
+              <p className="font-medium text-foreground">
+                {searchQuery ? "Tidak ada sesi yang cocok" : "Belum ada riwayat chat"}
+              </p>
+              <p className="text-[11px] text-muted-foreground/80 mt-1 max-w-[200px] mx-auto">
+                {searchQuery
+                  ? `Kata kunci "${searchQuery}" tidak ditemukan.`
+                  : "Mulai pertanyaan baru dengan AI untuk menyimpan sesi belajar Anda."}
+              </p>
+            </div>
+          ) : (
+            Object.entries(groupedSessions).map(([groupTitle, groupItems]) => {
+              if (groupItems.length === 0) return null;
+              return (
+                <div key={groupTitle} className="space-y-1">
+                  <div className="px-2 py-1 text-[10px] font-mono uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1.5">
+                    <Clock className="h-3 w-3" />
+                    <span>{groupTitle}</span>
+                  </div>
+
+                  {groupItems.map((session) => {
+                    const isActive = session.id === activeSessionId;
+                    return (
+                      <div
+                        key={session.id}
+                        onClick={() => {
+                          onSelectSession(session.id);
+                          onClose();
+                        }}
+                        className={cn(
+                          "group relative flex items-start justify-between p-2.5 rounded-xl text-xs cursor-pointer transition-colors select-none",
+                          isActive
+                            ? "bg-foreground text-background font-medium shadow-xs"
+                            : "hover:bg-muted text-foreground"
+                        )}
+                      >
+                        <div className="flex items-start gap-2.5 min-w-0 pr-2 flex-1">
+                          <MessageSquare
+                            className={cn(
+                              "h-3.5 w-3.5 shrink-0 mt-0.5",
+                              isActive ? "text-background/80" : "text-muted-foreground"
+                            )}
+                          />
+                          <div className="min-w-0 flex-1">
+                            <p
+                              className={cn(
+                                "truncate font-medium",
+                                isActive ? "text-background" : "text-foreground"
+                              )}
+                            >
+                              {session.title || "Percakapan Baru"}
+                            </p>
+                            {session.lastMessageSnippet && (
+                              <p
+                                className={cn(
+                                  "text-[11px] truncate mt-0.5 line-clamp-1",
+                                  isActive
+                                    ? "text-background/70"
+                                    : "text-muted-foreground/80"
+                                )}
+                              >
+                                {session.lastMessageSnippet}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-1 shrink-0 ml-1">
+                          {/* Delete Session Button */}
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onDeleteSession(session.id);
+                            }}
+                            className={cn(
+                              "opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-lg hover:bg-destructive/10 cursor-pointer",
+                              isActive
+                                ? "text-background/80 hover:text-rose-300"
+                                : "text-muted-foreground hover:text-destructive"
+                            )}
+                            title="Hapus sesi"
+                            aria-label="Hapus sesi"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="p-3 px-4 bg-muted/30 border-t border-border/40 flex items-center justify-between text-xs text-muted-foreground">
+          <span className="font-mono text-[11px] text-muted-foreground/80">
+            {filteredSessions.length} sesi tersimpan
+          </span>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={onClose}
+            className="h-7 px-3 rounded-lg text-xs font-medium cursor-pointer border-border/70"
+          >
+            Selesai
+          </Button>
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}

@@ -13,6 +13,7 @@ interface Window {
     readFile?: (filePath: string) => Promise<string | null>;
     readMedia?: (filePath: string) => Promise<string | null>;
     openDirectoryDialog: () => Promise<string | null>;
+    getDefaultWorkspacePath?: (learnId?: string) => Promise<string>;
     startAuth?: (options?: {
       accountsUrl?: string;
       action?: string;
@@ -34,6 +35,7 @@ interface Window {
         messages: any[];
         model?: string;
         workspacePath?: string;
+        learnId?: string;
         authToken?: string;
         mode?: "ask_before_changes" | "full_access";
         thinkingLevel?: string;

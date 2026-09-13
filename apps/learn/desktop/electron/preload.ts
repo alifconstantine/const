@@ -13,6 +13,8 @@ contextBridge.exposeInMainWorld("electron", {
   readFile: (filePath: string) => ipcRenderer.invoke("workspace:read-file", filePath),
   readMedia: (filePath: string) => ipcRenderer.invoke("workspace:read-media", filePath),
   openDirectoryDialog: () => ipcRenderer.invoke("dialog:open-directory"),
+  getDefaultWorkspacePath: (learnId?: string) =>
+    ipcRenderer.invoke("workspace:get-default-path", learnId),
   startAuth: (options?: { accountsUrl?: string; action?: string }) =>
     ipcRenderer.invoke("auth:start-login", options),
   cancelAuth: () => ipcRenderer.invoke("auth:cancel-login"),
@@ -21,12 +23,13 @@ contextBridge.exposeInMainWorld("electron", {
     ipcRenderer.on("auth:deep-link", handler);
     return () => ipcRenderer.removeListener("auth:deep-link", handler);
   },
-    agent: {
+  agent: {
     getModels: () => ipcRenderer.invoke("agent:get-models"),
     sendMessage: (payload: {
       messages: any[];
       model?: string;
       workspacePath?: string;
+      learnId?: string;
       authToken?: string;
       mode?: "ask_before_changes" | "full_access";
       thinkingLevel?: string;

@@ -45,7 +45,6 @@ export function CreateLearnDialog({
   onSubmit,
 }: CreateLearnDialogProps) {
   const [title, setTitle] = useState(initialData?.title ?? "");
-  const [description, setDescription] = useState(initialData?.description ?? "");
   const [selectedEmoji, setSelectedEmoji] = useState(initialData?.emoji ?? "🚀");
   const [selectedCollectionId, setSelectedCollectionId] = useState<string | undefined>(
     initialData?.collectionIds?.[0]
@@ -56,7 +55,6 @@ export function CreateLearnDialog({
   React.useEffect(() => {
     if (open) {
       setTitle(initialData?.title ?? "");
-      setDescription(initialData?.description ?? "");
       setSelectedEmoji(initialData?.emoji ?? "🚀");
       setSelectedCollectionId(initialData?.collectionIds?.[0]);
       setProjectPath(initialData?.projectPath ?? "");
@@ -81,7 +79,7 @@ export function CreateLearnDialog({
       await onSubmit({
         id: initialData?.id,
         title: title.trim(),
-        description: description.trim() || undefined,
+        description: initialData?.description,
         emoji: selectedEmoji,
         collectionId: selectedCollectionId,
         projectPath: projectPath.trim() || undefined,
@@ -98,30 +96,30 @@ export function CreateLearnDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[440px] p-6 rounded-2xl border border-border/80 bg-card text-card-foreground shadow-lg">
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <DialogHeader>
-            <DialogTitle className="font-serif text-xl font-medium tracking-tight text-foreground flex items-center gap-2">
-              <BookOpen className="h-5 w-5 text-primary" />
-              {isEdit ? "Ubah Detail Learn" : "Buat Learn Baru"}
+      <DialogContent className="w-full max-w-[400px] p-5 rounded-2xl border border-border/80 bg-card text-card-foreground shadow-2xl overflow-hidden">
+        <form onSubmit={handleSubmit} className="space-y-3.5 w-full min-w-0">
+          <DialogHeader className="pb-0.5">
+            <DialogTitle className="font-serif text-base font-medium tracking-tight text-foreground flex items-center gap-2">
+              <BookOpen className="h-4 w-4 text-primary shrink-0" />
+              <span>{isEdit ? "Ubah Detail Learn" : "Buat Learn Baru"}</span>
             </DialogTitle>
           </DialogHeader>
 
           {/* Emoji Picker */}
           <div>
-            <label className="text-xs font-medium text-muted-foreground mb-2 block">
+            <label className="text-[12px] font-medium text-muted-foreground mb-1.5 block">
               Pilih Ikon / Emoji
             </label>
-            <div className="grid grid-cols-8 gap-2 p-2 rounded-xl bg-secondary/50 border border-border/60">
+            <div className="grid grid-cols-8 gap-1 p-1.5 rounded-xl bg-secondary/40 border border-border/60 w-full justify-items-center">
               {EMOJI_OPTIONS.map((emoji) => (
                 <button
                   key={emoji}
                   type="button"
                   onClick={() => setSelectedEmoji(emoji)}
-                  className={`h-9 w-9 rounded-lg flex items-center justify-center text-lg transition-all cursor-pointer ${
+                  className={`h-8 w-8 rounded-lg flex items-center justify-center text-sm transition-all cursor-pointer ${
                     selectedEmoji === emoji
-                      ? "bg-background border-2 border-primary shadow-xs scale-105"
-                      : "hover:bg-background/60 hover:scale-105"
+                      ? "bg-background border border-primary shadow-xs"
+                      : "hover:bg-background/60"
                   }`}
                 >
                   {emoji}
@@ -131,38 +129,25 @@ export function CreateLearnDialog({
           </div>
 
           {/* Title input */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">
+          <div className="space-y-1">
+            <label className="text-[12px] font-medium text-muted-foreground">
               Judul Learn
             </label>
             <Input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               placeholder="Contoh: Kimi K3 Architecture & Pre-training"
-              className="h-10 rounded-xl bg-secondary/40 border-border/70 focus-visible:ring-1 focus-visible:ring-ring"
+              className="h-8 text-[12px] rounded-xl bg-secondary/40 border-border/70 focus-visible:ring-1 focus-visible:ring-ring w-full min-w-0 px-3 placeholder:text-muted-foreground/50"
               autoFocus
               required
             />
           </div>
 
-          {/* Description input */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">
-              Deskripsi (Opsional)
-            </label>
-            <Input
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Catatan ringkas atau topik materi"
-              className="h-10 rounded-xl bg-secondary/40 border-border/70 focus-visible:ring-1 focus-visible:ring-ring"
-            />
-          </div>
-
           {/* Project Folder / Workspace Selection */}
-          <div className="space-y-1.5">
+          <div className="space-y-1">
             <div className="flex items-center justify-between">
-              <label className="text-xs font-medium text-muted-foreground flex items-center gap-1.5">
-                <Folder className="h-3.5 w-3.5 text-primary" />
+              <label className="text-[12px] font-medium text-muted-foreground flex items-center gap-1.5">
+                <Folder className="h-3.5 w-3.5 text-primary shrink-0" />
                 <span>Folder Proyek (Workspace)</span>
               </label>
               {projectPath && (
@@ -172,18 +157,18 @@ export function CreateLearnDialog({
                   className="text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-0.5 cursor-pointer"
                 >
                   <X className="h-3 w-3" />
-                  <span>Gunakan Global</span>
+                  <span>Reset Default</span>
                 </button>
               )}
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 w-full min-w-0">
               <div
-                className="flex-1 h-10 px-3 rounded-xl bg-secondary/40 border border-border/70 text-xs text-foreground flex items-center overflow-hidden"
-                title={projectPath || "Di luar proyek (Global Workspace di ~/.const/learn/)"}
+                className="flex-1 min-w-0 h-8 px-2.5 rounded-xl bg-secondary/40 border border-border/70 text-[12px] text-foreground flex items-center overflow-hidden"
+                title={projectPath || "Default Workspace (~/.const/learn/workspaces/)"}
               >
                 <span className="truncate">
-                  {projectPath ? projectPath : "Di luar proyek (Global Workspace)"}
+                  {projectPath ? projectPath : "Default (~/.const/learn/workspaces/)"}
                 </span>
               </div>
 
@@ -193,25 +178,24 @@ export function CreateLearnDialog({
                   variant="outline"
                   size="sm"
                   onClick={handleSelectFolder}
-                  className="rounded-xl h-10 px-3 text-xs gap-1.5 shrink-0 cursor-pointer"
+                  className="rounded-xl h-8 px-2.5 text-[12px] gap-1.5 shrink-0 cursor-pointer border-border/70"
                 >
-                  <FolderOpen className="h-4 w-4 text-muted-foreground" />
+                  <FolderOpen className="h-3.5 w-3.5 text-muted-foreground" />
                   <span>Pilih Folder</span>
                 </Button>
               )}
             </div>
-            <p className="text-[11px] text-muted-foreground/70 leading-relaxed">
+            <p className="text-[11px] text-muted-foreground/70 leading-normal">
               {projectPath
-                ? "Agent dapat membaca, menganalisis, dan mengeksekusi perintah di dalam folder proyek ini."
-                : "Akan disimpan secara global di ~/.const/learn/. Pilih folder jika Anda ingin menganalisis kode/berkas proyek tertentu."}
+                ? "Agent beroperasi langsung di dalam folder proyek ini."
+                : "Default folder terisolasi di ~/.const/learn/workspaces/."}
             </p>
           </div>
 
           {/* Collection Assignment */}
-
           {!isEdit && collections.length > 0 && (
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-muted-foreground">
+            <div className="space-y-1">
+              <label className="text-[12px] font-medium text-muted-foreground">
                 Kategori Koleksi (Opsional)
               </label>
               <select
@@ -219,7 +203,7 @@ export function CreateLearnDialog({
                 onChange={(e) =>
                   setSelectedCollectionId(e.target.value || undefined)
                 }
-                className="w-full h-10 px-3 rounded-xl bg-secondary/40 border border-border/70 text-sm text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                className="w-full h-8 px-2.5 rounded-xl bg-secondary/40 border border-border/70 text-[12px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
               >
                 <option value="">Tanpa Koleksi</option>
                 {collections.map((col) => (
@@ -231,19 +215,19 @@ export function CreateLearnDialog({
             </div>
           )}
 
-          <DialogFooter className="pt-2 gap-2 sm:gap-0">
+          <DialogFooter className="pt-2 gap-2 flex flex-row items-center justify-end sm:justify-end">
             <Button
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
-              className="rounded-full cursor-pointer h-9 px-4 text-xs"
+              className="rounded-full cursor-pointer h-8 px-3.5 text-[12px] border-border/70"
             >
               Batal
             </Button>
             <Button
               type="submit"
               disabled={!title.trim() || isSubmitting}
-              className="rounded-full cursor-pointer h-9 px-5 text-xs font-medium"
+              className="rounded-full cursor-pointer h-8 px-4 text-[12px] font-medium"
             >
               {isSubmitting ? "Menyimpan..." : isEdit ? "Perbarui" : "Buat Learn"}
             </Button>

@@ -71,30 +71,30 @@ export function CreateCollectionDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[420px] p-6 rounded-2xl border border-border/80 bg-card text-card-foreground shadow-lg">
-        <form onSubmit={handleSubmit} className="space-y-5">
-          <DialogHeader>
-            <DialogTitle className="font-serif text-xl font-medium tracking-tight text-foreground flex items-center gap-2">
-              <FolderPlus className="h-5 w-5 text-primary" />
-              {isEdit ? "Ubah Koleksi" : "Buat Koleksi Baru"}
+      <DialogContent className="w-full max-w-[400px] p-5 rounded-2xl border border-border/80 bg-card text-card-foreground shadow-2xl overflow-hidden">
+        <form onSubmit={handleSubmit} className="space-y-3.5 w-full min-w-0">
+          <DialogHeader className="pb-0.5">
+            <DialogTitle className="font-serif text-base font-medium tracking-tight text-foreground flex items-center gap-2">
+              <FolderPlus className="h-4 w-4 text-primary shrink-0" />
+              <span>{isEdit ? "Ubah Koleksi" : "Buat Koleksi Baru"}</span>
             </DialogTitle>
           </DialogHeader>
 
           {/* Emoji Picker */}
           <div>
-            <label className="text-xs font-medium text-muted-foreground mb-2 block">
+            <label className="text-[12px] font-medium text-muted-foreground mb-1.5 block">
               Ikon Koleksi
             </label>
-            <div className="grid grid-cols-6 gap-2 p-2 rounded-xl bg-secondary/50 border border-border/60">
+            <div className="grid grid-cols-6 gap-1 p-1.5 rounded-xl bg-secondary/40 border border-border/60 w-full justify-items-center">
               {COLLECTION_EMOJIS.map((emoji) => (
                 <button
                   key={emoji}
                   type="button"
                   onClick={() => setSelectedEmoji(emoji)}
-                  className={`h-9 w-9 rounded-lg flex items-center justify-center text-lg transition-all cursor-pointer ${
+                  className={`h-8 w-8 rounded-lg flex items-center justify-center text-sm transition-all cursor-pointer ${
                     selectedEmoji === emoji
-                      ? "bg-background border-2 border-primary shadow-xs scale-105"
-                      : "hover:bg-background/60 hover:scale-105"
+                      ? "bg-background border border-primary shadow-xs"
+                      : "hover:bg-background/60"
                   }`}
                 >
                   {emoji}
@@ -104,46 +104,46 @@ export function CreateCollectionDialog({
           </div>
 
           {/* Name input */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">
+          <div className="space-y-1">
+            <label className="text-[12px] font-medium text-muted-foreground">
               Nama Koleksi
             </label>
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
               placeholder="Contoh: Kecerdasan Buatan, Riset Fisika"
-              className="h-10 rounded-xl bg-secondary/40 border-border/70 focus-visible:ring-1 focus-visible:ring-ring"
+              className="h-8 text-[12px] rounded-xl bg-secondary/40 border-border/70 focus-visible:ring-1 focus-visible:ring-ring w-full min-w-0 px-3 placeholder:text-muted-foreground/50"
               autoFocus
               required
             />
           </div>
 
           {/* Description input */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-muted-foreground">
+          <div className="space-y-1">
+            <label className="text-[12px] font-medium text-muted-foreground">
               Deskripsi (Opsional)
             </label>
             <Input
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="Kategori materi untuk topik tertentu"
-              className="h-10 rounded-xl bg-secondary/40 border-border/70 focus-visible:ring-1 focus-visible:ring-ring"
+              className="h-8 text-[12px] rounded-xl bg-secondary/40 border-border/70 focus-visible:ring-1 focus-visible:ring-ring w-full min-w-0 px-3 placeholder:text-muted-foreground/50"
             />
           </div>
 
-          <DialogFooter className="pt-2 gap-2 sm:gap-0">
+          <DialogFooter className="pt-2 gap-2 flex flex-row items-center justify-end sm:justify-end">
             <Button
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
-              className="rounded-full cursor-pointer h-9 px-4 text-xs"
+              className="rounded-full cursor-pointer h-8 px-3.5 text-[12px] border-border/70"
             >
               Batal
             </Button>
             <Button
               type="submit"
               disabled={!name.trim() || isSubmitting}
-              className="rounded-full cursor-pointer h-9 px-5 text-xs font-medium"
+              className="rounded-full cursor-pointer h-8 px-4 text-[12px] font-medium"
             >
               {isSubmitting ? "Menyimpan..." : isEdit ? "Perbarui" : "Buat Koleksi"}
             </Button>

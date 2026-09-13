@@ -16,11 +16,16 @@ import {
   X,
   Mic,
   MoreVertical,
+  Folder,
+  History,
+  Brain,
 } from "lucide-react";
 import { ScrollArea, cn } from "@const/ui";
 import { DEFAULT_MODELS } from "@const/agent/models";
-import type { ModelConfig } from "@const/agent/types";
-import { localDb } from "../../lib/db";
+import type { ModelConfig, AgentMessage } from "@const/agent/types";
+import { useLiveQuery } from "dexie-react-hooks";
+import { db, localDb } from "../../lib/db";
+import { ChatHistoryPanel } from "./chat-history-panel";
 import { ExecutionTrace, type DisplayToolCall } from "./execution-trace";
 import { MarkdownContent } from "./markdown-content";
 
@@ -233,14 +238,42 @@ export function ChatPanel({
   const models: ModelConfig[] = availableModels;
   const currentModel = models.find((m) => m.id === selectedModelId) || models[0]!;
 
-  // 1. Load chat messages from local Dexie database on learnId change
+  // Multi-session chat support
+  const sessions =
+    useLiveQuery(
+      () => {
+        if (!learnId) return [];
+        return db.sessions.where("learnId").equals(learnId).reverse().sortBy("updatedAt");
+      },
+      [learnId]
+    ) || [];
+
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
+
+  // Auto-initialize active session on mount or when sessions change
   useEffect(() => {
-    if (!learnId) {
+    if (!learnId) return;
+
+    if (sessions.length > 0) {
+      if (!activeSessionId || !sessions.some((s) => s.id === activeSessionId)) {
+        setActiveSessionId(sessions[0]!.id);
+      }
+    } else {
+      localDb.createSession(learnId, "Sesi Awal").then((newId) => {
+        setActiveSessionId(newId);
+      });
+    }
+  }, [learnId, sessions, activeSessionId]);
+
+  // Load chat messages when learnId or activeSessionId changes
+  useEffect(() => {
+    if (!learnId || !activeSessionId) {
       setMessages([]);
       return;
     }
     let isMounted = true;
-    localDb.getMessages(learnId).then((saved) => {
+    localDb.getMessages(learnId, activeSessionId).then((saved) => {
       if (!isMounted) return;
       if (saved && saved.length > 0) {
         setMessages(
@@ -263,7 +296,28 @@ export function ChatPanel({
     return () => {
       isMounted = false;
     };
-  }, [learnId]);
+  }, [learnId, activeSessionId]);
+
+  const handleNewChat = async () => {
+    if (!learnId) return;
+    const newSessionId = await localDb.createSession(learnId, "Percakapan Baru");
+    setActiveSessionId(newSessionId);
+    setMessages([]);
+    setIsHistoryOpen(false);
+  };
+
+  const handleDeleteSession = async (sessionIdToDelete: string) => {
+    await localDb.deleteSession(sessionIdToDelete);
+    if (activeSessionId === sessionIdToDelete) {
+      const remaining = sessions.filter((s) => s.id !== sessionIdToDelete);
+      if (remaining.length > 0) {
+        setActiveSessionId(remaining[0]!.id);
+      } else if (learnId) {
+        const newId = await localDb.createSession(learnId, "Percakapan Baru");
+        setActiveSessionId(newId);
+      }
+    }
+  };
 
   // Auto scroll to bottom on message updates
   useEffect(() => {
@@ -500,6 +554,47 @@ export function ChatPanel({
     const textToSend = (customPrompt || inputMessage).trim();
     if (!textToSend || isStreaming) return;
 
+    // 1. Ensure we have an active session
+    let currentSessionId = activeSessionId;
+    if (!currentSessionId && learnId) {
+      currentSessionId = await localDb.createSession(learnId, "Percakapan Baru");
+      setActiveSessionId(currentSessionId);
+    }
+
+    // 2. Auto-generate title if this is the first message in the session
+    if (currentSessionId) {
+      const currentSession = sessions.find((s) => s.id === currentSessionId);
+      const isDefaultTitle =
+        !currentSession ||
+        currentSession.messageCount === 0 ||
+        currentSession.title === "Percakapan Baru" ||
+        currentSession.title === "Sesi Awal";
+
+      if (isDefaultTitle) {
+        // Immediate fallback title: first 4-6 words
+        const words = textToSend.split(/\s+/).slice(0, 5).join(" ");
+        const fallbackTitle = words.length > 35 ? words.slice(0, 32) + "..." : words;
+        await localDb.updateSessionTitle(currentSessionId, fallbackTitle);
+
+        // Asynchronous AI refinement
+        const electronApi = (window as any).electron;
+        if (electronApi?.agent?.generateTitle) {
+          const authToken =
+            localStorage.getItem("const_learn_auth_token") ||
+            localStorage.getItem("const_sso_token") ||
+            "";
+          electronApi.agent
+            .generateTitle(textToSend, authToken)
+            .then((aiTitle: string | null) => {
+              if (aiTitle && currentSessionId) {
+                localDb.updateSessionTitle(currentSessionId, aiTitle);
+              }
+            })
+            .catch(() => {});
+        }
+      }
+    }
+
     const now = Date.now();
     const userMsgId = `user_${now}`;
     const assistantMsgId = `asst_${now + 1}`;
@@ -535,6 +630,7 @@ export function ChatPanel({
       await localDb.saveMessage({
         id: userMsgId,
         learnId,
+        sessionId: currentSessionId || undefined,
         role: "user",
         content: promptWithAttachments,
         createdAt: now,
@@ -607,6 +703,7 @@ export function ChatPanel({
           messages: formattedMessages,
           model: selectedModelId,
           workspacePath: workspacePath,
+          learnId: learnId,
           authToken: authToken || undefined,
         });
 
@@ -632,6 +729,7 @@ export function ChatPanel({
             await localDb.saveMessage({
               id: assistantMsgId,
               learnId,
+              sessionId: currentSessionId || undefined,
               role: "assistant",
               content: errorContent,
               createdAt: now + 1,
@@ -660,6 +758,7 @@ export function ChatPanel({
                   localDb.saveMessage({
                     id: finalized.id,
                     learnId,
+                    sessionId: currentSessionId || undefined,
                     role: "assistant",
                     content: finalized.content,
                     thinking: finalized.thinking,
@@ -690,6 +789,7 @@ export function ChatPanel({
           await localDb.saveMessage({
             id: assistantMsgId,
             learnId,
+            sessionId: currentSessionId || undefined,
             role: "assistant",
             content: errorContent,
             createdAt: now + 1,
@@ -795,6 +895,7 @@ export function ChatPanel({
           await localDb.saveMessage({
             id: assistantMsgId,
             learnId,
+            sessionId: activeSessionId || undefined,
             role: "assistant",
             content: accumulatedContent,
             thinking: accumulatedThinking,
@@ -818,6 +919,7 @@ export function ChatPanel({
           await localDb.saveMessage({
             id: assistantMsgId,
             learnId,
+            sessionId: activeSessionId || undefined,
             role: "assistant",
             content: errorText,
             createdAt: now + 1,
@@ -853,7 +955,7 @@ export function ChatPanel({
 
   const handleClearHistory = async () => {
     if (learnId) {
-      await localDb.clearMessages(learnId);
+      await localDb.clearMessages(learnId, activeSessionId || undefined);
     }
     setMessages([]);
   };
@@ -1054,35 +1156,107 @@ export function ChatPanel({
   return (
     <main className="flex-1 h-full flex flex-col bg-card rounded-2xl border border-border/50 text-foreground min-w-0 relative select-text overflow-hidden shadow-xs">
       {/* Top Header Bar */}
-      <div className="h-12 px-5 border-b border-border/50 flex items-center justify-between shrink-0 select-none bg-card/40">
-        {/* Left: Chat Label */}
-        <div className="flex items-center gap-3">
-          <span className="text-sm font-medium text-foreground">
-            Chat
-          </span>
-        </div>
-
-        {/* Right Header Actions */}
-        <div className="flex items-center gap-1">
-          {messages.length > 0 && (
-            <button
-              type="button"
-              onClick={handleClearHistory}
-              className="h-7 px-3 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground text-xs flex items-center gap-1.5 transition-colors cursor-pointer border border-border/40"
-              title="Bersihkan Percakapan"
-            >
-              <RotateCcw className="h-3 w-3" />
-              <span className="hidden sm:inline">Reset</span>
-            </button>
-          )}
-
+      <div className="h-12 px-4 sm:px-5 border-b border-border/50 flex items-center justify-between shrink-0 select-none bg-card/30">
+        {/* Left: Project / Workspace Folder Indicator + Model Selector Pill */}
+        <div className="flex items-center gap-2.5 min-w-0">
           <button
             type="button"
-            className="h-8 w-8 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
-            aria-label="Pengaturan Chat"
-            title="Pengaturan Chat"
+            onClick={() => {
+              if (workspacePath && (window as any).electron?.openPath) {
+                (window as any).electron.openPath(workspacePath);
+              }
+            }}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-muted/60 hover:bg-muted text-xs font-medium text-foreground transition-all cursor-pointer border border-border/60 max-w-[180px] sm:max-w-[260px] truncate group select-none shadow-xs active:scale-98 shrink-0"
+            title={
+              workspacePath
+                ? `Buka di File Explorer:\n${workspacePath}`
+                : "Workspace Default (~/.const/learn/workspaces/)"
+            }
           >
-            <SlidersHorizontal className="h-4 w-4" />
+            <Folder className="h-3.5 w-3.5 text-primary shrink-0 group-hover:scale-110 transition-transform" />
+            <span className="truncate font-mono text-[11px]">
+              {workspacePath
+                ? workspacePath.split(/[\\/]/).filter(Boolean).pop() || workspacePath
+                : "Default Workspace"}
+            </span>
+          </button>
+
+          {/* Model Selector Dropdown */}
+          <div className="relative" ref={dropdownRef}>
+            <button
+              type="button"
+              onClick={() => setIsModelDropdownOpen(!isModelDropdownOpen)}
+              className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-muted/60 hover:bg-muted border border-border/60 text-xs font-medium text-foreground transition-all cursor-pointer shadow-xs active:scale-98"
+              aria-label="Pilih Model AI"
+            >
+              <Sparkles className="h-3 w-3 text-accent" />
+              <span>{currentModel.displayName.split("(")[0]?.trim() || "Const"}</span>
+              <ChevronDown className="h-3 w-3 text-muted-foreground ml-0.5" />
+            </button>
+
+            {isModelDropdownOpen && (
+              <div className="absolute left-0 mt-1.5 w-64 rounded-2xl bg-card border border-border shadow-2xl p-1.5 z-50 animate-in fade-in zoom-in-95 duration-100">
+                <div className="px-2.5 py-1.5 text-[10px] uppercase font-semibold text-muted-foreground tracking-wider border-b border-border/40 mb-1">
+                  Pilih Model Cerdas
+                </div>
+                {models.map((m) => (
+                  <button
+                    key={m.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedModelId(m.id);
+                      setIsModelDropdownOpen(false);
+                    }}
+                    className={`w-full text-left px-2.5 py-2 rounded-xl text-xs flex items-center justify-between transition-colors cursor-pointer ${
+                      selectedModelId === m.id
+                        ? "bg-muted text-foreground font-medium"
+                        : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                    }`}
+                  >
+                    <div>
+                      <div className="font-medium text-foreground">{m.displayName}</div>
+                      <div className="text-[10px] text-muted-foreground/70 font-mono">
+                        {m.id}
+                      </div>
+                    </div>
+                    {selectedModelId === m.id && (
+                      <span className="h-1.5 w-1.5 rounded-full bg-accent shrink-0" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Right Header Actions: New Chat, History */}
+        <div className="flex items-center gap-2 shrink-0">
+          {/* New Chat Button */}
+          <button
+            type="button"
+            onClick={handleNewChat}
+            className="h-8 px-3 rounded-xl hover:bg-muted text-foreground text-xs flex items-center gap-1.5 transition-all cursor-pointer border border-border/60 bg-muted/40 font-medium shadow-xs active:scale-98"
+            title="Mulai percakapan baru"
+          >
+            <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
+            <span>New Chat</span>
+          </button>
+
+          {/* History Button */}
+          <button
+            type="button"
+            onClick={() => setIsHistoryOpen(true)}
+            className="h-8 px-2.5 rounded-xl hover:bg-muted text-muted-foreground hover:text-foreground text-xs flex items-center gap-1.5 transition-all cursor-pointer border border-border/60 bg-muted/40 shadow-xs active:scale-98"
+            title="Riwayat Percakapan"
+            aria-label="Riwayat Percakapan"
+          >
+            <History className="h-4 w-4" />
+            <span className="hidden sm:inline font-sans">History</span>
+            {sessions.length > 0 && (
+              <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-secondary text-foreground">
+                {sessions.length}
+              </span>
+            )}
           </button>
 
           <button
@@ -1336,6 +1510,17 @@ export function ChatPanel({
           </form>
         )}
       </div>
+
+      {/* Slide-over Chat History Panel */}
+      <ChatHistoryPanel
+        open={isHistoryOpen}
+        onClose={() => setIsHistoryOpen(false)}
+        sessions={sessions}
+        activeSessionId={activeSessionId}
+        onSelectSession={(sessionId) => setActiveSessionId(sessionId)}
+        onDeleteSession={handleDeleteSession}
+        onNewChat={handleNewChat}
+      />
     </main>
   );
 }

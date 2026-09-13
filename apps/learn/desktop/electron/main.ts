@@ -346,6 +346,17 @@ app.on("second-instance", (_event, commandLine) => {
     }
   });
 
+  ipcMain.handle("workspace:get-default-path", async (_event, learnId?: string) => {
+    const folderName = learnId ? learnId.replace(/[^a-zA-Z0-9_-]/g, "_") : "default";
+    const targetDir = path.join(learnWorkspacesDir, folderName);
+    if (!fs.existsSync(targetDir)) {
+      try {
+        fs.mkdirSync(targetDir, { recursive: true });
+      } catch {}
+    }
+    return targetDir;
+  });
+
   // Dedicated Loopback Auth Login Handlers
   ipcMain.handle("auth:start-login", async (_event, options?: { accountsUrl?: string; action?: string }) => {
     try {
@@ -548,6 +559,7 @@ app.on("second-instance", (_event, commandLine) => {
         messages: AgentMessage[];
         model?: string;
         workspacePath?: string;
+        learnId?: string;
         authToken?: string;
         mode?: "ask_before_changes" | "full_access";
         thinkingLevel?: string;
@@ -587,7 +599,8 @@ app.on("second-instance", (_event, commandLine) => {
 
       let targetWorkspace = payload.workspacePath;
       if (!targetWorkspace || targetWorkspace === "Outside Project" || !fs.existsSync(targetWorkspace)) {
-        targetWorkspace = path.join(learnWorkspacesDir, "default");
+        const folderName = payload.learnId ? payload.learnId.replace(/[^a-zA-Z0-9_-]/g, "_") : "default";
+        targetWorkspace = path.join(learnWorkspacesDir, folderName);
         if (!fs.existsSync(targetWorkspace)) {
           fs.mkdirSync(targetWorkspace, { recursive: true });
         }
