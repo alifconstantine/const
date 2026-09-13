@@ -15,6 +15,7 @@ import {
   Image as ImageIcon,
   X,
   Mic,
+  MoreVertical,
 } from "lucide-react";
 import { ScrollArea, cn } from "@const/ui";
 import { DEFAULT_MODELS } from "@const/agent/models";
@@ -1051,13 +1052,13 @@ export function ChatPanel({
   };
 
   return (
-    <main className="flex-1 h-full flex flex-col bg-background text-foreground min-w-0 relative select-text">
+    <main className="flex-1 h-full flex flex-col bg-card rounded-2xl border border-border/50 text-foreground min-w-0 relative select-text overflow-hidden shadow-xs">
       {/* Top Header Bar */}
-      <div className="h-12 px-5 border-b border-border/50 flex items-center justify-between shrink-0 select-none bg-card/30">
-        {/* Left: Socratic Chat Label */}
+      <div className="h-12 px-5 border-b border-border/50 flex items-center justify-between shrink-0 select-none bg-card/40">
+        {/* Left: Chat Label */}
         <div className="flex items-center gap-3">
-          <span className="text-xs font-mono font-semibold tracking-wider text-muted-foreground uppercase">
-            Socratic Chat
+          <span className="text-sm font-medium text-foreground">
+            Chat
           </span>
         </div>
 
@@ -1079,8 +1080,18 @@ export function ChatPanel({
             type="button"
             className="h-8 w-8 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
             aria-label="Pengaturan Chat"
+            title="Pengaturan Chat"
           >
             <SlidersHorizontal className="h-4 w-4" />
+          </button>
+
+          <button
+            type="button"
+            className="h-8 w-8 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
+            aria-label="Opsi lainnya"
+            title="Opsi lainnya"
+          >
+            <MoreVertical className="h-4 w-4" />
           </button>
         </div>
       </div>
@@ -1092,23 +1103,23 @@ export function ChatPanel({
           <div className="flex-1 flex flex-col justify-center my-auto py-10">
             <div className="text-3xl sm:text-4xl mb-3 select-none">👋</div>
 
-            <h1 className="text-2xl sm:text-3xl font-serif font-medium tracking-tight text-foreground mb-2">
-              Ruang Belajar Socrates
+            <h1 className="text-2xl sm:text-3xl font-sans font-medium tracking-tight text-foreground mb-2">
+              Mari mulai membuat notebook...
             </h1>
 
-            <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed mb-6 max-w-xl font-sans">
-              Didukung oleh model cerdas <strong>{currentModel.displayName}</strong>. Tanyakan konsep riset, bedah dokumen PDF, telusuri kode proyek, atau uji hipotesis bersama Const Agent.
+            <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed mb-4 max-w-xl font-sans">
+              Dengan notebook ini, Anda dapat mulai memahami, membuat, atau mengembangkan hal baru. Anda dapat meminta bantuan saya untuk memulai atau langsung menambahkan sumber Anda sendiri.
             </p>
 
             <p className="text-xs text-muted-foreground/80 font-medium mb-3 font-sans">
-              Mulai eksplorasi materi Anda:
+              Apa yang ingin Anda lakukan dengan notebook ini?
             </p>
 
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2.5 font-sans">
               {[
                 "Pelajari topik baru",
-                "Bedah dokumen & riset",
-                "Buat konten & simulasi",
+                "Buat konten baru",
+                "Lanjutkan project",
               ].map((chip) => (
                 <button
                   key={chip}

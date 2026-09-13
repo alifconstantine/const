@@ -1,6 +1,7 @@
 import React from "react";
 import {
   PanelRightClose,
+  PanelRightOpen,
   AudioLines,
   Presentation,
   Video,
@@ -12,6 +13,7 @@ import {
   Table2,
   ChevronRight,
   Plus,
+  SquarePen,
   PenTool,
 } from "lucide-react";
 
@@ -49,24 +51,53 @@ export function StudioPanel({
 }: StudioPanelProps) {
   if (isCollapsed) {
     return (
-      <div className="w-12 h-full flex flex-col items-center py-4 bg-card/40 border-l border-border/60 text-muted-foreground">
+      <div className="w-12 h-full flex flex-col items-center py-3 bg-card rounded-2xl border border-border/50 text-muted-foreground shrink-0 select-none shadow-xs">
+        {/* Top: Reopen Panel Toggle */}
         <button
           type="button"
           onClick={onToggleCollapse}
           className="h-8 w-8 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
           title="Buka Panel Studio"
+          aria-label="Buka Studio"
         >
-          <PanelRightClose className="h-4 w-4 rotate-180" />
+          <PanelRightOpen className="h-4 w-4" />
         </button>
-        <div className="mt-6 [writing-mode:vertical-lr] text-xs font-medium tracking-wider text-muted-foreground/80">
-          STUDIO
+
+        {/* Top-aligned: Vertical Stack of Studio Tools Icons (Image 3) */}
+        <div className="flex flex-col items-center gap-1.5 mt-2.5">
+          {STUDIO_TOOLS.map((tool) => {
+            const Icon = tool.icon;
+            return (
+              <button
+                key={tool.id}
+                type="button"
+                onClick={() => onSelectTool?.(tool.id)}
+                className="h-7 w-7 rounded-lg hover:bg-muted flex items-center justify-center transition-colors cursor-pointer group"
+                title={tool.name}
+                aria-label={tool.name}
+              >
+                <Icon className={`h-4 w-4 ${tool.iconColor} opacity-75 group-hover:opacity-100 transition-opacity`} />
+              </button>
+            );
+          })}
         </div>
+
+        {/* Bottom: Note Button pinned to bottom (Image 3) */}
+        <button
+          type="button"
+          onClick={onAddNote}
+          className="h-8 w-8 rounded-xl bg-muted/60 hover:bg-muted text-foreground flex items-center justify-center transition-colors cursor-pointer border border-border/40 shadow-xs mt-auto"
+          title="Tambahkan catatan"
+          aria-label="Tambahkan catatan"
+        >
+          <SquarePen className="h-4 w-4" />
+        </button>
       </div>
     );
   }
 
   return (
-    <aside className="w-[340px] xl:w-[360px] h-full flex flex-col bg-card/40 border-l border-border/60 text-foreground p-4 shrink-0 select-none overflow-y-auto">
+    <aside className="w-[340px] xl:w-[360px] h-full flex flex-col bg-card rounded-2xl border border-border/50 text-foreground p-3.5 sm:p-4 shrink-0 select-none overflow-y-auto shadow-xs">
       {/* Header */}
       <div className="flex items-center justify-between mb-3 px-1">
         <span className="text-sm font-medium text-foreground">Studio</span>

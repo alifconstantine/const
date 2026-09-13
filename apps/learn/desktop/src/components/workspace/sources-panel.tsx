@@ -5,6 +5,7 @@ import {
   Globe,
   FileText,
   PanelLeftClose,
+  PanelLeftOpen,
   ChevronDown,
 } from "lucide-react";
 
@@ -27,24 +28,32 @@ export function SourcesPanel({
 
   if (isCollapsed) {
     return (
-      <div className="w-12 h-full flex flex-col items-center py-4 bg-card/40 border-r border-border/60 text-muted-foreground">
+      <div className="w-12 h-full flex flex-col items-center py-3 bg-card rounded-2xl border border-border/50 text-muted-foreground shrink-0 select-none shadow-xs">
         <button
           type="button"
           onClick={onToggleCollapse}
           className="h-8 w-8 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
           title="Buka Panel Sumber"
+          aria-label="Buka Sumber"
         >
-          <PanelLeftClose className="h-4 w-4 rotate-180" />
+          <PanelLeftOpen className="h-4 w-4" />
         </button>
-        <div className="mt-6 [writing-mode:vertical-lr] text-xs font-medium tracking-wider text-muted-foreground/80">
-          SUMBER
-        </div>
+
+        <button
+          type="button"
+          onClick={onAddSource}
+          className="h-8 w-8 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer mt-1"
+          title="Tambahkan sumber"
+          aria-label="Tambahkan sumber"
+        >
+          <Plus className="h-4 w-4" />
+        </button>
       </div>
     );
   }
 
   return (
-    <aside className="w-[300px] xl:w-[320px] h-full flex flex-col bg-card/40 border-r border-border/60 text-foreground p-4 shrink-0 select-none overflow-y-auto">
+    <aside className="w-[300px] xl:w-[320px] h-full flex flex-col bg-card rounded-2xl border border-border/50 text-foreground p-3.5 sm:p-4 shrink-0 select-none overflow-y-auto shadow-xs">
       {/* Header */}
       <div className="flex items-center justify-between mb-3 px-1">
         <div className="flex items-center gap-2">
