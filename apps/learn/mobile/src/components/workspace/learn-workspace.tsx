@@ -14,7 +14,7 @@ import { AddSourceDialog } from "./add-source-dialog";
 import { HistoryPanel } from "./history-panel";
 import { ThinkingProcess } from "./working-process";
 import { ImageLightbox } from "./image-lightbox";
-import { ScrollArea, cn } from "@const/ui";
+import { ScrollArea, cn, toast } from "@const/ui";
 import { useI18n } from "../../lib/i18n";
 
 function formatFileSize(bytes: number): string {
@@ -65,6 +65,7 @@ import {
   Loader2,
   History,
   MessageCirclePlus,
+  Pencil,
 } from "lucide-react";
 
 type WorkspaceTab = "sources" | "chat" | "tools";
@@ -388,6 +389,33 @@ export function MobileLearnWorkspace({
       abortControllerRef.current = null;
     }
     setIsStreaming(false);
+  };
+
+  const handleEditAndUndoTurn = async (userMsg: DisplayMessage) => {
+    const userIdx = messages.findIndex((m) => m.id === userMsg.id);
+    if (userIdx === -1) return;
+
+    let assistantMsg: DisplayMessage | undefined;
+    if (userIdx + 1 < messages.length && messages[userIdx + 1]?.role === "assistant") {
+      assistantMsg = messages[userIdx + 1];
+    }
+
+    await localDb.deleteTurn(userMsg.id, assistantMsg?.id, activeSessionId || undefined);
+
+    setMessages((prev) => prev.filter((m) => m.id !== userMsg.id && m.id !== assistantMsg?.id));
+
+    const cleanedPrompt = cleanUserMessageContent(userMsg.content);
+    setInputMessage(cleanedPrompt);
+
+    if (userMsg.attachments && userMsg.attachments.length > 0) {
+      setAttachedFiles([...userMsg.attachments]);
+    }
+
+    toast.info(
+      language === "id"
+        ? "Pesan dikembalikan ke input untuk diedit"
+        : "Message restored to input for editing"
+    );
   };
 
   const handleSend = async (customPrompt?: string, attachmentsToSend?: AttachedMedia[]) => {
@@ -927,7 +955,7 @@ export function MobileLearnWorkspace({
                       );
                     })()}
 
-                    {/* User Message Action Bar: Timestamp & Copy */}
+                    {/* User Message Action Bar: Timestamp, Copy, Edit */}
                     <div className="flex items-center gap-2 pt-1 pr-1 text-[10.5px] font-mono text-[#777777] select-none">
                       {msg.createdAt && <span>{formatTimestamp(msg.createdAt)}</span>}
                       <button
@@ -941,6 +969,14 @@ export function MobileLearnWorkspace({
                         ) : (
                           <Copy className="w-3 h-3" />
                         )}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleEditAndUndoTurn(msg)}
+                        className="p-1 rounded hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
+                        title={t("editMessage")}
+                      >
+                        <Pencil className="w-3 h-3" />
                       </button>
                     </div>
                   </div>

@@ -1,4 +1,5 @@
 import Dexie, { type EntityTable } from "dexie";
+import type { FileMutationRecord } from "@const/agent";
 
 export interface LocalLearn {
   id: string;
@@ -41,6 +42,9 @@ export interface LocalMessage {
   content: string;
   thinking?: string;
   toolCalls?: any[];
+  mutations?: FileMutationRecord[];
+  traceSteps?: any[];
+  durationMs?: number;
   attachments?: any[];
   createdAt: number;
 }
@@ -395,6 +399,41 @@ export const localDb = {
     } else {
       await db.messages.where("learnId").equals(learnId).delete();
     }
+  },
+
+  async deleteMessage(messageId: string, sessionId?: string): Promise<void> {
+    await db.messages.delete(messageId);
+    if (sessionId) {
+      const remaining = await db.messages.where("sessionId").equals(sessionId).sortBy("createdAt");
+      const last = remaining[remaining.length - 1];
+      const snippet = last && typeof last.content === "string" ? last.content.slice(0, 100) : "";
+      await db.sessions.update(sessionId, {
+        lastMessageSnippet: snippet,
+        messageCount: remaining.length,
+        updatedAt: Date.now(),
+      });
+    }
+  },
+
+  async deleteTurn(userMsgId: string, assistantMsgId?: string, sessionId?: string): Promise<void> {
+    const toDelete = [userMsgId];
+    if (assistantMsgId) toDelete.push(assistantMsgId);
+    await db.messages.bulkDelete(toDelete);
+
+    if (sessionId) {
+      const remaining = await db.messages.where("sessionId").equals(sessionId).sortBy("createdAt");
+      const last = remaining[remaining.length - 1];
+      const snippet = last && typeof last.content === "string" ? last.content.slice(0, 100) : "";
+      await db.sessions.update(sessionId, {
+        lastMessageSnippet: snippet,
+        messageCount: remaining.length,
+        updatedAt: Date.now(),
+      });
+    }
+  },
+
+  async updateMessageMutations(messageId: string, mutations: FileMutationRecord[]): Promise<void> {
+    await db.messages.update(messageId, { mutations });
   },
 
   // Sources

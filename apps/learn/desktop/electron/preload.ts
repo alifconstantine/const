@@ -47,12 +47,16 @@ contextBridge.exposeInMainWorld("electron", {
     }) => ipcRenderer.invoke("agent:respond-approval", payload),
     generateTitle: (prompt: string, authToken?: string) =>
       ipcRenderer.invoke("agent:generate-title", prompt, authToken),
+    rollbackFile: (record: any) =>
+      ipcRenderer.invoke("agent:rollback-file", { record }),
     onStreamEvent: (callback: (event: any) => void) => {
       const handler = (_event: any, data: any) => callback(data);
       ipcRenderer.on("agent:stream-event", handler);
       return () => ipcRenderer.removeListener("agent:stream-event", handler);
     },
   },
+  rollbackFile: (record: any) =>
+    ipcRenderer.invoke("agent:rollback-file", { record }),
   config: {
     get: () => ipcRenderer.invoke("config:get"),
     save: (newConfig: any) => ipcRenderer.invoke("config:save", newConfig),

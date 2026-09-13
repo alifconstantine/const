@@ -20,6 +20,7 @@ import {
   History,
   Brain,
   MessageCirclePlus,
+  Pencil,
 } from "lucide-react";
 import {
   ScrollArea,
@@ -32,9 +33,11 @@ import {
   TooltipTrigger,
   TooltipContent,
   TooltipProvider,
+  toast,
 } from "@const/ui";
 import { DEFAULT_MODELS } from "@const/agent/models";
 import type { ModelConfig, AgentMessage } from "@const/agent/types";
+import type { FileMutationRecord } from "@const/agent";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db, localDb } from "../../lib/db";
 import { useI18n } from "../../lib/i18n";
@@ -59,6 +62,7 @@ interface DisplayMessage {
   thinking?: string;
   toolCalls?: DisplayToolCall[];
   traceSteps?: TraceStep[];
+  mutations?: FileMutationRecord[];
   attachments?: AttachedFile[];
   isStreaming?: boolean;
   createdAt?: number;
@@ -417,6 +421,8 @@ export function ChatPanel({
             content: m.content || "",
             thinking: m.thinking,
             toolCalls: m.toolCalls,
+            traceSteps: m.traceSteps,
+            mutations: m.mutations,
             attachments: m.attachments,
             createdAt: m.createdAt || Date.now(),
             durationMs: m.durationMs,
@@ -687,6 +693,31 @@ export function ChatPanel({
             };
           }
           updated.traceSteps = steps;
+        } else if (event.type === "file_mutation") {
+          if (event.record) {
+            const mutations = updated.mutations ? [...updated.mutations] : [];
+            mutations.push(event.record);
+            updated.mutations = mutations;
+
+            if (updated.traceSteps) {
+              const steps = updated.traceSteps.map((st) => {
+                if (st.type === "tool" && !st.mutation) {
+                  const norm = (st.name || "").toLowerCase().replace(/[-_]/g, "");
+                  if (
+                    norm.includes("write") ||
+                    norm.includes("edit") ||
+                    norm.includes("replace") ||
+                    norm.includes("create") ||
+                    norm.includes("patch")
+                  ) {
+                    return { ...st, mutation: event.record };
+                  }
+                }
+                return st;
+              });
+              updated.traceSteps = steps;
+            }
+          }
         } else if (event.type === "error") {
           const defaultError = language === "id"
             ? "Terjadi kesalahan saat memproses permintaan."
@@ -712,6 +743,9 @@ export function ChatPanel({
               content: updated.content,
               thinking: updated.thinking,
               toolCalls: updated.toolCalls,
+              traceSteps: updated.traceSteps,
+              mutations: updated.mutations,
+              durationMs: updated.durationMs,
               createdAt: updated.createdAt,
             });
           }
@@ -745,6 +779,9 @@ export function ChatPanel({
               content: updated.content,
               thinking: updated.thinking,
               toolCalls: updated.toolCalls,
+              traceSteps: updated.traceSteps,
+              mutations: updated.mutations,
+              durationMs: updated.durationMs,
               createdAt: updated.createdAt,
             });
           }
@@ -1367,6 +1404,157 @@ export function ChatPanel({
       await localDb.clearMessages(learnId, activeSessionId || undefined);
     }
     setMessages([]);
+  };
+
+  const handleRollbackFile = async (record: FileMutationRecord, msgId: string) => {
+    const electron = (window as any).electron;
+    const rollbackFn = electron?.agent?.rollbackFile || electron?.rollbackFile;
+    if (!rollbackFn) {
+      toast.error(
+        language === "id"
+          ? "Rollback hanya tersedia di aplikasi desktop"
+          : "Rollback is only available in the desktop app"
+      );
+      return;
+    }
+    try {
+      const res = await rollbackFn(record);
+      if (res.success) {
+        const raw = record.targetFile || record.filePath || record.absolutePath || "file";
+        const fileName = raw.replace(/\\/g, "/").split("/").filter(Boolean).pop() || raw;
+        toast.success(
+          res.message ||
+            (language === "id"
+              ? `Berhasil mengembalikan ${fileName}`
+              : `Reverted ${fileName}`)
+        );
+        setMessages((prev) => {
+          const next = prev.map((msg) => {
+            if (msg.id !== msgId && !msg.mutations?.some((m) => m.id === record.id)) return msg;
+            const updatedMuts = msg.mutations?.map((m) =>
+              m.id === record.id ? { ...m, rolledBack: true } : m
+            );
+            return { ...msg, mutations: updatedMuts };
+          });
+          const target = next.find((m) => m.id === msgId);
+          if (target?.mutations) {
+            localDb.updateMessageMutations(msgId, target.mutations);
+          }
+          return next;
+        });
+      } else {
+        toast.error(res.message || (language === "id" ? "Gagal me-rollback berkas" : "Failed to rollback file"));
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Rollback error");
+    }
+  };
+
+  const handleRollbackAll = async (records: FileMutationRecord[], msgId: string) => {
+    const electron = (window as any).electron;
+    const rollbackFn = electron?.agent?.rollbackFile || electron?.rollbackFile;
+    if (!rollbackFn) {
+      toast.error(
+        language === "id"
+          ? "Rollback hanya tersedia di aplikasi desktop"
+          : "Rollback is only available in the desktop app"
+      );
+      return;
+    }
+    const unrolled = records.filter((r) => !r.rolledBack);
+    if (unrolled.length === 0) {
+      toast.info(language === "id" ? "Semua perubahan sudah di-rollback" : "All changes have already been reverted");
+      return;
+    }
+    let successCount = 0;
+    const revertedIds = new Set<string>();
+    for (const rec of [...unrolled].reverse()) {
+      try {
+        const res = await rollbackFn(rec);
+        if (res.success) {
+          successCount++;
+          revertedIds.add(rec.id);
+        }
+      } catch {}
+    }
+    if (successCount > 0) {
+      toast.success(
+        language === "id"
+          ? `Berhasil mengembalikan ${successCount} berkas`
+          : `Reverted ${successCount} file(s)`
+      );
+      setMessages((prev) => {
+        const next = prev.map((msg) => {
+          if (msg.id !== msgId && !msg.mutations?.some((m) => revertedIds.has(m.id))) return msg;
+          const updatedMuts = msg.mutations?.map((m) =>
+            revertedIds.has(m.id) ? { ...m, rolledBack: true } : m
+          );
+          return { ...msg, mutations: updatedMuts };
+        });
+        const target = next.find((m) => m.id === msgId);
+        if (target?.mutations) {
+          localDb.updateMessageMutations(msgId, target.mutations);
+        }
+        return next;
+      });
+    }
+  };
+
+  const handleEditAndUndoTurn = async (userMsg: DisplayMessage) => {
+    const userIdx = messages.findIndex((m) => m.id === userMsg.id);
+    if (userIdx === -1) return;
+
+    let assistantMsg: DisplayMessage | undefined;
+    if (userIdx + 1 < messages.length && messages[userIdx + 1]?.role === "assistant") {
+      assistantMsg = messages[userIdx + 1];
+    }
+
+    let rolledBackFilesCount = 0;
+    if (assistantMsg?.mutations && assistantMsg.mutations.length > 0) {
+      const electron = (window as any).electron;
+      const rollbackFn = electron?.agent?.rollbackFile || electron?.rollbackFile;
+      if (rollbackFn) {
+        const unrolled = assistantMsg.mutations.filter((m) => !m.rolledBack);
+        for (const rec of [...unrolled].reverse()) {
+          try {
+            const res = await rollbackFn(rec);
+            if (res.success) {
+              rolledBackFilesCount++;
+            }
+          } catch {}
+        }
+      }
+    }
+
+    await localDb.deleteTurn(userMsg.id, assistantMsg?.id, activeSessionId || undefined);
+
+    setMessages((prev) => prev.filter((m) => m.id !== userMsg.id && m.id !== assistantMsg?.id));
+
+    const cleanedPrompt = cleanUserMessageContent(userMsg.content);
+    setInputMessage(cleanedPrompt);
+
+    if (userMsg.attachments && userMsg.attachments.length > 0) {
+      setAttachments([...userMsg.attachments]);
+    }
+
+    setIsMultiline(true);
+    setTimeout(() => {
+      textareaRef.current?.focus();
+    }, 50);
+
+    if (rolledBackFilesCount > 0) {
+      toast.success(
+        language === "id"
+          ? `Pesan dikembalikan untuk diedit & ${rolledBackFilesCount} berkas berhasil di-rollback`
+          : `Message restored for editing & ${rolledBackFilesCount} file(s) rolled back`
+      );
+    } else {
+      toast.info(
+        language === "id"
+          ? "Pesan dikembalikan ke input untuk diedit"
+          : "Message restored to input for editing"
+      );
+    }
   };
 
   const handleAnswerQuestion = async (toolCallId: string, answer: any) => {
@@ -2056,7 +2244,7 @@ export function ChatPanel({
                       </div>
                     ) : null}
 
-                    {/* User hover action bar: Timestamp and Copy */}
+                    {/* User hover action bar: Timestamp, Copy, Edit */}
                     <div className="flex items-center gap-2 pt-1.5 pr-1 opacity-0 group-hover:opacity-100 transition-opacity text-xs text-muted-foreground select-none font-sans">
                       {msg.createdAt && (
                         <span className="text-[11px] font-mono text-muted-foreground/70">
@@ -2075,6 +2263,14 @@ export function ChatPanel({
                           <Copy className="w-3.5 h-3.5" />
                         )}
                       </button>
+                      <button
+                        type="button"
+                        onClick={() => handleEditAndUndoTurn(msg)}
+                        className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                        title={t("editMessage")}
+                      >
+                        <Pencil className="w-3.5 h-3.5" />
+                      </button>
                     </div>
                   </div>
                 );
@@ -2087,9 +2283,12 @@ export function ChatPanel({
                     thinking={msg.thinking}
                     toolCalls={msg.toolCalls}
                     traceSteps={msg.traceSteps}
+                    mutations={msg.mutations}
                     isExecuting={isLatestAssistant}
                     durationMs={isLatestAssistant ? liveDurationMs : msg.durationMs}
                     onAnswerQuestion={handleAnswerQuestion}
+                    onRollback={(rec) => handleRollbackFile(rec, msg.id)}
+                    onRollbackAll={(recs) => handleRollbackAll(recs, msg.id)}
                   />
 
                   {/* Formatted Markdown Content Bubble */}

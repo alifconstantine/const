@@ -2,7 +2,13 @@ import { app, BrowserWindow, shell, ipcMain, dialog } from "electron";
 import path from "node:path";
 import fs from "node:fs";
 import os from "node:os";
-import { createConstAgent, DEFAULT_MODELS, type AgentMessage } from "@const/agent";
+import {
+  createConstAgent,
+  DEFAULT_MODELS,
+  rollbackFileMutation,
+  type AgentMessage,
+  type FileMutationRecord,
+} from "@const/agent";
 import {
   startLoopbackAuthServer,
   stopLoopbackAuthServer,
@@ -696,6 +702,13 @@ app.on("second-instance", (_event, commandLine) => {
     }
     return false;
   });
+
+  ipcMain.handle(
+    "agent:rollback-file",
+    async (_event, payload: { record: FileMutationRecord }) => {
+      return await rollbackFileMutation(payload.record);
+    }
+  );
 
   ipcMain.handle("agent:generate-title", async (_event, prompt: string, authToken?: string) => {
     try {

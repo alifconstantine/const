@@ -15,11 +15,13 @@ import {
   ArrowRight,
   Check,
   ListTodo,
+  RotateCcw,
 } from "lucide-react";
 import { ScrollArea, cn } from "@const/ui";
 import { FileIcon } from "./file-icon";
 import { MarkdownContent } from "./markdown-content";
 import { useI18n } from "../../lib/i18n";
+import type { FileMutationRecord } from "@const/agent";
 
 export interface TraceStep {
   id: string;
@@ -33,6 +35,7 @@ export interface TraceStep {
   result?: any;
   isError?: boolean;
   status?: "running" | "completed" | "error";
+  mutation?: FileMutationRecord;
 }
 
 export interface DisplayToolCall {
@@ -43,15 +46,19 @@ export interface DisplayToolCall {
   isError?: boolean;
   status?: "running" | "completed" | "error";
   durationMs?: number;
+  mutation?: FileMutationRecord;
 }
 
 export interface ExecutionTraceProps {
   thinking?: string;
   toolCalls?: DisplayToolCall[];
   traceSteps?: TraceStep[];
+  mutations?: FileMutationRecord[];
   isExecuting?: boolean;
   durationMs?: number;
   onAnswerQuestion?: (toolCallId: string, answer: any) => void;
+  onRollback?: (record: FileMutationRecord) => void;
+  onRollbackAll?: (records: FileMutationRecord[]) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -87,9 +94,12 @@ export function ExecutionTrace({
   thinking,
   toolCalls = [],
   traceSteps = [],
+  mutations = [],
   isExecuting = false,
   durationMs,
   onAnswerQuestion,
+  onRollback,
+  onRollbackAll,
 }: ExecutionTraceProps) {
   // Auto-open while executing to view progress live; auto-close when finished
   const [isMainOpen, setIsMainOpen] = useState(isExecuting);
@@ -148,7 +158,7 @@ export function ExecutionTrace({
     return result;
   }, [traceSteps, thinking, toolCalls, durationMs]);
 
-  const hasContent = steps.length > 0 || isExecuting;
+  const hasContent = steps.length > 0 || isExecuting || (mutations && mutations.length > 0);
   if (!hasContent) return null;
 
   // Format execution duration e.g. "Worked for 22s", "Working for 12s..."
@@ -173,36 +183,38 @@ export function ExecutionTrace({
 
   return (
     <div className="w-full flex flex-col gap-1.5 select-none my-1 font-sans">
-      {/* Root Summary Header: e.g. Worked for 22s > */}
-      <button
-        type="button"
-        onClick={() => setIsMainOpen((prev) => !prev)}
-        className="inline-flex items-center gap-1.5 text-[13px] text-[#a9a9a9] dark:text-[#969696] hover:text-[#262626] dark:hover:text-[#e0e0e0] transition-colors cursor-pointer py-0.5 w-fit select-none group"
-      >
-        <span>{formatDuration()}</span>
-        <ChevronRight
-          className={cn(
-            "w-3.5 h-3.5 text-[#a9a9a9] dark:text-[#777777] group-hover:text-foreground transition-transform duration-200 ease-out",
-            isMainOpen && "rotate-90"
-          )}
-        />
-      </button>
+      {(steps.length > 0 || isExecuting) && (
+        <>
+          {/* Root Summary Header: e.g. Worked for 22s > */}
+          <button
+            type="button"
+            onClick={() => setIsMainOpen((prev) => !prev)}
+            className="inline-flex items-center gap-1.5 text-[13px] text-[#a9a9a9] dark:text-[#969696] hover:text-[#262626] dark:hover:text-[#e0e0e0] transition-colors cursor-pointer py-0.5 w-fit select-none group"
+          >
+            <span>{formatDuration()}</span>
+            <ChevronRight
+              className={cn(
+                "w-3.5 h-3.5 text-[#a9a9a9] dark:text-[#777777] group-hover:text-foreground transition-transform duration-200 ease-out",
+                isMainOpen && "rotate-90"
+              )}
+            />
+          </button>
 
-      {/* Trace Body with Smooth Collapse */}
-      <SmoothCollapse isOpen={isMainOpen}>
-        <div className="flex flex-col gap-1.5 pl-3 ml-1 border-l border-[#e2e2e4] dark:border-[#2e2e2e]/70 text-[13px] text-[#a9a9a9] dark:text-[#888888] pt-1">
-          {steps.map((step, idx) => {
-            if (step.type === "thought") {
-              return (
-                <ThoughtItem
-                  key={step.id || `thought_${idx}`}
-                  thinking={step.content || ""}
-                  durationMs={step.durationMs}
-                  startTime={step.startTime}
-                  isExecuting={isExecuting && idx === steps.length - 1 && !step.durationMs}
-                />
-              );
-            }
+          {/* Smooth Collapsible Content matching apps/harness/desktop */}
+          <SmoothCollapse isOpen={isMainOpen}>
+            <div className="flex flex-col gap-1.5 pl-3 ml-1 border-l border-[#e2e2e4] dark:border-[#2e2e2e]/70 text-[13px] text-[#a9a9a9] dark:text-[#888888] pt-1">
+              {steps.map((step, idx) => {
+                if (step.type === "thought") {
+                  return (
+                    <ThoughtItem
+                      key={step.id || `thought_${idx}`}
+                      thinking={step.content || ""}
+                      durationMs={step.durationMs}
+                      startTime={step.startTime}
+                      isExecuting={isExecuting && idx === steps.length - 1 && !step.durationMs}
+                    />
+                  );
+                }
 
             if (step.type === "tool") {
               const norm = (step.name || "").toLowerCase().replace(/[-_]/g, "");
@@ -321,6 +333,17 @@ export function ExecutionTrace({
           )}
         </div>
       </SmoothCollapse>
+        </>
+      )}
+
+      {mutations && mutations.length > 0 && (
+        <MutationsSummaryCard
+          mutations={mutations}
+          isExecuting={isExecuting}
+          onRollback={onRollback}
+          onRollbackAll={onRollbackAll}
+        />
+      )}
     </div>
   );
 }
@@ -1199,3 +1222,290 @@ function GenericToolItem({ tool }: { tool: TraceStep | DisplayToolCall }) {
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// 10. MutationsSummaryCard & Rollback diff calculation
+// ---------------------------------------------------------------------------
+export interface DiffStats {
+  added: number;
+  removed: number;
+}
+
+export interface DiffLine {
+  type: "context" | "added" | "removed";
+  content: string;
+  oldNum?: number;
+  newNum?: number;
+}
+
+const diffStatsCache = new WeakMap<FileMutationRecord, DiffStats>();
+
+export function computeDiff(
+  prev: string | null | undefined,
+  next: string | null | undefined
+): DiffLine[] {
+  const prevLines = prev !== null && prev !== undefined ? prev.split(/\r?\n/) : [];
+  const nextLines = next !== null && next !== undefined ? next.split(/\r?\n/) : [];
+
+  if (prev === null || prev === undefined) {
+    return nextLines.map((line, idx) => ({
+      type: "added",
+      content: line,
+      newNum: idx + 1,
+    }));
+  }
+
+  if (next === null || next === undefined) {
+    return prevLines.map((line, idx) => ({
+      type: "removed",
+      content: line,
+      oldNum: idx + 1,
+    }));
+  }
+
+  if (prev === next) {
+    return prevLines.map((line, idx) => ({
+      type: "context",
+      content: line,
+      oldNum: idx + 1,
+      newNum: idx + 1,
+    }));
+  }
+
+  let prefix = 0;
+  while (
+    prefix < prevLines.length &&
+    prefix < nextLines.length &&
+    prevLines[prefix] === nextLines[prefix]
+  ) {
+    prefix++;
+  }
+
+  let suffixOld = prevLines.length - 1;
+  let suffixNew = nextLines.length - 1;
+  while (
+    suffixOld >= prefix &&
+    suffixNew >= prefix &&
+    prevLines[suffixOld] === nextLines[suffixNew]
+  ) {
+    suffixOld--;
+    suffixNew--;
+  }
+
+  const lines: DiffLine[] = [];
+  for (let i = 0; i < prefix; i++) {
+    lines.push({ type: "context", content: prevLines[i]!, oldNum: i + 1, newNum: i + 1 });
+  }
+
+  for (let i = prefix; i <= suffixOld; i++) {
+    lines.push({ type: "removed", content: prevLines[i]!, oldNum: i + 1 });
+  }
+
+  for (let i = prefix; i <= suffixNew; i++) {
+    lines.push({ type: "added", content: nextLines[i]!, newNum: i + 1 });
+  }
+
+  for (let i = suffixOld + 1; i < prevLines.length; i++) {
+    const nextIdx = suffixNew + 1 + (i - (suffixOld + 1));
+    lines.push({ type: "context", content: prevLines[i]!, oldNum: i + 1, newNum: nextIdx + 1 });
+  }
+
+  return lines;
+}
+
+export function getMutationDiffStats(m: FileMutationRecord): DiffStats {
+  if (diffStatsCache.has(m)) {
+    return diffStatsCache.get(m)!;
+  }
+
+  let stats: DiffStats;
+  const prev = m.previousContent;
+  const next = m.newContent;
+
+  if (m.operation === "create" || prev === null || prev === undefined) {
+    const lines = next !== null && next !== undefined ? next.split(/\r?\n/).length : 0;
+    stats = { added: Math.max(1, lines), removed: 0 };
+  } else if (m.operation === "delete" || next === null || next === undefined) {
+    const lines = prev !== null && prev !== undefined ? prev.split(/\r?\n/).length : 0;
+    stats = { added: 0, removed: Math.max(1, lines) };
+  } else if (prev === next) {
+    stats = { added: 0, removed: 0 };
+  } else {
+    const diff = computeDiff(prev, next);
+    let added = 0;
+    let removed = 0;
+    for (const line of diff) {
+      if (line.type === "added") added++;
+      else if (line.type === "removed") removed++;
+    }
+    stats = { added, removed };
+  }
+
+  diffStatsCache.set(m, stats);
+  return stats;
+}
+
+export function MutationsSummaryCard({
+  mutations,
+  isExecuting = false,
+  onRollback,
+  onRollbackAll,
+}: {
+  mutations: FileMutationRecord[];
+  isExecuting?: boolean;
+  onRollback?: (record: FileMutationRecord) => void;
+  onRollbackAll?: (records: FileMutationRecord[]) => void;
+}) {
+  const { t, language } = useI18n();
+  const [isOpen, setIsOpen] = useState(isExecuting);
+  const wasExecutingRef = useRef(isExecuting);
+
+  useEffect(() => {
+    if (isExecuting && !wasExecutingRef.current) {
+      setIsOpen(true);
+    } else if (!isExecuting && wasExecutingRef.current) {
+      setIsOpen(false);
+    }
+    wasExecutingRef.current = isExecuting;
+  }, [isExecuting]);
+
+  let totalAdded = 0;
+  let totalRemoved = 0;
+
+  for (const m of mutations) {
+    const stats = getMutationDiffStats(m);
+    totalAdded += stats.added;
+    totalRemoved += stats.removed;
+  }
+
+  const unrolledCount = mutations.filter((m) => !m.rolledBack).length;
+
+  return (
+    <div className="w-full rounded-xl bg-card dark:bg-[#141414] border border-border/70 dark:border-[#2b2b2b] my-2 select-none font-sans overflow-hidden transition-all shadow-xs animate-in fade-in-0 duration-200">
+      <div
+        className={cn(
+          "flex items-center justify-between px-3.5 py-2 transition-all",
+          isOpen && "border-b border-border/60 dark:border-[#242424]"
+        )}
+      >
+        <button
+          type="button"
+          onClick={() => setIsOpen((prev) => !prev)}
+          className="inline-flex items-center gap-2 text-[13px] text-foreground/90 dark:text-[#cccccc] hover:text-foreground dark:hover:text-white transition-colors cursor-pointer group/card"
+        >
+          <span className="font-normal text-foreground/90 dark:text-[#d4d4d4]">
+            {mutations.length === 1
+              ? t("fileChangedSingle")
+              : t("filesChanged", { count: mutations.length })}
+          </span>
+          <span className="font-mono text-xs text-[#409D62] font-medium">+{totalAdded}</span>
+          <span className="font-mono text-xs text-[#ff5c5c] font-medium">-{totalRemoved}</span>
+          <ChevronRight
+            className={cn(
+              "w-3.5 h-3.5 text-muted-foreground/60 transition-transform duration-200 ease-out",
+              isOpen && "rotate-90"
+            )}
+          />
+        </button>
+
+        <div className="flex items-center gap-2">
+          {onRollbackAll && unrolledCount > 0 && (
+            <button
+              type="button"
+              onClick={() => onRollbackAll(mutations)}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-muted/60 hover:bg-muted dark:bg-[#1e1e1e] dark:hover:bg-[#282828] border border-border/80 dark:border-[#333333] text-[11.5px] text-foreground/90 hover:text-foreground dark:text-[#d4d4d4] dark:hover:text-white transition-all cursor-pointer font-medium shadow-xs"
+              title={t("undoAllChangesInTurn")}
+            >
+              <RotateCcw className="w-3 h-3 text-muted-foreground" />
+              <span>{t("undoAll")}</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      <SmoothCollapse isOpen={isOpen}>
+        <div className="px-3 py-2 w-full">
+          {mutations.length > 6 ? (
+            <ScrollArea className="max-h-60 w-full pr-1" viewportClassName="[&>div[style]]:!block">
+              <div className="flex flex-col gap-0.5">
+                {mutations.map((mut) => (
+                  <MutationRowItem key={mut.id} mut={mut} onRollback={onRollback} />
+                ))}
+              </div>
+            </ScrollArea>
+          ) : (
+            <div className="flex flex-col gap-0.5">
+              {mutations.map((mut) => (
+                <MutationRowItem key={mut.id} mut={mut} onRollback={onRollback} />
+              ))}
+            </div>
+          )}
+        </div>
+      </SmoothCollapse>
+    </div>
+  );
+}
+
+function MutationRowItem({
+  mut,
+  onRollback,
+}: {
+  mut: FileMutationRecord;
+  onRollback?: (record: FileMutationRecord) => void;
+}) {
+  const { t, language } = useI18n();
+  const rawPath = mut.targetFile || mut.filePath || mut.absolutePath || "file";
+  const fileName = rawPath.replace(/\\/g, "/").split("/").filter(Boolean).pop() || rawPath;
+  const dirPath = rawPath.replace(/\\/g, "/").split("/").slice(0, -1).join("/") || "";
+  const fileStats = getMutationDiffStats(mut);
+
+  return (
+    <div className="flex items-center justify-between group py-1.5 px-2 rounded-lg hover:bg-black/[0.04] dark:hover:bg-white/[0.04] transition-colors">
+      <div className="flex items-center gap-2 min-w-0 pr-2">
+        <FileIcon filename={fileName} />
+        <span
+          className={`text-[13px] truncate font-sans ${
+            mut.rolledBack
+              ? "line-through text-muted-foreground/60 dark:text-[#666666]"
+              : "text-foreground/90 dark:text-[#d4d4d4]"
+          }`}
+        >
+          {fileName}
+        </span>
+        {dirPath && (
+          <span className="text-[11px] text-muted-foreground/60 dark:text-[#555555] font-mono truncate max-w-[240px]">
+            /{dirPath}
+          </span>
+        )}
+      </div>
+
+      <div className="shrink-0 ml-2 flex items-center gap-2">
+        <div className="flex items-center gap-1.5 font-mono text-xs">
+          <span className="text-[#409D62]">+{fileStats.added}</span>
+          <span className="text-[#ff5c5c]">-{fileStats.removed}</span>
+        </div>
+
+        {mut.rolledBack ? (
+          <span className="text-[10.5px] text-[#409D62] font-medium flex items-center gap-0.5">
+            <Check className="w-3 h-3 text-[#409D62]" />
+            <span>{t("undone")}</span>
+          </span>
+        ) : onRollback ? (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onRollback(mut);
+            }}
+            className="opacity-0 group-hover:opacity-100 flex items-center gap-1 px-2 py-0.5 rounded bg-muted/70 hover:bg-muted dark:bg-[#202020] dark:hover:bg-[#2e2e2e] border border-border/80 dark:border-[#333333] text-[10.5px] text-foreground/80 hover:text-foreground dark:text-[#d4d4d4] dark:hover:text-white transition-all cursor-pointer shadow-xs"
+            title={language === "id" ? "Undo perubahan pada berkas ini" : "Undo changes to this file"}
+          >
+            <RotateCcw className="w-2.5 h-2.5 text-muted-foreground" />
+            <span>Undo</span>
+          </button>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
