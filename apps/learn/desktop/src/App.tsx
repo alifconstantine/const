@@ -42,6 +42,7 @@ function AuthenticatedContent({
           const id = await localDb.createLearn({
             title: t("untitledNotebook"),
             emoji: "📘",
+            permissionMode: "ask_before_changes",
           });
           const initialSessionId = await localDb.createSession(id, t("initialSessionTitle"));
           try {

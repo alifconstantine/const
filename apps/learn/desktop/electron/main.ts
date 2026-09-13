@@ -442,14 +442,18 @@ app.on("second-instance", (_event, commandLine) => {
       _event,
       payload: {
         approvalId: string;
-        approved: boolean;
+        decision?: string;
+        approved?: boolean;
         feedback?: string;
       }
     ) => {
       if (activeAgent && typeof activeAgent.resolveApproval === "function") {
+        const decision =
+          payload.decision || (payload.approved !== false ? "allow_once" : "deny");
         const resolved = activeAgent.resolveApproval(payload.approvalId, {
           approvalId: payload.approvalId,
-          approved: payload.approved,
+          decision,
+          approved: decision !== "deny",
           feedback: payload.feedback,
           timestamp: Date.now(),
         });
@@ -656,7 +660,7 @@ app.on("second-instance", (_event, commandLine) => {
         model,
         workspacePath: targetWorkspace,
         preset: "learn",
-        mode: payload.mode || "full_access",
+        mode: payload.mode || "ask_before_changes",
         thinkingLevel: payload.thinkingLevel as any,
         maxOutputTokens: payload.maxOutputTokens ?? (modelDef as any)?.maxOutputTokens,
         onAskQuestion: (toolCallId, questionData) => {

@@ -42,7 +42,8 @@ contextBridge.exposeInMainWorld("electron", {
       ipcRenderer.invoke("agent:answer-question", { toolCallId, answer }),
     respondApproval: (payload: {
       approvalId: string;
-      approved: boolean;
+      decision?: string;
+      approved?: boolean;
       feedback?: string;
     }) => ipcRenderer.invoke("agent:respond-approval", payload),
     generateTitle: (prompt: string, authToken?: string) =>

@@ -12,6 +12,9 @@ import {
   User as UserIcon,
   Settings,
   Globe,
+  Hand,
+  ShieldAlert,
+  ChevronDown,
 } from "lucide-react";
 import {
   Avatar,
@@ -295,8 +298,81 @@ export function LearnWorkspace({
           )}
         </div>
 
-        {/* Right: User Account Only */}
-        <div className="flex items-center">
+        {/* Right: Permission Mode & User Account */}
+        <div className="flex items-center gap-2">
+          {/* Permission Mode Selector */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border border-border/70 bg-secondary/40 hover:bg-secondary/70 text-foreground transition-all cursor-pointer select-none"
+                title={t("permissionModeLabel")}
+              >
+                {(learn?.permissionMode || "ask_before_changes") === "ask_before_changes" ? (
+                  <>
+                    <Hand className="h-3.5 w-3.5 text-foreground shrink-0" />
+                    <span className="hidden sm:inline">{t("askBeforeChanges")}</span>
+                  </>
+                ) : (
+                  <>
+                    <ShieldAlert className="h-3.5 w-3.5 text-[#e79737] shrink-0" />
+                    <span className="hidden sm:inline text-[#e79737]">{t("fullAccess")}</span>
+                  </>
+                )}
+                <ChevronDown className="h-3 w-3 text-muted-foreground ml-0.5 opacity-70 shrink-0" />
+              </button>
+            </DropdownMenuTrigger>
+
+            <DropdownMenuContent align="end" className="w-64 p-1.5 shadow-xl">
+              {/* Option 1: Ask before changes */}
+              <DropdownMenuItem
+                className="cursor-pointer flex items-start gap-2.5 p-2 rounded-xl text-left"
+                onClick={async () => {
+                  if (learnId) {
+                    await localDb.updateLearn(learnId, { permissionMode: "ask_before_changes" });
+                  }
+                }}
+              >
+                <Hand className="h-4 w-4 text-foreground shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <div className="text-xs font-medium text-foreground">
+                    {t("askBeforeChanges")}
+                  </div>
+                  <div className="text-[11px] text-muted-foreground leading-tight mt-0.5">
+                    {t("askBeforeChangesDesc")}
+                  </div>
+                </div>
+                {(learn?.permissionMode || "ask_before_changes") === "ask_before_changes" && (
+                  <Check className="h-3.5 w-3.5 text-primary shrink-0 ml-1 mt-0.5" />
+                )}
+              </DropdownMenuItem>
+
+              {/* Option 2: Full access */}
+              <DropdownMenuItem
+                className="cursor-pointer flex items-start gap-2.5 p-2 rounded-xl text-left"
+                onClick={async () => {
+                  if (learnId) {
+                    await localDb.updateLearn(learnId, { permissionMode: "full_access" });
+                  }
+                }}
+              >
+                <ShieldAlert className="h-4 w-4 text-[#e79737] shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <div className="text-xs font-medium text-foreground">
+                    {t("fullAccess")}
+                  </div>
+                  <div className="text-[11px] text-muted-foreground leading-tight mt-0.5">
+                    {t("fullAccessDesc")}
+                  </div>
+                </div>
+                {(learn?.permissionMode || "ask_before_changes") === "full_access" && (
+                  <Check className="h-3.5 w-3.5 text-[#e79737] shrink-0 ml-1 mt-0.5" />
+                )}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* User Account Only */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
@@ -478,6 +554,7 @@ export function LearnWorkspace({
         <ChatPanel
           learnId={learnId}
           workspacePath={learn?.projectPath}
+          permissionMode={learn?.permissionMode || "ask_before_changes"}
           sourcesCount={learn?.sourcesCount || 0}
           onAddSource={() => setIsAddSourceOpen(true)}
           onSelectPromptChip={(prompt) => {

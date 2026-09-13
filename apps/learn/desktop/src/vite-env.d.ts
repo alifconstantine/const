@@ -13,6 +13,28 @@ export interface FileMutationRecord {
   rolledBack?: boolean;
 }
 
+export type ApprovalDecision =
+  | "allow_once"
+  | "allow_conversation"
+  | "allow_project"
+  | "allow_always"
+  | "deny"
+  | "skip";
+
+export interface ApprovalRequestData {
+  approvalId?: string;
+  id?: string;
+  toolCallId?: string;
+  toolName?: string;
+  command?: string;
+  args?: any;
+  cwd?: string;
+  description?: string;
+  reason?: string;
+  createdAt?: number;
+  timestamp?: number;
+}
+
 declare global {
   interface Window {
     electron?: {
@@ -60,7 +82,8 @@ declare global {
         answerQuestion?: (toolCallId: string, answer: any) => Promise<boolean>;
         respondApproval?: (payload: {
           approvalId: string;
-          approved: boolean;
+          decision?: ApprovalDecision | string;
+          approved?: boolean;
           feedback?: string;
         }) => Promise<{ success: boolean; resolved?: boolean; error?: string }>;
         generateTitle?: (prompt: string, authToken?: string) => Promise<string | null>;

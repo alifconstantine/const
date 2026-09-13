@@ -8,7 +8,7 @@ import {
   Button,
   Input,
 } from "@const/ui";
-import { BookOpen, Folder, FolderOpen, X } from "lucide-react";
+import { BookOpen, Check, Folder, FolderOpen, Hand, ShieldAlert, X } from "lucide-react";
 import { useI18n } from "../../../lib/i18n";
 
 const EMOJI_OPTIONS = [
@@ -27,6 +27,7 @@ interface CreateLearnDialogProps {
     emoji?: string;
     collectionIds?: string[];
     projectPath?: string;
+    permissionMode?: "ask_before_changes" | "full_access";
   };
   onSubmit: (data: {
     id?: string;
@@ -35,6 +36,7 @@ interface CreateLearnDialogProps {
     emoji: string;
     collectionId?: string;
     projectPath?: string;
+    permissionMode?: "ask_before_changes" | "full_access";
   }) => Promise<void>;
 }
 
@@ -51,6 +53,9 @@ export function CreateLearnDialog({
     initialData?.collectionIds?.[0]
   );
   const [projectPath, setProjectPath] = useState<string>(initialData?.projectPath ?? "");
+  const [permissionMode, setPermissionMode] = useState<"ask_before_changes" | "full_access">(
+    initialData?.permissionMode ?? "ask_before_changes"
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   React.useEffect(() => {
@@ -59,6 +64,7 @@ export function CreateLearnDialog({
       setSelectedEmoji(initialData?.emoji ?? "🚀");
       setSelectedCollectionId(initialData?.collectionIds?.[0]);
       setProjectPath(initialData?.projectPath ?? "");
+      setPermissionMode(initialData?.permissionMode ?? "ask_before_changes");
     }
   }, [open, initialData]);
 
@@ -84,6 +90,7 @@ export function CreateLearnDialog({
         emoji: selectedEmoji,
         collectionId: selectedCollectionId,
         projectPath: projectPath.trim() || undefined,
+        permissionMode,
       });
       onOpenChange(false);
     } catch (err) {
@@ -98,7 +105,7 @@ export function CreateLearnDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-full max-w-[400px] p-5 rounded-2xl border border-border/80 bg-card text-card-foreground shadow-2xl overflow-hidden">
+      <DialogContent className="w-full max-w-[440px] p-5 rounded-2xl border border-border/80 bg-card text-card-foreground shadow-2xl overflow-hidden">
         <form onSubmit={handleSubmit} className="space-y-3.5 w-full min-w-0">
           <DialogHeader className="pb-0.5">
             <DialogTitle className="font-serif text-base font-medium tracking-tight text-foreground flex items-center gap-2">
@@ -192,6 +199,64 @@ export function CreateLearnDialog({
                 ? t("agentWorkspaceNotice")
                 : t("defaultWorkspaceNotice")}
             </p>
+          </div>
+
+          {/* Permission Mode Selection */}
+          <div className="space-y-1.5">
+            <label className="text-[12px] font-medium text-muted-foreground block">
+              {t("permissionModeLabel")}
+            </label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setPermissionMode("ask_before_changes")}
+                className={`p-2.5 rounded-xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
+                  permissionMode === "ask_before_changes"
+                    ? "border-primary bg-primary/5 shadow-xs"
+                    : "border-border/70 bg-secondary/20 hover:bg-secondary/40"
+                }`}
+              >
+                <div className="flex items-center justify-between w-full mb-1">
+                  <Hand className="h-4 w-4 text-foreground shrink-0" />
+                  {permissionMode === "ask_before_changes" && (
+                    <Check className="h-3.5 w-3.5 text-primary shrink-0" />
+                  )}
+                </div>
+                <div>
+                  <div className="text-[12px] font-medium text-foreground">
+                    {t("askBeforeChanges")}
+                  </div>
+                  <div className="text-[10.5px] text-muted-foreground leading-tight mt-0.5">
+                    {t("askBeforeChangesDesc")}
+                  </div>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setPermissionMode("full_access")}
+                className={`p-2.5 rounded-xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
+                  permissionMode === "full_access"
+                    ? "border-[#e79737] bg-[#e79737]/10 shadow-xs"
+                    : "border-border/70 bg-secondary/20 hover:bg-secondary/40"
+                }`}
+              >
+                <div className="flex items-center justify-between w-full mb-1">
+                  <ShieldAlert className="h-4 w-4 text-[#e79737] shrink-0" />
+                  {permissionMode === "full_access" && (
+                    <Check className="h-3.5 w-3.5 text-[#e79737] shrink-0" />
+                  )}
+                </div>
+                <div>
+                  <div className="text-[12px] font-medium text-foreground">
+                    {t("fullAccess")}
+                  </div>
+                  <div className="text-[10.5px] text-muted-foreground leading-tight mt-0.5">
+                    {t("fullAccessDesc")}
+                  </div>
+                </div>
+              </button>
+            </div>
           </div>
 
           {/* Collection Assignment */}

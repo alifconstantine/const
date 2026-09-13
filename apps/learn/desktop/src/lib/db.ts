@@ -9,6 +9,7 @@ export interface LocalLearn {
   collectionIds: string[];
   sourcesCount: number;
   projectPath?: string;
+  permissionMode?: "ask_before_changes" | "full_access";
   updatedAt: number;
   createdAt: number;
   isArchived?: boolean;
@@ -154,6 +155,7 @@ export const localDb = {
     emoji?: string;
     collectionId?: string;
     projectPath?: string;
+    permissionMode?: "ask_before_changes" | "full_access";
   }): Promise<string> {
     const id = "learn_" + Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
     const now = Date.now();
@@ -165,6 +167,7 @@ export const localDb = {
       collectionIds: data.collectionId ? [data.collectionId] : [],
       sourcesCount: 0,
       projectPath: data.projectPath?.trim(),
+      permissionMode: data.permissionMode || "ask_before_changes",
       updatedAt: now,
       createdAt: now,
       isArchived: false,
@@ -180,6 +183,7 @@ export const localDb = {
       emoji?: string;
       collectionIds?: string[];
       projectPath?: string;
+      permissionMode?: "ask_before_changes" | "full_access";
     }
   ) {
     const updates: Partial<LocalLearn> = {
@@ -190,6 +194,7 @@ export const localDb = {
     if (data.emoji !== undefined) updates.emoji = data.emoji;
     if (data.collectionIds !== undefined) updates.collectionIds = data.collectionIds;
     if (data.projectPath !== undefined) updates.projectPath = data.projectPath.trim();
+    if (data.permissionMode !== undefined) updates.permissionMode = data.permissionMode;
 
     await db.learns.update(id, updates);
   },

@@ -143,6 +143,7 @@ export function LearnHome({
     emoji: string;
     collectionId?: string;
     projectPath?: string;
+    permissionMode?: "ask_before_changes" | "full_access";
   }) => {
     if (data.id) {
       await localDb.updateLearn(data.id, {
@@ -150,6 +151,7 @@ export function LearnHome({
         description: data.description,
         emoji: data.emoji,
         projectPath: data.projectPath,
+        permissionMode: data.permissionMode,
       });
     } else {
       const newId = await localDb.createLearn({
@@ -158,6 +160,7 @@ export function LearnHome({
         emoji: data.emoji,
         collectionId: data.collectionId || (activeCollectionId ?? undefined),
         projectPath: data.projectPath,
+        permissionMode: data.permissionMode || "ask_before_changes",
       });
       // Create initial chat session
       const initialSessionId = await localDb.createSession(newId, t("initialSessionTitle"));
@@ -726,6 +729,8 @@ export function LearnHome({
                 description: editingLearn.description,
                 emoji: editingLearn.emoji,
                 collectionIds: editingLearn.collectionIds,
+                projectPath: editingLearn.projectPath,
+                permissionMode: editingLearn.permissionMode,
               }
             : undefined
         }

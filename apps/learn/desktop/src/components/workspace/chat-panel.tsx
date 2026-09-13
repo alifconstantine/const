@@ -45,10 +45,13 @@ import { ChatHistoryPanel } from "./chat-history-panel";
 import { ExecutionTrace, type DisplayToolCall, type TraceStep } from "./execution-trace";
 import { MarkdownContent } from "./markdown-content";
 import { ImageLightbox } from "./image-lightbox";
+import { ApprovalCard } from "./approval-card";
+import type { ApprovalRequestData, ApprovalDecision } from "../../vite-env";
 
 interface ChatPanelProps {
   learnId?: string;
   workspacePath?: string;
+  permissionMode?: "ask_before_changes" | "full_access";
   sourcesCount?: number;
   onSelectPromptChip?: (prompt: string) => void;
   onSendMessage?: (message: string) => void;
@@ -115,6 +118,7 @@ function formatFileSize(bytes: number): string {
 export function ChatPanel({
   learnId,
   workspacePath,
+  permissionMode = "ask_before_changes",
   sourcesCount = 0,
   onSelectPromptChip,
   onAddSource,
@@ -127,6 +131,12 @@ export function ChatPanel({
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
   const [availableModels, setAvailableModels] = useState<ModelConfig[]>(DEFAULT_MODELS);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  // Approval state matching apps/harness
+  const permissionModeRef = useRef(permissionMode);
+  permissionModeRef.current = permissionMode;
+  const [activeApproval, setActiveApproval] = useState<ApprovalRequestData | null>(null);
+  const [isRespondingApproval, setIsRespondingApproval] = useState(false);
 
   // Attachments state (max 5 media/files)
   const MAX_ATTACHMENTS = 5;
@@ -143,6 +153,31 @@ export function ChatPanel({
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const modelDropdownRef = useRef<HTMLDivElement>(null);
   const activeAssistantIdRef = useRef<string | null>(null);
+
+  const handleRespondApproval = async (
+    decision: ApprovalDecision,
+    feedback?: string
+  ) => {
+    if (!activeApproval) return;
+    const approvalId = activeApproval.id || activeApproval.approvalId!;
+    setIsRespondingApproval(true);
+    try {
+      const electron = window.electron;
+      if (electron?.agent?.respondApproval) {
+        await electron.agent.respondApproval({
+          approvalId,
+          decision,
+          feedback,
+          approved: decision !== "deny" && decision !== "skip",
+        });
+      }
+      setActiveApproval(null);
+    } catch (err) {
+      console.error("Failed to respond to approval:", err);
+    } finally {
+      setIsRespondingApproval(false);
+    }
+  };
 
   // Input change handler ensuring reliable return to single-line pill when empty
   const handleInputChange = (val: string) => {
@@ -660,14 +695,37 @@ export function ChatPanel({
           }
           updated.traceSteps = steps;
         } else if (event.type === "approval_request") {
-          // If approval is requested in Learn, automatically approve so inspection commands do not hang
           const approvalId = event.id || event.approvalId || event.approval?.id || event.approval?.approvalId;
-          if (approvalId && electron?.agent?.respondApproval) {
-            electron.agent.respondApproval({
-              approvalId,
-              approved: true,
-            }).catch(() => {});
+          const currentMode = permissionModeRef.current || "ask_before_changes";
+          if (currentMode === "full_access") {
+            // Auto-approve in full_access mode so execution proceeds without interruption
+            if (approvalId && electron?.agent?.respondApproval) {
+              electron.agent.respondApproval({
+                approvalId,
+                approved: true,
+                decision: "allow_once",
+              }).catch(() => {});
+            }
+          } else {
+            // In ask_before_changes mode, display interactive ApprovalCard
+            const approvalData: ApprovalRequestData = event.approval || {
+              id: approvalId || `approval_${Date.now()}`,
+              approvalId: approvalId || `approval_${Date.now()}`,
+              toolCallId: event.toolCallId,
+              toolName: event.toolName,
+              command: event.command,
+              args: event.args,
+              cwd: event.cwd,
+              description: event.description,
+              reason: event.reason,
+            };
+            setActiveApproval(approvalData);
+            setTimeout(() => {
+              messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+            }, 60);
           }
+        } else if (event.type === "approval_resolved") {
+          setActiveApproval(null);
         } else if (event.type === "tool_result") {
           const toolCalls = [...(updated.toolCalls || [])];
           const existingIdx = toolCalls.findIndex((tc) => tc.id === event.toolCallId);
@@ -719,6 +777,7 @@ export function ChatPanel({
             }
           }
         } else if (event.type === "error") {
+          setActiveApproval(null);
           const defaultError = language === "id"
             ? "Terjadi kesalahan saat memproses permintaan."
             : "An error occurred while processing the request.";
@@ -750,6 +809,7 @@ export function ChatPanel({
             });
           }
         } else if (event.type === "done") {
+          setActiveApproval(null);
           if (event.fullContent && !updated.content) {
             updated.content = event.fullContent;
           } else if (!updated.content && updated.toolCalls && updated.toolCalls.length > 0) {
@@ -898,6 +958,8 @@ export function ChatPanel({
     const currentAttachmentsRaw = [...attachments];
 
     if ((!textToSend && currentAttachmentsRaw.length === 0) || isStreaming) return;
+
+    setActiveApproval(null);
 
     if (!textToSend && currentAttachmentsRaw.length > 0) {
       textToSend = t("analyzeAttachedMediaPrompt");
@@ -1136,7 +1198,7 @@ export function ChatPanel({
           workspacePath: workspacePath,
           learnId: learnId,
           authToken: authToken || undefined,
-          mode: "full_access",
+          mode: permissionMode || "ask_before_changes",
         });
 
         const finalDuration = streamStartTimeRef.current
@@ -2338,7 +2400,13 @@ export function ChatPanel({
 
       {/* Sticky Bottom Chat Input Container */}
       <div className="p-4 sm:p-5 shrink-0 max-w-3xl mx-auto w-full font-sans">
-        {isMultiline || attachments.length > 0 ? (
+        {activeApproval ? (
+          <ApprovalCard
+            request={activeApproval}
+            isResponding={isRespondingApproval}
+            onDecide={handleRespondApproval}
+          />
+        ) : isMultiline || attachments.length > 0 ? (
           /* Multi-line Mode (Image 3): Rounded card with top-level textarea inside ScrollArea + bottom toolbar */
           <form
             key="chat-input-multi"
