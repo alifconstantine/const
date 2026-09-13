@@ -326,7 +326,7 @@ export function ChatInputCard({
           {/* Attachments Shelf */}
           {attachments.length > 0 && (
             <ScrollArea orientation="horizontal" className="w-full">
-              <div className="flex items-center gap-2 px-1 pt-1.5 pb-2 select-none w-max">
+              <div className="flex items-center gap-2 px-2 pt-2.5 pb-2 select-none w-max">
                 {attachments.map((att) => {
                   const ext = (att.name.split(".").pop() || "FILE").toUpperCase();
                   const isImage = att.type === "image";
@@ -348,7 +348,7 @@ export function ChatInputCard({
                         }
                       }}
                       className={cn(
-                        "relative group shrink-0 rounded-xl border border-[#383838] bg-[#1a1917] overflow-hidden shadow-xs select-none",
+                        "relative group shrink-0 rounded-xl border border-[#383838] bg-[#1a1917] shadow-xs select-none",
                         isMedia
                           ? "w-16 h-16 sm:w-20 sm:h-20 cursor-pointer active:scale-95 transition-transform"
                           : "w-32 sm:w-36 h-16 sm:h-20"

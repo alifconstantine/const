@@ -1582,7 +1582,7 @@ export function ChatPanel({
     if (attachments.length === 0) return null;
     return (
       <ScrollArea orientation="horizontal" className="w-full">
-        <div className="flex items-center gap-2.5 pt-2 pb-2.5 px-1.5 w-max select-none">
+        <div className="flex items-center gap-2.5 pt-2.5 pb-2.5 px-2 w-max select-none">
           <TooltipProvider delayDuration={150}>
             {attachments.map((file) => {
               const isImage = file.type === "image";
