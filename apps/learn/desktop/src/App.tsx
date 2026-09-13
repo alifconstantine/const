@@ -4,7 +4,6 @@ import { ConstLogoIcon, Button } from "@const/ui";
 import { useQuery } from "convex/react";
 import { api } from "@const/backend/_generated/api";
 import { ConvexClientProvider } from "./components/convex-provider";
-import { Navbar } from "./components/navbar";
 import { LearnHome } from "./components/home/learn-home";
 import { LearnWorkspace } from "./components/workspace/learn-workspace";
 import { localDb } from "./lib/db";
@@ -53,14 +52,12 @@ function AuthenticatedContent({
   }
 
   return (
-    <div className="h-screen w-full flex flex-col bg-background text-foreground overflow-hidden">
-      <Navbar
-        user={user}
-        onSignOut={onSignOut}
-        onSwitchAccount={onSwitchAccount}
-      />
-      <LearnHome onOpenLearn={handleOpenLearn} />
-    </div>
+    <LearnHome
+      onOpenLearn={handleOpenLearn}
+      user={user}
+      onSignOut={onSignOut}
+      onSwitchAccount={onSwitchAccount}
+    />
   );
 }
 

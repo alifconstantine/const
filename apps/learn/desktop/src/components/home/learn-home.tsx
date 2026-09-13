@@ -1,149 +1,64 @@
-import React, { useState, useMemo, useRef } from "react";
+import React, { useState, useMemo } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db, localDb, LocalLearn, LocalCollection, LocalArtifact } from "../../lib/db";
 import {
   Button,
   Input,
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
   ScrollArea,
 } from "@const/ui";
 import {
   Search,
-  Check,
   LayoutGrid,
   List as ListIcon,
-  ArrowUpDown,
   Plus,
-  ChevronRight,
+  PanelLeftOpen,
   ArrowLeft,
-  Folder,
   Trash2,
   X,
-  Layers,
-  BookOpen,
+  Folder,
+  Clock,
 } from "lucide-react";
 
 import { LearnCard, LearnItem } from "./learn-card";
 import { CollectionCard, CollectionItem } from "./collection-card";
 import { CreateCard } from "./create-card";
+import { RecentlyViewedCard } from "./recently-viewed-card";
+import { Sidebar, HomeNavTab } from "./sidebar";
+import { SourcesView } from "./sources-view";
+import { SettingsView } from "../settings/settings-view";
 import { CreateLearnDialog } from "./dialogs/create-learn-dialog";
 import { CreateCollectionDialog } from "./dialogs/create-collection-dialog";
 import { ManageCollectionDialog } from "./dialogs/manage-collection-dialog";
 import { DeleteConfirmDialog } from "./dialogs/delete-confirm-dialog";
-
-type TabKey = "all" | "my_learn" | "collections" | "artifacts";
-type SortOption = "recent" | "oldest" | "title_asc" | "title_desc";
-
-const SORT_LABELS: Record<SortOption, string> = {
-  recent: "Terbaru",
-  oldest: "Terlama",
-  title_asc: "Nama (A-Z)",
-  title_desc: "Nama (Z-A)",
-};
+import type { UserProfile } from "../navbar";
 
 interface LearnHomeProps {
   onOpenLearn?: (learnId: string, openAddSource?: boolean) => void;
+  user?: UserProfile | null;
+  onSignOut?: () => void;
+  onSwitchAccount?: () => void;
 }
 
-export function LearnHome({ onOpenLearn }: LearnHomeProps) {
-  // Navigation & View state
-  const lastScrollTopRef = useRef(0);
-  const scrollAccumulatorRef = useRef(0);
-  const isTransitioningRef = useRef(false);
-  const transitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [isHeaderVisible, setIsHeaderVisible] = useState(true);
-
-  const setHeaderVisibleWithLock = (visible: boolean) => {
-    setIsHeaderVisible((prev) => {
-      if (prev === visible) return prev;
-      isTransitioningRef.current = true;
-      if (transitionTimerRef.current) clearTimeout(transitionTimerRef.current);
-      transitionTimerRef.current = setTimeout(() => {
-        isTransitioningRef.current = false;
-      }, 350);
-      return visible;
-    });
-  };
-
-  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    const target = e.currentTarget;
-    const currentScrollTop = target.scrollTop;
-    const clientHeight = target.clientHeight;
-    const scrollHeight = target.scrollHeight;
-
-    // 1. Ignore reflow / resize scroll events during CSS animation
-    if (isTransitioningRef.current) {
-      lastScrollTopRef.current = currentScrollTop;
-      return;
-    }
-
-    // 2. Mentok Atas: Always show toolbar when near top (<= 20px)
-    if (currentScrollTop <= 20) {
-      scrollAccumulatorRef.current = 0;
-      setHeaderVisibleWithLock(true);
-      lastScrollTopRef.current = currentScrollTop;
-      return;
-    }
-
-    // 3. Mentok Bawah: Check if at or very close to bottom
-    const isAtBottom = currentScrollTop + clientHeight >= scrollHeight - 20;
-    const delta = currentScrollTop - lastScrollTopRef.current;
-    lastScrollTopRef.current = currentScrollTop;
-
-    // If at bottom and continuing to scroll down or bounce, ignore to prevent flicker
-    if (isAtBottom && delta >= 0) {
-      scrollAccumulatorRef.current = 0;
-      return;
-    }
-
-    // 4. Directional delta accumulation with hysteresis
-    if (delta > 0) {
-      // Scrolling down: accumulate positive delta
-      scrollAccumulatorRef.current = Math.max(0, scrollAccumulatorRef.current) + delta;
-      if (scrollAccumulatorRef.current > 25 && currentScrollTop > 40) {
-        setHeaderVisibleWithLock(false);
-        scrollAccumulatorRef.current = 0;
-      }
-    } else if (delta < 0) {
-      // Scrolling up: accumulate negative delta ("sedikit saja" = 8px)
-      scrollAccumulatorRef.current = Math.min(0, scrollAccumulatorRef.current) + delta;
-      if (scrollAccumulatorRef.current < -8) {
-        setHeaderVisibleWithLock(true);
-        scrollAccumulatorRef.current = 0;
-      }
-    }
-  };
-  const [activeTab, setActiveTab] = useState<TabKey>("all");
+export function LearnHome({
+  onOpenLearn,
+  user,
+  onSignOut,
+  onSwitchAccount,
+}: LearnHomeProps) {
+  // Navigation & Shell State
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [activeTab, setActiveTab] = useState<HomeNavTab>("learns");
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [searchQuery, setSearchQuery] = useState("");
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
-  const [sortOption, setSortOption] = useState<SortOption>("recent");
   const [activeCollectionId, setActiveCollectionId] = useState<string | null>(null);
 
-  // Dialog states
+  // Dialog States
   const [isCreateLearnOpen, setIsCreateLearnOpen] = useState(false);
   const [editingLearn, setEditingLearn] = useState<LearnItem | null>(null);
   const [isCreateCollectionOpen, setIsCreateCollectionOpen] = useState(false);
   const [editingCollection, setEditingCollection] = useState<CollectionItem | null>(null);
   const [managingLearn, setManagingLearn] = useState<LearnItem | null>(null);
-
-  const handleCreateNewLearn = async (collectionId?: string) => {
-    if (onOpenLearn) {
-      const id = await localDb.createLearn({
-        title: "Notebook tanpa judul",
-        emoji: "📘",
-        collectionId: collectionId || activeCollectionId || undefined,
-      });
-      onOpenLearn(id, true);
-    } else {
-      setEditingLearn(null);
-      setIsCreateLearnOpen(true);
-    }
-  };
   const [deleteTarget, setDeleteTarget] = useState<{
     type: "learn" | "collection";
     id?: string;
@@ -151,29 +66,11 @@ export function LearnHome({ onOpenLearn }: LearnHomeProps) {
     description: string;
   } | null>(null);
 
-  // Dexie.js Live Queries (Reactive, ACID-compliant local database with ZERO dummy data)
-  const learnsData = useLiveQuery(async () => {
-    let items = await db.learns.toArray();
-    items = items.filter((l) => !l.isArchived);
-    if (searchQuery.trim()) {
-      const q = searchQuery.toLowerCase();
-      items = items.filter(
-        (l) =>
-          l.title.toLowerCase().includes(q) ||
-          (l.description && l.description.toLowerCase().includes(q))
-      );
-    }
-    if (sortOption === "recent") {
-      items.sort((a, b) => b.updatedAt - a.updatedAt);
-    } else if (sortOption === "oldest") {
-      items.sort((a, b) => a.updatedAt - b.updatedAt);
-    } else if (sortOption === "title_asc") {
-      items.sort((a, b) => a.title.localeCompare(b.title));
-    } else if (sortOption === "title_desc") {
-      items.sort((a, b) => b.title.localeCompare(a.title));
-    }
-    return items;
-  }, [searchQuery, sortOption]);
+  // Dexie.js Live Queries
+  const rawLearns = useLiveQuery(async () => {
+    const items = await db.learns.toArray();
+    return items.filter((l) => !l.isArchived).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+  });
 
   const collectionsData = useLiveQuery(async () => {
     const cols = await db.collections.toArray();
@@ -192,9 +89,25 @@ export function LearnHome({ onOpenLearn }: LearnHomeProps) {
     return arts;
   });
 
-  const learns = useMemo(() => learnsData ?? [], [learnsData]);
+  const allLearns = useMemo(() => rawLearns ?? [], [rawLearns]);
   const collections = useMemo(() => collectionsData ?? [], [collectionsData]);
   const artifacts = useMemo(() => artifactsData ?? [], [artifactsData]);
+
+  // Filtered learns based on search
+  const filteredLearns = useMemo(() => {
+    if (!searchQuery.trim()) return allLearns;
+    const q = searchQuery.toLowerCase();
+    return allLearns.filter(
+      (l) =>
+        l.title.toLowerCase().includes(q) ||
+        (l.description && l.description.toLowerCase().includes(q))
+    );
+  }, [allLearns, searchQuery]);
+
+  // Recently Viewed Learns (Top 5 most recent)
+  const recentlyViewedLearns = useMemo(() => {
+    return allLearns.slice(0, 5);
+  }, [allLearns]);
 
   // Active collection object when drilled down
   const activeCollection = useMemo(() => {
@@ -205,10 +118,29 @@ export function LearnHome({ onOpenLearn }: LearnHomeProps) {
   // Filtered learns when viewing a specific collection
   const collectionLearns = useMemo(() => {
     if (!activeCollectionId) return [];
-    return learns.filter((l) => l.collectionIds && l.collectionIds.includes(activeCollectionId));
-  }, [learns, activeCollectionId]);
+    return allLearns.filter((l) => l.collectionIds && l.collectionIds.includes(activeCollectionId));
+  }, [allLearns, activeCollectionId]);
 
-  // Submit Learn creation or edit
+  // Total sources count across all learns
+  const totalSourcesCount = useMemo(() => {
+    return allLearns.reduce((acc, curr) => acc + (curr.sourcesCount || 0), 0);
+  }, [allLearns]);
+
+  // Action handlers
+  const handleCreateNewLearn = async (collectionId?: string) => {
+    if (onOpenLearn) {
+      const id = await localDb.createLearn({
+        title: "Notebook tanpa judul",
+        emoji: "📘",
+        collectionId: collectionId || activeCollectionId || undefined,
+      });
+      onOpenLearn(id, true);
+    } else {
+      setEditingLearn(null);
+      setIsCreateLearnOpen(true);
+    }
+  };
+
   const handleSaveLearn = async (data: {
     id?: string;
     title: string;
@@ -235,7 +167,6 @@ export function LearnHome({ onOpenLearn }: LearnHomeProps) {
     }
   };
 
-  // Submit Collection creation or edit
   const handleSaveCollection = async (data: {
     id?: string;
     name: string;
@@ -257,10 +188,8 @@ export function LearnHome({ onOpenLearn }: LearnHomeProps) {
     }
   };
 
-  // Handle Delete Confirmation
   const handleExecuteDelete = async () => {
     if (!deleteTarget) return;
-
     if (deleteTarget.type === "learn" && deleteTarget.id) {
       await localDb.deleteLearn(deleteTarget.id);
     } else if (deleteTarget.type === "collection" && deleteTarget.id) {
@@ -271,657 +200,483 @@ export function LearnHome({ onOpenLearn }: LearnHomeProps) {
     }
   };
 
+  // If Settings view is triggered
+  if (isSettingsOpen) {
+    return (
+      <SettingsView
+        onBackToWorkspace={() => setIsSettingsOpen(false)}
+        user={user}
+        onSignOut={onSignOut}
+        onSwitchAccount={onSwitchAccount}
+      />
+    );
+  }
+
   return (
-    <div className="w-full flex-1 flex flex-col min-h-0 bg-background text-foreground overflow-hidden">
-      {/* -------------------------------------------------------------
-          TOP BAR: Filter Pills on Left, Tools on Right (Ref: Gemini Notebook)
-          ------------------------------------------------------------- */}
-      <div
-        className={`shrink-0 w-full bg-background px-6 flex items-center justify-between gap-4 select-none border-b border-border/40 z-20 transition-all duration-300 ease-in-out overflow-hidden ${
-          isHeaderVisible
-            ? "max-h-16 py-3 opacity-100 translate-y-0"
-            : "max-h-0 py-0 opacity-0 -translate-y-full border-b-transparent pointer-events-none"
+    <div className="h-screen w-full flex bg-[#ececee] dark:bg-[#2b2b2b] text-[#262626] dark:text-[#d4d4d4] overflow-hidden select-none">
+      {/* 1. Left Sidebar (Collapsible) */}
+      {isSidebarOpen && (
+        <Sidebar
+          activeTab={activeTab}
+          onSelectTab={(tab) => {
+            setActiveTab(tab);
+            if (tab !== "collections") setActiveCollectionId(null);
+          }}
+          onCollapse={() => setIsSidebarOpen(false)}
+          onCreateNewLearn={() => handleCreateNewLearn()}
+          onCreateNewCollection={() => {
+            setEditingCollection(null);
+            setIsCreateCollectionOpen(true);
+          }}
+          onOpenSettings={() => setIsSettingsOpen(true)}
+          user={user}
+          onSignOut={onSignOut}
+          onSwitchAccount={onSwitchAccount}
+          learnsCount={allLearns.length}
+          sourcesCount={totalSourcesCount}
+          collectionsCount={collections.length}
+          artifactsCount={artifacts.length}
+        />
+      )}
+
+      {/* 2. Main Canvas (Left rounded against sidebar, bg #161616 per DESIGN.md) */}
+      <main
+        className={`flex-1 min-w-0 h-full bg-[#f8f8f8] dark:bg-[#161616] text-[#262626] dark:text-[#d4d4d4] overflow-hidden flex flex-col relative transition-[border-radius] duration-200 ${
+          isSidebarOpen
+            ? "rounded-l-2xl sm:rounded-l-3xl border-l border-[#dedee2] dark:border-[#333333]/40"
+            : ""
         }`}
       >
-        {/* Left: Filter Tabs (All, My Learn, Koleksi, Artifact) */}
-        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+        {/* Reopen Sidebar Button (When collapsed) */}
+        {!isSidebarOpen && (
           <button
             type="button"
-            onClick={() => {
-              setActiveTab("all");
-              setActiveCollectionId(null);
-            }}
-            className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all cursor-pointer whitespace-nowrap ${
-              activeTab === "all"
-                ? "bg-primary text-primary-foreground shadow-xs"
-                : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
-            }`}
+            onClick={() => setIsSidebarOpen(true)}
+            className="absolute top-4 left-4 z-30 p-2 rounded-xl bg-white dark:bg-[#222222] border border-[#dedee2] dark:border-[#383838] text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white transition-colors cursor-pointer shadow-none"
+            title="Buka sidebar"
+            aria-label="Buka sidebar"
           >
-            All
+            <PanelLeftOpen className="w-4 h-4" />
           </button>
-          <button
-            type="button"
-            onClick={() => {
-              setActiveTab("my_learn");
-              setActiveCollectionId(null);
-            }}
-            className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-              activeTab === "my_learn"
-                ? "bg-primary text-primary-foreground shadow-xs"
-                : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
-            }`}
-          >
-            <span>My Learn</span>
-            {learns.length > 0 && (
-              <span className="text-[10px] opacity-75">({learns.length})</span>
-            )}
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setActiveTab("collections");
-              setActiveCollectionId(null);
-            }}
-            className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-              activeTab === "collections"
-                ? "bg-primary text-primary-foreground shadow-xs"
-                : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
-            }`}
-          >
-            <span>Koleksi</span>
-            {collections.length > 0 && (
-              <span className="text-[10px] opacity-75">({collections.length})</span>
-            )}
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setActiveTab("artifacts");
-              setActiveCollectionId(null);
-            }}
-            className={`px-4 py-1.5 rounded-full text-xs font-medium transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 ${
-              activeTab === "artifacts"
-                ? "bg-primary text-primary-foreground shadow-xs"
-                : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
-            }`}
-          >
-            <span>Artifact</span>
-            {artifacts.length > 0 && (
-              <span className="text-[10px] opacity-75">({artifacts.length})</span>
-            )}
-          </button>
-        </div>
-
-        {/* Right: Controls & Actions */}
-        <div className="flex items-center gap-2 shrink-0">
-          {/* Search Input / Expandable */}
-          {isSearchOpen ? (
-            <div className="relative flex items-center">
-              <Search className="absolute left-2.5 h-3.5 w-3.5 text-muted-foreground pointer-events-none" />
-              <Input
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Cari learn atau topik..."
-                className="h-8 w-44 sm:w-60 pl-8 pr-7 text-xs rounded-full bg-secondary/50 border-border/70 focus-visible:ring-1"
-                autoFocus
-              />
-              <button
-                type="button"
-                onClick={() => {
-                  setSearchQuery("");
-                  setIsSearchOpen(false);
-                }}
-                className="absolute right-2 text-muted-foreground hover:text-foreground cursor-pointer"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setIsSearchOpen(true)}
-              className="h-8 w-8 rounded-full flex items-center justify-center hover:bg-secondary text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
-              title="Cari materi"
-            >
-              <Search className="h-4 w-4" />
-            </button>
-          )}
-
-          {/* Grid / List View Toggle */}
-          <button
-            type="button"
-            onClick={() => setViewMode(viewMode === "grid" ? "list" : "grid")}
-            className="h-8 w-8 rounded-full flex items-center justify-center hover:bg-secondary text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
-            title={viewMode === "grid" ? "Tampilan Daftar" : "Tampilan Grid"}
-          >
-            {viewMode === "grid" ? (
-              <LayoutGrid className="h-4 w-4" />
-            ) : (
-              <ListIcon className="h-4 w-4" />
-            )}
-          </button>
-
-          {/* Sort Dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                className="h-8 px-2.5 rounded-full flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary cursor-pointer transition-colors"
-              >
-                <ArrowUpDown className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">{SORT_LABELS[sortOption]}</span>
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-40 p-1.5 shadow-md">
-              {(Object.keys(SORT_LABELS) as SortOption[]).map((key) => (
-                <DropdownMenuItem
-                  key={key}
-                  onClick={() => setSortOption(key)}
-                  className={`cursor-pointer text-xs py-1.5 px-2 flex items-center justify-between ${
-                    sortOption === key ? "font-medium text-foreground bg-secondary/80" : ""
-                  }`}
-                >
-                  <span>{SORT_LABELS[key]}</span>
-                  {sortOption === key && <Check className="h-3 w-3" />}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          {/* + Buat Baru CTA Pill (Dropdown or Click) */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                size="sm"
-                className="h-8 px-3.5 rounded-full text-xs font-medium gap-1.5 cursor-pointer shadow-xs"
-              >
-                <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
-                <span>Buat baru</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48 p-1.5 shadow-md">
-              <DropdownMenuItem
-                className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2"
-                onClick={() => handleCreateNewLearn()}
-              >
-                <BookOpen className="h-4 w-4 text-primary" />
-                <span>Buat Learn Baru</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2"
-                onClick={() => {
-                  setEditingCollection(null);
-                  setIsCreateCollectionOpen(true);
-                }}
-              >
-                <Folder className="h-4 w-4 text-primary" />
-                <span>Buat Koleksi Baru</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </div>
-
-      <ScrollArea
-        onScroll={handleScroll}
-        className="flex-1 w-full h-full min-h-0"
-        scrollBarClassName="py-1.5"
-      >
-        <main className="w-full max-w-7xl mx-auto px-6 py-6 space-y-10">
-        {/* =========================================================
-            TAB: ALL (Shows "My Learn" AND "Koleksi")
-            ========================================================= */}
-        {activeTab === "all" && (
-          <>
-            {/* Section 1: My Learn */}
-            <section className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <h2 className="font-serif text-xl font-normal text-foreground">
-                    My Learn
-                  </h2>
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-secondary text-muted-foreground font-mono">
-                    {learns.length}
-                  </span>
-                </div>
-
-                {learns.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab("my_learn")}
-                    className="text-xs font-medium text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors cursor-pointer group"
-                  >
-                    <span>Lihat semua</span>
-                    <ChevronRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
-                  </button>
-                )}
-              </div>
-
-              {/* Grid or List of My Learn */}
-              <div
-                className={
-                  viewMode === "grid"
-                    ? "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4"
-                    : "space-y-2"
-                }
-              >
-                {/* First Item: + Buat learn baru card */}
-                <CreateCard
-                  type="learn"
-                  onClick={() => handleCreateNewLearn()}
-                />
-
-                {/* Real User Learns */}
-                {learns.map((learn) => (
-                  <LearnCard
-                    key={learn.id}
-                    learn={learn}
-                    viewMode={viewMode}
-                    onClick={() => onOpenLearn?.(learn.id, false)}
-                    onEdit={(l) => {
-                      setEditingLearn(l);
-                      setIsCreateLearnOpen(true);
-                    }}
-                    onManageCollections={(l) => setManagingLearn(l)}
-                    onDelete={(l) =>
-                      setDeleteTarget({
-                        type: "learn",
-                        id: l.id,
-                        title: `Hapus Learn "${l.title}"?`,
-                        description:
-                          "Tindakan ini tidak dapat dibatalkan. Seluruh data riset dan artefak yang tersimpan di dalam learn ini akan dihapus permanen.",
-                      })
-                    }
-                  />
-                ))}
-              </div>
-            </section>
-
-            {/* Section 2: Koleksi (Manual categorization of learns) */}
-            <section className="space-y-4 pt-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <h2 className="font-serif text-xl font-normal text-foreground">
-                    Koleksi
-                  </h2>
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-secondary text-muted-foreground font-mono">
-                    {collections.length}
-                  </span>
-                </div>
-
-                {collections.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setActiveTab("collections")}
-                    className="text-xs font-medium text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors cursor-pointer group"
-                  >
-                    <span>Lihat semua</span>
-                    <ChevronRight className="h-3.5 w-3.5 group-hover:translate-x-0.5 transition-transform" />
-                  </button>
-                )}
-              </div>
-
-              {/* Grid or List of Koleksi */}
-              <div
-                className={
-                  viewMode === "grid"
-                    ? "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4"
-                    : "space-y-2"
-                }
-              >
-                {/* First Item: + Buat koleksi baru card */}
-                <CreateCard
-                  type="collection"
-                  onClick={() => {
-                    setEditingCollection(null);
-                    setIsCreateCollectionOpen(true);
-                  }}
-                />
-
-                {/* Real User Collections */}
-                {collections.map((col) => (
-                  <CollectionCard
-                    key={col.id}
-                    collection={col}
-                    viewMode={viewMode}
-                    onClick={(c) => {
-                      setActiveCollectionId(c.id);
-                      setActiveTab("collections");
-                    }}
-                    onEdit={(c) => {
-                      setEditingCollection(c);
-                      setIsCreateCollectionOpen(true);
-                    }}
-                    onDelete={(c) =>
-                      setDeleteTarget({
-                        type: "collection",
-                        id: c.id,
-                        title: `Hapus Koleksi "${c.name}"?`,
-                        description:
-                          "Materi learn di dalam koleksi ini tidak akan dihapus, hanya tautan kategorinya yang dilepaskan.",
-                      })
-                    }
-                  />
-                ))}
-              </div>
-            </section>
-          </>
         )}
 
-        {/* =========================================================
-            TAB: MY LEARN (Full view of learns)
-            ========================================================= */}
-        {activeTab === "my_learn" && (
-          <section className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <h2 className="font-serif text-2xl font-normal text-foreground">
-                  My Learn
-                </h2>
-                <span className="text-xs px-2.5 py-0.5 rounded-full bg-secondary text-muted-foreground font-mono">
-                  {learns.length} materi
-                </span>
-              </div>
-            </div>
+        {/* Scrollable Main Area */}
+        <ScrollArea className="flex-1 w-full h-full min-h-0">
+          <div className="max-w-7xl mx-auto px-6 sm:px-10 py-7 space-y-9">
+            {/* ============================================================ */}
+            {/* TAB: LEARNS (Default View)                                   */}
+            {/* ============================================================ */}
+            {activeTab === "learns" && (
+              <div className="space-y-8">
+                {/* Heading & Toolbar Row */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  {/* Left: Heading & Total Count */}
+                  <div className="flex items-center gap-2.5">
+                    <h1 className="font-serif text-2xl sm:text-3xl font-normal tracking-tight text-[#262626] dark:text-white">
+                      Learns
+                    </h1>
+                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-[#dedee2] dark:bg-[#2b2b2b] text-[#737373] dark:text-[#969696] font-mono border border-[#dedee2] dark:border-[#383838]">
+                      {filteredLearns.length}
+                    </span>
+                  </div>
 
-            <div
-              className={
-                viewMode === "grid"
-                  ? "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4"
-                  : "space-y-2"
-              }
-            >
-              {/* First Item: + Buat learn baru card */}
-              <CreateCard
-                type="learn"
-                onClick={() => handleCreateNewLearn()}
-              />
+                  {/* Right: Grid/List Toggle, Search, New Learns */}
+                  <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
+                    {/* View Mode Toggle (Grid vs List/Rows) */}
+                    <div className="flex items-center p-0.5 rounded-xl bg-[#ececee] dark:bg-[#222222] border border-[#dedee2] dark:border-[#383838]">
+                      <button
+                        type="button"
+                        onClick={() => setViewMode("grid")}
+                        className={`p-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                          viewMode === "grid"
+                            ? "bg-white dark:bg-[#383838] text-[#111111] dark:text-white shadow-none"
+                            : "text-[#737373] dark:text-[#969696] hover:text-black dark:hover:text-white"
+                        }`}
+                        title="Tampilan Grid"
+                        aria-label="Tampilan Grid"
+                      >
+                        <LayoutGrid className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setViewMode("list")}
+                        className={`p-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                          viewMode === "list"
+                            ? "bg-white dark:bg-[#383838] text-[#111111] dark:text-white shadow-none"
+                            : "text-[#737373] dark:text-[#969696] hover:text-black dark:hover:text-white"
+                        }`}
+                        title="Tampilan Baris"
+                        aria-label="Tampilan Baris"
+                      >
+                        <ListIcon className="w-4 h-4" />
+                      </button>
+                    </div>
 
-              {/* Real User Learns */}
-              {learns.map((learn) => (
-                <LearnCard
-                  key={learn.id}
-                  learn={learn}
-                  viewMode={viewMode}
-                  onClick={() => onOpenLearn?.(learn.id, false)}
-                  onEdit={(l) => {
-                    setEditingLearn(l);
-                    setIsCreateLearnOpen(true);
-                  }}
-                  onManageCollections={(l) => setManagingLearn(l)}
-                  onDelete={(l) =>
-                    setDeleteTarget({
-                      type: "learn",
-                      id: l.id,
-                      title: `Hapus Learn "${l.title}"?`,
-                      description:
-                        "Tindakan ini tidak dapat dibatalkan. Seluruh data riset dan artefak yang tersimpan di dalam learn ini akan dihapus permanen.",
-                    })
-                  }
-                />
-              ))}
-            </div>
-
-            {learns.length === 0 && searchQuery && (
-              <div className="text-center py-12 text-xs text-muted-foreground">
-                Tidak ada materi belajar yang cocok dengan pencarian &quot;{searchQuery}&quot;.
-              </div>
-            )}
-          </section>
-        )}
-
-        {/* =========================================================
-            TAB: KOLEKSI (Collections or Drilled-down collection)
-            ========================================================= */}
-        {activeTab === "collections" && (
-          <section className="space-y-4">
-            {activeCollection ? (
-              // Drilled-down collection view
-              <div className="space-y-6">
-                <div className="flex items-center justify-between pb-3">
-                  <div className="flex items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setActiveCollectionId(null)}
-                      className="h-8 w-8 rounded-full border border-border/70 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary cursor-pointer transition-colors"
-                      title="Kembali ke semua koleksi"
-                    >
-                      <ArrowLeft className="h-4 w-4" />
-                    </button>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xl">{activeCollection.emoji || "📁"}</span>
-                        <h2 className="font-serif text-2xl font-normal text-foreground">
-                          {activeCollection.name}
-                        </h2>
-                      </div>
-                      {activeCollection.description && (
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          {activeCollection.description}
-                        </p>
+                    {/* Search Input */}
+                    <div className="relative">
+                      <Search className="w-3.5 h-3.5 text-[#8a8a8a] dark:text-[#777777] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      <Input
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Search learns..."
+                        className="h-8 w-44 sm:w-56 pl-8 pr-7 text-xs rounded-xl bg-white dark:bg-[#222222] border-[#dedee2] dark:border-[#383838] text-[#262626] dark:text-[#d4d4d4] placeholder-[#8a8a8a] dark:placeholder-[#777777] focus-visible:ring-1 focus-visible:ring-[#888888] shadow-none"
+                      />
+                      {searchQuery && (
+                        <button
+                          type="button"
+                          onClick={() => setSearchQuery("")}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#8a8a8a] dark:text-[#777777] hover:text-[#262626] dark:hover:text-white"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
                       )}
                     </div>
-                  </div>
 
-                  <div className="flex items-center gap-2">
+                    {/* New Learns Button */}
                     <Button
-                      variant="outline"
                       size="sm"
-                      onClick={() => {
-                        setEditingCollection(activeCollection);
-                        setIsCreateCollectionOpen(true);
-                      }}
-                      className="rounded-full h-8 text-xs cursor-pointer"
+                      onClick={() => handleCreateNewLearn()}
+                      className="h-8 px-3.5 rounded-xl text-xs font-medium gap-1.5 bg-[#262626] dark:bg-white text-white dark:text-black hover:bg-black dark:hover:bg-zinc-200 transition-all cursor-pointer shadow-none"
                     >
-                      Ubah Koleksi
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() =>
-                        setDeleteTarget({
-                          type: "collection",
-                          id: activeCollection.id,
-                          title: `Hapus Koleksi "${activeCollection.name}"?`,
-                          description:
-                            "Materi learn di dalam koleksi ini tidak akan dihapus, hanya tautan kategorinya yang dilepaskan.",
-                        })
-                      }
-                      className="rounded-full h-8 text-xs cursor-pointer"
-                    >
-                      Hapus
+                      <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                      <span>New Learns</span>
                     </Button>
                   </div>
                 </div>
 
-                {/* List of learns in this collection */}
-                <div
-                  className={
-                    viewMode === "grid"
-                      ? "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4"
-                      : "space-y-2"
-                  }
-                >
-                  <CreateCard
-                    type="learn"
-                    onClick={() => handleCreateNewLearn(activeCollectionId || undefined)}
-                  />
+                {/* Section 1: Recently Viewed (Smaller Cards) */}
+                {recentlyViewedLearns.length > 0 && !searchQuery && (
+                  <section className="space-y-3">
+                    <div className="flex items-center gap-1.5 text-[#8a8a8a] dark:text-[#777777]">
+                      <Clock className="w-3.5 h-3.5" />
+                      <span className="text-[11px] font-medium uppercase tracking-wider">
+                        Recently Viewed
+                      </span>
+                    </div>
 
-                  {collectionLearns.map((learn) => (
-                    <LearnCard
-                      key={learn.id}
-                      learn={learn}
-                      viewMode={viewMode}
-                      onClick={() => onOpenLearn?.(learn.id, false)}
-                      onEdit={(l) => {
-                        setEditingLearn(l);
-                        setIsCreateLearnOpen(true);
-                      }}
-                      onManageCollections={(l) => setManagingLearn(l)}
-                      onDelete={(l) =>
-                        setDeleteTarget({
-                          type: "learn",
-                          id: l.id,
-                          title: `Hapus Learn "${l.title}"?`,
-                          description:
-                            "Tindakan ini tidak dapat dibatalkan. Seluruh data riset dan artefak yang tersimpan di dalam learn ini akan dihapus permanen.",
-                        })
-                      }
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+                      {recentlyViewedLearns.map((learn) => (
+                        <RecentlyViewedCard
+                          key={`recent-${learn.id}`}
+                          learn={learn}
+                          onClick={() => onOpenLearn?.(learn.id, false)}
+                        />
+                      ))}
+                    </div>
+                  </section>
+                )}
+
+                {/* Section 2: All Learns ("di bawahnya baru semua learn nya itu") */}
+                <section className="space-y-3.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-medium uppercase tracking-wider text-[#8a8a8a] dark:text-[#777777]">
+                      All Learns
+                    </span>
+                    {searchQuery && (
+                      <span className="text-xs text-[#8a8a8a] dark:text-[#777777]">
+                        Hasil pencarian untuk &quot;{searchQuery}&quot;
+                      </span>
+                    )}
+                  </div>
+
+                  <div
+                    className={
+                      viewMode === "grid"
+                        ? "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4"
+                        : "space-y-2"
+                    }
+                  >
+                    {/* First Card: Quick Create Learn Card */}
+                    <CreateCard
+                      type="learn"
+                      onClick={() => handleCreateNewLearn()}
                     />
-                  ))}
-                </div>
 
-                {collectionLearns.length === 0 && (
-                  <div className="text-center py-14 px-4 bg-secondary/20 rounded-2xl border border-dashed border-border/70">
-                    <p className="text-xs text-muted-foreground">
-                      Belum ada learn dalam koleksi ini.
-                    </p>
-                    <p className="text-[11px] text-muted-foreground/80 mt-1">
-                      Tambahkan learn menggunakan menu titik tiga pada kartu learn di halaman utama.
-                    </p>
+                    {/* All User Learn Cards */}
+                    {filteredLearns.map((learn) => (
+                      <LearnCard
+                        key={learn.id}
+                        learn={learn}
+                        viewMode={viewMode}
+                        onClick={() => onOpenLearn?.(learn.id, false)}
+                        onEdit={(l) => {
+                          setEditingLearn(l);
+                          setIsCreateLearnOpen(true);
+                        }}
+                        onManageCollections={(l) => setManagingLearn(l)}
+                        onDelete={(l) =>
+                          setDeleteTarget({
+                            type: "learn",
+                            id: l.id,
+                            title: `Hapus Learn "${l.title}"?`,
+                            description:
+                              "Tindakan ini tidak dapat dibatalkan. Seluruh catatan riset dan percakapan akan dihapus.",
+                          })
+                        }
+                      />
+                    ))}
+                  </div>
+
+                  {filteredLearns.length === 0 && searchQuery && (
+                    <div className="text-center py-14 px-4 rounded-2xl border border-dashed border-[#dedee2] dark:border-[#383838] bg-white/40 dark:bg-[#1e1e1e]/40">
+                      <p className="text-xs text-[#8a8a8a] dark:text-[#888888]">
+                        Tidak ada learn yang cocok dengan &quot;{searchQuery}&quot;.
+                      </p>
+                    </div>
+                  )}
+                </section>
+              </div>
+            )}
+
+            {/* ============================================================ */}
+            {/* TAB: SOURCES                                                 */}
+            {/* ============================================================ */}
+            {activeTab === "sources" && (
+              <SourcesView onAddSource={() => handleCreateNewLearn()} />
+            )}
+
+            {/* ============================================================ */}
+            {/* TAB: COLLECTIONS                                             */}
+            {/* ============================================================ */}
+            {activeTab === "collections" && (
+              <section className="space-y-6">
+                {activeCollection ? (
+                  // Drilled-down collection view
+                  <div className="space-y-6">
+                    <div className="flex items-center justify-between pb-3">
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => setActiveCollectionId(null)}
+                          className="h-8 w-8 rounded-full border border-[#dedee2] dark:border-[#383838] flex items-center justify-center text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white hover:bg-[#eaeaea] dark:hover:bg-[#282828] cursor-pointer transition-colors"
+                          title="Kembali ke semua koleksi"
+                        >
+                          <ArrowLeft className="h-4 w-4" />
+                        </button>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="text-xl">{activeCollection.emoji || "📁"}</span>
+                            <h2 className="font-serif text-2xl font-normal text-[#262626] dark:text-white">
+                              {activeCollection.name}
+                            </h2>
+                          </div>
+                          {activeCollection.description && (
+                            <p className="text-xs text-[#8a8a8a] dark:text-[#888888] mt-0.5">
+                              {activeCollection.description}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            setEditingCollection(activeCollection);
+                            setIsCreateCollectionOpen(true);
+                          }}
+                          className="rounded-xl h-8 text-xs border-[#dedee2] dark:border-[#383838] cursor-pointer"
+                        >
+                          Ubah Koleksi
+                        </Button>
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          onClick={() =>
+                            setDeleteTarget({
+                              type: "collection",
+                              id: activeCollection.id,
+                              title: `Hapus Koleksi "${activeCollection.name}"?`,
+                              description:
+                                "Materi learn di dalam koleksi ini tidak akan dihapus, hanya tautan kategorinya yang dilepaskan.",
+                            })
+                          }
+                          className="rounded-xl h-8 text-xs cursor-pointer"
+                        >
+                          Hapus
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Learns in this collection */}
+                    <div
+                      className={
+                        viewMode === "grid"
+                          ? "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4"
+                          : "space-y-2"
+                      }
+                    >
+                      <CreateCard
+                        type="learn"
+                        onClick={() => handleCreateNewLearn(activeCollectionId || undefined)}
+                      />
+
+                      {collectionLearns.map((learn) => (
+                        <LearnCard
+                          key={learn.id}
+                          learn={learn}
+                          viewMode={viewMode}
+                          onClick={() => onOpenLearn?.(learn.id, false)}
+                          onEdit={(l) => {
+                            setEditingLearn(l);
+                            setIsCreateLearnOpen(true);
+                          }}
+                          onManageCollections={(l) => setManagingLearn(l)}
+                          onDelete={(l) =>
+                            setDeleteTarget({
+                              type: "learn",
+                              id: l.id,
+                              title: `Hapus Learn "${l.title}"?`,
+                              description:
+                                "Tindakan ini tidak dapat dibatalkan. Seluruh data riset dan artefak yang tersimpan di dalam learn ini akan dihapus permanen.",
+                            })
+                          }
+                        />
+                      ))}
+                    </div>
+
+                    {collectionLearns.length === 0 && (
+                      <div className="text-center py-14 px-4 bg-white/40 dark:bg-[#1e1e1e]/40 rounded-2xl border border-dashed border-[#dedee2] dark:border-[#383838]">
+                        <p className="text-xs text-[#8a8a8a] dark:text-[#888888]">
+                          Belum ada learn dalam koleksi ini.
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  // All Collections overview
+                  <div className="space-y-5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <h2 className="font-serif text-2xl font-normal text-[#262626] dark:text-white">
+                          Collections
+                        </h2>
+                        <span className="text-xs px-2.5 py-0.5 rounded-full bg-[#dedee2] dark:bg-[#2b2b2b] text-[#737373] dark:text-[#969696] font-mono border border-[#dedee2] dark:border-[#383838]">
+                          {collections.length} koleksi
+                        </span>
+                      </div>
+                    </div>
+
+                    <div
+                      className={
+                        viewMode === "grid"
+                          ? "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4"
+                          : "space-y-2"
+                      }
+                    >
+                      <CreateCard
+                        type="collection"
+                        onClick={() => {
+                          setEditingCollection(null);
+                          setIsCreateCollectionOpen(true);
+                        }}
+                      />
+
+                      {collections.map((col) => (
+                        <CollectionCard
+                          key={col.id}
+                          collection={col}
+                          viewMode={viewMode}
+                          onClick={(c) => setActiveCollectionId(c.id)}
+                          onEdit={(c) => {
+                            setEditingCollection(c);
+                            setIsCreateCollectionOpen(true);
+                          }}
+                          onDelete={(c) =>
+                            setDeleteTarget({
+                              type: "collection",
+                              id: c.id,
+                              title: `Hapus Koleksi "${c.name}"?`,
+                              description:
+                                "Materi learn di dalam koleksi ini tidak akan dihapus, hanya tautan kategorinya yang dilepaskan.",
+                            })
+                          }
+                        />
+                      ))}
+                    </div>
                   </div>
                 )}
-              </div>
-            ) : (
-              // All Collections view
-              <>
+              </section>
+            )}
+
+            {/* ============================================================ */}
+            {/* TAB: ARTIFACT                                                */}
+            {/* ============================================================ */}
+            {activeTab === "artifacts" && (
+              <section className="space-y-5">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
-                    <h2 className="font-serif text-2xl font-normal text-foreground">
-                      Koleksi
+                    <h2 className="font-serif text-2xl font-normal text-[#262626] dark:text-white">
+                      Artifact
                     </h2>
-                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-secondary text-muted-foreground font-mono">
-                      {collections.length} koleksi
+                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-[#dedee2] dark:bg-[#2b2b2b] text-[#737373] dark:text-[#969696] font-mono border border-[#dedee2] dark:border-[#383838]">
+                      {artifacts.length}
                     </span>
                   </div>
                 </div>
 
-                <div
-                  className={
-                    viewMode === "grid"
-                      ? "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4"
-                      : "space-y-2"
-                  }
-                >
-                  <CreateCard
-                    type="collection"
-                    onClick={() => {
-                      setEditingCollection(null);
-                      setIsCreateCollectionOpen(true);
-                    }}
-                  />
-
-                  {collections.map((col) => (
-                    <CollectionCard
-                      key={col.id}
-                      collection={col}
-                      viewMode={viewMode}
-                      onClick={(c) => setActiveCollectionId(c.id)}
-                      onEdit={(c) => {
-                        setEditingCollection(c);
-                        setIsCreateCollectionOpen(true);
-                      }}
-                      onDelete={(c) =>
-                        setDeleteTarget({
-                          type: "collection",
-                          id: c.id,
-                          title: `Hapus Koleksi "${c.name}"?`,
-                          description:
-                            "Materi learn di dalam koleksi ini tidak akan dihapus, hanya tautan kategorinya yang dilepaskan.",
-                        })
-                      }
-                    />
-                  ))}
-                </div>
-              </>
-            )}
-          </section>
-        )}
-
-        {/* =========================================================
-            TAB: ARTIFACT (Research outputs, diagrams, simulations)
-            ========================================================= */}
-        {activeTab === "artifacts" && (
-          <section className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2.5">
-                <h2 className="font-serif text-2xl font-normal text-foreground">
-                  Artifact
-                </h2>
-                <span className="text-xs px-2.5 py-0.5 rounded-full bg-secondary text-muted-foreground font-mono">
-                  {artifacts.length} artifact
-                </span>
-              </div>
-            </div>
-
-            {artifacts.length > 0 ? (
-              <div
-                className={
-                  viewMode === "grid"
-                    ? "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4"
-                    : "space-y-2"
-                }
-              >
-                {artifacts.map((art) => (
-                  <div
-                    key={art.id}
-                    className="p-5 rounded-2xl border border-border/70 bg-card hover:border-foreground/30 hover:bg-secondary/30 transition-all flex flex-col justify-between"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="h-10 w-10 rounded-xl bg-secondary/80 flex items-center justify-center text-xl shrink-0">
-                        {art.type === "slide" ? "📊" : art.type === "diagram" ? "📐" : "⚡"}
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => localDb.deleteArtifact(art.id)}
-                        className="h-7 w-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-destructive transition-colors cursor-pointer"
-                        title="Hapus artifact"
+                {artifacts.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                    {artifacts.map((art) => (
+                      <div
+                        key={art.id}
+                        className="p-4 rounded-2xl border border-[#dedee2] dark:border-[#383838] bg-white dark:bg-[#222222] hover:border-[#b0b0b0] dark:hover:border-[#4f4f4f] transition-all flex flex-col justify-between shadow-none"
                       >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
+                        <div className="flex items-start justify-between">
+                          <div className="h-9 w-9 rounded-xl bg-[#f4f4f6] dark:bg-[#2b2b2b] border border-[#dedee2] dark:border-[#383838] flex items-center justify-center text-lg shrink-0">
+                            {art.type === "slide" ? "📊" : art.type === "diagram" ? "📐" : "⚡"}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => localDb.deleteArtifact(art.id)}
+                            className="h-7 w-7 rounded-lg flex items-center justify-center text-[#8a8a8a] hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                            title="Hapus artifact"
+                          >
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
 
-                    <div className="my-3">
-                      <h4 className="text-sm font-medium text-foreground line-clamp-2">
-                        {art.title}
-                      </h4>
-                      <span className="inline-block mt-1 text-[10px] uppercase font-mono px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
-                        {art.type}
-                      </span>
-                    </div>
+                        <div className="my-3">
+                          <h4 className="text-sm font-medium text-[#262626] dark:text-[#d4d4d4] line-clamp-2">
+                            {art.title}
+                          </h4>
+                          <span className="inline-block mt-1 text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-[#f4f4f6] dark:bg-[#2b2b2b] text-[#737373] dark:text-[#969696] border border-[#dedee2] dark:border-[#383838]">
+                            {art.type}
+                          </span>
+                        </div>
 
-                    <div className="text-[11px] text-muted-foreground pt-2">
-                      {new Intl.DateTimeFormat("id-ID", {
-                        day: "numeric",
-                        month: "short",
-                        year: "numeric",
-                      }).format(new Date(art.updatedAt))}
-                    </div>
+                        <div className="text-[11px] text-[#8a8a8a] dark:text-[#777777] pt-1">
+                          {new Intl.DateTimeFormat("id-ID", {
+                            day: "numeric",
+                            month: "short",
+                            year: "numeric",
+                          }).format(new Date(art.updatedAt))}
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-center py-20 px-4">
-                <div className="h-12 w-12 rounded-2xl bg-secondary/80 flex items-center justify-center text-2xl mx-auto mb-3">
-                  🎨
-                </div>
-                <h3 className="font-serif text-lg text-foreground font-medium">
-                  Belum ada artifact
-                </h3>
-                <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto leading-relaxed">
-                  Artifact seperti slide presentasi HTML, visualisasi diagram D3, dan modul interaktif yang dihasilkan saat Anda belajar dengan agen akan tersimpan otomatis di sini.
-                </p>
-              </div>
+                ) : (
+                  <div className="text-center py-16 px-4 rounded-2xl border border-dashed border-[#dedee2] dark:border-[#383838] bg-white/40 dark:bg-[#1e1e1e]/40">
+                    <div className="h-12 w-12 rounded-2xl bg-[#f4f4f6] dark:bg-[#2b2b2b] border border-[#dedee2] dark:border-[#383838] flex items-center justify-center text-2xl mx-auto mb-3">
+                      🎨
+                    </div>
+                    <h3 className="font-serif text-lg text-[#262626] dark:text-white font-medium">
+                      Belum ada artifact
+                    </h3>
+                    <p className="text-xs text-[#8a8a8a] dark:text-[#888888] mt-1 max-w-sm mx-auto leading-relaxed">
+                      Slide presentasi, visualisasi diagram, dan modul interaktif yang dihasilkan saat Anda belajar dengan agen akan otomatis tersimpan di sini.
+                    </p>
+                  </div>
+                )}
+              </section>
             )}
-          </section>
-        )}
+          </div>
+        </ScrollArea>
       </main>
-    </ScrollArea>
 
-    {/* -------------------------------------------------------------
-        MODALS & DIALOGS
-        ------------------------------------------------------------- */}
-      {/* Create / Edit Learn Dialog */}
+      {/* Dialogs */}
       <CreateLearnDialog
         open={isCreateLearnOpen}
         onOpenChange={setIsCreateLearnOpen}
@@ -940,7 +695,6 @@ export function LearnHome({ onOpenLearn }: LearnHomeProps) {
         onSubmit={handleSaveLearn}
       />
 
-      {/* Create / Edit Collection Dialog */}
       <CreateCollectionDialog
         open={isCreateCollectionOpen}
         onOpenChange={setIsCreateCollectionOpen}
@@ -957,7 +711,6 @@ export function LearnHome({ onOpenLearn }: LearnHomeProps) {
         onSubmit={handleSaveCollection}
       />
 
-      {/* Manage Collections for a Learn Dialog */}
       {managingLearn && (
         <ManageCollectionDialog
           open={!!managingLearn}
@@ -978,7 +731,6 @@ export function LearnHome({ onOpenLearn }: LearnHomeProps) {
         />
       )}
 
-      {/* Delete Confirmation Dialog */}
       {deleteTarget && (
         <DeleteConfirmDialog
           open={!!deleteTarget}
