@@ -156,7 +156,10 @@ export function LearnHome({
         projectPath: data.projectPath,
       });
       // Create initial chat session
-      await localDb.createSession(newId, "Sesi Awal");
+      const initialSessionId = await localDb.createSession(newId, "Sesi Awal");
+      try {
+        localStorage.setItem(`const_learn_active_session_${newId}`, initialSessionId);
+      } catch {}
       if (onOpenLearn) {
         onOpenLearn(newId, false);
       }

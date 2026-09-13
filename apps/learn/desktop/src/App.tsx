@@ -41,6 +41,10 @@ function AuthenticatedContent({
             title: "Notebook tanpa judul",
             emoji: "📘",
           });
+          const initialSessionId = await localDb.createSession(id, "Sesi Awal");
+          try {
+            localStorage.setItem(`const_learn_active_session_${id}`, initialSessionId);
+          } catch {}
           setActiveLearnId(id);
           setOpenAddSourceOnLoad(true);
         }}

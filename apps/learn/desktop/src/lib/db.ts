@@ -336,7 +336,25 @@ export const localDb = {
   // Messages (Chat History persistence)
   async getMessages(learnId: string, sessionId?: string): Promise<LocalMessage[]> {
     if (sessionId) {
-      return await db.messages.where("sessionId").equals(sessionId).sortBy("createdAt");
+      const sessionMsgs = await db.messages.where("sessionId").equals(sessionId).sortBy("createdAt");
+      if (sessionMsgs.length > 0) {
+        return sessionMsgs;
+      }
+
+      // Recovery fallback: If no messages have this sessionId, check if there are orphan messages for this learnId
+      // and associate them to this session (e.g. from stream events where sessionId was omitted)
+      const sessions = await db.sessions.where("learnId").equals(learnId).toArray();
+      if (sessions.length <= 1) {
+        const allMsgs = await db.messages.where("learnId").equals(learnId).sortBy("createdAt");
+        const orphans = allMsgs.filter((m) => !m.sessionId);
+        if (orphans.length > 0) {
+          for (const o of orphans) {
+            await db.messages.update(o.id, { sessionId });
+          }
+          return await db.messages.where("sessionId").equals(sessionId).sortBy("createdAt");
+        }
+      }
+      return sessionMsgs;
     }
     return await db.messages.where("learnId").equals(learnId).sortBy("createdAt");
   },
@@ -348,14 +366,15 @@ export const localDb = {
       createdAt: now,
     });
 
-    // If message is linked to a session, update session snippet, count, and updatedAt
+    // If message is linked to a session, update session snippet, accurate count, and updatedAt
     if (data.sessionId) {
       const session = await db.sessions.get(data.sessionId);
       if (session) {
         const snippet = typeof data.content === "string" ? data.content.slice(0, 100) : "";
+        const actualCount = await db.messages.where("sessionId").equals(data.sessionId).count();
         await db.sessions.update(data.sessionId, {
           lastMessageSnippet: snippet,
-          messageCount: (session.messageCount || 0) + 1,
+          messageCount: actualCount,
           updatedAt: now,
         });
       }

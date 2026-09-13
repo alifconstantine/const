@@ -258,33 +258,103 @@ export function ChatPanel({
   const [isSourcesDropdownOpen, setIsSourcesDropdownOpen] = useState(false);
   const sourcesDropdownRef = useRef<HTMLDivElement>(null);
 
-  // Multi-session chat support
-  const sessions =
-    useLiveQuery(
-      () => {
-        if (!learnId) return [];
-        return db.sessions.where("learnId").equals(learnId).reverse().sortBy("updatedAt");
-      },
-      [learnId]
-    ) || [];
+  // Multi-session chat support: query sessions from Dexie
+  const rawSessions = useLiveQuery(
+    () => {
+      if (!learnId) return [];
+      return db.sessions.where("learnId").equals(learnId).reverse().sortBy("updatedAt");
+    },
+    [learnId]
+  );
+  const sessions = rawSessions ?? [];
 
-  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  // Initialize active session from localStorage if available
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(() => {
+    if (!learnId) return null;
+    try {
+      return localStorage.getItem(`const_learn_active_session_${learnId}`);
+    } catch {
+      return null;
+    }
+  });
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
 
-  // Auto-initialize active session on mount or when sessions change
+  // Keep ref for stream callbacks and persist active session ID to localStorage
+  const activeSessionIdRef = useRef<string | null>(activeSessionId);
   useEffect(() => {
-    if (!learnId) return;
+    activeSessionIdRef.current = activeSessionId;
+    if (learnId && activeSessionId) {
+      try {
+        localStorage.setItem(`const_learn_active_session_${learnId}`, activeSessionId);
+      } catch {}
+    }
+  }, [learnId, activeSessionId]);
 
-    if (sessions.length > 0) {
-      if (!activeSessionId || !sessions.some((s) => s.id === activeSessionId)) {
-        setActiveSessionId(sessions[0]!.id);
+  const isCreatingSessionRef = useRef(false);
+  const isCleanedUpRef = useRef(false);
+
+  // Auto-initialize active session safely once sessions are loaded from Dexie
+  useEffect(() => {
+    if (!learnId || rawSessions === undefined) return;
+
+    // 1. One-time cleanup of duplicate empty initial sessions from previous bug runs
+    if (!isCleanedUpRef.current && rawSessions.length > 1) {
+      isCleanedUpRef.current = true;
+      (async () => {
+        try {
+          const emptyInitials = rawSessions.filter(
+            (s) =>
+              (!s.messageCount || s.messageCount === 0) &&
+              (s.title === "Sesi Awal" || s.title === "Percakapan Baru")
+          );
+          // If there are duplicate empty initial sessions, delete the excess ones
+          if (emptyInitials.length > 1) {
+            for (let i = 1; i < emptyInitials.length; i++) {
+              await localDb.deleteSession(emptyInitials[i]!.id);
+            }
+          }
+        } catch {}
+      })();
+    }
+
+    // 2. If sessions exist in DB, select or validate active session
+    if (rawSessions.length > 0) {
+      const storageKey = `const_learn_active_session_${learnId}`;
+      let savedSessionId: string | null = null;
+      try {
+        savedSessionId = localStorage.getItem(storageKey);
+      } catch {}
+
+      const hasActive = activeSessionId && rawSessions.some((s) => s.id === activeSessionId);
+      const hasSaved = savedSessionId && rawSessions.some((s) => s.id === savedSessionId);
+
+      if (!hasActive) {
+        if (hasSaved) {
+          setActiveSessionId(savedSessionId);
+        } else {
+          setActiveSessionId(rawSessions[0]!.id);
+        }
       }
     } else {
-      localDb.createSession(learnId, "Sesi Awal").then((newId) => {
-        setActiveSessionId(newId);
-      });
+      // 3. Only if rawSessions is genuinely empty (0 sessions in DB), create ONE initial session
+      if (isCreatingSessionRef.current) return;
+      isCreatingSessionRef.current = true;
+
+      (async () => {
+        try {
+          const fresh = await localDb.getSessions(learnId);
+          if (fresh.length > 0) {
+            setActiveSessionId(fresh[0]!.id);
+          } else {
+            const newId = await localDb.createSession(learnId, "Sesi Awal");
+            setActiveSessionId(newId);
+          }
+        } finally {
+          isCreatingSessionRef.current = false;
+        }
+      })();
     }
-  }, [learnId, sessions, activeSessionId]);
+  }, [learnId, rawSessions, activeSessionId]);
 
   // Load chat messages when learnId or activeSessionId changes
   useEffect(() => {
@@ -320,6 +390,18 @@ export function ChatPanel({
 
   const handleNewChat = async () => {
     if (!learnId) return;
+
+    // If the active session is already empty (0 messages), just reuse it instead of creating another empty session
+    const currentSession = sessions.find((s) => s.id === activeSessionId);
+    if (
+      currentSession &&
+      (!currentSession.messageCount || currentSession.messageCount === 0) &&
+      messages.length === 0
+    ) {
+      setIsHistoryOpen(false);
+      return;
+    }
+
     const newSessionId = await localDb.createSession(learnId, "Percakapan Baru");
     setActiveSessionId(newSessionId);
     setMessages([]);
@@ -444,6 +526,7 @@ export function ChatPanel({
             localDb.saveMessage({
               id: updated.id,
               learnId,
+              sessionId: activeSessionIdRef.current || undefined,
               role: "assistant",
               content: updated.content,
               thinking: updated.thinking,
@@ -472,6 +555,7 @@ export function ChatPanel({
             localDb.saveMessage({
               id: updated.id,
               learnId,
+              sessionId: activeSessionIdRef.current || undefined,
               role: "assistant",
               content: updated.content,
               thinking: updated.thinking,
