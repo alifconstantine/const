@@ -2,22 +2,26 @@ import React, { useState, useEffect, useRef } from "react";
 import {
   Sparkles,
   ArrowRight,
+  ArrowUp,
   Square,
   ChevronDown,
-  Brain,
   RotateCcw,
   SlidersHorizontal,
+  Plus,
+  Paperclip,
+  Copy,
+  Check,
+  FileText,
+  Image as ImageIcon,
+  X,
+  Mic,
 } from "lucide-react";
+import { ScrollArea, cn } from "@const/ui";
 import { DEFAULT_MODELS } from "@const/agent/models";
-import type { ModelConfig, AgentMessage } from "@const/agent/types";
+import type { ModelConfig } from "@const/agent/types";
 import { localDb } from "../../lib/db";
-import {
-  SocraticQuestionCard,
-  PythonRunnerCard,
-  TodoWriteCard,
-  GenericToolCard,
-  type DisplayToolCall,
-} from "./tool-cards";
+import { ExecutionTrace, type DisplayToolCall } from "./execution-trace";
+import { MarkdownContent } from "./markdown-content";
 
 interface ChatPanelProps {
   learnId?: string;
@@ -34,6 +38,37 @@ interface DisplayMessage {
   thinking?: string;
   toolCalls?: DisplayToolCall[];
   isStreaming?: boolean;
+  createdAt?: number;
+  durationMs?: number;
+}
+
+interface AttachedFile {
+  id: string;
+  name: string;
+  size: number;
+  type: "image" | "video" | "pdf" | "code" | "document" | "other";
+  url?: string;
+  path?: string;
+}
+
+function formatMessageTimestamp(ts?: number): string {
+  if (!ts) return "";
+  const d = new Date(ts);
+  const month = d.getMonth() + 1;
+  const day = d.getDate();
+  let hours = d.getHours();
+  const minutes = d.getMinutes().toString().padStart(2, "0");
+  const ampm = hours >= 12 ? "PM" : "AM";
+  hours = hours % 12;
+  if (hours === 0) hours = 12;
+  const hoursStr = hours.toString().padStart(2, "0");
+  return `${month}/${day} ${hoursStr}.${minutes} ${ampm}`;
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
 export function ChatPanel({
@@ -47,23 +82,150 @@ export function ChatPanel({
   const [isStreaming, setIsStreaming] = useState(false);
   const [selectedModelId, setSelectedModelId] = useState<string>("gemini-3.6-flash");
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
-  const [expandedThinkingIds, setExpandedThinkingIds] = useState<Record<string, boolean>>({});
-  const [expandedToolIds, setExpandedToolIds] = useState<Record<string, boolean>>({});
   const [availableModels, setAvailableModels] = useState<ModelConfig[]>(DEFAULT_MODELS);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  // Attachments state
+  const [attachments, setAttachments] = useState<AttachedFile[]>([]);
+  const [isMultiline, setIsMultiline] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const modelDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Input change handler ensuring reliable return to single-line pill when empty
+  const handleInputChange = (val: string) => {
+    setInputMessage(val);
+
+    // 1. When text is empty and no attachments, immediately return to single-line pill
+    if (!val.trim() && attachments.length === 0) {
+      if (isMultiline) {
+        setIsMultiline(false);
+      }
+      if (textareaRef.current) {
+        textareaRef.current.style.height = "auto";
+      }
+      return;
+    }
+
+    // 2. When text contains newline, switch to multi-line mode
+    if (val.includes("\n")) {
+      if (!isMultiline) {
+        setIsMultiline(true);
+      }
+      return;
+    }
+
+    // 3. When in multi-line mode but text has shrunk to a short single line (< 35 chars) without attachments, collapse back
+    if (isMultiline && val.length < 35 && attachments.length === 0) {
+      setIsMultiline(false);
+      if (textareaRef.current) {
+        textareaRef.current.style.height = "auto";
+      }
+      return;
+    }
+  };
+
+  // Auto-grow textarea height calculation (only applies to multi-line mode)
+  const adjustHeight = () => {
+    if (!isMultiline) return;
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    const viewport = textarea.closest(
+      "[data-radix-scroll-area-viewport]"
+    ) as HTMLElement | null;
+    const prevScrollTop = viewport ? viewport.scrollTop : 0;
+
+    textarea.style.height = "auto";
+    const nextHeight = Math.max(48, textarea.scrollHeight);
+    textarea.style.height = `${nextHeight}px`;
+
+    if (viewport) {
+      const isNearBottom =
+        viewport.scrollHeight - viewport.clientHeight - prevScrollTop < 40;
+      if (isNearBottom) {
+        viewport.scrollTop = viewport.scrollHeight;
+      } else if (prevScrollTop > 0) {
+        viewport.scrollTop = prevScrollTop;
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (isMultiline) {
+      adjustHeight();
+    } else if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+    }
+  }, [inputMessage, attachments.length, isMultiline]);
+
+  // Focus textarea and position cursor at end when switching between single-line and multi-line
+  useEffect(() => {
+    if (textareaRef.current) {
+      textareaRef.current.focus();
+      const len = textareaRef.current.value.length;
+      textareaRef.current.setSelectionRange(len, len);
+    }
+  }, [isMultiline]);
+
+  // Execution timing state
+  const [liveDurationMs, setLiveDurationMs] = useState(0);
+  const streamStartTimeRef = useRef<number | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const activeAssistantRef = useRef<DisplayMessage | null>(null);
 
+  // Timer for live duration while streaming
+  useEffect(() => {
+    let timer: any = null;
+    if (isStreaming) {
+      if (!streamStartTimeRef.current) {
+        streamStartTimeRef.current = Date.now();
+      }
+      timer = setInterval(() => {
+        if (streamStartTimeRef.current) {
+          setLiveDurationMs(Date.now() - streamStartTimeRef.current);
+        }
+      }, 300);
+    } else {
+      streamStartTimeRef.current = null;
+      setLiveDurationMs(0);
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [isStreaming]);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as Node;
+      const isOutsideDropdown =
+        !dropdownRef.current || !dropdownRef.current.contains(target);
+      const isOutsideModelDropdown =
+        !modelDropdownRef.current || !modelDropdownRef.current.contains(target);
+
+      if (isOutsideDropdown && isOutsideModelDropdown) {
+        setIsModelDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   // Available models list (fetched dynamically from router.const.web.id with fallback)
   useEffect(() => {
     const electron = (window as any).electron;
     if (electron?.agent?.getModels) {
-      electron.agent.getModels().then((remoteModels: any[]) => {
-        if (remoteModels && Array.isArray(remoteModels) && remoteModels.length > 0) {
-          setAvailableModels(remoteModels);
-        }
-      }).catch(() => {});
+      electron.agent
+        .getModels()
+        .then((remoteModels: any[]) => {
+          if (remoteModels && Array.isArray(remoteModels) && remoteModels.length > 0) {
+            setAvailableModels(remoteModels);
+          }
+        })
+        .catch(() => {});
     }
   }, []);
 
@@ -81,12 +243,14 @@ export function ChatPanel({
       if (!isMounted) return;
       if (saved && saved.length > 0) {
         setMessages(
-          saved.map((m) => ({
+          saved.map((m: any) => ({
             id: m.id,
             role: m.role,
             content: m.content || "",
             thinking: m.thinking,
             toolCalls: m.toolCalls,
+            createdAt: m.createdAt || Date.now(),
+            durationMs: m.durationMs,
             isStreaming: false,
           }))
         );
@@ -135,8 +299,6 @@ export function ChatPanel({
           updated.content = (updated.content || "") + event.token;
         } else if (event.type === "thinking") {
           updated.thinking = (updated.thinking || "") + event.thinking;
-          // Auto-expand thinking while receiving thinking tokens
-          setExpandedThinkingIds((exp) => ({ ...exp, [updated.id]: true }));
         } else if (event.type === "tool_call") {
           const toolCalls = [...(updated.toolCalls || [])];
           const existingIdx = toolCalls.findIndex((tc) => tc.id === event.toolCallId);
@@ -209,6 +371,10 @@ export function ChatPanel({
           updated.isStreaming = false;
           setIsStreaming(false);
 
+          if (streamStartTimeRef.current) {
+            updated.durationMs = Date.now() - streamStartTimeRef.current;
+          }
+
           if (learnId) {
             localDb.saveMessage({
               id: updated.id,
@@ -217,6 +383,7 @@ export function ChatPanel({
               content: updated.content,
               thinking: updated.thinking,
               toolCalls: updated.toolCalls,
+              createdAt: updated.createdAt,
             });
           }
         } else if (event.type === "done") {
@@ -227,6 +394,10 @@ export function ChatPanel({
               .map((tc) => `- \`${tc.name}\`: ${tc.status === "completed" ? "Selesai" : "Gagal"}`)
               .join("\n");
             updated.content = `Selesai menjalankan langkah-langkah tugas:\n\n${toolSummary}`;
+          }
+
+          if (streamStartTimeRef.current) {
+            updated.durationMs = Date.now() - streamStartTimeRef.current;
           }
 
           updated.isStreaming = false;
@@ -240,6 +411,7 @@ export function ChatPanel({
               content: updated.content,
               thinking: updated.thinking,
               toolCalls: updated.toolCalls,
+              createdAt: updated.createdAt,
             });
           }
         }
@@ -256,17 +428,95 @@ export function ChatPanel({
     };
   }, [learnId]);
 
+  const handleCopyMessage = async (id: string, text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedId(id);
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch {}
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const newAttached: AttachedFile[] = [];
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i]!;
+      const fileType = file.type;
+      let kind: AttachedFile["type"] = "other";
+
+      if (fileType.startsWith("image/")) kind = "image";
+      else if (fileType.startsWith("video/")) kind = "video";
+      else if (fileType === "application/pdf" || file.name.endsWith(".pdf")) kind = "pdf";
+      else if (
+        file.name.endsWith(".ts") ||
+        file.name.endsWith(".tsx") ||
+        file.name.endsWith(".js") ||
+        file.name.endsWith(".py") ||
+        file.name.endsWith(".json")
+      ) {
+        kind = "code";
+      } else if (file.name.endsWith(".md") || file.name.endsWith(".txt")) {
+        kind = "document";
+      }
+
+      newAttached.push({
+        id: `att_${Date.now()}_${i}`,
+        name: file.name,
+        size: file.size,
+        type: kind,
+        url: kind === "image" || kind === "video" ? URL.createObjectURL(file) : undefined,
+        path: (file as any).path,
+      });
+    }
+
+    setAttachments((prev) => [...prev, ...newAttached]);
+    setIsMultiline(true);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
+  const removeAttachment = (id: string) => {
+    setAttachments((prev) => {
+      const item = prev.find((a) => a.id === id);
+      if (item?.url) {
+        URL.revokeObjectURL(item.url);
+      }
+      const nextAtt = prev.filter((a) => a.id !== id);
+      if (
+        nextAtt.length === 0 &&
+        (!inputMessage.trim() || (!inputMessage.includes("\n") && inputMessage.length < 35))
+      ) {
+        setIsMultiline(false);
+      }
+      return nextAtt;
+    });
+  };
+
   const handleSend = async (customPrompt?: string) => {
     const textToSend = (customPrompt || inputMessage).trim();
     if (!textToSend || isStreaming) return;
 
-    const userMsgId = `user_${Date.now()}`;
-    const assistantMsgId = `asst_${Date.now()}`;
+    const now = Date.now();
+    const userMsgId = `user_${now}`;
+    const assistantMsgId = `asst_${now + 1}`;
+
+    // Append attachments summary to user prompt if any were added
+    let promptWithAttachments = textToSend;
+    if (attachments.length > 0) {
+      const attList = attachments
+        .map((a) => `- [Lampiran: ${a.name} (${formatFileSize(a.size)})]`)
+        .join("\n");
+      promptWithAttachments = `${textToSend}\n\n${attList}`;
+    }
 
     const newUserMsg: DisplayMessage = {
       id: userMsgId,
       role: "user",
-      content: textToSend,
+      content: promptWithAttachments,
+      createdAt: now,
     };
 
     const newAssistantMsg: DisplayMessage = {
@@ -276,6 +526,7 @@ export function ChatPanel({
       thinking: "",
       toolCalls: [],
       isStreaming: true,
+      createdAt: now + 1,
     };
 
     // 3. Persist user message to Dexie
@@ -284,14 +535,21 @@ export function ChatPanel({
         id: userMsgId,
         learnId,
         role: "user",
-        content: textToSend,
+        content: promptWithAttachments,
+        createdAt: now,
       });
     }
 
     const nextMessages = [...messages, newUserMsg];
     setMessages([...nextMessages, newAssistantMsg]);
     setInputMessage("");
+    setIsMultiline(false);
+    if (textareaRef.current) {
+      textareaRef.current.style.height = "auto";
+    }
+    setAttachments([]);
     setIsStreaming(true);
+    streamStartTimeRef.current = Date.now();
     activeAssistantRef.current = newAssistantMsg;
 
     const electron = (window as any).electron;
@@ -351,6 +609,10 @@ export function ChatPanel({
           authToken: authToken || undefined,
         });
 
+        const finalDuration = streamStartTimeRef.current
+          ? Date.now() - streamStartTimeRef.current
+          : undefined;
+
         if (res && res.success === false) {
           const errorContent = `⚠️ Terjadi kendala saat memproses: ${res.error || "Gagal mendapatkan respons dari engine"}`;
           setMessages((prev) =>
@@ -360,6 +622,7 @@ export function ChatPanel({
                     ...msg,
                     content: msg.content ? `${msg.content}\n\n${errorContent}` : errorContent,
                     isStreaming: false,
+                    durationMs: finalDuration,
                   }
                 : msg
             )
@@ -370,11 +633,11 @@ export function ChatPanel({
               learnId,
               role: "assistant",
               content: errorContent,
+              createdAt: now + 1,
             });
           }
           setIsStreaming(false);
         } else if (res && res.success) {
-          // Guarantee streaming state is turned off and finalize message
           setIsStreaming(false);
           setMessages((prev) =>
             prev.map((msg) => {
@@ -389,6 +652,7 @@ export function ChatPanel({
                 const finalized = {
                   ...msg,
                   content: finalContent,
+                  durationMs: finalDuration,
                   isStreaming: false,
                 };
                 if (learnId && finalized.content) {
@@ -399,6 +663,7 @@ export function ChatPanel({
                     content: finalized.content,
                     thinking: finalized.thinking,
                     toolCalls: finalized.toolCalls,
+                    createdAt: finalized.createdAt,
                   });
                 }
                 return finalized;
@@ -426,6 +691,7 @@ export function ChatPanel({
             learnId,
             role: "assistant",
             content: errorContent,
+            createdAt: now + 1,
           });
         }
         setIsStreaming(false);
@@ -515,13 +781,14 @@ export function ChatPanel({
                       : msg
                   )
                 );
-                setExpandedThinkingIds((exp) => ({ ...exp, [assistantMsgId]: true }));
               }
-            } catch {
-              // ignore chunk parse error
-            }
+            } catch {}
           }
         }
+
+        const finalDuration = streamStartTimeRef.current
+          ? Date.now() - streamStartTimeRef.current
+          : undefined;
 
         if (learnId) {
           await localDb.saveMessage({
@@ -530,6 +797,7 @@ export function ChatPanel({
             role: "assistant",
             content: accumulatedContent,
             thinking: accumulatedThinking,
+            createdAt: now + 1,
           });
         }
       } catch (err: any) {
@@ -551,12 +819,19 @@ export function ChatPanel({
             learnId,
             role: "assistant",
             content: errorText,
+            createdAt: now + 1,
           });
         }
       } finally {
+        const finalDuration = streamStartTimeRef.current
+          ? Date.now() - streamStartTimeRef.current
+          : undefined;
+
         setMessages((prev) =>
           prev.map((msg) =>
-            msg.id === assistantMsgId ? { ...msg, isStreaming: false } : msg
+            msg.id === assistantMsgId
+              ? { ...msg, isStreaming: false, durationMs: finalDuration }
+              : msg
           )
         );
         setIsStreaming(false);
@@ -607,70 +882,183 @@ export function ChatPanel({
     }
   };
 
-  const toggleThinking = (msgId: string) => {
-    setExpandedThinkingIds((prev) => ({ ...prev, [msgId]: !prev[msgId] }));
+  const renderModelDropdown = () => (
+    <div className="relative" ref={modelDropdownRef}>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setIsModelDropdownOpen(!isModelDropdownOpen);
+        }}
+        className="flex items-center gap-1.5 px-2.5 py-1 rounded-full hover:bg-muted/70 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer select-none shrink-0"
+        aria-label="Pilih Model AI"
+      >
+        <span className="font-medium text-foreground/85 text-[13px]">
+          {currentModel.displayName.split("(")[0]?.trim() || "Const"}
+        </span>
+        <ChevronDown className="h-3 w-3 text-muted-foreground/70" />
+      </button>
+
+      {isModelDropdownOpen && (
+        <div className="absolute bottom-full right-0 mb-2 w-64 rounded-2xl bg-card border border-border shadow-2xl p-1.5 z-50 animate-in fade-in zoom-in-95 duration-100">
+          <div className="px-2.5 py-1.5 text-[10px] uppercase font-semibold text-muted-foreground tracking-wider border-b border-border/40 mb-1">
+            Pilih Model Cerdas
+          </div>
+          {models.map((m) => (
+            <button
+              key={m.id}
+              type="button"
+              onClick={() => {
+                setSelectedModelId(m.id);
+                setIsModelDropdownOpen(false);
+              }}
+              className={cn(
+                "w-full text-left px-2.5 py-2 rounded-xl text-xs flex items-center justify-between transition-colors cursor-pointer",
+                selectedModelId === m.id
+                  ? "bg-muted text-foreground font-medium"
+                  : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+              )}
+            >
+              <div>
+                <div className="font-medium text-foreground">{m.displayName}</div>
+                <div className="text-[10px] text-muted-foreground/70 font-mono">
+                  {m.id}
+                </div>
+              </div>
+              {selectedModelId === m.id && (
+                <span className="h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
+  const renderSendButton = () => {
+    if (isStreaming) {
+      return (
+        <button
+          type="button"
+          onClick={handleAbort}
+          className="h-8 w-8 rounded-full bg-destructive/10 hover:bg-destructive/20 text-destructive flex items-center justify-center transition-colors cursor-pointer shrink-0"
+          title="Hentikan Proses"
+        >
+          <Square className="h-3.5 w-3.5 fill-current" />
+        </button>
+      );
+    }
+
+    const hasInput = Boolean(inputMessage.trim() || attachments.length > 0);
+
+    if (!hasInput && !isMultiline) {
+      // In single-line mode when empty, show circular mic button (Image 2)
+      return (
+        <button
+          type="button"
+          className="h-8 w-8 rounded-full bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer shrink-0"
+          title="Gunakan Input Suara"
+          aria-label="Input Suara"
+        >
+          <Mic className="h-4 w-4" />
+        </button>
+      );
+    }
+
+    return (
+      <div className="flex items-center gap-1.5 shrink-0">
+        {isMultiline && (
+          <button
+            type="button"
+            className="h-8 w-8 rounded-full hover:bg-muted/70 text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer shrink-0"
+            title="Gunakan Input Suara"
+            aria-label="Input Suara"
+          >
+            <Mic className="h-4 w-4" />
+          </button>
+        )}
+        <button
+          type="submit"
+          disabled={!hasInput}
+          className={cn(
+            "h-8 w-8 rounded-full flex items-center justify-center transition-colors cursor-pointer shrink-0 shadow-xs active:scale-95",
+            hasInput
+              ? "bg-[#1a73e8] hover:bg-[#1557b0] text-white"
+              : "bg-muted/60 text-muted-foreground/40 cursor-not-allowed"
+          )}
+          aria-label="Kirim"
+        >
+          <ArrowUp className="h-4 w-4 stroke-[2.5]" />
+        </button>
+      </div>
+    );
   };
 
-  const toggleTool = (toolId: string) => {
-    setExpandedToolIds((prev) => ({ ...prev, [toolId]: !prev[toolId] }));
+  const renderPlusButton = () => (
+    <>
+      <button
+        type="button"
+        onClick={() => fileInputRef.current?.click()}
+        className="h-8 w-8 rounded-full hover:bg-muted/70 text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer shrink-0"
+        title="Lampirkan File atau Media"
+        aria-label="Lampirkan File"
+      >
+        <Plus className="h-4 w-4 stroke-[2]" />
+      </button>
+
+      <input
+        ref={fileInputRef}
+        type="file"
+        multiple
+        className="hidden"
+        onChange={handleFileChange}
+        accept="image/*,video/*,audio/*,.pdf,.md,.txt,.py,.json,.csv,.doc,.docx"
+      />
+    </>
+  );
+
+  const renderAttachmentsShelf = () => {
+    if (attachments.length === 0) return null;
+    return (
+      <div className="flex items-center gap-2 px-1 pt-1 pb-1.5 overflow-x-auto select-none border-b border-border/40">
+        {attachments.map((file) => (
+          <div
+            key={file.id}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted/60 border border-border/60 text-xs text-foreground shrink-0"
+          >
+            {file.type === "image" ? (
+              <ImageIcon className="w-3 h-3 text-primary shrink-0" />
+            ) : (
+              <FileText className="w-3 h-3 text-primary shrink-0" />
+            )}
+            <span className="truncate max-w-[120px] font-medium text-[11px]">
+              {file.name}
+            </span>
+            <span className="text-[10px] text-muted-foreground font-mono">
+              ({formatFileSize(file.size)})
+            </span>
+            <button
+              type="button"
+              onClick={() => removeAttachment(file.id)}
+              className="p-0.5 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground cursor-pointer"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </div>
+        ))}
+      </div>
+    );
   };
 
   return (
     <main className="flex-1 h-full flex flex-col bg-background text-foreground min-w-0 relative select-text">
       {/* Top Header Bar */}
       <div className="h-12 px-5 border-b border-border/50 flex items-center justify-between shrink-0 select-none bg-card/30">
-        {/* Left: Chat Title + Model Selector Pill */}
+        {/* Left: Socratic Chat Label */}
         <div className="flex items-center gap-3">
           <span className="text-xs font-mono font-semibold tracking-wider text-muted-foreground uppercase">
             Socratic Chat
           </span>
-
-          {/* Model Selector Dropdown */}
-          <div className="relative" ref={dropdownRef}>
-            <button
-              type="button"
-              onClick={() => setIsModelDropdownOpen(!isModelDropdownOpen)}
-              className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-muted/60 hover:bg-muted border border-border/60 text-xs font-medium text-foreground transition-all cursor-pointer shadow-xs active:scale-98"
-              aria-label="Pilih Model AI"
-            >
-              <Sparkles className="h-3 w-3 text-accent" />
-              <span>{currentModel.displayName.split("(")[0]?.trim() || "Const"}</span>
-              <ChevronDown className="h-3 w-3 text-muted-foreground ml-0.5" />
-            </button>
-
-            {isModelDropdownOpen && (
-              <div className="absolute left-0 mt-1.5 w-64 rounded-2xl bg-card border border-border shadow-2xl p-1.5 z-50 animate-in fade-in zoom-in-95 duration-100">
-                <div className="px-2.5 py-1.5 text-[10px] uppercase font-semibold text-muted-foreground tracking-wider border-b border-border/40 mb-1">
-                  Pilih Model Cerdas
-                </div>
-                {models.map((m) => (
-                  <button
-                    key={m.id}
-                    type="button"
-                    onClick={() => {
-                      setSelectedModelId(m.id);
-                      setIsModelDropdownOpen(false);
-                    }}
-                    className={`w-full text-left px-2.5 py-2 rounded-xl text-xs flex items-center justify-between transition-colors cursor-pointer ${
-                      selectedModelId === m.id
-                        ? "bg-muted text-foreground font-medium"
-                        : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-                    }`}
-                  >
-                    <div>
-                      <div className="font-medium text-foreground">{m.displayName}</div>
-                      <div className="text-[10px] text-muted-foreground/70 font-mono">
-                        {m.id}
-                      </div>
-                    </div>
-                    {selectedModelId === m.id && (
-                      <span className="h-1.5 w-1.5 rounded-full bg-accent shrink-0" />
-                    )}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
         </div>
 
         {/* Right Header Actions */}
@@ -697,26 +1085,26 @@ export function ChatPanel({
         </div>
       </div>
 
-      {/* Main Conversation Stream */}
-      <div className="flex-1 overflow-y-auto px-4 sm:px-8 py-6 flex flex-col max-w-3xl mx-auto w-full space-y-5">
-        {/* Welcome Empty State */}
+      {/* Main Conversation Stream using Radix ScrollArea */}
+      <ScrollArea className="flex-1 w-full" viewportClassName="px-4 sm:px-8 py-6 max-w-3xl mx-auto w-full">
         {messages.length === 0 ? (
-          <div className="flex-1 flex flex-col justify-center my-auto py-8">
+          /* Welcome Empty State */
+          <div className="flex-1 flex flex-col justify-center my-auto py-10">
             <div className="text-3xl sm:text-4xl mb-3 select-none">👋</div>
 
             <h1 className="text-2xl sm:text-3xl font-serif font-medium tracking-tight text-foreground mb-2">
               Ruang Belajar Socrates
             </h1>
 
-            <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed mb-6 max-w-xl">
+            <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed mb-6 max-w-xl font-sans">
               Didukung oleh model cerdas <strong>{currentModel.displayName}</strong>. Tanyakan konsep riset, bedah dokumen PDF, telusuri kode proyek, atau uji hipotesis bersama Const Agent.
             </p>
 
-            <p className="text-xs text-muted-foreground/80 font-medium mb-3">
+            <p className="text-xs text-muted-foreground/80 font-medium mb-3 font-sans">
               Mulai eksplorasi materi Anda:
             </p>
 
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2.5">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2.5 font-sans">
               {[
                 "Pelajari topik baru",
                 "Bedah dokumen & riset",
@@ -737,171 +1125,205 @@ export function ChatPanel({
             </div>
           </div>
         ) : (
-          messages.map((msg) => (
-            <div
-              key={msg.id}
-              className={`flex flex-col ${
-                msg.role === "user" ? "items-end" : "items-start"
-              } w-full`}
-            >
-              {/* User Message Bubble */}
-              {msg.role === "user" ? (
-                <div className="max-w-[85%] rounded-3xl rounded-tr-md bg-muted text-foreground px-4 py-2.5 text-xs sm:text-sm border border-border/60 shadow-xs leading-relaxed whitespace-pre-wrap">
-                  {msg.content}
-                </div>
-              ) : (
-                /* Assistant Message Section */
-                <div className="w-full space-y-3">
-                  {/* Thinking Accordion (if available) */}
-                  {msg.thinking && (
-                    <div className="w-full rounded-2xl bg-muted/30 border border-border/40 overflow-hidden text-xs">
+          <div className="flex flex-col space-y-6 w-full pb-4">
+            {messages.map((msg, idx) => {
+              const isAssistant = msg.role === "assistant";
+              const isUser = msg.role === "user";
+              const isLatestAssistant = isAssistant && isStreaming && idx === messages.length - 1;
+
+              if (isUser) {
+                return (
+                  <div key={msg.id} className="flex flex-col items-end w-full group">
+                    <div className="max-w-[85%] rounded-3xl rounded-tr-md bg-muted/80 text-foreground px-4 py-2.5 text-[13.5px] border border-border/60 shadow-xs leading-relaxed whitespace-pre-wrap font-sans">
+                      {msg.content}
+                    </div>
+
+                    {/* User hover action bar: Timestamp and Copy */}
+                    <div className="flex items-center gap-2 pt-1.5 pr-1 opacity-0 group-hover:opacity-100 transition-opacity text-xs text-muted-foreground select-none font-sans">
+                      {msg.createdAt && (
+                        <span className="text-[11px] font-mono text-muted-foreground/70">
+                          {formatMessageTimestamp(msg.createdAt)}
+                        </span>
+                      )}
                       <button
                         type="button"
-                        onClick={() => toggleThinking(msg.id)}
-                        className="w-full px-3.5 py-2 flex items-center justify-between text-muted-foreground hover:text-foreground transition-colors cursor-pointer select-none bg-muted/20"
+                        onClick={() => handleCopyMessage(msg.id, msg.content)}
+                        className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                        title="Salin pesan"
                       >
-                        <div className="flex items-center gap-2">
-                          <Brain className="h-3.5 w-3.5 text-purple-400" />
-                          <span className="font-mono text-[11px] font-medium">
-                            Proses Berpikir (DeepThinking)
-                          </span>
-                        </div>
-                        <ChevronDown
-                          className={`h-3.5 w-3.5 transition-transform ${
-                            expandedThinkingIds[msg.id] ? "rotate-180" : ""
-                          }`}
-                        />
+                        {copiedId === msg.id ? (
+                          <Check className="w-3.5 h-3.5 text-emerald-500" />
+                        ) : (
+                          <Copy className="w-3.5 h-3.5" />
+                        )}
                       </button>
+                    </div>
+                  </div>
+                );
+              }
 
-                      {expandedThinkingIds[msg.id] && (
-                        <div className="p-3.5 text-muted-foreground font-mono text-[11px] leading-relaxed border-t border-border/40 whitespace-pre-wrap max-h-48 overflow-y-auto bg-background/50">
-                          {msg.thinking}
-                        </div>
+              return (
+                <div key={msg.id} className="w-full flex flex-col gap-2 group">
+                  {/* Execution Trace (Worked for Xs >) */}
+                  <ExecutionTrace
+                    thinking={msg.thinking}
+                    toolCalls={msg.toolCalls}
+                    isExecuting={isLatestAssistant}
+                    durationMs={isLatestAssistant ? liveDurationMs : msg.durationMs}
+                    onAnswerQuestion={handleAnswerQuestion}
+                  />
+
+                  {/* Formatted Markdown Content Bubble */}
+                  {msg.content ? (
+                    <div className="px-0.5">
+                      <MarkdownContent content={msg.content} />
+                      {isLatestAssistant && (
+                        <span className="inline-block w-1.5 h-3.5 ml-1 bg-primary animate-pulse align-middle" />
                       )}
                     </div>
-                  )}
-
-                  {/* Tool Calls Visual Cards (if any) */}
-                  {msg.toolCalls && msg.toolCalls.length > 0 && (
-                    <div className="space-y-2 w-full">
-                      {msg.toolCalls.map((tc) => {
-                        if (tc.name === "ask_question") {
-                          return (
-                            <SocraticQuestionCard
-                              key={tc.id}
-                              toolCall={tc}
-                              onAnswer={handleAnswerQuestion}
-                            />
-                          );
-                        }
-                        if (tc.name === "run_python") {
-                          return (
-                            <PythonRunnerCard
-                              key={tc.id}
-                              toolCall={tc}
-                              isExpanded={Boolean(expandedToolIds[tc.id])}
-                              onToggle={() => toggleTool(tc.id)}
-                            />
-                          );
-                        }
-                        if (tc.name === "todo_write") {
-                          return (
-                            <TodoWriteCard
-                              key={tc.id}
-                              toolCall={tc}
-                              isExpanded={Boolean(expandedToolIds[tc.id])}
-                              onToggle={() => toggleTool(tc.id)}
-                            />
-                          );
-                        }
-                        return (
-                          <GenericToolCard
-                            key={tc.id}
-                            toolCall={tc}
-                            isExpanded={Boolean(expandedToolIds[tc.id])}
-                            onToggle={() => toggleTool(tc.id)}
-                          />
-                        );
-                      })}
-                    </div>
-                  )}
-
-                  {/* Main Assistant Content Bubble */}
-                  {msg.content || (msg.isStreaming && (!msg.toolCalls || msg.toolCalls.length === 0)) ? (
-                    <div className="w-full rounded-3xl rounded-tl-md bg-card/60 border border-border/60 p-4 text-xs sm:text-sm text-foreground shadow-xs leading-relaxed whitespace-pre-wrap relative">
-                      {msg.content}
-
-                      {msg.isStreaming && (
-                        <span className="inline-block w-1.5 h-3.5 ml-1 bg-accent animate-pulse align-middle" />
-                      )}
-                    </div>
-                  ) : !msg.isStreaming && (!msg.toolCalls || msg.toolCalls.length === 0) ? (
-                    <div className="w-full rounded-3xl rounded-tl-md bg-card/60 border border-border/60 p-4 text-xs sm:text-sm text-muted-foreground shadow-xs leading-relaxed whitespace-pre-wrap relative">
-                      Selesai memproses.
+                  ) : isLatestAssistant ? (
+                    <div className="text-xs text-muted-foreground italic px-1 flex items-center gap-2">
+                      <span className="inline-block w-1.5 h-3.5 bg-primary animate-pulse align-middle" />
+                      <span>Sedang memproses respons...</span>
                     </div>
                   ) : null}
+
+                  {/* Assistant hover action bar: Timestamp and Copy */}
+                  {!isLatestAssistant && msg.content && (
+                    <div className="flex items-center gap-2 pt-1 opacity-0 group-hover:opacity-100 transition-opacity text-xs text-muted-foreground select-none font-sans">
+                      <button
+                        type="button"
+                        onClick={() => handleCopyMessage(msg.id, msg.content)}
+                        className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                        title="Salin respons"
+                      >
+                        {copiedId === msg.id ? (
+                          <Check className="w-3.5 h-3.5 text-emerald-500" />
+                        ) : (
+                          <Copy className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+                      {msg.createdAt && (
+                        <span className="text-[11px] font-mono text-muted-foreground/70">
+                          {formatMessageTimestamp(msg.createdAt)}
+                        </span>
+                      )}
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          ))
-        )}
-        <div ref={messagesEndRef} />
-      </div>
-
-      {/* Sticky Bottom Chat Input Bar */}
-      <div className="p-4 sm:p-5 shrink-0 max-w-3xl mx-auto w-full">
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            handleSend();
-          }}
-          className="w-full bg-muted/40 rounded-full p-2 border border-border/70 focus-within:border-foreground/40 transition-all flex items-center justify-between gap-3 shadow-lg"
-        >
-          <input
-            type="text"
-            value={inputMessage}
-            onChange={(e) => setInputMessage(e.target.value)}
-            disabled={isStreaming}
-            placeholder={
-              isStreaming
-                ? "Sedang memproses respons asisten..."
-                : `Tanyakan apa saja kepada ${currentModel.displayName.split("(")[0]?.trim()}...`
-            }
-            className="flex-1 bg-transparent text-xs sm:text-sm text-foreground placeholder:text-muted-foreground/60 outline-none px-3 disabled:opacity-50"
-          />
-
-          <div className="flex items-center gap-2 shrink-0 pr-1">
-            <span className="text-[11px] px-3 py-1 rounded-full bg-background/60 text-muted-foreground font-mono border border-border/40 select-none">
-              {sourcesCount} sumber
-            </span>
-
-            {isStreaming ? (
-              <button
-                type="button"
-                onClick={handleAbort}
-                className="h-8 w-8 rounded-full bg-destructive/10 hover:bg-destructive/20 text-destructive flex items-center justify-center transition-all cursor-pointer"
-                title="Hentikan Proses"
-              >
-                <Square className="h-3.5 w-3.5 fill-current" />
-              </button>
-            ) : (
-              <button
-                type="submit"
-                disabled={!inputMessage.trim()}
-                className="h-8 w-8 rounded-full bg-foreground text-background hover:opacity-90 disabled:opacity-30 flex items-center justify-center transition-all cursor-pointer active:scale-95"
-                aria-label="Kirim"
-              >
-                <ArrowRight className="h-4 w-4" />
-              </button>
-            )}
+              );
+            })}
+            <div ref={messagesEndRef} />
           </div>
-        </form>
+        )}
+      </ScrollArea>
 
-        {/* Subtle Model & Workspace Status Footer */}
-        <div className="flex items-center justify-between px-3 mt-2 select-none text-[10px] text-muted-foreground font-mono">
-          <span>{workspacePath ? `Workspace: ${workspacePath}` : "Global Workspace"}</span>
-          <span>Model: {currentModel.displayName}</span>
-        </div>
+      {/* Sticky Bottom Chat Input Container */}
+      <div className="p-4 sm:p-5 shrink-0 max-w-3xl mx-auto w-full font-sans">
+        {isMultiline || attachments.length > 0 ? (
+          /* Multi-line Mode (Image 3): Rounded card with top-level textarea inside ScrollArea + bottom toolbar */
+          <form
+            key="chat-input-multi"
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSend();
+            }}
+            className="w-full bg-card dark:bg-[#1e1f20] rounded-3xl border border-border/70 focus-within:border-foreground/30 transition-colors p-3 sm:p-3.5 shadow-md flex flex-col gap-2.5"
+          >
+            {renderAttachmentsShelf()}
+
+            {/* Top: Full-width Textarea with ScrollArea & max height */}
+            <ScrollArea
+              className="w-full max-h-48 sm:max-h-60 [&>div>div[style]]:!block"
+              viewportClassName="pr-1.5"
+            >
+              <textarea
+                ref={textareaRef}
+                value={inputMessage}
+                onChange={(e) => {
+                  handleInputChange(e.target.value);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSend();
+                  }
+                }}
+                rows={2}
+                disabled={isStreaming}
+                placeholder={
+                  isStreaming
+                    ? "Sedang memproses respons asisten..."
+                    : "Tanyakan apa saja atau ketik pesan..."
+                }
+                className="w-full resize-none bg-transparent text-[14px] leading-[1.65] text-foreground placeholder:text-muted-foreground/60 outline-none font-sans py-0.5 block disabled:opacity-50 min-h-[48px]"
+              />
+            </ScrollArea>
+
+            {/* Bottom Row: Plus on left, Model Selector + Send button on right */}
+            <div className="flex items-center justify-between pt-1">
+              <div className="flex items-center gap-2 shrink-0">
+                {renderPlusButton()}
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                {renderModelDropdown()}
+                {renderSendButton()}
+              </div>
+            </div>
+          </form>
+        ) : (
+          /* Single-line Mode (Image 2): Compact pill shape with plus on left, input in center, model + send on right */
+          <form
+            key="chat-input-single"
+            onSubmit={(e) => {
+              e.preventDefault();
+              handleSend();
+            }}
+            className="w-full bg-card dark:bg-[#1e1f20] rounded-full border border-border/70 focus-within:border-foreground/30 transition-colors px-3 py-1.5 sm:py-2 shadow-md flex items-center gap-2.5"
+          >
+            {renderPlusButton()}
+
+            <textarea
+              ref={textareaRef}
+              value={inputMessage}
+              onChange={(e) => {
+                const val = e.target.value;
+                handleInputChange(val);
+                if (e.target.scrollHeight > 30 || val.includes("\n")) {
+                  setIsMultiline(true);
+                }
+              }}
+              onPaste={(e) => {
+                const text = e.clipboardData.getData("text");
+                if (text.includes("\n") || text.length > 50) {
+                  setIsMultiline(true);
+                }
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSend();
+                } else if (e.key === "Enter" && e.shiftKey) {
+                  setIsMultiline(true);
+                }
+              }}
+              rows={1}
+              disabled={isStreaming}
+              placeholder={
+                isStreaming
+                  ? "Sedang memproses respons asisten..."
+                  : "Tanyakan apa saja atau ketik pesan..."
+              }
+              className="flex-1 bg-transparent text-[14px] leading-5 text-foreground placeholder:text-muted-foreground/60 outline-none font-sans resize-none overflow-hidden h-[28px] max-h-[28px] py-1 block disabled:opacity-50"
+            />
+
+            <div className="flex items-center gap-2 shrink-0">
+              {renderModelDropdown()}
+              {renderSendButton()}
+            </div>
+          </form>
+        )}
       </div>
     </main>
   );

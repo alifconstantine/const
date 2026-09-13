@@ -196,6 +196,9 @@ importers:
       lucide-react:
         specifier: ^1.16.0
         version: 1.38.0(react@19.2.8)
+      marked:
+        specifier: 18.0.5
+        version: 18.0.5
       react:
         specifier: ^19.0.0
         version: 19.2.8
@@ -206,6 +209,9 @@ importers:
       '@const/typescript-config':
         specifier: workspace:*
         version: link:../../../packages/typescript-config
+      '@types/marked':
+        specifier: ^6.0.0
+        version: 6.0.0
       '@types/node':
         specifier: ^22.13.9
         version: 22.20.1

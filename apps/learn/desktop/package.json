@@ -16,11 +16,13 @@
     "dexie": "^4.4.5",
     "dexie-react-hooks": "^4.4.0",
     "lucide-react": "^1.16.0",
+    "marked": "18.0.5",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
   "devDependencies": {
     "@const/typescript-config": "workspace:*",
+    "@types/marked": "^6.0.0",
     "@types/node": "^22.13.9",
     "@types/react": "^19.0.10",
     "@types/react-dom": "^19.0.4",
