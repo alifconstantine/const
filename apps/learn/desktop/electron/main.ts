@@ -304,6 +304,18 @@ app.on("second-instance", (_event, commandLine) => {
     return result.filePaths[0];
   });
 
+  ipcMain.handle("dialog:open-file", async (_event, options?: { multiple?: boolean }) => {
+    if (!win) return null;
+    const result = await dialog.showOpenDialog(win, {
+      title: "Pilih Berkas Sumber",
+      properties: options?.multiple !== false ? ["openFile", "multiSelections"] : ["openFile"],
+    });
+    if (result.canceled || !result.filePaths || result.filePaths.length === 0) {
+      return null;
+    }
+    return result.filePaths;
+  });
+
   ipcMain.handle("auth:open-external", async (_event, url: string) => {
     if (url.startsWith("http://") || url.startsWith("https://")) {
       await shell.openExternal(url);

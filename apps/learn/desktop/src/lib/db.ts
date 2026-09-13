@@ -54,12 +54,27 @@ export interface LocalChatSession {
   createdAt: number;
 }
 
+export interface LocalSource {
+  id: string;
+  learnId: string;
+  title: string;
+  type: "file" | "url" | "text" | "drive" | "book" | "github";
+  url?: string;
+  path?: string;
+  content?: string;
+  size?: number;
+  includedInChat: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
 export const db = new Dexie("ConstLearnDatabase") as Dexie & {
   learns: EntityTable<LocalLearn, "id">;
   collections: EntityTable<LocalCollection, "id">;
   artifacts: EntityTable<LocalArtifact, "id">;
   messages: EntityTable<LocalMessage, "id">;
   sessions: EntityTable<LocalChatSession, "id">;
+  sources: EntityTable<LocalSource, "id">;
 };
 
 db.version(1).stores({
@@ -115,6 +130,15 @@ db.version(3)
       }
     }
   });
+
+db.version(4).stores({
+  learns: "id, title, updatedAt, createdAt, *collectionIds, projectPath",
+  collections: "id, name, updatedAt, createdAt",
+  artifacts: "id, learnId, title, type, updatedAt, createdAt",
+  messages: "id, learnId, sessionId, role, createdAt",
+  sessions: "id, learnId, title, updatedAt, createdAt",
+  sources: "id, learnId, type, includedInChat, createdAt",
+});
 
 // Helper functions for CRUD operations
 export const localDb = {
@@ -350,6 +374,78 @@ export const localDb = {
       });
     } else {
       await db.messages.where("learnId").equals(learnId).delete();
+    }
+  },
+
+  // Sources
+  async createSource(data: {
+    learnId: string;
+    title: string;
+    type?: LocalSource["type"];
+    url?: string;
+    path?: string;
+    content?: string;
+    size?: number;
+    includedInChat?: boolean;
+  }): Promise<string> {
+    const id = "source_" + Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
+    const now = Date.now();
+    await db.sources.add({
+      id,
+      learnId: data.learnId,
+      title: data.title,
+      type: data.type || "file",
+      url: data.url,
+      path: data.path,
+      content: data.content,
+      size: data.size,
+      includedInChat: data.includedInChat ?? true,
+      createdAt: now,
+      updatedAt: now,
+    });
+
+    // Update learn sources count
+    const count = await db.sources.where("learnId").equals(data.learnId).count();
+    await db.learns.update(data.learnId, {
+      sourcesCount: count,
+      updatedAt: now,
+    });
+
+    return id;
+  },
+
+  async getSources(learnId: string): Promise<LocalSource[]> {
+    return await db.sources.where("learnId").equals(learnId).reverse().sortBy("createdAt");
+  },
+
+  async toggleSourceInChat(sourceId: string, includedInChat: boolean): Promise<void> {
+    await db.sources.update(sourceId, {
+      includedInChat,
+      updatedAt: Date.now(),
+    });
+  },
+
+  async setAllSourcesInChat(learnId: string, includedInChat: boolean): Promise<void> {
+    const all = await db.sources.where("learnId").equals(learnId).toArray();
+    await Promise.all(
+      all.map((s) =>
+        db.sources.update(s.id, {
+          includedInChat,
+          updatedAt: Date.now(),
+        })
+      )
+    );
+  },
+
+  async deleteSource(sourceId: string): Promise<void> {
+    const source = await db.sources.get(sourceId);
+    await db.sources.delete(sourceId);
+    if (source?.learnId) {
+      const count = await db.sources.where("learnId").equals(source.learnId).count();
+      await db.learns.update(source.learnId, {
+        sourcesCount: count,
+        updatedAt: Date.now(),
+      });
     }
   },
 };

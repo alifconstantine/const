@@ -278,6 +278,7 @@ export function LearnWorkspace({
       <div className="flex-1 flex overflow-hidden p-2 sm:p-2.5 gap-2 sm:gap-2.5 bg-background">
         {/* Left Column: Sumber */}
         <SourcesPanel
+          learnId={learnId}
           sourcesCount={learn?.sourcesCount || 0}
           onAddSource={() => setIsAddSourceOpen(true)}
           isCollapsed={isSourcesCollapsed}
@@ -289,6 +290,7 @@ export function LearnWorkspace({
           learnId={learnId}
           workspacePath={learn?.projectPath}
           sourcesCount={learn?.sourcesCount || 0}
+          onAddSource={() => setIsAddSourceOpen(true)}
           onSelectPromptChip={(prompt) => {
             console.log("Selected prompt chip:", prompt);
           }}
@@ -311,9 +313,49 @@ export function LearnWorkspace({
       <AddSourceDialog
         open={isAddSourceOpen}
         onOpenChange={setIsAddSourceOpen}
-        onSelectSource={(sourceType) => {
-          console.log("Selected source type:", sourceType);
+        onSelectSource={async (sourceType) => {
           setIsAddSourceOpen(false);
+          if (!learnId) return;
+
+          if (sourceType === "upload") {
+            const filePaths = await window.electron?.openFileDialog?.({ multiple: true });
+            if (filePaths && filePaths.length > 0) {
+              for (const filePath of filePaths) {
+                const fileName = filePath.split(/[\\/]/).pop() || "Berkas Sumber";
+                await localDb.createSource({
+                  learnId,
+                  title: fileName,
+                  type: "file",
+                  path: filePath,
+                  includedInChat: true,
+                });
+              }
+            }
+          } else if (sourceType === "paste") {
+            const text = await navigator.clipboard.readText().catch(() => "");
+            if (text && text.trim()) {
+              const snippet = text.trim().slice(0, 30);
+              await localDb.createSource({
+                learnId,
+                title: `Kutipan: ${snippet}...`,
+                type: "text",
+                content: text,
+                size: new Blob([text]).size,
+                includedInChat: true,
+              });
+            }
+          } else if (sourceType === "url") {
+            const url = window.prompt("Masukkan URL / tautan web sumber:");
+            if (url && url.trim()) {
+              await localDb.createSource({
+                learnId,
+                title: url.replace(/^https?:\/\//, "").replace(/\/$/, ""),
+                type: "url",
+                url: url.trim(),
+                includedInChat: true,
+              });
+            }
+          }
         }}
       />
     </div>

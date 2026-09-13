@@ -35,6 +35,7 @@ interface ChatPanelProps {
   sourcesCount?: number;
   onSelectPromptChip?: (prompt: string) => void;
   onSendMessage?: (message: string) => void;
+  onAddSource?: () => void;
 }
 
 interface DisplayMessage {
@@ -82,6 +83,7 @@ export function ChatPanel({
   workspacePath,
   sourcesCount = 0,
   onSelectPromptChip,
+  onAddSource,
 }: ChatPanelProps) {
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [inputMessage, setInputMessage] = useState("");
@@ -209,11 +211,14 @@ export function ChatPanel({
       const target = e.target as Node;
       const isOutsideDropdown =
         !dropdownRef.current || !dropdownRef.current.contains(target);
-      const isOutsideModelDropdown =
-        !modelDropdownRef.current || !modelDropdownRef.current.contains(target);
+      const isOutsideSourcesDropdown =
+        !sourcesDropdownRef.current || !sourcesDropdownRef.current.contains(target);
 
-      if (isOutsideDropdown && isOutsideModelDropdown) {
+      if (isOutsideDropdown) {
         setIsModelDropdownOpen(false);
+      }
+      if (isOutsideSourcesDropdown) {
+        setIsSourcesDropdownOpen(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -237,6 +242,21 @@ export function ChatPanel({
 
   const models: ModelConfig[] = availableModels;
   const currentModel = models.find((m) => m.id === selectedModelId) || models[0]!;
+
+  // Sources live query in this learn
+  const sources =
+    useLiveQuery(
+      () => {
+        if (!learnId) return [];
+        return db.sources.where("learnId").equals(learnId).reverse().sortBy("createdAt");
+      },
+      [learnId]
+    ) || [];
+
+  const carriedSources = sources.filter((s) => s.includedInChat !== false);
+  const carriedSourcesCount = sources.length > 0 ? carriedSources.length : sourcesCount;
+  const [isSourcesDropdownOpen, setIsSourcesDropdownOpen] = useState(false);
+  const sourcesDropdownRef = useRef<HTMLDivElement>(null);
 
   // Multi-session chat support
   const sessions =
@@ -324,16 +344,6 @@ export function ChatPanel({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isStreaming]);
 
-  // Close dropdown on outside click
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setIsModelDropdownOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
 
   // 2. Set up Electron stream listener with auto-persistence
   useEffect(() => {
@@ -605,7 +615,15 @@ export function ChatPanel({
       const attList = attachments
         .map((a) => `- [Lampiran: ${a.name} (${formatFileSize(a.size)})]`)
         .join("\n");
-      promptWithAttachments = `${textToSend}\n\n${attList}`;
+      promptWithAttachments = `${promptWithAttachments}\n\n${attList}`;
+    }
+
+    // Append active/carried sources summary if any
+    if (carriedSources.length > 0) {
+      const sourceList = carriedSources
+        .map((s) => `- [Sumber: ${s.title} (${s.type}${s.url ? ` - ${s.url}` : ""})]`)
+        .join("\n");
+      promptWithAttachments = `${promptWithAttachments}\n\nReferensi Sumber Dibawa:\n${sourceList}`;
     }
 
     const newUserMsg: DisplayMessage = {
@@ -985,54 +1003,124 @@ export function ChatPanel({
     }
   };
 
-  const renderModelDropdown = () => (
-    <div className="relative" ref={modelDropdownRef}>
+  const renderSourcesDropdown = () => (
+    <div className="relative" ref={sourcesDropdownRef}>
       <button
         type="button"
         onClick={(e) => {
           e.stopPropagation();
-          setIsModelDropdownOpen(!isModelDropdownOpen);
+          setIsSourcesDropdownOpen(!isSourcesDropdownOpen);
         }}
-        className="flex items-center gap-1.5 px-2.5 py-1 rounded-full hover:bg-muted/70 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer select-none shrink-0"
-        aria-label="Pilih Model AI"
+        className={cn(
+          "flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer select-none shrink-0 border",
+          carriedSourcesCount > 0
+            ? "bg-secondary/70 hover:bg-secondary border-border/70 text-foreground"
+            : "hover:bg-muted/60 text-muted-foreground border-transparent hover:border-border/50"
+        )}
+        aria-label="Kelola Sumber yang Dibawa"
+        title="Kelola sumber yang dibawa ke obrolan"
       >
-        <span className="font-medium text-foreground/85 text-[13px]">
-          {currentModel.displayName.split("(")[0]?.trim() || "Const"}
+        <FileText className="h-3 w-3 text-muted-foreground shrink-0" />
+        <span className="font-mono text-[11px] sm:text-[12px] text-foreground/85 font-medium">
+          {carriedSourcesCount} sumber
         </span>
-        <ChevronDown className="h-3 w-3 text-muted-foreground/70" />
+        <ChevronDown
+          className={cn(
+            "h-3 w-3 text-muted-foreground/70 transition-transform duration-150 ml-0.5",
+            isSourcesDropdownOpen && "rotate-180"
+          )}
+        />
       </button>
 
-      {isModelDropdownOpen && (
-        <div className="absolute bottom-full right-0 mb-2 w-64 rounded-2xl bg-card border border-border shadow-2xl p-1.5 z-50 animate-in fade-in zoom-in-95 duration-100">
-          <div className="px-2.5 py-1.5 text-[10px] uppercase font-semibold text-muted-foreground tracking-wider border-b border-border/40 mb-1">
-            Pilih Model Cerdas
+      {isSourcesDropdownOpen && (
+        <div
+          className="absolute bottom-full right-0 mb-2 w-72 sm:w-80 rounded-2xl bg-card border border-border shadow-2xl p-2.5 z-50 animate-in fade-in zoom-in-95 duration-100 font-sans"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div className="flex items-center justify-between px-1.5 pb-2 mb-1.5 border-b border-border/50">
+            <span className="text-[11px] font-semibold text-foreground tracking-tight">
+              Sumber Dibawa ({carriedSourcesCount}/{sources.length})
+            </span>
+            {sources.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  const allSelected = carriedSources.length === sources.length;
+                  if (learnId) {
+                    localDb.setAllSourcesInChat(learnId, !allSelected);
+                  }
+                }}
+                className="text-[10px] text-primary hover:underline cursor-pointer font-medium"
+              >
+                {carriedSources.length === sources.length ? "Batal Semua" : "Pilih Semua"}
+              </button>
+            )}
           </div>
-          {models.map((m) => (
-            <button
-              key={m.id}
-              type="button"
-              onClick={() => {
-                setSelectedModelId(m.id);
-                setIsModelDropdownOpen(false);
-              }}
-              className={cn(
-                "w-full text-left px-2.5 py-2 rounded-xl text-xs flex items-center justify-between transition-colors cursor-pointer",
-                selectedModelId === m.id
-                  ? "bg-muted text-foreground font-medium"
-                  : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-              )}
-            >
-              <div>
-                <div className="font-medium text-foreground">{m.displayName}</div>
-                <div className="text-[10px] text-muted-foreground/70 font-mono">
-                  {m.id}
-                </div>
+
+          {/* List of sources */}
+          <div className="max-h-48 overflow-y-auto space-y-1 py-0.5">
+            {sources.length === 0 ? (
+              <div className="py-4 px-2 text-center text-muted-foreground">
+                <FileText className="h-6 w-6 mx-auto mb-1.5 opacity-40" />
+                <p className="text-xs font-medium text-foreground">Belum ada sumber</p>
+                <p className="text-[10px] text-muted-foreground/80 mt-0.5">
+                  Tambahkan berkas atau tautan web ke notebook
+                </p>
               </div>
-              {selectedModelId === m.id && (
-                <span className="h-1.5 w-1.5 rounded-full bg-primary shrink-0" />
-              )}
-            </button>
-          ))}
+            ) : (
+              sources.map((source) => {
+                const isCarried = source.includedInChat !== false;
+                return (
+                  <div
+                    key={source.id}
+                    onClick={() => {
+                      localDb.toggleSourceInChat(source.id, !isCarried);
+                    }}
+                    className={cn(
+                      "w-full flex items-center gap-2 px-2 py-1.5 rounded-xl text-left cursor-pointer transition-colors select-none text-xs",
+                      isCarried
+                        ? "bg-secondary/70 hover:bg-secondary text-foreground"
+                        : "hover:bg-muted/50 text-muted-foreground opacity-60 hover:opacity-100"
+                    )}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={isCarried}
+                      onChange={() => {}}
+                      className="rounded border-border h-3.5 w-3.5 text-primary focus:ring-0 cursor-pointer pointer-events-none"
+                    />
+                    <div className="flex-1 min-w-0">
+                      <div className="truncate text-[11.5px] font-medium text-foreground">
+                        {source.title}
+                      </div>
+                      <div className="text-[9.5px] text-muted-foreground/70 font-mono flex items-center gap-1">
+                        <span className="capitalize">{source.type}</span>
+                        {source.size ? `• ${formatFileSize(source.size)}` : null}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* Footer action: Add new source */}
+          {onAddSource && (
+            <div className="pt-2 mt-1.5 border-t border-border/40">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsSourcesDropdownOpen(false);
+                  onAddSource();
+                }}
+                className="w-full h-7 rounded-xl bg-muted/60 hover:bg-muted text-xs font-medium text-foreground flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <Plus className="h-3 w-3" />
+                <span>Tambah Sumber</span>
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -1445,14 +1533,14 @@ export function ChatPanel({
               />
             </ScrollArea>
 
-            {/* Bottom Row: Plus on left, Model Selector + Send button on right */}
+            {/* Bottom Row: Plus on left, Sources Dropdown + Send button on right */}
             <div className="flex items-center justify-between pt-1">
               <div className="flex items-center gap-2 shrink-0">
                 {renderPlusButton()}
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
-                {renderModelDropdown()}
+                {renderSourcesDropdown()}
                 {renderSendButton()}
               </div>
             </div>
@@ -1504,7 +1592,7 @@ export function ChatPanel({
             />
 
             <div className="flex items-center gap-2 shrink-0">
-              {renderModelDropdown()}
+              {renderSourcesDropdown()}
               {renderSendButton()}
             </div>
           </form>

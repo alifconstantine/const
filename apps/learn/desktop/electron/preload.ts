@@ -13,6 +13,8 @@ contextBridge.exposeInMainWorld("electron", {
   readFile: (filePath: string) => ipcRenderer.invoke("workspace:read-file", filePath),
   readMedia: (filePath: string) => ipcRenderer.invoke("workspace:read-media", filePath),
   openDirectoryDialog: () => ipcRenderer.invoke("dialog:open-directory"),
+  openFileDialog: (options?: { multiple?: boolean }) =>
+    ipcRenderer.invoke("dialog:open-file", options),
   getDefaultWorkspacePath: (learnId?: string) =>
     ipcRenderer.invoke("workspace:get-default-path", learnId),
   startAuth: (options?: { accountsUrl?: string; action?: string }) =>

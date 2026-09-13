@@ -13,6 +13,7 @@ interface Window {
     readFile?: (filePath: string) => Promise<string | null>;
     readMedia?: (filePath: string) => Promise<string | null>;
     openDirectoryDialog: () => Promise<string | null>;
+    openFileDialog?: (options?: { multiple?: boolean }) => Promise<string[] | null>;
     getDefaultWorkspacePath?: (learnId?: string) => Promise<string>;
     startAuth?: (options?: {
       accountsUrl?: string;
