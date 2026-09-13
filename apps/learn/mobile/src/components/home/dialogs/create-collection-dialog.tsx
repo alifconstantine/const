@@ -9,6 +9,7 @@ import {
   Input,
 } from "@const/ui";
 import { FolderPlus } from "lucide-react";
+import { useI18n } from "../../../lib/i18n";
 const COLLECTION_EMOJIS = ["📁", "📚", "🔬", "💻", "🎯", "🚀", "🧪", "📊", "🎨", "⚡", "🧠", "💡"];
 
 interface CreateCollectionDialogProps {
@@ -34,6 +35,7 @@ export function CreateCollectionDialog({
   initialData,
   onSubmit,
 }: CreateCollectionDialogProps) {
+  const { t } = useI18n();
   const [name, setName] = useState(initialData?.name ?? "");
   const [description, setDescription] = useState(initialData?.description ?? "");
   const [selectedEmoji, setSelectedEmoji] = useState(initialData?.emoji ?? "📁");
@@ -76,14 +78,14 @@ export function CreateCollectionDialog({
           <DialogHeader>
             <DialogTitle className="font-sans text-lg font-semibold tracking-tight text-foreground flex items-center gap-2">
               <FolderPlus className="h-5 w-5 text-primary" />
-              {isEdit ? "Edit Collection" : "New Collection"}
+              {isEdit ? t("editCollectionDialogTitle") : t("createCollectionDialogTitle")}
             </DialogTitle>
           </DialogHeader>
 
           {/* Emoji Picker */}
           <div>
             <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
-              Choose Icon / Emoji
+              {t("collectionIcon")}
             </label>
             <div className="grid grid-cols-6 gap-2 p-2 rounded-xl bg-secondary/50 border border-border/60">
               {COLLECTION_EMOJIS.map((emoji) => (
@@ -106,12 +108,12 @@ export function CreateCollectionDialog({
           {/* Name input */}
           <div className="space-y-1">
             <label className="text-xs font-medium text-muted-foreground">
-              Collection Name
+              {t("collectionNameLabel")}
             </label>
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Artificial Intelligence"
+              placeholder={t("collectionNamePlaceholder")}
               className="h-10 rounded-xl bg-secondary/40 border-border/70 text-sm focus-visible:ring-1 focus-visible:ring-ring"
               autoFocus
               required
@@ -121,12 +123,12 @@ export function CreateCollectionDialog({
           {/* Description input */}
           <div className="space-y-1">
             <label className="text-xs font-medium text-muted-foreground">
-              Description (Optional)
+              {t("collectionDescOptional")}
             </label>
             <Input
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Topic or category summary"
+              placeholder={t("collectionDescPlaceholder")}
               className="h-10 rounded-xl bg-secondary/40 border-border/70 text-sm focus-visible:ring-1 focus-visible:ring-ring"
             />
           </div>
@@ -138,14 +140,14 @@ export function CreateCollectionDialog({
               onClick={() => onOpenChange(false)}
               className="rounded-full cursor-pointer h-9 px-4 text-xs flex-1"
             >
-              Cancel
+              {t("cancel")}
             </Button>
             <Button
               type="submit"
               disabled={!name.trim() || isSubmitting}
               className="rounded-full cursor-pointer h-9 px-5 text-xs font-medium flex-1"
             >
-              {isSubmitting ? "Saving..." : isEdit ? "Update" : "Create"}
+              {isSubmitting ? t("saving") : isEdit ? t("update") : t("create")}
             </Button>
           </DialogFooter>
         </form>

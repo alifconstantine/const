@@ -29,24 +29,10 @@ import { CreateLearnDialog } from "./dialogs/create-learn-dialog";
 import { CreateCollectionDialog } from "./dialogs/create-collection-dialog";
 import { ManageCollectionDialog } from "./dialogs/manage-collection-dialog";
 import { DeleteConfirmDialog } from "./dialogs/delete-confirm-dialog";
+import { useI18n } from "../../lib/i18n";
 
 type TabKey = "all" | "learns" | "sources" | "collections" | "artifact";
 type SortOption = "recent" | "oldest" | "title_asc" | "title_desc";
-
-const SORT_LABELS: Record<SortOption, string> = {
-  recent: "Recent",
-  oldest: "Oldest",
-  title_asc: "A-Z",
-  title_desc: "Z-A",
-};
-
-const TABS: { key: TabKey; label: string }[] = [
-  { key: "all", label: "All" },
-  { key: "learns", label: "Learns" },
-  { key: "sources", label: "Sources" },
-  { key: "collections", label: "Collections" },
-  { key: "artifact", label: "Artifact" },
-];
 
 interface LearnHomeProps {
   onOpenLearn?: (learnId: string, openAddSource?: boolean) => void;
@@ -59,6 +45,29 @@ export function LearnHome({
   searchQuery: propSearchQuery,
   onSearchQueryChange,
 }: LearnHomeProps) {
+  const { t, language } = useI18n();
+
+  const sortLabels: Record<SortOption, string> = useMemo(
+    () => ({
+      recent: t("sortRecent"),
+      oldest: t("sortOldest"),
+      title_asc: t("sortTitleAsc"),
+      title_desc: t("sortTitleDesc"),
+    }),
+    [t]
+  );
+
+  const tabs: { key: TabKey; label: string }[] = useMemo(
+    () => [
+      { key: "all", label: t("tabAll") },
+      { key: "learns", label: t("learns") },
+      { key: "sources", label: t("sources") },
+      { key: "collections", label: t("collections") },
+      { key: "artifact", label: t("artifacts") },
+    ],
+    [t]
+  );
+
   // Navigation & View state (locked to list per user instruction)
   const [activeTab, setActiveTab] = useState<TabKey>("all");
   const viewMode = "list";
@@ -94,7 +103,7 @@ export function LearnHome({
   const handleCreateNewLearn = async (collectionId?: string) => {
     if (onOpenLearn) {
       const id = await localDb.createLearn({
-        title: "Untitled notebook",
+        title: t("untitledNotebook"),
         emoji: "📘",
         collectionId: collectionId || activeCollectionId || undefined,
       });
@@ -272,7 +281,7 @@ export function LearnHome({
             }}
           />
 
-          {TABS.map((tab) => {
+          {tabs.map((tab) => {
             const isActive = activeTab === tab.key;
             return (
               <button
@@ -305,7 +314,7 @@ export function LearnHome({
             type="button"
             onClick={() => setActiveCollectionId(null)}
             className="h-7 w-7 rounded-full border border-[#383838] flex items-center justify-center text-[#969696] hover:text-[#d4d4d4] shrink-0 cursor-pointer active:scale-95 transition-all"
-            aria-label="Back to collections"
+            aria-label={t("backToAllCollections")}
           >
             <ArrowLeft className="h-3.5 w-3.5" />
           </button>
@@ -325,7 +334,7 @@ export function LearnHome({
               }}
               className="rounded-full h-7 text-[11px] px-2.5 cursor-pointer border-[#383838] text-[#d4d4d4] hover:bg-[#2b2b2b]"
             >
-              Edit
+              {t("edit")}
             </Button>
             <Button
               variant="destructive"
@@ -334,13 +343,13 @@ export function LearnHome({
                 setDeleteTarget({
                   type: "collection",
                   id: activeCollection.id,
-                  title: `Delete collection "${activeCollection.name}"?`,
-                  description: "Notebooks in this collection will not be deleted.",
+                  title: t("deleteCollectionTitle", { name: activeCollection.name }),
+                  description: t("deleteCollectionConfirm"),
                 })
               }
               className="rounded-full h-7 text-[11px] px-2.5 cursor-pointer"
             >
-              Delete
+              {t("delete")}
             </Button>
           </div>
         </div>
@@ -361,14 +370,14 @@ export function LearnHome({
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={
                 activeTab === "learns"
-                  ? "Search notebooks..."
+                  ? t("searchNotebooks")
                   : activeTab === "collections"
-                  ? "Search collections..."
+                  ? t("searchCollections")
                   : activeTab === "sources"
-                  ? "Search sources..."
+                  ? t("searchSources")
                   : activeTab === "artifact"
-                  ? "Search artifacts..."
-                  : "Search notebooks, collections..."
+                  ? t("searchArtifacts")
+                  : t("searchNotebooksAndCollections")
               }
               className="h-10 w-full pl-10 pr-9 text-xs sm:text-sm rounded-xl bg-[#222222] border-[#383838] text-[#d4d4d4] placeholder:text-[#5d5d5d] focus-visible:ring-1 focus-visible:ring-[#5d5d5d]"
             />
@@ -377,7 +386,7 @@ export function LearnHome({
                 type="button"
                 onClick={() => setSearchQuery("")}
                 className="absolute right-3 p-1 text-[#969696] hover:text-[#d4d4d4] cursor-pointer"
-                aria-label="Clear search"
+                aria-label={t("clearSearch")}
               >
                 <X className="h-3.5 w-3.5" />
               </button>
@@ -390,20 +399,20 @@ export function LearnHome({
               <button
                 type="button"
                 className="h-10 px-3 rounded-xl flex items-center gap-1.5 text-xs text-[#969696] hover:text-[#d4d4d4] hover:bg-[#222222] bg-[#222222] border border-[#383838] active:scale-95 transition-all duration-200 cursor-pointer shrink-0"
-                title="Sort"
+                title={t("sort")}
               >
                 <ArrowUpDown className="h-3.5 w-3.5" />
-                <span>{SORT_LABELS[sortOption]}</span>
+                <span>{sortLabels[sortOption]}</span>
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-36 p-1 shadow-none border-[#383838] bg-[#222222]">
-              {(Object.keys(SORT_LABELS) as SortOption[]).map((key) => (
+              {(Object.keys(sortLabels) as SortOption[]).map((key) => (
                 <DropdownMenuItem
                   key={key}
                   onClick={() => setSortOption(key)}
                   className="cursor-pointer text-xs py-1.5 px-2 text-[#d4d4d4] hover:bg-[#2b2b2b]"
                 >
-                  {SORT_LABELS[key]}
+                  {sortLabels[key]}
                 </DropdownMenuItem>
               ))}
             </DropdownMenuContent>
@@ -423,7 +432,7 @@ export function LearnHome({
               <div className="flex items-center justify-between px-0.5">
                 <div className="flex items-center gap-2">
                   <h2 className="font-sans text-sm font-semibold tracking-tight text-foreground">
-                    Learns
+                    {t("learns")}
                   </h2>
                   <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#222222] border border-[#383838] text-[#969696] font-mono">
                     {learns.length}
@@ -436,7 +445,7 @@ export function LearnHome({
                     onClick={() => setActiveTab("learns")}
                     className="text-xs text-[#969696] hover:text-[#d4d4d4] flex items-center gap-0.5 transition-colors cursor-pointer"
                   >
-                    <span>View all</span>
+                    <span>{t("viewAll")}</span>
                     <ChevronRight className="h-3 w-3" />
                   </button>
                 )}
@@ -459,16 +468,15 @@ export function LearnHome({
                         setDeleteTarget({
                           type: "learn",
                           id: l.id,
-                          title: `Delete notebook "${l.title}"?`,
-                          description:
-                            "This action cannot be undone. Notebook data will be permanently deleted.",
+                          title: t("deleteLearnTitle", { title: l.title }),
+                          description: t("deleteLearnConfirm"),
                         })
                       }
                     />
                   ))
                 ) : (
                   <div className="text-center py-6 px-4 bg-[#1b1b1b] rounded-2xl border border-dashed border-[#2e2e2e]">
-                    <p className="text-xs text-[#969696]">No notebooks found.</p>
+                    <p className="text-xs text-[#969696]">{t("noLearnsFound")}</p>
                   </div>
                 )}
               </div>
@@ -479,7 +487,7 @@ export function LearnHome({
               <div className="flex items-center justify-between px-0.5">
                 <div className="flex items-center gap-2">
                   <h2 className="font-sans text-sm font-semibold tracking-tight text-foreground">
-                    Collections
+                    {t("collections")}
                   </h2>
                   <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#222222] border border-[#383838] text-[#969696] font-mono">
                     {collections.length}
@@ -492,7 +500,7 @@ export function LearnHome({
                     onClick={() => setActiveTab("collections")}
                     className="text-xs text-[#969696] hover:text-[#d4d4d4] flex items-center gap-0.5 transition-colors cursor-pointer"
                   >
-                    <span>View all</span>
+                    <span>{t("viewAll")}</span>
                     <ChevronRight className="h-3 w-3" />
                   </button>
                 )}
@@ -517,16 +525,15 @@ export function LearnHome({
                         setDeleteTarget({
                           type: "collection",
                           id: c.id,
-                          title: `Delete collection "${c.name}"?`,
-                          description:
-                            "Notebooks inside this collection will not be deleted, only unlinked.",
+                          title: t("deleteCollectionTitle", { name: c.name }),
+                          description: t("deleteCollectionConfirm"),
                         })
                       }
                     />
                   ))
                 ) : (
                   <div className="text-center py-6 px-4 bg-[#1b1b1b] rounded-2xl border border-dashed border-[#2e2e2e]">
-                    <p className="text-xs text-[#969696]">No collections found.</p>
+                    <p className="text-xs text-[#969696]">{t("noCollectionsYet")}</p>
                   </div>
                 )}
               </div>
@@ -542,7 +549,7 @@ export function LearnHome({
             <div className="flex items-center justify-between px-0.5">
               <div className="flex items-center gap-2">
                 <h2 className="font-sans text-sm font-semibold tracking-tight text-foreground">
-                  All Notebooks
+                  {t("allLearns")}
                 </h2>
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#222222] border border-[#383838] text-[#969696] font-mono">
                   {learns.length}
@@ -567,8 +574,8 @@ export function LearnHome({
                       setDeleteTarget({
                         type: "learn",
                         id: l.id,
-                        title: `Delete notebook "${l.title}"?`,
-                        description: "This notebook will be permanently deleted.",
+                        title: t("deleteLearnTitle", { title: l.title }),
+                        description: t("deleteLearnConfirm"),
                       })
                     }
                   />
@@ -579,10 +586,10 @@ export function LearnHome({
                     📘
                   </div>
                   <h3 className="text-sm font-medium text-foreground mb-1">
-                    No notebooks found
+                    {t("noLearnsFound")}
                   </h3>
                   <p className="text-xs text-[#969696]">
-                    {searchQuery ? "Try a different search keyword." : "Tap New Learn below to create your first notebook."}
+                    {searchQuery ? t("noLearnsMatchSearch", { query: searchQuery }) : t("noLearnsDescription")}
                   </p>
                 </div>
               )}
@@ -598,7 +605,7 @@ export function LearnHome({
             <div className="flex items-center justify-between px-0.5">
               <div className="flex items-center gap-2">
                 <h2 className="font-sans text-sm font-semibold tracking-tight text-foreground">
-                  Learning Sources
+                  {t("sources")}
                 </h2>
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#222222] border border-[#383838] text-[#969696] font-mono">
                   {sourcesLearns.length}
@@ -623,12 +630,14 @@ export function LearnHome({
                           {learn.title}
                         </h4>
                         <span className="text-xs text-[#969696] mt-0.5 block">
-                          {learn.sourcesCount} {learn.sourcesCount === 1 ? "source attached" : "sources attached"}
+                          {(learn.sourcesCount || 0) === 1
+                            ? t("sourcesCountSingle")
+                            : t("sourcesCount", { count: learn.sourcesCount || 0 })}
                         </span>
                       </div>
                     </div>
                     <div className="flex items-center gap-1.5 text-xs text-[#969696] shrink-0">
-                      <span>View</span>
+                      <span>{t("openLearn")}</span>
                       <ChevronRight className="h-3.5 w-3.5" />
                     </div>
                   </div>
@@ -639,10 +648,10 @@ export function LearnHome({
                     <FileText className="h-5 w-5 stroke-[1.5]" />
                   </div>
                   <h3 className="text-sm font-medium text-foreground mb-1">
-                    No sources attached yet
+                    {t("sourcesEmptyWorkspaceTitle")}
                   </h3>
                   <p className="text-xs text-[#969696] leading-relaxed max-w-xs mx-auto">
-                    Add documents, web links, or research notes inside any notebook to ground your AI tutor.
+                    {t("sourcesEmptyWorkspaceDesc")}
                   </p>
                 </div>
               )}
@@ -675,8 +684,8 @@ export function LearnHome({
                           setDeleteTarget({
                             type: "learn",
                             id: l.id,
-                            title: `Delete notebook "${l.title}"?`,
-                            description: "This notebook will be permanently deleted.",
+                            title: t("deleteLearnTitle", { title: l.title }),
+                            description: t("deleteLearnConfirm"),
                           })
                         }
                       />
@@ -684,7 +693,7 @@ export function LearnHome({
                   ) : (
                     <div className="text-center py-12 px-4 bg-[#1b1b1b] rounded-2xl border border-dashed border-[#2e2e2e]">
                       <p className="text-xs text-[#969696]">
-                        No notebooks in this collection yet.
+                        {t("noLearnsInCollection")}
                       </p>
                     </div>
                   )}
@@ -696,7 +705,7 @@ export function LearnHome({
                 <div className="flex items-center justify-between px-0.5">
                   <div className="flex items-center gap-2">
                     <h2 className="font-sans text-sm font-semibold tracking-tight text-foreground">
-                      Collections
+                      {t("collections")}
                     </h2>
                     <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#222222] border border-[#383838] text-[#969696] font-mono">
                       {collections.length}
@@ -711,7 +720,7 @@ export function LearnHome({
                     className="h-7 px-2.5 rounded-full bg-[#222222] hover:bg-[#2b2b2b] text-foreground text-xs font-medium border border-[#383838] flex items-center gap-1.5 transition-colors cursor-pointer"
                   >
                     <Plus className="h-3 w-3" />
-                    <span>New Collection</span>
+                    <span>{t("newCollection")}</span>
                   </button>
                 </div>
 
@@ -731,16 +740,15 @@ export function LearnHome({
                           setDeleteTarget({
                             type: "collection",
                             id: c.id,
-                            title: `Delete collection "${c.name}"?`,
-                            description:
-                              "Notebooks inside this collection will not be deleted, only unlinked.",
+                            title: t("deleteCollectionTitle", { name: c.name }),
+                            description: t("deleteCollectionConfirm"),
                           })
                         }
                       />
                     ))
                   ) : (
                     <div className="text-center py-12 px-4 bg-[#1b1b1b] rounded-2xl border border-dashed border-[#2e2e2e]">
-                      <p className="text-xs text-[#969696]">No collections found.</p>
+                      <p className="text-xs text-[#969696]">{t("noCollectionsYet")}</p>
                       <button
                         type="button"
                         onClick={() => {
@@ -750,7 +758,7 @@ export function LearnHome({
                         className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#222222] hover:bg-[#2b2b2b] text-foreground text-xs font-medium border border-[#383838] transition-colors cursor-pointer"
                       >
                         <Plus className="h-3.5 w-3.5" />
-                        <span>Create Collection</span>
+                        <span>{t("createCardCollection")}</span>
                       </button>
                     </div>
                   )}
@@ -767,7 +775,7 @@ export function LearnHome({
           <section className="space-y-2.5">
             <div className="flex items-center gap-2 px-0.5">
               <h2 className="font-sans text-sm font-semibold tracking-tight text-foreground">
-                Artifacts
+                {t("artifacts")}
               </h2>
               <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#222222] border border-[#383838] text-[#969696] font-mono">
                 {artifacts.length}
@@ -789,7 +797,7 @@ export function LearnHome({
                         type="button"
                         onClick={() => localDb.deleteArtifact(art.id)}
                         className="h-7 w-7 rounded-lg flex items-center justify-center text-[#969696] hover:text-destructive active:text-destructive cursor-pointer transition-colors"
-                        title="Delete artifact"
+                        title={t("deleteArtifact")}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
@@ -805,7 +813,7 @@ export function LearnHome({
                     </div>
 
                     <div className="text-[10px] text-[#969696] pt-1.5">
-                      {new Intl.DateTimeFormat("en-US", {
+                      {new Intl.DateTimeFormat(language === "id" ? "id-ID" : "en-US", {
                         day: "numeric",
                         month: "short",
                         year: "numeric",
@@ -820,10 +828,10 @@ export function LearnHome({
                   🎨
                 </div>
                 <h3 className="font-sans text-sm text-foreground font-semibold">
-                  No artifacts yet
+                  {t("noArtifactsTitle")}
                 </h3>
                 <p className="text-xs text-[#969696] mt-1 leading-relaxed max-w-xs mx-auto">
-                  Artifacts like presentation slides and interactive diagrams generated during your learning sessions will appear here.
+                  {t("noArtifactsDesc")}
                 </p>
               </div>
             )}
@@ -841,10 +849,10 @@ export function LearnHome({
           type="button"
           onClick={() => handleCreateNewLearn()}
           className="h-12 px-5 rounded-full bg-foreground text-background hover:opacity-95 active:scale-95 transition-all duration-200 flex items-center gap-2 font-medium text-xs border border-background/20 cursor-pointer select-none"
-          aria-label="New Learn"
+          aria-label={t("newLearn")}
         >
           <Plus className="h-4 w-4 stroke-[2.5]" />
-          <span>New Learn</span>
+          <span>{t("newLearn")}</span>
         </button>
       </div>
 

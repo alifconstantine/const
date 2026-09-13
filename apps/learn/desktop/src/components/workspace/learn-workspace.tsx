@@ -11,6 +11,7 @@ import {
   ArrowLeftRight,
   User as UserIcon,
   Settings,
+  Globe,
 } from "lucide-react";
 import {
   Avatar,
@@ -26,6 +27,7 @@ import {
   DropdownMenuSubContent,
   useTheme,
 } from "@const/ui";
+import { useI18n, LANGUAGE_OPTIONS } from "../../lib/i18n";
 import { SourcesPanel } from "./sources-panel";
 import { ChatPanel } from "./chat-panel";
 import { StudioPanel } from "./studio-panel";
@@ -51,6 +53,7 @@ export function LearnWorkspace({
   onSwitchAccount,
 }: LearnWorkspaceProps) {
   const [theme, setTheme] = useTheme();
+  const { t, language, setLanguage } = useI18n();
 
   // Live notebook data from Dexie
   const learn = useLiveQuery(async () => {
@@ -64,7 +67,7 @@ export function LearnWorkspace({
 
   // Editable title state
   const [isEditingTitle, setIsEditingTitle] = useState(false);
-  const [titleValue, setTitleValue] = useState("Notebook tanpa judul");
+  const [titleValue, setTitleValue] = useState(t("untitledNotebook"));
 
   useEffect(() => {
     if (learn?.title) {
@@ -74,7 +77,7 @@ export function LearnWorkspace({
 
   const handleSaveTitle = async () => {
     setIsEditingTitle(false);
-    const trimmed = titleValue.trim() || "Notebook tanpa judul";
+    const trimmed = titleValue.trim() || t("untitledNotebook");
     setTitleValue(trimmed);
     await localDb.updateLearn(learnId, { title: trimmed });
   };
@@ -83,7 +86,7 @@ export function LearnWorkspace({
     if (e.key === "Enter") {
       handleSaveTitle();
     } else if (e.key === "Escape") {
-      setTitleValue(learn?.title || "Notebook tanpa judul");
+      setTitleValue(learn?.title || t("untitledNotebook"));
       setIsEditingTitle(false);
     }
   };
@@ -98,8 +101,8 @@ export function LearnWorkspace({
             type="button"
             onClick={onBack}
             className="h-8 w-8 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
-            title="Kembali ke Beranda"
-            aria-label="Kembali"
+            title={t("backToHome")}
+            aria-label={t("back")}
           >
             <ArrowLeft className="h-4 w-4" />
           </button>
@@ -129,7 +132,7 @@ export function LearnWorkspace({
               type="button"
               onClick={() => setIsEditingTitle(true)}
               className="text-sm font-semibold text-foreground hover:bg-muted/50 px-2.5 py-1 rounded-full transition-colors cursor-pointer text-left font-sans tracking-tight"
-              title="Klik untuk mengubah judul"
+              title={t("clickToRename")}
             >
               {titleValue}
             </button>
@@ -192,7 +195,18 @@ export function LearnWorkspace({
                 </>
               )}
 
-              {/* Tema Aplikasi (Submenu) */}
+              {/* Settings */}
+              <DropdownMenuItem
+                className="cursor-pointer flex items-center gap-2 text-xs py-2 px-2.5 text-muted-foreground hover:text-foreground"
+                onClick={() => {
+                  // Settings placeholder: intentionally does nothing
+                }}
+              >
+                <Settings className="h-4 w-4" />
+                <span>{t("settings")}</span>
+              </DropdownMenuItem>
+
+              {/* Theme (Submenu) */}
               <DropdownMenuSub>
                 <DropdownMenuSubTrigger className="cursor-pointer flex items-center gap-2 text-xs py-2 px-2.5 text-muted-foreground hover:text-foreground">
                   {theme === "dark" ? (
@@ -202,7 +216,7 @@ export function LearnWorkspace({
                   ) : (
                     <Laptop className="h-4 w-4" />
                   )}
-                  <span>Tema aplikasi</span>
+                  <span>{t("theme")}</span>
                 </DropdownMenuSubTrigger>
                 <DropdownMenuSubContent className="min-w-[140px] p-1.5 shadow-md">
                   <DropdownMenuItem
@@ -211,7 +225,7 @@ export function LearnWorkspace({
                   >
                     <div className="flex items-center gap-2">
                       <Laptop className="h-3.5 w-3.5" />
-                      <span>Sistem</span>
+                      <span>{t("themeSystem")}</span>
                     </div>
                     {theme === "system" && <Check className="h-3.5 w-3.5 ml-2" />}
                   </DropdownMenuItem>
@@ -221,7 +235,7 @@ export function LearnWorkspace({
                   >
                     <div className="flex items-center gap-2">
                       <Sun className="h-3.5 w-3.5" />
-                      <span>Terang</span>
+                      <span>{t("themeLight")}</span>
                     </div>
                     {theme === "light" && <Check className="h-3.5 w-3.5 ml-2" />}
                   </DropdownMenuItem>
@@ -231,22 +245,32 @@ export function LearnWorkspace({
                   >
                     <div className="flex items-center gap-2">
                       <Moon className="h-3.5 w-3.5" />
-                      <span>Gelap</span>
+                      <span>{t("themeDark")}</span>
                     </div>
                     {theme === "dark" && <Check className="h-3.5 w-3.5 ml-2" />}
                   </DropdownMenuItem>
                 </DropdownMenuSubContent>
               </DropdownMenuSub>
 
-              <DropdownMenuItem
-                className="cursor-pointer flex items-center gap-2 text-xs py-2 px-2.5 text-muted-foreground hover:text-foreground"
-                onClick={() => {
-                  // Settings placeholder: intentionally does nothing
-                }}
-              >
-                <Settings className="h-4 w-4" />
-                <span>Settings</span>
-              </DropdownMenuItem>
+              {/* Language (Submenu) */}
+              <DropdownMenuSub>
+                <DropdownMenuSubTrigger className="cursor-pointer flex items-center gap-2 text-xs py-2 px-2.5 text-muted-foreground hover:text-foreground">
+                  <Globe className="h-4 w-4" />
+                  <span>{t("language")}</span>
+                </DropdownMenuSubTrigger>
+                <DropdownMenuSubContent className="min-w-[150px] p-1.5 shadow-md">
+                  {LANGUAGE_OPTIONS.map((lang) => (
+                    <DropdownMenuItem
+                      key={lang.code}
+                      className="cursor-pointer flex items-center justify-between text-xs py-1.5 px-2.5 text-muted-foreground hover:text-foreground"
+                      onClick={() => setLanguage(lang.code)}
+                    >
+                      <span>{lang.label}</span>
+                      {language === lang.code && <Check className="h-3.5 w-3.5 ml-2" />}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuSubContent>
+              </DropdownMenuSub>
 
               <DropdownMenuSeparator />
 
@@ -256,7 +280,7 @@ export function LearnWorkspace({
                   onClick={onSwitchAccount}
                 >
                   <ArrowLeftRight className="h-4 w-4" />
-                  <span>Switch account</span>
+                  <span>{t("switchAccount")}</span>
                 </DropdownMenuItem>
               )}
 
@@ -266,7 +290,7 @@ export function LearnWorkspace({
                   onClick={onSignOut}
                 >
                   <LogOut className="h-4 w-4" />
-                  <span>Log out</span>
+                  <span>{t("logout")}</span>
                 </DropdownMenuItem>
               )}
             </DropdownMenuContent>
@@ -321,7 +345,7 @@ export function LearnWorkspace({
             const filePaths = await window.electron?.openFileDialog?.({ multiple: true });
             if (filePaths && filePaths.length > 0) {
               for (const filePath of filePaths) {
-                const fileName = filePath.split(/[\\/]/).pop() || "Berkas Sumber";
+                const fileName = filePath.split(/[\\/]/).pop() || t("sourceFileFallback");
                 await localDb.createSource({
                   learnId,
                   title: fileName,
@@ -337,7 +361,7 @@ export function LearnWorkspace({
               const snippet = text.trim().slice(0, 30);
               await localDb.createSource({
                 learnId,
-                title: `Kutipan: ${snippet}...`,
+                title: t("copiedQuote", { snippet }),
                 type: "text",
                 content: text,
                 size: new Blob([text]).size,
@@ -345,7 +369,7 @@ export function LearnWorkspace({
               });
             }
           } else if (sourceType === "url") {
-            const url = window.prompt("Masukkan URL / tautan web sumber:");
+            const url = window.prompt(t("enterUrlPrompt"));
             if (url && url.trim()) {
               await localDb.createSource({
                 learnId,

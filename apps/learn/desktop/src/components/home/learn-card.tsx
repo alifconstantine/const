@@ -9,6 +9,7 @@ import {
 } from "@const/ui";
 import { MoreVertical, FolderPlus, Edit3, Trash2, ExternalLink } from "lucide-react";
 import { LocalLearn } from "../../lib/db";
+import { useI18n } from "../../lib/i18n";
 
 export type LearnItem = LocalLearn;
 
@@ -24,9 +25,10 @@ interface LearnCardProps {
   onDelete?: (learn: LearnItem) => void;
 }
 
-function formatDate(timestamp: number): string {
+function formatDate(timestamp: number, language: "en" | "id"): string {
+  const locale = language === "id" ? "id-ID" : "en-US";
   try {
-    return new Intl.DateTimeFormat("id-ID", {
+    return new Intl.DateTimeFormat(locale, {
       day: "numeric",
       month: "short",
       year: "numeric",
@@ -48,8 +50,10 @@ export function LearnCard({
   onManageCollections,
   onDelete,
 }: LearnCardProps) {
-  const formattedDate = formatDate(learn.updatedAt);
-  const sourcesText = `${learn.sourcesCount ?? 0} sumber`;
+  const { t, language } = useI18n();
+  const formattedDate = formatDate(learn.updatedAt, language);
+  const count = learn.sourcesCount ?? 0;
+  const sourcesText = count === 1 ? t("sourcesCountSingle") : t("sourcesCount", { count });
 
   const handleCardClick = (e: React.MouseEvent) => {
     if (isSelectionMode) {
@@ -117,21 +121,21 @@ export function LearnCard({
                 onClick={() => onClick?.(learn)}
               >
                 <ExternalLink className="h-3.5 w-3.5" />
-                <span>Buka Learn</span>
+                <span>{t("openLearn")}</span>
               </DropdownMenuItem>
               <DropdownMenuItem
                 className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2 hover:bg-[#f4f4f5] dark:hover:bg-[#2e2e2e]"
                 onClick={() => onManageCollections?.(learn)}
               >
                 <FolderPlus className="h-3.5 w-3.5" />
-                <span>Kelola Koleksi</span>
+                <span>{t("manageCollections")}</span>
               </DropdownMenuItem>
               <DropdownMenuItem
                 className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2 hover:bg-[#f4f4f5] dark:hover:bg-[#2e2e2e]"
                 onClick={() => onEdit?.(learn)}
               >
                 <Edit3 className="h-3.5 w-3.5" />
-                <span>Ubah Nama & Emoji</span>
+                <span>{t("editLearn")}</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator className="my-1 bg-[#dedee2] dark:bg-[#383838]" />
               <DropdownMenuItem
@@ -139,7 +143,7 @@ export function LearnCard({
                 onClick={() => onDelete?.(learn)}
               >
                 <Trash2 className="h-3.5 w-3.5" />
-                <span>Hapus</span>
+                <span>{t("delete")}</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -179,7 +183,7 @@ export function LearnCard({
                 type="button"
                 onClick={(e) => e.stopPropagation()}
                 className="h-7 w-7 rounded-lg flex items-center justify-center hover:bg-[#dedee2] dark:hover:bg-[#383838] text-[#8a8a8a] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white cursor-pointer transition-colors"
-                aria-label="Menu pilihan learn"
+                aria-label={t("moreOptions")}
               >
                 <MoreVertical className="h-4 w-4" />
               </button>
@@ -190,21 +194,21 @@ export function LearnCard({
                 onClick={() => onClick?.(learn)}
               >
                 <ExternalLink className="h-3.5 w-3.5" />
-                <span>Buka Learn</span>
+                <span>{t("openLearn")}</span>
               </DropdownMenuItem>
               <DropdownMenuItem
                 className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2 hover:bg-[#f4f4f5] dark:hover:bg-[#2e2e2e]"
                 onClick={() => onManageCollections?.(learn)}
               >
                 <FolderPlus className="h-3.5 w-3.5" />
-                <span>Kelola Koleksi</span>
+                <span>{t("manageCollections")}</span>
               </DropdownMenuItem>
               <DropdownMenuItem
                 className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2 hover:bg-[#f4f4f5] dark:hover:bg-[#2e2e2e]"
                 onClick={() => onEdit?.(learn)}
               >
                 <Edit3 className="h-3.5 w-3.5" />
-                <span>Ubah Nama & Emoji</span>
+                <span>{t("editLearn")}</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator className="my-1 bg-[#dedee2] dark:bg-[#383838]" />
               <DropdownMenuItem
@@ -212,7 +216,7 @@ export function LearnCard({
                 onClick={() => onDelete?.(learn)}
               >
                 <Trash2 className="h-3.5 w-3.5" />
-                <span>Hapus</span>
+                <span>{t("delete")}</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

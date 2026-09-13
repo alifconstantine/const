@@ -295,7 +295,7 @@ app.on("second-instance", (_event, commandLine) => {
   ipcMain.handle("dialog:open-directory", async () => {
     if (!win) return null;
     const result = await dialog.showOpenDialog(win, {
-      title: "Pilih Folder Proyek Belajar",
+      title: "Select Project Workspace Folder",
       properties: ["openDirectory", "createDirectory"],
     });
     if (result.canceled || !result.filePaths || result.filePaths.length === 0) {
@@ -307,7 +307,7 @@ app.on("second-instance", (_event, commandLine) => {
   ipcMain.handle("dialog:open-file", async (_event, options?: { multiple?: boolean }) => {
     if (!win) return null;
     const result = await dialog.showOpenDialog(win, {
-      title: "Pilih Berkas Sumber",
+      title: "Select Source Files",
       properties: options?.multiple !== false ? ["openFile", "multiSelections"] : ["openFile"],
     });
     if (result.canceled || !result.filePaths || result.filePaths.length === 0) {

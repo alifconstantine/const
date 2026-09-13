@@ -18,6 +18,7 @@ import {
   Clock,
 } from "lucide-react";
 import type { LocalChatSession } from "../../lib/db";
+import { useI18n } from "../../lib/i18n";
 
 interface ChatHistoryPanelProps {
   open: boolean;
@@ -38,6 +39,7 @@ export function ChatHistoryPanel({
   onDeleteSession,
   onNewChat,
 }: ChatHistoryPanelProps) {
+  const { t } = useI18n();
   const [searchQuery, setSearchQuery] = useState("");
 
   const filteredSessions = useMemo(() => {
@@ -61,28 +63,28 @@ export function ChatHistoryPanel({
     const lastWeek = new Date(today);
     lastWeek.setDate(lastWeek.getDate() - 7);
 
-    const groups = {
-      "Hari Ini": [] as LocalChatSession[],
-      Kemarin: [] as LocalChatSession[],
-      "7 Hari Terakhir": [] as LocalChatSession[],
-      "Lebih Lama": [] as LocalChatSession[],
+    const groups: Record<string, LocalChatSession[]> = {
+      [t("today")]: [],
+      [t("yesterday")]: [],
+      [t("last7Days")]: [],
+      [t("older")]: [],
     };
 
     filteredSessions.forEach((session) => {
       const sessionDate = new Date(session.updatedAt);
       if (sessionDate >= today) {
-        groups["Hari Ini"].push(session);
+        groups[t("today")]?.push(session);
       } else if (sessionDate >= yesterday) {
-        groups.Kemarin.push(session);
+        groups[t("yesterday")]?.push(session);
       } else if (sessionDate >= lastWeek) {
-        groups["7 Hari Terakhir"].push(session);
+        groups[t("last7Days")]?.push(session);
       } else {
-        groups["Lebih Lama"].push(session);
+        groups[t("older")]?.push(session);
       }
     });
 
     return groups;
-  }, [filteredSessions]);
+  }, [filteredSessions, t]);
 
   if (!open) return null;
 
@@ -101,10 +103,10 @@ export function ChatHistoryPanel({
             </div>
             <div>
               <SheetTitle className="font-serif text-base font-semibold text-foreground">
-                Riwayat Chat
+                {t("chatHistory")}
               </SheetTitle>
               <p className="text-[11px] text-muted-foreground">
-                Sesi diskusi di notebook ini
+                {t("historySubtitle")}
               </p>
             </div>
           </div>
@@ -118,10 +120,10 @@ export function ChatHistoryPanel({
                 onClose();
               }}
               className="h-8 px-2.5 rounded-xl text-xs gap-1.5 font-medium cursor-pointer border-border/70 hover:bg-muted"
-              title="Mulai percakapan baru"
+              title={t("startConversationNew")}
             >
               <Plus className="h-3.5 w-3.5" />
-              <span>New Chat</span>
+              <span>{t("newChat")}</span>
             </Button>
 
             <SheetClose asChild>
@@ -129,7 +131,7 @@ export function ChatHistoryPanel({
                 variant="ghost"
                 size="icon"
                 className="h-8 w-8 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
-                aria-label="Tutup panel riwayat"
+                aria-label={t("close")}
               >
                 <X className="h-4 w-4" />
               </Button>
@@ -144,7 +146,7 @@ export function ChatHistoryPanel({
             <Input
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Cari topik atau riwayat percakapan..."
+              placeholder={t("searchHistory")}
               className="pl-9 pr-7 h-9 rounded-xl text-xs font-sans border-border/70 bg-secondary/30 text-foreground placeholder:text-muted-foreground/70 focus-visible:ring-1 focus-visible:ring-ring"
               autoFocus
             />
@@ -166,12 +168,12 @@ export function ChatHistoryPanel({
             <div className="py-16 text-center text-xs text-muted-foreground">
               <MessageSquare className="h-8 w-8 mx-auto mb-2 text-muted-foreground/40 stroke-[1.5]" />
               <p className="font-medium text-foreground">
-                {searchQuery ? "Tidak ada sesi yang cocok" : "Belum ada riwayat chat"}
+                {searchQuery ? t("noHistorySearchTitle") : t("noHistoryTitle")}
               </p>
               <p className="text-[11px] text-muted-foreground/80 mt-1 max-w-[200px] mx-auto">
                 {searchQuery
-                  ? `Kata kunci "${searchQuery}" tidak ditemukan.`
-                  : "Mulai pertanyaan baru dengan AI untuk menyimpan sesi belajar Anda."}
+                  ? t("noHistorySearchDesc", { query: searchQuery })
+                  : t("noHistoryDesc")}
               </p>
             </div>
           ) : (
@@ -214,7 +216,7 @@ export function ChatHistoryPanel({
                                 isActive ? "text-background" : "text-foreground"
                               )}
                             >
-                              {session.title || "Percakapan Baru"}
+                              {session.title || t("newSessionTitle")}
                             </p>
                             {session.lastMessageSnippet && (
                               <p
@@ -245,8 +247,8 @@ export function ChatHistoryPanel({
                                 ? "text-background/80 hover:text-rose-300"
                                 : "text-muted-foreground hover:text-destructive"
                             )}
-                            title="Hapus sesi"
-                            aria-label="Hapus sesi"
+                            title={t("deleteSession")}
+                            aria-label={t("deleteSession")}
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
@@ -263,7 +265,7 @@ export function ChatHistoryPanel({
         {/* Footer */}
         <div className="p-3 px-4 bg-muted/30 border-t border-border/40 flex items-center justify-between text-xs text-muted-foreground">
           <span className="font-mono text-[11px] text-muted-foreground/80">
-            {filteredSessions.length} sesi tersimpan
+            {t("sessionsSavedCount", { count: filteredSessions.length })}
           </span>
           <Button
             size="sm"
@@ -271,7 +273,7 @@ export function ChatHistoryPanel({
             onClick={onClose}
             className="h-7 px-3 rounded-lg text-xs font-medium cursor-pointer border-border/70"
           >
-            Selesai
+            {t("done")}
           </Button>
         </div>
       </SheetContent>

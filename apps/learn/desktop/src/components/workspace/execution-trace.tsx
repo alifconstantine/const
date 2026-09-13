@@ -21,6 +21,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { ScrollArea, cn } from "@const/ui";
+import { useI18n } from "../../lib/i18n";
 
 export interface DisplayToolCall {
   id: string;
@@ -288,6 +289,7 @@ function SocraticQuestionTraceItem({
   toolCall: DisplayToolCall;
   onAnswer?: (toolCallId: string, answer: any) => void;
 }) {
+  const { t } = useI18n();
   const [customInput, setCustomInput] = useState("");
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -295,7 +297,7 @@ function SocraticQuestionTraceItem({
   const rawQuestion =
     toolCall.args?.question ||
     toolCall.args?.questions?.[0]?.question ||
-    "Bagaimana kita ingin melanjutkan?";
+    t("howToProceedFallback");
 
   const rawOptions: string[] = Array.isArray(toolCall.args?.options)
     ? toolCall.args.options.map((opt: any) => (typeof opt === "string" ? opt : opt?.label || JSON.stringify(opt)))
@@ -337,19 +339,19 @@ function SocraticQuestionTraceItem({
             <HelpCircle className="h-3.5 w-3.5" />
           </div>
           <span className="font-semibold text-foreground tracking-tight">
-            Pertanyaan Socrates
+            {t("socraticQuestion")}
           </span>
         </div>
 
         {isCompleted ? (
           <span className="inline-flex items-center gap-1 text-[11px] text-emerald-400 font-mono">
             <CheckCircle2 className="h-3.5 w-3.5" />
-            Terjawab
+            {t("answered")}
           </span>
         ) : (
           <span className="inline-flex items-center gap-1 text-[11px] text-sky-400 font-mono animate-pulse">
             <Loader2 className="h-3 w-3 animate-spin" />
-            Menunggu Pilihan
+            {t("waitingForChoiceShort")}
           </span>
         )}
       </div>
@@ -362,7 +364,7 @@ function SocraticQuestionTraceItem({
         <div className="p-2.5 rounded-lg bg-background/60 border border-border/50 text-foreground flex items-center gap-2">
           <Check className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
           <span className="text-xs">
-            Jawaban:{" "}
+            {t("answerLabel")}{" "}
             <strong className="text-emerald-400">
               {typeof toolCall.result === "string"
                 ? toolCall.result
@@ -401,13 +403,13 @@ function SocraticQuestionTraceItem({
               value={customInput}
               onChange={(e) => setCustomInput(e.target.value)}
               disabled={isSubmitting}
-              placeholder="Atau ketik jawaban sendiri..."
+              placeholder={t("customAnswerPlaceholder")}
               className="flex-1 bg-background/80 border border-border/60 rounded-xl px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground/60 outline-none focus:border-sky-500/70 transition-all"
             />
             <button
               type="submit"
               disabled={!customInput.trim() || isSubmitting}
-              className="px-3 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white disabled:opacity-40 transition-all flex items-center justify-center cursor-pointer shadow-xs active:scale-95"
+              className="px-3.5 py-1.5 rounded-xl bg-sky-600 hover:bg-sky-500 text-white disabled:opacity-40 transition-all flex items-center justify-center cursor-pointer shadow-xs active:scale-95"
             >
               <Send className="h-3 w-3" />
             </button>
@@ -422,6 +424,7 @@ function SocraticQuestionTraceItem({
 // 3. Python Runner Item (run_python) with Visual Charts & Media Previews
 // ---------------------------------------------------------------------------
 function PythonRunnerTraceItem({ toolCall }: { toolCall: DisplayToolCall }) {
+  const { t } = useI18n();
   const [isOpen, setIsOpen] = useState(false);
   const [mediaPreviews, setMediaPreviews] = useState<Record<string, string>>({});
 
@@ -477,7 +480,7 @@ function PythonRunnerTraceItem({ toolCall }: { toolCall: DisplayToolCall }) {
           </div>
           <span className="font-mono font-medium text-foreground">Python</span>
           <span className="text-[11px] text-muted-foreground font-mono truncate max-w-[200px] sm:max-w-xs">
-            {code ? code.split("\n")[0]?.slice(0, 35) + "..." : "Perhitungan"}
+            {code ? code.split("\n")[0]?.slice(0, 35) + "..." : t("calculation")}
           </span>
         </div>
 
@@ -485,17 +488,17 @@ function PythonRunnerTraceItem({ toolCall }: { toolCall: DisplayToolCall }) {
           {isRunning ? (
             <span className="inline-flex items-center gap-1 text-[11px] text-amber-500 font-mono">
               <Loader2 className="h-3 w-3 animate-spin" />
-              Menghitung...
+              {t("calculating")}
             </span>
           ) : isError ? (
             <span className="inline-flex items-center gap-1 text-[11px] text-destructive font-mono">
               <AlertCircle className="h-3 w-3" />
-              Gagal
+              {t("failed")}
             </span>
           ) : (
             <span className="inline-flex items-center gap-1 text-[11px] text-emerald-500 font-mono">
               <CheckCircle2 className="h-3 w-3" />
-              Selesai
+              {t("completed")}
             </span>
           )}
 
@@ -504,7 +507,7 @@ function PythonRunnerTraceItem({ toolCall }: { toolCall: DisplayToolCall }) {
             onClick={() => setIsOpen((prev) => !prev)}
             className="h-6 px-2 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground text-[10px] transition-colors cursor-pointer border border-border/40"
           >
-            {isOpen ? "Tutup" : "Detail"}
+            {isOpen ? t("closeDetail") : t("details")}
           </button>
         </div>
       </div>
@@ -524,14 +527,14 @@ function PythonRunnerTraceItem({ toolCall }: { toolCall: DisplayToolCall }) {
                 <div className="flex items-center justify-between text-[11px]">
                   <span className="font-mono text-foreground/90 flex items-center gap-1.5">
                     <Sparkles className="h-3 w-3 text-yellow-500" />
-                    Grafik: <strong>{fileName}</strong>
+                    {t("chart")} <strong>{fileName}</strong>
                   </span>
                   <button
                     type="button"
                     onClick={() => handleOpenPath(artPath)}
                     className="flex items-center gap-1 text-[10px] text-primary hover:underline font-medium cursor-pointer"
                   >
-                    <span>Buka File</span>
+                    <span>{t("openFile")}</span>
                     <ExternalLink className="h-2.5 w-2.5" />
                   </button>
                 </div>
@@ -556,7 +559,7 @@ function PythonRunnerTraceItem({ toolCall }: { toolCall: DisplayToolCall }) {
         <div className="mt-2 pt-2 border-t border-border/40 space-y-2 font-mono text-[11px]">
           {code && (
             <div>
-              <div className="text-muted-foreground text-[10px] mb-1">Kode Python:</div>
+              <div className="text-muted-foreground text-[10px] mb-1">{t("pythonCodeExecuted")}</div>
               <pre className="p-2.5 rounded-lg bg-background/80 border border-border/40 overflow-x-auto text-yellow-400/90 whitespace-pre max-h-44 overflow-y-auto">
                 {code}
               </pre>
@@ -565,7 +568,7 @@ function PythonRunnerTraceItem({ toolCall }: { toolCall: DisplayToolCall }) {
 
           {stdout && (
             <div>
-              <div className="text-muted-foreground text-[10px] mb-1">Output (stdout):</div>
+              <div className="text-muted-foreground text-[10px] mb-1">{t("stdoutOutput")}</div>
               <pre className="p-2.5 rounded-lg bg-background/80 border border-border/40 overflow-x-auto text-emerald-400 whitespace-pre-wrap max-h-44 overflow-y-auto">
                 {stdout}
               </pre>
@@ -590,6 +593,7 @@ function PythonRunnerTraceItem({ toolCall }: { toolCall: DisplayToolCall }) {
 // 4. Todo Write Item (todo_write)
 // ---------------------------------------------------------------------------
 function TodoWriteTraceItem({ toolCall }: { toolCall: DisplayToolCall }) {
+  const { t } = useI18n();
   const [isOpen, setIsOpen] = useState(false);
 
   const rawTasks = toolCall.args?.todos || toolCall.args?.tasks || [];
@@ -605,9 +609,9 @@ function TodoWriteTraceItem({ toolCall }: { toolCall: DisplayToolCall }) {
           <div className="w-5 h-5 rounded-md bg-cyan-500/20 text-cyan-400 flex items-center justify-center">
             <ListTodo className="h-3.5 w-3.5" />
           </div>
-          <span className="font-semibold text-foreground">Roadmap Belajar</span>
+          <span className="font-semibold text-foreground">{t("studyRoadmap")}</span>
           <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-400 font-mono">
-            {completedCount}/{tasks.length} Selesai
+            {completedCount}/{tasks.length} {t("completed")}
           </span>
         </div>
 
@@ -616,14 +620,14 @@ function TodoWriteTraceItem({ toolCall }: { toolCall: DisplayToolCall }) {
           onClick={() => setIsOpen((prev) => !prev)}
           className="h-6 px-2.5 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground text-[10px] transition-colors cursor-pointer border border-border/40"
         >
-          {isOpen ? "Tutup" : "Lihat"}
+          {isOpen ? t("closeDetail") : t("view")}
         </button>
       </div>
 
       <SmoothCollapse isOpen={isOpen}>
         <div className="space-y-1.5 pt-2 border-t border-border/40">
           {tasks.map((task, idx) => {
-            const text = task.content || task.text || `Tugas ${idx + 1}`;
+            const text = task.content || task.text || `${t("taskItem")} ${idx + 1}`;
             return (
               <div
                 key={idx}
@@ -657,6 +661,7 @@ function TodoWriteTraceItem({ toolCall }: { toolCall: DisplayToolCall }) {
 // 5. File Mutation Item (write, edit)
 // ---------------------------------------------------------------------------
 function FileMutationTraceItem({ toolCall }: { toolCall: DisplayToolCall }) {
+  const { t } = useI18n();
   const [isOpen, setIsOpen] = useState(false);
   const path = toolCall.args?.path || toolCall.args?.filePath || "file";
   const fileName = path.split(/[\\/]/).pop() || path;
@@ -671,7 +676,7 @@ function FileMutationTraceItem({ toolCall }: { toolCall: DisplayToolCall }) {
           ) : (
             <FilePlus className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
           )}
-          <span className="font-mono text-foreground/80">{isEdit ? "Edit" : "Buat"}:</span>
+          <span className="font-mono text-foreground/80">{isEdit ? t("fileActionEdit") : t("fileActionCreate")}:</span>
           <span className="font-mono text-foreground font-medium truncate max-w-xs sm:max-w-md">
             {fileName}
           </span>
@@ -682,7 +687,7 @@ function FileMutationTraceItem({ toolCall }: { toolCall: DisplayToolCall }) {
           onClick={() => setIsOpen((prev) => !prev)}
           className="text-[10px] text-muted-foreground hover:text-foreground cursor-pointer px-2 py-0.5 rounded hover:bg-muted"
         >
-          {isOpen ? "Tutup" : "Lihat"}
+          {isOpen ? t("closeDetail") : t("view")}
         </button>
       </div>
 
@@ -706,6 +711,7 @@ function FileMutationTraceItem({ toolCall }: { toolCall: DisplayToolCall }) {
 // 6. Terminal Shell Item (run_command, bash)
 // ---------------------------------------------------------------------------
 function TerminalTraceItem({ toolCall }: { toolCall: DisplayToolCall }) {
+  const { t } = useI18n();
   const [isOpen, setIsOpen] = useState(false);
   const cmd = toolCall.args?.command || toolCall.args?.cmd || "";
 
@@ -714,7 +720,7 @@ function TerminalTraceItem({ toolCall }: { toolCall: DisplayToolCall }) {
       <div className="flex items-center justify-between py-1 text-muted-foreground select-none">
         <div className="flex items-center gap-2 truncate">
           <Terminal className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-          <span className="font-mono text-foreground/80">Perintah:</span>
+          <span className="font-mono text-foreground/80">{t("commandLabel")}:</span>
           <span className="font-mono text-foreground truncate max-w-xs sm:max-w-md">
             {cmd}
           </span>
@@ -725,7 +731,7 @@ function TerminalTraceItem({ toolCall }: { toolCall: DisplayToolCall }) {
           onClick={() => setIsOpen((prev) => !prev)}
           className="text-[10px] text-muted-foreground hover:text-foreground cursor-pointer px-2 py-0.5 rounded hover:bg-muted"
         >
-          {isOpen ? "Tutup" : "Output"}
+          {isOpen ? t("closeDetail") : t("output")}
         </button>
       </div>
 
@@ -738,7 +744,7 @@ function TerminalTraceItem({ toolCall }: { toolCall: DisplayToolCall }) {
                 : JSON.stringify(toolCall.result, null, 2)}
             </pre>
           ) : (
-            <span className="text-muted-foreground">Tidak ada keluaran</span>
+            <span className="text-muted-foreground">{t("noOutput")}</span>
           )}
         </div>
       </SmoothCollapse>
@@ -775,6 +781,7 @@ function ExplorationTraceItem({ toolCall }: { toolCall: DisplayToolCall }) {
 // 8. Generic Tool Fallback
 // ---------------------------------------------------------------------------
 function GenericTraceItem({ toolCall }: { toolCall: DisplayToolCall }) {
+  const { t } = useI18n();
   const [isOpen, setIsOpen] = useState(false);
 
   return (
@@ -790,7 +797,7 @@ function GenericTraceItem({ toolCall }: { toolCall: DisplayToolCall }) {
           onClick={() => setIsOpen((prev) => !prev)}
           className="text-[10px] text-muted-foreground hover:text-foreground cursor-pointer px-2 py-0.5 rounded hover:bg-muted"
         >
-          {isOpen ? "Tutup" : "Detail"}
+          {isOpen ? t("closeDetail") : t("details")}
         </button>
       </div>
 

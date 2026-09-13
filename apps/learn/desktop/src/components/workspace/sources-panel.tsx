@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db, localDb, type LocalSource } from "@/lib/db";
+import { useI18n } from "../../lib/i18n";
 
 interface SourcesPanelProps {
   learnId?: string;
@@ -53,9 +54,10 @@ export function SourcesPanel({
   onToggleCollapse,
   isCollapsed = false,
 }: SourcesPanelProps) {
+  const { t } = useI18n();
   const [searchQuery, setSearchQuery] = useState("");
   const [webScope, setWebScope] = useState("Web");
-  const [researchSpeed, setResearchSpeed] = useState("Riset Cepat");
+  const [researchSpeed, setResearchSpeed] = useState("Fast");
 
   // Query sources live from Dexie database
   const sources =
@@ -83,8 +85,8 @@ export function SourcesPanel({
           type="button"
           onClick={onToggleCollapse}
           className="h-8 w-8 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
-          title="Buka Panel Sumber"
-          aria-label="Buka Sumber"
+          title={t("openSourcesPanel")}
+          aria-label={t("sourcesPanelTitle")}
         >
           <PanelLeftOpen className="h-4 w-4" />
         </button>
@@ -93,8 +95,8 @@ export function SourcesPanel({
           type="button"
           onClick={onAddSource}
           className="h-8 w-8 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer mt-1"
-          title="Tambahkan sumber"
-          aria-label="Tambahkan sumber"
+          title={t("addSource")}
+          aria-label={t("addSource")}
         >
           <Plus className="h-4 w-4" />
         </button>
@@ -107,7 +109,7 @@ export function SourcesPanel({
       {/* Header */}
       <div className="flex items-center justify-between mb-3 px-1">
         <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-foreground">Sumber</span>
+          <span className="text-sm font-medium text-foreground">{t("sourcesPanelTitle")}</span>
           {displayCount > 0 && (
             <span className="text-[10px] px-2 py-0.5 rounded-full bg-muted text-muted-foreground font-mono">
               {displayCount}
@@ -120,21 +122,21 @@ export function SourcesPanel({
             type="button"
             onClick={onToggleCollapse}
             className="h-7 w-7 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
-            title="Sembunyikan Panel"
+            title={t("hidePanel")}
           >
             <PanelLeftClose className="h-4 w-4" />
           </button>
         )}
       </div>
 
-      {/* "+ Tambahkan sumber" Button */}
+      {/* "+ Add source" Button */}
       <button
         type="button"
         onClick={onAddSource}
         className="w-full py-2 px-3 rounded-full border border-border hover:border-border/80 bg-muted/50 hover:bg-muted text-xs font-medium text-foreground flex items-center justify-center gap-1.5 transition-all cursor-pointer mb-3 shrink-0"
       >
         <Plus className="h-3.5 w-3.5" />
-        <span>Tambahkan sumber</span>
+        <span>{t("addSource")}</span>
       </button>
 
       {/* Search & Web Research Box */}
@@ -143,18 +145,18 @@ export function SourcesPanel({
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Telusuri sumber baru di web"
+          placeholder={t("searchWebSources")}
           className="w-full bg-transparent text-xs text-foreground placeholder:text-muted-foreground/60 outline-none px-1 py-1"
         />
         <div className="flex items-center justify-between mt-2 pt-1">
           <div className="flex items-center gap-1.5">
             <button
               type="button"
-              onClick={() => setWebScope(webScope === "Web" ? "Jurnal" : "Web")}
+              onClick={() => setWebScope(webScope === "Web" ? "Journal" : "Web")}
               className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-background/60 hover:bg-background text-[11px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer border border-border/40"
             >
               <Globe className="h-2.5 w-2.5" />
-              <span>{webScope}</span>
+              <span>{webScope === "Journal" ? t("webScopeJournal") : t("webScopeWeb")}</span>
               <ChevronDown className="h-2.5 w-2.5 opacity-60" />
             </button>
 
@@ -162,13 +164,13 @@ export function SourcesPanel({
               type="button"
               onClick={() =>
                 setResearchSpeed(
-                  researchSpeed === "Riset Cepat" ? "Riset Mendalam" : "Riset Cepat"
+                  researchSpeed === "Fast" ? "Deep" : "Fast"
                 )
               }
               className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-background/60 hover:bg-background text-[11px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer border border-border/40"
             >
               <Search className="h-2.5 w-2.5" />
-              <span>{researchSpeed}</span>
+              <span>{researchSpeed === "Deep" ? t("speedDeep") : t("speedFast")}</span>
               <ChevronDown className="h-2.5 w-2.5 opacity-60" />
             </button>
           </div>
@@ -176,7 +178,7 @@ export function SourcesPanel({
           <button
             type="button"
             className="h-6 w-6 rounded-full bg-background hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer border border-border/40"
-            aria-label="Cari"
+            aria-label={t("search")}
           >
             <Search className="h-3 w-3" />
           </button>
@@ -189,7 +191,7 @@ export function SourcesPanel({
           {/* Subheader: Selection info & Bulk toggle */}
           <div className="flex items-center justify-between px-1 pb-2 mb-1.5 border-b border-border/40 text-[11px] text-muted-foreground shrink-0">
             <span>
-              Dibawa: <strong className="text-foreground font-mono">{carriedCount}</strong>/{sources.length}
+              {t("carriedSourcesHeader", { carried: carriedCount, total: sources.length })}
             </span>
             {learnId && (
               <button
@@ -200,7 +202,7 @@ export function SourcesPanel({
                 }}
                 className="text-[10px] text-primary hover:underline cursor-pointer font-medium"
               >
-                {carriedCount === sources.length ? "Batal Semua" : "Pilih Semua"}
+                {carriedCount === sources.length ? t("deselectAll") : t("selectAll")}
               </button>
             )}
           </div>
@@ -251,8 +253,8 @@ export function SourcesPanel({
                       localDb.deleteSource(source.id);
                     }}
                     className="absolute right-2 opacity-0 group-hover:opacity-100 h-6 w-6 rounded-lg hover:bg-destructive/20 text-muted-foreground hover:text-destructive flex items-center justify-center transition-all cursor-pointer"
-                    title="Hapus Sumber"
-                    aria-label="Hapus Sumber"
+                    title={t("removeSource")}
+                    aria-label={t("removeSource")}
                   >
                     <Trash2 className="h-3 w-3" />
                   </button>
@@ -268,19 +270,19 @@ export function SourcesPanel({
             <FileText className="h-5 w-5 stroke-[1.5]" />
           </div>
           <h3 className="text-xs font-medium text-foreground mb-1">
-            Sumber yang telah disimpan akan muncul di sini
+            {t("emptySourcesTitle")}
           </h3>
           <p className="text-[11px] text-muted-foreground leading-relaxed max-w-[240px] mb-3">
-            Tambahkan file, situs, atau lainnya. Kemudian, ajukan pertanyaan atau buat sesuatu berdasarkan sumber ini.
+            {t("emptySourcesDescription")}
           </p>
           <p className="text-[11px] text-muted-foreground">
-            Lepaskan file di sini atau{" "}
+            {t("dropFilesHere")}{" "}
             <button
               type="button"
               onClick={onAddSource}
               className="text-foreground underline underline-offset-2 hover:text-primary transition-colors cursor-pointer"
             >
-              tambahkan sumber
+              {t("addSourceAction")}
             </button>
           </p>
         </div>

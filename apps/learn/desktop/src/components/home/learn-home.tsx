@@ -30,6 +30,7 @@ import { CreateLearnDialog } from "./dialogs/create-learn-dialog";
 import { CreateCollectionDialog } from "./dialogs/create-collection-dialog";
 import { ManageCollectionDialog } from "./dialogs/manage-collection-dialog";
 import { DeleteConfirmDialog } from "./dialogs/delete-confirm-dialog";
+import { useI18n } from "../../lib/i18n";
 import type { UserProfile } from "../navbar";
 
 interface LearnHomeProps {
@@ -45,6 +46,8 @@ export function LearnHome({
   onSignOut,
   onSwitchAccount,
 }: LearnHomeProps) {
+  const { t, language } = useI18n();
+
   // Navigation & Shell State
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [activeTab, setActiveTab] = useState<HomeNavTab>("learns");
@@ -156,7 +159,7 @@ export function LearnHome({
         projectPath: data.projectPath,
       });
       // Create initial chat session
-      const initialSessionId = await localDb.createSession(newId, "Sesi Awal");
+      const initialSessionId = await localDb.createSession(newId, t("initialSessionTitle"));
       try {
         localStorage.setItem(`const_learn_active_session_${newId}`, initialSessionId);
       } catch {}
@@ -218,8 +221,8 @@ export function LearnHome({
         type="button"
         onClick={() => setIsSidebarOpen(true)}
         className="p-1.5 -ml-1 rounded-xl bg-[#dedee2]/60 hover:bg-[#dedee2] dark:bg-[#2b2b2b] dark:hover:bg-[#383838] text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white transition-all cursor-pointer flex items-center justify-center shrink-0 shadow-none"
-        title="Buka sidebar (Ctrl+B)"
-        aria-label="Buka sidebar"
+        title={t("openSidebarKeyboard")}
+        aria-label={t("openSidebar")}
       >
         <PanelLeftOpen className="w-4 h-4" />
       </button>
@@ -285,7 +288,7 @@ export function LearnHome({
                   <div className="flex items-center gap-2.5">
                     {renderSidebarToggle()}
                     <h1 className="font-serif text-2xl sm:text-3xl font-normal tracking-tight text-[#262626] dark:text-white">
-                      Learns
+                      {t("learns")}
                     </h1>
                     <span className="text-xs px-2.5 py-0.5 rounded-full bg-[#dedee2] dark:bg-[#2b2b2b] text-[#737373] dark:text-[#969696] font-mono">
                       {filteredLearns.length}
@@ -304,8 +307,8 @@ export function LearnHome({
                             ? "bg-white dark:bg-[#383838] text-[#111111] dark:text-white shadow-none"
                             : "text-[#737373] dark:text-[#969696] hover:text-black dark:hover:text-white"
                         }`}
-                        title="Tampilan Grid"
-                        aria-label="Tampilan Grid"
+                        title="Grid"
+                        aria-label="Grid"
                       >
                         <LayoutGrid className="w-4 h-4" />
                       </button>
@@ -317,8 +320,8 @@ export function LearnHome({
                             ? "bg-white dark:bg-[#383838] text-[#111111] dark:text-white shadow-none"
                             : "text-[#737373] dark:text-[#969696] hover:text-black dark:hover:text-white"
                         }`}
-                        title="Tampilan Baris"
-                        aria-label="Tampilan Baris"
+                        title="List"
+                        aria-label="List"
                       >
                         <ListIcon className="w-4 h-4" />
                       </button>
@@ -331,7 +334,7 @@ export function LearnHome({
                         type="text"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder="Search learns..."
+                        placeholder={t("searchLearns")}
                         className="h-8 w-44 sm:w-56 pl-8 pr-7 text-xs rounded-xl bg-white dark:bg-[#222222] border-[#dedee2] dark:border-[#383838] text-[#262626] dark:text-[#d4d4d4] placeholder-[#8a8a8a] dark:placeholder-[#777777] focus-visible:ring-1 focus-visible:ring-[#888888] shadow-none"
                       />
                       {searchQuery && (
@@ -352,7 +355,7 @@ export function LearnHome({
                       className="h-8 px-3.5 rounded-xl text-xs font-medium gap-1.5 bg-[#262626] dark:bg-white text-white dark:text-black hover:bg-black dark:hover:bg-zinc-200 transition-all cursor-pointer shadow-none"
                     >
                       <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-                      <span>New Learns</span>
+                      <span>{t("newLearn")}</span>
                     </Button>
                   </div>
                 </div>
@@ -363,7 +366,7 @@ export function LearnHome({
                     <div className="flex items-center gap-1.5 text-[#8a8a8a] dark:text-[#777777]">
                       <Clock className="w-3.5 h-3.5" />
                       <span className="text-[11px] font-medium uppercase tracking-wider">
-                        Recently Viewed
+                        {t("recentlyViewed")}
                       </span>
                     </div>
 
@@ -379,15 +382,15 @@ export function LearnHome({
                   </section>
                 )}
 
-                {/* Section 2: All Learns ("di bawahnya baru semua learn nya itu") */}
+                {/* Section 2: All Learns */}
                 <section className="space-y-3.5">
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] font-medium uppercase tracking-wider text-[#8a8a8a] dark:text-[#777777]">
-                      All Learns
+                      {t("allLearns")}
                     </span>
                     {searchQuery && (
                       <span className="text-xs text-[#8a8a8a] dark:text-[#777777]">
-                        Hasil pencarian untuk &quot;{searchQuery}&quot;
+                        {t("searchResultsFor", { query: searchQuery })}
                       </span>
                     )}
                   </div>
@@ -421,9 +424,8 @@ export function LearnHome({
                           setDeleteTarget({
                             type: "learn",
                             id: l.id,
-                            title: `Hapus Learn "${l.title}"?`,
-                            description:
-                              "Tindakan ini tidak dapat dibatalkan. Seluruh catatan riset dan percakapan akan dihapus.",
+                            title: t("deleteLearnTitle", { title: l.title }),
+                            description: t("deleteLearnConfirm"),
                           })
                         }
                       />
@@ -433,7 +435,7 @@ export function LearnHome({
                   {filteredLearns.length === 0 && searchQuery && (
                     <div className="text-center py-14 px-4 rounded-2xl border border-dashed border-[#dedee2] dark:border-[#383838] bg-white/40 dark:bg-[#1e1e1e]/40">
                       <p className="text-xs text-[#8a8a8a] dark:text-[#888888]">
-                        Tidak ada learn yang cocok dengan &quot;{searchQuery}&quot;.
+                        {t("noLearnsMatchSearch", { query: searchQuery })}
                       </p>
                     </div>
                   )}
@@ -467,7 +469,7 @@ export function LearnHome({
                           type="button"
                           onClick={() => setActiveCollectionId(null)}
                           className="h-8 w-8 rounded-full border border-[#dedee2] dark:border-[#383838] flex items-center justify-center text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white hover:bg-[#eaeaea] dark:hover:bg-[#282828] cursor-pointer transition-colors"
-                          title="Kembali ke semua koleksi"
+                          title={t("backToAllCollections")}
                         >
                           <ArrowLeft className="h-4 w-4" />
                         </button>
@@ -496,7 +498,7 @@ export function LearnHome({
                           }}
                           className="rounded-xl h-8 text-xs border-[#dedee2] dark:border-[#383838] cursor-pointer"
                         >
-                          Ubah Koleksi
+                          {t("editCollection")}
                         </Button>
                         <Button
                           variant="destructive"
@@ -505,14 +507,13 @@ export function LearnHome({
                             setDeleteTarget({
                               type: "collection",
                               id: activeCollection.id,
-                              title: `Hapus Koleksi "${activeCollection.name}"?`,
-                              description:
-                                "Materi learn di dalam koleksi ini tidak akan dihapus, hanya tautan kategorinya yang dilepaskan.",
+                              title: t("deleteCollectionTitle", { name: activeCollection.name }),
+                              description: t("deleteCollectionConfirm"),
                             })
                           }
                           className="rounded-xl h-8 text-xs cursor-pointer"
                         >
-                          Hapus
+                          {t("delete")}
                         </Button>
                       </div>
                     </div>
@@ -545,9 +546,8 @@ export function LearnHome({
                             setDeleteTarget({
                               type: "learn",
                               id: l.id,
-                              title: `Hapus Learn "${l.title}"?`,
-                              description:
-                                "Tindakan ini tidak dapat dibatalkan. Seluruh data riset dan artefak yang tersimpan di dalam learn ini akan dihapus permanen.",
+                              title: t("deleteLearnTitle", { title: l.title }),
+                              description: t("deleteLearnConfirm"),
                             })
                           }
                         />
@@ -557,7 +557,7 @@ export function LearnHome({
                     {collectionLearns.length === 0 && (
                       <div className="text-center py-14 px-4 bg-white/40 dark:bg-[#1e1e1e]/40 rounded-2xl border border-dashed border-[#dedee2] dark:border-[#383838]">
                         <p className="text-xs text-[#8a8a8a] dark:text-[#888888]">
-                          Belum ada learn dalam koleksi ini.
+                          {t("noLearnsInCollection")}
                         </p>
                       </div>
                     )}
@@ -569,10 +569,10 @@ export function LearnHome({
                       <div className="flex items-center gap-2.5">
                         {renderSidebarToggle()}
                         <h2 className="font-serif text-2xl font-normal text-[#262626] dark:text-white">
-                          Collections
+                          {t("collections")}
                         </h2>
                         <span className="text-xs px-2.5 py-0.5 rounded-full bg-[#dedee2] dark:bg-[#2b2b2b] text-[#737373] dark:text-[#969696] font-mono">
-                          {collections.length} koleksi
+                          {t("collectionsCountText", { count: collections.length })}
                         </span>
                       </div>
                     </div>
@@ -606,9 +606,8 @@ export function LearnHome({
                             setDeleteTarget({
                               type: "collection",
                               id: c.id,
-                              title: `Hapus Koleksi "${c.name}"?`,
-                              description:
-                                "Materi learn di dalam koleksi ini tidak akan dihapus, hanya tautan kategorinya yang dilepaskan.",
+                              title: t("deleteCollectionTitle", { name: c.name }),
+                              description: t("deleteCollectionConfirm"),
                             })
                           }
                         />
@@ -628,7 +627,7 @@ export function LearnHome({
                   <div className="flex items-center gap-2.5">
                     {renderSidebarToggle()}
                     <h2 className="font-serif text-2xl font-normal text-[#262626] dark:text-white">
-                      Artifact
+                      {t("artifacts")}
                     </h2>
                     <span className="text-xs px-2.5 py-0.5 rounded-full bg-[#dedee2] dark:bg-[#2b2b2b] text-[#737373] dark:text-[#969696] font-mono">
                       {artifacts.length}
@@ -651,7 +650,7 @@ export function LearnHome({
                             type="button"
                             onClick={() => localDb.deleteArtifact(art.id)}
                             className="h-7 w-7 rounded-lg flex items-center justify-center text-[#8a8a8a] hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
-                            title="Hapus artifact"
+                            title={t("delete")}
                           >
                             <Trash2 className="h-3.5 w-3.5" />
                           </button>
@@ -667,7 +666,7 @@ export function LearnHome({
                         </div>
 
                         <div className="text-[11px] text-[#8a8a8a] dark:text-[#777777] pt-1">
-                          {new Intl.DateTimeFormat("id-ID", {
+                          {new Intl.DateTimeFormat(language === "id" ? "id-ID" : "en-US", {
                             day: "numeric",
                             month: "short",
                             year: "numeric",
@@ -682,10 +681,10 @@ export function LearnHome({
                       🎨
                     </div>
                     <h3 className="font-serif text-lg text-[#262626] dark:text-white font-medium">
-                      Belum ada artifact
+                      {t("noArtifactsTitle")}
                     </h3>
                     <p className="text-xs text-[#8a8a8a] dark:text-[#888888] mt-1 max-w-sm mx-auto leading-relaxed">
-                      Slide presentasi, visualisasi diagram, dan modul interaktif yang dihasilkan saat Anda belajar dengan agen akan otomatis tersimpan di sini.
+                      {t("noArtifactsDesc")}
                     </p>
                   </div>
                 )}

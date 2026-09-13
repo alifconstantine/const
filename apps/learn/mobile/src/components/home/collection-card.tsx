@@ -8,6 +8,7 @@ import {
 } from "@const/ui";
 import { MoreVertical, Edit3, Trash2, FolderOpen } from "lucide-react";
 import { LocalCollection } from "../../lib/db";
+import { useI18n } from "../../lib/i18n";
 
 export interface CollectionItem extends LocalCollection {
   itemCount: number;
@@ -28,8 +29,10 @@ export function CollectionCard({
   onEdit,
   onDelete,
 }: CollectionCardProps) {
+  const { t } = useI18n();
   const count = collection.itemCount;
-  const itemCountText = `${count} ${count === 1 ? "notebook" : "notebooks"}`;
+  const itemCountText =
+    count === 1 ? t("learnCountTextSingle") : t("learnCountText", { count });
 
   if (viewMode === "list") {
     return (
@@ -57,7 +60,7 @@ export function CollectionCard({
               type="button"
               onClick={(e) => e.stopPropagation()}
               className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground active:text-foreground cursor-pointer shrink-0 transition-colors"
-              aria-label="Collection actions"
+              aria-label={t("moreOptions")}
             >
               <MoreVertical className="h-4 w-4" />
             </button>
@@ -68,14 +71,14 @@ export function CollectionCard({
               onClick={() => onClick?.(collection)}
             >
               <FolderOpen className="h-3.5 w-3.5" />
-              <span>Open collection</span>
+              <span>{t("openLearn")}</span>
             </DropdownMenuItem>
             <DropdownMenuItem
               className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2"
               onClick={() => onEdit?.(collection)}
             >
               <Edit3 className="h-3.5 w-3.5" />
-              <span>Edit collection</span>
+              <span>{t("editCollection")}</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
@@ -83,7 +86,7 @@ export function CollectionCard({
               onClick={() => onDelete?.(collection)}
             >
               <Trash2 className="h-3.5 w-3.5" />
-              <span>Delete</span>
+              <span>{t("delete")}</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -109,7 +112,7 @@ export function CollectionCard({
               type="button"
               onClick={(e) => e.stopPropagation()}
               className="h-7 w-7 rounded-lg flex items-center justify-center text-muted-foreground active:text-foreground cursor-pointer -mr-1"
-              aria-label="Menu koleksi"
+              aria-label={t("moreOptions")}
             >
               <MoreVertical className="h-4 w-4" />
             </button>
@@ -120,14 +123,14 @@ export function CollectionCard({
               onClick={() => onClick?.(collection)}
             >
               <FolderOpen className="h-3.5 w-3.5" />
-              <span>Open collection</span>
+              <span>{t("openLearn")}</span>
             </DropdownMenuItem>
             <DropdownMenuItem
               className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2"
               onClick={() => onEdit?.(collection)}
             >
               <Edit3 className="h-3.5 w-3.5" />
-              <span>Edit collection</span>
+              <span>{t("editCollection")}</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
@@ -135,7 +138,7 @@ export function CollectionCard({
               onClick={() => onDelete?.(collection)}
             >
               <Trash2 className="h-3.5 w-3.5" />
-              <span>Delete</span>
+              <span>{t("delete")}</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

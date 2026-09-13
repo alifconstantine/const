@@ -9,6 +9,7 @@ import {
   Input,
 } from "@const/ui";
 import { BookOpen } from "lucide-react";
+import { useI18n } from "../../../lib/i18n";
 const EMOJI_OPTIONS = [
   "🚀", "🧠", "💡", "🎨", "🏆", "📚", "💻", "🔬",
   "📐", "⚡", "🌐", "📝", "🧬", "🪐", "🎯", "🤖"
@@ -41,6 +42,7 @@ export function CreateLearnDialog({
   initialData,
   onSubmit,
 }: CreateLearnDialogProps) {
+  const { t } = useI18n();
   const [title, setTitle] = useState(initialData?.title ?? "");
   const [description, setDescription] = useState(initialData?.description ?? "");
   const [selectedEmoji, setSelectedEmoji] = useState(initialData?.emoji ?? "🚀");
@@ -88,14 +90,14 @@ export function CreateLearnDialog({
           <DialogHeader>
             <DialogTitle className="font-sans text-lg font-semibold tracking-tight text-foreground flex items-center gap-2">
               <BookOpen className="h-5 w-5 text-primary" />
-              {isEdit ? "Edit Notebook" : "New Notebook"}
+              {isEdit ? t("editLearnDialogTitle") : t("createLearnDialogTitle")}
             </DialogTitle>
           </DialogHeader>
 
           {/* Emoji Picker */}
           <div>
             <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
-              Choose Icon / Emoji
+              {t("pickIconEmoji")}
             </label>
             <div className="grid grid-cols-8 gap-1.5 p-2 rounded-xl bg-secondary/50 border border-border/60">
               {EMOJI_OPTIONS.map((emoji) => (
@@ -118,12 +120,12 @@ export function CreateLearnDialog({
           {/* Title input */}
           <div className="space-y-1">
             <label className="text-xs font-medium text-muted-foreground">
-              Notebook Title
+              {t("learnTitleLabel")}
             </label>
             <Input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="e.g. Machine Learning Systems"
+              placeholder={t("learnTitlePlaceholder")}
               className="h-10 rounded-xl bg-secondary/40 border-border/70 text-sm focus-visible:ring-1 focus-visible:ring-ring"
               autoFocus
               required
@@ -133,12 +135,12 @@ export function CreateLearnDialog({
           {/* Description input */}
           <div className="space-y-1">
             <label className="text-xs font-medium text-muted-foreground">
-              Description (Optional)
+              {t("collectionDescOptional")}
             </label>
             <Input
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Brief summary or topic notes"
+              placeholder={t("collectionDescPlaceholder")}
               className="h-10 rounded-xl bg-secondary/40 border-border/70 text-sm focus-visible:ring-1 focus-visible:ring-ring"
             />
           </div>
@@ -147,7 +149,7 @@ export function CreateLearnDialog({
           {!isEdit && collections.length > 0 && (
             <div className="space-y-1">
               <label className="text-xs font-medium text-muted-foreground">
-                Collection (Optional)
+                {t("collectionCategoryOptional")}
               </label>
               <select
                 value={selectedCollectionId ?? ""}
@@ -156,7 +158,7 @@ export function CreateLearnDialog({
                 }
                 className="w-full h-10 px-3 rounded-xl bg-secondary/40 border border-border/70 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
               >
-                <option value="">No Collection</option>
+                <option value="">{t("noCollection")}</option>
                 {collections.map((col) => (
                   <option key={col.id} value={col.id}>
                     {col.name}
@@ -173,14 +175,14 @@ export function CreateLearnDialog({
               onClick={() => onOpenChange(false)}
               className="rounded-full cursor-pointer h-9 px-4 text-xs flex-1"
             >
-              Cancel
+              {t("cancel")}
             </Button>
             <Button
               type="submit"
               disabled={!title.trim() || isSubmitting}
               className="rounded-full cursor-pointer h-9 px-5 text-xs font-medium flex-1"
             >
-              {isSubmitting ? "Saving..." : isEdit ? "Update" : "Create"}
+              {isSubmitting ? t("saving") : isEdit ? t("update") : t("create")}
             </Button>
           </DialogFooter>
         </form>

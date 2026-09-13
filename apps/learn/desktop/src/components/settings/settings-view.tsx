@@ -25,6 +25,7 @@ import {
   ArrowLeftRight,
 } from "lucide-react";
 import { getUserInitials, type UserProfile } from "../navbar";
+import { useI18n, LANGUAGE_OPTIONS } from "../../lib/i18n";
 
 interface SettingsViewProps {
   onBackToWorkspace: () => void;
@@ -42,7 +43,8 @@ export const BUILTIN_MODELS = [
     maxOutput: "128K Output",
     supportsThinking: true,
     isDefault: true,
-    desc: "Model reasoning multimodal cepat untuk eksplorasi dan riset materi belajar.",
+    descEn: "Fast multimodal reasoning model for exploration and study research.",
+    descId: "Model reasoning multimodal cepat untuk eksplorasi dan riset materi belajar.",
   },
   {
     id: "gemini-3.7-flash",
@@ -50,7 +52,8 @@ export const BUILTIN_MODELS = [
     contextWindow: "1M Context",
     maxOutput: "128K Output",
     supportsThinking: true,
-    desc: "Model frontier hybrid dengan kedalaman penalaran dinamis.",
+    descEn: "Hybrid frontier model with dynamic reasoning depth.",
+    descId: "Model frontier hybrid dengan kedalaman penalaran dinamis.",
   },
   {
     id: "gemini-3.8-flash",
@@ -58,7 +61,8 @@ export const BUILTIN_MODELS = [
     contextWindow: "1M Context",
     maxOutput: "128K Output",
     supportsThinking: true,
-    desc: "Model penalaran tingkat lanjut untuk sintesis materi kompleks.",
+    descEn: "Advanced reasoning model for complex subject synthesis.",
+    descId: "Model penalaran tingkat lanjut untuk sintesis materi kompleks.",
   },
   {
     id: "combo/auto",
@@ -66,7 +70,8 @@ export const BUILTIN_MODELS = [
     contextWindow: "1M Context",
     maxOutput: "128K Output",
     supportsThinking: true,
-    desc: "Dynamic router cerdas yang menyeimbangkan latensi dan keakuratan jawaban.",
+    descEn: "Intelligent dynamic router balancing latency and accuracy.",
+    descId: "Dynamic router cerdas yang menyeimbangkan latensi dan keakuratan jawaban.",
   },
   {
     id: "combo/fast",
@@ -74,7 +79,8 @@ export const BUILTIN_MODELS = [
     contextWindow: "1M Context",
     maxOutput: "128K Output",
     supportsThinking: false,
-    desc: "Kecepatan respons sub-detik untuk dialog cepat dan ringkasan kilat.",
+    descEn: "Sub-second response speed for quick dialogues and rapid summaries.",
+    descId: "Kecepatan respons sub-detik untuk dialog cepat dan ringkasan kilat.",
   },
   {
     id: "combo/coding",
@@ -82,7 +88,8 @@ export const BUILTIN_MODELS = [
     contextWindow: "1M Context",
     maxOutput: "128K Output",
     supportsThinking: true,
-    desc: "Model khusus untuk pembelajaran pemrograman, sintaks, dan debugging kode.",
+    descEn: "Specialized model for coding education, syntax, and debugging.",
+    descId: "Model khusus untuk pembelajaran pemrograman, sintaks, dan debugging kode.",
   },
 ];
 
@@ -93,6 +100,7 @@ export function SettingsView({
   onSwitchAccount,
   initialTab = "general",
 }: SettingsViewProps) {
+  const { t, language, setLanguage } = useI18n();
   const [activeTab, setActiveTab] = useState<string>(initialTab);
   const [theme, setTheme] = useTheme();
   const initials = getUserInitials(user?.name, user?.email);
@@ -118,12 +126,12 @@ export function SettingsView({
     if (window.electron?.config?.save) {
       window.electron.config.save({ activeModel: modelId }).catch(() => {});
     }
-    toast.success(`Model aktif diubah menjadi ${modelId}`);
+    toast.success(t("activeModelChanged", { modelId }));
   };
 
   const navItems = [
-    { id: "general", label: "General", icon: SlidersHorizontal },
-    { id: "appearance", label: "Appearance", icon: Palette },
+    { id: "general", label: t("generalSettings"), icon: SlidersHorizontal },
+    { id: "appearance", label: t("theme"), icon: Palette },
     { id: "models", label: "AI Models", icon: Bot },
   ];
 
@@ -149,13 +157,13 @@ export function SettingsView({
             className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-xl text-xs font-medium text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-[#dedee2] dark:hover:bg-[#383838] transition-colors cursor-pointer"
           >
             <ArrowLeft className="w-4 h-4 text-[#8a8a8a] dark:text-[#969696]" />
-            <span>Kembali ke Learns</span>
+            <span>{t("backToLearns")}</span>
           </button>
 
           {/* Navigation Categories */}
           <div className="flex flex-col gap-0.5 pt-2">
             <span className="text-[11px] font-medium text-[#8a8a8a] dark:text-[#737373] px-2.5 mb-1 tracking-tight">
-              Preferences
+              {t("preferences")}
             </span>
             {navItems.map((item) => {
               const Icon = item.icon;
@@ -213,7 +221,7 @@ export function SettingsView({
               className="w-full flex items-center gap-2 px-2.5 py-1 rounded-lg text-xs text-[#8a8a8a] hover:text-[#262626] dark:hover:text-white hover:bg-[#dedee2]/50 dark:hover:bg-[#383838]/50 transition-colors cursor-pointer"
             >
               <ArrowLeftRight className="w-3.5 h-3.5" />
-              <span>Ganti Akun</span>
+              <span>{t("switchAccount")}</span>
             </button>
           )}
 
@@ -224,7 +232,7 @@ export function SettingsView({
               className="w-full flex items-center gap-2 px-2.5 py-1 rounded-lg text-xs text-rose-500 hover:text-rose-600 hover:bg-rose-500/10 transition-colors cursor-pointer"
             >
               <LogOut className="w-3.5 h-3.5" />
-              <span>Keluar</span>
+              <span>{t("logout")}</span>
             </button>
           )}
         </div>
@@ -238,17 +246,17 @@ export function SettingsView({
             <div className="space-y-6">
               <div>
                 <h1 className="text-xl font-medium tracking-tight text-[#262626] dark:text-white">
-                  General Settings
+                  {t("generalSettings")}
                 </h1>
                 <p className="mt-1 text-xs text-[#8a8a8a] dark:text-[#888888]">
-                  Kelola profil pengguna, status sesi belajar, dan konfigurasi lingkungan sistem.
+                  {t("generalSettingsSubtitle")}
                 </p>
               </div>
 
               {/* Account details card */}
               <div className="p-4 rounded-2xl bg-white dark:bg-[#222222] border border-[#dedee2] dark:border-[#383838] space-y-4">
                 <span className="text-[11px] font-medium uppercase tracking-wider text-[#8a8a8a] dark:text-[#777777]">
-                  Akun Terhubung
+                  {t("connectedAccount")}
                 </span>
 
                 <div className="flex items-center gap-4">
@@ -270,25 +278,58 @@ export function SettingsView({
                     <div className="flex items-center gap-2 mt-1.5">
                       <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-md">
                         <ShieldCheck className="w-3 h-3" />
-                        Terautentikasi (Const Hub SSO)
+                        {t("authenticatedSso")}
                       </span>
                     </div>
                   </div>
                 </div>
               </div>
 
+              {/* Language selection card */}
+              <div className="p-4 rounded-2xl bg-white dark:bg-[#222222] border border-[#dedee2] dark:border-[#383838] space-y-3">
+                <span className="text-[11px] font-medium uppercase tracking-wider text-[#8a8a8a] dark:text-[#777777]">
+                  {t("language")}
+                </span>
+                <div className="grid grid-cols-2 gap-3">
+                  {LANGUAGE_OPTIONS.map((opt) => {
+                    const isSelected = language === opt.code;
+                    return (
+                      <button
+                        key={opt.code}
+                        type="button"
+                        onClick={() => setLanguage(opt.code)}
+                        className={cn(
+                          "flex items-center justify-between p-3.5 rounded-xl border text-left transition-all cursor-pointer",
+                          isSelected
+                            ? "border-[#262626] dark:border-white bg-[#f4f4f6] dark:bg-[#2b2b2b]"
+                            : "border-[#dedee2] dark:border-[#383838] hover:border-[#8a8a8a] dark:hover:border-[#555555] bg-transparent"
+                        )}
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <Globe className="w-4 h-4 text-[#8a8a8a] dark:text-[#888888]" />
+                          <span className="text-xs font-medium text-[#262626] dark:text-white">
+                            {opt.label}
+                          </span>
+                        </div>
+                        {isSelected && <Check className="w-3.5 h-3.5 text-[#262626] dark:text-white" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               {/* System environment card */}
               <div className="p-4 rounded-2xl bg-white dark:bg-[#222222] border border-[#dedee2] dark:border-[#383838] space-y-3">
                 <span className="text-[11px] font-medium uppercase tracking-wider text-[#8a8a8a] dark:text-[#777777]">
-                  Sistem & Runtime
+                  {t("systemRuntime")}
                 </span>
                 <div className="grid grid-cols-2 gap-3 text-xs">
                   <div className="p-3 rounded-xl bg-[#f4f4f6] dark:bg-[#2b2b2b] border border-[#dedee2] dark:border-[#383838]">
-                    <span className="text-[#8a8a8a] dark:text-[#888888] block text-[11px]">Aplikasi</span>
+                    <span className="text-[#8a8a8a] dark:text-[#888888] block text-[11px]">{t("application")}</span>
                     <span className="font-medium text-[#262626] dark:text-white">Const Learn Desktop</span>
                   </div>
                   <div className="p-3 rounded-xl bg-[#f4f4f6] dark:bg-[#2b2b2b] border border-[#dedee2] dark:border-[#383838]">
-                    <span className="text-[#8a8a8a] dark:text-[#888888] block text-[11px]">Database Lokal</span>
+                    <span className="text-[#8a8a8a] dark:text-[#888888] block text-[11px]">{t("localDatabase")}</span>
                     <span className="font-medium text-[#262626] dark:text-white">Dexie.js (ACID-compliant)</span>
                   </div>
                 </div>
@@ -301,31 +342,31 @@ export function SettingsView({
             <div className="space-y-6">
               <div>
                 <h1 className="text-xl font-medium tracking-tight text-[#262626] dark:text-white">
-                  Appearance
+                  {t("theme")}
                 </h1>
                 <p className="mt-1 text-xs text-[#8a8a8a] dark:text-[#888888]">
-                  Sesuaikan tema tampilan antarmuka sesuai dengan kenyamanan visual Anda.
+                  {t("appearanceSubtitle")}
                 </p>
               </div>
 
               <div className="p-4 rounded-2xl bg-white dark:bg-[#222222] border border-[#dedee2] dark:border-[#383838] space-y-4">
                 <span className="text-[11px] font-medium uppercase tracking-wider text-[#8a8a8a] dark:text-[#777777]">
-                  Tema Antarmuka
+                  {t("interfaceTheme")}
                 </span>
 
                 <div className="grid grid-cols-3 gap-3">
                   {[
-                    { id: "system", label: "Sistem", icon: Laptop, desc: "Ikuti tema OS" },
-                    { id: "light", label: "Terang", icon: Sun, desc: "Canvas #f8f8f8" },
-                    { id: "dark", label: "Gelap", icon: Moon, desc: "Canvas #161616 (Studio)" },
-                  ].map((t) => {
-                    const Icon = t.icon;
-                    const isSelected = theme === t.id;
+                    { id: "system", label: t("themeSystem"), icon: Laptop, desc: t("themeSystemDesc") },
+                    { id: "light", label: t("themeLight"), icon: Sun, desc: t("themeLightDesc") },
+                    { id: "dark", label: t("themeDark"), icon: Moon, desc: t("themeDarkDesc") },
+                  ].map((tTheme) => {
+                    const Icon = tTheme.icon;
+                    const isSelected = theme === tTheme.id;
                     return (
                       <button
-                        key={t.id}
+                        key={tTheme.id}
                         type="button"
-                        onClick={() => setTheme(t.id as any)}
+                        onClick={() => setTheme(tTheme.id as any)}
                         className={cn(
                           "flex flex-col items-start p-3.5 rounded-xl border text-left transition-all cursor-pointer",
                           isSelected
@@ -338,10 +379,10 @@ export function SettingsView({
                           {isSelected && <Check className="w-3.5 h-3.5 text-[#262626] dark:text-white" />}
                         </div>
                         <span className="text-xs font-medium text-[#262626] dark:text-white">
-                          {t.label}
+                          {tTheme.label}
                         </span>
                         <span className="text-[10px] text-[#8a8a8a] dark:text-[#888888] mt-0.5">
-                          {t.desc}
+                          {tTheme.desc}
                         </span>
                       </button>
                     );
@@ -359,7 +400,7 @@ export function SettingsView({
                   AI Models
                 </h1>
                 <p className="mt-1 text-xs text-[#8a8a8a] dark:text-[#888888]">
-                  Pilih model AI bawaan atau atur router penalaran yang digunakan selama proses belajar.
+                  {t("aiModelsSubtitle")}
                 </p>
               </div>
 
@@ -395,7 +436,7 @@ export function SettingsView({
                           )}
                         </div>
                         <p className="text-xs text-[#8a8a8a] dark:text-[#888888] leading-relaxed">
-                          {model.desc}
+                          {language === "id" ? model.descId : model.descEn}
                         </p>
                         <div className="flex items-center gap-3 pt-1 text-[11px] font-mono text-[#8a8a8a] dark:text-[#777777]">
                           <span>{model.contextWindow}</span>

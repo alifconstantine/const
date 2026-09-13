@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { marked, type Token, type Tokens } from "marked";
 import { Check, Copy, Download, Maximize2, X } from "lucide-react";
 import { cn } from "@const/ui";
+import { useI18n } from "../../lib/i18n";
 
 interface MarkdownContentProps {
   content: string;
@@ -206,6 +207,7 @@ function TableBlock({
   rows: Tokens.TableCell[][];
   align: Array<"center" | "left" | "right" | null>;
 }) {
+  const { t } = useI18n();
   const [copied, setCopied] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -261,7 +263,7 @@ function TableBlock({
             type="button"
             onClick={handleCopy}
             className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
-            title={copied ? "Tabel Disalin" : "Salin Tabel (TSV)"}
+            title={copied ? t("tableCopied") : t("copyTsv")}
           >
             {copied ? (
               <Check className="w-3.5 h-3.5 text-emerald-500" />
@@ -273,7 +275,7 @@ function TableBlock({
             type="button"
             onClick={handleDownloadCsv}
             className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
-            title="Unduh CSV"
+            title={t("downloadCsv")}
           >
             <Download className="w-3.5 h-3.5" />
           </button>
@@ -281,7 +283,7 @@ function TableBlock({
             type="button"
             onClick={() => setIsExpanded(true)}
             className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
-            title="Perbesar Tampilan"
+            title={t("expandView")}
           >
             <Maximize2 className="w-3.5 h-3.5" />
           </button>
@@ -340,10 +342,10 @@ function TableBlock({
             <div className="flex items-center justify-between px-5 py-3.5 bg-muted/40 border-b border-border">
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium text-foreground">
-                  Tabel Data
+                  {t("dataTable")}
                 </span>
                 <span className="text-xs text-muted-foreground font-mono">
-                  ({rows.length} baris, {header.length} kolom)
+                  {t("tableRowsCols", { rows: rows.length, cols: header.length })}
                 </span>
               </div>
               <div className="flex items-center gap-1.5">
@@ -355,12 +357,12 @@ function TableBlock({
                   {copied ? (
                     <>
                       <Check className="w-3.5 h-3.5 text-emerald-500" />
-                      <span>Tersalin</span>
+                      <span>{t("copiedBadge")}</span>
                     </>
                   ) : (
                     <>
                       <Copy className="w-3.5 h-3.5" />
-                      <span>Salin TSV</span>
+                      <span>{t("copyTsvShort")}</span>
                     </>
                   )}
                 </button>
@@ -370,7 +372,7 @@ function TableBlock({
                   className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg border border-border hover:bg-muted text-foreground transition-colors cursor-pointer"
                 >
                   <Download className="w-3.5 h-3.5" />
-                  <span>Unduh CSV</span>
+                  <span>{t("downloadCsv")}</span>
                 </button>
                 <button
                   type="button"
@@ -430,6 +432,7 @@ function TableBlock({
 }
 
 function CodeBlock({ code, language }: { code: string; language: string }) {
+  const { t } = useI18n();
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
@@ -450,17 +453,17 @@ function CodeBlock({ code, language }: { code: string; language: string }) {
           type="button"
           onClick={handleCopy}
           className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer py-0.5 px-1.5 rounded hover:bg-muted"
-          title="Salin Kode"
+          title={t("copyCode")}
         >
           {copied ? (
             <>
               <Check className="w-3 h-3 text-emerald-500" />
-              <span className="text-emerald-500">Tersalin</span>
+              <span className="text-emerald-500">{t("copiedBadge")}</span>
             </>
           ) : (
             <>
               <Copy className="w-3 h-3" />
-              <span>Salin</span>
+              <span>{t("copy")}</span>
             </>
           )}
         </button>

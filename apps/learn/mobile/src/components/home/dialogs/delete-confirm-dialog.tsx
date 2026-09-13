@@ -9,6 +9,7 @@ import {
   Button,
 } from "@const/ui";
 import { AlertTriangle } from "lucide-react";
+import { useI18n } from "../../../lib/i18n";
 
 interface DeleteConfirmDialogProps {
   open: boolean;
@@ -25,6 +26,7 @@ export function DeleteConfirmDialog({
   description,
   onConfirm,
 }: DeleteConfirmDialogProps) {
+  const { t } = useI18n();
   const [isDeleting, setIsDeleting] = useState(false);
 
   const handleConfirm = async () => {
@@ -62,7 +64,7 @@ export function DeleteConfirmDialog({
             disabled={isDeleting}
             className="rounded-full cursor-pointer h-9 px-4 text-xs flex-1"
           >
-            Cancel
+            {t("cancel")}
           </Button>
           <Button
             type="button"
@@ -71,7 +73,7 @@ export function DeleteConfirmDialog({
             disabled={isDeleting}
             className="rounded-full cursor-pointer h-9 px-5 text-xs font-medium flex-1 bg-destructive text-destructive-foreground hover:bg-destructive/90"
           >
-            {isDeleting ? "Deleting..." : "Delete"}
+            {isDeleting ? t("saving") : t("delete")}
           </Button>
         </DialogFooter>
       </DialogContent>

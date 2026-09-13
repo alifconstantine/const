@@ -9,6 +9,7 @@ import {
   Input,
 } from "@const/ui";
 import { FolderPlus } from "lucide-react";
+import { useI18n } from "../../../lib/i18n";
 const COLLECTION_EMOJIS = ["📁", "📚", "🔬", "💻", "🎯", "🚀", "🧪", "📊", "🎨", "⚡", "🧠", "💡"];
 
 interface CreateCollectionDialogProps {
@@ -67,6 +68,7 @@ export function CreateCollectionDialog({
     }
   };
 
+  const { t } = useI18n();
   const isEdit = !!initialData;
 
   return (
@@ -76,14 +78,14 @@ export function CreateCollectionDialog({
           <DialogHeader className="pb-0.5">
             <DialogTitle className="font-serif text-base font-medium tracking-tight text-foreground flex items-center gap-2">
               <FolderPlus className="h-4 w-4 text-primary shrink-0" />
-              <span>{isEdit ? "Ubah Koleksi" : "Buat Koleksi Baru"}</span>
+              <span>{isEdit ? t("editCollectionDialogTitle") : t("createCollectionDialogTitle")}</span>
             </DialogTitle>
           </DialogHeader>
 
           {/* Emoji Picker */}
           <div>
             <label className="text-[12px] font-medium text-muted-foreground mb-1.5 block">
-              Ikon Koleksi
+              {t("collectionIcon")}
             </label>
             <div className="grid grid-cols-6 gap-1 p-1.5 rounded-xl bg-secondary/40 border border-border/60 w-full justify-items-center">
               {COLLECTION_EMOJIS.map((emoji) => (
@@ -106,12 +108,12 @@ export function CreateCollectionDialog({
           {/* Name input */}
           <div className="space-y-1">
             <label className="text-[12px] font-medium text-muted-foreground">
-              Nama Koleksi
+              {t("collectionNameLabel")}
             </label>
             <Input
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="Contoh: Kecerdasan Buatan, Riset Fisika"
+              placeholder={t("collectionNamePlaceholder")}
               className="h-8 text-[12px] rounded-xl bg-secondary/40 border-border/70 focus-visible:ring-1 focus-visible:ring-ring w-full min-w-0 px-3 placeholder:text-muted-foreground/50"
               autoFocus
               required
@@ -121,12 +123,12 @@ export function CreateCollectionDialog({
           {/* Description input */}
           <div className="space-y-1">
             <label className="text-[12px] font-medium text-muted-foreground">
-              Deskripsi (Opsional)
+              {t("collectionDescOptional")}
             </label>
             <Input
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Kategori materi untuk topik tertentu"
+              placeholder={t("collectionDescPlaceholder")}
               className="h-8 text-[12px] rounded-xl bg-secondary/40 border-border/70 focus-visible:ring-1 focus-visible:ring-ring w-full min-w-0 px-3 placeholder:text-muted-foreground/50"
             />
           </div>
@@ -138,14 +140,14 @@ export function CreateCollectionDialog({
               onClick={() => onOpenChange(false)}
               className="rounded-full cursor-pointer h-8 px-3.5 text-[12px] border-border/70"
             >
-              Batal
+              {t("cancel")}
             </Button>
             <Button
               type="submit"
               disabled={!name.trim() || isSubmitting}
               className="rounded-full cursor-pointer h-8 px-4 text-[12px] font-medium"
             >
-              {isSubmitting ? "Menyimpan..." : isEdit ? "Perbarui" : "Buat Koleksi"}
+              {isSubmitting ? t("saving") : isEdit ? t("update") : t("create")}
             </Button>
           </DialogFooter>
         </form>

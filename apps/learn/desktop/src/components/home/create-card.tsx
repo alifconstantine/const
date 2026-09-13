@@ -1,5 +1,6 @@
 import React from "react";
 import { Plus } from "lucide-react";
+import { useI18n } from "../../lib/i18n";
 
 interface CreateCardProps {
   type: "learn" | "collection";
@@ -8,7 +9,8 @@ interface CreateCardProps {
 }
 
 export function CreateCard({ type, onClick, className = "" }: CreateCardProps) {
-  const label = type === "learn" ? "Buat notebook baru" : "Buat koleksi baru";
+  const { t } = useI18n();
+  const label = type === "learn" ? t("createCardLearn") : t("createCardCollection");
 
   return (
     <button

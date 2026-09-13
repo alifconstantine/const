@@ -228,7 +228,7 @@ export const localDb = {
     const now = Date.now();
     await db.collections.add({
       id,
-      name: data.name.trim() || "Koleksi Baru",
+      name: data.name.trim() || "New Collection",
       description: data.description?.trim(),
       emoji: data.emoji || "📁",
       color: data.color || "#0066ff",
@@ -250,7 +250,7 @@ export const localDb = {
     const updates: Partial<LocalCollection> = {
       updatedAt: Date.now(),
     };
-    if (data.name !== undefined) updates.name = data.name.trim() || "Koleksi Baru";
+    if (data.name !== undefined) updates.name = data.name.trim() || "New Collection";
     if (data.description !== undefined) updates.description = data.description?.trim();
     if (data.emoji !== undefined) updates.emoji = data.emoji;
     if (data.color !== undefined) updates.color = data.color;

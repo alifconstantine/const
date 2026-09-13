@@ -8,6 +8,8 @@ import {
   Button,
 } from "@const/ui";
 import { Folder, Check } from "lucide-react";
+import { useI18n } from "../../../lib/i18n";
+
 interface ManageCollectionDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -33,6 +35,7 @@ export function ManageCollectionDialog({
   onToggle,
   onCreateNewCollection,
 }: ManageCollectionDialogProps) {
+  const { t } = useI18n();
   const [loadingId, setLoadingId] = useState<string | null>(null);
 
   const handleToggle = async (collectionId: string) => {
@@ -52,10 +55,10 @@ export function ManageCollectionDialog({
         <DialogHeader>
           <DialogTitle className="font-sans text-lg font-semibold tracking-tight text-foreground flex items-center gap-2">
             <Folder className="h-5 w-5 text-primary" />
-            Manage Collections
+            {t("manageCollectionsDialogTitle")}
           </DialogTitle>
           <p className="text-xs text-muted-foreground line-clamp-1 pt-1">
-            Notebook: <span className="text-foreground font-medium">{learnTitle}</span>
+            {t("manageCollectionsFor", { title: learnTitle })}
           </p>
         </DialogHeader>
 
@@ -63,7 +66,7 @@ export function ManageCollectionDialog({
           {collections.length === 0 ? (
             <div className="text-center py-6 px-4 bg-secondary/30 rounded-xl border border-dashed border-border/70">
               <p className="text-xs text-muted-foreground">
-                No collections created yet.
+                {t("noCollectionsYet")}
               </p>
               {onCreateNewCollection && (
                 <Button
@@ -75,7 +78,7 @@ export function ManageCollectionDialog({
                   }}
                   className="mt-3 rounded-full text-xs h-8 cursor-pointer"
                 >
-                  + Create New Collection
+                  + {t("newCollection")}
                 </Button>
               )}
             </div>
@@ -121,7 +124,7 @@ export function ManageCollectionDialog({
             onClick={() => onOpenChange(false)}
             className="rounded-full cursor-pointer h-9 px-5 text-xs font-medium w-full"
           >
-            Done
+            {t("done")}
           </Button>
         </DialogFooter>
       </DialogContent>

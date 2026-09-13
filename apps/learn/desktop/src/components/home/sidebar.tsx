@@ -32,8 +32,10 @@ import {
   ArrowLeftRight,
   FolderPlus,
   ChevronDown,
+  Globe,
 } from "lucide-react";
 import { getUserInitials, type UserProfile } from "../navbar";
+import { useI18n, LANGUAGE_OPTIONS } from "../../lib/i18n";
 
 export type HomeNavTab = "learns" | "sources" | "collections" | "artifacts";
 
@@ -69,6 +71,7 @@ export function Sidebar({
   artifactsCount = 0,
 }: SidebarProps) {
   const [theme, setTheme] = useTheme();
+  const { language, setLanguage, t } = useI18n();
   const initials = getUserInitials(user?.name, user?.email);
 
   const navItems: Array<{
@@ -77,10 +80,10 @@ export function Sidebar({
     icon: React.ComponentType<{ className?: string }>;
     count?: number;
   }> = [
-    { id: "learns", label: "Learns", icon: BookOpen, count: learnsCount },
-    { id: "sources", label: "Sources", icon: FileText, count: sourcesCount },
-    { id: "collections", label: "Collections", icon: Folder, count: collectionsCount },
-    { id: "artifacts", label: "Artifact", icon: Sparkles, count: artifactsCount },
+    { id: "learns", label: t("learns"), icon: BookOpen, count: learnsCount },
+    { id: "sources", label: t("sources"), icon: FileText, count: sourcesCount },
+    { id: "collections", label: t("collections"), icon: Folder, count: collectionsCount },
+    { id: "artifacts", label: t("artifacts"), icon: Sparkles, count: artifactsCount },
   ];
 
   return (
@@ -114,8 +117,8 @@ export function Sidebar({
             onClick={onCollapse}
             style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
             className="p-1.5 rounded-lg hover:bg-[#dedee2] dark:hover:bg-[#383838] text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white transition-colors cursor-pointer"
-            title="Tutup sidebar (Ctrl+B)"
-            aria-label="Tutup sidebar"
+            title={t("closeSidebarKeyboard")}
+            aria-label={t("closeSidebar")}
           >
             <PanelLeftClose className="w-4 h-4" />
           </button>
@@ -131,7 +134,7 @@ export function Sidebar({
               >
                 <div className="flex items-center gap-2">
                   <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-                  <span>Create New</span>
+                  <span>{t("createNew")}</span>
                 </div>
                 <ChevronDown className="w-3.5 h-3.5 opacity-70" />
               </button>
@@ -146,14 +149,14 @@ export function Sidebar({
                 className="cursor-pointer flex items-center gap-2.5 py-2 px-2.5 rounded-lg hover:bg-[#f4f4f5] dark:hover:bg-[#2e2e2e] focus:bg-[#f4f4f5] dark:focus:bg-[#2e2e2e]"
               >
                 <BookOpen className="w-4 h-4 text-[#0066ff]" />
-                <span>New Learn</span>
+                <span>{t("newLearn")}</span>
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={onCreateNewCollection}
                 className="cursor-pointer flex items-center gap-2.5 py-2 px-2.5 rounded-lg hover:bg-[#f4f4f5] dark:hover:bg-[#2e2e2e] focus:bg-[#f4f4f5] dark:focus:bg-[#2e2e2e]"
               >
                 <FolderPlus className="w-4 h-4 text-[#0066ff]" />
-                <span>New Collection</span>
+                <span>{t("newCollection")}</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -248,20 +251,20 @@ export function Sidebar({
               className="cursor-pointer flex items-center gap-2.5 py-2 px-2.5 rounded-xl hover:bg-[#f4f4f5] dark:hover:bg-[#2e2e2e] focus:bg-[#f4f4f5] dark:focus:bg-[#2e2e2e] text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white"
             >
               <Settings className="w-4 h-4 text-[#737373] dark:text-[#8e8e93] shrink-0" />
-              <span>Settings</span>
+              <span>{t("settings")}</span>
             </DropdownMenuItem>
 
             {/* 2. App theme (Submenu) */}
             <DropdownMenuSub>
               <DropdownMenuSubTrigger className="cursor-pointer flex items-center gap-2.5 py-2 px-2.5 rounded-xl hover:bg-[#f4f4f5] dark:hover:bg-[#2e2e2e] focus:bg-[#f4f4f5] dark:focus:bg-[#2e2e2e] text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white">
                 <Sun className="w-4 h-4 text-[#737373] dark:text-[#8e8e93] shrink-0" />
-                <span>Tema Tampilan</span>
+                <span>{t("theme")}</span>
               </DropdownMenuSubTrigger>
               <DropdownMenuSubContent className="min-w-[140px] p-1.5 rounded-xl bg-white dark:bg-[#222222] border border-[#dedee2] dark:border-[#383838] text-[#262626] dark:text-[#d4d4d4] shadow-xl text-xs">
                 {[
-                  { value: "system", label: "Sistem", icon: Laptop },
-                  { value: "light", label: "Terang", icon: Sun },
-                  { value: "dark", label: "Gelap", icon: Moon },
+                  { value: "system", label: t("themeSystem"), icon: Laptop },
+                  { value: "light", label: t("themeLight"), icon: Sun },
+                  { value: "dark", label: t("themeDark"), icon: Moon },
                 ].map((item) => {
                   const Icon = item.icon;
                   return (
@@ -283,27 +286,49 @@ export function Sidebar({
               </DropdownMenuSubContent>
             </DropdownMenuSub>
 
+            {/* 3. Language (Submenu) */}
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger className="cursor-pointer flex items-center gap-2.5 py-2 px-2.5 rounded-xl hover:bg-[#f4f4f5] dark:hover:bg-[#2e2e2e] focus:bg-[#f4f4f5] dark:focus:bg-[#2e2e2e] text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white">
+                <Globe className="w-4 h-4 text-[#737373] dark:text-[#8e8e93] shrink-0" />
+                <span>{t("language")}</span>
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent className="min-w-[160px] p-1.5 rounded-xl bg-white dark:bg-[#222222] border border-[#dedee2] dark:border-[#383838] text-[#262626] dark:text-[#d4d4d4] shadow-xl text-xs">
+                {LANGUAGE_OPTIONS.map((lang) => (
+                  <DropdownMenuItem
+                    key={lang.code}
+                    onClick={() => setLanguage(lang.code)}
+                    className="cursor-pointer flex items-center justify-between py-1.5 px-2.5 rounded-lg hover:bg-[#f4f4f5] dark:hover:bg-[#2e2e2e] text-[#262626] dark:text-[#d4d4d4]"
+                  >
+                    <span>{lang.label}</span>
+                    {language === lang.code && (
+                      <Check className="w-3.5 h-3.5 text-[#111111] dark:text-white ml-2 shrink-0" />
+                    )}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuSubContent>
+            </DropdownMenuSub>
+
             <DropdownMenuSeparator className="my-1 bg-[#dedee2] dark:bg-[#333333]" />
 
-            {/* 3. Switch account */}
+            {/* 4. Switch account */}
             {onSwitchAccount && (
               <DropdownMenuItem
                 onClick={onSwitchAccount}
                 className="cursor-pointer flex items-center gap-2.5 py-2 px-2.5 rounded-xl hover:bg-[#f4f4f5] dark:hover:bg-[#2e2e2e] focus:bg-[#f4f4f5] dark:focus:bg-[#2e2e2e] text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white"
               >
                 <ArrowLeftRight className="w-4 h-4 text-[#737373] dark:text-[#8e8e93] shrink-0" />
-                <span>Switch account</span>
+                <span>{t("switchAccount")}</span>
               </DropdownMenuItem>
             )}
 
-            {/* 4. Log out */}
+            {/* 5. Log out */}
             {onSignOut && (
               <DropdownMenuItem
                 onClick={onSignOut}
                 className="cursor-pointer flex items-center gap-2.5 py-2 px-2.5 rounded-xl hover:bg-red-500/10 dark:hover:bg-red-500/10 focus:bg-red-500/10 text-rose-600 dark:text-rose-400"
               >
                 <LogOut className="w-4 h-4 shrink-0" />
-                <span>Log out</span>
+                <span>{t("logout")}</span>
               </DropdownMenuItem>
             )}
           </DropdownMenuContent>

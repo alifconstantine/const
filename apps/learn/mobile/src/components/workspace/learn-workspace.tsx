@@ -12,6 +12,7 @@ import { ChatInputCard, type AttachedMedia } from "./chat-input-card";
 import { AddSourceDialog } from "./add-source-dialog";
 import { WorkingProcess } from "./working-process";
 import { ScrollArea, cn } from "@const/ui";
+import { useI18n } from "../../lib/i18n";
 import {
   ArrowLeft,
   Share2,
@@ -90,6 +91,20 @@ export function MobileLearnWorkspace({
   onBack,
   onCreateNew,
 }: MobileLearnWorkspaceProps) {
+  const { t, language } = useI18n();
+
+  const toolNameMap: Record<string, string> = {
+    audio_summary: t("toolsAudioSummary"),
+    slides: t("toolsSlides"),
+    video_summary: t("toolsVideo"),
+    mind_map: t("toolsMindMap"),
+    report: t("toolsReport"),
+    flashcards: t("toolsFlashcards"),
+    quiz: t("toolsQuiz"),
+    infographic: t("toolsInfographic"),
+    data_table: t("toolsDataTable"),
+  };
+
   // Live notebook data from local Dexie
   const learn = useLiveQuery(async () => {
     return await db.learns.get(learnId);
@@ -145,7 +160,7 @@ export function MobileLearnWorkspace({
 
   // Editable title
   const [isEditingTitle, setIsEditingTitle] = useState(false);
-  const [titleValue, setTitleValue] = useState("Untitled notebook");
+  const [titleValue, setTitleValue] = useState(t("untitledNotebook"));
 
   useEffect(() => {
     if (learn?.title) {
@@ -208,7 +223,7 @@ export function MobileLearnWorkspace({
 
   const handleSaveTitle = async () => {
     setIsEditingTitle(false);
-    const trimmed = titleValue.trim() || "Notebook tanpa judul";
+    const trimmed = titleValue.trim() || t("untitledNotebook");
     setTitleValue(trimmed);
     await localDb.updateLearn(learnId, { title: trimmed });
   };
@@ -352,7 +367,10 @@ export function MobileLearnWorkspace({
         },
         onError: async (err) => {
           const finalDuration = Date.now() - now;
-          const errorText = `Gagal memanggil Const Router: ${err.message}`;
+          const errorText =
+            language === "id"
+              ? `Gagal memanggil Const Router: ${err.message}`
+              : `Failed to call Const Router: ${err.message}`;
           setMessages((prev) =>
             prev.map((msg) =>
               msg.id === assistantMsgId
@@ -420,7 +438,7 @@ export function MobileLearnWorkspace({
             type="button"
             onClick={onBack}
             className="h-8 w-8 rounded-xl hover:bg-[#2b2b2b] text-[#969696] hover:text-[#ffffff] flex items-center justify-center transition-colors cursor-pointer shrink-0 border border-transparent hover:border-[#383838]"
-            aria-label="Back to home"
+            aria-label={t("backToHome")}
           >
             <ArrowLeft className="h-4 w-4" />
           </button>
@@ -452,7 +470,7 @@ export function MobileLearnWorkspace({
               type="button"
               onClick={() => setIsEditingTitle(true)}
               className="text-[14px] font-sans font-medium text-[#d4d4d4] hover:text-[#ffffff] hover:bg-[#2b2b2b] px-2.5 py-1 rounded-xl transition-colors cursor-pointer text-left truncate max-w-[180px]"
-              title="Click to rename"
+              title={t("clickToRename")}
             >
               {titleValue}
             </button>
@@ -466,7 +484,7 @@ export function MobileLearnWorkspace({
               type="button"
               onClick={handleClearHistory}
               className="h-8 px-2 rounded-xl hover:bg-[#2b2b2b] text-[#969696] hover:text-[#ffffff] flex items-center gap-1 text-[11px] transition-colors cursor-pointer border border-[#383838]"
-              title="Clear conversation"
+              title={t("clearConversation")}
             >
               <RotateCcw className="h-3.5 w-3.5" />
             </button>
@@ -476,7 +494,7 @@ export function MobileLearnWorkspace({
             type="button"
             onClick={() => setIsAddSourceOpen(true)}
             className="h-8 w-8 rounded-xl hover:bg-[#2b2b2b] text-[#969696] hover:text-[#ffffff] flex items-center justify-center transition-colors cursor-pointer border border-[#383838]"
-            aria-label="Add source"
+            aria-label={t("addSource")}
           >
             <Plus className="h-4 w-4" />
           </button>
@@ -489,7 +507,7 @@ export function MobileLearnWorkspace({
               }
             }}
             className="h-8 w-8 rounded-xl hover:bg-[#2b2b2b] text-[#969696] hover:text-[#ffffff] flex items-center justify-center transition-colors cursor-pointer border border-[#383838]"
-            aria-label="Share"
+            aria-label={t("share")}
           >
             <Share2 className="h-4 w-4" />
           </button>
@@ -626,7 +644,7 @@ export function MobileLearnWorkspace({
                         type="button"
                         onClick={() => handleCopy(msg.id, msg.content)}
                         className="p-1 rounded hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
-                        title="Salin pesan"
+                        title={t("copyMessage")}
                       >
                         {copiedId === msg.id ? (
                           <Check className="w-3 h-3 text-[#34d399]" />
@@ -664,7 +682,7 @@ export function MobileLearnWorkspace({
                           type="button"
                           onClick={() => handleCopy(msg.id, msg.content)}
                           className="p-1 rounded hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
-                          title="Salin jawaban"
+                          title={t("copyMessage")}
                         >
                           {copiedId === msg.id ? (
                             <Check className="w-3 h-3 text-[#34d399]" />
@@ -703,9 +721,11 @@ export function MobileLearnWorkspace({
           {activeTab === "sources" && (
             <div className="p-4 space-y-4 max-w-lg mx-auto">
               <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-[#ffffff]">Learning Sources</span>
+                <span className="text-sm font-medium text-[#ffffff]">{t("learningSources")}</span>
                 <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-[#222222] border border-[#383838] text-[#969696] font-mono">
-                  {learn?.sourcesCount || 0} {learn?.sourcesCount === 1 ? "source" : "sources"}
+                  {(learn?.sourcesCount || 0) === 1
+                    ? t("sourcesCountSingle")
+                    : t("sourcesCount", { count: learn?.sourcesCount || 0 })}
                 </span>
               </div>
 
@@ -716,7 +736,7 @@ export function MobileLearnWorkspace({
                 className="w-full py-2.5 px-4 rounded-xl border border-[#383838] hover:border-[#5d5d5d] bg-[#2b2b2b] hover:bg-[#383838] text-xs font-medium text-[#d4d4d4] hover:text-[#ffffff] flex items-center justify-center gap-1.5 transition-all cursor-pointer"
               >
                 <Plus className="h-4 w-4" />
-                <span>Add source</span>
+                <span>{t("addSource")}</span>
               </button>
 
               {/* Search Box */}
@@ -725,7 +745,7 @@ export function MobileLearnWorkspace({
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search for new sources on the web"
+                  placeholder={t("searchWebSources")}
                   className="w-full bg-transparent text-xs text-[#d4d4d4] placeholder:text-[#5d5d5d] outline-none px-1 py-1"
                 />
                 <div className="flex items-center justify-between mt-2 pt-1 border-t border-[#2e2e2e]">
@@ -736,7 +756,7 @@ export function MobileLearnWorkspace({
                       className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-[#2b2b2b] hover:bg-[#383838] text-[11px] text-[#969696] hover:text-[#d4d4d4] transition-colors cursor-pointer border border-[#383838]"
                     >
                       <Globe className="h-2.5 w-2.5" />
-                      <span>{webScope}</span>
+                      <span>{webScope === "Web" ? t("webScopeWeb") : t("webScopeJournal")}</span>
                       <ChevronDown className="h-2.5 w-2.5 opacity-60" />
                     </button>
 
@@ -750,7 +770,9 @@ export function MobileLearnWorkspace({
                       className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-[#2b2b2b] hover:bg-[#383838] text-[11px] text-[#969696] hover:text-[#d4d4d4] transition-colors cursor-pointer border border-[#383838]"
                     >
                       <Search className="h-2.5 w-2.5" />
-                      <span>{researchSpeed}</span>
+                      <span>
+                        {researchSpeed === "Fast Research" ? t("speedFast") : t("speedDeep")}
+                      </span>
                       <ChevronDown className="h-2.5 w-2.5 opacity-60" />
                     </button>
                   </div>
@@ -758,7 +780,7 @@ export function MobileLearnWorkspace({
                   <button
                     type="button"
                     className="h-6 w-6 rounded-lg bg-[#2b2b2b] hover:bg-[#383838] text-[#969696] hover:text-[#ffffff] flex items-center justify-center transition-colors cursor-pointer border border-[#383838]"
-                    aria-label="Search"
+                    aria-label={t("search")}
                   >
                     <Search className="h-3 w-3" />
                   </button>
@@ -771,17 +793,17 @@ export function MobileLearnWorkspace({
                   <FileText className="h-5 w-5 stroke-[1.5]" />
                 </div>
                 <h3 className="text-xs font-medium text-[#ffffff] mb-1">
-                  Saved sources will appear here
+                  {t("emptySourcesTitle")}
                 </h3>
                 <p className="text-[11px] text-[#969696] leading-relaxed max-w-[240px] mb-3">
-                  Add files, notes, or web links to ground your AI assistant.
+                  {t("emptySourcesDescription")}
                 </p>
                 <button
                   type="button"
                   onClick={() => setIsAddSourceOpen(true)}
                   className="text-xs text-[#0066ff] hover:underline transition-colors cursor-pointer"
                 >
-                  + Add first source
+                  + {t("addFirstSource")}
                 </button>
               </div>
             </div>
@@ -791,20 +813,25 @@ export function MobileLearnWorkspace({
         {activeTab === "tools" && (
           <div className="p-4 space-y-5 max-w-lg mx-auto">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-[#ffffff]">Studio Tools</span>
+              <span className="text-sm font-medium text-[#ffffff]">{t("studioTools")}</span>
             </div>
 
             {/* 3x3 Grid of Tools */}
             <div className="grid grid-cols-3 gap-2">
               {STUDIO_TOOLS.map((tool) => {
                 const Icon = tool.icon;
+                const toolTitle = toolNameMap[tool.id] || tool.name;
                 return (
                   <button
                     key={tool.id}
                     type="button"
                     onClick={() => {
                       setActiveTab("chat");
-                      handleSend(`Please create a ${tool.name} for this notebook.`);
+                      handleSend(
+                        language === "id"
+                          ? `Tolong buatkan ${toolTitle} untuk notebook ini.`
+                          : `Please create a ${toolTitle} for this notebook.`
+                      );
                     }}
                     className="p-2.5 rounded-xl bg-[#222222] hover:bg-[#2b2b2b] border border-[#383838] transition-all flex flex-col justify-between h-20 text-left cursor-pointer active:scale-98"
                   >
@@ -813,7 +840,7 @@ export function MobileLearnWorkspace({
                       <ChevronRight className="h-3 w-3 text-[#5d5d5d]" />
                     </div>
                     <span className="text-[10px] font-normal text-[#d4d4d4] leading-tight line-clamp-2">
-                      {tool.name}
+                      {toolTitle}
                     </span>
                   </button>
                 );
@@ -824,11 +851,13 @@ export function MobileLearnWorkspace({
             <div className="pt-2">
               <div className="flex items-center justify-between mb-2.5">
                 <span className="text-xs font-medium text-[#ffffff]">
-                  Generated Files & Artifacts
+                  {t("artifacts")}
                 </span>
                 {artifacts && artifacts.length > 0 && (
                   <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#222222] border border-[#383838] font-mono text-[#969696]">
-                    {artifacts.length} {artifacts.length === 1 ? "file" : "files"}
+                    {artifacts.length === 1
+                      ? t("filesCountSingle")
+                      : t("filesCount", { count: artifacts.length })}
                   </span>
                 )}
               </div>
@@ -866,7 +895,7 @@ export function MobileLearnWorkspace({
                         className="h-8 px-3 rounded-lg bg-[#2b2b2b] hover:bg-[#383838] text-[#ffffff] text-xs flex items-center gap-1.5 transition-colors cursor-pointer border border-[#383838] shrink-0"
                       >
                         <Download className="h-3 w-3" />
-                        <span>Download</span>
+                        <span>{t("download")}</span>
                       </button>
                     </div>
                   ))}
@@ -877,10 +906,10 @@ export function MobileLearnWorkspace({
                     <PenTool className="h-4 w-4 stroke-[1.5]" />
                   </div>
                   <h3 className="text-xs font-medium text-[#ffffff] mb-1">
-                    No artifacts or files saved yet
+                    {t("noArtifactsSaved")}
                   </h3>
                   <p className="text-[11px] text-[#969696] leading-relaxed max-w-[240px]">
-                    Any files produced in learning sessions will appear here and can be downloaded directly.
+                    {t("noArtifactsSavedDesc")}
                   </p>
                 </div>
               )}
@@ -903,7 +932,7 @@ export function MobileLearnWorkspace({
           }`}
         >
           <FolderOpen className="h-5 w-5" />
-          <span className="text-[10px] mt-1 tracking-tight">Sources</span>
+          <span className="text-[10px] mt-1 tracking-tight">{t("sources")}</span>
         </button>
 
         {/* Tab 2: Chat */}
@@ -917,7 +946,7 @@ export function MobileLearnWorkspace({
           }`}
         >
           <MessageSquare className="h-5 w-5" />
-          <span className="text-[10px] mt-1 tracking-tight">Chat</span>
+          <span className="text-[10px] mt-1 tracking-tight">{t("chat")}</span>
         </button>
 
         {/* Tab 3: Tools */}
@@ -931,7 +960,7 @@ export function MobileLearnWorkspace({
           }`}
         >
           <LayoutGrid className="h-5 w-5" />
-          <span className="text-[10px] mt-1 tracking-tight">Studio</span>
+          <span className="text-[10px] mt-1 tracking-tight">{t("studioTitle")}</span>
         </button>
       </nav>
 

@@ -17,7 +17,9 @@ import {
   Sun,
   Moon,
   Laptop,
+  Globe,
 } from "lucide-react";
+import { useI18n, LANGUAGE_OPTIONS } from "../lib/i18n";
 
 export interface UserProfile {
   name?: string | null;
@@ -59,6 +61,7 @@ export function Navbar({
   onSignOut,
   onSwitchAccount,
 }: NavbarProps) {
+  const { t, language, setLanguage } = useI18n();
   const initials = getUserInitials(user?.name, user?.email);
   const [theme, setTheme] = useTheme();
 
@@ -81,31 +84,31 @@ export function Navbar({
       <div className="flex items-center">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  className="relative flex items-center justify-center rounded-full outline-none ring-offset-background transition-all hover:ring-2 hover:ring-ring/20 focus-visible:ring-2 focus-visible:ring-ring cursor-pointer select-none p-0.5"
-                  aria-label="Account menu"
-                >
-                  <Avatar className="h-9 w-9 rounded-full border border-border/70 transition-transform active:scale-95">
-                    {user?.image ? (
-                      <AvatarImage
-                        src={user.image}
-                        alt={user.name || "Avatar"}
-                        referrerPolicy="no-referrer"
-                      />
-                    ) : null}
-                    <AvatarFallback className="bg-secondary text-secondary-foreground font-sans text-xs font-medium">
-                      {user === undefined ? (
-                        <UserIcon className="h-3.5 w-3.5 text-muted-foreground animate-pulse" />
-                      ) : (
-                        initials
-                      )}
-                    </AvatarFallback>
-                  </Avatar>
-                </button>
-              </DropdownMenuTrigger>
+            <button
+              type="button"
+              className="relative flex items-center justify-center rounded-full outline-none ring-offset-background transition-all hover:ring-2 hover:ring-ring/20 focus-visible:ring-2 focus-visible:ring-ring cursor-pointer select-none p-0.5"
+              aria-label="Account menu"
+            >
+              <Avatar className="h-9 w-9 rounded-full border border-border/70 transition-transform active:scale-95">
+                {user?.image ? (
+                  <AvatarImage
+                    src={user.image}
+                    alt={user.name || "Avatar"}
+                    referrerPolicy="no-referrer"
+                  />
+                ) : null}
+                <AvatarFallback className="bg-secondary text-secondary-foreground font-sans text-xs font-medium">
+                  {user === undefined ? (
+                    <UserIcon className="h-3.5 w-3.5 text-muted-foreground animate-pulse" />
+                  ) : (
+                    initials
+                  )}
+                </AvatarFallback>
+              </Avatar>
+            </button>
+          </DropdownMenuTrigger>
 
-              <DropdownMenuContent align="end" className="w-56 p-1.5 shadow-md mr-1">
+          <DropdownMenuContent align="end" className="w-56 p-1.5 shadow-md mr-1">
             {(user?.name || user?.email) && (
               <>
                 <div className="px-2 py-1.5">
@@ -124,6 +127,32 @@ export function Navbar({
               </>
             )}
 
+            {/* App Language (Segmented Control) */}
+            <div className="px-2 py-1.5 flex flex-col gap-1.5">
+              <span className="text-[11px] text-muted-foreground font-medium flex items-center gap-1.5">
+                <Globe className="h-3.5 w-3.5" />
+                {t("language")}
+              </span>
+              <div className="flex items-center gap-1 p-0.5 rounded-lg bg-secondary/80 border border-border/50">
+                {LANGUAGE_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.code}
+                    type="button"
+                    onClick={() => setLanguage(opt.code)}
+                    className={`flex-1 flex items-center justify-center gap-1 py-1 rounded-md text-[11px] font-medium transition-all cursor-pointer ${
+                      language === opt.code
+                        ? "bg-background text-foreground shadow-2xs font-semibold"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <span>{opt.label === "Bahasa Indonesia" ? "Indonesia" : opt.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <DropdownMenuSeparator />
+
             {/* App Theme (Segmented Control) */}
             <div className="px-2 py-1.5 flex flex-col gap-1.5">
               <span className="text-[11px] text-muted-foreground font-medium flex items-center gap-1.5">
@@ -134,7 +163,7 @@ export function Navbar({
                 ) : (
                   <Laptop className="h-3.5 w-3.5" />
                 )}
-                Theme
+                {t("theme")}
               </span>
               <div className="flex items-center gap-1 p-0.5 rounded-lg bg-secondary/80 border border-border/50">
                 <button
@@ -147,7 +176,7 @@ export function Navbar({
                   }`}
                 >
                   <Laptop className="h-3 w-3" />
-                  <span>System</span>
+                  <span>{t("themeSystem")}</span>
                 </button>
                 <button
                   type="button"
@@ -159,7 +188,7 @@ export function Navbar({
                   }`}
                 >
                   <Sun className="h-3 w-3" />
-                  <span>Light</span>
+                  <span>{t("themeLight")}</span>
                 </button>
                 <button
                   type="button"
@@ -171,7 +200,7 @@ export function Navbar({
                   }`}
                 >
                   <Moon className="h-3 w-3" />
-                  <span>Dark</span>
+                  <span>{t("themeDark")}</span>
                 </button>
               </div>
             </div>
@@ -183,7 +212,7 @@ export function Navbar({
               }}
             >
               <Settings className="h-4 w-4" />
-              <span>Settings</span>
+              <span>{t("settings")}</span>
             </DropdownMenuItem>
 
             <DropdownMenuSeparator />
@@ -194,7 +223,7 @@ export function Navbar({
                 onClick={onSwitchAccount}
               >
                 <ArrowLeftRight className="h-4 w-4" />
-                <span>Switch account</span>
+                <span>{t("switchAccount")}</span>
               </DropdownMenuItem>
             )}
 
@@ -203,7 +232,7 @@ export function Navbar({
               onClick={onSignOut}
             >
               <LogOut className="h-4 w-4" />
-              <span>Log out</span>
+              <span>{t("logout")}</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

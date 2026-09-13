@@ -9,6 +9,7 @@ import {
 } from "@const/ui";
 import { MoreVertical, FolderPlus, Edit3, Trash2, ExternalLink, Sparkles } from "lucide-react";
 import { LocalLearn } from "../../lib/db";
+import { useI18n } from "../../lib/i18n";
 
 export type LearnItem = LocalLearn;
 
@@ -24,16 +25,16 @@ interface LearnCardProps {
   onDelete?: (learn: LearnItem) => void;
 }
 
-function formatDate(timestamp: number): string {
+function formatDate(timestamp: number, language: string): string {
   try {
-    return new Intl.DateTimeFormat("en-US", {
+    return new Intl.DateTimeFormat(language === "id" ? "id-ID" : "en-US", {
       month: "short",
       day: "numeric",
       year: "numeric",
     }).format(new Date(timestamp));
   } catch {
     const d = new Date(timestamp);
-    return `${d.toLocaleDateString("en-US")}`;
+    return `${d.toLocaleDateString(language === "id" ? "id-ID" : "en-US")}`;
   }
 }
 
@@ -48,9 +49,15 @@ export function LearnCard({
   onManageCollections,
   onDelete,
 }: LearnCardProps) {
-  const formattedDate = formatDate(learn.updatedAt);
+  const { t, language } = useI18n();
+  const formattedDate = formatDate(learn.updatedAt, language);
   const count = learn.sourcesCount ?? 0;
-  const sourcesText = `${count} ${count === 1 ? "source" : "sources"}`;
+  const sourcesText =
+    count === 1
+      ? t("sourcesCountSingle")
+      : count === 0
+      ? t("sourcesCountNone")
+      : t("sourcesCount", { count });
 
   const handleCardClick = (e: React.MouseEvent) => {
     if (isSelectionMode) {
@@ -101,7 +108,7 @@ export function LearnCard({
               type="button"
               onClick={(e) => e.stopPropagation()}
               className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground active:text-foreground cursor-pointer shrink-0 transition-colors"
-              aria-label="Notebook actions"
+              aria-label={t("moreOptions")}
             >
               <Sparkles className="h-4 w-4" />
             </button>
@@ -112,21 +119,21 @@ export function LearnCard({
               onClick={() => onClick?.(learn)}
             >
               <ExternalLink className="h-3.5 w-3.5" />
-              <span>Open notebook</span>
+              <span>{t("openLearn")}</span>
             </DropdownMenuItem>
             <DropdownMenuItem
               className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2"
               onClick={() => onManageCollections?.(learn)}
             >
               <FolderPlus className="h-3.5 w-3.5" />
-              <span>Manage collections</span>
+              <span>{t("manageCollections")}</span>
             </DropdownMenuItem>
             <DropdownMenuItem
               className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2"
               onClick={() => onEdit?.(learn)}
             >
               <Edit3 className="h-3.5 w-3.5" />
-              <span>Rename</span>
+              <span>{t("editLearn")}</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
@@ -134,7 +141,7 @@ export function LearnCard({
               onClick={() => onDelete?.(learn)}
             >
               <Trash2 className="h-3.5 w-3.5" />
-              <span>Delete</span>
+              <span>{t("delete")}</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -173,7 +180,7 @@ export function LearnCard({
                 type="button"
                 onClick={(e) => e.stopPropagation()}
                 className="h-7 w-7 rounded-lg flex items-center justify-center text-muted-foreground active:text-foreground cursor-pointer -mr-1"
-                aria-label="Menu learn"
+                aria-label={t("moreOptions")}
               >
                 <MoreVertical className="h-4 w-4" />
               </button>
@@ -184,21 +191,21 @@ export function LearnCard({
                 onClick={() => onClick?.(learn)}
               >
                 <ExternalLink className="h-3.5 w-3.5" />
-                <span>Open notebook</span>
+                <span>{t("openLearn")}</span>
               </DropdownMenuItem>
               <DropdownMenuItem
                 className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2"
                 onClick={() => onManageCollections?.(learn)}
               >
                 <FolderPlus className="h-3.5 w-3.5" />
-                <span>Manage collections</span>
+                <span>{t("manageCollections")}</span>
               </DropdownMenuItem>
               <DropdownMenuItem
                 className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2"
                 onClick={() => onEdit?.(learn)}
               >
                 <Edit3 className="h-3.5 w-3.5" />
-                <span>Rename</span>
+                <span>{t("editLearn")}</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
@@ -206,7 +213,7 @@ export function LearnCard({
                 onClick={() => onDelete?.(learn)}
               >
                 <Trash2 className="h-3.5 w-3.5" />
-                <span>Delete</span>
+                <span>{t("delete")}</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

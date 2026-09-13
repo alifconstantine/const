@@ -25,6 +25,7 @@ import { DEFAULT_MODELS } from "@const/agent/models";
 import type { ModelConfig, AgentMessage } from "@const/agent/types";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db, localDb } from "../../lib/db";
+import { useI18n } from "../../lib/i18n";
 import { ChatHistoryPanel } from "./chat-history-panel";
 import { ExecutionTrace, type DisplayToolCall } from "./execution-trace";
 import { MarkdownContent } from "./markdown-content";
@@ -85,6 +86,7 @@ export function ChatPanel({
   onSelectPromptChip,
   onAddSource,
 }: ChatPanelProps) {
+  const { t, language } = useI18n();
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [inputMessage, setInputMessage] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
@@ -305,7 +307,11 @@ export function ChatPanel({
           const emptyInitials = rawSessions.filter(
             (s) =>
               (!s.messageCount || s.messageCount === 0) &&
-              (s.title === "Sesi Awal" || s.title === "Percakapan Baru")
+              (s.title === "Sesi Awal" ||
+                s.title === "Percakapan Baru" ||
+                s.title === "Initial Session" ||
+                s.title === "Main Session" ||
+                s.title === "New Conversation")
           );
           // If there are duplicate empty initial sessions, delete the excess ones
           if (emptyInitials.length > 1) {
@@ -346,7 +352,7 @@ export function ChatPanel({
           if (fresh.length > 0) {
             setActiveSessionId(fresh[0]!.id);
           } else {
-            const newId = await localDb.createSession(learnId, "Sesi Awal");
+            const newId = await localDb.createSession(learnId, t("initialSessionTitle"));
             setActiveSessionId(newId);
           }
         } finally {
@@ -511,10 +517,14 @@ export function ChatPanel({
           }
           updated.toolCalls = toolCalls;
         } else if (event.type === "error") {
-          const errorMsg = event.error || "Terjadi kesalahan saat memproses permintaan.";
+          const defaultError = language === "id"
+            ? "Terjadi kesalahan saat memproses permintaan."
+            : "An error occurred while processing the request.";
+          const errorMsg = event.error || defaultError;
+          const errorPrefix = language === "id" ? "Terjadi kendala" : "Issue encountered";
           updated.content = updated.content
             ? `${updated.content}\n\n⚠️ **Error:** ${errorMsg}`
-            : `⚠️ **Terjadi kendala:** ${errorMsg}`;
+            : `⚠️ **${errorPrefix}:** ${errorMsg}`;
           updated.isStreaming = false;
           setIsStreaming(false);
 
@@ -539,9 +549,11 @@ export function ChatPanel({
             updated.content = event.fullContent;
           } else if (!updated.content && updated.toolCalls && updated.toolCalls.length > 0) {
             const toolSummary = updated.toolCalls
-              .map((tc) => `- \`${tc.name}\`: ${tc.status === "completed" ? "Selesai" : "Gagal"}`)
+              .map((tc) => `- \`${tc.name}\`: ${tc.status === "completed" ? (language === "id" ? "Selesai" : "Completed") : (language === "id" ? "Gagal" : "Failed")}`)
               .join("\n");
-            updated.content = `Selesai menjalankan langkah-langkah tugas:\n\n${toolSummary}`;
+            updated.content = language === "id"
+              ? `Selesai menjalankan langkah-langkah tugas:\n\n${toolSummary}`
+              : `Completed running task steps:\n\n${toolSummary}`;
           }
 
           if (streamStartTimeRef.current) {
@@ -651,7 +663,7 @@ export function ChatPanel({
     // 1. Ensure we have an active session
     let currentSessionId = activeSessionId;
     if (!currentSessionId && learnId) {
-      currentSessionId = await localDb.createSession(learnId, "Percakapan Baru");
+      currentSessionId = await localDb.createSession(learnId, t("newSessionTitle"));
       setActiveSessionId(currentSessionId);
     }
 
@@ -662,7 +674,10 @@ export function ChatPanel({
         !currentSession ||
         currentSession.messageCount === 0 ||
         currentSession.title === "Percakapan Baru" ||
-        currentSession.title === "Sesi Awal";
+        currentSession.title === "Sesi Awal" ||
+        currentSession.title === "Initial Session" ||
+        currentSession.title === "Main Session" ||
+        currentSession.title === "New Conversation";
 
       if (isDefaultTitle) {
         // Immediate fallback title: first 4-6 words
@@ -696,18 +711,21 @@ export function ChatPanel({
     // Append attachments summary to user prompt if any were added
     let promptWithAttachments = textToSend;
     if (attachments.length > 0) {
+      const attLabel = language === "id" ? "Lampiran" : "Attachment";
       const attList = attachments
-        .map((a) => `- [Lampiran: ${a.name} (${formatFileSize(a.size)})]`)
+        .map((a) => `- [${attLabel}: ${a.name} (${formatFileSize(a.size)})]`)
         .join("\n");
       promptWithAttachments = `${promptWithAttachments}\n\n${attList}`;
     }
 
     // Append active/carried sources summary if any
     if (carriedSources.length > 0) {
+      const srcLabel = language === "id" ? "Sumber" : "Source";
+      const refLabel = language === "id" ? "Referensi Sumber Dibawa" : "Carried Source References";
       const sourceList = carriedSources
-        .map((s) => `- [Sumber: ${s.title} (${s.type}${s.url ? ` - ${s.url}` : ""})]`)
+        .map((s) => `- [${srcLabel}: ${s.title} (${s.type}${s.url ? ` - ${s.url}` : ""})]`)
         .join("\n");
-      promptWithAttachments = `${promptWithAttachments}\n\nReferensi Sumber Dibawa:\n${sourceList}`;
+      promptWithAttachments = `${promptWithAttachments}\n\n${refLabel}:\n${sourceList}`;
     }
 
     const newUserMsg: DisplayMessage = {
@@ -814,7 +832,13 @@ export function ChatPanel({
           : undefined;
 
         if (res && res.success === false) {
-          const errorContent = `⚠️ Terjadi kendala saat memproses: ${res.error || "Gagal mendapatkan respons dari engine"}`;
+          const defaultResError = language === "id"
+            ? "Gagal mendapatkan respons dari engine"
+            : "Failed to get response from engine";
+          const errorPrefix = language === "id"
+            ? "Terjadi kendala saat memproses"
+            : "An issue occurred while processing";
+          const errorContent = `⚠️ ${errorPrefix}: ${res.error || defaultResError}`;
           setMessages((prev) =>
             prev.map((msg) =>
               msg.id === assistantMsgId
@@ -846,9 +870,11 @@ export function ChatPanel({
                 let finalContent = msg.content;
                 if (!finalContent && msg.toolCalls && msg.toolCalls.length > 0) {
                   const toolSummary = msg.toolCalls
-                    .map((tc) => `- \`${tc.name}\`: ${tc.status === "completed" ? "Selesai" : "Gagal"}`)
+                    .map((tc) => `- \`${tc.name}\`: ${tc.status === "completed" ? (language === "id" ? "Selesai" : "Completed") : (language === "id" ? "Gagal" : "Failed")}`)
                     .join("\n");
-                  finalContent = `Selesai menjalankan langkah-langkah tugas:\n\n${toolSummary}`;
+                  finalContent = language === "id"
+                    ? `Selesai menjalankan langkah-langkah tugas:\n\n${toolSummary}`
+                    : `Completed running task steps:\n\n${toolSummary}`;
                 }
                 const finalized = {
                   ...msg,
@@ -875,7 +901,9 @@ export function ChatPanel({
           );
         }
       } catch (err: any) {
-        const errorContent = `Terjadi kendala koneksi ke Agent: ${err.message}`;
+        const errorContent = language === "id"
+          ? `Terjadi kendala koneksi ke Agent: ${err.message}`
+          : `Agent connection error: ${err.message}`;
         setMessages((prev) =>
           prev.map((msg) =>
             msg.id === assistantMsgId
@@ -1005,7 +1033,9 @@ export function ChatPanel({
           });
         }
       } catch (err: any) {
-        const errorText = `Gagal memanggil Const: ${err.message}`;
+        const errorText = language === "id"
+          ? `Gagal memanggil Const: ${err.message}`
+          : `Failed to call Const: ${err.message}`;
         setMessages((prev) =>
           prev.map((msg) =>
             msg.id === assistantMsgId
@@ -1101,12 +1131,16 @@ export function ChatPanel({
             ? "bg-secondary/70 hover:bg-secondary border-border/70 text-foreground"
             : "hover:bg-muted/60 text-muted-foreground border-transparent hover:border-border/50"
         )}
-        aria-label="Kelola Sumber yang Dibawa"
-        title="Kelola sumber yang dibawa ke obrolan"
+        aria-label={t("manageCarriedSources")}
+        title={t("manageCarriedSources")}
       >
         <FileText className="h-3 w-3 text-muted-foreground shrink-0" />
         <span className="font-mono text-[11px] sm:text-[12px] text-foreground/85 font-medium">
-          {carriedSourcesCount} sumber
+          {carriedSourcesCount > 1
+            ? t("carriedSourcesPill", { count: carriedSourcesCount })
+            : carriedSourcesCount === 1
+            ? t("carriedSourcesPillSingle")
+            : t("sourcesCountNone")}
         </span>
         <ChevronDown
           className={cn(
@@ -1124,7 +1158,7 @@ export function ChatPanel({
           {/* Header */}
           <div className="flex items-center justify-between px-1.5 pb-2 mb-1.5 border-b border-border/50">
             <span className="text-[11px] font-semibold text-foreground tracking-tight">
-              Sumber Dibawa ({carriedSourcesCount}/{sources.length})
+              {t("carriedSourcesTitle", { carried: carriedSourcesCount, total: sources.length })}
             </span>
             {sources.length > 0 && (
               <button
@@ -1137,7 +1171,7 @@ export function ChatPanel({
                 }}
                 className="text-[10px] text-primary hover:underline cursor-pointer font-medium"
               >
-                {carriedSources.length === sources.length ? "Batal Semua" : "Pilih Semua"}
+                {carriedSources.length === sources.length ? t("deselectAll") : t("selectAll")}
               </button>
             )}
           </div>
@@ -1147,9 +1181,9 @@ export function ChatPanel({
             {sources.length === 0 ? (
               <div className="py-4 px-2 text-center text-muted-foreground">
                 <FileText className="h-6 w-6 mx-auto mb-1.5 opacity-40" />
-                <p className="text-xs font-medium text-foreground">Belum ada sumber</p>
+                <p className="text-xs font-medium text-foreground">{t("noSourcesInChat")}</p>
                 <p className="text-[10px] text-muted-foreground/80 mt-0.5">
-                  Tambahkan berkas atau tautan web ke notebook
+                  {t("noSourcesInChatDesc")}
                 </p>
               </div>
             ) : (
@@ -1201,7 +1235,7 @@ export function ChatPanel({
                 className="w-full h-7 rounded-xl bg-muted/60 hover:bg-muted text-xs font-medium text-foreground flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
               >
                 <Plus className="h-3 w-3" />
-                <span>Tambah Sumber</span>
+                <span>{t("addSource")}</span>
               </button>
             </div>
           )}
@@ -1217,7 +1251,7 @@ export function ChatPanel({
           type="button"
           onClick={handleAbort}
           className="h-8 w-8 rounded-full bg-destructive/10 hover:bg-destructive/20 text-destructive flex items-center justify-center transition-colors cursor-pointer shrink-0"
-          title="Hentikan Proses"
+          title={t("stopGenerating")}
         >
           <Square className="h-3.5 w-3.5 fill-current" />
         </button>
@@ -1232,8 +1266,8 @@ export function ChatPanel({
         <button
           type="button"
           className="h-8 w-8 rounded-full bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer shrink-0"
-          title="Gunakan Input Suara"
-          aria-label="Input Suara"
+          title={t("voiceInput")}
+          aria-label={t("voiceInput")}
         >
           <Mic className="h-4 w-4" />
         </button>
@@ -1246,8 +1280,8 @@ export function ChatPanel({
           <button
             type="button"
             className="h-8 w-8 rounded-full hover:bg-muted/70 text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer shrink-0"
-            title="Gunakan Input Suara"
-            aria-label="Input Suara"
+            title={t("voiceInput")}
+            aria-label={t("voiceInput")}
           >
             <Mic className="h-4 w-4" />
           </button>
@@ -1261,7 +1295,7 @@ export function ChatPanel({
               ? "bg-[#1a73e8] hover:bg-[#1557b0] text-white"
               : "bg-muted/60 text-muted-foreground/40 cursor-not-allowed"
           )}
-          aria-label="Kirim"
+          aria-label={t("sendMessage")}
         >
           <ArrowUp className="h-4 w-4 stroke-[2.5]" />
         </button>
@@ -1275,8 +1309,8 @@ export function ChatPanel({
         type="button"
         onClick={() => fileInputRef.current?.click()}
         className="h-8 w-8 rounded-full hover:bg-muted/70 text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer shrink-0"
-        title="Lampirkan File atau Media"
-        aria-label="Lampirkan File"
+        title={t("attachFileMedia")}
+        aria-label={t("attachFileMedia")}
       >
         <Plus className="h-4 w-4 stroke-[2]" />
       </button>
@@ -1341,15 +1375,15 @@ export function ChatPanel({
             className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-muted/60 hover:bg-muted text-xs font-medium text-foreground transition-all cursor-pointer border border-border/60 max-w-[180px] sm:max-w-[260px] truncate group select-none shadow-xs active:scale-98 shrink-0"
             title={
               workspacePath
-                ? `Buka di File Explorer:\n${workspacePath}`
-                : "Workspace Default (~/.const/learn/workspaces/)"
+                ? t("openInExplorer", { path: workspacePath })
+                : `${t("defaultWorkspace")} (~/.const/learn/workspaces/)`
             }
           >
             <Folder className="h-3.5 w-3.5 text-primary shrink-0 group-hover:scale-110 transition-transform" />
             <span className="truncate font-mono text-[11px]">
               {workspacePath
                 ? workspacePath.split(/[\\/]/).filter(Boolean).pop() || workspacePath
-                : "Default Workspace"}
+                : t("defaultWorkspace")}
             </span>
           </button>
 
@@ -1359,7 +1393,7 @@ export function ChatPanel({
               type="button"
               onClick={() => setIsModelDropdownOpen(!isModelDropdownOpen)}
               className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-muted/60 hover:bg-muted border border-border/60 text-xs font-medium text-foreground transition-all cursor-pointer shadow-xs active:scale-98"
-              aria-label="Pilih Model AI"
+              aria-label={t("selectAiModel")}
             >
               <Sparkles className="h-3 w-3 text-accent" />
               <span>{currentModel.displayName.split("(")[0]?.trim() || "Const"}</span>
@@ -1369,7 +1403,7 @@ export function ChatPanel({
             {isModelDropdownOpen && (
               <div className="absolute left-0 mt-1.5 w-64 rounded-2xl bg-card border border-border shadow-2xl p-1.5 z-50 animate-in fade-in zoom-in-95 duration-100">
                 <div className="px-2.5 py-1.5 text-[10px] uppercase font-semibold text-muted-foreground tracking-wider border-b border-border/40 mb-1">
-                  Pilih Model Cerdas
+                  {t("selectAiModel")}
                 </div>
                 {models.map((m) => (
                   <button
@@ -1408,10 +1442,10 @@ export function ChatPanel({
             type="button"
             onClick={handleNewChat}
             className="h-8 px-3 rounded-xl hover:bg-muted text-foreground text-xs flex items-center gap-1.5 transition-all cursor-pointer border border-border/60 bg-muted/40 font-medium shadow-xs active:scale-98"
-            title="Mulai percakapan baru"
+            title={t("startConversationNew")}
           >
             <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
-            <span>New Chat</span>
+            <span>{t("newChat")}</span>
           </button>
 
           {/* History Button */}
@@ -1419,11 +1453,11 @@ export function ChatPanel({
             type="button"
             onClick={() => setIsHistoryOpen(true)}
             className="h-8 px-2.5 rounded-xl hover:bg-muted text-muted-foreground hover:text-foreground text-xs flex items-center gap-1.5 transition-all cursor-pointer border border-border/60 bg-muted/40 shadow-xs active:scale-98"
-            title="Riwayat Percakapan"
-            aria-label="Riwayat Percakapan"
+            title={t("chatHistory")}
+            aria-label={t("chatHistory")}
           >
             <History className="h-4 w-4" />
-            <span className="hidden sm:inline font-sans">History</span>
+            <span className="hidden sm:inline font-sans">{t("chatHistory")}</span>
             {sessions.length > 0 && (
               <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-secondary text-foreground">
                 {sessions.length}
@@ -1434,8 +1468,8 @@ export function ChatPanel({
           <button
             type="button"
             className="h-8 w-8 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
-            aria-label="Opsi lainnya"
-            title="Opsi lainnya"
+            aria-label={t("moreOptions")}
+            title={t("moreOptions")}
           >
             <MoreVertical className="h-4 w-4" />
           </button>
@@ -1450,22 +1484,22 @@ export function ChatPanel({
             <div className="text-3xl sm:text-4xl mb-3 select-none">👋</div>
 
             <h1 className="text-2xl sm:text-3xl font-sans font-medium tracking-tight text-foreground mb-2">
-              Mari mulai membuat notebook...
+              {t("welcomeNotebookTitle")}
             </h1>
 
             <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed mb-4 max-w-xl font-sans">
-              Dengan notebook ini, Anda dapat mulai memahami, membuat, atau mengembangkan hal baru. Anda dapat meminta bantuan saya untuk memulai atau langsung menambahkan sumber Anda sendiri.
+              {t("welcomeNotebookDesc")}
             </p>
 
             <p className="text-xs text-muted-foreground/80 font-medium mb-3 font-sans">
-              Apa yang ingin Anda lakukan dengan notebook ini?
+              {t("welcomeNotebookPrompt")}
             </p>
 
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2.5 font-sans">
               {[
-                "Pelajari topik baru",
-                "Buat konten baru",
-                "Lanjutkan project",
+                t("chipLearnNewTopic"),
+                t("chipCreateContent"),
+                t("chipContinueProject"),
               ].map((chip) => (
                 <button
                   key={chip}
@@ -1506,7 +1540,7 @@ export function ChatPanel({
                         type="button"
                         onClick={() => handleCopyMessage(msg.id, msg.content)}
                         className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                        title="Salin pesan"
+                        title={t("copyMessage")}
                       >
                         {copiedId === msg.id ? (
                           <Check className="w-3.5 h-3.5 text-emerald-500" />
@@ -1541,7 +1575,7 @@ export function ChatPanel({
                   ) : isLatestAssistant ? (
                     <div className="text-xs text-muted-foreground italic px-1 flex items-center gap-2">
                       <span className="inline-block w-1.5 h-3.5 bg-primary animate-pulse align-middle" />
-                      <span>Sedang memproses respons...</span>
+                      <span>{t("processingResponse")}</span>
                     </div>
                   ) : null}
 
@@ -1552,7 +1586,7 @@ export function ChatPanel({
                         type="button"
                         onClick={() => handleCopyMessage(msg.id, msg.content)}
                         className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                        title="Salin respons"
+                        title={t("copyMessage")}
                       >
                         {copiedId === msg.id ? (
                           <Check className="w-3.5 h-3.5 text-emerald-500" />
@@ -1610,8 +1644,8 @@ export function ChatPanel({
                 disabled={isStreaming}
                 placeholder={
                   isStreaming
-                    ? "Sedang memproses respons asisten..."
-                    : "Tanyakan apa saja atau ketik pesan..."
+                    ? t("inputStreamingPlaceholder")
+                    : t("inputPlaceholder")
                 }
                 className="w-full resize-none bg-transparent text-[14px] leading-[1.65] text-foreground placeholder:text-muted-foreground/60 outline-none font-sans py-0.5 block disabled:opacity-50 min-h-[48px]"
               />
@@ -1669,8 +1703,8 @@ export function ChatPanel({
               disabled={isStreaming}
               placeholder={
                 isStreaming
-                  ? "Sedang memproses respons asisten..."
-                  : "Tanyakan apa saja atau ketik pesan..."
+                  ? t("inputStreamingPlaceholder")
+                  : t("inputPlaceholder")
               }
               className="flex-1 bg-transparent text-[14px] leading-5 text-foreground placeholder:text-muted-foreground/60 outline-none font-sans resize-none overflow-hidden h-[28px] max-h-[28px] py-1 block disabled:opacity-50"
             />

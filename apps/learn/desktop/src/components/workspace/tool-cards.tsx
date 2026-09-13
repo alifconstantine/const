@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from "react";
+import React, { useState, useEffect } from "react";
 import {
   HelpCircle,
   CheckCircle2,
@@ -19,6 +19,7 @@ import {
   Circle,
   Sparkles,
 } from "lucide-react";
+import { useI18n } from "../../lib/i18n";
 
 export interface DisplayToolCall {
   id: string;
@@ -38,6 +39,7 @@ interface SocraticQuestionCardProps {
 }
 
 export function SocraticQuestionCard({ toolCall, onAnswer }: SocraticQuestionCardProps) {
+  const { t } = useI18n();
   const [customInput, setCustomInput] = useState("");
   const [selectedOption, setSelectedOption] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -45,7 +47,7 @@ export function SocraticQuestionCard({ toolCall, onAnswer }: SocraticQuestionCar
   const rawQuestion =
     toolCall.args?.question ||
     toolCall.args?.questions?.[0]?.question ||
-    "Bagaimana kita ingin melanjutkan?";
+    t("howToProceedFallback");
 
   const rawOptions: string[] = Array.isArray(toolCall.args?.options)
     ? toolCall.args.options
@@ -89,22 +91,22 @@ export function SocraticQuestionCard({ toolCall, onAnswer }: SocraticQuestionCar
             <HelpCircle className="h-3.5 w-3.5" />
           </div>
           <span className="font-semibold text-foreground tracking-tight">
-            Pertanyaan Socrates
+            {t("socraticQuestion")}
           </span>
           <span className="text-[10px] px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-400 font-mono">
-            Inkuiri
+            {t("inquiry")}
           </span>
         </div>
 
         {isCompleted ? (
           <span className="inline-flex items-center gap-1 text-[11px] text-emerald-400 font-mono">
             <CheckCircle2 className="h-3.5 w-3.5" />
-            Terjawab
+            {t("answered")}
           </span>
         ) : (
           <span className="inline-flex items-center gap-1 text-[11px] text-sky-400 font-mono animate-pulse">
             <Loader2 className="h-3 w-3 animate-spin" />
-            Menunggu Pilihan Anda
+            {t("waitingForChoice")}
           </span>
         )}
       </div>
@@ -120,7 +122,7 @@ export function SocraticQuestionCard({ toolCall, onAnswer }: SocraticQuestionCar
           <div className="flex items-center gap-2">
             <Check className="h-4 w-4 text-emerald-400 shrink-0" />
             <span className="text-xs">
-              Pilihan:{" "}
+              {t("choiceLabel")}{" "}
               <strong className="text-emerald-400">
                 {typeof toolCall.result === "string"
                   ? toolCall.result
@@ -162,14 +164,14 @@ export function SocraticQuestionCard({ toolCall, onAnswer }: SocraticQuestionCar
                 value={customInput}
                 onChange={(e) => setCustomInput(e.target.value)}
                 disabled={isSubmitting}
-                placeholder="Atau ketik pemikiran / jawaban Anda sendiri..."
+                placeholder={t("customAnswerPlaceholder")}
                 className="flex-1 bg-background/80 border border-border/60 rounded-xl px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground/60 outline-none focus:border-sky-500/70 transition-all"
               />
               <button
                 type="submit"
                 disabled={!customInput.trim() || isSubmitting}
                 className="px-3.5 py-2 rounded-xl bg-sky-600 hover:bg-sky-500 text-white disabled:opacity-40 transition-all flex items-center justify-center cursor-pointer shadow-xs active:scale-95"
-                title="Kirim Jawaban Kustom"
+                title={t("sendCustomAnswer")}
               >
                 <Send className="h-3.5 w-3.5" />
               </button>
@@ -191,6 +193,7 @@ interface PythonRunnerCardProps {
 }
 
 export function PythonRunnerCard({ toolCall, isExpanded, onToggle }: PythonRunnerCardProps) {
+  const { t } = useI18n();
   const [mediaPreviews, setMediaPreviews] = useState<Record<string, string>>({});
 
   const artifacts: string[] = Array.isArray(toolCall.result?.artifacts)
@@ -247,7 +250,7 @@ export function PythonRunnerCard({ toolCall, isExpanded, onToggle }: PythonRunne
             Python Engine
           </span>
           <span className="text-[10px] text-muted-foreground font-mono truncate max-w-[200px] sm:max-w-xs">
-            {code ? code.split("\n")[0]?.slice(0, 35) + "..." : "Perhitungan"}
+            {code ? code.split("\n")[0]?.slice(0, 35) + "..." : t("calculation")}
           </span>
         </div>
 
@@ -255,17 +258,17 @@ export function PythonRunnerCard({ toolCall, isExpanded, onToggle }: PythonRunne
           {toolCall.status === "running" ? (
             <span className="inline-flex items-center gap-1 text-[11px] text-accent font-mono">
               <Loader2 className="h-3 w-3 animate-spin" />
-              Menghitung...
+              {t("calculating")}
             </span>
           ) : toolCall.status === "completed" ? (
             <span className="inline-flex items-center gap-1 text-[11px] text-emerald-500 font-mono">
               <CheckCircle2 className="h-3 w-3" />
-              Selesai
+              {t("completed")}
             </span>
           ) : (
             <span className="inline-flex items-center gap-1 text-[11px] text-destructive font-mono">
               <AlertCircle className="h-3 w-3" />
-              Gagal
+              {t("failed")}
             </span>
           )}
 
@@ -274,7 +277,7 @@ export function PythonRunnerCard({ toolCall, isExpanded, onToggle }: PythonRunne
             onClick={onToggle}
             className="h-6 px-2.5 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground text-[10px] transition-colors cursor-pointer border border-border/40"
           >
-            {isExpanded ? "Tutup" : "Detail"}
+            {isExpanded ? t("closeDetail") : t("details")}
           </button>
         </div>
       </div>
@@ -294,14 +297,14 @@ export function PythonRunnerCard({ toolCall, isExpanded, onToggle }: PythonRunne
                 <div className="flex items-center justify-between text-[11px]">
                   <span className="font-mono text-foreground/90 flex items-center gap-1.5">
                     <Sparkles className="h-3 w-3 text-yellow-400" />
-                    Grafik Dihasilkan: <strong>{fileName}</strong>
+                    {t("generatedChart")} <strong>{fileName}</strong>
                   </span>
                   <button
                     type="button"
                     onClick={() => handleOpenPath(artPath)}
                     className="flex items-center gap-1 text-[10px] text-sky-400 hover:text-sky-300 font-medium cursor-pointer"
                   >
-                    <span>Buka Berkas</span>
+                    <span>{t("openFile")}</span>
                     <ExternalLink className="h-2.5 w-2.5" />
                   </button>
                 </div>
@@ -327,7 +330,7 @@ export function PythonRunnerCard({ toolCall, isExpanded, onToggle }: PythonRunne
           {code && (
             <div>
               <div className="text-muted-foreground text-[10px] mb-1">
-                Kode Python Dieksekusi:
+                {t("pythonCodeExecuted")}
               </div>
               <pre className="p-2.5 rounded-xl bg-background/80 border border-border/30 overflow-x-auto text-yellow-300/90 whitespace-pre max-h-48 overflow-y-auto">
                 {code}
@@ -338,7 +341,7 @@ export function PythonRunnerCard({ toolCall, isExpanded, onToggle }: PythonRunne
           {stdout && (
             <div>
               <div className="text-muted-foreground text-[10px] mb-1">
-                Keluaran (stdout):
+                {t("stdoutOutput")}
               </div>
               <pre className="p-2.5 rounded-xl bg-background/80 border border-border/30 overflow-x-auto text-emerald-400 whitespace-pre-wrap max-h-48 overflow-y-auto">
                 {stdout}
@@ -372,9 +375,12 @@ interface TodoWriteCardProps {
 }
 
 export function TodoWriteCard({ toolCall, isExpanded, onToggle }: TodoWriteCardProps) {
-  const title = toolCall.args?.title || "Rencana Belajar & Tugas";
+  const { t } = useI18n();
+  const title = toolCall.args?.title || t("studyRoadmapAndTasks");
   const tasks: Array<{ id: string; text: string; status: "pending" | "in_progress" | "completed" }> =
     Array.isArray(toolCall.args?.tasks) ? toolCall.args.tasks : [];
+
+  const completedCount = tasks.filter((t) => t.status === "completed").length;
 
   return (
     <div className="rounded-2xl border border-cyan-500/30 bg-cyan-950/10 p-3 text-xs shadow-xs space-y-2.5">
@@ -385,7 +391,7 @@ export function TodoWriteCard({ toolCall, isExpanded, onToggle }: TodoWriteCardP
           </div>
           <span className="font-semibold text-foreground">{title}</span>
           <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-400 font-mono">
-            {tasks.filter((t) => t.status === "completed").length}/{tasks.length} Selesai
+            {t("tasksCompleted", { completed: completedCount, total: tasks.length })}
           </span>
         </div>
 
@@ -394,7 +400,7 @@ export function TodoWriteCard({ toolCall, isExpanded, onToggle }: TodoWriteCardP
           onClick={onToggle}
           className="h-6 px-2.5 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground text-[10px] transition-colors cursor-pointer border border-border/40"
         >
-          {isExpanded ? "Tutup" : "Lihat Roadmap"}
+          {isExpanded ? t("closeDetail") : t("viewRoadmap")}
         </button>
       </div>
 
@@ -436,6 +442,7 @@ interface GenericToolCardProps {
 }
 
 export function GenericToolCard({ toolCall, isExpanded, onToggle }: GenericToolCardProps) {
+  const { t } = useI18n();
   const getToolIcon = (name: string) => {
     switch (name) {
       case "run_command":
@@ -489,17 +496,17 @@ export function GenericToolCard({ toolCall, isExpanded, onToggle }: GenericToolC
           {toolCall.status === "running" ? (
             <span className="inline-flex items-center gap-1 text-[11px] text-accent font-mono">
               <Loader2 className="h-3 w-3 animate-spin" />
-              Menjalankan...
+              {t("running")}
             </span>
           ) : toolCall.status === "completed" ? (
             <span className="inline-flex items-center gap-1 text-[11px] text-emerald-500 font-mono">
               <CheckCircle2 className="h-3 w-3" />
-              Selesai
+              {t("completed")}
             </span>
           ) : (
             <span className="inline-flex items-center gap-1 text-[11px] text-destructive font-mono">
               <AlertCircle className="h-3 w-3" />
-              Gagal
+              {t("failed")}
             </span>
           )}
 
@@ -508,7 +515,7 @@ export function GenericToolCard({ toolCall, isExpanded, onToggle }: GenericToolC
             onClick={onToggle}
             className="h-6 px-2.5 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground text-[10px] transition-colors cursor-pointer border border-border/40"
           >
-            {isExpanded ? "Tutup" : "Detail"}
+            {isExpanded ? t("closeDetail") : t("details")}
           </button>
         </div>
       </div>
@@ -516,7 +523,7 @@ export function GenericToolCard({ toolCall, isExpanded, onToggle }: GenericToolC
       {/* Expanded Details */}
       {isExpanded && (
         <div className="mt-2.5 pt-2.5 border-t border-border/40 space-y-1.5 font-mono text-[11px]">
-          <div className="text-muted-foreground text-[10px]">Parameter Input:</div>
+          <div className="text-muted-foreground text-[10px]">{t("inputParams")}</div>
           <pre className="p-2.5 rounded-xl bg-background/80 border border-border/30 overflow-x-auto text-foreground/90">
             {JSON.stringify(toolCall.args, null, 2)}
           </pre>
@@ -524,7 +531,7 @@ export function GenericToolCard({ toolCall, isExpanded, onToggle }: GenericToolC
           {toolCall.result && (
             <>
               <div className="text-muted-foreground text-[10px] mt-2">
-                Hasil Eksekusi:
+                {t("executionResult")}
               </div>
               <pre className="p-2.5 rounded-xl bg-background/80 border border-border/30 overflow-x-auto text-emerald-500/90 whitespace-pre-wrap max-h-60 overflow-y-auto">
                 {typeof toolCall.result === "string"

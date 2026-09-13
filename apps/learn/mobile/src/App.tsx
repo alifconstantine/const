@@ -8,6 +8,7 @@ import { Navbar } from "./components/navbar";
 import { LearnHome } from "./components/home/learn-home";
 import { MobileLearnWorkspace } from "./components/workspace/learn-workspace";
 import { localDb } from "./lib/db";
+import { useI18n } from "./lib/i18n";
 
 function AuthenticatedContent({
   onSignOut,
@@ -16,6 +17,7 @@ function AuthenticatedContent({
   onSignOut: () => void;
   onSwitchAccount: () => void;
 }) {
+  const { t } = useI18n();
   const user = useQuery(api.auth.queries.currentUser, {});
   const [activeLearnId, setActiveLearnId] = useState<string | null>(null);
   const [openAddSourceOnLoad, setOpenAddSourceOnLoad] = useState(false);
@@ -38,7 +40,7 @@ function AuthenticatedContent({
         onBack={handleBackToHome}
         onCreateNew={async () => {
           const id = await localDb.createLearn({
-            title: "Untitled notebook",
+            title: t("untitledNotebook"),
             emoji: "📘",
           });
           setActiveLearnId(id);
@@ -64,6 +66,7 @@ function AuthenticatedContent({
 }
 
 export default function App() {
+  const { language, setLanguage, t } = useI18n();
   const [token, setToken] = useState<string | null>(() => {
     return (
       localStorage.getItem("const_learn_auth_token") ||
@@ -180,10 +183,10 @@ export default function App() {
       {/* Center Card (NO Image on right for mobile as requested) */}
       <div className="my-auto mx-auto w-full max-w-sm py-8">
         <h1 className="font-sans text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-          Sign in to Const Learn.
+          {t("signInConstLearn")}
         </h1>
         <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-          Sign in to start learning with cloud AI right away — no complex setup required.
+          {t("signInSubtitle")}
         </p>
 
         <div className="mt-8 space-y-4">
@@ -193,17 +196,21 @@ export default function App() {
             className="w-full h-12 rounded-xl text-sm font-medium gap-2 cursor-pointer transition-all active:scale-[0.99]"
           >
             <LogIn className="h-4 w-4" />
-            {isWaitingAuth ? "Reopen Login Page" : "Sign in to Const Learn"}
+            {isWaitingAuth ? t("reopenLoginPage") : t("signInConstLearn")}
           </Button>
         </div>
       </div>
 
       {/* Bottom Footer */}
       <div className="flex items-center justify-between pt-4 text-xs text-muted-foreground">
-        <div className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-muted-foreground">
+        <button
+          type="button"
+          onClick={() => setLanguage(language === "en" ? "id" : "en")}
+          className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
+        >
           <Globe className="h-3.5 w-3.5" />
-          <span>English</span>
-        </div>
+          <span>{language === "id" ? "Bahasa Indonesia" : "English"}</span>
+        </button>
         <span>© 2026 Const</span>
       </div>
     </div>

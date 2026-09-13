@@ -8,6 +8,7 @@ import {
 } from "@const/ui";
 import { MoreVertical, Edit3, Trash2, FolderOpen } from "lucide-react";
 import { LocalCollection } from "../../lib/db";
+import { useI18n } from "../../lib/i18n";
 
 export interface CollectionItem extends LocalCollection {
   itemCount: number;
@@ -28,7 +29,10 @@ export function CollectionCard({
   onEdit,
   onDelete,
 }: CollectionCardProps) {
-  const itemCountText = `${collection.itemCount} learn`;
+  const { t } = useI18n();
+  const itemCountText = collection.itemCount === 1
+    ? t("learnCountTextSingle")
+    : t("learnCountText", { count: collection.itemCount });
 
   if (viewMode === "list") {
     return (
@@ -71,14 +75,14 @@ export function CollectionCard({
                 onClick={() => onClick?.(collection)}
               >
                 <FolderOpen className="h-3.5 w-3.5" />
-                <span>Buka Koleksi</span>
+                <span>{t("openLearn")}</span>
               </DropdownMenuItem>
               <DropdownMenuItem
                 className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2"
                 onClick={() => onEdit?.(collection)}
               >
                 <Edit3 className="h-3.5 w-3.5" />
-                <span>Ubah Koleksi</span>
+                <span>{t("editCollection")}</span>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
@@ -86,7 +90,7 @@ export function CollectionCard({
                 onClick={() => onDelete?.(collection)}
               >
                 <Trash2 className="h-3.5 w-3.5" />
-                <span>Hapus</span>
+                <span>{t("delete")}</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -113,7 +117,7 @@ export function CollectionCard({
               type="button"
               onClick={(e) => e.stopPropagation()}
               className="h-7 w-7 rounded-lg flex items-center justify-center hover:bg-secondary text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
-              aria-label="Menu pilihan koleksi"
+              aria-label={t("moreOptions")}
             >
               <MoreVertical className="h-4 w-4" />
             </button>
@@ -124,14 +128,14 @@ export function CollectionCard({
               onClick={() => onClick?.(collection)}
             >
               <FolderOpen className="h-3.5 w-3.5" />
-              <span>Buka Koleksi</span>
+              <span>{t("openLearn")}</span>
             </DropdownMenuItem>
             <DropdownMenuItem
               className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2"
               onClick={() => onEdit?.(collection)}
             >
               <Edit3 className="h-3.5 w-3.5" />
-              <span>Ubah Koleksi</span>
+              <span>{t("editCollection")}</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem
@@ -139,7 +143,7 @@ export function CollectionCard({
               onClick={() => onDelete?.(collection)}
             >
               <Trash2 className="h-3.5 w-3.5" />
-              <span>Hapus</span>
+              <span>{t("delete")}</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -161,7 +165,7 @@ export function CollectionCard({
       <div className="text-[11px] font-normal text-muted-foreground flex items-center justify-between pt-1">
         <span>{itemCountText}</span>
         <span className="text-[10px] text-muted-foreground/80 group-hover:text-foreground flex items-center gap-1 transition-colors">
-          Buka &rarr;
+          {t("open")} &rarr;
         </span>
       </div>
     </div>

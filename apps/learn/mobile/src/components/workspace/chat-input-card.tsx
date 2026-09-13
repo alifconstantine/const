@@ -9,6 +9,7 @@ import {
   Video,
 } from "lucide-react";
 import { ScrollArea, cn } from "@const/ui";
+import { useI18n } from "../../lib/i18n";
 
 export interface AttachedMedia {
   id: string;
@@ -50,6 +51,7 @@ export function ChatInputCard({
   attachments: externalAttachments,
   onAttachmentsChange,
 }: ChatInputCardProps) {
+  const { t } = useI18n();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -190,8 +192,8 @@ export function ChatInputCard({
       type="button"
       onClick={onOpenSources}
       className="inline-flex items-center gap-1 px-1.5 py-1 rounded-full text-xs text-[#888888] hover:text-[#d4d4d4] transition-colors cursor-pointer select-none"
-      title="Learning Sources"
-      aria-label="Learning Sources"
+      title={t("learningSources")}
+      aria-label={t("learningSources")}
     >
       <Layers className="w-3.5 h-3.5 text-[#888888]" />
       <span className="font-mono text-[11px] text-[#888888]">{sourcesCount}</span>
@@ -206,8 +208,8 @@ export function ChatInputCard({
           type="button"
           onClick={onStop}
           className="w-8 h-8 rounded-full bg-[#383838] hover:bg-[#48484e] text-[#f87171] hover:text-white flex items-center justify-center transition-colors cursor-pointer border border-[#48484e] shrink-0"
-          title="Stop response"
-          aria-label="Stop response"
+          title={t("stopGenerating")}
+          aria-label={t("stopGenerating")}
         >
           <Square className="w-3 h-3 fill-current" />
         </button>
@@ -225,8 +227,8 @@ export function ChatInputCard({
             ? "bg-[#d4d4d4] text-[#161616] hover:bg-white cursor-pointer active:scale-95 shadow-sm"
             : "bg-[#2b2b2b] text-[#555555] cursor-not-allowed border border-[#383838]"
         )}
-        title="Send prompt"
-        aria-label="Send prompt"
+        title={t("sendMessage")}
+        aria-label={t("sendMessage")}
       >
         <ArrowUp className="w-3.5 h-3.5 stroke-[2.5]" />
       </button>
@@ -245,8 +247,8 @@ export function ChatInputCard({
             type="button"
             onClick={() => fileInputRef.current?.click()}
             className="w-7 h-7 rounded-full hover:bg-[#2b2b2b] text-[#888888] hover:text-[#e0e0e0] flex items-center justify-center transition-colors cursor-pointer shrink-0"
-            title="Add media or document"
-            aria-label="Add media or document"
+            title={t("addMediaOrDoc")}
+            aria-label={t("addMediaOrDoc")}
           >
             <Plus className="w-4 h-4" />
           </button>
@@ -260,8 +262,8 @@ export function ChatInputCard({
             onKeyDown={handleKeyDown}
             placeholder={
               isStreaming
-                ? "Menunggu respon..."
-                : `Tanya ${selectedModelName || "Const"}...`
+                ? t("waitingResponse")
+                : t("askModel", { model: selectedModelName || "Const" })
             }
             className="flex-1 bg-transparent text-[14px] leading-5 text-[#ececec] placeholder:text-[#666666] outline-none resize-none py-1 px-1 font-sans max-h-7 overflow-hidden block"
           />
@@ -322,8 +324,8 @@ export function ChatInputCard({
                       type="button"
                       onClick={() => handleRemoveAttachment(att.id)}
                       className="absolute -top-1.5 -right-1.5 w-4.5 h-4.5 rounded-full bg-[#2b2b2b] hover:bg-[#e11d48] border border-[#444444] text-[#a9a9a9] hover:text-white flex items-center justify-center transition-colors cursor-pointer shadow-sm z-10"
-                      title="Hapus lampiran"
-                      aria-label="Hapus lampiran"
+                      title={t("removeAttachment")}
+                      aria-label={t("removeAttachment")}
                     >
                       <X className="w-2.5 h-2.5 stroke-[2.5]" />
                     </button>
@@ -343,8 +345,8 @@ export function ChatInputCard({
               rows={2}
               placeholder={
                 isStreaming
-                  ? "Menunggu respon..."
-                  : `Tanya ${selectedModelName || "Const"}...`
+                  ? t("waitingResponse")
+                  : t("askModel", { model: selectedModelName || "Const" })
               }
               className="w-full bg-transparent text-[14px] leading-5 text-[#ececec] placeholder:text-[#666666] outline-none resize-none py-1 px-0.5 font-sans overflow-hidden block"
               style={{ height: `${Math.max(textareaHeight, 44)}px` }}
@@ -357,8 +359,8 @@ export function ChatInputCard({
               type="button"
               onClick={() => fileInputRef.current?.click()}
               className="w-8 h-8 rounded-full hover:bg-[#2b2b2b] text-[#888888] hover:text-[#e0e0e0] flex items-center justify-center transition-colors cursor-pointer shrink-0"
-              title="Add media or document"
-              aria-label="Add media or document"
+              title={t("addMediaOrDoc")}
+              aria-label={t("addMediaOrDoc")}
             >
               <Plus className="w-4 h-4" />
             </button>

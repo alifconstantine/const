@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Search, FileText, Globe, Plus, ExternalLink, PanelLeftOpen } from "lucide-react";
 import { Button, Input } from "@const/ui";
+import { useI18n } from "../../lib/i18n";
 
 interface SourcesViewProps {
   onAddSource?: () => void;
@@ -13,6 +14,7 @@ export function SourcesView({
   isSidebarOpen = true,
   onToggleSidebar,
 }: SourcesViewProps) {
+  const { t } = useI18n();
   const [searchQuery, setSearchQuery] = useState("");
 
   return (
@@ -26,18 +28,18 @@ export function SourcesView({
                 type="button"
                 onClick={onToggleSidebar}
                 className="p-1.5 -ml-1 rounded-xl bg-[#ececee] dark:bg-[#262626] hover:bg-[#dedee2] dark:hover:bg-[#333333] text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white transition-all cursor-pointer flex items-center justify-center shrink-0"
-                title="Buka sidebar (Ctrl+B)"
-                aria-label="Buka sidebar"
+                title={t("openSidebarKeyboard")}
+                aria-label={t("openSidebar")}
               >
                 <PanelLeftOpen className="w-4 h-4" />
               </button>
             )}
             <h2 className="font-serif text-2xl font-normal tracking-tight text-[#262626] dark:text-white">
-              Sources
+              {t("sourcesViewTitle")}
             </h2>
           </div>
           <p className="text-xs text-[#8a8a8a] dark:text-[#888888] mt-0.5">
-            Kumpulan dokumen, tautan riset web, dan referensi belajar Anda.
+            {t("sourcesViewSubtitle")}
           </p>
         </div>
 
@@ -48,7 +50,7 @@ export function SourcesView({
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Cari sumber referensi..."
+              placeholder={t("searchSourcesPlaceholder")}
               className="h-8 w-52 sm:w-64 pl-8 pr-3 text-xs rounded-xl bg-white dark:bg-[#222222] border-[#dedee2] dark:border-[#383838] text-[#262626] dark:text-[#d4d4d4] placeholder-[#8a8a8a] dark:placeholder-[#777777] focus-visible:ring-1 focus-visible:ring-[#888888]"
             />
           </div>
@@ -60,7 +62,7 @@ export function SourcesView({
               className="h-8 px-3.5 rounded-xl text-xs font-medium gap-1.5 bg-[#262626] dark:bg-white text-white dark:text-black hover:bg-black dark:hover:bg-zinc-200 cursor-pointer shadow-none"
             >
               <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-              <span>Tambah Sumber</span>
+              <span>{t("addSourceBtn")}</span>
             </Button>
           )}
         </div>
@@ -72,10 +74,10 @@ export function SourcesView({
           <FileText className="w-6 h-6 stroke-[1.5]" />
         </div>
         <h3 className="text-sm font-medium text-[#262626] dark:text-white mb-1">
-          Belum ada sumber tersimpan
+          {t("noSavedSourcesTitle")}
         </h3>
         <p className="text-xs text-[#8a8a8a] dark:text-[#888888] max-w-md leading-relaxed mb-4">
-          Tautkan artikel web, berkas PDF, dokumen markdown, atau catatan riset ke dalam notebook belajar Anda untuk mulai melakukan penalaran berbasis bukti dengan agen AI.
+          {t("noSavedSourcesDesc")}
         </p>
         {onAddSource && (
           <Button
@@ -85,7 +87,7 @@ export function SourcesView({
             className="rounded-xl text-xs border-[#dedee2] dark:border-[#383838] hover:bg-[#eaeaea] dark:hover:bg-[#2c2c2c] cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5 mr-1.5" />
-            <span>Tambahkan sumber pertama</span>
+            <span>{t("addFirstSource")}</span>
           </Button>
         )}
       </div>

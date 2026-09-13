@@ -9,6 +9,7 @@ import {
   Input,
 } from "@const/ui";
 import { BookOpen, Folder, FolderOpen, X } from "lucide-react";
+import { useI18n } from "../../../lib/i18n";
 
 const EMOJI_OPTIONS = [
   "🚀", "🧠", "💡", "🎨", "🏆", "📚", "💻", "🔬",
@@ -92,6 +93,7 @@ export function CreateLearnDialog({
     }
   };
 
+  const { t } = useI18n();
   const isEdit = !!initialData;
 
   return (
@@ -101,14 +103,14 @@ export function CreateLearnDialog({
           <DialogHeader className="pb-0.5">
             <DialogTitle className="font-serif text-base font-medium tracking-tight text-foreground flex items-center gap-2">
               <BookOpen className="h-4 w-4 text-primary shrink-0" />
-              <span>{isEdit ? "Ubah Detail Learn" : "Buat Learn Baru"}</span>
+              <span>{isEdit ? t("editLearnDialogTitle") : t("createLearnDialogTitle")}</span>
             </DialogTitle>
           </DialogHeader>
 
           {/* Emoji Picker */}
           <div>
             <label className="text-[12px] font-medium text-muted-foreground mb-1.5 block">
-              Pilih Ikon / Emoji
+              {t("pickIconEmoji")}
             </label>
             <div className="grid grid-cols-8 gap-1 p-1.5 rounded-xl bg-secondary/40 border border-border/60 w-full justify-items-center">
               {EMOJI_OPTIONS.map((emoji) => (
@@ -131,12 +133,12 @@ export function CreateLearnDialog({
           {/* Title input */}
           <div className="space-y-1">
             <label className="text-[12px] font-medium text-muted-foreground">
-              Judul Learn
+              {t("learnTitleLabel")}
             </label>
             <Input
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Contoh: Kimi K3 Architecture & Pre-training"
+              placeholder={t("learnTitlePlaceholder")}
               className="h-8 text-[12px] rounded-xl bg-secondary/40 border-border/70 focus-visible:ring-1 focus-visible:ring-ring w-full min-w-0 px-3 placeholder:text-muted-foreground/50"
               autoFocus
               required
@@ -148,7 +150,7 @@ export function CreateLearnDialog({
             <div className="flex items-center justify-between">
               <label className="text-[12px] font-medium text-muted-foreground flex items-center gap-1.5">
                 <Folder className="h-3.5 w-3.5 text-primary shrink-0" />
-                <span>Folder Proyek (Workspace)</span>
+                <span>{t("workspacePathLabel")}</span>
               </label>
               {projectPath && (
                 <button
@@ -157,7 +159,7 @@ export function CreateLearnDialog({
                   className="text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-0.5 cursor-pointer"
                 >
                   <X className="h-3 w-3" />
-                  <span>Reset Default</span>
+                  <span>{t("resetDefault")}</span>
                 </button>
               )}
             </div>
@@ -165,10 +167,10 @@ export function CreateLearnDialog({
             <div className="flex items-center gap-1.5 w-full min-w-0">
               <div
                 className="flex-1 min-w-0 h-8 px-2.5 rounded-xl bg-secondary/40 border border-border/70 text-[12px] text-foreground flex items-center overflow-hidden"
-                title={projectPath || "Default Workspace (~/.const/learn/workspaces/)"}
+                title={projectPath || t("workspacePathPlaceholder")}
               >
                 <span className="truncate">
-                  {projectPath ? projectPath : "Default (~/.const/learn/workspaces/)"}
+                  {projectPath ? projectPath : t("workspacePathPlaceholder")}
                 </span>
               </div>
 
@@ -181,14 +183,14 @@ export function CreateLearnDialog({
                   className="rounded-xl h-8 px-2.5 text-[12px] gap-1.5 shrink-0 cursor-pointer border-border/70"
                 >
                   <FolderOpen className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span>Pilih Folder</span>
+                  <span>{t("selectFolder")}</span>
                 </Button>
               )}
             </div>
             <p className="text-[11px] text-muted-foreground/70 leading-normal">
               {projectPath
-                ? "Agent beroperasi langsung di dalam folder proyek ini."
-                : "Default folder terisolasi di ~/.const/learn/workspaces/."}
+                ? t("agentWorkspaceNotice")
+                : t("defaultWorkspaceNotice")}
             </p>
           </div>
 
@@ -196,7 +198,7 @@ export function CreateLearnDialog({
           {!isEdit && collections.length > 0 && (
             <div className="space-y-1">
               <label className="text-[12px] font-medium text-muted-foreground">
-                Kategori Koleksi (Opsional)
+                {t("collectionCategoryOptional")}
               </label>
               <select
                 value={selectedCollectionId ?? ""}
@@ -205,7 +207,7 @@ export function CreateLearnDialog({
                 }
                 className="w-full h-8 px-2.5 rounded-xl bg-secondary/40 border border-border/70 text-[12px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
               >
-                <option value="">Tanpa Koleksi</option>
+                <option value="">{t("noCollection")}</option>
                 {collections.map((col) => (
                   <option key={col.id} value={col.id}>
                     {col.name}
@@ -222,14 +224,14 @@ export function CreateLearnDialog({
               onClick={() => onOpenChange(false)}
               className="rounded-full cursor-pointer h-8 px-3.5 text-[12px] border-border/70"
             >
-              Batal
+              {t("cancel")}
             </Button>
             <Button
               type="submit"
               disabled={!title.trim() || isSubmitting}
               className="rounded-full cursor-pointer h-8 px-4 text-[12px] font-medium"
             >
-              {isSubmitting ? "Menyimpan..." : isEdit ? "Perbarui" : "Buat Learn"}
+              {isSubmitting ? t("saving") : isEdit ? t("update") : t("newLearn")}
             </Button>
           </DialogFooter>
         </form>
