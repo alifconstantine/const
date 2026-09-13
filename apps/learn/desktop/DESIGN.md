@@ -1,7 +1,7 @@
 ---
-version: alpha
-name: Const Harness Design System
-description: Master design language and interface architecture for Const Harness — the local-first agent workbench and developer studio. Built on an austere studio monochrome palette (#161616 canvas, #2b2b2b sidebar & input fields, #222222 project headers, #d4d4d4 crisp interface ink, #5d5d5d secondary elements, and #969696 utility chips). Zero drop shadows, pure fill elevation, hairline boundaries, 16px/24px geometry, with an integrated 1-line prompt input architecture.
+version: beta
+name: Const Design System
+description: Master design language and interface architecture for the Const Studio Platform (Const Harness & Const Learn) — local-first AI workspaces and developer studios. Built on an austere studio monochrome palette (#161616 canvas, #2b2b2b sidebar & input fields, #222222 card headers, #ffffff crisp white reading ink, #d4d4d4 secondary interface ink, and #969696 utility chips). Seamless borderless panels, hairline boundaries, 16px/24px geometry, pure sans-serif UI typography, and high-contrast readable markdown.
 
 colors:
   canvas: "#161616"
@@ -11,8 +11,8 @@ colors:
   field-hover: "#383838"
   chip-bg: "#1b1b1b"
   chip-hover: "#252528"
-  ink: "#d4d4d4"
   ink-bright: "#ffffff"
+  ink: "#d4d4d4"
   text-muted: "#969696"
   text-faint: "#5d5d5d"
   hairline: "#383838"
@@ -86,7 +86,7 @@ components:
     inputPadding: "10px 14px"
     inputHeight: "28px"
     fontSize: "14px"
-    textColor: "{colors.ink}"
+    textColor: "{colors.ink-bright}"
     placeholderColor: "{colors.text-faint}"
 
   action-chip:
@@ -94,7 +94,7 @@ components:
     hoverBackground: "{colors.chip-hover}"
     borderColor: "{colors.hairline-chip}"
     textColor: "{colors.text-muted}"
-    hoverTextColor: "{colors.ink}"
+    hoverTextColor: "{colors.ink-bright}"
     rounded: "{rounded.md}"
     padding: "6px 12px"
     fontSize: "12px"
@@ -117,17 +117,16 @@ components:
 
 ## Overview
 
-**Const Harness** is a high-performance local AI agent workbench and developer studio. Designed to disappear behind the agent tasks and codebases it orchestrates, its aesthetic is disciplined, dark-calibrated studio monochrome.
+**Const Design System** is the unified design language and interface architecture for the Const Platform Ecosystem — encompassing **Const Harness** (local-first agent developer studio) and **Const Learn** (local-first Socratic AI learning studio). Built for deep focus, long-form work, and zero visual friction, its aesthetic is disciplined, dark-calibrated studio monochrome.
 
-Unlike the marketing surfaces of Const Web (which balance light canvas with dark ink), Harness is built around an intentional dark IDE paradigm:
+The interface prioritizes **clarity, reading comfort, and zero visual noise**:
 - **Canvas Base (`#161616`)**: Deep, low-fatigue workspace canvas.
-- **Sidebar & Input Field (`#2b2b2b`)**: Tactile surfaces providing gentle structural contrast.
-- **Attached Header Strip (`#222222`)**: Dark header well for project context.
-- **Primary Ink (`#d4d4d4`)**: Crisp, glare-free interface text and icons rendered bright by default.
-- **Faint Accent & Placeholders (`#5d5d5d`)**: De-emphasized secondary chrome and input hints.
-- **Action Chips (`#969696`)**: Intermediate utility text.
-
-Structure is achieved entirely through **fill variation and razor-sharp 1px hairlines**. Drop shadows are completely prohibited.
+- **Card Panels & Sidebar (`#2b2b2b`)**: Tactile surfaces providing gentle structural contrast.
+- **Crisp Reading Ink (`#ffffff`)**: Primary reading text (AI output paragraphs, headings, active chip text, interactive buttons) must be pure bright white in dark mode for maximum legibility.
+- **Secondary Ink (`#d4d4d4`)**: Chrome labels, secondary icons, and subtle interface text.
+- **Faint Accent & Placeholders (`#5d5d5d`)**: De-emphasized input hints and folder glyphs.
+- **Action Chips (`#969696` / `#ffffff`)**: Interactive utility controls.
+- **Seamless Paneling**: Panel headers have **no dividing border lines** (`border-b`). Elevation is achieved strictly through fill variations and hairline boundaries.
 
 ---
 
@@ -137,131 +136,96 @@ Structure is achieved entirely through **fill variation and razor-sharp 1px hair
 
 | Token | Hex | Role & Usage |
 |:---|:---|:---|
-| `canvas` | `#161616` | Main workbench canvas background. Sits behind the watermark logo, greeting, and floating card. |
-| `sidebar` | `#2b2b2b` | Sidebar panel background. Extends full height on the left; exposed at the curved canvas seam. |
-| `header-strip` | `#222222` | Attached top header strip for the project selector (`Outside Project ⌵`). |
-| `field` | `#2b2b2b` | AI prompt input container fill. Perfectly balanced against the `#161616` canvas. |
-| `ink` | `#d4d4d4` | Primary interface ink: headings, input text, toolbar icons, and sidebar navigation items by default. |
-| `ink-bright` | `#ffffff` | Hover state highlight for interactive items and buttons. |
-| `text-muted` | `#969696` | Quick action chips text (`PPT Creation`, `Error Fix`), keyboard shortcuts (`Ctrl+N`), section headers. |
-| `text-faint` | `#5d5d5d` | Input placeholder text, folder chevron indicators, and de-emphasized secondary glyphs. |
-| `hairline` | `#383838` | Structural 1px boundary lines around the chat card and input box. |
-| `hairline-chip` | `#2e2e2e` | Hairline border for standalone action pill chips. |
-| `accent` | `#0066ff` | Reserved high-priority signal (live agent executing, critical badge). |
+| `canvas` | `#161616` | Main workbench canvas background. |
+| `sidebar` | `#2b2b2b` | Sidebar panel background. |
+| `header-strip` | `#222222` | Attached top header strip for card containers. |
+| `field` | `#2b2b2b` | AI prompt input container fill and floating panel background. |
+| `ink-bright` | `#ffffff` | **Primary text for reading**: AI markdown responses, headings, active chip text, and interactive buttons. |
+| `ink` | `#d4d4d4` | Secondary interface text: unhovered toolbar icons, sidebar links, and subtle chrome. |
+| `text-muted` | `#969696` | Timestamps, file size metadata, keyboard hints (`Ctrl+N`). |
+| `text-faint` | `#5d5d5d` | Input placeholder text and inactive chevrons. |
+| `hairline` | `#383838` | Structural 1px boundary lines around floating cards and dialogs. |
+| `hairline-chip` | `#2e2e2e` | Hairline border for standalone pill buttons and toolbar controls. |
+| `accent` | `#0066ff` | Reserved high-priority signal (live agent executing, active focus ring). |
 
-### Elevation by Fill (Shadow-Free)
+### Elevation by Fill (Zero Drop Shadows)
 
-Elevation in Harness follows a flat neutral ladder:
+Structure in Const is established purely through fill variation:
 1. **Level 0 (Canvas)**: `#161616`
-2. **Level 1 (Header Well & Action Chips)**: `#222222` / `#1b1b1b`
-3. **Level 2 (Sidebar & Input Box)**: `#2b2b2b`
+2. **Level 1 (Card Headers & Action Chips)**: `#222222` / `#1b1b1b`
+3. **Level 2 (Panels, Sidebar & Input Box)**: `#2b2b2b`
 4. **Level 3 (Hover States & Control Tracks)**: `#383838`
 
-No drop shadows exist in the application.
+Drop shadows on internal cards are strictly prohibited.
 
 ---
 
-## Typography
+## Typography & Contrast Rules
 
-### Font Family
-Harness exclusively utilizes **Inter** (`-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`) for all interface utility, code references, toolbars, and prompt fields. Headings leverage natural sentence case without tracking distortion.
+### 1. Pure Sans-serif Interface Typography (`font-sans`)
+- **Strict Rule**: All UI controls, buttons, dropdown triggers, pills, chips, navigation items, and message body text MUST use standard sans-serif (`font-sans` / `Inter`, `-apple-system`, `sans-serif`).
+- **Monospace Usage**: `font-mono` is strictly **prohibited** on interface chrome (e.g., do NOT use `font-mono` on `Default Workspace`, `0 sources`, history badges, or list numbering).
+- `font-mono` is reserved **exclusively** for:
+  - Fenced code blocks (`<pre><code>`)
+  - Terminal outputs and `$ command` lines
+  - Raw filesystem paths inside code contexts
 
-### Hierarchy
-
-| Token | Size | Weight | Line Height | Usage |
-|:---|:---|:---|:---|:---|
-| `display` | 28px | 500 | 1.2 | Main studio greeting ("Morning, how can I help?") |
-| `title` | 16px | 500 | 1.3 | Modal dialog headers, task titles |
-| `body` | 14px | 450 | 1.43 | AI Chat prompt input text (`text-[14px] leading-5`) |
-| `body-sm` | 13px | 450 | 1.38 | Project selector, model dropdown, change mode (`Ask before changes`) |
-| `label` | 12px | 500 | 1.33 | Quick action chips, sidebar navigation links |
-| `caption` | 11px | 500 | 1.33 | History section eyebrows, fine metadata, timestamps |
-
----
-
-## Layout & Geometry
-
-### Window & Canvas Architecture
-- **Window Shell**: Bound to `100vw` by `100vh` with `bg-[#2b2b2b]`.
-- **Sidebar**: Fixed 224px (`w-56`) on the left.
-- **Main Canvas (`<main>`)**:
-  - Touches top and right window boundaries completely (`rounded-r-none`).
-  - Rounds **only** on the left boundary seam against the sidebar (`rounded-l-2xl sm:rounded-l-3xl`).
-  - Boundary seam between sidebar and canvas carries an ultra-soft hairline `border-l border-[#333333]/40`.
-- **Conversation Bounding Width**:
-  - Bound to `max-w-2xl` (672px wide), strictly verified against studio reference measurements.
+### 2. High-Contrast Reading Ink (`dark:text-white` / `#ffffff`)
+- In dark mode, do **not** render AI response paragraphs, headings, or list items in muted gray (`#d4d4d4` or `text-foreground/90`).
+- Always apply crisp white (`dark:text-white` / `#ffffff`) for:
+  - AI markdown paragraphs (`<p>`), headings (`<h1>`–`<h4>`), and list items (`<li>`)
+  - Bold / strong text (`<strong>`, `<b>`)
+  - Active top toolbar pills (`Default Workspace`, `0 sources ⌵`)
+  - Active toolbar icons (`MessageCirclePlus`, `History`, `MoreVertical`)
+- Secondary muted colors (`#969696` / `text-muted-foreground`) are reserved for metadata like timestamps (`10:45 AM`) or file sizes (`1.2 MB`).
 
 ---
 
-## Component Architecture
+## Workspace & Header Architecture
 
-### 1. Chat Input Card (`ChatCard`)
-The central interaction unit. Follows a unified top-header layout:
-- **Outer Shell**:
-  - Width: `w-full max-w-2xl` (672px).
-  - Background: `#222222`.
-  - Border: 1px `#383838`.
-  - Corner Radius: 16px (`rounded-2xl`).
-- **Attached Header Strip (Only at Top)**:
-  - Background: `#222222`.
-  - Sits exclusively at the top. There is **no** outer container padding on the left, right, or bottom.
-  - Houses the project selector button: `📁 Outside Project ⌵`.
-- **AI Input Box**:
-  - Position: Flush with the outer card edges on left, right, and bottom (`w-[calc(100%+2px)] -mx-[1px] -mb-[1px]`).
-  - Corner Radius: `rounded-2xl` on **all four corners** (top-left, top-right, bottom-left, bottom-right). The top curves cut gracefully into the `#222222` header.
-  - Background: `#2b2b2b`.
-  - Border: 1px `#383838`.
-  - Textarea: Compact 1-line height at rest (`rows={1}`, min-height 24px), font size `14px` (`leading-5`), color `#d4d4d4`, placeholder `#5d5d5d`.
-  - Auto-Growing ScrollArea: Textarea auto-expands in height smoothly as text grows, up to `max-h-52` (208px).
-  - Custom Scrollbar: When text exceeds `max-h-52`, scrolling is managed strictly by `@packages/ui/src/components/ui/scroll-area.tsx` with zero native browser scrollbars. The thumb uses `#48484e` (hovering to `#5d5d5d`), seamlessly blending with the studio dark palette.
-  - Action Toolbar (Bottom Row):
-    - Left: Context addition (`+`) and mode selector (`✋ Ask before changes ⌵` / `🛡️ Full access ⌵`).
-    - Right: Model selector (`Manage model ⌵`) and squircle send button (`w-7 h-7 rounded-lg bg-[#48484e] text-[#d4d4d4]`).
-  - Dropdown Systems:
-    - **Choose Project Dropdown**: Defaults to `Outside Project`. Zero dummy workspaces. Popover provides real opened folder workspaces (with search filter), `Open folder` (system directory picker), and `Work outside a project`.
-    - **Access Mode Selector**: Strictly 2 items: `Ask before changes` (`✋`, "Ask before file changes.") and `Full access` (`🛡️!`, `#ff7a00`, "Run with fewer confirmations."). When `Full access` is selected, the toolbar trigger button activates vibrant orange styling (`#ff7a00`).
-    - **Model Selector Dropdown**: Defaults to `Manage model` (since no models are configured yet). Clean popover showing empty state with `Manage models` action (zero dummy providers or submenus).
+### 1. Seamless Borderless Headers
+- Inside floating cards and panels (such as the Central Chat Panel, Sources Panel, Studio Panel, and File Explorer), the top toolbar must **never** have a bottom border divider (`border-b border-border`).
+- The header sits seamlessly atop the content area without any dividing line (`h-12 px-4 sm:px-5 flex items-center justify-between shrink-0 select-none`).
+- Content scrolls naturally beneath the header without arbitrary horizontal lines.
 
-### 2. Frameless Window Header & Window Controls
-- **Frameless Shell**: Electron BrowserWindow configured with `frame: false`.
-- **Draggable Header Region**: Window dragging enabled across empty header regions (`-webkit-app-region: drag`), with `-webkit-app-region: no-drag` strictly enforced on all interactive buttons.
-- **Window Controls**:
-  - Minimize (`-` / `Minus` icon)
-  - Maximize / Restore (`□` / `Square` or `❐` / `Copy` icon reflecting window state)
-  - Close (`✕` / `X` icon with Windows-native red hover `#e81123`)
+### 2. Panel Geometry & Layout
+- **Studio Sidebar**: Fixed 224px (`w-56`), `#2b2b2b`.
+- **Floating Cards**: 16px/24px geometry (`rounded-2xl`).
+- **Multi-column Layouts**: Floating studio columns (Sources, Central Chat, and Studio/Tools) sit on the `#161616` canvas with hairline boundaries.
 
-### 3. Quick Action Chips
-- Sits centered directly beneath the chat card with `mt-3 gap-2`.
-- Items: `Weekly Summary` (`AlarmClock`), `Error Fix` (`Bug`), `PPT Creation` (`Presentation`), `Idle-time task` (`Moon`).
-- Pill geometry: 12px radius (`rounded-xl`), background `#1b1b1b`, border 1px `#2e2e2e`.
-- Typography: 12px (`text-[12px]`), color `#969696`, hover to `#d4d4d4` with `#252528` background.
+---
 
-### 4. Studio Sidebar
-- Background `#2b2b2b`, full height.
-- All icons and menu labels render in `#d4d4d4` **by default** (not dimmed to dark gray).
-- Hovering an item lifts it to pure white (`text-white`) with a soft `#383838` pill background.
-- Preserved Account Settings dropdown at the base with user avatar, name (`#d4d4d4`), and email (`#969696`).
+## Iconography & Empty States
 
-### 5. Watermark Studio Logo
-- Positioned above and behind the greeting text (`absolute -top-36 sm:-top-44 left-1/2 -translate-x-1/2`).
-- Renders with 20%–25% opacity in `#d4d4d4`.
-- Masked with a vertical gradient fade: `linear-gradient(to bottom, rgba(0,0,0,1) 15%, rgba(0,0,0,0.4) 55%, rgba(0,0,0,0) 90%)`.
-- Light gaussian blur (`blur(0.75px)`) so it recedes into the `#161616` background without competing with interface text.
+### 1. Lucide Vector Icons over Emojis
+- **Never** use raw emojis (e.g., 🎨, 📁, 🚀, ✋, 🛡️) as the icon for empty state containers, system navigation tabs, toolbar actions, or dropdown items.
+- Always use clean, single-color Lucide vector icons (`w-5 h-5` or `w-6 h-6`) centered in a subtle rounded squircle container (`rounded-2xl bg-[#f4f4f6] dark:bg-[#2b2b2b] border border-[#dedee2] dark:border-[#383838]`).
+
+### 2. Feature & Tab Icon Alignment
+- **Artifacts**: Represented strictly by `Layers` (`lucide-react`).
+  - Do **not** use `Sparkles` for Artifacts (`Sparkles` is reserved strictly for Generative AI / Chat actions).
+  - Empty states in the Artifacts tab must use the matching `Layers` icon.
+- **Sources / Files**: `FileText`
+- **Workspaces / Folders**: `Folder`
+- **Terminal / Execution**: `SquareTerminal` / `Terminal`
+- **Settings / Account**: `Settings` / `User`
 
 ---
 
 ## Do's and Don'ts
 
 ### Do
-- Maintain the exact palette: `#161616` for canvas, `#2b2b2b` for sidebar and input, `#222222` for top header, `#d4d4d4` for primary text.
-- Render all sidebar icons and text in `#d4d4d4` by default; use hover only for bright `#ffffff` highlights.
-- Keep the AI input box strictly 1-line height at rest with 14px font size.
-- Ensure the AI input box is rounded on top-left and top-right corners (`rounded-2xl`) while staying flush on the left, right, and bottom.
-- Anchor the watermark logo directly to the greeting container so it scales predictably on all display sizes.
+- **Do** use `font-sans` (`Inter`) for all button labels, pills, dropdowns, and counter badges.
+- **Do** render AI response text and active header pills in crisp `#ffffff` (`dark:text-white`) for crystal-clear readability.
+- **Do** keep panel headers seamless and borderless — remove all `border-b` lines separating headers from content.
+- **Do** use `Layers` for the Artifacts tab and empty states.
+- **Do** wrap empty state icons in minimalist rounded squircles (`rounded-2xl`).
+- **Do** maintain the exact palette: `#161616` for canvas, `#2b2b2b` for sidebar and input, `#222222` for top header, `#ffffff` for primary reading text.
 
 ### Don't
-- Don't add drop shadows anywhere (`shadow-md`, `shadow-xl`, `shadow-2xl` are strictly forbidden).
-- Don't wrap the AI input box in an outer card that adds padding to the left, right, or bottom.
-- Don't dim primary sidebar icons to `#5d5d5d` at rest.
-- Don't widen the conversation container beyond `max-w-2xl` (672px).
-- Don't introduce saturated accent colors (purples, greens, yellows) for chrome or borders.
+- **Don't** apply `font-mono` to UI buttons, project selectors, sources pills, or list numbers.
+- **Don't** use muddy or dim gray (`#969696` or `text-foreground/90`) for primary AI reading copy.
+- **Don't** add horizontal dividing lines (`border-b`) under the top header of workspace panels.
+- **Don't** use `Sparkles` for Artifacts or non-AI feature tabs.
+- **Don't** use emojis as interface icons or empty state visual representations.
+- **Don't** use heavy drop shadows (`shadow-md`, `shadow-xl`) on workspace panels.

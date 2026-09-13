@@ -1653,16 +1653,16 @@ export function ChatPanel({
           setIsSourcesDropdownOpen(!isSourcesDropdownOpen);
         }}
         className={cn(
-          "h-8 px-2.5 rounded-xl text-xs font-medium transition-all cursor-pointer select-none flex items-center gap-1.5 border shrink-0 shadow-xs active:scale-98",
+          "h-8 px-2.5 rounded-xl text-xs font-medium transition-all cursor-pointer select-none flex items-center gap-1.5 border shrink-0 shadow-xs active:scale-98 font-sans",
           carriedSourcesCount > 0
-            ? "bg-muted/60 hover:bg-muted border-border/70 text-foreground"
-            : "bg-muted/40 hover:bg-muted text-muted-foreground border-border/50"
+            ? "bg-muted/60 hover:bg-muted border-border/70 text-foreground dark:text-white"
+            : "bg-muted/40 hover:bg-muted text-foreground/80 dark:text-white/90 hover:dark:text-white border-border/50"
         )}
         aria-label={t("manageCarriedSources")}
         title={t("manageCarriedSources")}
       >
-        <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-        <span className="font-mono text-[11px] text-foreground/90 font-medium">
+        <FileText className="h-3.5 w-3.5 text-foreground/70 dark:text-white/80 shrink-0" />
+        <span className="font-sans text-xs text-foreground dark:text-white font-medium">
           {carriedSourcesCount > 1
             ? t("carriedSourcesPill", { count: carriedSourcesCount })
             : carriedSourcesCount === 1
@@ -1671,7 +1671,7 @@ export function ChatPanel({
         </span>
         <ChevronDown
           className={cn(
-            "h-3 w-3 text-muted-foreground/70 transition-transform duration-150 ml-0.5",
+            "h-3 w-3 text-foreground/60 dark:text-white/70 transition-transform duration-150 ml-0.5",
             isSourcesDropdownOpen && "rotate-180"
           )}
         />
@@ -2074,7 +2074,7 @@ export function ChatPanel({
   return (
     <main className="flex-1 h-full flex flex-col bg-card rounded-2xl border border-border/50 text-foreground min-w-0 relative select-text overflow-hidden shadow-xs">
       {/* Top Header Bar */}
-      <div className="h-12 px-4 sm:px-5 border-b border-border/50 flex items-center justify-between shrink-0 select-none bg-card/30">
+      <div className="h-12 px-4 sm:px-5 flex items-center justify-between shrink-0 select-none">
         {/* Left: Project / Workspace Folder Indicator */}
         <div className="flex items-center gap-2.5 min-w-0">
           <button
@@ -2084,15 +2084,15 @@ export function ChatPanel({
                 (window as any).electron.openPath(workspacePath);
               }
             }}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-muted/60 hover:bg-muted text-xs font-medium text-foreground transition-all cursor-pointer border border-border/60 max-w-[200px] sm:max-w-[280px] truncate group select-none shadow-xs active:scale-98 shrink-0"
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-muted/60 hover:bg-muted text-xs font-medium text-foreground dark:text-white transition-all cursor-pointer border border-border/60 max-w-[200px] sm:max-w-[280px] truncate group select-none shadow-xs active:scale-98 shrink-0 font-sans"
             title={
               workspacePath
                 ? t("openInExplorer", { path: workspacePath })
                 : `${t("defaultWorkspace")} (~/.const/learn/workspaces/)`
             }
           >
-            <Folder className="h-3.5 w-3.5 text-primary shrink-0 group-hover:scale-110 transition-transform" />
-            <span className="truncate font-mono text-[11px]">
+            <Folder className="h-3.5 w-3.5 text-primary dark:text-white shrink-0 group-hover:scale-110 transition-transform" />
+            <span className="truncate font-sans text-xs font-medium">
               {workspacePath
                 ? workspacePath.split(/[\\/]/).filter(Boolean).pop() || workspacePath
                 : t("defaultWorkspace")}
@@ -2109,7 +2109,7 @@ export function ChatPanel({
           <button
             type="button"
             onClick={handleNewChat}
-            className="h-8 w-8 rounded-xl hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-all cursor-pointer border border-border/60 bg-muted/40 shadow-xs active:scale-98 shrink-0"
+            className="h-8 w-8 rounded-xl hover:bg-muted text-foreground/80 hover:text-foreground dark:text-white/80 dark:hover:text-white flex items-center justify-center transition-all cursor-pointer border border-border/60 bg-muted/40 shadow-xs active:scale-98 shrink-0"
             title={t("startConversationNew")}
             aria-label={t("newChat")}
           >
@@ -2120,13 +2120,13 @@ export function ChatPanel({
           <button
             type="button"
             onClick={() => setIsHistoryOpen(true)}
-            className="relative h-8 w-8 rounded-xl hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-all cursor-pointer border border-border/60 bg-muted/40 shadow-xs active:scale-98 shrink-0"
+            className="relative h-8 w-8 rounded-xl hover:bg-muted text-foreground/80 hover:text-foreground dark:text-white/80 dark:hover:text-white flex items-center justify-center transition-all cursor-pointer border border-border/60 bg-muted/40 shadow-xs active:scale-98 shrink-0"
             title={t("chatHistory")}
             aria-label={t("chatHistory")}
           >
             <History className="h-4 w-4 stroke-[1.8]" />
             {sessions.length > 0 && (
-              <span className="absolute -top-1 -right-1 min-w-[15px] h-3.5 px-1 rounded-full bg-secondary text-[9px] font-mono font-medium text-foreground flex items-center justify-center border border-border/60">
+              <span className="absolute -top-1 -right-1 min-w-[15px] h-3.5 px-1 rounded-full bg-secondary text-[9px] font-sans font-medium text-foreground dark:text-white flex items-center justify-center border border-border/60">
                 {sessions.length > 99 ? "99+" : sessions.length}
               </span>
             )}
@@ -2137,7 +2137,7 @@ export function ChatPanel({
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
-                className="h-8 w-8 rounded-xl hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-all cursor-pointer border border-border/60 bg-muted/40 shadow-xs active:scale-98 shrink-0"
+                className="h-8 w-8 rounded-xl hover:bg-muted text-foreground/80 hover:text-foreground dark:text-white/80 dark:hover:text-white flex items-center justify-center transition-all cursor-pointer border border-border/60 bg-muted/40 shadow-xs active:scale-98 shrink-0"
                 aria-label={t("moreOptions")}
                 title={t("moreOptions")}
               >

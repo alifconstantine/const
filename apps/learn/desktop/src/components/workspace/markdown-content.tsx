@@ -30,7 +30,7 @@ export function MarkdownContent({ content, className = "" }: MarkdownContentProp
   return (
     <div
       className={cn(
-        "space-y-3 text-[14px] leading-[1.68] text-foreground/90 select-text font-sans [&_strong]:font-semibold [&_b]:font-semibold [&_strong]:text-foreground [&_b]:text-foreground",
+        "space-y-3 text-[14px] leading-[1.68] text-foreground dark:text-white select-text font-sans [&_strong]:font-semibold [&_b]:font-semibold [&_strong]:text-foreground dark:[&_strong]:text-white [&_b]:text-foreground dark:[&_b]:text-white",
         className
       )}
     >
@@ -48,12 +48,12 @@ function TokenRenderer({ token, isNested }: { token: Token; isNested?: boolean }
       const Tag = `h${Math.min(heading.depth, 6)}` as keyof React.JSX.IntrinsicElements;
       const sizeClasses =
         heading.depth === 1
-          ? "text-[19px] font-semibold text-foreground mt-5 mb-2 tracking-tight"
+          ? "text-[19px] font-semibold text-foreground dark:text-white mt-5 mb-2 tracking-tight"
           : heading.depth === 2
-          ? "text-[16px] font-semibold text-foreground mt-4 mb-1.5 tracking-tight"
+          ? "text-[16px] font-semibold text-foreground dark:text-white mt-4 mb-1.5 tracking-tight"
           : heading.depth === 3
-          ? "text-[14.5px] font-semibold text-foreground mt-3.5 mb-1 tracking-tight"
-          : "text-[13.5px] font-semibold text-foreground mt-3 mb-1";
+          ? "text-[14.5px] font-semibold text-foreground dark:text-white mt-3.5 mb-1 tracking-tight"
+          : "text-[13.5px] font-semibold text-foreground dark:text-white mt-3 mb-1";
       return (
         <Tag className={`${sizeClasses} font-sans`}>
           <InlineRenderer text={heading.text} />
@@ -64,7 +64,7 @@ function TokenRenderer({ token, isNested }: { token: Token; isNested?: boolean }
     case "paragraph": {
       const paragraph = token as Tokens.Paragraph;
       return (
-        <p className="leading-[1.68] text-foreground/90 my-2 font-sans">
+        <p className="leading-[1.68] text-foreground dark:text-white my-2 font-sans">
           <InlineRenderer text={paragraph.text} />
         </p>
       );
@@ -100,10 +100,10 @@ function TokenRenderer({ token, isNested }: { token: Token; isNested?: boolean }
       if (list.ordered) {
         const start = list.start || 1;
         return (
-          <ol className={cn("space-y-2 my-2.5 pl-0.5 text-foreground/90", isNested && "my-1.5 pl-2 space-y-1.5")}>
+          <ol className={cn("space-y-2 my-2.5 pl-0.5 text-foreground dark:text-white", isNested && "my-1.5 pl-2 space-y-1.5")}>
             {list.items.map((item: Tokens.ListItem, idx: number) => (
               <li key={idx} className="flex items-start gap-2.5 leading-[1.65]">
-                <span className="select-none font-mono text-[12px] text-muted-foreground pt-0.5 w-4 text-right shrink-0">
+                <span className="select-none font-sans text-[12px] text-muted-foreground dark:text-white/60 pt-0.5 w-4 text-right shrink-0">
                   {start + idx}.
                 </span>
                 <div className="flex-1 min-w-0">
@@ -115,7 +115,7 @@ function TokenRenderer({ token, isNested }: { token: Token; isNested?: boolean }
         );
       }
       return (
-        <ul className={cn("space-y-2 my-2.5 pl-0.5 text-foreground/90", isNested && "my-1.5 pl-3 space-y-1.5")}>
+        <ul className={cn("space-y-2 my-2.5 pl-0.5 text-foreground dark:text-white", isNested && "my-1.5 pl-3 space-y-1.5")}>
           {list.items.map((item: Tokens.ListItem, idx: number) => (
             <li key={idx} className="flex items-start gap-2 leading-[1.65]">
               {item.task ? (
@@ -127,7 +127,7 @@ function TokenRenderer({ token, isNested }: { token: Token; isNested?: boolean }
                 />
               ) : (
                 <span className={cn(
-                  "select-none text-muted-foreground shrink-0 font-medium",
+                  "select-none text-muted-foreground dark:text-white/60 shrink-0 font-medium",
                   isNested ? "text-[13px] leading-[1.65]" : "text-[15px] leading-[1.6]"
                 )}>
                   {isNested ? "-" : "•"}
@@ -145,7 +145,7 @@ function TokenRenderer({ token, isNested }: { token: Token; isNested?: boolean }
     case "blockquote": {
       const bq = token as Tokens.Blockquote;
       return (
-        <blockquote className="border-l-2 border-primary/80 pl-3.5 py-1.5 my-3 text-muted-foreground bg-muted/20 rounded-r-lg italic">
+        <blockquote className="border-l-2 border-primary/80 pl-3.5 py-1.5 my-3 text-muted-foreground dark:text-white/80 bg-muted/20 rounded-r-lg italic">
           <InlineRenderer text={bq.text} />
         </blockquote>
       );
@@ -160,7 +160,7 @@ function TokenRenderer({ token, isNested }: { token: Token; isNested?: boolean }
     default: {
       if ("text" in token && typeof (token as any).text === "string") {
         return (
-          <p className="leading-[1.68] text-foreground/90 my-1.5 font-sans">
+          <p className="leading-[1.68] text-foreground dark:text-white my-1.5 font-sans">
             <InlineRenderer text={(token as any).text} />
           </p>
         );
@@ -327,8 +327,8 @@ function TableBlock({
                     <td
                       key={cellIdx}
                       className={cn(
-                        "px-4 py-3 leading-relaxed text-foreground/90 align-top",
-                        cellIdx === 0 && "font-medium text-foreground",
+                        "px-4 py-3 leading-relaxed text-foreground dark:text-white align-top",
+                        cellIdx === 0 && "font-medium text-foreground dark:text-white",
                         getAlignClass(cellIdx)
                       )}
                     >
@@ -422,8 +422,8 @@ function TableBlock({
                         <td
                           key={cellIdx}
                           className={cn(
-                            "px-4 py-3 leading-relaxed text-foreground/90 align-top",
-                            cellIdx === 0 && "font-medium text-foreground",
+                            "px-4 py-3 leading-relaxed text-foreground dark:text-white align-top",
+                            cellIdx === 0 && "font-medium text-foreground dark:text-white",
                             getAlignClass(cellIdx)
                           )}
                         >
@@ -563,7 +563,7 @@ function InlineRenderer({ text }: { text: string }) {
     return (
       <span
         dangerouslySetInnerHTML={{ __html: html }}
-        className="[&_code]:bg-muted/80 [&_code]:text-foreground [&_code]:font-mono [&_code]:text-[12.5px] [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:border [&_code]:border-border/60 [&_strong]:font-semibold [&_b]:font-semibold [&_strong]:text-foreground [&_b]:text-foreground [&_em]:italic [&_em]:text-foreground/90 [&_a]:text-primary [&_a]:hover:underline cursor-text"
+        className="[&_code]:bg-muted/80 [&_code]:text-foreground dark:[&_code]:text-white [&_code]:font-mono [&_code]:text-[12.5px] [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:border [&_code]:border-border/60 [&_strong]:font-semibold [&_b]:font-semibold [&_strong]:text-foreground dark:[&_strong]:text-white [&_b]:text-foreground dark:[&_b]:text-white [&_em]:italic [&_em]:text-foreground/90 dark:[&_em]:text-white [&_a]:text-primary dark:[&_a]:text-sky-400 [&_a]:hover:underline cursor-text"
       />
     );
   }
