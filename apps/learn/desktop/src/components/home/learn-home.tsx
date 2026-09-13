@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db, localDb, LocalLearn, LocalCollection, LocalArtifact } from "../../lib/db";
 import {
@@ -200,6 +200,33 @@ export function LearnHome({
     }
   };
 
+  // Keyboard shortcut: Toggle sidebar with Ctrl+B or Cmd+B
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "b") {
+        e.preventDefault();
+        setIsSidebarOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, []);
+
+  const renderSidebarToggle = () => {
+    if (isSidebarOpen) return null;
+    return (
+      <button
+        type="button"
+        onClick={() => setIsSidebarOpen(true)}
+        className="p-1.5 -ml-1 rounded-xl bg-[#dedee2]/60 hover:bg-[#dedee2] dark:bg-[#2b2b2b] dark:hover:bg-[#383838] text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white transition-all cursor-pointer flex items-center justify-center shrink-0 shadow-none"
+        title="Buka sidebar (Ctrl+B)"
+        aria-label="Buka sidebar"
+      >
+        <PanelLeftOpen className="w-4 h-4" />
+      </button>
+    );
+  };
+
   // If Settings view is triggered
   if (isSettingsOpen) {
     return (
@@ -239,27 +266,12 @@ export function LearnHome({
         />
       )}
 
-      {/* 2. Main Canvas (Left rounded against sidebar, bg #161616 per DESIGN.md) */}
+      {/* 2. Main Canvas (Left rounded against sidebar, bg #161616 per DESIGN.md - no dividing lines) */}
       <main
         className={`flex-1 min-w-0 h-full bg-[#f8f8f8] dark:bg-[#161616] text-[#262626] dark:text-[#d4d4d4] overflow-hidden flex flex-col relative transition-[border-radius] duration-200 ${
-          isSidebarOpen
-            ? "rounded-l-2xl sm:rounded-l-3xl border-l border-[#dedee2] dark:border-[#333333]/40"
-            : ""
+          isSidebarOpen ? "rounded-l-2xl sm:rounded-l-3xl" : ""
         }`}
       >
-        {/* Reopen Sidebar Button (When collapsed) */}
-        {!isSidebarOpen && (
-          <button
-            type="button"
-            onClick={() => setIsSidebarOpen(true)}
-            className="absolute top-4 left-4 z-30 p-2 rounded-xl bg-white dark:bg-[#222222] border border-[#dedee2] dark:border-[#383838] text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white transition-colors cursor-pointer shadow-none"
-            title="Buka sidebar"
-            aria-label="Buka sidebar"
-          >
-            <PanelLeftOpen className="w-4 h-4" />
-          </button>
-        )}
-
         {/* Scrollable Main Area */}
         <ScrollArea className="flex-1 w-full h-full min-h-0">
           <div className="max-w-7xl mx-auto px-6 sm:px-10 py-7 space-y-9">
@@ -272,10 +284,11 @@ export function LearnHome({
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   {/* Left: Heading & Total Count */}
                   <div className="flex items-center gap-2.5">
+                    {renderSidebarToggle()}
                     <h1 className="font-serif text-2xl sm:text-3xl font-normal tracking-tight text-[#262626] dark:text-white">
                       Learns
                     </h1>
-                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-[#dedee2] dark:bg-[#2b2b2b] text-[#737373] dark:text-[#969696] font-mono border border-[#dedee2] dark:border-[#383838]">
+                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-[#dedee2] dark:bg-[#2b2b2b] text-[#737373] dark:text-[#969696] font-mono">
                       {filteredLearns.length}
                     </span>
                   </div>
@@ -433,7 +446,11 @@ export function LearnHome({
             {/* TAB: SOURCES                                                 */}
             {/* ============================================================ */}
             {activeTab === "sources" && (
-              <SourcesView onAddSource={() => handleCreateNewLearn()} />
+              <SourcesView
+                onAddSource={() => handleCreateNewLearn()}
+                isSidebarOpen={isSidebarOpen}
+                onToggleSidebar={() => setIsSidebarOpen(true)}
+              />
             )}
 
             {/* ============================================================ */}
@@ -446,6 +463,7 @@ export function LearnHome({
                   <div className="space-y-6">
                     <div className="flex items-center justify-between pb-3">
                       <div className="flex items-center gap-3">
+                        {renderSidebarToggle()}
                         <button
                           type="button"
                           onClick={() => setActiveCollectionId(null)}
@@ -550,10 +568,11 @@ export function LearnHome({
                   <div className="space-y-5">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2.5">
+                        {renderSidebarToggle()}
                         <h2 className="font-serif text-2xl font-normal text-[#262626] dark:text-white">
                           Collections
                         </h2>
-                        <span className="text-xs px-2.5 py-0.5 rounded-full bg-[#dedee2] dark:bg-[#2b2b2b] text-[#737373] dark:text-[#969696] font-mono border border-[#dedee2] dark:border-[#383838]">
+                        <span className="text-xs px-2.5 py-0.5 rounded-full bg-[#dedee2] dark:bg-[#2b2b2b] text-[#737373] dark:text-[#969696] font-mono">
                           {collections.length} koleksi
                         </span>
                       </div>
@@ -608,10 +627,11 @@ export function LearnHome({
               <section className="space-y-5">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
+                    {renderSidebarToggle()}
                     <h2 className="font-serif text-2xl font-normal text-[#262626] dark:text-white">
                       Artifact
                     </h2>
-                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-[#dedee2] dark:bg-[#2b2b2b] text-[#737373] dark:text-[#969696] font-mono border border-[#dedee2] dark:border-[#383838]">
+                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-[#dedee2] dark:bg-[#2b2b2b] text-[#737373] dark:text-[#969696] font-mono">
                       {artifacts.length}
                     </span>
                   </div>

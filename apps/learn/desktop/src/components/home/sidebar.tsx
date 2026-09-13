@@ -84,7 +84,7 @@ export function Sidebar({
   ];
 
   return (
-    <aside className="w-56 h-full flex flex-col justify-between shrink-0 select-none bg-[#ececee] dark:bg-[#2b2b2b] text-[#262626] dark:text-[#d4d4d4] p-3 border-r border-[#dedee2] dark:border-transparent">
+    <aside className="w-56 h-full flex flex-col justify-between shrink-0 select-none bg-[#ececee] dark:bg-[#2b2b2b] text-[#262626] dark:text-[#d4d4d4] p-3">
       {/* Top Section */}
       <div className="flex flex-col gap-3">
         {/* Brand Header & Sidebar Close Icon */}
@@ -102,7 +102,7 @@ export function Sidebar({
               <span className="font-serif text-base font-normal tracking-tight text-[#262626] dark:text-white">
                 Const
               </span>
-              <span className="text-[10px] font-mono tracking-wider uppercase px-1.5 py-0.5 rounded bg-[#dedee2] dark:bg-[#383838] text-[#5d5d5d] dark:text-[#969696] border border-[#d5d5d9] dark:border-[#383838]/60">
+              <span className="text-[10px] font-mono tracking-wider uppercase px-1.5 py-0.5 rounded bg-[#dedee2] dark:bg-[#383838] text-[#5d5d5d] dark:text-[#969696]">
                 Learn
               </span>
             </div>
@@ -114,7 +114,7 @@ export function Sidebar({
             onClick={onCollapse}
             style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
             className="p-1.5 rounded-lg hover:bg-[#dedee2] dark:hover:bg-[#383838] text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white transition-colors cursor-pointer"
-            title="Tutup sidebar"
+            title="Tutup sidebar (Ctrl+B)"
             aria-label="Tutup sidebar"
           >
             <PanelLeftClose className="w-4 h-4" />
@@ -205,19 +205,8 @@ export function Sidebar({
         </nav>
       </div>
 
-      {/* Bottom Section: Settings & User Profile (Modeled after apps/harness/desktop) */}
-      <div className="pt-2 border-t border-[#dedee2] dark:border-[#383838]/40 flex flex-col gap-1">
-        {/* Settings Direct Button */}
-        <button
-          type="button"
-          onClick={onOpenSettings}
-          className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-xs font-medium text-[#262626] dark:text-[#d4d4d4] hover:bg-[#dedee2]/60 dark:hover:bg-[#383838]/60 hover:text-black dark:hover:text-white transition-colors cursor-pointer"
-        >
-          <Settings className="w-4 h-4 text-[#737373] dark:text-[#969696] shrink-0" />
-          <span>Settings</span>
-        </button>
-
-        {/* User Profile Dropdown Menu */}
+      {/* Bottom Section: User Profile Menu (Zero dividing lines per DESIGN.md) */}
+      <div className="pt-2">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button

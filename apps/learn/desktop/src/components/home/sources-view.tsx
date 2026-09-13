@@ -1,12 +1,18 @@
 import React, { useState } from "react";
-import { Search, FileText, Globe, Plus, ExternalLink } from "lucide-react";
+import { Search, FileText, Globe, Plus, ExternalLink, PanelLeftOpen } from "lucide-react";
 import { Button, Input } from "@const/ui";
 
 interface SourcesViewProps {
   onAddSource?: () => void;
+  isSidebarOpen?: boolean;
+  onToggleSidebar?: () => void;
 }
 
-export function SourcesView({ onAddSource }: SourcesViewProps) {
+export function SourcesView({
+  onAddSource,
+  isSidebarOpen = true,
+  onToggleSidebar,
+}: SourcesViewProps) {
   const [searchQuery, setSearchQuery] = useState("");
 
   return (
@@ -14,9 +20,22 @@ export function SourcesView({ onAddSource }: SourcesViewProps) {
       {/* Header & Controls */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h2 className="font-serif text-2xl font-normal tracking-tight text-[#262626] dark:text-white">
-            Sources
-          </h2>
+          <div className="flex items-center gap-2.5">
+            {!isSidebarOpen && onToggleSidebar && (
+              <button
+                type="button"
+                onClick={onToggleSidebar}
+                className="p-1.5 -ml-1 rounded-xl bg-[#ececee] dark:bg-[#262626] hover:bg-[#dedee2] dark:hover:bg-[#333333] text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white transition-all cursor-pointer flex items-center justify-center shrink-0"
+                title="Buka sidebar (Ctrl+B)"
+                aria-label="Buka sidebar"
+              >
+                <PanelLeftOpen className="w-4 h-4" />
+              </button>
+            )}
+            <h2 className="font-serif text-2xl font-normal tracking-tight text-[#262626] dark:text-white">
+              Sources
+            </h2>
+          </div>
           <p className="text-xs text-[#8a8a8a] dark:text-[#888888] mt-0.5">
             Kumpulan dokumen, tautan riset web, dan referensi belajar Anda.
           </p>
