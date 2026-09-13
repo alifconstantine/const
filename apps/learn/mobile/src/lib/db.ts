@@ -38,6 +38,7 @@ export interface LocalArtifact {
 export interface LocalMessage {
   id: string;
   learnId: string;
+  sessionId?: string;
   role: "user" | "assistant" | "tool";
   content: string;
   thinking?: string;
@@ -47,11 +48,23 @@ export interface LocalMessage {
   createdAt: number;
 }
 
+export interface LocalChatSession {
+  id: string;
+  learnId: string;
+  title: string;
+  createdAt: number;
+  updatedAt: number;
+  messageCount?: number;
+  lastMessageSnippet?: string;
+  isPinned?: boolean;
+}
+
 export const db = new Dexie("ConstLearnDatabase") as Dexie & {
   learns: EntityTable<LocalLearn, "id">;
   collections: EntityTable<LocalCollection, "id">;
   artifacts: EntityTable<LocalArtifact, "id">;
   messages: EntityTable<LocalMessage, "id">;
+  chatSessions: EntityTable<LocalChatSession, "id">;
 };
 
 db.version(1).stores({
@@ -65,6 +78,46 @@ db.version(2).stores({
   collections: "id, name, updatedAt, createdAt",
   artifacts: "id, learnId, title, type, updatedAt, createdAt",
   messages: "id, learnId, role, createdAt",
+});
+
+db.version(3).stores({
+  learns: "id, title, updatedAt, createdAt, *collectionIds, projectPath",
+  collections: "id, name, updatedAt, createdAt",
+  artifacts: "id, learnId, title, type, updatedAt, createdAt",
+  messages: "id, learnId, sessionId, role, createdAt",
+  chatSessions: "id, learnId, updatedAt, createdAt",
+}).upgrade(async (tx) => {
+  try {
+    const allMessages = await tx.table("messages").toArray();
+    const messagesByLearn: Record<string, any[]> = {};
+    for (const msg of allMessages) {
+      const list = messagesByLearn[msg.learnId] ?? [];
+      list.push(msg);
+      messagesByLearn[msg.learnId] = list;
+    }
+    for (const [learnId, msgs] of Object.entries(messagesByLearn)) {
+      const existingSessions = await tx.table("chatSessions").where("learnId").equals(learnId).count();
+      if (existingSessions === 0 && msgs.length > 0) {
+        const sessionId = `session_${learnId}_legacy`;
+        const firstMsg = msgs[0];
+        const lastMsg = msgs[msgs.length - 1];
+        await tx.table("chatSessions").add({
+          id: sessionId,
+          learnId,
+          title: firstMsg?.content ? firstMsg.content.slice(0, 30) : "Percakapan",
+          createdAt: firstMsg?.createdAt || Date.now(),
+          updatedAt: lastMsg?.createdAt || Date.now(),
+          messageCount: msgs.length,
+          lastMessageSnippet: lastMsg?.content ? lastMsg.content.slice(0, 60) : "",
+        });
+        for (const msg of msgs) {
+          await tx.table("messages").update(msg.id, { sessionId });
+        }
+      }
+    }
+  } catch (err) {
+    console.error("Dexie v3 migration error:", err);
+  }
 });
 
 // Helper functions for CRUD operations
@@ -117,9 +170,10 @@ export const localDb = {
   },
 
   async deleteLearn(id: string) {
-    // Delete associated artifacts and messages
+    // Delete associated artifacts, messages, and chat sessions
     await db.artifacts.where("learnId").equals(id).delete();
     await db.messages.where("learnId").equals(id).delete();
+    await db.chatSessions.where("learnId").equals(id).delete();
     await db.learns.delete(id);
   },
 
@@ -127,6 +181,7 @@ export const localDb = {
     for (const id of ids) {
       await db.artifacts.where("learnId").equals(id).delete();
       await db.messages.where("learnId").equals(id).delete();
+      await db.chatSessions.where("learnId").equals(id).delete();
     }
     await db.learns.bulkDelete(ids);
   },
@@ -228,9 +283,63 @@ export const localDb = {
     await db.artifacts.delete(id);
   },
 
+  // Chat Sessions
+  async createChatSession(learnId: string, title?: string): Promise<string> {
+    const id = "session_" + Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
+    const now = Date.now();
+    await db.chatSessions.add({
+      id,
+      learnId,
+      title: title?.trim() || "Percakapan Baru",
+      createdAt: now,
+      updatedAt: now,
+      messageCount: 0,
+    });
+    return id;
+  },
+
+  async getChatSessions(learnId: string): Promise<LocalChatSession[]> {
+    const list = await db.chatSessions.where("learnId").equals(learnId).toArray();
+    return list.sort((a, b) => {
+      if (Boolean(a.isPinned) && !Boolean(b.isPinned)) return -1;
+      if (!Boolean(a.isPinned) && Boolean(b.isPinned)) return 1;
+      return (b.updatedAt || 0) - (a.updatedAt || 0);
+    });
+  },
+
+  async updateChatSession(
+    id: string,
+    data: {
+      title?: string;
+      messageCount?: number;
+      lastMessageSnippet?: string;
+      updatedAt?: number;
+      isPinned?: boolean;
+    }
+  ) {
+    const updates: Partial<LocalChatSession> = {
+      updatedAt: data.updatedAt ?? Date.now(),
+    };
+    if (data.title !== undefined) updates.title = data.title.trim() || "Percakapan Baru";
+    if (data.messageCount !== undefined) updates.messageCount = data.messageCount;
+    if (data.lastMessageSnippet !== undefined) updates.lastMessageSnippet = data.lastMessageSnippet;
+    if (data.isPinned !== undefined) updates.isPinned = data.isPinned;
+
+    await db.chatSessions.update(id, updates);
+  },
+
+  async deleteChatSession(sessionId: string) {
+    await db.messages.where("sessionId").equals(sessionId).delete();
+    await db.chatSessions.delete(sessionId);
+  },
+
   // Messages (Chat History persistence)
   async getMessages(learnId: string): Promise<LocalMessage[]> {
     return await db.messages.where("learnId").equals(learnId).sortBy("createdAt");
+  },
+
+  async getSessionMessages(sessionId: string): Promise<LocalMessage[]> {
+    return await db.messages.where("sessionId").equals(sessionId).sortBy("createdAt");
   },
 
   async saveMessage(data: Omit<LocalMessage, "createdAt"> & { createdAt?: number }): Promise<string> {
@@ -239,11 +348,31 @@ export const localDb = {
       ...data,
       createdAt: now,
     });
+
+    if (data.sessionId) {
+      const session = await db.chatSessions.get(data.sessionId);
+      if (session) {
+        await db.chatSessions.update(data.sessionId, {
+          updatedAt: now,
+          messageCount: (session.messageCount || 0) + 1,
+          lastMessageSnippet: data.content ? data.content.slice(0, 80) : session.lastMessageSnippet,
+        });
+      }
+    }
     return data.id;
   },
 
   async clearMessages(learnId: string): Promise<void> {
     await db.messages.where("learnId").equals(learnId).delete();
+  },
+
+  async clearSessionMessages(sessionId: string): Promise<void> {
+    await db.messages.where("sessionId").equals(sessionId).delete();
+    await db.chatSessions.update(sessionId, {
+      messageCount: 0,
+      lastMessageSnippet: "",
+      updatedAt: Date.now(),
+    });
   },
 };
 

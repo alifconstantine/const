@@ -38,13 +38,17 @@ function AuthenticatedContent({
         learnId={activeLearnId}
         initialSourceModalOpen={openAddSourceOnLoad}
         onBack={handleBackToHome}
+        onSelectLearn={(id) => {
+          setActiveLearnId(id);
+          setOpenAddSourceOnLoad(false);
+        }}
         onCreateNew={async () => {
           const id = await localDb.createLearn({
             title: t("untitledNotebook"),
             emoji: "📘",
           });
           setActiveLearnId(id);
-          setOpenAddSourceOnLoad(true);
+          setOpenAddSourceOnLoad(false);
         }}
         user={user}
       />

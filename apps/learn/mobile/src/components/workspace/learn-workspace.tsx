@@ -1,15 +1,17 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { db, localDb, type LocalMessage, type LocalArtifact } from "../../lib/db";
+import { db, localDb, type LocalMessage, type LocalArtifact, type LocalChatSession } from "../../lib/db";
 import {
   DEFAULT_MOBILE_MODELS,
   streamChatCompletion,
   fetchRouterModels,
+  generateChatTitle,
   type MobileModel,
 } from "../../lib/ai-stream";
 import { MarkdownContent } from "./markdown-content";
 import { ChatInputCard, type AttachedMedia } from "./chat-input-card";
 import { AddSourceDialog } from "./add-source-dialog";
+import { HistoryPanel } from "./history-panel";
 import { WorkingProcess } from "./working-process";
 import { ScrollArea, cn } from "@const/ui";
 import { useI18n } from "../../lib/i18n";
@@ -42,6 +44,8 @@ import {
   Package,
   Copy,
   Loader2,
+  History,
+  MessageCirclePlus,
 } from "lucide-react";
 
 type WorkspaceTab = "sources" | "chat" | "tools";
@@ -82,6 +86,7 @@ interface MobileLearnWorkspaceProps {
   initialSourceModalOpen?: boolean;
   onBack: () => void;
   onCreateNew?: () => void;
+  onSelectLearn?: (learnId: string) => void;
   user?: any;
 }
 
@@ -90,6 +95,7 @@ export function MobileLearnWorkspace({
   initialSourceModalOpen = false,
   onBack,
   onCreateNew,
+  onSelectLearn,
 }: MobileLearnWorkspaceProps) {
   const { t, language } = useI18n();
 
@@ -119,6 +125,7 @@ export function MobileLearnWorkspace({
   const [activeTab, setActiveTab] = useState<WorkspaceTab>("chat");
 
   // Local state
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [inputMessage, setInputMessage] = useState("");
   const [availableModels, setAvailableModels] = useState<MobileModel[]>(DEFAULT_MOBILE_MODELS);
@@ -127,6 +134,7 @@ export function MobileLearnWorkspace({
   );
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
   const [isAddSourceOpen, setIsAddSourceOpen] = useState(initialSourceModalOpen);
+  const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [webScope, setWebScope] = useState("Web");
   const [researchSpeed, setResearchSpeed] = useState("Fast Research");
@@ -136,6 +144,43 @@ export function MobileLearnWorkspace({
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [streamStartTime, setStreamStartTime] = useState<number>(0);
   const [liveDurationMs, setLiveDurationMs] = useState<number>(0);
+
+  // Reactively query chat sessions for this learn/notebook
+  const sessions = useLiveQuery(async () => {
+    if (!learnId) return [];
+    return await localDb.getChatSessions(learnId);
+  }, [learnId]);
+
+  // Current active chat session
+  const activeSession = useMemo(() => {
+    return sessions?.find((s) => s.id === activeSessionId) || sessions?.[0] || null;
+  }, [sessions, activeSessionId]);
+
+  // Initialize or restore active chat session on learnId change
+  useEffect(() => {
+    if (!learnId) {
+      setActiveSessionId(null);
+      return;
+    }
+    let isMounted = true;
+    (async () => {
+      const existing = await localDb.getChatSessions(learnId);
+      if (!isMounted) return;
+      if (existing.length === 0) {
+        const defaultName = language === "id" ? "Percakapan Baru" : "New Chat";
+        const newId = await localDb.createChatSession(learnId, defaultName);
+        if (isMounted) {
+          setActiveSessionId(newId);
+        }
+      } else if (!activeSessionId || !existing.some((s) => s.id === activeSessionId)) {
+        setActiveSessionId(existing[0]!.id);
+      }
+    })();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [learnId]);
 
   // Live timer for working process duration
   useEffect(() => {
@@ -158,24 +203,28 @@ export function MobileLearnWorkspace({
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Editable title
+  // Editable session title in header
   const [isEditingTitle, setIsEditingTitle] = useState(false);
-  const [titleValue, setTitleValue] = useState(t("untitledNotebook"));
+  const [titleValue, setTitleValue] = useState(
+    language === "id" ? "Percakapan Baru" : "New Chat"
+  );
 
   useEffect(() => {
-    if (learn?.title) {
-      setTitleValue(learn.title);
+    if (activeSession?.title) {
+      setTitleValue(activeSession.title);
+    } else {
+      setTitleValue(language === "id" ? "Percakapan Baru" : "New Chat");
     }
-  }, [learn?.title]);
+  }, [activeSession?.title, language]);
 
-  // Load chat messages from local Dexie on mount / learnId change
+  // Load chat messages from local Dexie when activeSessionId changes
   useEffect(() => {
-    if (!learnId) {
+    if (!activeSessionId) {
       setMessages([]);
       return;
     }
     let isMounted = true;
-    localDb.getMessages(learnId).then((saved) => {
+    localDb.getSessionMessages(activeSessionId).then((saved) => {
       if (!isMounted) return;
       if (saved && saved.length > 0) {
         setMessages(
@@ -199,7 +248,7 @@ export function MobileLearnWorkspace({
     return () => {
       isMounted = false;
     };
-  }, [learnId]);
+  }, [activeSessionId]);
 
   // Auto scroll to bottom on message updates in chat tab
   useEffect(() => {
@@ -223,19 +272,70 @@ export function MobileLearnWorkspace({
 
   const handleSaveTitle = async () => {
     setIsEditingTitle(false);
-    const trimmed = titleValue.trim() || t("untitledNotebook");
+    const defaultName = language === "id" ? "Percakapan Baru" : "New Chat";
+    const trimmed = titleValue.trim() || defaultName;
     setTitleValue(trimmed);
-    await localDb.updateLearn(learnId, { title: trimmed });
+    if (activeSessionId) {
+      await localDb.updateChatSession(activeSessionId, { title: trimmed });
+    }
   };
 
   const handleClearHistory = async () => {
     if (isStreaming) {
       handleStop();
     }
-    if (learnId) {
-      await localDb.clearMessages(learnId);
+    if (activeSessionId) {
+      await localDb.clearSessionMessages(activeSessionId);
     }
     setMessages([]);
+  };
+
+  // Create a new chat session within the current workspace/learn
+  const handleNewChat = async () => {
+    if (isStreaming) {
+      handleStop();
+    }
+    if (!learnId) return;
+    const defaultName = language === "id" ? "Percakapan Baru" : "New Chat";
+    const newSessionId = await localDb.createChatSession(learnId, defaultName);
+    setActiveSessionId(newSessionId);
+    setMessages([]);
+    setInputMessage("");
+    setAttachedFiles([]);
+  };
+
+  const handleSelectChat = (sessionId: string) => {
+    if (isStreaming) {
+      handleStop();
+    }
+    setActiveSessionId(sessionId);
+  };
+
+  const handleDeleteChat = async (sessionId: string) => {
+    await localDb.deleteChatSession(sessionId);
+    if (activeSessionId === sessionId) {
+      const remaining = (sessions || []).filter((s) => s.id !== sessionId);
+      if (remaining.length > 0 && remaining[0]) {
+        setActiveSessionId(remaining[0].id);
+      } else {
+        const defaultName = language === "id" ? "Percakapan Baru" : "New Chat";
+        const newId = await localDb.createChatSession(learnId, defaultName);
+        setActiveSessionId(newId);
+        setMessages([]);
+      }
+    }
+  };
+
+  const handleRenameChat = async (sessionId: string, newTitle: string) => {
+    const trimmed = newTitle.trim() || (language === "id" ? "Percakapan Baru" : "New Chat");
+    await localDb.updateChatSession(sessionId, { title: trimmed });
+    if (sessionId === activeSessionId) {
+      setTitleValue(trimmed);
+    }
+  };
+
+  const handleTogglePinChat = async (sessionId: string, isPinned: boolean) => {
+    await localDb.updateChatSession(sessionId, { isPinned });
   };
 
   const handleStop = () => {
@@ -250,6 +350,13 @@ export function MobileLearnWorkspace({
     const textToSend = (customPrompt || inputMessage).trim();
     const currentAttachments = attachmentsToSend || attachedFiles;
     if ((!textToSend && currentAttachments.length === 0) || isStreaming) return;
+
+    let targetSessionId = activeSessionId;
+    if (!targetSessionId) {
+      const defaultName = language === "id" ? "Percakapan Baru" : "New Chat";
+      targetSessionId = await localDb.createChatSession(learnId, defaultName);
+      setActiveSessionId(targetSessionId);
+    }
 
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -289,15 +396,34 @@ export function MobileLearnWorkspace({
       createdAt: now,
     };
 
-    // Save user message to Dexie
-    if (learnId) {
+    // Save user message to Dexie with sessionId
+    if (learnId && targetSessionId) {
       await localDb.saveMessage({
         id: userMsgId,
         learnId,
+        sessionId: targetSessionId,
         role: "user",
         content: textToSend,
         attachments: serializedAttachments,
         createdAt: now,
+      });
+    }
+
+    // Auto-generate title with AI (with fallback) for this chat session
+    const isDefaultTitle =
+      !activeSession?.title ||
+      activeSession.title.trim().toLowerCase() === "percakapan baru" ||
+      activeSession.title.trim().toLowerCase() === "new chat" ||
+      activeSession.title.trim().toLowerCase() === "untitled chat" ||
+      activeSession.title.trim().toLowerCase() === "untitled notebook" ||
+      activeSession.title.trim().toLowerCase() === "notebook tanpa judul";
+
+    if (isDefaultTitle && textToSend && targetSessionId) {
+      generateChatTitle(textToSend, selectedModelId).then((newTitle) => {
+        if (newTitle && newTitle.trim().length > 0) {
+          setTitleValue(newTitle);
+          localDb.updateChatSession(targetSessionId!, { title: newTitle });
+        }
       });
     }
 
@@ -353,10 +479,11 @@ export function MobileLearnWorkspace({
           setIsStreaming(false);
           abortControllerRef.current = null;
 
-          if (learnId) {
+          if (learnId && targetSessionId) {
             await localDb.saveMessage({
               id: assistantMsgId,
               learnId,
+              sessionId: targetSessionId,
               role: "assistant",
               content: finalContent,
               thinking: finalThinking,
@@ -386,10 +513,11 @@ export function MobileLearnWorkspace({
           setIsStreaming(false);
           abortControllerRef.current = null;
 
-          if (learnId) {
+          if (learnId && targetSessionId) {
             await localDb.saveMessage({
               id: assistantMsgId,
               learnId,
+              sessionId: targetSessionId,
               role: "assistant",
               content: errorText,
               durationMs: finalDuration,
@@ -477,39 +605,26 @@ export function MobileLearnWorkspace({
           )}
         </div>
 
-        {/* Right actions */}
-        <div className="flex items-center gap-1 shrink-0">
-          {activeTab === "chat" && messages.length > 0 && (
-            <button
-              type="button"
-              onClick={handleClearHistory}
-              className="h-8 px-2 rounded-xl hover:bg-[#2b2b2b] text-[#969696] hover:text-[#ffffff] flex items-center gap-1 text-[11px] transition-colors cursor-pointer border border-[#383838]"
-              title={t("clearConversation")}
-            >
-              <RotateCcw className="h-3.5 w-3.5" />
-            </button>
-          )}
-
+        {/* Right actions: New Chat (left, primary accent) & History (right, muted) */}
+        <div className="flex items-center gap-2 shrink-0">
           <button
             type="button"
-            onClick={() => setIsAddSourceOpen(true)}
-            className="h-8 w-8 rounded-xl hover:bg-[#2b2b2b] text-[#969696] hover:text-[#ffffff] flex items-center justify-center transition-colors cursor-pointer border border-[#383838]"
-            aria-label={t("addSource")}
+            onClick={handleNewChat}
+            className="h-8 w-8 rounded-xl bg-[#0066ff] hover:bg-[#0055dd] text-[#ffffff] flex items-center justify-center transition-all duration-150 cursor-pointer border border-[#0066ff]/80 shadow-xs active:scale-95"
+            title={t("newChat") || "Chat Baru"}
+            aria-label={t("newChat") || "Chat Baru"}
           >
-            <Plus className="h-4 w-4" />
+            <MessageCirclePlus className="h-4 w-4" />
           </button>
 
           <button
             type="button"
-            onClick={() => {
-              if (navigator.share) {
-                navigator.share({ title: titleValue, url: window.location.href }).catch(() => {});
-              }
-            }}
-            className="h-8 w-8 rounded-xl hover:bg-[#2b2b2b] text-[#969696] hover:text-[#ffffff] flex items-center justify-center transition-colors cursor-pointer border border-[#383838]"
-            aria-label={t("share")}
+            onClick={() => setIsHistoryOpen(true)}
+            className="h-8 w-8 rounded-xl bg-[#2b2b2b] hover:bg-[#383838] text-[#969696] hover:text-[#ffffff] flex items-center justify-center transition-colors cursor-pointer border border-[#383838] active:scale-95"
+            title={t("chatHistory") || "Riwayat Chat"}
+            aria-label={t("chatHistory") || "Riwayat Chat"}
           >
-            <Share2 className="h-4 w-4" />
+            <History className="h-4 w-4" />
           </button>
         </div>
       </header>
@@ -560,10 +675,6 @@ export function MobileLearnWorkspace({
                 </div>
               )}
             </div>
-
-            <span className="text-[10px] font-mono text-[#5d5d5d]">
-              Local IndexedDB
-            </span>
           </div>
 
           {/* Scrollable Conversation Stream */}
@@ -971,6 +1082,18 @@ export function MobileLearnWorkspace({
         onSelectSource={(sourceType) => {
           setIsAddSourceOpen(false);
         }}
+      />
+
+      {/* Chat History Panel (Drawer matching apps/router generation) */}
+      <HistoryPanel
+        open={isHistoryOpen}
+        onClose={() => setIsHistoryOpen(false)}
+        sessions={sessions || []}
+        activeChatId={activeSessionId}
+        onSelectChat={handleSelectChat}
+        onDeleteChat={handleDeleteChat}
+        onRenameChat={handleRenameChat}
+        onTogglePinChat={handleTogglePinChat}
       />
     </div>
   );

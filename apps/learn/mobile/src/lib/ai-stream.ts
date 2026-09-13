@@ -298,3 +298,96 @@ export async function streamChatCompletion({
     throw err;
   }
 }
+
+/**
+ * Generates a clean fallback title from the user prompt
+ */
+export function fallbackTitle(prompt: string): string {
+  if (!prompt || !prompt.trim()) return "Untitled notebook";
+  const cleaned = prompt.replace(/\s+/g, " ").trim();
+  if (cleaned.length <= 35) return cleaned;
+  const words = cleaned.split(" ");
+  let result = "";
+  for (const word of words) {
+    if ((result + " " + word).trim().length > 35) break;
+    result = (result + " " + word).trim();
+  }
+  return (result || cleaned.slice(0, 32)) + "...";
+}
+
+/**
+ * Generates a short, relevant chat title using AI via Const Router with fallback
+ */
+export async function generateChatTitle(
+  firstPrompt: string,
+  model = "combo/fast"
+): Promise<string> {
+  if (!firstPrompt || !firstPrompt.trim()) {
+    return "Untitled notebook";
+  }
+
+  const fallback = fallbackTitle(firstPrompt);
+
+  try {
+    const baseUrl = getRouterBaseUrl();
+    const endpoint = `${baseUrl.replace(/\/+$/, "")}/chat/completions`;
+    const authToken =
+      localStorage.getItem("const_learn_auth_token") ||
+      localStorage.getItem("const_sso_token") ||
+      "";
+    const apiKey =
+      authToken ||
+      (import.meta as any).env?.VITE_CONST_ROUTER_API_KEY ||
+      "";
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
+
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+      },
+      body: JSON.stringify({
+        model: model || "combo/fast",
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are a title generator. Generate a concise, natural, and informative title (3 to 6 words) summarizing the user's inquiry or topic. Respond with ONLY the title. No quotes, no markdown, no punctuation at the end. Match the language of the prompt.",
+          },
+          {
+            role: "user",
+            content: firstPrompt.slice(0, 500),
+          },
+        ],
+        max_tokens: 25,
+        temperature: 0.3,
+        stream: false,
+      }),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+
+    if (res.ok) {
+      const data = await res.json();
+      const rawTitle = data.choices?.[0]?.message?.content?.trim();
+      if (rawTitle && rawTitle.length > 0 && rawTitle.length < 60) {
+        const sanitized = rawTitle
+          .replace(/^["'`“‘]+|["'`”’]+$/g, "")
+          .replace(/[.。!]+$/, "")
+          .trim();
+        if (sanitized.length > 0) {
+          return sanitized;
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("AI title generation failed, using fallback:", err);
+  }
+
+  return fallback;
+}
+
