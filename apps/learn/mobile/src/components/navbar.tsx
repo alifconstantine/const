@@ -1,5 +1,4 @@
 import {
-  ConstLogoIcon,
   Avatar,
   AvatarImage,
   AvatarFallback,
@@ -9,7 +8,6 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   useTheme,
-  Input,
 } from "@const/ui";
 import {
   Settings,
@@ -19,8 +17,6 @@ import {
   Sun,
   Moon,
   Laptop,
-  Search,
-  X,
 } from "lucide-react";
 
 export interface UserProfile {
@@ -34,10 +30,6 @@ interface NavbarProps {
   user?: UserProfile | null;
   onSignOut: () => void;
   onSwitchAccount?: () => void;
-  searchQuery?: string;
-  onSearchChange?: (query: string) => void;
-  isSearchOpen?: boolean;
-  onToggleSearch?: () => void;
 }
 
 export function getUserInitials(name?: string | null, email?: string | null): string {
@@ -66,83 +58,35 @@ export function Navbar({
   user,
   onSignOut,
   onSwitchAccount,
-  searchQuery = "",
-  onSearchChange,
-  isSearchOpen = false,
-  onToggleSearch,
 }: NavbarProps) {
   const initials = getUserInitials(user?.name, user?.email);
   const [theme, setTheme] = useTheme();
 
   return (
-    <header className="sticky top-0 w-full h-14 border-b border-border/70 bg-background/95 backdrop-blur-md px-3.5 flex items-center justify-between select-none z-40">
-      {isSearchOpen ? (
-        <div className="w-full flex items-center gap-2 animate-in fade-in duration-150">
-          <div className="relative flex-1 flex items-center">
-            <Search className="absolute left-3 h-4 w-4 text-muted-foreground pointer-events-none" />
-            <Input
-              value={searchQuery}
-              onChange={(e) => onSearchChange?.(e.target.value)}
-              placeholder="Search notebooks, collections..."
-              className="h-9 w-full pl-9 pr-8 text-xs rounded-full bg-secondary/60 border-border/70 focus-visible:ring-1"
-              autoFocus
-            />
-            {searchQuery ? (
-              <button
-                type="button"
-                onClick={() => onSearchChange?.("")}
-                className="absolute right-2.5 p-0.5 text-muted-foreground hover:text-foreground cursor-pointer"
-                aria-label="Clear search"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            ) : null}
-          </div>
-          <button
-            type="button"
-            onClick={onToggleSearch}
-            className="px-2 py-1 text-xs text-muted-foreground hover:text-foreground cursor-pointer font-medium"
-          >
-            Cancel
-          </button>
-        </div>
-      ) : (
-        <>
-          {/* Left: Const Logo & Product Title */}
-          <div className="flex items-center gap-2">
-            <ConstLogoIcon size="sm" className="w-5 h-5 text-foreground shrink-0" />
-            <div className="flex items-center gap-1.5">
-              <span className="font-sans font-semibold text-base tracking-tight text-foreground">
-                Const
-              </span>
-              <span className="text-[9px] font-mono tracking-wider uppercase px-1.5 py-0.5 rounded-full bg-secondary text-muted-foreground border border-border/50">
-                Learn
-              </span>
-            </div>
-          </div>
+    <header className="sticky top-0 w-full h-16 sm:h-20 bg-background/95 backdrop-blur-md px-5 flex items-center justify-between select-none z-40">
+      {/* Left: Const Learn Brand Title (Styled like apps/router: Lora Const + pill badge Learn) */}
+      <div className="flex items-center gap-2 select-none py-1">
+        <span className="font-serif text-2xl font-medium tracking-tight text-foreground">
+          Const
+        </span>
+        <span className="text-[11px] font-mono tracking-wider uppercase px-2 py-0.5 rounded-full bg-secondary text-muted-foreground border border-border/50">
+          Learn
+        </span>
+      </div>
 
-          {/* Middle Spacer */}
-          <div className="flex-1" />
+      {/* Middle Spacer */}
+      <div className="flex-1" />
 
-          {/* Right: Search button & User Account Avatar */}
-          <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={onToggleSearch}
-              className="h-8 w-8 rounded-full flex items-center justify-center hover:bg-secondary active:bg-secondary/80 text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
-              aria-label="Search"
-            >
-              <Search className="h-4 w-4" />
-            </button>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
+      {/* Right: User Account Avatar Dropdown */}
+      <div className="flex items-center">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
                 <button
                   type="button"
                   className="relative flex items-center justify-center rounded-full outline-none ring-offset-background transition-all hover:ring-2 hover:ring-ring/20 focus-visible:ring-2 focus-visible:ring-ring cursor-pointer select-none p-0.5"
                   aria-label="Account menu"
                 >
-                  <Avatar className="h-8 w-8 rounded-full border border-border/70 transition-transform active:scale-95">
+                  <Avatar className="h-9 w-9 rounded-full border border-border/70 transition-transform active:scale-95">
                     {user?.image ? (
                       <AvatarImage
                         src={user.image}
@@ -264,8 +208,6 @@ export function Navbar({
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-    </>
-  )}
-</header>
-);
+    </header>
+  );
 }

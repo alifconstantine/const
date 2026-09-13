@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef, useLayoutEffect } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db, localDb, LocalLearn, LocalCollection, LocalArtifact } from "../../lib/db";
 import {
@@ -12,29 +12,25 @@ import {
 } from "@const/ui";
 import {
   Search,
-  LayoutGrid,
-  List as ListIcon,
   ArrowUpDown,
   Plus,
   ChevronRight,
   ArrowLeft,
-  Package,
   Folder,
   Trash2,
   X,
-  Layers,
   BookOpen,
+  FileText,
 } from "lucide-react";
 
 import { LearnCard, LearnItem } from "./learn-card";
 import { CollectionCard, CollectionItem } from "./collection-card";
-import { CreateCard } from "./create-card";
 import { CreateLearnDialog } from "./dialogs/create-learn-dialog";
 import { CreateCollectionDialog } from "./dialogs/create-collection-dialog";
 import { ManageCollectionDialog } from "./dialogs/manage-collection-dialog";
 import { DeleteConfirmDialog } from "./dialogs/delete-confirm-dialog";
 
-type TabKey = "all" | "my_learn" | "collections" | "artifacts";
+type TabKey = "all" | "learns" | "sources" | "collections" | "artifact";
 type SortOption = "recent" | "oldest" | "title_asc" | "title_desc";
 
 const SORT_LABELS: Record<SortOption, string> = {
@@ -46,9 +42,10 @@ const SORT_LABELS: Record<SortOption, string> = {
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: "all", label: "All" },
-  { key: "my_learn", label: "My Learn" },
+  { key: "learns", label: "Learns" },
+  { key: "sources", label: "Sources" },
   { key: "collections", label: "Collections" },
-  { key: "artifacts", label: "Artifacts" },
+  { key: "artifact", label: "Artifact" },
 ];
 
 interface LearnHomeProps {
@@ -70,6 +67,22 @@ export function LearnHome({
   const setSearchQuery = onSearchQueryChange ?? setLocalSearchQuery;
   const [sortOption, setSortOption] = useState<SortOption>("recent");
   const [activeCollectionId, setActiveCollectionId] = useState<string | null>(null);
+
+  // Floating pill active indicator state
+  const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 0, opacity: 0 });
+  const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const navRef = useRef<HTMLElement | null>(null);
+
+  useLayoutEffect(() => {
+    const currentTab = tabRefs.current[activeTab];
+    if (currentTab) {
+      setIndicatorStyle({
+        left: currentTab.offsetLeft,
+        width: currentTab.offsetWidth,
+        opacity: 1,
+      });
+    }
+  }, [activeTab]);
 
   // Dialog states
   const [isCreateLearnOpen, setIsCreateLearnOpen] = useState(false);
@@ -143,6 +156,11 @@ export function LearnHome({
   const collections = useMemo(() => collectionsData ?? [], [collectionsData]);
   const artifacts = useMemo(() => artifactsData ?? [], [artifactsData]);
 
+  // Notebooks that have sources attached
+  const sourcesLearns = useMemo(() => {
+    return learns.filter((l) => (l.sourcesCount || 0) > 0);
+  }, [learns]);
+
   // Active collection when drilled down
   const activeCollection = useMemo(() => {
     if (!activeCollectionId) return null;
@@ -153,6 +171,23 @@ export function LearnHome({
     if (!activeCollectionId) return [];
     return learns.filter((l) => l.collectionIds && l.collectionIds.includes(activeCollectionId));
   }, [learns, activeCollectionId]);
+
+  const getItemCountForActiveTab = () => {
+    switch (activeTab) {
+      case "all":
+        return learns.length + collections.length;
+      case "learns":
+        return learns.length;
+      case "sources":
+        return sourcesLearns.length;
+      case "collections":
+        return activeCollectionId ? collectionLearns.length : collections.length;
+      case "artifact":
+        return artifacts.length;
+      default:
+        return 0;
+    }
+  };
 
   // Submit Learn
   const handleSaveLearn = async (data: {
@@ -215,50 +250,98 @@ export function LearnHome({
   };
 
   return (
-    <div className="w-full flex-1 flex flex-col bg-background text-foreground min-h-screen">
+    <div className="w-full flex-1 flex flex-col bg-background text-foreground overflow-y-auto overflow-x-hidden min-h-0">
       {/* -------------------------------------------------------------
-          MAIN CONTENT MENU CHIPS: (All, My Learn, Collections, Artifacts)
+          FLOATING PILL NAVMENU: (All, Learns, Sources, Collections, Artifact)
+          with Smooth Sliding Indicator Animation
           ------------------------------------------------------------- */}
-      <div className="sticky top-14 z-30 w-full bg-background/90 backdrop-blur-md px-3.5 py-2 select-none">
-        <div className="flex items-center gap-1.5 w-full">
+      <div className="sticky top-0 z-30 w-full px-3 py-2 flex items-center justify-center select-none bg-background/90 backdrop-blur-md">
+        <nav
+          ref={navRef}
+          aria-label="Navigation Tabs"
+          className="relative inline-flex items-center p-1 rounded-full bg-[#222222] border border-[#383838] overflow-x-auto no-scrollbar max-w-full"
+        >
+          {/* Animated Sliding Pill Indicator */}
+          <div
+            className="absolute top-1 bottom-1 rounded-full bg-[#2b2b2b] border border-[#383838] transition-all duration-300 pointer-events-none"
+            style={{
+              left: `${indicatorStyle.left}px`,
+              width: `${indicatorStyle.width}px`,
+              opacity: indicatorStyle.opacity,
+              transitionTimingFunction: "cubic-bezier(0.25, 1, 0.5, 1)",
+            }}
+          />
+
           {TABS.map((tab) => {
             const isActive = activeTab === tab.key;
             return (
               <button
                 key={tab.key}
+                ref={(el) => {
+                  tabRefs.current[tab.key] = el;
+                }}
                 type="button"
                 onClick={() => {
                   setActiveTab(tab.key);
                   setActiveCollectionId(null);
                 }}
-                className={`flex-1 py-1.5 px-1 rounded-full text-[11px] sm:text-xs font-medium text-center tracking-tight transition-all duration-200 cursor-pointer ${
+                className={`relative z-10 px-3.5 py-1.5 rounded-full text-xs font-medium tracking-tight whitespace-nowrap transition-colors duration-200 cursor-pointer select-none ${
                   isActive
-                    ? "bg-secondary text-foreground font-semibold border border-white/10 shadow-xs active:scale-95"
-                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/40 active:scale-95"
+                    ? "text-[#ffffff]"
+                    : "text-[#969696] hover:text-[#d4d4d4] active:scale-95"
                 }`}
               >
                 {tab.label}
               </button>
             );
           })}
-        </div>
+        </nav>
       </div>
 
       {/* Collection Drilldown Header Banner */}
       {activeCollection && (
-        <div className="mx-3.5 my-1.5 px-3 py-2 flex items-center gap-2 bg-secondary/30 rounded-xl">
+        <div className="mx-4 my-2 px-3.5 py-2 flex items-center gap-2.5 bg-[#222222] border border-[#383838] rounded-xl">
           <button
             type="button"
             onClick={() => setActiveCollectionId(null)}
-            className="h-7 w-7 rounded-full border border-border/70 flex items-center justify-center text-muted-foreground hover:text-foreground shrink-0 cursor-pointer active:scale-95 transition-all"
+            className="h-7 w-7 rounded-full border border-[#383838] flex items-center justify-center text-[#969696] hover:text-[#d4d4d4] shrink-0 cursor-pointer active:scale-95 transition-all"
+            aria-label="Back to collections"
           >
             <ArrowLeft className="h-3.5 w-3.5" />
           </button>
-          <div className="flex items-center gap-1.5 min-w-0">
+          <div className="flex items-center gap-1.5 min-w-0 flex-1">
             <span className="text-base">{activeCollection.emoji || "📁"}</span>
-            <span className="font-sans text-sm font-semibold truncate text-foreground">
+            <span className="font-sans text-sm font-semibold truncate text-[#d4d4d4]">
               {activeCollection.name}
             </span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setEditingCollection(activeCollection);
+                setIsCreateCollectionOpen(true);
+              }}
+              className="rounded-full h-7 text-[11px] px-2.5 cursor-pointer border-[#383838] text-[#d4d4d4] hover:bg-[#2b2b2b]"
+            >
+              Edit
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              onClick={() =>
+                setDeleteTarget({
+                  type: "collection",
+                  id: activeCollection.id,
+                  title: `Delete collection "${activeCollection.name}"?`,
+                  description: "Notebooks in this collection will not be deleted.",
+                })
+              }
+              className="rounded-full h-7 text-[11px] px-2.5 cursor-pointer"
+            >
+              Delete
+            </Button>
           </div>
         </div>
       )}
@@ -266,110 +349,92 @@ export function LearnHome({
       {/* -------------------------------------------------------------
           MAIN CONTENT AREA (Mobile)
           ------------------------------------------------------------- */}
-      <main className="flex-1 w-full px-3.5 py-4 space-y-6 pb-28">
+      <main className="flex-1 w-full px-4 py-3 space-y-4 pb-28">
+        {/* Search & Sort on One Single Line (No List) */}
+        <div className="flex items-center gap-2 w-full">
+          {/* Search Input */}
+          <div className="relative flex-1 flex items-center">
+            <Search className="absolute left-3.5 h-4 w-4 text-[#969696] pointer-events-none" />
+            <Input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={
+                activeTab === "learns"
+                  ? "Search notebooks..."
+                  : activeTab === "collections"
+                  ? "Search collections..."
+                  : activeTab === "sources"
+                  ? "Search sources..."
+                  : activeTab === "artifact"
+                  ? "Search artifacts..."
+                  : "Search notebooks, collections..."
+              }
+              className="h-10 w-full pl-10 pr-9 text-xs sm:text-sm rounded-xl bg-[#222222] border-[#383838] text-[#d4d4d4] placeholder:text-[#5d5d5d] focus-visible:ring-1 focus-visible:ring-[#5d5d5d]"
+            />
+            {searchQuery ? (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-3 p-1 text-[#969696] hover:text-[#d4d4d4] cursor-pointer"
+                aria-label="Clear search"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            ) : null}
+          </div>
+
+          {/* Sort Dropdown (Recent) */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="h-10 px-3 rounded-xl flex items-center gap-1.5 text-xs text-[#969696] hover:text-[#d4d4d4] hover:bg-[#222222] bg-[#222222] border border-[#383838] active:scale-95 transition-all duration-200 cursor-pointer shrink-0"
+                title="Sort"
+              >
+                <ArrowUpDown className="h-3.5 w-3.5" />
+                <span>{SORT_LABELS[sortOption]}</span>
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-36 p-1 shadow-none border-[#383838] bg-[#222222]">
+              {(Object.keys(SORT_LABELS) as SortOption[]).map((key) => (
+                <DropdownMenuItem
+                  key={key}
+                  onClick={() => setSortOption(key)}
+                  className="cursor-pointer text-xs py-1.5 px-2 text-[#d4d4d4] hover:bg-[#2b2b2b]"
+                >
+                  {SORT_LABELS[key]}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+
+        {/* Tab Content with Smooth Transition */}
+        <div key={activeTab + (activeCollectionId || "")} className="animate-in fade-in duration-200 space-y-4">
+
         {/* =========================================================
-            TAB: ALL (My Learn + Koleksi)
+            TAB 1: ALL (Recent Learns + Collections)
             ========================================================= */}
         {activeTab === "all" && (
-          <>
-            {/* Section 1: My Learn */}
-            <section className="space-y-3">
-              <div className="flex items-center justify-between">
+          <div className="space-y-6">
+            {/* Section 1: Learns */}
+            <section className="space-y-2.5">
+              <div className="flex items-center justify-between px-0.5">
                 <div className="flex items-center gap-2">
-                  <h2 className="font-sans text-base font-semibold tracking-tight text-foreground">
-                    My Learn
+                  <h2 className="font-sans text-sm font-semibold tracking-tight text-foreground">
+                    Learns
                   </h2>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary text-muted-foreground font-mono">
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#222222] border border-[#383838] text-[#969696] font-mono">
                     {learns.length}
                   </span>
                 </div>
 
-                <div className="flex items-center gap-1.5">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <button
-                        type="button"
-                        className="h-7 px-2 rounded-full flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground hover:bg-secondary active:scale-95 transition-all duration-200 cursor-pointer"
-                        title="Sort"
-                      >
-                        <ArrowUpDown className="h-3 w-3" />
-                        <span>{SORT_LABELS[sortOption]}</span>
-                      </button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-36 p-1 shadow-md">
-                      {(Object.keys(SORT_LABELS) as SortOption[]).map((key) => (
-                        <DropdownMenuItem
-                          key={key}
-                          onClick={() => setSortOption(key)}
-                          className="cursor-pointer text-xs py-1.5 px-2"
-                        >
-                          {SORT_LABELS[key]}
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-
-                  {learns.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab("my_learn")}
-                      className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-0.5 transition-colors cursor-pointer pl-1"
-                    >
-                      <span>View all</span>
-                      <ChevronRight className="h-3 w-3" />
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <CreateCard
-                  type="learn"
-                  onClick={() => handleCreateNewLearn()}
-                />
-
-                {learns.map((learn) => (
-                  <LearnCard
-                    key={learn.id}
-                    learn={learn}
-                    viewMode={viewMode}
-                    onClick={() => onOpenLearn?.(learn.id, false)}
-                    onEdit={(l) => {
-                      setEditingLearn(l);
-                      setIsCreateLearnOpen(true);
-                    }}
-                    onManageCollections={(l) => setManagingLearn(l)}
-                    onDelete={(l) =>
-                      setDeleteTarget({
-                        type: "learn",
-                        id: l.id,
-                        title: `Delete notebook "${l.title}"?`,
-                        description:
-                          "This action cannot be undone. Notebook data will be permanently deleted.",
-                      })
-                    }
-                  />
-                ))}
-              </div>
-            </section>
-
-            {/* Section 2: Collections */}
-            <section className="space-y-3 pt-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <h2 className="font-sans text-base font-semibold tracking-tight text-foreground">
-                    Collections
-                  </h2>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary text-muted-foreground font-mono">
-                    {collections.length}
-                  </span>
-                </div>
-
-                {collections.length > 0 && (
+                {learns.length > 0 && (
                   <button
                     type="button"
-                    onClick={() => setActiveTab("collections")}
-                    className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-0.5 transition-colors cursor-pointer"
+                    onClick={() => setActiveTab("learns")}
+                    className="text-xs text-[#969696] hover:text-[#d4d4d4] flex items-center gap-0.5 transition-colors cursor-pointer"
                   >
                     <span>View all</span>
                     <ChevronRight className="h-3 w-3" />
@@ -378,177 +443,8 @@ export function LearnHome({
               </div>
 
               <div className="space-y-2">
-                <CreateCard
-                  type="collection"
-                  onClick={() => {
-                    setEditingCollection(null);
-                    setIsCreateCollectionOpen(true);
-                  }}
-                />
-
-                {collections.map((col) => (
-                  <CollectionCard
-                    key={col.id}
-                    collection={col}
-                    viewMode={viewMode}
-                    onClick={(c) => {
-                      setActiveCollectionId(c.id);
-                      setActiveTab("collections");
-                    }}
-                    onEdit={(c) => {
-                      setEditingCollection(c);
-                      setIsCreateCollectionOpen(true);
-                    }}
-                    onDelete={(c) =>
-                      setDeleteTarget({
-                        type: "collection",
-                        id: c.id,
-                        title: `Delete collection "${c.name}"?`,
-                        description:
-                          "Notebooks inside this collection will not be deleted, only unlinked.",
-                      })
-                    }
-                  />
-                ))}
-              </div>
-            </section>
-          </>
-        )}
-
-        {/* =========================================================
-            TAB: MY LEARN (Mobile)
-            ========================================================= */}
-        {activeTab === "my_learn" && (
-          <section className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <h2 className="font-sans text-base font-semibold tracking-tight text-foreground">
-                  My Learn
-                </h2>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary text-muted-foreground font-mono">
-                  {learns.length}
-                </span>
-              </div>
-
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    type="button"
-                    className="h-7 px-2 rounded-full flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground hover:bg-secondary active:scale-95 transition-all duration-200 cursor-pointer"
-                    title="Sort"
-                  >
-                    <ArrowUpDown className="h-3 w-3" />
-                    <span>{SORT_LABELS[sortOption]}</span>
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-36 p-1 shadow-md">
-                  {(Object.keys(SORT_LABELS) as SortOption[]).map((key) => (
-                    <DropdownMenuItem
-                      key={key}
-                      onClick={() => setSortOption(key)}
-                      className="cursor-pointer text-xs py-1.5 px-2"
-                    >
-                      {SORT_LABELS[key]}
-                    </DropdownMenuItem>
-                  ))}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-
-            <div className="space-y-2">
-              <CreateCard
-                type="learn"
-                onClick={() => handleCreateNewLearn()}
-              />
-
-              {learns.map((learn) => (
-                <LearnCard
-                  key={learn.id}
-                  learn={learn}
-                  viewMode={viewMode}
-                  onClick={() => onOpenLearn?.(learn.id, false)}
-                  onEdit={(l) => {
-                    setEditingLearn(l);
-                    setIsCreateLearnOpen(true);
-                  }}
-                  onManageCollections={(l) => setManagingLearn(l)}
-                  onDelete={(l) =>
-                    setDeleteTarget({
-                      type: "learn",
-                      id: l.id,
-                      title: `Delete notebook "${l.title}"?`,
-                      description: "This notebook will be permanently deleted.",
-                    })
-                  }
-                />
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* =========================================================
-            TAB: COLLECTIONS (Mobile)
-            ========================================================= */}
-        {activeTab === "collections" && (
-          <section className="space-y-3">
-            {activeCollection ? (
-              // Drilled-down collection
-              <div className="space-y-4">
-                <div className="flex items-center justify-between pb-2">
-                  <div className="flex items-center gap-2.5">
-                    <button
-                      type="button"
-                      onClick={() => setActiveCollectionId(null)}
-                      className="h-7 w-7 rounded-full border border-border/70 flex items-center justify-center text-muted-foreground hover:text-foreground cursor-pointer active:scale-95 transition-all"
-                    >
-                      <ArrowLeft className="h-3.5 w-3.5" />
-                    </button>
-                    <div>
-                      <h2 className="font-sans text-base font-semibold tracking-tight text-foreground flex items-center gap-1.5">
-                        <span>{activeCollection.emoji || "📁"}</span>
-                        <span>{activeCollection.name}</span>
-                      </h2>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-1.5">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => {
-                        setEditingCollection(activeCollection);
-                        setIsCreateCollectionOpen(true);
-                      }}
-                      className="rounded-full h-7 text-[11px] px-2.5 cursor-pointer"
-                    >
-                      Edit
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      size="sm"
-                      onClick={() =>
-                        setDeleteTarget({
-                          type: "collection",
-                          id: activeCollection.id,
-                          title: `Delete collection "${activeCollection.name}"?`,
-                          description:
-                            "Notebooks in this collection will not be deleted.",
-                        })
-                      }
-                      className="rounded-full h-7 text-[11px] px-2.5 cursor-pointer"
-                    >
-                      Delete
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="space-y-2">
-                  <CreateCard
-                    type="learn"
-                    onClick={() => handleCreateNewLearn(activeCollectionId || undefined)}
-                  />
-
-                  {collectionLearns.map((learn) => (
+                {learns.length > 0 ? (
+                  learns.map((learn) => (
                     <LearnCard
                       key={learn.id}
                       learn={learn}
@@ -564,48 +460,55 @@ export function LearnHome({
                           type: "learn",
                           id: l.id,
                           title: `Delete notebook "${l.title}"?`,
-                          description: "This notebook will be permanently deleted.",
+                          description:
+                            "This action cannot be undone. Notebook data will be permanently deleted.",
                         })
                       }
                     />
-                  ))}
-                </div>
-
-                {collectionLearns.length === 0 && (
-                  <div className="text-center py-10 px-4 bg-secondary/20 rounded-2xl border border-dashed border-border/70">
-                    <p className="text-xs text-muted-foreground">
-                      No notebooks in this collection yet.
-                    </p>
+                  ))
+                ) : (
+                  <div className="text-center py-6 px-4 bg-[#1b1b1b] rounded-2xl border border-dashed border-[#2e2e2e]">
+                    <p className="text-xs text-[#969696]">No notebooks found.</p>
                   </div>
                 )}
               </div>
-            ) : (
-              // All Collections
-              <>
+            </section>
+
+            {/* Section 2: Collections */}
+            <section className="space-y-2.5 pt-1">
+              <div className="flex items-center justify-between px-0.5">
                 <div className="flex items-center gap-2">
-                  <h2 className="font-sans text-base font-semibold tracking-tight text-foreground">
+                  <h2 className="font-sans text-sm font-semibold tracking-tight text-foreground">
                     Collections
                   </h2>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary text-muted-foreground font-mono">
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#222222] border border-[#383838] text-[#969696] font-mono">
                     {collections.length}
                   </span>
                 </div>
 
-                <div className="space-y-2">
-                  <CreateCard
-                    type="collection"
-                    onClick={() => {
-                      setEditingCollection(null);
-                      setIsCreateCollectionOpen(true);
-                    }}
-                  />
+                {collections.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => setActiveTab("collections")}
+                    className="text-xs text-[#969696] hover:text-[#d4d4d4] flex items-center gap-0.5 transition-colors cursor-pointer"
+                  >
+                    <span>View all</span>
+                    <ChevronRight className="h-3 w-3" />
+                  </button>
+                )}
+              </div>
 
-                  {collections.map((col) => (
+              <div className="space-y-2">
+                {collections.length > 0 ? (
+                  collections.map((col) => (
                     <CollectionCard
                       key={col.id}
                       collection={col}
                       viewMode={viewMode}
-                      onClick={(c) => setActiveCollectionId(c.id)}
+                      onClick={(c) => {
+                        setActiveCollectionId(c.id);
+                        setActiveTab("collections");
+                      }}
                       onEdit={(c) => {
                         setEditingCollection(c);
                         setIsCreateCollectionOpen(true);
@@ -616,11 +519,241 @@ export function LearnHome({
                           id: c.id,
                           title: `Delete collection "${c.name}"?`,
                           description:
-                            "Notebooks inside this collection will not be deleted.",
+                            "Notebooks inside this collection will not be deleted, only unlinked.",
                         })
                       }
                     />
-                  ))}
+                  ))
+                ) : (
+                  <div className="text-center py-6 px-4 bg-[#1b1b1b] rounded-2xl border border-dashed border-[#2e2e2e]">
+                    <p className="text-xs text-[#969696]">No collections found.</p>
+                  </div>
+                )}
+              </div>
+            </section>
+          </div>
+        )}
+
+        {/* =========================================================
+            TAB 2: LEARNS
+            ========================================================= */}
+        {activeTab === "learns" && (
+          <section className="space-y-2.5">
+            <div className="flex items-center justify-between px-0.5">
+              <div className="flex items-center gap-2">
+                <h2 className="font-sans text-sm font-semibold tracking-tight text-foreground">
+                  All Notebooks
+                </h2>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#222222] border border-[#383838] text-[#969696] font-mono">
+                  {learns.length}
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              {learns.length > 0 ? (
+                learns.map((learn) => (
+                  <LearnCard
+                    key={learn.id}
+                    learn={learn}
+                    viewMode={viewMode}
+                    onClick={() => onOpenLearn?.(learn.id, false)}
+                    onEdit={(l) => {
+                      setEditingLearn(l);
+                      setIsCreateLearnOpen(true);
+                    }}
+                    onManageCollections={(l) => setManagingLearn(l)}
+                    onDelete={(l) =>
+                      setDeleteTarget({
+                        type: "learn",
+                        id: l.id,
+                        title: `Delete notebook "${l.title}"?`,
+                        description: "This notebook will be permanently deleted.",
+                      })
+                    }
+                  />
+                ))
+              ) : (
+                <div className="text-center py-12 px-4 bg-[#1b1b1b] rounded-2xl border border-dashed border-[#2e2e2e]">
+                  <div className="h-10 w-10 rounded-xl bg-[#222222] border border-[#383838] flex items-center justify-center text-lg mx-auto mb-2 text-[#969696]">
+                    📘
+                  </div>
+                  <h3 className="text-sm font-medium text-foreground mb-1">
+                    No notebooks found
+                  </h3>
+                  <p className="text-xs text-[#969696]">
+                    {searchQuery ? "Try a different search keyword." : "Tap New Learn below to create your first notebook."}
+                  </p>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
+        {/* =========================================================
+            TAB 3: SOURCES
+            ========================================================= */}
+        {activeTab === "sources" && (
+          <section className="space-y-2.5">
+            <div className="flex items-center justify-between px-0.5">
+              <div className="flex items-center gap-2">
+                <h2 className="font-sans text-sm font-semibold tracking-tight text-foreground">
+                  Learning Sources
+                </h2>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#222222] border border-[#383838] text-[#969696] font-mono">
+                  {sourcesLearns.length}
+                </span>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              {sourcesLearns.length > 0 ? (
+                sourcesLearns.map((learn) => (
+                  <div
+                    key={learn.id}
+                    onClick={() => onOpenLearn?.(learn.id, false)}
+                    className="w-full px-4 py-3.5 rounded-2xl border border-[#383838] bg-[#1e1e24] hover:bg-[#25252b] active:bg-[#282832] transition-all duration-200 flex items-center justify-between gap-3.5 cursor-pointer select-none"
+                  >
+                    <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                      <div className="h-10 w-10 rounded-xl bg-[#2b2b2b] border border-[#383838] flex items-center justify-center text-xl shrink-0">
+                        {learn.emoji || "📚"}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h4 className="text-sm font-medium text-foreground truncate leading-snug">
+                          {learn.title}
+                        </h4>
+                        <span className="text-xs text-[#969696] mt-0.5 block">
+                          {learn.sourcesCount} {learn.sourcesCount === 1 ? "source attached" : "sources attached"}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5 text-xs text-[#969696] shrink-0">
+                      <span>View</span>
+                      <ChevronRight className="h-3.5 w-3.5" />
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="text-center py-14 px-4 border border-[#2e2e2e] rounded-2xl bg-[#1b1b1b]">
+                  <div className="h-10 w-10 rounded-xl bg-[#222222] border border-[#383838] flex items-center justify-center text-[#969696] mx-auto mb-3">
+                    <FileText className="h-5 w-5 stroke-[1.5]" />
+                  </div>
+                  <h3 className="text-sm font-medium text-foreground mb-1">
+                    No sources attached yet
+                  </h3>
+                  <p className="text-xs text-[#969696] leading-relaxed max-w-xs mx-auto">
+                    Add documents, web links, or research notes inside any notebook to ground your AI tutor.
+                  </p>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
+        {/* =========================================================
+            TAB 4: COLLECTIONS
+            ========================================================= */}
+        {activeTab === "collections" && (
+          <section className="space-y-2.5">
+            {activeCollection ? (
+              // Drilled-down collection
+              <div className="space-y-3">
+                <div className="space-y-2">
+                  {collectionLearns.length > 0 ? (
+                    collectionLearns.map((learn) => (
+                      <LearnCard
+                        key={learn.id}
+                        learn={learn}
+                        viewMode={viewMode}
+                        onClick={() => onOpenLearn?.(learn.id, false)}
+                        onEdit={(l) => {
+                          setEditingLearn(l);
+                          setIsCreateLearnOpen(true);
+                        }}
+                        onManageCollections={(l) => setManagingLearn(l)}
+                        onDelete={(l) =>
+                          setDeleteTarget({
+                            type: "learn",
+                            id: l.id,
+                            title: `Delete notebook "${l.title}"?`,
+                            description: "This notebook will be permanently deleted.",
+                          })
+                        }
+                      />
+                    ))
+                  ) : (
+                    <div className="text-center py-12 px-4 bg-[#1b1b1b] rounded-2xl border border-dashed border-[#2e2e2e]">
+                      <p className="text-xs text-[#969696]">
+                        No notebooks in this collection yet.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              // All Collections
+              <>
+                <div className="flex items-center justify-between px-0.5">
+                  <div className="flex items-center gap-2">
+                    <h2 className="font-sans text-sm font-semibold tracking-tight text-foreground">
+                      Collections
+                    </h2>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#222222] border border-[#383838] text-[#969696] font-mono">
+                      {collections.length}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingCollection(null);
+                      setIsCreateCollectionOpen(true);
+                    }}
+                    className="h-7 px-2.5 rounded-full bg-[#222222] hover:bg-[#2b2b2b] text-foreground text-xs font-medium border border-[#383838] flex items-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <Plus className="h-3 w-3" />
+                    <span>New Collection</span>
+                  </button>
+                </div>
+
+                <div className="space-y-2">
+                  {collections.length > 0 ? (
+                    collections.map((col) => (
+                      <CollectionCard
+                        key={col.id}
+                        collection={col}
+                        viewMode={viewMode}
+                        onClick={(c) => setActiveCollectionId(c.id)}
+                        onEdit={(c) => {
+                          setEditingCollection(c);
+                          setIsCreateCollectionOpen(true);
+                        }}
+                        onDelete={(c) =>
+                          setDeleteTarget({
+                            type: "collection",
+                            id: c.id,
+                            title: `Delete collection "${c.name}"?`,
+                            description:
+                              "Notebooks inside this collection will not be deleted, only unlinked.",
+                          })
+                        }
+                      />
+                    ))
+                  ) : (
+                    <div className="text-center py-12 px-4 bg-[#1b1b1b] rounded-2xl border border-dashed border-[#2e2e2e]">
+                      <p className="text-xs text-[#969696]">No collections found.</p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingCollection(null);
+                          setIsCreateCollectionOpen(true);
+                        }}
+                        className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#222222] hover:bg-[#2b2b2b] text-foreground text-xs font-medium border border-[#383838] transition-colors cursor-pointer"
+                      >
+                        <Plus className="h-3.5 w-3.5" />
+                        <span>Create Collection</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               </>
             )}
@@ -628,15 +761,15 @@ export function LearnHome({
         )}
 
         {/* =========================================================
-            TAB: ARTIFACTS (Mobile)
+            TAB 5: ARTIFACTS
             ========================================================= */}
-        {activeTab === "artifacts" && (
-          <section className="space-y-3">
-            <div className="flex items-center gap-2">
-              <h2 className="font-sans text-base font-semibold tracking-tight text-foreground">
+        {activeTab === "artifact" && (
+          <section className="space-y-2.5">
+            <div className="flex items-center gap-2 px-0.5">
+              <h2 className="font-sans text-sm font-semibold tracking-tight text-foreground">
                 Artifacts
               </h2>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary text-muted-foreground font-mono">
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#222222] border border-[#383838] text-[#969696] font-mono">
                 {artifacts.length}
               </span>
             </div>
@@ -646,16 +779,16 @@ export function LearnHome({
                 {artifacts.map((art) => (
                   <div
                     key={art.id}
-                    className="p-3.5 rounded-2xl border border-border/80 dark:border-white/10 bg-[#1e1e22] dark:bg-[#1e1e24] hover:bg-[#25252b] active:bg-gradient-to-r active:from-[#282832] active:to-[#1e1e24] active:scale-[0.99] transition-all duration-200 flex flex-col justify-between select-none"
+                    className="p-3.5 rounded-2xl border border-[#383838] bg-[#1e1e24] hover:bg-[#25252b] active:scale-[0.99] transition-all duration-200 flex flex-col justify-between select-none"
                   >
                     <div className="flex items-start justify-between">
-                      <div className="h-8 w-8 rounded-xl bg-secondary/80 flex items-center justify-center text-lg shrink-0 border border-white/10 shadow-2xs">
+                      <div className="h-8 w-8 rounded-xl bg-[#2b2b2b] border border-[#383838] flex items-center justify-center text-base shrink-0">
                         {art.type === "slide" ? "📊" : art.type === "diagram" ? "📐" : "⚡"}
                       </div>
                       <button
                         type="button"
                         onClick={() => localDb.deleteArtifact(art.id)}
-                        className="h-7 w-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-destructive active:text-destructive cursor-pointer transition-colors"
+                        className="h-7 w-7 rounded-lg flex items-center justify-center text-[#969696] hover:text-destructive active:text-destructive cursor-pointer transition-colors"
                         title="Delete artifact"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
@@ -666,12 +799,12 @@ export function LearnHome({
                       <h4 className="text-xs font-medium text-foreground line-clamp-2">
                         {art.title}
                       </h4>
-                      <span className="inline-block mt-1 text-[9px] uppercase font-mono px-1.5 py-0.5 rounded-full bg-secondary text-muted-foreground">
+                      <span className="inline-block mt-1 text-[9px] uppercase font-mono px-1.5 py-0.5 rounded-full bg-[#2b2b2b] border border-[#383838] text-[#969696]">
                         {art.type}
                       </span>
                     </div>
 
-                    <div className="text-[10px] text-muted-foreground pt-1.5">
+                    <div className="text-[10px] text-[#969696] pt-1.5">
                       {new Intl.DateTimeFormat("en-US", {
                         day: "numeric",
                         month: "short",
@@ -682,68 +815,37 @@ export function LearnHome({
                 ))}
               </div>
             ) : (
-              <div className="text-center py-14 px-4">
-                <div className="h-10 w-10 rounded-2xl bg-secondary/80 flex items-center justify-center text-xl mx-auto mb-2 border border-white/10">
+              <div className="text-center py-14 px-4 border border-[#2e2e2e] rounded-2xl bg-[#1b1b1b]">
+                <div className="h-10 w-10 rounded-xl bg-[#222222] border border-[#383838] flex items-center justify-center text-xl mx-auto mb-2">
                   🎨
                 </div>
-                <h3 className="font-sans text-base text-foreground font-semibold">
+                <h3 className="font-sans text-sm text-foreground font-semibold">
                   No artifacts yet
                 </h3>
-                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                <p className="text-xs text-[#969696] mt-1 leading-relaxed max-w-xs mx-auto">
                   Artifacts like presentation slides and interactive diagrams generated during your learning sessions will appear here.
                 </p>
               </div>
             )}
           </section>
         )}
+        </div>
       </main>
 
       {/* -------------------------------------------------------------
-          FLOATING ACTION BUTTON (+ Create new) CENTERED AT BOTTOM
+          FLOATING ACTION BUTTON (+ New Learn) AT BOTTOM
+          Directly creates and opens a new learn (no modal / dropdown)
           ------------------------------------------------------------- */}
-      <div className="fixed bottom-6 inset-x-0 flex justify-center z-40 pointer-events-none safe-area-bottom">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button
-              type="button"
-              className="pointer-events-auto h-12 px-6 rounded-full bg-foreground text-background hover:opacity-95 active:scale-95 active:bg-gradient-to-r active:from-foreground active:to-foreground/80 transition-all duration-200 flex items-center gap-2 font-medium text-sm shadow-xl border border-background/20 cursor-pointer select-none"
-              aria-label="Create new"
-            >
-              <Plus className="h-4 w-4 stroke-[2.5]" />
-              <span>Create new</span>
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="center" side="top" className="w-56 p-1.5 border border-border bg-popover mb-2 shadow-xl rounded-xl">
-            <DropdownMenuItem
-              onClick={() => handleCreateNewLearn()}
-              className="cursor-pointer text-xs py-2.5 px-3 flex items-center gap-3 rounded-lg"
-            >
-              <div className="h-7 w-7 rounded-md bg-secondary text-foreground flex items-center justify-center shrink-0">
-                <BookOpen className="h-4 w-4" />
-              </div>
-              <div className="flex flex-col text-left">
-                <span className="font-medium text-foreground">Create notebook</span>
-                <span className="text-[10px] text-muted-foreground">New blank notebook</span>
-              </div>
-            </DropdownMenuItem>
-            <DropdownMenuSeparator className="my-1" />
-            <DropdownMenuItem
-              onClick={() => {
-                setEditingCollection(null);
-                setIsCreateCollectionOpen(true);
-              }}
-              className="cursor-pointer text-xs py-2.5 px-3 flex items-center gap-3 rounded-lg"
-            >
-              <div className="h-7 w-7 rounded-md bg-secondary text-foreground flex items-center justify-center shrink-0">
-                <Folder className="h-4 w-4" />
-              </div>
-              <div className="flex flex-col text-left">
-                <span className="font-medium text-foreground">Create collection</span>
-                <span className="text-[10px] text-muted-foreground">New category folder</span>
-              </div>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+      <div className="fixed bottom-6 right-5 z-40 safe-area-bottom">
+        <button
+          type="button"
+          onClick={() => handleCreateNewLearn()}
+          className="h-12 px-5 rounded-full bg-foreground text-background hover:opacity-95 active:scale-95 transition-all duration-200 flex items-center gap-2 font-medium text-xs border border-background/20 cursor-pointer select-none"
+          aria-label="New Learn"
+        >
+          <Plus className="h-4 w-4 stroke-[2.5]" />
+          <span>New Learn</span>
+        </button>
       </div>
 
       {/* Dialogs */}

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { LogIn, Globe } from "lucide-react";
-import { ConstLogoIcon, Button } from "@const/ui";
+import { Button } from "@const/ui";
 import { useQuery } from "convex/react";
 import { api } from "@const/backend/_generated/api";
 import { ConvexClientProvider } from "./components/convex-provider";
@@ -19,9 +19,6 @@ function AuthenticatedContent({
   const user = useQuery(api.auth.queries.currentUser, {});
   const [activeLearnId, setActiveLearnId] = useState<string | null>(null);
   const [openAddSourceOnLoad, setOpenAddSourceOnLoad] = useState(false);
-
-  const [searchQuery, setSearchQuery] = useState("");
-  const [isSearchOpen, setIsSearchOpen] = useState(false);
 
   const handleOpenLearn = (learnId: string, openAddSource = false) => {
     setActiveLearnId(learnId);
@@ -58,20 +55,9 @@ function AuthenticatedContent({
         user={user}
         onSignOut={onSignOut}
         onSwitchAccount={onSwitchAccount}
-        searchQuery={searchQuery}
-        onSearchChange={setSearchQuery}
-        isSearchOpen={isSearchOpen}
-        onToggleSearch={() => {
-          setIsSearchOpen((prev) => {
-            if (prev) setSearchQuery("");
-            return !prev;
-          });
-        }}
       />
       <LearnHome
         onOpenLearn={handleOpenLearn}
-        searchQuery={searchQuery}
-        onSearchQueryChange={setSearchQuery}
       />
     </div>
   );
@@ -181,16 +167,13 @@ export default function App() {
     <div className="flex min-h-screen w-full flex-col justify-between bg-background p-6 sm:p-8 text-foreground selection:bg-primary selection:text-primary-foreground">
       {/* Top Header & Brand */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <ConstLogoIcon size="sm" className="w-6 h-6 text-foreground shrink-0" />
-          <div className="flex items-center gap-2">
-            <span className="font-sans text-lg font-semibold tracking-tight text-foreground">
-              Const
-            </span>
-            <span className="text-[10px] font-mono tracking-wider uppercase px-2 py-0.5 rounded-full bg-secondary text-muted-foreground border border-border/50">
-              Learn
-            </span>
-          </div>
+        <div className="flex items-center select-none py-1">
+          <span className="font-serif text-[22px] font-medium tracking-tight text-foreground">
+            Const
+          </span>
+          <span className="font-sans text-[18px] font-normal text-muted-foreground ml-1.5 tracking-tight">
+            Learn
+          </span>
         </div>
       </div>
 
