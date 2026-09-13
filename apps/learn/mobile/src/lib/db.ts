@@ -42,6 +42,8 @@ export interface LocalMessage {
   content: string;
   thinking?: string;
   toolCalls?: any[];
+  durationMs?: number;
+  attachments?: any[];
   createdAt: number;
 }
 

@@ -8,8 +8,10 @@ import {
   type MobileModel,
 } from "../../lib/ai-stream";
 import { MarkdownContent } from "./markdown-content";
-import { ChatInputCard } from "./chat-input-card";
+import { ChatInputCard, type AttachedMedia } from "./chat-input-card";
 import { AddSourceDialog } from "./add-source-dialog";
+import { WorkingProcess } from "./working-process";
+import { ScrollArea, cn } from "@const/ui";
 import {
   ArrowLeft,
   Share2,
@@ -37,6 +39,8 @@ import {
   Brain,
   Download,
   Package,
+  Copy,
+  Loader2,
 } from "lucide-react";
 
 type WorkspaceTab = "sources" | "chat" | "tools";
@@ -66,6 +70,10 @@ interface DisplayMessage {
   content: string;
   thinking?: string;
   isStreaming?: boolean;
+  toolCalls?: any[];
+  durationMs?: number;
+  attachments?: any[];
+  createdAt?: number;
 }
 
 interface MobileLearnWorkspaceProps {
@@ -108,7 +116,20 @@ export function MobileLearnWorkspace({
   const [webScope, setWebScope] = useState("Web");
   const [researchSpeed, setResearchSpeed] = useState("Fast Research");
   const [isStreaming, setIsStreaming] = useState(false);
-  const [expandedThinkingIds, setExpandedThinkingIds] = useState<Record<string, boolean>>({});
+  const [attachedFiles, setAttachedFiles] = useState<AttachedMedia[]>([]);
+  const [expandedUserMessageId, setExpandedUserMessageId] = useState<string | null>(null);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [streamStartTime, setStreamStartTime] = useState<number>(0);
+  const [liveDurationMs, setLiveDurationMs] = useState<number>(0);
+
+  // Live timer for working process duration
+  useEffect(() => {
+    if (!isStreaming || !streamStartTime) return;
+    const interval = setInterval(() => {
+      setLiveDurationMs(Math.max(0, Date.now() - streamStartTime));
+    }, 400);
+    return () => clearInterval(interval);
+  }, [isStreaming, streamStartTime]);
 
   // Fetch available models dynamically from router on mount
   useEffect(() => {
@@ -148,6 +169,10 @@ export function MobileLearnWorkspace({
             role: m.role as "user" | "assistant",
             content: m.content || "",
             thinking: m.thinking,
+            toolCalls: m.toolCalls,
+            durationMs: m.durationMs,
+            attachments: m.attachments,
+            createdAt: m.createdAt,
             isStreaming: false,
           }))
         );
@@ -167,6 +192,19 @@ export function MobileLearnWorkspace({
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
   }, [messages, isStreaming, activeTab]);
+
+  const handleCopy = (id: string, text: string) => {
+    if (!text) return;
+    navigator.clipboard.writeText(text).catch(() => {});
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const formatTimestamp = (ts?: number) => {
+    if (!ts) return "";
+    const d = new Date(ts);
+    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  };
 
   const handleSaveTitle = async () => {
     setIsEditingTitle(false);
@@ -193,9 +231,10 @@ export function MobileLearnWorkspace({
     setIsStreaming(false);
   };
 
-  const handleSend = async (customPrompt?: string) => {
+  const handleSend = async (customPrompt?: string, attachmentsToSend?: AttachedMedia[]) => {
     const textToSend = (customPrompt || inputMessage).trim();
-    if (!textToSend || isStreaming) return;
+    const currentAttachments = attachmentsToSend || attachedFiles;
+    if ((!textToSend && currentAttachments.length === 0) || isStreaming) return;
 
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -203,13 +242,27 @@ export function MobileLearnWorkspace({
     const controller = new AbortController();
     abortControllerRef.current = controller;
 
-    const userMsgId = `user_${Date.now()}`;
-    const assistantMsgId = `asst_${Date.now()}`;
+    const now = Date.now();
+    setStreamStartTime(now);
+    setLiveDurationMs(0);
+
+    const userMsgId = `user_${now}`;
+    const assistantMsgId = `asst_${now}`;
+
+    const serializedAttachments = currentAttachments.map((a) => ({
+      id: a.id,
+      name: a.name,
+      size: a.size,
+      type: a.type,
+      url: a.url,
+    }));
 
     const newUserMsg: DisplayMessage = {
       id: userMsgId,
       role: "user",
       content: textToSend,
+      attachments: serializedAttachments,
+      createdAt: now,
     };
 
     const newAssistantMsg: DisplayMessage = {
@@ -218,6 +271,7 @@ export function MobileLearnWorkspace({
       content: "",
       thinking: "",
       isStreaming: true,
+      createdAt: now,
     };
 
     // Save user message to Dexie
@@ -227,12 +281,15 @@ export function MobileLearnWorkspace({
         learnId,
         role: "user",
         content: textToSend,
+        attachments: serializedAttachments,
+        createdAt: now,
       });
     }
 
     const nextMessages = [...messages, newUserMsg];
     setMessages([...nextMessages, newAssistantMsg]);
     setInputMessage("");
+    setAttachedFiles([]);
     setIsStreaming(true);
 
     const formattedMessages = nextMessages.map((m) => ({
@@ -253,7 +310,6 @@ export function MobileLearnWorkspace({
                 : msg
             )
           );
-          setExpandedThinkingIds((exp) => ({ ...exp, [assistantMsgId]: true }));
         },
         onToken: (chunk) => {
           setMessages((prev) =>
@@ -265,6 +321,7 @@ export function MobileLearnWorkspace({
           );
         },
         onDone: async (finalContent, finalThinking) => {
+          const finalDuration = Date.now() - now;
           setMessages((prev) =>
             prev.map((msg) =>
               msg.id === assistantMsgId
@@ -272,6 +329,7 @@ export function MobileLearnWorkspace({
                     ...msg,
                     content: finalContent,
                     thinking: finalThinking,
+                    durationMs: finalDuration,
                     isStreaming: false,
                   }
                 : msg
@@ -287,10 +345,13 @@ export function MobileLearnWorkspace({
               role: "assistant",
               content: finalContent,
               thinking: finalThinking,
+              durationMs: finalDuration,
+              createdAt: Date.now(),
             });
           }
         },
         onError: async (err) => {
+          const finalDuration = Date.now() - now;
           const errorText = `Gagal memanggil Const Router: ${err.message}`;
           setMessages((prev) =>
             prev.map((msg) =>
@@ -298,6 +359,7 @@ export function MobileLearnWorkspace({
                 ? {
                     ...msg,
                     content: errorText,
+                    durationMs: finalDuration,
                     isStreaming: false,
                   }
                 : msg
@@ -312,6 +374,8 @@ export function MobileLearnWorkspace({
               learnId,
               role: "assistant",
               content: errorText,
+              durationMs: finalDuration,
+              createdAt: Date.now(),
             });
           }
         },
@@ -433,267 +497,295 @@ export function MobileLearnWorkspace({
       </header>
 
       {/* Main Content Area Based on Active Tab */}
-      <div className="flex-1 overflow-y-auto pb-20">
-        {/* TAB 1: SOURCES */}
-        {activeTab === "sources" && (
-          <div className="p-4 space-y-4 max-w-lg mx-auto">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-[#ffffff]">Learning Sources</span>
-              <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-[#222222] border border-[#383838] text-[#969696] font-mono">
-                {learn?.sourcesCount || 0} {learn?.sourcesCount === 1 ? "source" : "sources"}
-              </span>
-            </div>
-
-            {/* "+ Add source" Button */}
-            <button
-              type="button"
-              onClick={() => setIsAddSourceOpen(true)}
-              className="w-full py-2.5 px-4 rounded-xl border border-[#383838] hover:border-[#5d5d5d] bg-[#2b2b2b] hover:bg-[#383838] text-xs font-medium text-[#d4d4d4] hover:text-[#ffffff] flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-            >
-              <Plus className="h-4 w-4" />
-              <span>Add source</span>
-            </button>
-
-            {/* Search Box */}
-            <div className="w-full bg-[#222222] rounded-xl p-3 border border-[#383838] focus-within:border-[#5d5d5d] transition-all text-left">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search for new sources on the web"
-                className="w-full bg-transparent text-xs text-[#d4d4d4] placeholder:text-[#5d5d5d] outline-none px-1 py-1"
-              />
-              <div className="flex items-center justify-between mt-2 pt-1 border-t border-[#2e2e2e]">
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => setWebScope(webScope === "Web" ? "Journal" : "Web")}
-                    className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-[#2b2b2b] hover:bg-[#383838] text-[11px] text-[#969696] hover:text-[#d4d4d4] transition-colors cursor-pointer border border-[#383838]"
-                  >
-                    <Globe className="h-2.5 w-2.5" />
-                    <span>{webScope}</span>
-                    <ChevronDown className="h-2.5 w-2.5 opacity-60" />
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() =>
-                      setResearchSpeed(
-                        researchSpeed === "Fast Research" ? "Deep Research" : "Fast Research"
-                      )
-                    }
-                    className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-[#2b2b2b] hover:bg-[#383838] text-[11px] text-[#969696] hover:text-[#d4d4d4] transition-colors cursor-pointer border border-[#383838]"
-                  >
-                    <Search className="h-2.5 w-2.5" />
-                    <span>{researchSpeed}</span>
-                    <ChevronDown className="h-2.5 w-2.5 opacity-60" />
-                  </button>
-                </div>
-
-                <button
-                  type="button"
-                  className="h-6 w-6 rounded-lg bg-[#2b2b2b] hover:bg-[#383838] text-[#969696] hover:text-[#ffffff] flex items-center justify-center transition-colors cursor-pointer border border-[#383838]"
-                  aria-label="Search"
-                >
-                  <Search className="h-3 w-3" />
-                </button>
-              </div>
-            </div>
-
-            {/* Empty State */}
-            <div className="flex flex-col items-center justify-center text-center p-6 min-h-[200px] border border-[#2e2e2e] rounded-xl bg-[#1b1b1b]">
-              <div className="h-10 w-10 rounded-xl bg-[#222222] border border-[#383838] flex items-center justify-center text-[#969696] mb-3">
-                <FileText className="h-5 w-5 stroke-[1.5]" />
-              </div>
-              <h3 className="text-xs font-medium text-[#ffffff] mb-1">
-                Saved sources will appear here
-              </h3>
-              <p className="text-[11px] text-[#969696] leading-relaxed max-w-[240px] mb-3">
-                Add files, notes, or web links to ground your AI assistant.
-              </p>
+      {activeTab === "chat" ? (
+        <div className="flex-1 flex flex-col min-h-0 overflow-hidden pb-16 max-w-lg mx-auto w-full relative">
+          {/* Top Model Selector Pill */}
+          <div className="flex items-center justify-between px-4 py-2 select-none shrink-0">
+            <div className="relative">
               <button
                 type="button"
-                onClick={() => setIsAddSourceOpen(true)}
-                className="text-xs text-[#0066ff] hover:underline transition-colors cursor-pointer"
+                onClick={() => setIsModelDropdownOpen(!isModelDropdownOpen)}
+                className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-[#2b2b2b] hover:bg-[#383838] border border-[#383838] text-xs font-medium text-[#d4d4d4] transition-colors duration-150 cursor-pointer"
               >
-                + Add first source
+                <Sparkles className="h-3 w-3 text-[#0066ff]" />
+                <span>{currentModel.name}</span>
+                <ChevronDown className="h-3 w-3 text-[#969696]" />
               </button>
-            </div>
-          </div>
-        )}
 
-        {/* TAB 2: CHAT (CORE CONVERSATIONAL EXPERIENCE) */}
-        {activeTab === "chat" && (
-          <div className="flex flex-col h-full justify-between p-3 sm:p-4 max-w-lg mx-auto min-h-[calc(100vh-8.5rem)]">
-            {/* Top Model Selector Pill */}
-            <div className="flex items-center justify-between pb-3 select-none">
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setIsModelDropdownOpen(!isModelDropdownOpen)}
-                  className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-[#2b2b2b] hover:bg-[#383838] border border-[#383838] text-xs font-medium text-[#d4d4d4] transition-all cursor-pointer"
-                >
-                  <Sparkles className="h-3 w-3 text-[#0066ff]" />
-                  <span>{currentModel.name}</span>
-                  <ChevronDown className="h-3 w-3 text-[#969696]" />
-                </button>
-
-                {isModelDropdownOpen && (
-                  <div className="absolute left-0 mt-1.5 w-64 rounded-xl bg-[#222222] border border-[#383838] p-1.5 z-50 animate-in fade-in duration-100">
-                    {availableModels.map((m) => (
-                      <button
-                        key={m.id}
-                        type="button"
-                        onClick={() => {
-                          setSelectedModelId(m.id);
-                          setIsModelDropdownOpen(false);
-                        }}
-                        className={`w-full text-left px-3 py-2 rounded-lg text-xs flex flex-col cursor-pointer transition-colors ${
-                          selectedModelId === m.id
-                            ? "bg-[#2b2b2b] text-[#ffffff] font-medium"
-                            : "text-[#969696] hover:text-[#d4d4d4] hover:bg-[#2b2b2b]/50"
-                        }`}
-                      >
-                        <div className="flex items-center justify-between w-full">
-                          <span className="font-sans">{m.name}</span>
-                          {selectedModelId === m.id && (
-                            <span className="h-1.5 w-1.5 rounded-full bg-[#0066ff]" />
-                          )}
-                        </div>
-                        <span className="text-[10px] text-[#5d5d5d] mt-0.5">
-                          {m.description}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-
-              <span className="text-[10px] font-mono text-[#5d5d5d]">
-                Local IndexedDB
-              </span>
-            </div>
-
-            {/* Conversation Stream or Empty Greeting */}
-            {messages.length === 0 ? (
-              <div className="my-auto py-8 text-center select-none">
-                <div className="text-3xl mb-3">📘</div>
-                <h1 className="text-lg font-sans font-medium tracking-tight text-[#ffffff] mb-1.5">
-                  Socratic Learning Tutor
-                </h1>
-                <p className="text-xs text-[#969696] leading-relaxed max-w-xs mx-auto mb-6">
-                  Diskusikan materi, jelaskan konsep yang belum dipahami, atau minta analogi dan kuis latihan.
-                </p>
-
-                <div className="flex flex-col gap-2 max-w-sm mx-auto text-left">
-                  {[
-                    "Jelaskan konsep ini dengan analogi sederhana",
-                    "Buat rangkuman poin-poin penting materi ini",
-                    "Uji pemahaman saya dengan 3 pertanyaan sokratik",
-                  ].map((chip) => (
+              {isModelDropdownOpen && (
+                <div className="absolute left-0 mt-1.5 w-64 rounded-xl bg-[#222222] border border-[#383838] p-1.5 z-50 animate-in fade-in duration-100">
+                  {availableModels.map((m) => (
                     <button
-                      key={chip}
+                      key={m.id}
                       type="button"
-                      onClick={() => handleSend(chip)}
-                      className="w-full text-left px-3.5 py-2.5 rounded-xl bg-[#222222] hover:bg-[#2b2b2b] border border-[#383838] text-xs text-[#d4d4d4] hover:text-[#ffffff] transition-all cursor-pointer active:scale-98"
+                      onClick={() => {
+                        setSelectedModelId(m.id);
+                        setIsModelDropdownOpen(false);
+                      }}
+                      className={`w-full text-left px-3 py-2 rounded-lg text-xs flex flex-col cursor-pointer transition-colors ${
+                        selectedModelId === m.id
+                          ? "bg-[#2b2b2b] text-[#ffffff] font-medium"
+                          : "text-[#969696] hover:text-[#d4d4d4] hover:bg-[#2b2b2b]/50"
+                      }`}
                     >
-                      {chip}
+                      <div className="flex items-center justify-between w-full">
+                        <span className="font-sans">{m.name}</span>
+                        {selectedModelId === m.id && (
+                          <span className="h-1.5 w-1.5 rounded-full bg-[#0066ff]" />
+                        )}
+                      </div>
+                      <span className="text-[10px] text-[#5d5d5d] mt-0.5">
+                        {m.description}
+                      </span>
                     </button>
                   ))}
                 </div>
-              </div>
-            ) : (
-              <div className="space-y-4 my-2 flex-1">
-                {messages.map((msg) => (
-                  <div
-                    key={msg.id}
-                    className={`flex flex-col ${
-                      msg.role === "user" ? "items-end" : "items-start"
-                    } w-full`}
-                  >
-                    {msg.role === "user" ? (
-                      <div className="max-w-[85%] rounded-2xl rounded-tr-xs bg-[#2b2b2b] text-[#d4d4d4] px-3.5 py-2 text-[13px] sm:text-[14px] border border-[#383838] leading-relaxed whitespace-pre-wrap font-sans">
-                        {msg.content}
-                      </div>
-                    ) : (
-                      <div className="w-full space-y-2">
-                        {/* Thinking Process Accordion */}
-                        {msg.thinking && (
-                          <div className="w-full rounded-xl bg-[#1b1b1b] border border-[#383838] overflow-hidden text-xs">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setExpandedThinkingIds((prev) => ({
-                                  ...prev,
-                                  [msg.id]: !prev[msg.id],
-                                }))
-                              }
-                              className="w-full px-3 py-1.5 flex items-center justify-between text-[#969696] hover:text-[#d4d4d4] transition-colors cursor-pointer select-none bg-[#222222]"
-                            >
-                              <div className="flex items-center gap-1.5">
-                                <Brain className="h-3 w-3 text-[#0066ff]" />
-                                <span className="font-mono text-[10px] font-medium text-[#d4d4d4]">
-                                  Thinking Process
-                                </span>
-                                {msg.isStreaming && !msg.content && (
-                                  <span className="inline-flex items-center gap-1 text-[10px] text-[#969696] font-mono ml-1">
-                                    <span className="h-1.5 w-1.5 rounded-full bg-[#0066ff] animate-pulse" />
-                                    reasoning...
-                                  </span>
-                                )}
-                              </div>
-                              <ChevronDown
-                                className={`h-3 w-3 transition-transform text-[#969696] ${
-                                  expandedThinkingIds[msg.id] ? "rotate-180" : ""
-                                }`}
-                              />
-                            </button>
+              )}
+            </div>
 
-                            {expandedThinkingIds[msg.id] && (
-                              <div className="p-3 text-[#969696] font-mono text-[10.5px] leading-relaxed border-t border-[#383838] whitespace-pre-wrap max-h-44 overflow-y-auto bg-[#161616]">
-                                {msg.thinking}
+            <span className="text-[10px] font-mono text-[#5d5d5d]">
+              Local IndexedDB
+            </span>
+          </div>
+
+          {/* Scrollable Conversation Stream */}
+          <div className="flex-1 overflow-y-auto px-3 sm:px-4 py-3 space-y-5 min-h-0">
+            {messages.map((msg) => (
+              <div
+                key={msg.id}
+                className={`flex flex-col ${
+                  msg.role === "user" ? "items-end" : "items-start"
+                } w-full`}
+              >
+                {msg.role === "user" ? (
+                  <div className="w-full flex flex-col items-end group">
+                    {/* Attached Media / Files Preview */}
+                    {msg.attachments && msg.attachments.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mb-1.5 justify-end max-w-[88%]">
+                        {msg.attachments.map((att: any, attIdx: number) => (
+                          <div
+                            key={att.id || attIdx}
+                            className="rounded-xl border border-[#383838] bg-[#1a1917] p-1 shadow-xs"
+                          >
+                            {att.type === "image" && att.url ? (
+                              <img
+                                src={att.url}
+                                alt={att.name}
+                                className="w-16 h-16 rounded-lg object-cover block"
+                              />
+                            ) : (
+                              <div className="px-2.5 py-1.5 rounded-lg bg-[#262626] flex items-center gap-2 text-xs text-[#d4d4d4]">
+                                <FileText className="w-3.5 h-3.5 text-[#0066ff]" />
+                                <span className="truncate max-w-[120px]">{att.name}</span>
                               </div>
                             )}
                           </div>
-                        )}
+                        ))}
+                      </div>
+                    )}
 
-                        {/* Assistant Output Message */}
-                        <div className="w-full rounded-2xl rounded-tl-xs bg-[#222222]/70 border border-[#383838] p-3.5 sm:p-4 text-[13px] sm:text-[14px] text-[#d4d4d4] leading-relaxed relative">
-                          {msg.content ? (
-                            <MarkdownContent content={msg.content} />
-                          ) : msg.isStreaming ? (
-                            <div className="flex items-center gap-1.5 text-xs text-[#969696] font-mono py-1">
-                              <span className="h-2 w-2 rounded-full bg-[#0066ff] animate-ping" />
-                              <span>Thinking and formulating response...</span>
-                            </div>
-                          ) : null}
+                    {/* User Message Bubble with ScrollArea when long */}
+                    {(() => {
+                      const isLongPrompt =
+                        msg.content.length > 250 || msg.content.split("\n").length > 4;
+                      const isExpanded = expandedUserMessageId === msg.id;
 
-                          {msg.isStreaming && msg.content && (
-                            <span className="inline-block w-1.5 h-3.5 ml-1 bg-[#0066ff] animate-pulse align-middle" />
+                      return (
+                        <div
+                          onClick={() => {
+                            if (isLongPrompt) {
+                              setExpandedUserMessageId(isExpanded ? null : msg.id);
+                            }
+                          }}
+                          className={cn(
+                            "max-w-[88%] rounded-2xl bg-[#222222] border border-[#383838] px-3.5 py-2.5 text-[13.5px] text-[#ececec] select-text leading-relaxed whitespace-pre-wrap break-words [overflow-wrap:anywhere] [word-break:break-word] shadow-xs font-sans transition-colors duration-150",
+                            isLongPrompt && !isExpanded && "cursor-pointer hover:border-[#555555]"
+                          )}
+                        >
+                          {isLongPrompt ? (
+                            <ScrollArea
+                              className={cn(
+                                "w-full transition-[max-height] duration-200 ease-in-out",
+                                isExpanded ? "max-h-[360px]" : "max-h-24"
+                              )}
+                              viewportClassName="[&>div[style]]:!block"
+                            >
+                              <div className="pr-1.5">{msg.content}</div>
+                            </ScrollArea>
+                          ) : (
+                            <div>{msg.content}</div>
                           )}
                         </div>
+                      );
+                    })()}
+
+                    {/* User Message Action Bar: Timestamp & Copy */}
+                    <div className="flex items-center gap-2 pt-1 pr-1 text-[10.5px] font-mono text-[#777777] select-none">
+                      {msg.createdAt && <span>{formatTimestamp(msg.createdAt)}</span>}
+                      <button
+                        type="button"
+                        onClick={() => handleCopy(msg.id, msg.content)}
+                        className="p-1 rounded hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
+                        title="Salin pesan"
+                      >
+                        {copiedId === msg.id ? (
+                          <Check className="w-3 h-3 text-[#34d399]" />
+                        ) : (
+                          <Copy className="w-3 h-3" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="w-full flex flex-col gap-2 group select-text">
+                    {/* Working Process (Thinking, Live Timer, Tool Calls) */}
+                    <WorkingProcess
+                      thinking={msg.thinking}
+                      toolCalls={msg.toolCalls}
+                      isExecuting={Boolean(msg.isStreaming)}
+                      durationMs={msg.isStreaming ? liveDurationMs : msg.durationMs}
+                    />
+
+                    {/* Assistant Output Message (Pure clean MarkdownContent, NO card wrapper, matching apps/harness/desktop!) */}
+                    {msg.content ? (
+                      <div className="px-0.5 text-[14px] text-[#d4d4d4] leading-relaxed select-text font-sans">
+                        <MarkdownContent content={msg.content} />
+                        {msg.isStreaming && (
+                          <span className="inline-block w-1.5 h-3.5 ml-1 bg-[#0066ff] animate-pulse align-middle" />
+                        )}
+                      </div>
+                    ) : null}
+
+                    {/* Assistant Action Bar: Timestamp & Copy */}
+                    {!msg.isStreaming && msg.content && (
+                      <div className="flex items-center gap-2 pt-0.5 pl-0.5 text-[10.5px] font-mono text-[#777777] select-none">
+                        {msg.createdAt && <span>{formatTimestamp(msg.createdAt)}</span>}
+                        <button
+                          type="button"
+                          onClick={() => handleCopy(msg.id, msg.content)}
+                          className="p-1 rounded hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
+                          title="Salin jawaban"
+                        >
+                          {copiedId === msg.id ? (
+                            <Check className="w-3 h-3 text-[#34d399]" />
+                          ) : (
+                            <Copy className="w-3 h-3" />
+                          )}
+                        </button>
                       </div>
                     )}
                   </div>
-                ))}
-                <div ref={messagesEndRef} />
+                )}
               </div>
-            )}
-
-            {/* Mobile Chat Input Form (Adhering to DESIGN.md) */}
-            <div className="pt-2">
-              <ChatInputCard
-                inputMessage={inputMessage}
-                onChangeInput={setInputMessage}
-                onSend={handleSend}
-                onStop={handleStop}
-                isStreaming={isStreaming}
-                selectedModelName={currentModel.name}
-                showChips={messages.length === 0}
-              />
-            </div>
+            ))}
+            <div ref={messagesEndRef} />
           </div>
-        )}
+
+          {/* Sticky Bottom Chat Input Bar - Pinned right above bottom nav */}
+          <div className="p-3 pt-1 shrink-0 bg-[#161616]/95 backdrop-blur-xs z-10 w-full">
+            <ChatInputCard
+              inputMessage={inputMessage}
+              onChangeInput={setInputMessage}
+              onSend={handleSend}
+              onStop={handleStop}
+              isStreaming={isStreaming}
+              selectedModelName={currentModel.name}
+              sourcesCount={learn?.sourcesCount || 0}
+              onOpenSources={() => setIsAddSourceOpen(true)}
+              attachments={attachedFiles}
+              onAttachmentsChange={setAttachedFiles}
+            />
+          </div>
+        </div>
+      ) : (
+        <div className="flex-1 overflow-y-auto pb-20">
+          {/* TAB 1: SOURCES */}
+          {activeTab === "sources" && (
+            <div className="p-4 space-y-4 max-w-lg mx-auto">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-[#ffffff]">Learning Sources</span>
+                <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-[#222222] border border-[#383838] text-[#969696] font-mono">
+                  {learn?.sourcesCount || 0} {learn?.sourcesCount === 1 ? "source" : "sources"}
+                </span>
+              </div>
+
+              {/* "+ Add source" Button */}
+              <button
+                type="button"
+                onClick={() => setIsAddSourceOpen(true)}
+                className="w-full py-2.5 px-4 rounded-xl border border-[#383838] hover:border-[#5d5d5d] bg-[#2b2b2b] hover:bg-[#383838] text-xs font-medium text-[#d4d4d4] hover:text-[#ffffff] flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+              >
+                <Plus className="h-4 w-4" />
+                <span>Add source</span>
+              </button>
+
+              {/* Search Box */}
+              <div className="w-full bg-[#222222] rounded-xl p-3 border border-[#383838] focus-within:border-[#5d5d5d] transition-all text-left">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search for new sources on the web"
+                  className="w-full bg-transparent text-xs text-[#d4d4d4] placeholder:text-[#5d5d5d] outline-none px-1 py-1"
+                />
+                <div className="flex items-center justify-between mt-2 pt-1 border-t border-[#2e2e2e]">
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setWebScope(webScope === "Web" ? "Journal" : "Web")}
+                      className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-[#2b2b2b] hover:bg-[#383838] text-[11px] text-[#969696] hover:text-[#d4d4d4] transition-colors cursor-pointer border border-[#383838]"
+                    >
+                      <Globe className="h-2.5 w-2.5" />
+                      <span>{webScope}</span>
+                      <ChevronDown className="h-2.5 w-2.5 opacity-60" />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setResearchSpeed(
+                          researchSpeed === "Fast Research" ? "Deep Research" : "Fast Research"
+                        )
+                      }
+                      className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-[#2b2b2b] hover:bg-[#383838] text-[11px] text-[#969696] hover:text-[#d4d4d4] transition-colors cursor-pointer border border-[#383838]"
+                    >
+                      <Search className="h-2.5 w-2.5" />
+                      <span>{researchSpeed}</span>
+                      <ChevronDown className="h-2.5 w-2.5 opacity-60" />
+                    </button>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="h-6 w-6 rounded-lg bg-[#2b2b2b] hover:bg-[#383838] text-[#969696] hover:text-[#ffffff] flex items-center justify-center transition-colors cursor-pointer border border-[#383838]"
+                    aria-label="Search"
+                  >
+                    <Search className="h-3 w-3" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Empty State */}
+              <div className="flex flex-col items-center justify-center text-center p-6 min-h-[200px] border border-[#2e2e2e] rounded-xl bg-[#1b1b1b]">
+                <div className="h-10 w-10 rounded-xl bg-[#222222] border border-[#383838] flex items-center justify-center text-[#969696] mb-3">
+                  <FileText className="h-5 w-5 stroke-[1.5]" />
+                </div>
+                <h3 className="text-xs font-medium text-[#ffffff] mb-1">
+                  Saved sources will appear here
+                </h3>
+                <p className="text-[11px] text-[#969696] leading-relaxed max-w-[240px] mb-3">
+                  Add files, notes, or web links to ground your AI assistant.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setIsAddSourceOpen(true)}
+                  className="text-xs text-[#0066ff] hover:underline transition-colors cursor-pointer"
+                >
+                  + Add first source
+                </button>
+              </div>
+            </div>
+          )}
 
         {/* TAB 3: TOOLS (STUDIO & ARTIFACTS) */}
         {activeTab === "tools" && (
@@ -796,6 +888,7 @@ export function MobileLearnWorkspace({
           </div>
         )}
       </div>
+      )}
 
       {/* FIXED BOTTOM NAVIGATION BAR (Sources, Chat, Studio) */}
       <nav className="fixed bottom-0 left-0 right-0 h-16 bg-[#222222] border-t border-[#383838] flex items-center justify-around px-4 z-20">
