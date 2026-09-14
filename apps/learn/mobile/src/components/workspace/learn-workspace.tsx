@@ -11,7 +11,9 @@ import {
 import { MarkdownContent } from "./markdown-content";
 import { ChatInputCard, type AttachedMedia } from "./chat-input-card";
 import { AddSourceDialog } from "./add-source-dialog";
-import { HistoryPanel } from "./history-panel";
+import { WorkspaceSidebar } from "./workspace-sidebar";
+import { SourcesSheet } from "./sources-sheet";
+import { StudioSheet } from "./studio-sheet";
 import { ThinkingProcess } from "./working-process";
 import { ImageLightbox } from "./image-lightbox";
 import {
@@ -20,7 +22,19 @@ import {
   formatTokenDisplay,
   formatDurationDisplay,
 } from "../../lib/telemetry";
-import { ScrollArea, cn, toast } from "@const/ui";
+import {
+  ScrollArea,
+  cn,
+  toast,
+  Dialog,
+  DialogContent,
+  DialogTitle,
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+} from "@const/ui";
 import { useI18n } from "../../lib/i18n";
 
 function formatFileSize(bytes: number): string {
@@ -72,6 +86,7 @@ import {
   History,
   MessageCirclePlus,
   Pencil,
+  MoreVertical,
 } from "lucide-react";
 
 type WorkspaceTab = "sources" | "chat" | "tools";
@@ -199,6 +214,7 @@ interface MobileLearnWorkspaceProps {
   onCreateNew?: () => void;
   onSelectLearn?: (learnId: string) => void;
   user?: any;
+  onSignOut?: () => void;
 }
 
 export function MobileLearnWorkspace({
@@ -207,6 +223,8 @@ export function MobileLearnWorkspace({
   onBack,
   onCreateNew,
   onSelectLearn,
+  user,
+  onSignOut,
 }: MobileLearnWorkspaceProps) {
   const { t, language } = useI18n();
 
@@ -231,7 +249,10 @@ export function MobileLearnWorkspace({
     return await db.artifacts.where("learnId").equals(learnId).toArray();
   }, [learnId]);
 
-  // Navigation tabs: sources, chat, tools
+  // Navigation drawers & sheets
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSourcesSheetOpen, setIsSourcesSheetOpen] = useState(false);
+  const [isStudioSheetOpen, setIsStudioSheetOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<WorkspaceTab>("chat");
 
   // Local state
@@ -827,6 +848,34 @@ export function MobileLearnWorkspace({
     }
   };
 
+  const handleTriggerWebSearch = () => {
+    if (!searchQuery.trim()) return;
+    setIsSourcesSheetOpen(false);
+    handleSend(
+      language === "id"
+        ? `Tolong cari referensi web mendalam (${webScope}, ${researchSpeed}) tentang: ${searchQuery}`
+        : `Please perform deep research (${webScope}, ${researchSpeed}) on the web regarding: ${searchQuery}`
+    );
+    setSearchQuery("");
+  };
+
+  const handleSelectStudioTool = (toolId: string, toolTitle: string) => {
+    setIsStudioSheetOpen(false);
+    if (toolId === "browser") {
+      handleSend(
+        language === "id"
+          ? "Tolong gunakan browser untuk mencari referensi web dan riset mendalam terkait topik ini."
+          : "Please use the browser to search the web and research in-depth references for this topic."
+      );
+    } else {
+      handleSend(
+        language === "id"
+          ? `Tolong buatkan ${toolTitle} untuk notebook ini.`
+          : `Please create a ${toolTitle} for this notebook.`
+      );
+    }
+  };
+
   const currentModel =
     availableModels.find((m) => m.id === selectedModelId) ??
     availableModels[0] ??
@@ -834,336 +883,350 @@ export function MobileLearnWorkspace({
 
   return (
     <div className="h-screen w-screen flex flex-col bg-[#161616] text-[#d4d4d4] overflow-hidden select-none">
-      {/* Top Mobile Header (Level 1 Header Well: #222222 per DESIGN.md) */}
-      <header className="h-14 px-4 bg-[#222222] border-b border-[#383838] flex items-center justify-between shrink-0 z-10">
-        <div className="flex items-center gap-2 min-w-0">
+      {/* Top Mobile Header with Garis 2, Model Selector, Context Window, New Chat, and Titik 3 */}
+      <header className="h-14 px-3 sm:px-4 bg-[#222222] border-b border-[#383838] flex items-center justify-between shrink-0 z-20 select-none">
+        {/* Left Section: Garis 2 (Sidebar Toggle) & Model Selector */}
+        <div className="flex items-center gap-2 min-w-0 flex-1 mr-2">
+          {/* Tombol Garis Dua */}
           <button
             type="button"
-            onClick={onBack}
-            className="h-8 w-8 rounded-xl hover:bg-[#2b2b2b] text-[#969696] hover:text-[#ffffff] flex items-center justify-center transition-colors cursor-pointer shrink-0 border border-transparent hover:border-[#383838]"
-            aria-label={t("backToHome")}
+            onClick={() => setIsSidebarOpen(true)}
+            className="h-9 w-9 rounded-xl hover:bg-[#2b2b2b] text-[#d4d4d4] hover:text-white flex items-center justify-center transition-colors cursor-pointer border border-transparent hover:border-[#383838] shrink-0 active:scale-95"
+            title="Buka Menu"
+            aria-label="Buka Menu"
           >
-            <ArrowLeft className="h-4 w-4" />
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <line x1="4" y1="8" x2="20" y2="8" />
+              <line x1="4" y1="16" x2="20" y2="16" />
+            </svg>
           </button>
 
-          {isEditingTitle ? (
-            <div className="flex items-center gap-1.5 min-w-0">
-              <input
-                type="text"
-                autoFocus
-                value={titleValue}
-                onChange={(e) => setTitleValue(e.target.value)}
-                onBlur={handleSaveTitle}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleSaveTitle();
-                  if (e.key === "Escape") setIsEditingTitle(false);
-                }}
-                className="text-[13px] font-medium text-[#ffffff] bg-[#2b2b2b] rounded-xl px-2.5 py-1 outline-none border border-[#383838] max-w-[170px]"
-              />
-              <button
-                type="button"
-                onClick={handleSaveTitle}
-                className="h-7 w-7 rounded-xl bg-[#0066ff] text-[#ffffff] flex items-center justify-center cursor-pointer"
-              >
-                <Check className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          ) : (
+          {/* Model Selector Trigger */}
+          <div className="relative min-w-0">
             <button
               type="button"
-              onClick={() => setIsEditingTitle(true)}
-              className="text-[14px] font-sans font-medium text-[#d4d4d4] hover:text-[#ffffff] hover:bg-[#2b2b2b] px-2.5 py-1 rounded-xl transition-colors cursor-pointer text-left truncate max-w-[180px]"
-              title={t("clickToRename")}
+              onClick={() => {
+                const next = !isModelDropdownOpen;
+                if (next) {
+                  setSearchModelQuery("");
+                  setIsContextDropdownOpen(false);
+                }
+                setIsModelDropdownOpen(next);
+              }}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[#2b2b2b] hover:bg-[#383838] border border-[#383838] text-xs font-medium text-[#d4d4d4] hover:text-white transition-colors duration-150 cursor-pointer max-w-[135px] sm:max-w-[200px]"
+              title={currentModel.name}
             >
-              {titleValue}
+              <span className="font-sans text-[12px] truncate">{currentModel.name}</span>
+              <ChevronDown className="h-3 w-3 text-[#969696] shrink-0" />
             </button>
-          )}
+
+            {isModelDropdownOpen && (
+              <>
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => {
+                    setIsModelDropdownOpen(false);
+                    setSearchModelQuery("");
+                  }}
+                />
+                <div className="absolute left-0 mt-1.5 w-72 max-w-[calc(100vw-32px)] rounded-2xl bg-[#1e1e20] border border-[#383838] shadow-2xl p-2 z-50 animate-in fade-in duration-100 flex flex-col gap-1 font-sans">
+                  {/* Search Input (Matching Desktop) */}
+                  <div className="flex items-center gap-2 px-2.5 py-1.5 mb-1 rounded-xl bg-[#262628] border border-[#333335]">
+                    <Search className="w-3.5 h-3.5 text-[#888888] shrink-0" />
+                    <input
+                      type="text"
+                      value={searchModelQuery}
+                      onChange={(e) => setSearchModelQuery(e.target.value)}
+                      placeholder={t("searchModels")}
+                      className="w-full bg-transparent text-xs text-white placeholder:text-[#666666] outline-none font-sans"
+                      autoFocus
+                    />
+                    {searchModelQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setSearchModelQuery("")}
+                        className="p-0.5 hover:bg-[#333335] rounded text-[#888888] hover:text-white transition-colors cursor-pointer"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Scrollable Model List */}
+                  <ScrollArea className="max-h-[260px] w-full" viewportClassName="pr-1">
+                    <div className="space-y-1 py-0.5">
+                      {filteredModels.length > 0 ? (
+                        filteredModels.map((m) => {
+                          const isSelected = selectedModelId === m.id;
+                          return (
+                            <button
+                              key={m.id}
+                              type="button"
+                              onClick={() => {
+                                setSelectedModelId(m.id);
+                                setIsModelDropdownOpen(false);
+                                setSearchModelQuery("");
+                              }}
+                              className={cn(
+                                "w-full text-left px-3 py-2 rounded-xl text-xs flex flex-col cursor-pointer transition-colors",
+                                isSelected
+                                  ? "bg-[#2b2b2b] text-white font-medium"
+                                  : "text-[#969696] hover:text-white hover:bg-[#262628]"
+                              )}
+                            >
+                              <div className="flex items-center justify-between w-full">
+                                <span className="font-sans text-[13px] font-medium text-white">{m.name}</span>
+                                {isSelected && (
+                                  <Check className="w-3.5 h-3.5 text-white shrink-0 ml-auto" />
+                                )}
+                              </div>
+                              {m.description && (
+                                <span className="text-[11px] text-[#777777] mt-0.5 leading-snug line-clamp-2">
+                                  {m.description}
+                                </span>
+                              )}
+                            </button>
+                          );
+                        })
+                      ) : (
+                        <div className="py-6 px-3 text-center text-xs text-[#888888]">
+                          {t("noModelsFound")}
+                        </div>
+                      )}
+                    </div>
+                  </ScrollArea>
+                </div>
+              </>
+            )}
+          </div>
         </div>
 
-        {/* Right actions: New Chat (left, primary accent) & History (right, muted) */}
-        <div className="flex items-center gap-2 shrink-0">
+        {/* Right Section: Context Window + New Chat + Titik 3 */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          {/* Context Window Indicator */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => {
+                const next = !isContextDropdownOpen;
+                if (next) setIsModelDropdownOpen(false);
+                setIsContextDropdownOpen(next);
+              }}
+              className={cn(
+                "w-8 h-8 flex items-center justify-center rounded-xl bg-[#2b2b2b] hover:bg-[#383838] border border-[#383838] transition-colors cursor-pointer shrink-0 active:scale-95",
+                contextUsage.rawPercentUsed >= 90
+                  ? "text-red-400"
+                  : contextUsage.rawPercentUsed >= 75
+                  ? "text-[#e79737]"
+                  : "text-[#a9a9a9] hover:text-[#d4d4d4]"
+              )}
+              title={`Context: ${contextUsage.rawPercentUsed === 0 ? "0%" : contextUsage.percentUsed}`}
+              aria-label="Context & session info"
+            >
+              <svg className="w-3.5 h-3.5 transform -rotate-90" viewBox="0 0 24 24">
+                <circle
+                  cx="12"
+                  cy="12"
+                  r="9"
+                  fill="none"
+                  stroke="#383838"
+                  strokeWidth="2.5"
+                />
+                <circle
+                  cx="12"
+                  cy="12"
+                  r="9"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeDasharray={56.55}
+                  strokeDashoffset={56.55 - (56.55 * contextUsage.safePercent) / 100}
+                  strokeLinecap="round"
+                />
+              </svg>
+            </button>
+
+            {/* Context Dropdown Info */}
+            {isContextDropdownOpen && (
+              <>
+                <div
+                  className="fixed inset-0 z-40"
+                  onClick={() => setIsContextDropdownOpen(false)}
+                />
+                <div className="absolute right-0 mt-1.5 w-72 max-w-[calc(100vw-32px)] rounded-2xl bg-[#1e1e20] border border-[#383838] shadow-2xl p-3 z-50 animate-in fade-in duration-100 flex flex-col font-sans select-none">
+                  {/* Header: % of context used and tokens */}
+                  <div className="flex items-center justify-between pb-2 border-b border-[#2d2d30]">
+                    <span className="text-xs font-semibold text-white">
+                      {contextUsage.rawPercentUsed === 0 ? "0%" : contextUsage.percentUsed} {t("contextUsed")}
+                    </span>
+                    <span className="font-mono text-[11px] text-[#888888]">
+                      ~{formatTokenDisplay(contextUsage.usedTokens)} / {formatTokenDisplay(contextUsage.totalTokens)}
+                    </span>
+                  </div>
+
+                  {/* Thin progress bar */}
+                  <div className="w-full h-1.5 bg-[#2d2d30] rounded-full overflow-hidden flex gap-0.5 my-2">
+                    {contextUsage.sourcesTokens > 0 && (
+                      <div
+                        className="bg-[#10b981] h-full transition-all"
+                        style={{ width: `${Math.max(1, (contextUsage.sourcesTokens / contextUsage.totalTokens) * 100)}%` }}
+                      />
+                    )}
+                    {contextUsage.systemPromptTokens > 0 && (
+                      <div
+                        className="bg-[#71717a] h-full transition-all"
+                        style={{ width: `${Math.max(1, (contextUsage.systemPromptTokens / contextUsage.totalTokens) * 100)}%` }}
+                      />
+                    )}
+                    {contextUsage.messagesTokens > 0 && (
+                      <div
+                        className="bg-[#3b82f6] h-full transition-all"
+                        style={{ width: `${Math.max(1, (contextUsage.messagesTokens / contextUsage.totalTokens) * 100)}%` }}
+                      />
+                    )}
+                    {contextUsage.draftInputTokens > 0 && (
+                      <div
+                        className="bg-[#a855f7] h-full transition-all"
+                        style={{ width: `${Math.max(1, (contextUsage.draftInputTokens / contextUsage.totalTokens) * 100)}%` }}
+                      />
+                    )}
+                  </div>
+
+                  {/* Breakdown list */}
+                  <div className="flex flex-col gap-1.5 text-[11px]">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 text-[#a0a0a0]">
+                        <span className="w-2 h-2 rounded-xs bg-[#10b981]" />
+                        <span>{t("learningSources")} ({learn?.sourcesCount || 0})</span>
+                      </div>
+                      <span className="font-mono text-[#888888]">~{formatTokenDisplay(contextUsage.sourcesTokens)}</span>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 text-[#a0a0a0]">
+                        <span className="w-2 h-2 rounded-xs bg-[#71717a]" />
+                        <span>{t("tutorInstructions")}</span>
+                      </div>
+                      <span className="font-mono text-[#888888]">~{formatTokenDisplay(contextUsage.systemPromptTokens)}</span>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 text-[#a0a0a0]">
+                        <span className="w-2 h-2 rounded-xs bg-[#3b82f6]" />
+                        <span>{t("chatHistory")}</span>
+                      </div>
+                      <span className="font-mono text-[#888888]">~{formatTokenDisplay(contextUsage.messagesTokens)}</span>
+                    </div>
+
+                    {contextUsage.draftInputTokens > 0 && (
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5 text-[#a855f7]">
+                          <span className="w-2 h-2 rounded-xs bg-[#a855f7]" />
+                          <span>{t("currentInput")}</span>
+                        </div>
+                        <span className="font-mono text-[#a855f7]">~{formatTokenDisplay(contextUsage.draftInputTokens)}</span>
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between pt-1 border-t border-[#2d2d30] text-[#777777]">
+                      <span>{t("availableContext")}</span>
+                      <span className="font-mono">~{formatTokenDisplay(contextUsage.availableTokens)}</span>
+                    </div>
+                  </div>
+
+                  {/* Session Telemetry */}
+                  {conversationMetrics && (
+                    <div className="mt-2.5 pt-2 border-t border-[#2d2d30] flex flex-col gap-1.5">
+                      <div className="text-[10px] uppercase font-semibold text-[#666666] tracking-wider">
+                        {t("sessionTelemetry")}
+                      </div>
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-[#a0a0a0]">Turns & Steps</span>
+                        <span className="font-mono text-white">{conversationMetrics.turns} turns · {conversationMetrics.steps} steps</span>
+                      </div>
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-[#a0a0a0]">Speed & Time</span>
+                        <span className="font-mono text-white">LLM {formatDurationDisplay(conversationMetrics.llmDurationMs)} · {conversationMetrics.tokPerSec} tok/s</span>
+                      </div>
+                      <div className="flex items-center justify-between text-[11px]">
+                        <span className="text-[#a0a0a0]">Cache & Tokens</span>
+                        <span className="font-mono text-white">{conversationMetrics.cacheHitRate}% cache · ↑{formatTokenDisplay(conversationMetrics.inputTokens)} ↓{formatTokenDisplay(conversationMetrics.outputTokens)}</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* New Chat Button */}
           <button
             type="button"
             onClick={handleNewChat}
-            className="h-8 w-8 rounded-xl bg-[#0066ff] hover:bg-[#0055dd] text-[#ffffff] flex items-center justify-center transition-all duration-150 cursor-pointer border border-[#0066ff]/80 shadow-xs active:scale-95"
+            className="h-8 w-8 rounded-xl bg-[#2b2b2b] hover:bg-[#383838] text-[#d4d4d4] hover:text-white flex items-center justify-center transition-colors cursor-pointer border border-[#383838] shrink-0 active:scale-95"
             title={t("newChat") || "Chat Baru"}
             aria-label={t("newChat") || "Chat Baru"}
           >
             <MessageCirclePlus className="h-4 w-4" />
           </button>
 
-          <button
-            type="button"
-            onClick={() => setIsHistoryOpen(true)}
-            className="h-8 w-8 rounded-xl bg-[#2b2b2b] hover:bg-[#383838] text-[#969696] hover:text-[#ffffff] flex items-center justify-center transition-colors cursor-pointer border border-[#383838] active:scale-95"
-            title={t("chatHistory") || "Riwayat Chat"}
-            aria-label={t("chatHistory") || "Riwayat Chat"}
-          >
-            <History className="h-4 w-4" />
-          </button>
+          {/* Titik 3 (More options) */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="h-8 w-8 rounded-xl bg-[#2b2b2b] hover:bg-[#383838] text-[#d4d4d4] hover:text-white flex items-center justify-center transition-colors cursor-pointer border border-[#383838] shrink-0 active:scale-95"
+                title={t("moreOptions") || "Opsi lainnya"}
+                aria-label={t("moreOptions") || "Opsi lainnya"}
+              >
+                <MoreVertical className="h-4 w-4" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="end"
+              sideOffset={6}
+              className="w-52 rounded-xl bg-[#222222] border border-[#383838] p-1 text-[#d4d4d4] shadow-2xl z-50 font-sans"
+            >
+              <DropdownMenuItem
+                onClick={() => setIsEditingTitle(true)}
+                className="flex items-center gap-2 px-2.5 py-1.5 text-xs rounded-lg text-[#d4d4d4] hover:text-white hover:bg-[#2b2b2b] cursor-pointer"
+              >
+                <Pencil className="h-3.5 w-3.5 text-[#969696]" />
+                <span>{t("editLearn") || "Ubah Nama Notebook"}</span>
+              </DropdownMenuItem>
+
+              <DropdownMenuItem
+                onClick={() => setIsSourcesSheetOpen(true)}
+                className="flex items-center gap-2 px-2.5 py-1.5 text-xs rounded-lg text-[#d4d4d4] hover:text-white hover:bg-[#2b2b2b] cursor-pointer"
+              >
+                <FolderOpen className="h-3.5 w-3.5 text-[#969696]" />
+                <span>{t("sources") || "Sumber Belajar"}</span>
+              </DropdownMenuItem>
+
+              <DropdownMenuItem
+                onClick={() => setIsStudioSheetOpen(true)}
+                className="flex items-center gap-2 px-2.5 py-1.5 text-xs rounded-lg text-[#d4d4d4] hover:text-white hover:bg-[#2b2b2b] cursor-pointer"
+              >
+                <LayoutGrid className="h-3.5 w-3.5 text-[#969696]" />
+                <span>{t("studioTitle") || "Studio Tools"}</span>
+              </DropdownMenuItem>
+
+              <DropdownMenuSeparator className="bg-[#383838] my-1" />
+
+              <DropdownMenuItem
+                onClick={handleNewChat}
+                className="flex items-center gap-2 px-2.5 py-1.5 text-xs rounded-lg text-[#d4d4d4] hover:text-white hover:bg-[#2b2b2b] cursor-pointer"
+              >
+                <RotateCcw className="h-3.5 w-3.5 text-[#969696]" />
+                <span>{t("newChat") || "Chat Baru"}</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </header>
 
-      {/* Main Content Area Based on Active Tab */}
-      {activeTab === "chat" ? (
-        <div className="flex-1 flex flex-col min-h-0 overflow-hidden pb-16 max-w-lg mx-auto w-full relative">
-          {/* Top Model Selector (Left) & Context Dropdown (Right) */}
-          <div className="flex items-center justify-between px-4 py-2 select-none shrink-0">
-            {/* Left: Model Selector Trigger */}
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => {
-                  const next = !isModelDropdownOpen;
-                  if (next) {
-                    setSearchModelQuery("");
-                    setIsContextDropdownOpen(false);
-                  }
-                  setIsModelDropdownOpen(next);
-                }}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#2b2b2b] hover:bg-[#383838] border border-[#383838] text-xs font-medium text-[#d4d4d4] hover:text-white transition-colors duration-150 cursor-pointer"
-                title={currentModel.name}
-              >
-                <span className="font-sans text-xs">{currentModel.name}</span>
-                <ChevronDown className="h-3 w-3 text-[#969696]" />
-              </button>
-
-              {isModelDropdownOpen && (
-                <>
-                  <div
-                    className="fixed inset-0 z-40"
-                    onClick={() => {
-                      setIsModelDropdownOpen(false);
-                      setSearchModelQuery("");
-                    }}
-                  />
-                  <div className="absolute left-0 mt-1.5 w-72 max-w-[calc(100vw-32px)] rounded-2xl bg-[#1e1e20] border border-[#383838] shadow-2xl p-2 z-50 animate-in fade-in duration-100 flex flex-col gap-1 font-sans">
-                    {/* Search Input (Matching Desktop) */}
-                    <div className="flex items-center gap-2 px-2.5 py-1.5 mb-1 rounded-xl bg-[#262628] border border-[#333335]">
-                      <Search className="w-3.5 h-3.5 text-[#888888] shrink-0" />
-                      <input
-                        type="text"
-                        value={searchModelQuery}
-                        onChange={(e) => setSearchModelQuery(e.target.value)}
-                        placeholder={t("searchModels")}
-                        className="w-full bg-transparent text-xs text-white placeholder:text-[#666666] outline-none font-sans"
-                        autoFocus
-                      />
-                      {searchModelQuery && (
-                        <button
-                          type="button"
-                          onClick={() => setSearchModelQuery("")}
-                          className="p-0.5 hover:bg-[#333335] rounded text-[#888888] hover:text-white transition-colors cursor-pointer"
-                        >
-                          <X className="w-3 h-3" />
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Scrollable Model List */}
-                    <ScrollArea className="max-h-[260px] w-full" viewportClassName="pr-1">
-                      <div className="space-y-1 py-0.5">
-                        {filteredModels.length > 0 ? (
-                          filteredModels.map((m) => {
-                            const isSelected = selectedModelId === m.id;
-                            return (
-                              <button
-                                key={m.id}
-                                type="button"
-                                onClick={() => {
-                                  setSelectedModelId(m.id);
-                                  setIsModelDropdownOpen(false);
-                                  setSearchModelQuery("");
-                                }}
-                                className={cn(
-                                  "w-full text-left px-3 py-2 rounded-xl text-xs flex flex-col cursor-pointer transition-colors",
-                                  isSelected
-                                    ? "bg-[#2b2b2b] text-white font-medium"
-                                    : "text-[#969696] hover:text-white hover:bg-[#262628]"
-                                )}
-                              >
-                                <div className="flex items-center justify-between w-full">
-                                  <span className="font-sans text-[13px] font-medium text-white">{m.name}</span>
-                                  {isSelected && (
-                                    <Check className="w-3.5 h-3.5 text-white shrink-0 ml-auto" />
-                                  )}
-                                </div>
-                                {m.description && (
-                                  <span className="text-[11px] text-[#777777] mt-0.5 leading-snug line-clamp-2">
-                                    {m.description}
-                                  </span>
-                                )}
-                              </button>
-                            );
-                          })
-                        ) : (
-                          <div className="py-6 px-3 text-center text-xs text-[#888888]">
-                            {t("noModelsFound")}
-                          </div>
-                        )}
-                      </div>
-                    </ScrollArea>
-                  </div>
-                </>
-              )}
-            </div>
-
-            {/* Right: Context Window Indicator (Bulatan SVG di sebelah kanan) with Minimalist Dropdown */}
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => {
-                  const next = !isContextDropdownOpen;
-                  if (next) setIsModelDropdownOpen(false);
-                  setIsContextDropdownOpen(next);
-                }}
-                className={cn(
-                  "w-7 h-7 flex items-center justify-center rounded-xl bg-[#2b2b2b] hover:bg-[#383838] border border-[#383838] transition-colors cursor-pointer shrink-0 active:scale-95",
-                  contextUsage.rawPercentUsed >= 90
-                    ? "text-red-400"
-                    : contextUsage.rawPercentUsed >= 75
-                    ? "text-[#e79737]"
-                    : "text-[#a9a9a9] hover:text-[#d4d4d4]"
-                )}
-                title={`Context: ${contextUsage.rawPercentUsed === 0 ? "0%" : contextUsage.percentUsed}`}
-                aria-label="Context & session info"
-              >
-                <svg className="w-3.5 h-3.5 transform -rotate-90" viewBox="0 0 24 24">
-                  <circle
-                    cx="12"
-                    cy="12"
-                    r="9"
-                    fill="none"
-                    stroke="#383838"
-                    strokeWidth="2.5"
-                  />
-                  <circle
-                    cx="12"
-                    cy="12"
-                    r="9"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2.5"
-                    strokeDasharray={56.55}
-                    strokeDashoffset={56.55 - (56.55 * contextUsage.safePercent) / 100}
-                    strokeLinecap="round"
-                  />
-                </svg>
-              </button>
-
-              {/* Minimalist Dropdown Info (No bulky cards, clean and clear) */}
-              {isContextDropdownOpen && (
-                <>
-                  <div
-                    className="fixed inset-0 z-40"
-                    onClick={() => setIsContextDropdownOpen(false)}
-                  />
-                  <div className="absolute right-0 mt-1.5 w-72 max-w-[calc(100vw-32px)] rounded-2xl bg-[#1e1e20] border border-[#383838] shadow-2xl p-3 z-50 animate-in fade-in duration-100 flex flex-col font-sans select-none">
-                    {/* Header: % of context used and tokens */}
-                    <div className="flex items-center justify-between pb-2 border-b border-[#2d2d30]">
-                      <span className="text-xs font-semibold text-white">
-                        {contextUsage.rawPercentUsed === 0 ? "0%" : contextUsage.percentUsed} {t("contextUsed")}
-                      </span>
-                      <span className="font-mono text-[11px] text-[#888888]">
-                        ~{formatTokenDisplay(contextUsage.usedTokens)} / {formatTokenDisplay(contextUsage.totalTokens)}
-                      </span>
-                    </div>
-
-                    {/* Thin progress bar */}
-                    <div className="w-full h-1.5 bg-[#2d2d30] rounded-full overflow-hidden flex gap-0.5 my-2">
-                      {contextUsage.sourcesTokens > 0 && (
-                        <div
-                          className="bg-[#10b981] h-full transition-all"
-                          style={{ width: `${Math.max(1, (contextUsage.sourcesTokens / contextUsage.totalTokens) * 100)}%` }}
-                        />
-                      )}
-                      {contextUsage.systemPromptTokens > 0 && (
-                        <div
-                          className="bg-[#71717a] h-full transition-all"
-                          style={{ width: `${Math.max(1, (contextUsage.systemPromptTokens / contextUsage.totalTokens) * 100)}%` }}
-                        />
-                      )}
-                      {contextUsage.messagesTokens > 0 && (
-                        <div
-                          className="bg-[#3b82f6] h-full transition-all"
-                          style={{ width: `${Math.max(1, (contextUsage.messagesTokens / contextUsage.totalTokens) * 100)}%` }}
-                        />
-                      )}
-                      {contextUsage.draftInputTokens > 0 && (
-                        <div
-                          className="bg-[#a855f7] h-full transition-all"
-                          style={{ width: `${Math.max(1, (contextUsage.draftInputTokens / contextUsage.totalTokens) * 100)}%` }}
-                        />
-                      )}
-                    </div>
-
-                    {/* Breakdown list */}
-                    <div className="flex flex-col gap-1.5 text-[11px]">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1.5 text-[#a0a0a0]">
-                          <span className="w-2 h-2 rounded-xs bg-[#10b981]" />
-                          <span>{t("learningSources")} ({learn?.sourcesCount || 0})</span>
-                        </div>
-                        <span className="font-mono text-[#888888]">~{formatTokenDisplay(contextUsage.sourcesTokens)}</span>
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1.5 text-[#a0a0a0]">
-                          <span className="w-2 h-2 rounded-xs bg-[#71717a]" />
-                          <span>{t("tutorInstructions")}</span>
-                        </div>
-                        <span className="font-mono text-[#888888]">~{formatTokenDisplay(contextUsage.systemPromptTokens)}</span>
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1.5 text-[#a0a0a0]">
-                          <span className="w-2 h-2 rounded-xs bg-[#3b82f6]" />
-                          <span>{t("chatHistory")}</span>
-                        </div>
-                        <span className="font-mono text-[#888888]">~{formatTokenDisplay(contextUsage.messagesTokens)}</span>
-                      </div>
-
-                      {contextUsage.draftInputTokens > 0 && (
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-1.5 text-[#a855f7]">
-                            <span className="w-2 h-2 rounded-xs bg-[#a855f7]" />
-                            <span>{t("currentInput")}</span>
-                          </div>
-                          <span className="font-mono text-[#a855f7]">~{formatTokenDisplay(contextUsage.draftInputTokens)}</span>
-                        </div>
-                      )}
-
-                      <div className="flex items-center justify-between pt-1 border-t border-[#2d2d30] text-[#777777]">
-                        <span>{t("availableContext")}</span>
-                        <span className="font-mono">~{formatTokenDisplay(contextUsage.availableTokens)}</span>
-                      </div>
-                    </div>
-
-                    {/* Session Telemetry (Clean & minimal) */}
-                    {conversationMetrics && (
-                      <div className="mt-2.5 pt-2 border-t border-[#2d2d30] flex flex-col gap-1.5">
-                        <div className="text-[10px] uppercase font-semibold text-[#666666] tracking-wider">
-                          {t("sessionTelemetry")}
-                        </div>
-                        <div className="flex items-center justify-between text-[11px]">
-                          <span className="text-[#a0a0a0]">Turns & Steps</span>
-                          <span className="font-mono text-white">{conversationMetrics.turns} turns · {conversationMetrics.steps} steps</span>
-                        </div>
-                        <div className="flex items-center justify-between text-[11px]">
-                          <span className="text-[#a0a0a0]">Speed & Time</span>
-                          <span className="font-mono text-white">LLM {formatDurationDisplay(conversationMetrics.llmDurationMs)} · {conversationMetrics.tokPerSec} tok/s</span>
-                        </div>
-                        <div className="flex items-center justify-between text-[11px]">
-                          <span className="text-[#a0a0a0]">Cache & Tokens</span>
-                          <span className="font-mono text-white">{conversationMetrics.cacheHitRate}% cache · ↑{formatTokenDisplay(conversationMetrics.inputTokens)} ↓{formatTokenDisplay(conversationMetrics.outputTokens)}</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
-          </div>
+      {/* Main Chat Workspace (Full Viewport Height - No Bottom Nav) */}
+      <div className="flex-1 flex flex-col min-h-0 overflow-hidden max-w-lg mx-auto w-full relative">
 
           {/* Scrollable Conversation Stream */}
           <div className="flex-1 overflow-y-auto px-3 sm:px-4 py-3 space-y-5 min-h-0">
@@ -1227,7 +1290,7 @@ export function MobileLearnWorkspace({
                                     <span className="text-[8px] font-bold text-[#888888] font-mono uppercase">
                                       {ext}
                                     </span>
-                                    <FileText className="w-3 h-3 text-[#0066ff] shrink-0" />
+                                    <FileText className="w-3 h-3 text-[#d4d4d4] shrink-0" />
                                   </div>
                                   <div className="w-full flex-1 my-0.5 min-h-0 overflow-hidden">
                                     <ScrollArea className="w-full h-full max-h-[30px] sm:max-h-[34px]">
@@ -1327,7 +1390,7 @@ export function MobileLearnWorkspace({
                       <div className="px-0.5 text-[14px] text-[#d4d4d4] leading-relaxed select-text font-sans">
                         <MarkdownContent content={msg.content} />
                         {msg.isStreaming && (
-                          <span className="inline-block w-1.5 h-3.5 ml-1 bg-[#0066ff] animate-pulse align-middle" />
+                          <span className="inline-block w-1.5 h-3.5 ml-1 bg-white animate-pulse align-middle" />
                         )}
                       </div>
                     ) : null}
@@ -1357,7 +1420,7 @@ export function MobileLearnWorkspace({
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Sticky Bottom Chat Input Bar - Pinned right above bottom nav */}
+          {/* Sticky Bottom Chat Input Bar - Pinned right at bottom */}
           <div className="p-3 pt-1 shrink-0 bg-[#161616]/95 backdrop-blur-xs z-10 w-full">
             <ChatInputCard
               inputMessage={inputMessage}
@@ -1367,255 +1430,103 @@ export function MobileLearnWorkspace({
               isStreaming={isStreaming}
               selectedModelName={currentModel.name}
               sourcesCount={learn?.sourcesCount || 0}
-              onOpenSources={() => setIsAddSourceOpen(true)}
+              onOpenSources={() => setIsSourcesSheetOpen(true)}
               attachments={attachedFiles}
               onAttachmentsChange={setAttachedFiles}
               onPreviewMedia={setLightboxItem}
             />
           </div>
         </div>
-      ) : (
-        <div className="flex-1 overflow-y-auto pb-20">
-          {/* TAB 1: SOURCES */}
-          {activeTab === "sources" && (
-            <div className="p-4 space-y-4 max-w-lg mx-auto">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium text-[#ffffff]">{t("learningSources")}</span>
-                <span className="text-[11px] px-2.5 py-0.5 rounded-full bg-[#222222] border border-[#383838] text-[#969696] font-mono">
-                  {(learn?.sourcesCount || 0) === 1
-                    ? t("sourcesCountSingle")
-                    : t("sourcesCount", { count: learn?.sourcesCount || 0 })}
-                </span>
-              </div>
 
-              {/* "+ Add source" Button */}
+      {/* Rename Notebook Dialog */}
+      <Dialog open={isEditingTitle} onOpenChange={setIsEditingTitle}>
+        <DialogContent className="w-[90vw] max-w-[360px] p-5 rounded-2xl bg-[#1e1e20] border border-[#383838] text-white [&>button]:hidden font-sans">
+          <DialogTitle className="text-sm font-semibold">{t("editLearn") || "Ubah Nama Notebook"}</DialogTitle>
+          <div className="mt-3 space-y-3">
+            <input
+              type="text"
+              value={titleValue}
+              onChange={(e) => setTitleValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleSaveTitle();
+                if (e.key === "Escape") setIsEditingTitle(false);
+              }}
+              autoFocus
+              className="w-full px-3 py-2 text-xs bg-[#262628] border border-[#383838] rounded-xl text-white outline-none focus:border-[#555555]"
+            />
+            <div className="flex items-center justify-end gap-2 pt-1">
               <button
                 type="button"
-                onClick={() => setIsAddSourceOpen(true)}
-                className="w-full py-2.5 px-4 rounded-xl border border-[#383838] hover:border-[#5d5d5d] bg-[#2b2b2b] hover:bg-[#383838] text-xs font-medium text-[#d4d4d4] hover:text-[#ffffff] flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                onClick={() => setIsEditingTitle(false)}
+                className="px-3 py-1.5 text-xs text-[#969696] hover:text-white rounded-lg transition-colors cursor-pointer"
               >
-                <Plus className="h-4 w-4" />
-                <span>{t("addSource")}</span>
+                {t("cancel")}
               </button>
-
-              {/* Search Box */}
-              <div className="w-full bg-[#222222] rounded-xl p-3 border border-[#383838] focus-within:border-[#5d5d5d] transition-all text-left">
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder={t("searchWebSources")}
-                  className="w-full bg-transparent text-xs text-[#d4d4d4] placeholder:text-[#5d5d5d] outline-none px-1 py-1"
-                />
-                <div className="flex items-center justify-between mt-2 pt-1">
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => setWebScope(webScope === "Web" ? "Journal" : "Web")}
-                      className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-[#2b2b2b] hover:bg-[#383838] text-[11px] text-[#969696] hover:text-[#d4d4d4] transition-colors cursor-pointer border border-[#383838]"
-                    >
-                      <Globe className="h-2.5 w-2.5" />
-                      <span>{webScope === "Web" ? t("webScopeWeb") : t("webScopeJournal")}</span>
-                      <ChevronDown className="h-2.5 w-2.5 opacity-60" />
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setResearchSpeed(
-                          researchSpeed === "Fast Research" ? "Deep Research" : "Fast Research"
-                        )
-                      }
-                      className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg bg-[#2b2b2b] hover:bg-[#383838] text-[11px] text-[#969696] hover:text-[#d4d4d4] transition-colors cursor-pointer border border-[#383838]"
-                    >
-                      <Search className="h-2.5 w-2.5" />
-                      <span>
-                        {researchSpeed === "Fast Research" ? t("speedFast") : t("speedDeep")}
-                      </span>
-                      <ChevronDown className="h-2.5 w-2.5 opacity-60" />
-                    </button>
-                  </div>
-
-                  <button
-                    type="button"
-                    className="h-6 w-6 rounded-lg bg-[#2b2b2b] hover:bg-[#383838] text-[#969696] hover:text-[#ffffff] flex items-center justify-center transition-colors cursor-pointer border border-[#383838]"
-                    aria-label={t("search")}
-                  >
-                    <Search className="h-3 w-3" />
-                  </button>
-                </div>
-              </div>
-
-              {/* Empty State */}
-              <div className="flex flex-col items-center justify-center text-center p-6 min-h-[200px] border border-[#2e2e2e] rounded-xl bg-[#1b1b1b]">
-                <div className="h-10 w-10 rounded-xl bg-[#222222] border border-[#383838] flex items-center justify-center text-[#969696] mb-3">
-                  <FileText className="h-5 w-5 stroke-[1.5]" />
-                </div>
-                <h3 className="text-xs font-medium text-[#ffffff] mb-1">
-                  {t("emptySourcesTitle")}
-                </h3>
-                <p className="text-[11px] text-[#969696] leading-relaxed max-w-[240px] mb-3">
-                  {t("emptySourcesDescription")}
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setIsAddSourceOpen(true)}
-                  className="text-xs text-[#0066ff] hover:underline transition-colors cursor-pointer"
-                >
-                  + {t("addFirstSource")}
-                </button>
-              </div>
-            </div>
-          )}
-
-        {/* TAB 3: TOOLS (STUDIO & ARTIFACTS) */}
-        {activeTab === "tools" && (
-          <div className="p-4 space-y-5 max-w-lg mx-auto">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-[#ffffff]">{t("studioTools")}</span>
-            </div>
-
-            {/* 2-Column Grid of Tools (8 Tools, Matching Reference UI) */}
-            <div className="grid grid-cols-2 gap-2.5">
-              {STUDIO_TOOLS.map((tool) => {
-                const Icon = tool.icon;
-                const toolTitle = toolNameMap[tool.id] || tool.name;
-                return (
-                  <div
-                    key={tool.id}
-                    className={`p-3 rounded-2xl border ${tool.cardBg} ${tool.borderColor} transition-all flex flex-col justify-between h-[86px] text-left cursor-default shadow-xs select-none`}
-                  >
-                    {/* Top Row: Icon on left, Chevron on right */}
-                    <div className="flex items-center justify-between w-full">
-                      <Icon className={`h-4 w-4 ${tool.iconColor} shrink-0`} />
-                      <ChevronRight className="h-3.5 w-3.5 text-[#888888]/60 shrink-0" />
-                    </div>
-
-                    {/* Bottom Row: Tool Title */}
-                    <span className={`text-xs font-medium ${tool.textColor || "text-[#ffffff]"} tracking-tight leading-snug line-clamp-2 mt-auto`}>
-                      {toolTitle}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-
-            {/* Artifacts / Downloads Section */}
-            <div className="pt-2">
-              <div className="flex items-center justify-between mb-2.5">
-                <span className="text-xs font-medium text-[#ffffff]">
-                  {t("artifacts")}
-                </span>
-                {artifacts && artifacts.length > 0 && (
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#222222] border border-[#383838] font-mono text-[#969696]">
-                    {artifacts.length === 1
-                      ? t("filesCountSingle")
-                      : t("filesCount", { count: artifacts.length })}
-                  </span>
-                )}
-              </div>
-
-              {artifacts && artifacts.length > 0 ? (
-                <div className="space-y-2">
-                  {artifacts.map((art) => (
-                    <div
-                      key={art.id}
-                      className="p-3 rounded-xl bg-[#222222] border border-[#383838] flex items-center justify-between"
-                    >
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        {art.isZip ? (
-                          <div className="h-8 w-8 rounded-lg bg-amber-500/10 text-amber-400 flex items-center justify-center shrink-0">
-                            <Package className="h-4 w-4" />
-                          </div>
-                        ) : (
-                          <div className="h-8 w-8 rounded-lg bg-[#0066ff]/10 text-[#0066ff] flex items-center justify-center shrink-0">
-                            <FileText className="h-4 w-4" />
-                          </div>
-                        )}
-                        <div className="min-w-0">
-                          <div className="text-xs font-medium text-[#d4d4d4] truncate">
-                            {art.title}
-                          </div>
-                          <div className="text-[10px] text-[#969696] font-mono">
-                            {art.isZip ? "ZIP Archive / Folder" : art.type}
-                          </div>
-                        </div>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => handleDownloadArtifact(art)}
-                        className="h-8 px-3 rounded-lg bg-[#2b2b2b] hover:bg-[#383838] text-[#ffffff] text-xs flex items-center gap-1.5 transition-colors cursor-pointer border border-[#383838] shrink-0"
-                      >
-                        <Download className="h-3 w-3" />
-                        <span>{t("download")}</span>
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="flex flex-col items-center justify-center text-center p-6 rounded-xl border border-[#2e2e2e] bg-[#1b1b1b] min-h-[140px]">
-                  <div className="h-9 w-9 rounded-xl bg-[#222222] border border-[#383838] flex items-center justify-center text-[#969696] mb-2.5">
-                    <PenTool className="h-4 w-4 stroke-[1.5]" />
-                  </div>
-                  <h3 className="text-xs font-medium text-[#ffffff] mb-1">
-                    {t("noArtifactsSaved")}
-                  </h3>
-                  <p className="text-[11px] text-[#969696] leading-relaxed max-w-[240px]">
-                    {t("noArtifactsSavedDesc")}
-                  </p>
-                </div>
-              )}
+              <button
+                type="button"
+                onClick={handleSaveTitle}
+                className="px-3.5 py-1.5 text-xs bg-white hover:bg-neutral-200 text-[#141414] font-semibold rounded-lg transition-colors cursor-pointer"
+              >
+                {t("save")}
+              </button>
             </div>
           </div>
-        )}
-      </div>
-      )}
+        </DialogContent>
+      </Dialog>
 
-      {/* FIXED BOTTOM NAVIGATION BAR (Sources, Chat, Studio) */}
-      <nav className="fixed bottom-0 left-0 right-0 h-16 bg-[#222222] border-t border-[#383838] flex items-center justify-around px-4 z-20">
-        {/* Tab 1: Sources */}
-        <button
-          type="button"
-          onClick={() => setActiveTab("sources")}
-          className={`flex flex-col items-center justify-center flex-1 py-1.5 transition-colors cursor-pointer ${
-            activeTab === "sources"
-              ? "text-[#0066ff] font-medium"
-              : "text-[#969696] hover:text-[#d4d4d4]"
-          }`}
-        >
-          <FolderOpen className="h-5 w-5" />
-          <span className="text-[10px] mt-1 tracking-tight">{t("sources")}</span>
-        </button>
+      {/* Smooth Animated Workspace Sidebar */}
+      <WorkspaceSidebar
+        open={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
+        onBack={onBack}
+        onNewChat={handleNewChat}
+        notebookTitle={titleValue}
+        notebookEmoji={learn?.emoji || "📘"}
+        onRenameNotebook={() => setIsEditingTitle(true)}
+        sourcesCount={learn?.sourcesCount || 0}
+        onOpenSources={() => setIsSourcesSheetOpen(true)}
+        toolsCount={STUDIO_TOOLS.length}
+        artifactsCount={artifacts?.length || 0}
+        onOpenStudio={() => setIsStudioSheetOpen(true)}
+        sessions={sessions || []}
+        activeChatId={activeSessionId}
+        onSelectChat={handleSelectChat}
+        onDeleteChat={handleDeleteChat}
+        onRenameChat={handleRenameChat}
+        onTogglePinChat={handleTogglePinChat}
+        user={user}
+        onSignOut={onSignOut}
+      />
 
-        {/* Tab 2: Chat */}
-        <button
-          type="button"
-          onClick={() => setActiveTab("chat")}
-          className={`flex flex-col items-center justify-center flex-1 py-1.5 transition-colors cursor-pointer ${
-            activeTab === "chat"
-              ? "text-[#0066ff] font-medium"
-              : "text-[#969696] hover:text-[#d4d4d4]"
-          }`}
-        >
-          <MessageSquare className="h-5 w-5" />
-          <span className="text-[10px] mt-1 tracking-tight">{t("chat")}</span>
-        </button>
+      {/* Sources Slide-over Sheet */}
+      <SourcesSheet
+        open={isSourcesSheetOpen}
+        onClose={() => setIsSourcesSheetOpen(false)}
+        sourcesCount={learn?.sourcesCount || 0}
+        onOpenAddSource={() => setIsAddSourceOpen(true)}
+        searchQuery={searchQuery}
+        onSearchQueryChange={setSearchQuery}
+        webScope={webScope}
+        onToggleWebScope={() => setWebScope(webScope === "Web" ? "Journal" : "Web")}
+        researchSpeed={researchSpeed}
+        onToggleResearchSpeed={() =>
+          setResearchSpeed(
+            researchSpeed === "Fast Research" ? "Deep Research" : "Fast Research"
+          )
+        }
+        onSearchWeb={handleTriggerWebSearch}
+      />
 
-        {/* Tab 3: Tools */}
-        <button
-          type="button"
-          onClick={() => setActiveTab("tools")}
-          className={`flex flex-col items-center justify-center flex-1 py-1.5 transition-colors cursor-pointer ${
-            activeTab === "tools"
-              ? "text-[#0066ff] font-medium"
-              : "text-[#969696] hover:text-[#d4d4d4]"
-          }`}
-        >
-          <LayoutGrid className="h-5 w-5" />
-          <span className="text-[10px] mt-1 tracking-tight">{t("studioTitle")}</span>
-        </button>
-      </nav>
+      {/* Studio & Tools Slide-over Sheet */}
+      <StudioSheet
+        open={isStudioSheetOpen}
+        onClose={() => setIsStudioSheetOpen(false)}
+        tools={STUDIO_TOOLS}
+        toolNameMap={toolNameMap}
+        artifacts={artifacts}
+        onSelectTool={handleSelectStudioTool}
+        onDownloadArtifact={handleDownloadArtifact}
+      />
 
       {/* Add Source Pop-up Modal */}
       <AddSourceDialog
@@ -1624,18 +1535,6 @@ export function MobileLearnWorkspace({
         onSelectSource={(sourceType) => {
           setIsAddSourceOpen(false);
         }}
-      />
-
-      {/* Chat History Panel (Drawer matching apps/router generation) */}
-      <HistoryPanel
-        open={isHistoryOpen}
-        onClose={() => setIsHistoryOpen(false)}
-        sessions={sessions || []}
-        activeChatId={activeSessionId}
-        onSelectChat={handleSelectChat}
-        onDeleteChat={handleDeleteChat}
-        onRenameChat={handleRenameChat}
-        onTogglePinChat={handleTogglePinChat}
       />
 
       {/* Media Lightbox */}

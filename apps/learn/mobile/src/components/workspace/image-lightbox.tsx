@@ -87,7 +87,7 @@ export function ImageLightbox({
           </div>
         ) : (
           <div className="bg-[#1e1e1e] border border-[#383838] rounded-2xl p-6 shadow-2xl flex flex-col items-center gap-3 text-white">
-            <div className="w-12 h-12 rounded-xl bg-[#2a2a2a] flex items-center justify-center text-[#0066ff]">
+            <div className="w-12 h-12 rounded-xl bg-[#2a2a2a] flex items-center justify-center text-white">
               <FileText className="w-6 h-6" />
             </div>
             <span className="text-sm font-medium text-white truncate max-w-[240px]" title={alt}>

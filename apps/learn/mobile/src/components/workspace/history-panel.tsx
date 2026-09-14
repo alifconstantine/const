@@ -217,7 +217,7 @@ export function HistoryPanel({
                             type="button"
                             size="icon"
                             variant="default"
-                            className="h-8 w-8 shrink-0 bg-[#0066ff] hover:bg-[#0055dd] text-white rounded-lg cursor-pointer"
+                            className="h-8 w-8 shrink-0 bg-white hover:bg-[#e8e8e8] text-black rounded-lg cursor-pointer"
                             onClick={() => handleSaveRename(session.id)}
                             title="Simpan"
                           >

@@ -122,7 +122,7 @@ function TokenRenderer({ token, isNested }: { token: Token; isNested?: boolean }
                   type="checkbox"
                   checked={item.checked}
                   readOnly
-                  className="mt-1 mr-0.5 rounded accent-[#0066ff] shrink-0 pointer-events-none"
+                  className="mt-1 mr-0.5 rounded accent-white shrink-0 pointer-events-none"
                 />
               ) : (
                 <span className={cn(
@@ -144,7 +144,7 @@ function TokenRenderer({ token, isNested }: { token: Token; isNested?: boolean }
     case "blockquote": {
       const bq = token as Tokens.Blockquote;
       return (
-        <blockquote className="border-l-2 border-[#0066ff] pl-3 py-1 my-2.5 text-[#a8a8a8] bg-[#222222]/50 rounded-r-lg italic text-[12.5px]">
+        <blockquote className="border-l-2 border-[#555555] pl-3 py-1 my-2.5 text-[#d4d4d4] bg-[#222222]/60 rounded-r-lg italic text-[12.5px]">
           <InlineRenderer text={bq.text} />
         </blockquote>
       );
@@ -513,7 +513,7 @@ function InlineRenderer({ text }: { text: string }) {
     return (
       <span
         dangerouslySetInnerHTML={{ __html: html }}
-        className="[&_code]:bg-[#242424] [&_code]:text-[#ececec] [&_code]:font-mono [&_code]:text-[11.5px] [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:border [&_code]:border-[#383838] [&_strong]:font-semibold [&_b]:font-semibold [&_strong]:text-[#ffffff] [&_em]:italic [&_em]:text-[#d4d4d4] [&_a]:text-[#0066ff] [&_a]:hover:underline cursor-text"
+        className="[&_code]:bg-[#242424] [&_code]:text-[#ececec] [&_code]:font-mono [&_code]:text-[11.5px] [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:border [&_code]:border-[#383838] [&_strong]:font-semibold [&_b]:font-semibold [&_strong]:text-[#ffffff] [&_em]:italic [&_em]:text-[#d4d4d4] [&_a]:text-[#ffffff] [&_a]:underline [&_a]:decoration-[#666666] [&_a]:hover:decoration-white cursor-text"
       />
     );
   }

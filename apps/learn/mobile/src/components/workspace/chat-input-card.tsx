@@ -385,7 +385,7 @@ export function ChatInputCard({
                             <span className="text-[8px] font-bold text-[#888888] font-mono uppercase">
                               {ext}
                             </span>
-                            <FileText className="w-3 h-3 text-[#0066ff] shrink-0" />
+                            <FileText className="w-3 h-3 text-[#d4d4d4] shrink-0" />
                           </div>
                           <div className="w-full flex-1 my-0.5 min-h-0 overflow-hidden">
                             <ScrollArea className="w-full h-full max-h-[30px] sm:max-h-[36px]">
