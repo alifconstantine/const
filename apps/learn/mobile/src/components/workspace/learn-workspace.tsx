@@ -86,7 +86,6 @@ interface StudioTool {
   borderColor: string;
   hoverBg: string;
   hoverBorder: string;
-  hasBadge?: boolean;
 }
 
 const STUDIO_TOOLS: StudioTool[] = [
@@ -144,7 +143,6 @@ const STUDIO_TOOLS: StudioTool[] = [
     borderColor: "border-[#3c3a2b]",
     hoverBg: "hover:bg-[#343225]",
     hoverBorder: "hover:border-[#4d4a37]",
-    hasBadge: true,
   },
   {
     id: "browser",
@@ -1483,37 +1481,13 @@ export function MobileLearnWorkspace({
                 const Icon = tool.icon;
                 const toolTitle = toolNameMap[tool.id] || tool.name;
                 return (
-                  <button
+                  <div
                     key={tool.id}
-                    type="button"
-                    onClick={() => {
-                      setActiveTab("chat");
-                      if (tool.id === "browser") {
-                        handleSend(
-                          language === "id"
-                            ? "Tolong gunakan browser untuk mencari referensi web dan riset mendalam terkait topik ini."
-                            : "Please use the browser to search the web and research in-depth references for this topic."
-                        );
-                      } else {
-                        handleSend(
-                          language === "id"
-                            ? `Tolong buatkan ${toolTitle} untuk notebook ini.`
-                            : `Please create a ${toolTitle} for this notebook.`
-                        );
-                      }
-                    }}
-                    className={`p-3 rounded-2xl border ${tool.cardBg} ${tool.borderColor} ${tool.hoverBg} ${tool.hoverBorder} transition-all flex flex-col justify-between h-[86px] text-left cursor-pointer active:scale-98 shadow-xs`}
+                    className={`p-3 rounded-2xl border ${tool.cardBg} ${tool.borderColor} transition-all flex flex-col justify-between h-[86px] text-left cursor-default shadow-xs select-none`}
                   >
-                    {/* Top Row: Icon + Badge on left, Chevron on right */}
+                    {/* Top Row: Icon on left, Chevron on right */}
                     <div className="flex items-center justify-between w-full">
-                      <div className="flex items-center gap-1.5">
-                        <Icon className={`h-4 w-4 ${tool.iconColor} shrink-0`} />
-                        {tool.hasBadge && (
-                          <span className="bg-[#ededed] text-[#141414] text-[9.5px] font-bold px-1.5 py-0.5 rounded-full leading-none shadow-2xs">
-                            {t("badgeNew")}
-                          </span>
-                        )}
-                      </div>
+                      <Icon className={`h-4 w-4 ${tool.iconColor} shrink-0`} />
                       <ChevronRight className="h-3.5 w-3.5 text-[#888888]/60 shrink-0" />
                     </div>
 
@@ -1521,7 +1495,7 @@ export function MobileLearnWorkspace({
                     <span className={`text-xs font-medium ${tool.textColor || "text-[#ffffff]"} tracking-tight leading-snug line-clamp-2 mt-auto`}>
                       {toolTitle}
                     </span>
-                  </button>
+                  </div>
                 );
               })}
             </div>

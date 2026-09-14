@@ -9,12 +9,12 @@ import {
   Globe,
   HelpCircle,
   BarChart3,
-  Terminal,
   ChevronRight,
   Plus,
   SquarePen,
   PenTool,
 } from "lucide-react";
+import { ScrollArea } from "@const/ui";
 
 import { useI18n, type TranslationKey } from "../../lib/i18n";
 
@@ -28,7 +28,6 @@ interface StudioTool {
   borderColor: string;
   hoverBg: string;
   hoverBorder: string;
-  hasBadge?: boolean;
 }
 
 const STUDIO_TOOLS: StudioTool[] = [
@@ -86,7 +85,6 @@ const STUDIO_TOOLS: StudioTool[] = [
     borderColor: "border-[#3c3a2b]",
     hoverBg: "hover:bg-[#343225]",
     hoverBorder: "hover:border-[#4d4a37]",
-    hasBadge: true,
   },
   {
     id: "browser",
@@ -121,17 +119,6 @@ const STUDIO_TOOLS: StudioTool[] = [
     hoverBg: "hover:bg-[#322739]",
     hoverBorder: "hover:border-[#4b3a55]",
   },
-  {
-    id: "terminal",
-    translationKey: "toolsTerminal",
-    icon: Terminal,
-    iconColor: "text-[#4ade80]",
-    textColor: "text-[#e2e8f0]",
-    cardBg: "bg-[#202326]",
-    borderColor: "border-[#2f353a]",
-    hoverBg: "hover:bg-[#272b2f]",
-    hoverBorder: "hover:border-[#3e464c]",
-  },
 ];
 
 interface StudioPanelProps {
@@ -165,22 +152,20 @@ export function StudioPanel({
           <PanelRight className="h-4 w-4" />
         </button>
 
-        {/* Top-aligned: Vertical Stack of Studio Tools Icons (Image 3) */}
+        {/* Top-aligned: Vertical Stack of Studio Tools Icons */}
         <div className="flex flex-col items-center gap-1.5 mt-2.5">
           {STUDIO_TOOLS.map((tool) => {
             const Icon = tool.icon;
             const toolName = t(tool.translationKey);
             return (
-              <button
+              <div
                 key={tool.id}
-                type="button"
-                onClick={() => onSelectTool?.(tool.id)}
-                className="h-7 w-7 rounded-lg hover:bg-muted flex items-center justify-center transition-colors cursor-pointer group"
+                className="h-7 w-7 rounded-lg flex items-center justify-center transition-colors cursor-default"
                 title={toolName}
                 aria-label={toolName}
               >
-                <Icon className={`h-4 w-4 ${tool.iconColor} opacity-75 group-hover:opacity-100 transition-opacity`} />
-              </button>
+                <Icon className={`h-4 w-4 ${tool.iconColor} opacity-75`} />
+              </div>
             );
           })}
         </div>
@@ -202,10 +187,10 @@ export function StudioPanel({
   return (
     <aside
       style={{ width: isCollapsed ? undefined : width ? `${width}px` : undefined }}
-      className="w-[285px] sm:w-[310px] lg:w-[360px] xl:w-[420px] 2xl:w-[480px] h-full flex flex-col bg-card rounded-2xl border border-border/50 text-foreground p-3 sm:p-3.5 shrink-0 select-none overflow-y-auto shadow-xs font-sans"
+      className="w-[285px] sm:w-[310px] lg:w-[360px] xl:w-[420px] 2xl:w-[480px] h-full flex flex-col bg-card rounded-2xl border border-border/50 text-foreground p-3 sm:p-3.5 shrink-0 select-none shadow-xs font-sans overflow-hidden"
     >
       {/* Header */}
-      <div className="flex items-center justify-between mb-3 px-1">
+      <div className="flex items-center justify-between mb-3 px-1 shrink-0">
         <span className="text-sm font-semibold tracking-tight text-foreground">{t("studioTitle")}</span>
         {onToggleCollapse && (
           <button
@@ -219,64 +204,60 @@ export function StudioPanel({
         )}
       </div>
 
-      {/* 3x3 Grid of Studio Tools (Visual Match to Reference Design) */}
-      <div className="grid grid-cols-3 gap-2 mb-6">
-        {STUDIO_TOOLS.map((tool) => {
-          const Icon = tool.icon;
-          const toolName = t(tool.translationKey);
-          return (
-            <button
-              key={tool.id}
-              type="button"
-              onClick={() => onSelectTool?.(tool.id)}
-              className={`p-3 rounded-2xl border ${tool.cardBg} ${tool.borderColor} ${tool.hoverBg} ${tool.hoverBorder} transition-all flex flex-col justify-between h-[86px] sm:h-[90px] text-left group cursor-pointer shadow-xs active:scale-[0.98]`}
-            >
-              {/* Top Row: Icon + Badge on left, Chevron on right */}
-              <div className="flex items-center justify-between w-full">
-                <div className="flex items-center gap-1.5">
-                  <Icon className={`h-4 w-4 ${tool.iconColor} shrink-0`} />
-                  {tool.hasBadge && (
-                    <span className="bg-[#ededed] text-[#141414] text-[9.5px] font-bold px-1.5 py-0.5 rounded-full leading-none shadow-2xs">
-                      {t("badgeNew")}
-                    </span>
-                  )}
+      {/* Scrollable Studio Content using ScrollArea from @const/ui */}
+      <ScrollArea className="flex-1 w-full min-h-0 -mr-1 pr-1">
+        <div className="flex flex-col min-h-full pb-1">
+          {/* 3-Column Grid of Studio Tools (8 Tools) */}
+          <div className="grid grid-cols-3 gap-2 mb-6">
+            {STUDIO_TOOLS.map((tool) => {
+              const Icon = tool.icon;
+              const toolName = t(tool.translationKey);
+              return (
+                <div
+                  key={tool.id}
+                  className={`p-2.5 sm:p-3 rounded-2xl border ${tool.cardBg} ${tool.borderColor} transition-all flex flex-col justify-between h-[86px] sm:h-[90px] text-left cursor-default shadow-xs select-none`}
+                >
+                  {/* Top Row: Icon on left, Chevron on right */}
+                  <div className="flex items-center justify-between w-full">
+                    <Icon className={`h-4 w-4 ${tool.iconColor} shrink-0`} />
+                    <ChevronRight className="h-3.5 w-3.5 text-[#888888]/60 shrink-0" />
+                  </div>
+
+                  {/* Bottom Row: Tool Name */}
+                  <span className={`text-[10.5px] sm:text-xs font-medium ${tool.textColor || "text-foreground"} tracking-tight leading-tight line-clamp-2 mt-auto`}>
+                    {toolName}
+                  </span>
                 </div>
-                <ChevronRight className="h-3.5 w-3.5 text-[#888888]/60 group-hover:text-[#d4d4d4] group-hover:translate-x-0.5 transition-all shrink-0" />
-              </div>
+              );
+            })}
+          </div>
 
-              {/* Bottom Row: Tool Name */}
-              <span className={`text-[11px] sm:text-xs font-medium ${tool.textColor || "text-foreground"} tracking-tight leading-snug line-clamp-2 mt-auto`}>
-                {toolName}
-              </span>
+          {/* Empty State Studio Output (Zero Dummy Data) */}
+          <div className="flex-1 flex flex-col items-center justify-center text-center p-4 min-h-[180px]">
+            <div className="h-12 w-12 rounded-2xl bg-secondary/80 border border-border/50 flex items-center justify-center text-muted-foreground/80 mb-3 shadow-2xs">
+              <PenTool className="h-6 w-6 stroke-[1.5]" />
+            </div>
+            <h3 className="text-xs font-semibold text-foreground mb-1.5 tracking-tight">
+              {t("studioEmptyTitle")}
+            </h3>
+            <p className="text-[11px] text-muted-foreground/80 leading-relaxed max-w-[280px]">
+              {t("studioEmptyDesc")}
+            </p>
+          </div>
+
+          {/* "+ Tambahkan catatan" Button */}
+          <div className="pt-3 flex justify-center mt-auto">
+            <button
+              type="button"
+              onClick={onAddNote}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-foreground hover:bg-foreground/90 text-background text-xs font-medium transition-all shadow-xs active:scale-98 cursor-pointer"
+            >
+              <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
+              <span>{t("addNote")}</span>
             </button>
-          );
-        })}
-      </div>
-
-      {/* Empty State Studio Output (Zero Dummy Data) */}
-      <div className="flex-1 flex flex-col items-center justify-center text-center p-4 min-h-[180px]">
-        <div className="h-12 w-12 rounded-2xl bg-secondary/80 border border-border/50 flex items-center justify-center text-muted-foreground/80 mb-3 shadow-2xs">
-          <PenTool className="h-6 w-6 stroke-[1.5]" />
+          </div>
         </div>
-        <h3 className="text-xs font-semibold text-foreground mb-1.5 tracking-tight">
-          {t("studioEmptyTitle")}
-        </h3>
-        <p className="text-[11px] text-muted-foreground/80 leading-relaxed max-w-[280px]">
-          {t("studioEmptyDesc")}
-        </p>
-      </div>
-
-      {/* "+ Tambahkan catatan" Button */}
-      <div className="pt-3 flex justify-center">
-        <button
-          type="button"
-          onClick={onAddNote}
-          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-foreground hover:bg-foreground/90 text-background text-xs font-medium transition-all shadow-xs active:scale-98 cursor-pointer"
-        >
-          <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
-          <span>{t("addNote")}</span>
-        </button>
-      </div>
+      </ScrollArea>
     </aside>
   );
 }
