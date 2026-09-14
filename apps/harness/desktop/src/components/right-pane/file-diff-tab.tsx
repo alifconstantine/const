@@ -117,10 +117,11 @@ export function FileDiffTab({ tab, onRollbackFile }: FileDiffTabProps) {
       </div>
 
       {/* Main Diff Body */}
-      <div className="flex-1 w-full min-h-0 overflow-y-auto">
+      <div className="flex-1 w-full max-w-full min-w-0 flex flex-col overflow-hidden">
         <DiffViewer
           previousContent={previousContent}
           newContent={newContent}
+          className="flex-1 min-h-0 h-full"
         />
       </div>
     </div>

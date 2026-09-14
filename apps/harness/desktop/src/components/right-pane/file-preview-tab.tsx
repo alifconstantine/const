@@ -157,17 +157,17 @@ export function FilePreviewTab({ tab }: FilePreviewTabProps) {
           </div>
         ) : (
           /* Monospace Code Viewer matching Image 2 with Line Numbers */
-          <ScrollArea className="w-full h-full">
-            <div className="w-full min-w-max py-3 font-mono text-[12px] leading-5 select-text">
+          <ScrollArea className="w-full max-w-full h-full">
+            <div className="w-full max-w-full py-3 font-mono text-[12px] leading-5 select-text">
               {lines.map((line, idx) => (
                 <div
                   key={idx}
-                  className="flex items-stretch w-full hover:bg-white/[0.03] transition-colors"
+                  className="flex items-start w-full max-w-full hover:bg-white/[0.03] transition-colors"
                 >
-                  <div className="w-12 px-2 text-right select-none text-[11px] text-neutral-600 dark:text-[#555555] shrink-0 border-r border-[#262626]">
+                  <div className="w-12 px-2 text-right select-none text-[11px] text-neutral-600 dark:text-[#555555] shrink-0 border-r border-[#262626] self-stretch">
                     {idx + 1}
                   </div>
-                  <div className="flex-1 px-3 whitespace-pre text-[#d4d4d4] overflow-x-visible">
+                  <div className="flex-1 min-w-0 px-3 whitespace-pre-wrap break-words [overflow-wrap:anywhere] text-[#d4d4d4]">
                     {line || " "}
                   </div>
                 </div>

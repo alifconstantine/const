@@ -156,7 +156,7 @@ export function DiffViewer({
   }
 
   return (
-    <div className={cn("w-full h-full flex-1 min-h-0 flex flex-col font-mono text-xs select-text bg-[#141414]", className)}>
+    <div className={cn("w-full max-w-full h-full flex-1 min-h-0 flex flex-col font-mono text-xs select-text bg-[#141414] overflow-hidden", className)}>
       {/* Global Toggle Toolbar if folded chunks exist */}
       {hasAnyFolded && (
         <div className="flex items-center justify-end px-3 py-1 bg-[#1a1a1a] border-b border-[#282828] select-none text-[11px] text-neutral-400 shrink-0">
@@ -174,11 +174,11 @@ export function DiffViewer({
 
       {/* Main Diff Content */}
       <ScrollArea
-        className="w-full flex-1 min-h-0 h-full"
+        className="w-full max-w-full flex-1 min-h-0 h-full"
         viewportClassName="h-full"
         style={maxHeight ? { maxHeight } : undefined}
       >
-        <div className="w-full min-w-max pb-6">
+        <div className="w-full max-w-full pb-6">
           {blocks.map((block) => {
             if (block.type === "folded") {
               const isUnfolded = unfoldedHunkIds.has(block.id);
@@ -186,7 +186,7 @@ export function DiffViewer({
 
               if (isUnfolded) {
                 return (
-                  <div key={block.id} className="w-full">
+                  <div key={block.id} className="w-full max-w-full">
                     {block.lines.map((line, lIdx) => (
                       <DiffLineRow key={`unfolded_${block.startIndex + lIdx}`} line={line} />
                     ))}
@@ -200,7 +200,7 @@ export function DiffViewer({
               const remainingCount = Math.max(0, block.lines.length - extraVisible * 2);
 
               return (
-                <div key={block.id} className="w-full flex flex-col select-none">
+                <div key={block.id} className="w-full max-w-full flex flex-col select-none">
                   {visibleTop.map((line, lIdx) => (
                     <DiffLineRow key={`top_${block.startIndex + lIdx}`} line={line} />
                   ))}
@@ -245,7 +245,7 @@ export function DiffViewer({
 
             // Standard line blocks
             return (
-              <div key={block.id} className="w-full">
+              <div key={block.id} className="w-full max-w-full">
                 {block.lines.map((line, lIdx) => (
                   <DiffLineRow key={`line_${block.startIndex + lIdx}`} line={line} />
                 ))}
@@ -265,7 +265,7 @@ function DiffLineRow({ line }: { line: DiffLine }) {
   return (
     <div
       className={cn(
-        "flex items-stretch w-full leading-5 font-mono text-[12px] group hover:bg-white/[0.03] transition-colors",
+        "flex items-start w-full max-w-full leading-5 font-mono text-[12px] group hover:bg-white/[0.03] transition-colors",
         isAdded && "bg-[#238636]/15 dark:bg-[#238636]/15 text-[#e6edf3]",
         isRemoved && "bg-[#da3633]/15 dark:bg-[#da3633]/15 text-[#e6edf3]"
       )}
@@ -273,7 +273,7 @@ function DiffLineRow({ line }: { line: DiffLine }) {
       {/* Old Line Number */}
       <div
         className={cn(
-          "w-10 sm:w-12 px-2 text-right select-none text-[11px] shrink-0 border-r border-[#262626]",
+          "w-10 sm:w-12 px-2 text-right select-none text-[11px] shrink-0 border-r border-[#262626] self-stretch",
           isRemoved ? "text-[#ff5c5c] font-medium" : "text-neutral-600 dark:text-[#555555]"
         )}
       >
@@ -283,7 +283,7 @@ function DiffLineRow({ line }: { line: DiffLine }) {
       {/* New Line Number */}
       <div
         className={cn(
-          "w-10 sm:w-12 px-2 text-right select-none text-[11px] shrink-0 border-r border-[#262626]",
+          "w-10 sm:w-12 px-2 text-right select-none text-[11px] shrink-0 border-r border-[#262626] self-stretch",
           isAdded ? "text-[#409D62] font-medium" : "text-neutral-600 dark:text-[#555555]"
         )}
       >
@@ -293,7 +293,7 @@ function DiffLineRow({ line }: { line: DiffLine }) {
       {/* Diff Sign Indicator */}
       <div
         className={cn(
-          "w-5 text-center select-none font-mono text-xs shrink-0 font-bold",
+          "w-5 text-center select-none font-mono text-xs shrink-0 font-bold self-stretch",
           isAdded && "text-[#409D62]",
           isRemoved && "text-[#ff5c5c]",
           !isAdded && !isRemoved && "text-transparent"
@@ -303,7 +303,7 @@ function DiffLineRow({ line }: { line: DiffLine }) {
       </div>
 
       {/* Code Line Content */}
-      <div className="flex-1 px-1.5 whitespace-pre overflow-x-visible break-none">
+      <div className="flex-1 min-w-0 px-1.5 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
         {line.content || " "}
       </div>
     </div>

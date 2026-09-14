@@ -127,7 +127,7 @@ export function ReviewTab({
             <div
               key={key}
               className={cn(
-                "flex flex-col w-full bg-[#141414]",
+                "flex flex-col w-full max-w-full bg-[#141414]",
                 mutations.length === 1 && isOpen && "flex-1 min-h-0"
               )}
             >
@@ -196,7 +196,7 @@ export function ReviewTab({
               {isOpen && (
                 <div
                   className={cn(
-                    "border-t border-[#222222] bg-[#111111]",
+                    "border-t border-[#222222] bg-[#111111] w-full max-w-full min-w-0",
                     mutations.length === 1 ? "flex-1 min-h-0 flex flex-col" : "min-h-[220px]"
                   )}
                 >
