@@ -74,6 +74,7 @@ export function LearnWorkspace({
   const [isAddSourceOpen, setIsAddSourceOpen] = useState(initialSourceModalOpen);
   const [isSourcesCollapsed, setIsSourcesCollapsed] = useState(false);
   const [isStudioCollapsed, setIsStudioCollapsed] = useState(false);
+  const [pendingStudioPrompt, setPendingStudioPrompt] = useState<string | null>(null);
 
   // Dynamic responsive default widths
   const getResponsiveWidths = () => {
@@ -611,6 +612,8 @@ export function LearnWorkspace({
           onSelectPromptChip={(prompt) => {
             console.log("Selected prompt chip:", prompt);
           }}
+          externalPrompt={pendingStudioPrompt}
+          onExternalPromptConsumed={() => setPendingStudioPrompt(null)}
         />
 
         {/* Right Resize Handle */}
@@ -632,7 +635,50 @@ export function LearnWorkspace({
         <StudioPanel
           width={studioWidth}
           onSelectTool={(toolId) => {
-            console.log("Selected studio tool:", toolId);
+            const toolPrompts: Record<string, { id: string; en: string }> = {
+              audio_summary: {
+                id: "Tolong buatkan Ringkasan Audio untuk materi dalam notebook ini.",
+                en: "Please generate an Audio Overview for the material in this notebook.",
+              },
+              slides: {
+                id: "Tolong buatkan Slide Presentasi interaktif untuk materi ini.",
+                en: "Please create interactive Presentation Slides for this material.",
+              },
+              video_summary: {
+                id: "Tolong buatkan ringkasan visual dan naskah Ringkasan Video untuk materi ini.",
+                en: "Please create a Video Summary outline and visual script for this material.",
+              },
+              mind_map: {
+                id: "Tolong buatkan Peta Pikiran konsep hierarkis dari sumber-sumber ini.",
+                en: "Please generate a structured Mind Map of the key concepts from these sources.",
+              },
+              report: {
+                id: "Tolong susun Laporan komprehensif dan terstruktur berdasarkan materi ini.",
+                en: "Please compile a comprehensive and structured Report based on this material.",
+              },
+              browser: {
+                id: "Tolong gunakan browser untuk mencari referensi web dan riset mendalam terkait topik ini.",
+                en: "Please use the browser to search the web and research in-depth references for this topic.",
+              },
+              quiz: {
+                id: "Tolong buatkan Kuis latihan interaktif lengkap dengan opsi pilihan dan pembahasan.",
+                en: "Please create an interactive practice Quiz with questions and detailed explanations.",
+              },
+              infographic: {
+                id: "Tolong buatkan Infografis visual dan ringkasan data penting untuk materi ini.",
+                en: "Please create an Infographic outline and key data points for this material.",
+              },
+              terminal: {
+                id: "Tolong jalankan simulasi kode dan analisis data di terminal untuk topik ini.",
+                en: "Please run a terminal code simulation and data analysis for this topic.",
+              },
+            };
+
+            const promptObj = toolPrompts[toolId];
+            if (promptObj) {
+              const promptText = language === "id" ? promptObj.id : promptObj.en;
+              setPendingStudioPrompt(promptText);
+            }
           }}
           onAddNote={() => {
             console.log("Add note clicked");

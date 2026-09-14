@@ -62,6 +62,8 @@ interface ChatPanelProps {
   onSendMessage?: (message: string) => void;
   onAddSource?: () => void;
   onOpenSettings?: (tab?: string) => void;
+  externalPrompt?: string | null;
+  onExternalPromptConsumed?: () => void;
 }
 
 interface DisplayMessage {
@@ -221,6 +223,8 @@ export function ChatPanel({
   onSelectPromptChip,
   onAddSource,
   onOpenSettings,
+  externalPrompt,
+  onExternalPromptConsumed,
 }: ChatPanelProps) {
   const { t, language } = useI18n();
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
@@ -1613,6 +1617,13 @@ export function ChatPanel({
       }
     }
   };
+
+  useEffect(() => {
+    if (externalPrompt && !isStreaming) {
+      handleSend(externalPrompt);
+      onExternalPromptConsumed?.();
+    }
+  }, [externalPrompt, isStreaming]);
 
   const handleAbort = async () => {
     const electron = (window as any).electron;

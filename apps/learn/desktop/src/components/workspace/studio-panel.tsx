@@ -6,10 +6,10 @@ import {
   Video,
   GitFork,
   FileText,
+  Globe,
   HelpCircle,
-  Award,
   BarChart3,
-  Table2,
+  Terminal,
   ChevronRight,
   Plus,
   SquarePen,
@@ -23,18 +23,115 @@ interface StudioTool {
   translationKey: TranslationKey;
   icon: React.ElementType;
   iconColor: string;
+  textColor?: string;
+  cardBg: string;
+  borderColor: string;
+  hoverBg: string;
+  hoverBorder: string;
+  hasBadge?: boolean;
 }
 
 const STUDIO_TOOLS: StudioTool[] = [
-  { id: "audio_summary", translationKey: "toolsAudioSummary", icon: AudioLines, iconColor: "text-indigo-400" },
-  { id: "slides", translationKey: "toolsSlides", icon: Presentation, iconColor: "text-amber-400" },
-  { id: "video_summary", translationKey: "toolsVideo", icon: Video, iconColor: "text-emerald-400" },
-  { id: "mind_map", translationKey: "toolsMindMap", icon: GitFork, iconColor: "text-purple-400" },
-  { id: "report", translationKey: "toolsReport", icon: FileText, iconColor: "text-blue-400" },
-  { id: "flashcards", translationKey: "toolsFlashcards", icon: HelpCircle, iconColor: "text-orange-400" },
-  { id: "quiz", translationKey: "toolsQuiz", icon: Award, iconColor: "text-green-400" },
-  { id: "infographic", translationKey: "toolsInfographic", icon: BarChart3, iconColor: "text-pink-400" },
-  { id: "data_table", translationKey: "toolsDataTable", icon: Table2, iconColor: "text-cyan-400" },
+  {
+    id: "audio_summary",
+    translationKey: "toolsAudioSummary",
+    icon: AudioLines,
+    iconColor: "text-[#a5b4fc]",
+    textColor: "text-[#dbeafe]",
+    cardBg: "bg-[#21232d]",
+    borderColor: "border-[#303444]",
+    hoverBg: "hover:bg-[#282b37]",
+    hoverBorder: "hover:border-[#3d4257]",
+  },
+  {
+    id: "slides",
+    translationKey: "toolsSlides",
+    icon: Presentation,
+    iconColor: "text-[#fde047]",
+    textColor: "text-[#fef9c3]",
+    cardBg: "bg-[#2b291d]",
+    borderColor: "border-[#3e3b2a]",
+    hoverBg: "hover:bg-[#353224]",
+    hoverBorder: "hover:border-[#4f4b36]",
+  },
+  {
+    id: "video_summary",
+    translationKey: "toolsVideo",
+    icon: Video,
+    iconColor: "text-[#86efac]",
+    textColor: "text-[#dcfce7]",
+    cardBg: "bg-[#1d2820]",
+    borderColor: "border-[#2b3d30]",
+    hoverBg: "hover:bg-[#243329]",
+    hoverBorder: "hover:border-[#384e3e]",
+  },
+  {
+    id: "mind_map",
+    translationKey: "toolsMindMap",
+    icon: GitFork,
+    iconColor: "text-[#f472b6]",
+    textColor: "text-[#fce7f3]",
+    cardBg: "bg-[#2e212b]",
+    borderColor: "border-[#422f3e]",
+    hoverBg: "hover:bg-[#372834]",
+    hoverBorder: "hover:border-[#543b4f]",
+  },
+  {
+    id: "report",
+    translationKey: "toolsReport",
+    icon: FileText,
+    iconColor: "text-[#dedac2]",
+    textColor: "text-[#f5f4eb]",
+    cardBg: "bg-[#29281e]",
+    borderColor: "border-[#3c3a2b]",
+    hoverBg: "hover:bg-[#343225]",
+    hoverBorder: "hover:border-[#4d4a37]",
+    hasBadge: true,
+  },
+  {
+    id: "browser",
+    translationKey: "toolsBrowser",
+    icon: Globe,
+    iconColor: "text-[#38bdf8]",
+    textColor: "text-[#e0f2fe]",
+    cardBg: "bg-[#1e262f]",
+    borderColor: "border-[#2c3947]",
+    hoverBg: "hover:bg-[#25313d]",
+    hoverBorder: "hover:border-[#38495a]",
+  },
+  {
+    id: "quiz",
+    translationKey: "toolsQuiz",
+    icon: HelpCircle,
+    iconColor: "text-[#5eead4]",
+    textColor: "text-[#ccfbf1]",
+    cardBg: "bg-[#1c2628]",
+    borderColor: "border-[#29383c]",
+    hoverBg: "hover:bg-[#233235]",
+    hoverBorder: "hover:border-[#364b50]",
+  },
+  {
+    id: "infographic",
+    translationKey: "toolsInfographic",
+    icon: BarChart3,
+    iconColor: "text-[#c084fc]",
+    textColor: "text-[#f3e8ff]",
+    cardBg: "bg-[#28202d]",
+    borderColor: "border-[#3a2d42]",
+    hoverBg: "hover:bg-[#322739]",
+    hoverBorder: "hover:border-[#4b3a55]",
+  },
+  {
+    id: "terminal",
+    translationKey: "toolsTerminal",
+    icon: Terminal,
+    iconColor: "text-[#4ade80]",
+    textColor: "text-[#e2e8f0]",
+    cardBg: "bg-[#202326]",
+    borderColor: "border-[#2f353a]",
+    hoverBg: "hover:bg-[#272b2f]",
+    hoverBorder: "hover:border-[#3e464c]",
+  },
 ];
 
 interface StudioPanelProps {
@@ -122,8 +219,8 @@ export function StudioPanel({
         )}
       </div>
 
-      {/* 3x3 Grid of Studio Tools */}
-      <div className="grid grid-cols-3 gap-1.5 mb-6">
+      {/* 3x3 Grid of Studio Tools (Visual Match to Reference Design) */}
+      <div className="grid grid-cols-3 gap-2 mb-6">
         {STUDIO_TOOLS.map((tool) => {
           const Icon = tool.icon;
           const toolName = t(tool.translationKey);
@@ -132,15 +229,23 @@ export function StudioPanel({
               key={tool.id}
               type="button"
               onClick={() => onSelectTool?.(tool.id)}
-              className="p-2.5 rounded-xl bg-muted/40 hover:bg-muted/70 border border-border/50 hover:border-border/80 transition-all flex flex-col justify-between h-[84px] text-left group cursor-pointer shadow-2xs hover:shadow-xs active:scale-[0.98]"
+              className={`p-3 rounded-2xl border ${tool.cardBg} ${tool.borderColor} ${tool.hoverBg} ${tool.hoverBorder} transition-all flex flex-col justify-between h-[86px] sm:h-[90px] text-left group cursor-pointer shadow-xs active:scale-[0.98]`}
             >
+              {/* Top Row: Icon + Badge on left, Chevron on right */}
               <div className="flex items-center justify-between w-full">
-                <div className="h-6 w-6 rounded-lg bg-background/70 border border-border/40 flex items-center justify-center group-hover:bg-background group-hover:border-border/70 transition-all shrink-0">
-                  <Icon className={`h-3.5 w-3.5 ${tool.iconColor}`} />
+                <div className="flex items-center gap-1.5">
+                  <Icon className={`h-4 w-4 ${tool.iconColor} shrink-0`} />
+                  {tool.hasBadge && (
+                    <span className="bg-[#ededed] text-[#141414] text-[9.5px] font-bold px-1.5 py-0.5 rounded-full leading-none shadow-2xs">
+                      {t("badgeNew")}
+                    </span>
+                  )}
                 </div>
-                <ChevronRight className="h-3 w-3 text-muted-foreground/30 group-hover:text-muted-foreground group-hover:translate-x-0.5 transition-all" />
+                <ChevronRight className="h-3.5 w-3.5 text-[#888888]/60 group-hover:text-[#d4d4d4] group-hover:translate-x-0.5 transition-all shrink-0" />
               </div>
-              <span className="text-[11px] sm:text-xs font-medium text-foreground tracking-tight leading-snug line-clamp-2 mt-1">
+
+              {/* Bottom Row: Tool Name */}
+              <span className={`text-[11px] sm:text-xs font-medium ${tool.textColor || "text-foreground"} tracking-tight leading-snug line-clamp-2 mt-auto`}>
                 {toolName}
               </span>
             </button>

@@ -75,18 +75,104 @@ interface StudioTool {
   name: string;
   icon: React.ElementType;
   iconColor: string;
+  textColor?: string;
+  cardBg: string;
+  borderColor: string;
+  hoverBg: string;
+  hoverBorder: string;
+  hasBadge?: boolean;
 }
 
 const STUDIO_TOOLS: StudioTool[] = [
-  { id: "audio_summary", name: "Audio Overview", icon: AudioLines, iconColor: "text-indigo-400" },
-  { id: "slides", name: "Slide Deck", icon: Presentation, iconColor: "text-amber-400" },
-  { id: "video_summary", name: "Video Summary", icon: Video, iconColor: "text-emerald-400" },
-  { id: "mind_map", name: "Mind Map", icon: GitFork, iconColor: "text-purple-400" },
-  { id: "report", name: "Briefing Doc", icon: FileText, iconColor: "text-blue-400" },
-  { id: "flashcards", name: "Flashcards", icon: HelpCircle, iconColor: "text-orange-400" },
-  { id: "quiz", name: "Study Quiz", icon: Award, iconColor: "text-green-400" },
-  { id: "infographic", name: "Infographic", icon: BarChart3, iconColor: "text-pink-400" },
-  { id: "data_table", name: "Data Table", icon: Table2, iconColor: "text-cyan-400" },
+  {
+    id: "audio_summary",
+    name: "Audio Overview",
+    icon: AudioLines,
+    iconColor: "text-[#a5b4fc]",
+    textColor: "text-[#dbeafe]",
+    cardBg: "bg-[#21232d]",
+    borderColor: "border-[#303444]",
+    hoverBg: "hover:bg-[#282b37]",
+    hoverBorder: "hover:border-[#3d4257]",
+  },
+  {
+    id: "slides",
+    name: "Presentation Slides",
+    icon: Presentation,
+    iconColor: "text-[#fde047]",
+    textColor: "text-[#fef9c3]",
+    cardBg: "bg-[#2b291d]",
+    borderColor: "border-[#3e3b2a]",
+    hoverBg: "hover:bg-[#353224]",
+    hoverBorder: "hover:border-[#4f4b36]",
+  },
+  {
+    id: "video_summary",
+    name: "Video Summary",
+    icon: Video,
+    iconColor: "text-[#86efac]",
+    textColor: "text-[#dcfce7]",
+    cardBg: "bg-[#1d2820]",
+    borderColor: "border-[#2b3d30]",
+    hoverBg: "hover:bg-[#243329]",
+    hoverBorder: "hover:border-[#384e3e]",
+  },
+  {
+    id: "mind_map",
+    name: "Mind Map",
+    icon: GitFork,
+    iconColor: "text-[#f472b6]",
+    textColor: "text-[#fce7f3]",
+    cardBg: "bg-[#2e212b]",
+    borderColor: "border-[#422f3e]",
+    hoverBg: "hover:bg-[#372834]",
+    hoverBorder: "hover:border-[#543b4f]",
+  },
+  {
+    id: "report",
+    name: "Report",
+    icon: FileText,
+    iconColor: "text-[#dedac2]",
+    textColor: "text-[#f5f4eb]",
+    cardBg: "bg-[#29281e]",
+    borderColor: "border-[#3c3a2b]",
+    hoverBg: "hover:bg-[#343225]",
+    hoverBorder: "hover:border-[#4d4a37]",
+    hasBadge: true,
+  },
+  {
+    id: "browser",
+    name: "Browser",
+    icon: Globe,
+    iconColor: "text-[#38bdf8]",
+    textColor: "text-[#e0f2fe]",
+    cardBg: "bg-[#1e262f]",
+    borderColor: "border-[#2c3947]",
+    hoverBg: "hover:bg-[#25313d]",
+    hoverBorder: "hover:border-[#38495a]",
+  },
+  {
+    id: "quiz",
+    name: "Quiz",
+    icon: HelpCircle,
+    iconColor: "text-[#5eead4]",
+    textColor: "text-[#ccfbf1]",
+    cardBg: "bg-[#1c2628]",
+    borderColor: "border-[#29383c]",
+    hoverBg: "hover:bg-[#233235]",
+    hoverBorder: "hover:border-[#364b50]",
+  },
+  {
+    id: "infographic",
+    name: "Infographic",
+    icon: BarChart3,
+    iconColor: "text-[#c084fc]",
+    textColor: "text-[#f3e8ff]",
+    cardBg: "bg-[#28202d]",
+    borderColor: "border-[#3a2d42]",
+    hoverBg: "hover:bg-[#322739]",
+    hoverBorder: "hover:border-[#4b3a55]",
+  },
 ];
 
 interface DisplayMessage {
@@ -126,10 +212,9 @@ export function MobileLearnWorkspace({
     video_summary: t("toolsVideo"),
     mind_map: t("toolsMindMap"),
     report: t("toolsReport"),
-    flashcards: t("toolsFlashcards"),
+    browser: t("toolsBrowser"),
     quiz: t("toolsQuiz"),
     infographic: t("toolsInfographic"),
-    data_table: t("toolsDataTable"),
   };
 
   // Live notebook data from local Dexie
@@ -1145,8 +1230,8 @@ export function MobileLearnWorkspace({
               <span className="text-sm font-medium text-[#ffffff]">{t("studioTools")}</span>
             </div>
 
-            {/* 3x3 Grid of Tools */}
-            <div className="grid grid-cols-3 gap-2">
+            {/* 2-Column Grid of Tools (8 Tools, Matching Reference UI) */}
+            <div className="grid grid-cols-2 gap-2.5">
               {STUDIO_TOOLS.map((tool) => {
                 const Icon = tool.icon;
                 const toolTitle = toolNameMap[tool.id] || tool.name;
@@ -1156,19 +1241,37 @@ export function MobileLearnWorkspace({
                     type="button"
                     onClick={() => {
                       setActiveTab("chat");
-                      handleSend(
-                        language === "id"
-                          ? `Tolong buatkan ${toolTitle} untuk notebook ini.`
-                          : `Please create a ${toolTitle} for this notebook.`
-                      );
+                      if (tool.id === "browser") {
+                        handleSend(
+                          language === "id"
+                            ? "Tolong gunakan browser untuk mencari referensi web dan riset mendalam terkait topik ini."
+                            : "Please use the browser to search the web and research in-depth references for this topic."
+                        );
+                      } else {
+                        handleSend(
+                          language === "id"
+                            ? `Tolong buatkan ${toolTitle} untuk notebook ini.`
+                            : `Please create a ${toolTitle} for this notebook.`
+                        );
+                      }
                     }}
-                    className="p-2.5 rounded-xl bg-[#222222] hover:bg-[#2b2b2b] border border-[#383838] transition-all flex flex-col justify-between h-20 text-left cursor-pointer active:scale-98"
+                    className={`p-3 rounded-2xl border ${tool.cardBg} ${tool.borderColor} ${tool.hoverBg} ${tool.hoverBorder} transition-all flex flex-col justify-between h-[86px] text-left cursor-pointer active:scale-98 shadow-xs`}
                   >
+                    {/* Top Row: Icon + Badge on left, Chevron on right */}
                     <div className="flex items-center justify-between w-full">
-                      <Icon className={`h-4 w-4 ${tool.iconColor}`} />
-                      <ChevronRight className="h-3 w-3 text-[#5d5d5d]" />
+                      <div className="flex items-center gap-1.5">
+                        <Icon className={`h-4 w-4 ${tool.iconColor} shrink-0`} />
+                        {tool.hasBadge && (
+                          <span className="bg-[#ededed] text-[#141414] text-[9.5px] font-bold px-1.5 py-0.5 rounded-full leading-none shadow-2xs">
+                            {t("badgeNew")}
+                          </span>
+                        )}
+                      </div>
+                      <ChevronRight className="h-3.5 w-3.5 text-[#888888]/60 shrink-0" />
                     </div>
-                    <span className="text-[10px] font-normal text-[#d4d4d4] leading-tight line-clamp-2">
+
+                    {/* Bottom Row: Tool Title */}
+                    <span className={`text-xs font-medium ${tool.textColor || "text-[#ffffff]"} tracking-tight leading-snug line-clamp-2 mt-auto`}>
                       {toolTitle}
                     </span>
                   </button>
