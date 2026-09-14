@@ -59,6 +59,8 @@ export interface ExecutionTraceProps {
   onAnswerQuestion?: (toolCallId: string, answer: any) => void;
   onRollback?: (record: FileMutationRecord) => void;
   onRollbackAll?: (records: FileMutationRecord[]) => void;
+  onOpenFileDiff?: (record: FileMutationRecord) => void;
+  showMutationsSummary?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -100,6 +102,8 @@ export function ExecutionTrace({
   onAnswerQuestion,
   onRollback,
   onRollbackAll,
+  onOpenFileDiff,
+  showMutationsSummary = false,
 }: ExecutionTraceProps) {
   // Auto-open while executing to view progress live; auto-close when finished
   const [isMainOpen, setIsMainOpen] = useState(isExecuting);
@@ -280,6 +284,8 @@ export function ExecutionTrace({
                   <FileMutationCard
                     key={step.id || `mut_${idx}`}
                     tool={step}
+                    mutations={mutations}
+                    onOpenFileDiff={onOpenFileDiff}
                   />
                 );
               }
@@ -336,12 +342,13 @@ export function ExecutionTrace({
         </>
       )}
 
-      {mutations && mutations.length > 0 && (
+      {showMutationsSummary && mutations && mutations.length > 0 && (
         <MutationsSummaryCard
           mutations={mutations}
           isExecuting={isExecuting}
           onRollback={onRollback}
           onRollbackAll={onRollbackAll}
+          onOpenFileDiff={onOpenFileDiff}
         />
       )}
     </div>
@@ -713,7 +720,15 @@ function FileReadCard({ tool }: { tool: TraceStep | DisplayToolCall }) {
 // ---------------------------------------------------------------------------
 // 5. File Mutation Card: FileIcon + filename + +X -Y diffs
 // ---------------------------------------------------------------------------
-function FileMutationCard({ tool }: { tool: TraceStep | DisplayToolCall }) {
+function FileMutationCard({
+  tool,
+  mutations = [],
+  onOpenFileDiff,
+}: {
+  tool: TraceStep | DisplayToolCall;
+  mutations?: FileMutationRecord[];
+  onOpenFileDiff?: (record: FileMutationRecord) => void;
+}) {
   const [isOpen, setIsOpen] = useState(false);
 
   let targetArg = "";
@@ -732,6 +747,11 @@ function FileMutationCard({ tool }: { tool: TraceStep | DisplayToolCall }) {
 
   const fileName =
     targetArg.replace(/\\/g, "/").split("/").filter(Boolean).pop() || targetArg || "file";
+
+  const matchedMutation = tool.mutation || mutations.find((m) => {
+    const p = m.targetFile || m.filePath || "";
+    return p === targetArg || p.endsWith("/" + fileName);
+  });
 
   // Calculate approximate lines added/removed from content or replacement
   let added = 0;
@@ -771,6 +791,19 @@ function FileMutationCard({ tool }: { tool: TraceStep | DisplayToolCall }) {
               {added > 0 && <span className="text-[#409D62]">+{added}</span>}
               {removed > 0 && <span className="text-[#ff5c5c]">-{removed}</span>}
             </div>
+          )}
+          {matchedMutation && onOpenFileDiff && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenFileDiff(matchedMutation);
+              }}
+              className="px-1.5 py-0.5 rounded text-[10.5px] text-neutral-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+              title="Open diff in Preview panel"
+            >
+              Focus ↗
+            </button>
           )}
           {hasSnippet && (
             <ChevronDown
@@ -1244,105 +1277,135 @@ export function computeDiff(
   prev: string | null | undefined,
   next: string | null | undefined
 ): DiffLine[] {
-  const prevLines = prev !== null && prev !== undefined ? prev.split(/\r?\n/) : [];
-  const nextLines = next !== null && next !== undefined ? next.split(/\r?\n/) : [];
+  try {
+    const safePrev = typeof prev === "string" ? prev : (prev != null ? String(prev) : null);
+    const safeNext = typeof next === "string" ? next : (next != null ? String(next) : null);
 
-  if (prev === null || prev === undefined) {
-    return nextLines.map((line, idx) => ({
-      type: "added",
-      content: line,
-      newNum: idx + 1,
-    }));
+    const prevLines = safePrev !== null ? safePrev.split(/\r?\n/) : [];
+    const nextLines = safeNext !== null ? safeNext.split(/\r?\n/) : [];
+
+    if (safePrev === null) {
+      return nextLines.map((line, idx) => ({
+        type: "added",
+        content: line,
+        newNum: idx + 1,
+      }));
+    }
+
+    if (safeNext === null) {
+      return prevLines.map((line, idx) => ({
+        type: "removed",
+        content: line,
+        oldNum: idx + 1,
+      }));
+    }
+
+    if (safePrev === safeNext) {
+      return prevLines.map((line, idx) => ({
+        type: "context",
+        content: line,
+        oldNum: idx + 1,
+        newNum: idx + 1,
+      }));
+    }
+
+    // Safety guard for very large files (> 3000 lines) to prevent freezing main thread
+    if (prevLines.length + nextLines.length > 3000) {
+      const truncatedNext = nextLines.slice(0, 300);
+      return [
+        ...truncatedNext.map((line, idx) => ({
+          type: "added" as const,
+          content: line,
+          newNum: idx + 1,
+        })),
+        {
+          type: "context" as const,
+          content: `... (${nextLines.length - 300} more lines omitted for performance) ...`,
+        },
+      ];
+    }
+
+    let prefix = 0;
+    while (
+      prefix < prevLines.length &&
+      prefix < nextLines.length &&
+      prevLines[prefix] === nextLines[prefix]
+    ) {
+      prefix++;
+    }
+
+    let suffixOld = prevLines.length - 1;
+    let suffixNew = nextLines.length - 1;
+    while (
+      suffixOld >= prefix &&
+      suffixNew >= prefix &&
+      prevLines[suffixOld] === nextLines[suffixNew]
+    ) {
+      suffixOld--;
+      suffixNew--;
+    }
+
+    const lines: DiffLine[] = [];
+    for (let i = 0; i < prefix; i++) {
+      lines.push({ type: "context", content: prevLines[i]!, oldNum: i + 1, newNum: i + 1 });
+    }
+
+    for (let i = prefix; i <= suffixOld; i++) {
+      lines.push({ type: "removed", content: prevLines[i]!, oldNum: i + 1 });
+    }
+
+    for (let i = prefix; i <= suffixNew; i++) {
+      lines.push({ type: "added", content: nextLines[i]!, newNum: i + 1 });
+    }
+
+    for (let i = suffixOld + 1; i < prevLines.length; i++) {
+      const nextIdx = suffixNew + 1 + (i - (suffixOld + 1));
+      lines.push({ type: "context", content: prevLines[i]!, oldNum: i + 1, newNum: nextIdx + 1 });
+    }
+
+    return lines;
+  } catch (err) {
+    console.error("[computeDiff error]:", err);
+    return [];
   }
-
-  if (next === null || next === undefined) {
-    return prevLines.map((line, idx) => ({
-      type: "removed",
-      content: line,
-      oldNum: idx + 1,
-    }));
-  }
-
-  if (prev === next) {
-    return prevLines.map((line, idx) => ({
-      type: "context",
-      content: line,
-      oldNum: idx + 1,
-      newNum: idx + 1,
-    }));
-  }
-
-  let prefix = 0;
-  while (
-    prefix < prevLines.length &&
-    prefix < nextLines.length &&
-    prevLines[prefix] === nextLines[prefix]
-  ) {
-    prefix++;
-  }
-
-  let suffixOld = prevLines.length - 1;
-  let suffixNew = nextLines.length - 1;
-  while (
-    suffixOld >= prefix &&
-    suffixNew >= prefix &&
-    prevLines[suffixOld] === nextLines[suffixNew]
-  ) {
-    suffixOld--;
-    suffixNew--;
-  }
-
-  const lines: DiffLine[] = [];
-  for (let i = 0; i < prefix; i++) {
-    lines.push({ type: "context", content: prevLines[i]!, oldNum: i + 1, newNum: i + 1 });
-  }
-
-  for (let i = prefix; i <= suffixOld; i++) {
-    lines.push({ type: "removed", content: prevLines[i]!, oldNum: i + 1 });
-  }
-
-  for (let i = prefix; i <= suffixNew; i++) {
-    lines.push({ type: "added", content: nextLines[i]!, newNum: i + 1 });
-  }
-
-  for (let i = suffixOld + 1; i < prevLines.length; i++) {
-    const nextIdx = suffixNew + 1 + (i - (suffixOld + 1));
-    lines.push({ type: "context", content: prevLines[i]!, oldNum: i + 1, newNum: nextIdx + 1 });
-  }
-
-  return lines;
 }
 
 export function getMutationDiffStats(m: FileMutationRecord): DiffStats {
-  if (diffStatsCache.has(m)) {
-    return diffStatsCache.get(m)!;
-  }
-
-  let stats: DiffStats;
-  const prev = m.previousContent;
-  const next = m.newContent;
-
-  if (m.operation === "create" || prev === null || prev === undefined) {
-    const lines = next !== null && next !== undefined ? next.split(/\r?\n/).length : 0;
-    stats = { added: Math.max(1, lines), removed: 0 };
-  } else if (m.operation === "delete" || next === null || next === undefined) {
-    const lines = prev !== null && prev !== undefined ? prev.split(/\r?\n/).length : 0;
-    stats = { added: 0, removed: Math.max(1, lines) };
-  } else if (prev === next) {
-    stats = { added: 0, removed: 0 };
-  } else {
-    const diff = computeDiff(prev, next);
-    let added = 0;
-    let removed = 0;
-    for (const line of diff) {
-      if (line.type === "added") added++;
-      else if (line.type === "removed") removed++;
+  try {
+    if (!m) return { added: 0, removed: 0 };
+    if (diffStatsCache.has(m)) {
+      return diffStatsCache.get(m)!;
     }
-    stats = { added, removed };
-  }
 
-  diffStatsCache.set(m, stats);
-  return stats;
+    let stats: DiffStats;
+    const prev = typeof m.previousContent === "string" ? m.previousContent : (m.previousContent != null ? String(m.previousContent) : null);
+    const next = typeof m.newContent === "string" ? m.newContent : (m.newContent != null ? String(m.newContent) : null);
+
+    if (m.operation === "create" || prev === null) {
+      const lines = next !== null ? next.split(/\r?\n/).length : 0;
+      stats = { added: Math.max(1, lines), removed: 0 };
+    } else if (m.operation === "delete" || next === null) {
+      const lines = prev !== null ? prev.split(/\r?\n/).length : 0;
+      stats = { added: 0, removed: Math.max(1, lines) };
+    } else if (prev === next) {
+      stats = { added: 0, removed: 0 };
+    } else {
+      const diff = computeDiff(prev, next);
+      let added = 0;
+      let removed = 0;
+      for (const line of diff) {
+        if (line.type === "added") added++;
+        else if (line.type === "removed") removed++;
+      }
+      stats = { added, removed };
+    }
+
+    diffStatsCache.set(m, stats);
+    return stats;
+  } catch (err) {
+    console.error("[getMutationDiffStats error]:", err);
+    return { added: 0, removed: 0 };
+  }
 }
 
 export function MutationsSummaryCard({
@@ -1350,11 +1413,13 @@ export function MutationsSummaryCard({
   isExecuting = false,
   onRollback,
   onRollbackAll,
+  onOpenFileDiff,
 }: {
   mutations: FileMutationRecord[];
   isExecuting?: boolean;
   onRollback?: (record: FileMutationRecord) => void;
   onRollbackAll?: (records: FileMutationRecord[]) => void;
+  onOpenFileDiff?: (record: FileMutationRecord) => void;
 }) {
   const { t, language } = useI18n();
   const [isOpen, setIsOpen] = useState(isExecuting);
@@ -1429,14 +1494,14 @@ export function MutationsSummaryCard({
             <ScrollArea className="max-h-60 w-full pr-1" viewportClassName="[&>div[style]]:!block">
               <div className="flex flex-col gap-0.5">
                 {mutations.map((mut) => (
-                  <MutationRowItem key={mut.id} mut={mut} onRollback={onRollback} />
+                  <MutationRowItem key={mut.id} mut={mut} onRollback={onRollback} onOpenFileDiff={onOpenFileDiff} />
                 ))}
               </div>
             </ScrollArea>
           ) : (
             <div className="flex flex-col gap-0.5">
               {mutations.map((mut) => (
-                <MutationRowItem key={mut.id} mut={mut} onRollback={onRollback} />
+                <MutationRowItem key={mut.id} mut={mut} onRollback={onRollback} onOpenFileDiff={onOpenFileDiff} />
               ))}
             </div>
           )}
@@ -1449,9 +1514,11 @@ export function MutationsSummaryCard({
 function MutationRowItem({
   mut,
   onRollback,
+  onOpenFileDiff,
 }: {
   mut: FileMutationRecord;
   onRollback?: (record: FileMutationRecord) => void;
+  onOpenFileDiff?: (record: FileMutationRecord) => void;
 }) {
   const { t, language } = useI18n();
   const rawPath = mut.targetFile || mut.filePath || mut.absolutePath || "file";
@@ -1460,7 +1527,12 @@ function MutationRowItem({
   const fileStats = getMutationDiffStats(mut);
 
   return (
-    <div className="flex items-center justify-between group py-1.5 px-2 rounded-lg hover:bg-black/[0.04] dark:hover:bg-white/[0.04] transition-colors">
+    <div
+      onClick={() => onOpenFileDiff?.(mut)}
+      className={`flex items-center justify-between group py-1.5 px-2 rounded-lg hover:bg-black/[0.04] dark:hover:bg-white/[0.04] transition-colors ${
+        onOpenFileDiff ? "cursor-pointer" : ""
+      }`}
+    >
       <div className="flex items-center gap-2 min-w-0 pr-2">
         <FileIcon filename={fileName} />
         <span
@@ -1484,6 +1556,20 @@ function MutationRowItem({
           <span className="text-[#409D62]">+{fileStats.added}</span>
           <span className="text-[#ff5c5c]">-{fileStats.removed}</span>
         </div>
+
+        {onOpenFileDiff && !mut.rolledBack && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onOpenFileDiff(mut);
+            }}
+            className="opacity-0 group-hover:opacity-100 flex items-center gap-1 px-1.5 py-0.5 rounded bg-muted/70 hover:bg-muted dark:bg-[#202020] dark:hover:bg-[#2e2e2e] border border-border/80 dark:border-[#333333] text-[10.5px] text-neutral-400 hover:text-white transition-all cursor-pointer shadow-xs"
+            title="Focus in Preview panel"
+          >
+            Focus ↗
+          </button>
+        )}
 
         {mut.rolledBack ? (
           <span className="text-[10.5px] text-[#409D62] font-medium flex items-center gap-0.5">

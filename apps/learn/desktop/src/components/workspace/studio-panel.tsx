@@ -18,7 +18,7 @@ import { ScrollArea } from "@const/ui";
 
 import { useI18n, type TranslationKey } from "../../lib/i18n";
 
-interface StudioTool {
+export interface StudioTool {
   id: string;
   translationKey: TranslationKey;
   icon: React.ElementType;
@@ -28,9 +28,10 @@ interface StudioTool {
   borderColor: string;
   hoverBg: string;
   hoverBorder: string;
+  hasBadge?: boolean;
 }
 
-const STUDIO_TOOLS: StudioTool[] = [
+export const STUDIO_TOOLS: StudioTool[] = [
   {
     id: "audio_summary",
     translationKey: "toolsAudioSummary",

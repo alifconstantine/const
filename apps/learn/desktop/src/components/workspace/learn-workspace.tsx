@@ -39,9 +39,11 @@ import {
 import { useI18n, LANGUAGE_OPTIONS } from "../../lib/i18n";
 import { SourcesPanel } from "./sources-panel";
 import { ChatPanel } from "./chat-panel";
-import { StudioPanel } from "./studio-panel";
+import { RightPane, type RightPaneTab } from "../right-pane";
 import { AddSourceDialog } from "./add-source-dialog";
 import { SettingsView } from "../settings/settings-view";
+import { ErrorBoundary } from "../ui/error-boundary";
+import type { FileMutationRecord } from "@const/agent";
 
 interface LearnWorkspaceProps {
   learnId: string;
@@ -75,6 +77,151 @@ export function LearnWorkspace({
   const [isSourcesCollapsed, setIsSourcesCollapsed] = useState(false);
   const [isStudioCollapsed, setIsStudioCollapsed] = useState(false);
   const [pendingStudioPrompt, setPendingStudioPrompt] = useState<string | null>(null);
+
+  // Right Pane: Dual Studio & Preview state
+  const [rightPaneMode, setRightPaneMode] = useState<"studio" | "preview">("studio");
+  const [rightPaneTabs, setRightPaneTabs] = useState<RightPaneTab[]>([
+    { id: "review", type: "review", title: "Review" },
+  ]);
+  const [activeRightPaneTabId, setActiveRightPaneTabId] = useState<string>("review");
+  const [sessionMutations, setSessionMutations] = useState<FileMutationRecord[]>([]);
+
+  const handleOpenFileDiff = (mutation: FileMutationRecord) => {
+    setIsStudioCollapsed(false);
+    setRightPaneMode("preview");
+
+    const filePath = mutation.filePath || mutation.targetFile || "";
+    const fileName =
+      filePath.replace(/\\/g, "/").split("/").filter(Boolean).pop() ||
+      filePath ||
+      "Diff";
+
+    const existing = rightPaneTabs.find(
+      (t) =>
+        t.type === "file_diff" &&
+        (t.filePath === filePath ||
+          t.mutation?.targetFile === mutation.targetFile ||
+          t.title === fileName)
+    );
+
+    if (existing) {
+      setRightPaneTabs((prev) =>
+        prev.map((t) =>
+          t.id === existing.id
+            ? {
+                ...t,
+                mutation,
+                filePath,
+                previousContent: mutation.previousContent,
+                newContent: mutation.newContent,
+              }
+            : t
+        )
+      );
+      setActiveRightPaneTabId(existing.id);
+      return;
+    }
+
+    const newTab: RightPaneTab = {
+      id: `diff_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      type: "file_diff",
+      title: fileName,
+      filePath,
+      mutation,
+      previousContent: mutation.previousContent,
+      newContent: mutation.newContent,
+    };
+    setRightPaneTabs((prev) => [...prev, newTab]);
+    setActiveRightPaneTabId(newTab.id);
+  };
+
+  const handleSelectTab = (tabId: string) => {
+    setActiveRightPaneTabId(tabId);
+  };
+
+  const handleCloseTab = (tabId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setRightPaneTabs((prev) => {
+      const idx = prev.findIndex((t) => t.id === tabId);
+      const next = prev.filter((t) => t.id !== tabId);
+      if (activeRightPaneTabId === tabId) {
+        if (next.length > 0) {
+          const nextActive = next[Math.min(idx, next.length - 1)];
+          setActiveRightPaneTabId(nextActive?.id || "review");
+        } else {
+          setActiveRightPaneTabId("review");
+        }
+      }
+      return next;
+    });
+  };
+
+  const handleRollbackFile = async (record: FileMutationRecord) => {
+    const electron = (window as any).electron;
+    const rollbackFn = electron?.agent?.rollbackFile || electron?.rollbackFile;
+    if (rollbackFn) {
+      await rollbackFn(record);
+    }
+    setSessionMutations((prev) =>
+      prev.map((m) => (m.id === record.id ? { ...m, rolledBack: true } : m))
+    );
+    setRightPaneTabs((prev) =>
+      prev.map((t) =>
+        t.mutation && t.mutation.id === record.id
+          ? { ...t, mutation: { ...t.mutation, rolledBack: true } }
+          : t
+      )
+    );
+    try {
+      const msgs = await db.messages
+        .filter((m) => Boolean(m.mutations?.some((mut) => mut.id === record.id)))
+        .toArray();
+      for (const msg of msgs) {
+        if (msg.mutations) {
+          const updated = msg.mutations.map((m) =>
+            m.id === record.id ? { ...m, rolledBack: true } : m
+          );
+          await db.messages.update(msg.id, { mutations: updated });
+        }
+      }
+    } catch {}
+  };
+
+  const handleRollbackAll = async (records: FileMutationRecord[]) => {
+    const electron = (window as any).electron;
+    const rollbackFn = electron?.agent?.rollbackFile || electron?.rollbackFile;
+    if (rollbackFn) {
+      for (const rec of [...records].reverse()) {
+        try {
+          await rollbackFn(rec);
+        } catch {}
+      }
+    }
+    const recordIds = new Set(records.map((r) => r.id));
+    setSessionMutations((prev) =>
+      prev.map((m) => (recordIds.has(m.id) ? { ...m, rolledBack: true } : m))
+    );
+    setRightPaneTabs((prev) =>
+      prev.map((t) =>
+        t.mutation && recordIds.has(t.mutation.id)
+          ? { ...t, mutation: { ...t.mutation, rolledBack: true } }
+          : t
+      )
+    );
+    try {
+      const msgs = await db.messages
+        .filter((m) => Boolean(m.mutations?.some((mut) => recordIds.has(mut.id))))
+        .toArray();
+      for (const msg of msgs) {
+        if (msg.mutations) {
+          const updated = msg.mutations.map((m) =>
+            recordIds.has(m.id) ? { ...m, rolledBack: true } : m
+          );
+          await db.messages.update(msg.id, { mutations: updated });
+        }
+      }
+    } catch {}
+  };
 
   // Dynamic responsive default widths
   const getResponsiveWidths = () => {
@@ -614,6 +761,8 @@ export function LearnWorkspace({
           }}
           externalPrompt={pendingStudioPrompt}
           onExternalPromptConsumed={() => setPendingStudioPrompt(null)}
+          onOpenFileDiff={handleOpenFileDiff}
+          onMutationsChange={setSessionMutations}
         />
 
         {/* Right Resize Handle */}
@@ -631,16 +780,35 @@ export function LearnWorkspace({
           </div>
         )}
 
-        {/* Right Column: Studio Tools */}
-        <StudioPanel
-          width={studioWidth}
-          onSelectTool={undefined}
-          onAddNote={() => {
-            console.log("Add note clicked");
-          }}
-          isCollapsed={isStudioCollapsed}
-          onToggleCollapse={() => setIsStudioCollapsed(!isStudioCollapsed)}
-        />
+        {/* Right Column: Dual Studio & Preview RightPane */}
+        <ErrorBoundary
+          title="Panel samping mengalami kendala"
+          description="Terjadi kesalahan pada panel Studio/Preview."
+        >
+          <RightPane
+            width={studioWidth}
+            onWidthChange={(w) => {
+              setIsManualWidth(true);
+              setStudioWidth(w);
+            }}
+            isCollapsed={isStudioCollapsed}
+            onToggleCollapse={() => setIsStudioCollapsed(!isStudioCollapsed)}
+            mode={rightPaneMode}
+            onModeChange={setRightPaneMode}
+            tabs={rightPaneTabs}
+            activeTabId={activeRightPaneTabId}
+            onSelectTab={handleSelectTab}
+            onCloseTab={handleCloseTab}
+            mutations={sessionMutations}
+            onRollbackFile={handleRollbackFile}
+            onRollbackAll={handleRollbackAll}
+            onOpenFileDiff={handleOpenFileDiff}
+            onSelectStudioTool={undefined}
+            onAddNote={() => {
+              console.log("Add note clicked");
+            }}
+          />
+        </ErrorBoundary>
       </div>
 
       {/* Add Source Pop-up Modal */}

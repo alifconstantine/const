@@ -169,6 +169,14 @@ export const translations = {
 
     // Workspace: Studio Panel
     studioTitle: "Studio",
+    studio: "Studio",
+    preview: "Preview",
+    review: "Review",
+    noChangesToReview: "No Changes to Review",
+    noChangesDesc: "Files modified by the AI will appear here with line-by-line diffs and rollback controls.",
+    undoFile: "Undo changes to this file",
+    undo: "Undo",
+    copyDiff: "Copy diff",
     studioTools: "Studio Tools",
     notes: "Notes",
     addNote: "Add note",
@@ -529,6 +537,14 @@ export const translations = {
 
     // Workspace: Studio Panel
     studioTitle: "Studio",
+    studio: "Studio",
+    preview: "Pratinjau",
+    review: "Tinjauan",
+    noChangesToReview: "Tidak Ada Perubahan untuk Ditinjau",
+    noChangesDesc: "Berkas yang dimodifikasi oleh AI akan muncul di sini lengkap dengan perbandingan baris dan kontrol pembatalan.",
+    undoFile: "Batalkan perubahan berkas ini",
+    undo: "Batalkan",
+    copyDiff: "Salin diff",
     studioTools: "Alat Studio",
     notes: "Catatan",
     addNote: "Tambah catatan",

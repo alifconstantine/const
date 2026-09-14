@@ -52,7 +52,12 @@ import {
   formatDurationDisplay,
 } from "../../lib/telemetry";
 import { ChatHistoryPanel } from "./chat-history-panel";
-import { ExecutionTrace, type DisplayToolCall, type TraceStep } from "./execution-trace";
+import {
+  ExecutionTrace,
+  MutationsSummaryCard,
+  type DisplayToolCall,
+  type TraceStep,
+} from "./execution-trace";
 import { MarkdownContent } from "./markdown-content";
 import { ImageLightbox } from "./image-lightbox";
 import { ApprovalCard } from "./approval-card";
@@ -69,6 +74,8 @@ interface ChatPanelProps {
   onOpenSettings?: (tab?: string) => void;
   externalPrompt?: string | null;
   onExternalPromptConsumed?: () => void;
+  onOpenFileDiff?: (record: FileMutationRecord) => void;
+  onMutationsChange?: (mutations: FileMutationRecord[]) => void;
 }
 
 interface DisplayMessage {
@@ -210,9 +217,38 @@ export function ChatPanel({
   onOpenSettings,
   externalPrompt,
   onExternalPromptConsumed,
+  onOpenFileDiff,
+  onMutationsChange,
 }: ChatPanelProps) {
   const { t, language } = useI18n();
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
+
+  // Sync mutations to parent workspace (for Preview/Review tab)
+  const prevMutationsRef = useRef<FileMutationRecord[]>([]);
+  useEffect(() => {
+    if (!onMutationsChange) return;
+    const allMuts: FileMutationRecord[] = [];
+    for (const msg of messages) {
+      if (msg.mutations && msg.mutations.length > 0) {
+        allMuts.push(...msg.mutations);
+      }
+    }
+
+    const prev = prevMutationsRef.current;
+    const hasChanged =
+      prev.length !== allMuts.length ||
+      prev.some(
+        (m, idx) =>
+          m.id !== allMuts[idx]?.id ||
+          m.rolledBack !== allMuts[idx]?.rolledBack ||
+          m.operation !== allMuts[idx]?.operation
+      );
+
+    if (hasChanged) {
+      prevMutationsRef.current = allMuts;
+      onMutationsChange(allMuts);
+    }
+  }, [messages, onMutationsChange]);
   const [inputMessage, setInputMessage] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
   const [selectedModelId, setSelectedModelId] = useState<string>(() => {
@@ -2938,6 +2974,7 @@ export function ChatPanel({
                     onAnswerQuestion={handleAnswerQuestion}
                     onRollback={(rec) => handleRollbackFile(rec, msg.id)}
                     onRollbackAll={(recs) => handleRollbackAll(recs, msg.id)}
+                    onOpenFileDiff={onOpenFileDiff}
                   />
 
                   {/* Formatted Markdown Content Bubble */}
@@ -2954,6 +2991,17 @@ export function ChatPanel({
                       <span>{t("processingResponse")}</span>
                     </div>
                   ) : null}
+
+                  {/* Changed Files Summary Card at the bottom of the message only after all output is finished (matching apps/harness/desktop) */}
+                  {!isLatestAssistant && msg.mutations && msg.mutations.length > 0 && (
+                    <MutationsSummaryCard
+                      mutations={msg.mutations}
+                      isExecuting={false}
+                      onRollback={(rec) => handleRollbackFile(rec, msg.id)}
+                      onRollbackAll={(recs) => handleRollbackAll(recs, msg.id)}
+                      onOpenFileDiff={onOpenFileDiff}
+                    />
+                  )}
 
                   {/* Assistant hover action bar: Timestamp and Copy */}
                   {!isLatestAssistant && msg.content && (
