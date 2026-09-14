@@ -7,7 +7,8 @@ import { TaskOutputTab } from "./task-output-tab";
 import { ReviewTab } from "./review-tab";
 import { FileDiffTab } from "./file-diff-tab";
 import { FilePreviewTab } from "./file-preview-tab";
-import type { RightPaneTab, RightPaneTabType } from "./types";
+import { BrowserTab } from "./browser-tab";
+import type { RightPaneTab, RightPaneTabType, BrowserSelectedElement } from "./types";
 import type { FileMutationRecord } from "../../vite-env";
 
 interface RightPaneProps {
@@ -27,6 +28,8 @@ interface RightPaneProps {
   onRollbackAll?: (records: FileMutationRecord[]) => Promise<any> | void;
   onOpenFileDiff?: (record: FileMutationRecord) => void;
   onStopTask?: (taskId: string) => void;
+  onUpdateTab?: (tabId: string, updates: Partial<RightPaneTab>) => void;
+  onSelectElementForChat?: (element: BrowserSelectedElement) => void;
 }
 
 export function RightPane({
@@ -46,6 +49,8 @@ export function RightPane({
   onRollbackAll,
   onOpenFileDiff,
   onStopTask,
+  onUpdateTab,
+  onSelectElementForChat,
 }: RightPaneProps) {
   const isDraggingRef = useRef(false);
   const startXRef = useRef(0);
@@ -148,21 +153,15 @@ export function RightPane({
               Open a separate scratchpad conversation alongside your main thread.
             </p>
           </div>
-        ) : (
+        ) : activeTab.type === "browser" ? (
           /* Browser Tab */
-          <div className="flex-1 w-full h-full p-4 text-white flex flex-col items-center justify-center text-center">
-            <Globe className="w-8 h-8 mb-2 text-neutral-500 opacity-60" />
-            <h4 className="text-sm font-medium text-neutral-300 mb-1">Browser Preview</h4>
-            <p className="text-xs text-neutral-500 max-w-xs mb-3">
-              Inspect web interfaces or local dev server URLs.
-            </p>
-            {workspacePath && (
-              <span className="text-[11px] font-mono text-neutral-400 bg-neutral-900 px-2 py-1 rounded border border-neutral-800">
-                Workspace: {workspacePath}
-              </span>
-            )}
-          </div>
-        )}
+          <BrowserTab
+            key={activeTab.id}
+            tab={activeTab}
+            onUpdateTab={onUpdateTab}
+            onSelectElementForChat={onSelectElementForChat}
+          />
+        ) : null}
       </div>
     </aside>
   );

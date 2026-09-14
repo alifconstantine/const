@@ -17,3 +17,10 @@ body,
   overflow: hidden;
 }
 
+webview {
+  display: inline-flex !important;
+  width: 100% !important;
+  height: 100% !important;
+  flex: 1 1 auto;
+}
+

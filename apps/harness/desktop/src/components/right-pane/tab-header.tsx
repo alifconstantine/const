@@ -44,6 +44,41 @@ function getTabIcon(type: RightPaneTabType) {
   }
 }
 
+function TabFavicon({
+  favicon,
+  fallbackIcon: FallbackIcon,
+  isActive,
+}: {
+  favicon?: string;
+  fallbackIcon: React.ComponentType<{ className?: string }>;
+  isActive: boolean;
+}) {
+  const [hasError, setHasError] = useState(false);
+
+  useEffect(() => {
+    setHasError(false);
+  }, [favicon]);
+
+  if (favicon && !hasError) {
+    return (
+      <img
+        src={favicon}
+        alt=""
+        className="w-3.5 h-3.5 shrink-0 object-contain rounded-xs pointer-events-none"
+        onError={() => setHasError(true)}
+      />
+    );
+  }
+
+  return (
+    <FallbackIcon
+      className={`w-3.5 h-3.5 shrink-0 pointer-events-none ${
+        isActive ? "text-white" : "text-[#8e8e8e] group-hover:text-white"
+      }`}
+    />
+  );
+}
+
 export function TabHeader({
   tabs,
   activeTabId,
@@ -211,6 +246,8 @@ export function TabHeader({
                       <div className="flex items-center gap-2 min-w-0">
                         {t.type === "file_diff" || t.type === "file_preview" ? (
                           <FileIcon filename={t.filePath || t.title} className="w-3.5 h-3.5 shrink-0" />
+                        ) : t.type === "browser" ? (
+                          <TabFavicon favicon={t.favicon} fallbackIcon={Icon} isActive={isActive} />
                         ) : (
                           <Icon className="w-3.5 h-3.5 shrink-0" />
                         )}
@@ -306,6 +343,8 @@ export function TabHeader({
 
               {tab.type === "file_diff" || tab.type === "file_preview" ? (
                 <FileIcon filename={tab.filePath || tab.title} className="w-3.5 h-3.5 shrink-0 pointer-events-none" />
+              ) : tab.type === "browser" ? (
+                <TabFavicon favicon={tab.favicon} fallbackIcon={Icon} isActive={isActive} />
               ) : (
                 <Icon
                   className={`w-3.5 h-3.5 shrink-0 pointer-events-none ${

@@ -362,6 +362,7 @@ function createWindow() {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
       nodeIntegration: false,
+      webviewTag: true,
     },
   });
 
@@ -391,6 +392,14 @@ function createWindow() {
     win.loadFile(path.join(__dirname, "../dist/index.html"));
   }
 }
+
+app.on("web-contents-created", (_event, contents) => {
+  contents.on("will-attach-webview", (_waEvent, webPreferences) => {
+    delete webPreferences.preload;
+    webPreferences.nodeIntegration = false;
+    webPreferences.contextIsolation = true;
+  });
+});
 
 app.whenReady().then(() => {
   // Window control handlers

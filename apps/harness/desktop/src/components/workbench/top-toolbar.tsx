@@ -12,6 +12,7 @@ import {
   X,
   Folder,
   MoreHorizontal,
+  Globe,
 } from "lucide-react";
 import {
   ConstLogoIcon,
@@ -41,6 +42,7 @@ interface TopToolbarProps {
   isRightSidebarOpen?: boolean;
   onToggleRightSidebar?: () => void;
   onOpenTerminal?: () => void;
+  onOpenBrowser?: () => void;
 }
 
 export function TopToolbar({
@@ -60,6 +62,7 @@ export function TopToolbar({
   isRightSidebarOpen = false,
   onToggleRightSidebar,
   onOpenTerminal,
+  onOpenBrowser,
 }: TopToolbarProps) {
   const [isMaximized, setIsMaximized] = useState(false);
 
@@ -359,6 +362,16 @@ export function TopToolbar({
         className="flex items-center gap-1 text-[#262626] dark:text-[#d4d4d4] shrink-0 ml-auto"
         style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
       >
+
+        <button
+          type="button"
+          onClick={() => onOpenBrowser?.()}
+          className="p-1.5 rounded-lg text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-[#222222] transition-colors cursor-pointer"
+          title="Open browser"
+          aria-label="Open browser"
+        >
+          <Globe className="w-4 h-4" />
+        </button>
 
         <button
           type="button"

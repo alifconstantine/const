@@ -25,4 +25,19 @@ export interface RightPaneTab {
   taskId?: string;
   command?: string;
   createdAt?: number;
+  url?: string;
+  favicon?: string;
+}
+
+export interface BrowserSelectedElement {
+  tag: string;
+  id?: string;
+  className?: string;
+  selector: string;
+  rect: { width: number; height: number };
+  color?: string;
+  font?: string;
+  textSnippet?: string;
+  htmlSnippet?: string;
+  url: string;
 }

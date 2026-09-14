@@ -39,7 +39,7 @@ import { TrajectoryDialog } from "./components/workbench/trajectory-dialog";
 import { SettingsView } from "./components/settings-view";
 import { ScheduledTasksView } from "./components/scheduled-tasks";
 import { CommandPaletteModal } from "./components/command-palette-modal";
-import { RightPane, type RightPaneTab, type RightPaneTabType } from "./components/right-pane";
+import { RightPane, type RightPaneTab, type RightPaneTabType, type BrowserSelectedElement } from "./components/right-pane";
 import { useAppAuth } from "./components/convex-provider";
 import { useConversationWidth } from "./lib/theme";
 import {
@@ -324,6 +324,66 @@ function AuthenticatedContent({
     setIsOpeningNewTab(false);
   };
 
+  const handleOpenBrowser = (initialUrl?: any) => {
+    setIsRightSidebarOpen(true);
+    const resolvedUrl =
+      typeof initialUrl === "string" && initialUrl.trim() && initialUrl !== "[object Object]"
+        ? initialUrl.trim()
+        : "https://www.google.com";
+
+    const existingBrowser = rightPaneTabs.find((t) => t.type === "browser");
+    if (existingBrowser) {
+      if (
+        typeof initialUrl === "string" &&
+        initialUrl.trim() &&
+        initialUrl !== "[object Object]" &&
+        initialUrl !== existingBrowser.url
+      ) {
+        handleUpdateTab(existingBrowser.id, { url: resolvedUrl });
+      }
+      setActiveRightPaneTabId(existingBrowser.id);
+      setIsOpeningNewTab(false);
+      return;
+    }
+
+    const newTab: RightPaneTab = {
+      id: `browser_${Date.now()}`,
+      type: "browser",
+      title: "Browser",
+      url: resolvedUrl,
+      project: currentProject,
+      conversationId,
+    };
+    setRightPaneTabs((prev) => [...prev, newTab]);
+    setActiveRightPaneTabId(newTab.id);
+    setIsOpeningNewTab(false);
+  };
+
+  const handleUpdateTab = (tabId: string, updates: Partial<RightPaneTab>) => {
+    setRightPaneTabs((prev) =>
+      prev.map((t) => (t.id === tabId ? { ...t, ...updates } : t))
+    );
+  };
+
+  const handleSelectElementForChat = (element: BrowserSelectedElement) => {
+    const selectorLabel = element.id
+      ? `#${element.id}`
+      : element.className
+      ? `${element.tag}.${element.className.split(" ")[0]}`
+      : element.selector || element.tag;
+    const details = [
+      element.rect ? `${element.rect.width}x${element.rect.height}` : null,
+      element.color ? `color: ${element.color}` : null,
+      element.font ? `font: ${element.font}` : null,
+      element.textSnippet ? `"${element.textSnippet}"` : null,
+    ]
+      .filter(Boolean)
+      .join(", ");
+
+    const formatted = `@browser [${selectorLabel}] (${details})`;
+    setEditingPrompt((prev) => (prev ? `${prev} ${formatted} ` : `${formatted} `));
+  };
+
   const handleOpenTabType = async (type: RightPaneTabType) => {
     let title = "";
     let resolvedCwd = currentProject === "Outside Project" ? undefined : currentProject;
@@ -360,6 +420,7 @@ function AuthenticatedContent({
       id: `${type}_${Date.now()}`,
       type,
       title,
+      url: type === "browser" ? "https://www.google.com" : undefined,
       cwd: resolvedCwd,
       project: currentProject,
       conversationId,
@@ -2154,6 +2215,7 @@ function AuthenticatedContent({
                   isRightSidebarOpen={isRightSidebarOpen}
                   onToggleRightSidebar={handleToggleRightSidebar}
                   onOpenTerminal={handleOpenTerminal}
+                  onOpenBrowser={handleOpenBrowser}
                 />
               );
             })()}
@@ -2491,6 +2553,8 @@ function AuthenticatedContent({
                   onRollbackAll={handleRollbackAll}
                   onOpenFileDiff={handleOpenFileDiff}
                   onStopTask={handleStopBackgroundTask}
+                  onUpdateTab={handleUpdateTab}
+                  onSelectElementForChat={handleSelectElementForChat}
                 />
               )}
             </div>
