@@ -15,6 +15,7 @@ import {
   Hand,
   ShieldAlert,
   ChevronDown,
+  RotateCcw,
 } from "lucide-react";
 import {
   Avatar,
@@ -29,12 +30,18 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuSubContent,
   useTheme,
+  cn,
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
+  TooltipProvider,
 } from "@const/ui";
 import { useI18n, LANGUAGE_OPTIONS } from "../../lib/i18n";
 import { SourcesPanel } from "./sources-panel";
 import { ChatPanel } from "./chat-panel";
 import { StudioPanel } from "./studio-panel";
 import { AddSourceDialog } from "./add-source-dialog";
+import { SettingsView } from "../settings/settings-view";
 
 interface LearnWorkspaceProps {
   learnId: string;
@@ -97,6 +104,19 @@ export function LearnWorkspace({
   const [sourcesWidth, setSourcesWidth] = useState<number>(() => getResponsiveWidths().sources);
   const [studioWidth, setStudioWidth] = useState<number>(() => getResponsiveWidths().studio);
   const [isManualWidth, setIsManualWidth] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [settingsInitialTab, setSettingsInitialTab] = useState<string>("general");
+
+  const responsiveDefaults = getResponsiveWidths();
+  const isLayoutModified =
+    sourcesWidth !== responsiveDefaults.sources || studioWidth !== responsiveDefaults.studio;
+
+  const handleResetLayout = () => {
+    setIsManualWidth(false);
+    const defaults = getResponsiveWidths();
+    setSourcesWidth(defaults.sources);
+    setStudioWidth(defaults.studio);
+  };
 
   useEffect(() => {
     const handleResize = () => {
@@ -298,8 +318,34 @@ export function LearnWorkspace({
           )}
         </div>
 
-        {/* Right: Permission Mode & User Account */}
+        {/* Right: Reset Layout, Permission Mode & User Account */}
         <div className="flex items-center gap-2">
+          {/* Reset Panel Layout Button (Left of Permission Mode) */}
+          <TooltipProvider delayDuration={150}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  onClick={handleResetLayout}
+                  disabled={!isLayoutModified}
+                  aria-label={isLayoutModified ? t("resetLayout") : t("layoutDefault")}
+                  className={cn(
+                    "h-7 w-7 rounded-full flex items-center justify-center transition-all select-none",
+                    isLayoutModified
+                      ? "text-foreground bg-secondary/70 hover:bg-secondary border border-border/80 shadow-xs cursor-pointer active:scale-95 hover:border-border"
+                      : "text-muted-foreground/35 bg-transparent border border-transparent cursor-not-allowed"
+                  )}
+                  title={isLayoutModified ? t("resetLayoutDesc") : t("layoutDefaultDesc")}
+                >
+                  <RotateCcw className="h-3.5 w-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" align="center" className="text-xs font-sans">
+                {isLayoutModified ? t("resetLayoutDesc") : t("layoutDefaultDesc")}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
           {/* Permission Mode Selector */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -422,7 +468,8 @@ export function LearnWorkspace({
               <DropdownMenuItem
                 className="cursor-pointer flex items-center gap-2 text-xs py-2 px-2.5 text-muted-foreground hover:text-foreground"
                 onClick={() => {
-                  // Settings placeholder: intentionally does nothing
+                  setSettingsInitialTab("general");
+                  setIsSettingsOpen(true);
                 }}
               >
                 <Settings className="h-4 w-4" />
@@ -557,6 +604,10 @@ export function LearnWorkspace({
           permissionMode={learn?.permissionMode || "ask_before_changes"}
           sourcesCount={learn?.sourcesCount || 0}
           onAddSource={() => setIsAddSourceOpen(true)}
+          onOpenSettings={(tab) => {
+            setSettingsInitialTab(tab || "models");
+            setIsSettingsOpen(true);
+          }}
           onSelectPromptChip={(prompt) => {
             console.log("Selected prompt chip:", prompt);
           }}
@@ -597,6 +648,19 @@ export function LearnWorkspace({
         onOpenChange={setIsAddSourceOpen}
         onSelectSource={handleSelectSource}
       />
+
+      {/* Settings Modal / Overlay */}
+      {isSettingsOpen && (
+        <div className="fixed inset-0 z-50 bg-background">
+          <SettingsView
+            initialTab={settingsInitialTab}
+            onBackToWorkspace={() => setIsSettingsOpen(false)}
+            user={user}
+            onSignOut={onSignOut}
+            onSwitchAccount={onSwitchAccount}
+          />
+        </div>
+      )}
     </div>
   );
 }

@@ -21,6 +21,11 @@ import {
   Brain,
   MessageCirclePlus,
   Pencil,
+  Search,
+  Settings,
+  Cpu,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import {
   ScrollArea,
@@ -56,6 +61,7 @@ interface ChatPanelProps {
   onSelectPromptChip?: (prompt: string) => void;
   onSendMessage?: (message: string) => void;
   onAddSource?: () => void;
+  onOpenSettings?: (tab?: string) => void;
 }
 
 interface DisplayMessage {
@@ -115,6 +121,98 @@ function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function getModelProviderInfo(model: ModelConfig): { providerId: string; providerName: string } {
+  const p = (model.provider || "").toLowerCase().trim();
+  const rawName = (model as any).providerName;
+  if (rawName && typeof rawName === "string" && rawName.trim().length > 0) {
+    const cleanRaw = rawName.trim();
+    if (cleanRaw.toLowerCase().includes("const")) {
+      return { providerId: "const", providerName: "Const Router" };
+    }
+    return { providerId: p || cleanRaw.toLowerCase().replace(/\s+/g, "-"), providerName: cleanRaw };
+  }
+
+  if (p === "const" || p.startsWith("const") || p === "native" || p === "const-engine" || p === "const router") {
+    return { providerId: "const", providerName: "Const Router" };
+  }
+  if (p === "google" || p === "gemini") {
+    return { providerId: "google", providerName: "Google Gemini" };
+  }
+  if (p === "openai") {
+    return { providerId: "openai", providerName: "OpenAI" };
+  }
+  if (p === "anthropic") {
+    return { providerId: "anthropic", providerName: "Anthropic" };
+  }
+  if (p === "deepseek") {
+    return { providerId: "deepseek", providerName: "DeepSeek" };
+  }
+  if (p === "groq") {
+    return { providerId: "groq", providerName: "Groq" };
+  }
+  if (p === "openrouter") {
+    return { providerId: "openrouter", providerName: "OpenRouter" };
+  }
+  if (p === "ollama") {
+    return { providerId: "ollama", providerName: "Ollama" };
+  }
+
+  const id = model.id.toLowerCase();
+  if (id.startsWith("gemini-") || id.includes("gemini")) {
+    return { providerId: "const", providerName: "Const Router" };
+  }
+  if (id.startsWith("gpt-") || id.startsWith("o1") || id.startsWith("o3")) {
+    return { providerId: "openai", providerName: "OpenAI" };
+  }
+  if (id.startsWith("claude-")) {
+    return { providerId: "anthropic", providerName: "Anthropic" };
+  }
+  if (id.startsWith("deepseek-")) {
+    return { providerId: "deepseek", providerName: "DeepSeek" };
+  }
+  if (id.startsWith("combo/")) {
+    return { providerId: "const", providerName: "Const Router" };
+  }
+
+  if (p) {
+    const formatted = p.charAt(0).toUpperCase() + p.slice(1);
+    return { providerId: p, providerName: formatted };
+  }
+
+  return { providerId: "const", providerName: "Const Router" };
+}
+
+function formatThinkingLabel(level?: string): string {
+  if (!level) return "Medium";
+  const clean = level.toLowerCase().trim();
+  if (clean === "low") return "Low";
+  if (clean === "medium") return "Medium";
+  if (clean === "high") return "High";
+  if (clean === "xhigh" || clean === "extra_high" || clean === "extra-high") return "X-High";
+  if (clean === "max") return "Max";
+  return clean.charAt(0).toUpperCase() + clean.slice(1);
+}
+
+function getThinkingDescription(level: string, lang: string): string {
+  const isId = lang === "id";
+  switch (level.toLowerCase()) {
+    case "low":
+      return isId ? "Respons cepat, penalaran ringkas" : "Fastest response, light reasoning";
+    case "medium":
+      return isId ? "Penalaran dan kecepatan seimbang" : "Balanced reasoning and speed";
+    case "high":
+      return isId ? "Analisis mendalam untuk tugas kompleks" : "Deep reasoning for complex tasks";
+    case "xhigh":
+    case "extra_high":
+    case "extra-high":
+      return isId ? "Penalaran intensif ekstra" : "Extra intensive reasoning";
+    case "max":
+      return isId ? "Kedalaman penalaran maksimum" : "Maximum reasoning depth";
+    default:
+      return "";
+  }
+}
+
 export function ChatPanel({
   learnId,
   workspacePath,
@@ -122,13 +220,21 @@ export function ChatPanel({
   sourcesCount = 0,
   onSelectPromptChip,
   onAddSource,
+  onOpenSettings,
 }: ChatPanelProps) {
   const { t, language } = useI18n();
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [inputMessage, setInputMessage] = useState("");
   const [isStreaming, setIsStreaming] = useState(false);
-  const [selectedModelId, setSelectedModelId] = useState<string>("gemini-3.8-flash");
+  const [selectedModelId, setSelectedModelId] = useState<string>(() => {
+    return localStorage.getItem("const_learn_active_model") || "gemini-3.8-flash";
+  });
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
+  const [menuView, setMenuView] = useState<"main" | "models" | "thinking">("main");
+  const [searchModelQuery, setSearchModelQuery] = useState("");
+  const [thinkingLevel, setThinkingLevel] = useState<string>(() => {
+    return localStorage.getItem("const_learn_thinking_level") || "medium";
+  });
   const [availableModels, setAvailableModels] = useState<ModelConfig[]>(DEFAULT_MODELS);
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -295,6 +401,7 @@ export function ChatPanel({
 
       if (isOutsideDropdown) {
         setIsModelDropdownOpen(false);
+        setMenuView("main");
       }
       if (isOutsideSourcesDropdown) {
         setIsSourcesDropdownOpen(false);
@@ -320,7 +427,62 @@ export function ChatPanel({
   }, []);
 
   const models: ModelConfig[] = availableModels;
-  const currentModel = models.find((m) => m.id === selectedModelId) || models[0]!;
+  const currentModel = useMemo(() => {
+    return availableModels.find((m) => m.id === selectedModelId) || availableModels[0] || DEFAULT_MODELS[0]!;
+  }, [availableModels, selectedModelId]);
+
+  const currentThinkingLevels = useMemo(() => {
+    return currentModel?.thinkingLevels || (currentModel?.supportsThinking ? ["low", "medium", "high"] : []);
+  }, [currentModel]);
+
+  const groupedModels = useMemo(() => {
+    const map = new Map<string, { providerId: string; providerName: string; items: ModelConfig[] }>();
+    for (const m of availableModels) {
+      const { providerId, providerName } = getModelProviderInfo(m);
+      if (!map.has(providerId)) {
+        map.set(providerId, { providerId, providerName, items: [] });
+      }
+      map.get(providerId)!.items.push(m);
+    }
+    return Array.from(map.values());
+  }, [availableModels]);
+
+  const filteredGroupedModels = useMemo(() => {
+    const q = searchModelQuery.toLowerCase().trim();
+    if (!q) return groupedModels;
+
+    return groupedModels
+      .map((group) => {
+        const matchesProvider = group.providerName.toLowerCase().includes(q);
+        const matchingItems = group.items.filter(
+          (m) =>
+            matchesProvider ||
+            (m.displayName || "").toLowerCase().includes(q) ||
+            m.id.toLowerCase().includes(q)
+        );
+        return {
+          ...group,
+          items: matchingItems,
+        };
+      })
+      .filter((group) => group.items.length > 0);
+  }, [groupedModels, searchModelQuery]);
+
+  const handleSelectModel = (m: ModelConfig) => {
+    setSelectedModelId(m.id);
+    localStorage.setItem("const_learn_active_model", m.id);
+    (window as any).electron?.config?.save?.({ activeModel: m.id })?.catch?.(() => {});
+
+    if (m.id === "combo/coding" || m.displayName === "combo/coding") {
+      setThinkingLevel("high");
+      localStorage.setItem("const_learn_thinking_level", "high");
+    } else if (m.defaultThinkingLevel) {
+      setThinkingLevel(m.defaultThinkingLevel);
+      localStorage.setItem("const_learn_thinking_level", m.defaultThinkingLevel);
+    }
+    setIsModelDropdownOpen(false);
+    setMenuView("main");
+  };
 
   // Sources live query in this learn
   const sources =
@@ -1199,6 +1361,7 @@ export function ChatPanel({
           learnId: learnId,
           authToken: authToken || undefined,
           mode: permissionMode || "ask_before_changes",
+          thinkingLevel: currentModel.supportsThinking ? thinkingLevel : undefined,
         });
 
         const finalDuration = streamStartTimeRef.current
@@ -1339,6 +1502,7 @@ export function ChatPanel({
               ...formattedMessages,
             ],
             stream: true,
+            ...(currentModel.supportsThinking && thinkingLevel ? { thinking_level: thinkingLevel } : {}),
           }),
         });
 
@@ -1771,68 +1935,310 @@ export function ChatPanel({
     </div>
   );
 
-  const renderModelDropdown = () => (
-    <div className="relative" ref={dropdownRef}>
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          setIsModelDropdownOpen(!isModelDropdownOpen);
-        }}
-        className="flex items-center gap-1 px-2.5 py-1 rounded-full hover:bg-muted/70 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer select-none shrink-0"
-        aria-label={t("selectAiModel")}
-        title={t("selectAiModel")}
-      >
-        <span className="text-[12px] font-medium text-foreground/80">
-          {currentModel.displayName.split("(")[0]?.trim() || "Const"}
-        </span>
-        <ChevronDown
-          className={cn(
-            "h-3 w-3 text-muted-foreground/70 transition-transform duration-150 ml-0.5",
-            isModelDropdownOpen && "rotate-180"
-          )}
-        />
-      </button>
+  const renderModelDropdown = () => {
+    const isCurrentThinkingSupported = Boolean(currentModel?.supportsThinking);
+    const currentModelName = currentModel.displayName?.split("(")[0]?.trim() || currentModel.id || "Const";
+    const activeThinkingLabel = formatThinkingLabel(thinkingLevel || currentModel.defaultThinkingLevel || "medium");
 
-      {isModelDropdownOpen && (
-        <div
-          className="absolute bottom-full right-0 mb-2 w-64 rounded-2xl bg-card border border-border shadow-2xl p-1.5 z-50 animate-in fade-in zoom-in-95 duration-100 font-sans"
-          onClick={(e) => e.stopPropagation()}
+    // Display string on chat bar: "Gemini 3.8 Flash (High)" or "combo/fast" (no brain icon)
+    const triggerDisplayText = isCurrentThinkingSupported
+      ? `${currentModelName} (${activeThinkingLabel})`
+      : currentModelName;
+
+    return (
+      <div className="relative" ref={dropdownRef}>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            const next = !isModelDropdownOpen;
+            if (next) {
+              setSearchModelQuery("");
+              setMenuView("main");
+            }
+            setIsModelDropdownOpen(next);
+          }}
+          className="flex items-center gap-1 px-2.5 py-1 rounded-full hover:bg-muted/70 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer select-none shrink-0 max-w-[200px] sm:max-w-[280px]"
+          aria-label={t("selectAiModel")}
+          title={triggerDisplayText}
         >
-          <div className="px-2.5 py-1.5 text-[10px] uppercase font-semibold text-muted-foreground tracking-wider border-b border-border/40 mb-1">
-            {t("selectAiModel")}
-          </div>
-          <div className="max-h-56 overflow-y-auto space-y-0.5">
-            {models.map((m) => (
-              <button
-                key={m.id}
-                type="button"
-                onClick={() => {
-                  setSelectedModelId(m.id);
-                  setIsModelDropdownOpen(false);
-                }}
-                className={`w-full text-left px-2.5 py-2 rounded-xl text-xs flex items-center justify-between transition-colors cursor-pointer ${
-                  selectedModelId === m.id
-                    ? "bg-muted text-foreground font-medium"
-                    : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
-                }`}
-              >
-                <div>
-                  <div className="font-medium text-foreground">{m.displayName}</div>
-                  <div className="text-[10px] text-muted-foreground/70 font-mono">
-                    {m.id}
+          <span className="text-[12px] font-medium text-foreground/80 truncate">
+            {triggerDisplayText}
+          </span>
+          <ChevronDown
+            className={cn(
+              "h-3 w-3 text-muted-foreground/70 transition-transform duration-150 ml-0.5 shrink-0",
+              isModelDropdownOpen && "rotate-180"
+            )}
+          />
+        </button>
+
+        {isModelDropdownOpen && (
+          <div
+            className="absolute bottom-full right-0 mb-2 w-[275px] max-w-[calc(100vw-32px)] rounded-2xl bg-card border border-border shadow-2xl p-1.5 z-50 flex flex-col text-left select-none animate-in fade-in zoom-in-95 duration-100 font-sans"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* View 1: Main Menu (Choose Model & Thinking Effort) */}
+            {menuView === "main" && (
+              <div className="flex flex-col gap-0.5">
+                {/* 1. Choose Model Menu Item */}
+                <button
+                  type="button"
+                  onClick={() => setMenuView("models")}
+                  className="w-full px-3 py-2.5 flex items-center justify-between rounded-xl hover:bg-muted/60 text-left transition-colors cursor-pointer group"
+                >
+                  <div className="flex flex-col min-w-0 pr-2">
+                    <span className="text-[10px] text-muted-foreground uppercase font-semibold tracking-wider">
+                      {t("chooseModel")}
+                    </span>
+                    <span className="text-[13px] font-medium text-foreground truncate mt-0.5">
+                      {currentModelName}
+                    </span>
                   </div>
+                  <ChevronRight className="w-4 h-4 text-muted-foreground/60 group-hover:text-foreground transition-colors shrink-0" />
+                </button>
+
+                {/* 2. Thinking Effort Menu Item */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isCurrentThinkingSupported) {
+                      setMenuView("thinking");
+                    }
+                  }}
+                  disabled={!isCurrentThinkingSupported}
+                  className={cn(
+                    "w-full px-3 py-2.5 flex items-center justify-between rounded-xl text-left transition-colors",
+                    isCurrentThinkingSupported
+                      ? "hover:bg-muted/60 cursor-pointer group"
+                      : "opacity-45 cursor-not-allowed"
+                  )}
+                >
+                  <div className="flex flex-col min-w-0 pr-2">
+                    <span className="text-[10px] text-muted-foreground uppercase font-semibold tracking-wider">
+                      {t("thinkingEffort")}
+                    </span>
+                    <span className="text-[13px] font-medium text-foreground truncate mt-0.5">
+                      {isCurrentThinkingSupported ? activeThinkingLabel : t("notSupported")}
+                    </span>
+                  </div>
+                  {isCurrentThinkingSupported && (
+                    <ChevronRight className="w-4 h-4 text-muted-foreground/60 group-hover:text-foreground transition-colors shrink-0" />
+                  )}
+                </button>
+
+                {/* Bottom Footer: Manage models */}
+                <div className="flex-none pt-1 border-t border-border/40 mt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsModelDropdownOpen(false);
+                      setMenuView("main");
+                      onOpenSettings?.("models");
+                    }}
+                    className="w-full px-2.5 py-1.5 flex items-center gap-2 text-[12px] text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-lg transition-colors cursor-pointer"
+                  >
+                    <Settings className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                    <span>{t("manageModels")}</span>
+                  </button>
                 </div>
-                {selectedModelId === m.id && (
-                  <span className="h-1.5 w-1.5 rounded-full bg-accent shrink-0" />
+              </div>
+            )}
+
+            {/* View 2: Choose Model Submenu */}
+            {menuView === "models" && (
+              <div className="flex flex-col">
+                {/* Header with Back button and Title */}
+                <div className="flex items-center gap-1.5 px-1 py-1 mb-1.5 border-b border-border/40">
+                  <button
+                    type="button"
+                    onClick={() => setMenuView("main")}
+                    className="p-1 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                    title={t("back")}
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <span className="text-[12px] font-semibold text-foreground">
+                    {t("chooseModel")}
+                  </span>
+                </div>
+
+                {availableModels.length > 0 ? (
+                  <>
+                    {/* Search Input */}
+                    <div className="flex-none flex items-center gap-2 px-2 py-1 mb-1">
+                      <Search className="w-3.5 h-3.5 text-muted-foreground/70 shrink-0" />
+                      <input
+                        type="text"
+                        value={searchModelQuery}
+                        onChange={(e) => setSearchModelQuery(e.target.value)}
+                        placeholder={t("searchModels")}
+                        className="w-full bg-transparent text-[12px] text-foreground placeholder:text-muted-foreground/60 outline-none font-sans"
+                        autoFocus
+                      />
+                      {searchModelQuery && (
+                        <button
+                          type="button"
+                          onClick={() => setSearchModelQuery("")}
+                          className="p-0.5 hover:bg-muted rounded text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Categorized Model List with ScrollArea */}
+                    {filteredGroupedModels.length > 0 ? (
+                      <ScrollArea className="max-h-[250px] w-full flex-1 min-h-0" viewportClassName="pr-1">
+                        <div className="space-y-2 py-0.5 pr-0.5">
+                          {filteredGroupedModels.map((group) => (
+                            <div key={group.providerId} className="flex flex-col">
+                              {/* Provider Header */}
+                              <div className="px-2 pt-1 pb-0.5 text-[11px] font-medium text-[#1a73e8] dark:text-[#5ea0e8] select-none tracking-wide">
+                                {group.providerName}
+                              </div>
+
+                              {/* Model Items */}
+                              <div className="flex flex-col space-y-0.5">
+                                {group.items.map((m) => {
+                                  const isSelected = selectedModelId === m.id;
+                                  return (
+                                    <button
+                                      key={m.id}
+                                      type="button"
+                                      onClick={() => handleSelectModel(m)}
+                                      className={cn(
+                                        "w-full px-2.5 py-1.5 flex items-center justify-between text-[12px] rounded-lg transition-colors cursor-pointer text-left",
+                                        isSelected
+                                          ? "bg-muted text-foreground font-medium"
+                                          : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                                      )}
+                                    >
+                                      <span className="truncate pr-2">{m.displayName}</span>
+                                      {isSelected && (
+                                        <Check className="w-3.5 h-3.5 text-foreground shrink-0 ml-auto" />
+                                      )}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    ) : (
+                      <div className="py-6 px-3 text-center text-xs text-muted-foreground">
+                        {t("noModelsFound")}
+                      </div>
+                    )}
+
+                    {/* Bottom Footer: Manage models */}
+                    <div className="flex-none pt-1 border-t border-border/40 mt-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsModelDropdownOpen(false);
+                          setMenuView("main");
+                          onOpenSettings?.("models");
+                        }}
+                        className="w-full px-2.5 py-1.5 flex items-center gap-2 text-[12px] text-muted-foreground hover:text-foreground hover:bg-muted/50 rounded-lg transition-colors cursor-pointer"
+                      >
+                        <Settings className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                        <span>{t("manageModels")}</span>
+                      </button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="p-3.5 flex flex-col items-center text-center">
+                    <div className="w-9 h-9 rounded-xl bg-muted border border-border flex items-center justify-center text-foreground mb-2.5 shadow-2xs">
+                      <Cpu className="w-4 h-4 text-muted-foreground stroke-[1.75]" />
+                    </div>
+                    <div className="text-[13px] font-medium text-foreground">
+                      {t("noModelsConfigured")}
+                    </div>
+                    <p className="text-[11px] text-muted-foreground leading-relaxed mt-1 mb-3.5">
+                      {t("connectModelProviders")}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsModelDropdownOpen(false);
+                        setMenuView("main");
+                        onOpenSettings?.("models");
+                      }}
+                      className="w-full py-1.5 px-3 rounded-lg bg-muted hover:bg-muted/80 border border-border text-[12px] font-medium text-foreground transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>{t("manageModels")}</span>
+                    </button>
+                  </div>
                 )}
-              </button>
-            ))}
+              </div>
+            )}
+
+            {/* View 3: Thinking Effort Submenu */}
+            {menuView === "thinking" && (
+              <div className="flex flex-col">
+                {/* Header with Back button and Title */}
+                <div className="flex items-center gap-1.5 px-1 py-1 mb-1.5 border-b border-border/40">
+                  <button
+                    type="button"
+                    onClick={() => setMenuView("main")}
+                    className="p-1 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                    title={t("back")}
+                  >
+                    <ChevronLeft className="w-4 h-4" />
+                  </button>
+                  <span className="text-[12px] font-semibold text-foreground">
+                    {t("thinkingEffort")}
+                  </span>
+                </div>
+
+                {/* Thinking Levels List */}
+                <div className="flex flex-col space-y-1 py-0.5">
+                  {currentThinkingLevels.map((lvl) => {
+                    const isSelected =
+                      (thinkingLevel || currentModel.defaultThinkingLevel || "medium").toLowerCase() ===
+                      lvl.toLowerCase();
+                    return (
+                      <button
+                        key={lvl}
+                        type="button"
+                        onClick={() => {
+                          setThinkingLevel(lvl);
+                          localStorage.setItem("const_learn_thinking_level", lvl);
+                          setIsModelDropdownOpen(false);
+                          setMenuView("main");
+                        }}
+                        className={cn(
+                          "w-full px-2.5 py-2 flex items-center justify-between text-[12px] rounded-xl transition-colors text-left cursor-pointer",
+                          isSelected
+                            ? "bg-muted text-foreground font-medium"
+                            : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+                        )}
+                      >
+                        <div className="flex flex-col min-w-0 pr-2">
+                          <span className="font-medium text-foreground">
+                            {formatThinkingLabel(lvl)}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground/70 leading-tight mt-0.5">
+                            {getThinkingDescription(lvl, language)}
+                          </span>
+                        </div>
+                        {isSelected && (
+                          <Check className="w-3.5 h-3.5 text-foreground shrink-0 ml-auto" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </div>
-        </div>
-      )}
-    </div>
-  );
+        )}
+      </div>
+    );
+  };
 
   const renderSendButton = () => {
     if (isStreaming) {
