@@ -21,8 +21,10 @@ export function FileDiffTab({ tab, onRollbackFile }: FileDiffTabProps) {
 
   const rawPath = tab.filePath || mutation?.filePath || mutation?.targetFile || tab.title || "";
   const normalizedPath = rawPath.replace(/\\/g, "/");
-  const pathParts = normalizedPath.split("/").filter(Boolean);
-  const fileName = pathParts.pop() || normalizedPath;
+  const allParts = normalizedPath.split("/").filter(Boolean);
+  const fileName = allParts.pop() || normalizedPath;
+  const hasLeadingEllipsis = allParts.length > 2;
+  const pathParts = hasLeadingEllipsis ? allParts.slice(-2) : allParts;
 
   const stats = mutation
     ? getMutationDiffStats(mutation)
@@ -61,6 +63,17 @@ export function FileDiffTab({ tab, onRollbackFile }: FileDiffTabProps) {
           }}
           className="flex items-center gap-1.5 min-w-0 flex-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden font-mono text-[11.5px] pr-3 select-none"
         >
+          {hasLeadingEllipsis && (
+            <>
+              <span
+                className="text-neutral-500 hover:text-neutral-300 transition-colors shrink-0"
+                title={rawPath}
+              >
+                ...
+              </span>
+              <ChevronRight className="w-3 h-3 text-neutral-600 shrink-0" />
+            </>
+          )}
           {pathParts.map((part, idx) => (
             <React.Fragment key={idx}>
               <span className="text-neutral-500 hover:text-neutral-300 transition-colors shrink-0">
@@ -69,7 +82,7 @@ export function FileDiffTab({ tab, onRollbackFile }: FileDiffTabProps) {
               <ChevronRight className="w-3 h-3 text-neutral-600 shrink-0" />
             </React.Fragment>
           ))}
-          <div className="flex items-center gap-1.5 shrink-0 text-white font-medium">
+          <div className="flex items-center gap-1.5 shrink-0 text-white font-medium" title={rawPath}>
             <FileIcon filename={fileName} />
             <span className="truncate">{fileName}</span>
             <span className="text-[10px] font-sans px-1.5 py-0.2 rounded bg-blue-500/15 text-blue-400 border border-blue-500/25 ml-1">

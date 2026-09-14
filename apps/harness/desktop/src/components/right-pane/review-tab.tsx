@@ -121,7 +121,10 @@ export function ReviewTab({
           const normalized = rawPath.replace(/\\/g, "/");
           const parts = normalized.split("/").filter(Boolean);
           const fileName = parts.pop() || normalized;
-          const dirPath = parts.join("/");
+          const dirPath =
+            parts.length > 2
+              ? `.../${parts.slice(-2).join("/")}`
+              : parts.join("/");
 
           return (
             <div
@@ -143,11 +146,11 @@ export function ReviewTab({
                     }`}
                   />
                   <FileIcon filename={fileName} />
-                  <span className="font-medium text-neutral-200 group-hover:text-white truncate">
+                  <span className="font-medium text-neutral-200 group-hover:text-white truncate" title={rawPath}>
                     {fileName}
                   </span>
                   {dirPath && (
-                    <span className="font-mono text-[11px] text-neutral-500 truncate max-w-[200px]">
+                    <span className="font-mono text-[11px] text-neutral-500 truncate max-w-[200px]" title={rawPath}>
                       {dirPath}
                     </span>
                   )}

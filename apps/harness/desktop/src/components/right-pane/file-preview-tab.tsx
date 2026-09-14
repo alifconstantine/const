@@ -16,8 +16,10 @@ export function FilePreviewTab({ tab }: FilePreviewTabProps) {
 
   const rawPath = tab.filePath || tab.title || "";
   const normalizedPath = rawPath.replace(/\\/g, "/");
-  const pathParts = normalizedPath.split("/").filter(Boolean);
-  const fileName = pathParts.pop() || normalizedPath;
+  const allParts = normalizedPath.split("/").filter(Boolean);
+  const fileName = allParts.pop() || normalizedPath;
+  const hasLeadingEllipsis = allParts.length > 2;
+  const pathParts = hasLeadingEllipsis ? allParts.slice(-2) : allParts;
   const isMarkdown = fileName.toLowerCase().endsWith(".md") || fileName.toLowerCase().endsWith(".markdown");
 
   const [mode, setMode] = useState<"formatted" | "raw">(
@@ -65,6 +67,17 @@ export function FilePreviewTab({ tab }: FilePreviewTabProps) {
           }}
           className="flex items-center gap-1.5 min-w-0 flex-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden font-mono text-[11.5px] pr-3 select-none"
         >
+          {hasLeadingEllipsis && (
+            <>
+              <span
+                className="text-neutral-500 hover:text-neutral-300 transition-colors shrink-0"
+                title={rawPath}
+              >
+                ...
+              </span>
+              <ChevronRight className="w-3 h-3 text-neutral-600 shrink-0" />
+            </>
+          )}
           {pathParts.map((part, idx) => (
             <React.Fragment key={idx}>
               <span className="text-neutral-500 hover:text-neutral-300 transition-colors shrink-0">
@@ -73,7 +86,7 @@ export function FilePreviewTab({ tab }: FilePreviewTabProps) {
               <ChevronRight className="w-3 h-3 text-neutral-600 shrink-0" />
             </React.Fragment>
           ))}
-          <div className="flex items-center gap-1.5 shrink-0 text-white font-medium">
+          <div className="flex items-center gap-1.5 shrink-0 text-white font-medium" title={rawPath}>
             <FileIcon filename={fileName} />
             <span className="truncate">{fileName}</span>
           </div>
