@@ -21,7 +21,6 @@ interface RightPaneProps {
   onNewTab: () => void;
   onOpenTabType: (type: RightPaneTabType) => void;
   onReorderTabs?: (fromIndex: number, toIndex: number) => void;
-  onToggleSidebar?: () => void;
   workspacePath?: string;
   mutations?: FileMutationRecord[];
   onRollbackFile?: (record: FileMutationRecord) => Promise<any> | void;
@@ -41,7 +40,6 @@ export function RightPane({
   onNewTab,
   onOpenTabType,
   onReorderTabs,
-  onToggleSidebar,
   workspacePath,
   mutations,
   onRollbackFile,
@@ -106,7 +104,6 @@ export function RightPane({
         onCloseTab={onCloseTab}
         onNewTab={onNewTab}
         onReorderTabs={onReorderTabs}
-        onToggleSidebar={onToggleSidebar}
       />
 
       {/* Main Tab Body */}

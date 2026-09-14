@@ -10,7 +10,6 @@ import {
   Search,
   Activity,
   Layers,
-  PanelRightClose,
 } from "lucide-react";
 import { FileIcon } from "../workbench/file-icon";
 import type { RightPaneTab, RightPaneTabType } from "./types";
@@ -23,7 +22,6 @@ interface TabHeaderProps {
   onCloseTab: (tabId: string, e: React.MouseEvent) => void;
   onNewTab: () => void;
   onReorderTabs?: (fromIndex: number, toIndex: number) => void;
-  onToggleSidebar?: () => void;
 }
 
 function getTabIcon(type: RightPaneTabType) {
@@ -54,7 +52,6 @@ export function TabHeader({
   onCloseTab,
   onNewTab,
   onReorderTabs,
-  onToggleSidebar,
 }: TabHeaderProps) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -368,21 +365,6 @@ export function TabHeader({
           <Plus className="w-3.5 h-3.5" />
         </button>
       </div>
-
-      {/* 4. Collapse / Close right sidebar button */}
-      {onToggleSidebar && (
-        <div className="flex items-center shrink-0 pl-1 border-l border-[#2e2e2e]/50">
-          <button
-            type="button"
-            onClick={onToggleSidebar}
-            className="w-6 h-6 rounded flex items-center justify-center text-[#8e8e8e] hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-            title="Collapse sidebar"
-            aria-label="Collapse sidebar"
-          >
-            <PanelRightClose className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      )}
     </div>
   );
 }

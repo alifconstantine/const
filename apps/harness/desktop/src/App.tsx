@@ -2481,7 +2481,6 @@ function AuthenticatedContent({
                   onNewTab={handleNewTab}
                   onOpenTabType={handleOpenTabType}
                   onReorderTabs={handleReorderTabs}
-                  onToggleSidebar={handleToggleRightSidebar}
                   workspacePath={currentProject === "Outside Project" ? undefined : currentProject}
                   mutations={
                     sidebarReviewMutations && sidebarReviewMutations.length > 0
