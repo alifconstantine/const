@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import {
-  Sparkles,
   ArrowRight,
   ArrowUp,
   Square,
@@ -46,6 +45,12 @@ import type { FileMutationRecord } from "@const/agent";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db, localDb } from "../../lib/db";
 import { useI18n } from "../../lib/i18n";
+import {
+  calculateConversationMetrics,
+  calculateContextUsage,
+  formatTokenDisplay,
+  formatDurationDisplay,
+} from "../../lib/telemetry";
 import { ChatHistoryPanel } from "./chat-history-panel";
 import { ExecutionTrace, type DisplayToolCall, type TraceStep } from "./execution-trace";
 import { MarkdownContent } from "./markdown-content";
@@ -262,6 +267,8 @@ export function ChatPanel({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const modelDropdownRef = useRef<HTMLDivElement>(null);
+  const [isContextOpen, setIsContextOpen] = useState(false);
+  const contextMenuRef = useRef<HTMLDivElement>(null);
   const activeAssistantIdRef = useRef<string | null>(null);
 
   const handleRespondApproval = async (
@@ -402,6 +409,8 @@ export function ChatPanel({
         !dropdownRef.current || !dropdownRef.current.contains(target);
       const isOutsideSourcesDropdown =
         !sourcesDropdownRef.current || !sourcesDropdownRef.current.contains(target);
+      const isOutsideContextDropdown =
+        !contextMenuRef.current || !contextMenuRef.current.contains(target);
 
       if (isOutsideDropdown) {
         setIsModelDropdownOpen(false);
@@ -409,6 +418,9 @@ export function ChatPanel({
       }
       if (isOutsideSourcesDropdown) {
         setIsSourcesDropdownOpen(false);
+      }
+      if (isOutsideContextDropdown) {
+        setIsContextOpen(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -502,6 +514,21 @@ export function ChatPanel({
   const carriedSourcesCount = sources.length > 0 ? carriedSources.length : sourcesCount;
   const [isSourcesDropdownOpen, setIsSourcesDropdownOpen] = useState(false);
   const sourcesDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Dynamic telemetry metrics for active conversation (matching apps/harness/desktop)
+  const conversationMetrics = useMemo(() => {
+    return calculateConversationMetrics(messages);
+  }, [messages]);
+
+  // Context window usage estimation for learning sources and discussion history
+  const contextUsage = useMemo(() => {
+    return calculateContextUsage({
+      sources,
+      messages,
+      draftInput: inputMessage,
+      totalTokens: 1048576,
+    });
+  }, [sources, messages, inputMessage]);
 
   // Multi-session chat support: query sessions from Dexie
   const rawSessions = useLiveQuery(
@@ -1946,6 +1973,174 @@ export function ChatPanel({
     </div>
   );
 
+  const renderContextIndicator = () => {
+    const rawPercentUsed = contextUsage.rawPercentUsed;
+    const percentUsed = contextUsage.percentUsed;
+    const usedTokens = contextUsage.usedTokens;
+    const totalTokens = contextUsage.totalTokens;
+    const safePercent = contextUsage.safePercent;
+
+    return (
+      <div className="relative" ref={contextMenuRef}>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsModelDropdownOpen(false);
+            setIsSourcesDropdownOpen(false);
+            setIsContextOpen(!isContextOpen);
+          }}
+          className={cn(
+            "w-7 h-7 flex items-center justify-center rounded-lg transition-colors cursor-pointer hover:bg-muted/70",
+            rawPercentUsed >= 90
+              ? "text-red-500 hover:text-red-400"
+              : rawPercentUsed >= 75
+              ? "text-[#e79737] hover:text-[#ff9838]"
+              : "text-muted-foreground hover:text-foreground"
+          )}
+          title={`Context window: ${rawPercentUsed === 0 ? "0%" : percentUsed} (~${formatTokenDisplay(usedTokens)} / ${formatTokenDisplay(totalTokens)})`}
+          aria-label="Context window usage"
+        >
+          <svg className="w-3.5 h-3.5 transform -rotate-90" viewBox="0 0 24 24">
+            <circle
+              cx="12"
+              cy="12"
+              r="9"
+              fill="none"
+              stroke="currentColor"
+              className="text-border/70 dark:text-[#383838]"
+              strokeWidth="2.5"
+            />
+            <circle
+              cx="12"
+              cy="12"
+              r="9"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeDasharray={56.55}
+              strokeDashoffset={56.55 - (56.55 * safePercent) / 100}
+              strokeLinecap="round"
+            />
+          </svg>
+        </button>
+
+        {/* Context Window Popover */}
+        {isContextOpen && (
+          <div
+            className="absolute bottom-full mb-2 right-0 w-72 sm:w-80 max-w-[calc(100vw-32px)] bg-card dark:bg-[#1e1e1e] border border-border/70 dark:border-[#383838] rounded-2xl shadow-2xl p-4 z-50 flex flex-col gap-3 text-left select-none animate-in fade-in zoom-in-95 duration-100 font-sans"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header: % of context used and tokens */}
+            <div className="flex items-center justify-between text-[13px]">
+              <span className="text-foreground dark:text-white font-medium">
+                {rawPercentUsed === 0 ? "0%" : rawPercentUsed < 0.1 ? "<0.1%" : `${percentUsed}`} {t("contextUsed") || "of context used"}
+              </span>
+              <span className="font-mono text-[12px] text-muted-foreground dark:text-[#a0a0a0]">
+                ~{formatTokenDisplay(usedTokens)} / {formatTokenDisplay(totalTokens)}
+              </span>
+            </div>
+
+            {/* Multi-segment Horizontal Progress Bar */}
+            <div className="w-full h-2 bg-muted/60 dark:bg-[#2d2d2d] rounded-full overflow-hidden flex gap-0.5">
+              {contextUsage.sourcesTokens > 0 && (
+                <div
+                  className="bg-[#10b981] h-full transition-all"
+                  style={{
+                    width: `${Math.max(0.5, (contextUsage.sourcesTokens / totalTokens) * 100)}%`,
+                  }}
+                  title={`Sources: ~${formatTokenDisplay(contextUsage.sourcesTokens)}`}
+                />
+              )}
+              {contextUsage.systemPromptTokens > 0 && (
+                <div
+                  className="bg-[#71717a] h-full transition-all"
+                  style={{
+                    width: `${Math.max(0.5, (contextUsage.systemPromptTokens / totalTokens) * 100)}%`,
+                  }}
+                  title={`Socratic Tutor: ~${formatTokenDisplay(contextUsage.systemPromptTokens)}`}
+                />
+              )}
+              {contextUsage.messagesTokens > 0 && (
+                <div
+                  className="bg-[#3b82f6] h-full transition-all"
+                  style={{
+                    width: `${Math.max(0.5, (contextUsage.messagesTokens / totalTokens) * 100)}%`,
+                  }}
+                  title={`Messages: ~${formatTokenDisplay(contextUsage.messagesTokens)}`}
+                />
+              )}
+              {contextUsage.draftInputTokens > 0 && (
+                <div
+                  className="bg-[#a855f7] h-full transition-all"
+                  style={{
+                    width: `${Math.max(0.5, (contextUsage.draftInputTokens / totalTokens) * 100)}%`,
+                  }}
+                  title={`Current Input: ~${formatTokenDisplay(contextUsage.draftInputTokens)}`}
+                />
+              )}
+            </div>
+
+            {/* Legend / Breakdown List */}
+            <div className="flex flex-col gap-2 pt-1">
+              <div className="flex items-center justify-between text-[12px]">
+                <div className="flex items-center gap-2">
+                  <div className="w-2.5 h-2.5 rounded-xs bg-[#10b981] shrink-0" />
+                  <span className="text-foreground/90 dark:text-[#d4d4d4]">{t("learningSources") || "Learning Sources"}</span>
+                </div>
+                <span className="font-mono text-foreground/90 dark:text-[#d4d4d4]">
+                  ~{formatTokenDisplay(contextUsage.sourcesTokens)}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between text-[12px]">
+                <div className="flex items-center gap-2">
+                  <div className="w-2.5 h-2.5 rounded-xs bg-[#71717a] shrink-0" />
+                  <span className="text-foreground/90 dark:text-[#d4d4d4]">{t("tutorInstructions") || "Socratic Tutor"}</span>
+                </div>
+                <span className="font-mono text-foreground/90 dark:text-[#d4d4d4]">
+                  ~{formatTokenDisplay(contextUsage.systemPromptTokens)}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between text-[12px]">
+                <div className="flex items-center gap-2">
+                  <div className="w-2.5 h-2.5 rounded-xs bg-[#3b82f6] shrink-0" />
+                  <span className="text-foreground/90 dark:text-[#d4d4d4]">{t("chatHistory") || "Discussion History"}</span>
+                </div>
+                <span className="font-mono text-foreground/90 dark:text-[#d4d4d4]">
+                  ~{formatTokenDisplay(contextUsage.messagesTokens)}
+                </span>
+              </div>
+
+              {contextUsage.draftInputTokens > 0 && (
+                <div className="flex items-center justify-between text-[12px]">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 rounded-xs bg-[#a855f7] shrink-0" />
+                    <span className="text-[#a855f7] font-medium">{t("currentInput") || "Current Input"}</span>
+                  </div>
+                  <span className="font-mono text-[#a855f7]">
+                    ~{formatTokenDisplay(contextUsage.draftInputTokens)}
+                  </span>
+                </div>
+              )}
+
+              <div className="flex items-center justify-between text-[12px] pt-1 border-t border-border/50 dark:border-[#383838]/60">
+                <div className="flex items-center gap-2">
+                  <div className="w-2.5 h-2.5 rounded-xs bg-muted/60 dark:bg-[#383838] shrink-0" />
+                  <span className="text-muted-foreground">{t("availableContext") || "Available Context"}</span>
+                </div>
+                <span className="font-mono text-muted-foreground">
+                  ~{formatTokenDisplay(contextUsage.availableTokens)}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const renderModelDropdown = () => {
     const isCurrentThinkingSupported = Boolean(currentModel?.supportsThinking);
     const currentModelName = currentModel.displayName?.split("(")[0]?.trim() || currentModel.id || "Const";
@@ -2863,20 +3058,21 @@ export function ChatPanel({
               />
             </ScrollArea>
 
-            {/* Bottom Row: Plus on left, Model Dropdown + Send button on right */}
+            {/* Bottom Row: Plus on left, Context + Model Dropdown + Send button on right */}
             <div className="flex items-center justify-between pt-1">
               <div className="flex items-center gap-2 shrink-0">
                 {renderPlusButton()}
               </div>
 
               <div className="flex items-center gap-2 shrink-0">
+                {renderContextIndicator()}
                 {renderModelDropdown()}
                 {renderSendButton()}
               </div>
             </div>
           </form>
         ) : (
-          /* Single-line Mode (Image 2): Compact pill shape with plus on left, input in center, model + send on right */
+          /* Single-line Mode (Image 2): Compact pill shape with plus on left, input in center, context + model + send on right */
           <form
             key="chat-input-single"
             onSubmit={(e) => {
@@ -2922,10 +3118,39 @@ export function ChatPanel({
             />
 
             <div className="flex items-center gap-2 shrink-0">
+              {renderContextIndicator()}
               {renderModelDropdown()}
               {renderSendButton()}
             </div>
           </form>
+        )}
+
+        {/* Active Conversation Footer Telemetry Bar (Matching apps/harness/desktop) */}
+        {conversationMetrics && (
+          <div
+            className="w-full flex flex-wrap items-center justify-center gap-x-2 gap-y-0.5 text-[11px] font-mono text-[#a9a9a9] dark:text-[#888888] pt-2 pb-0.5 select-none overflow-hidden"
+            title="Session telemetry metrics"
+          >
+            <span title={`${conversationMetrics.turns} conversation turns, ${conversationMetrics.steps} tool execution steps`}>
+              {conversationMetrics.turns} turns · {conversationMetrics.steps} steps
+            </span>
+            <span className="text-[#d5d5d9] dark:text-[#444444]">|</span>
+            <span title={`LLM duration: ${formatDurationDisplay(conversationMetrics.llmDurationMs)} · Tools duration: ${formatDurationDisplay(conversationMetrics.toolDurationMs)}`}>
+              LLM {formatDurationDisplay(conversationMetrics.llmDurationMs)} · Tools {formatDurationDisplay(conversationMetrics.toolDurationMs)}
+            </span>
+            <span className="text-[#d5d5d9] dark:text-[#444444]">|</span>
+            <span title={`Average TTFT: ${conversationMetrics.ttftSeconds.toFixed(1)}s · Generation speed: ${conversationMetrics.tokPerSec} tok/s`}>
+              {conversationMetrics.tokPerSec} tok/s
+            </span>
+            <span className="text-[#d5d5d9] dark:text-[#444444]">|</span>
+            <span title={`Prompt cache hit rate: ${conversationMetrics.cacheHitRate}%`}>
+              {conversationMetrics.cacheHitRate}% cache
+            </span>
+            <span className="text-[#d5d5d9] dark:text-[#444444]">|</span>
+            <span title={`Input: ${conversationMetrics.inputTokens.toLocaleString()} tokens · Output: ${conversationMetrics.outputTokens.toLocaleString()} tokens`}>
+              ↑{formatTokenDisplay(conversationMetrics.inputTokens)} · ↓{formatTokenDisplay(conversationMetrics.outputTokens)} tok
+            </span>
+          </div>
         )}
       </div>
 

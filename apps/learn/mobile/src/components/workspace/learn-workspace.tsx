@@ -14,6 +14,12 @@ import { AddSourceDialog } from "./add-source-dialog";
 import { HistoryPanel } from "./history-panel";
 import { ThinkingProcess } from "./working-process";
 import { ImageLightbox } from "./image-lightbox";
+import {
+  calculateConversationMetrics,
+  calculateContextUsage,
+  formatTokenDisplay,
+  formatDurationDisplay,
+} from "../../lib/telemetry";
 import { ScrollArea, cn, toast } from "@const/ui";
 import { useI18n } from "../../lib/i18n";
 
@@ -57,7 +63,7 @@ import {
   PenTool,
   Check,
   RotateCcw,
-  Sparkles,
+  X,
   Brain,
   Download,
   Package,
@@ -239,7 +245,35 @@ export function MobileLearnWorkspace({
     DEFAULT_MOBILE_MODELS[0]!.id
   );
   const [isModelDropdownOpen, setIsModelDropdownOpen] = useState(false);
+  const [isContextDropdownOpen, setIsContextDropdownOpen] = useState(false);
+  const [searchModelQuery, setSearchModelQuery] = useState("");
   const [isAddSourceOpen, setIsAddSourceOpen] = useState(initialSourceModalOpen);
+
+  // Dynamic telemetry metrics for active conversation
+  const conversationMetrics = useMemo(() => {
+    return calculateConversationMetrics(messages);
+  }, [messages]);
+
+  // Context window usage estimation for learning sources and discussion history
+  const contextUsage = useMemo(() => {
+    return calculateContextUsage({
+      sourcesCount: learn?.sourcesCount || 0,
+      messages,
+      draftInput: inputMessage,
+      totalTokens: 1048576,
+    });
+  }, [learn?.sourcesCount, messages, inputMessage]);
+
+  const filteredModels = useMemo(() => {
+    const q = searchModelQuery.toLowerCase().trim();
+    if (!q) return availableModels;
+    return availableModels.filter(
+      (m) =>
+        m.name.toLowerCase().includes(q) ||
+        m.id.toLowerCase().includes(q) ||
+        (m.description || "").toLowerCase().includes(q)
+    );
+  }, [availableModels, searchModelQuery]);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [webScope, setWebScope] = useState("Web");
@@ -875,47 +909,260 @@ export function MobileLearnWorkspace({
       {/* Main Content Area Based on Active Tab */}
       {activeTab === "chat" ? (
         <div className="flex-1 flex flex-col min-h-0 overflow-hidden pb-16 max-w-lg mx-auto w-full relative">
-          {/* Top Model Selector Pill */}
+          {/* Top Model Selector (Left) & Context Dropdown (Right) */}
           <div className="flex items-center justify-between px-4 py-2 select-none shrink-0">
+            {/* Left: Model Selector Trigger */}
             <div className="relative">
               <button
                 type="button"
-                onClick={() => setIsModelDropdownOpen(!isModelDropdownOpen)}
-                className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-[#2b2b2b] hover:bg-[#383838] border border-[#383838] text-xs font-medium text-[#d4d4d4] transition-colors duration-150 cursor-pointer"
+                onClick={() => {
+                  const next = !isModelDropdownOpen;
+                  if (next) {
+                    setSearchModelQuery("");
+                    setIsContextDropdownOpen(false);
+                  }
+                  setIsModelDropdownOpen(next);
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#2b2b2b] hover:bg-[#383838] border border-[#383838] text-xs font-medium text-[#d4d4d4] hover:text-white transition-colors duration-150 cursor-pointer"
+                title={currentModel.name}
               >
-                <Sparkles className="h-3 w-3 text-[#0066ff]" />
-                <span>{currentModel.name}</span>
+                <span className="font-sans text-xs">{currentModel.name}</span>
                 <ChevronDown className="h-3 w-3 text-[#969696]" />
               </button>
 
               {isModelDropdownOpen && (
-                <div className="absolute left-0 mt-1.5 w-64 rounded-xl bg-[#222222] border border-[#383838] p-1.5 z-50 animate-in fade-in duration-100">
-                  {availableModels.map((m) => (
-                    <button
-                      key={m.id}
-                      type="button"
-                      onClick={() => {
-                        setSelectedModelId(m.id);
-                        setIsModelDropdownOpen(false);
-                      }}
-                      className={`w-full text-left px-3 py-2 rounded-lg text-xs flex flex-col cursor-pointer transition-colors ${
-                        selectedModelId === m.id
-                          ? "bg-[#2b2b2b] text-[#ffffff] font-medium"
-                          : "text-[#969696] hover:text-[#d4d4d4] hover:bg-[#2b2b2b]/50"
-                      }`}
-                    >
-                      <div className="flex items-center justify-between w-full">
-                        <span className="font-sans">{m.name}</span>
-                        {selectedModelId === m.id && (
-                          <span className="h-1.5 w-1.5 rounded-full bg-[#0066ff]" />
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => {
+                      setIsModelDropdownOpen(false);
+                      setSearchModelQuery("");
+                    }}
+                  />
+                  <div className="absolute left-0 mt-1.5 w-72 max-w-[calc(100vw-32px)] rounded-2xl bg-[#1e1e20] border border-[#383838] shadow-2xl p-2 z-50 animate-in fade-in duration-100 flex flex-col gap-1 font-sans">
+                    {/* Search Input (Matching Desktop) */}
+                    <div className="flex items-center gap-2 px-2.5 py-1.5 mb-1 rounded-xl bg-[#262628] border border-[#333335]">
+                      <Search className="w-3.5 h-3.5 text-[#888888] shrink-0" />
+                      <input
+                        type="text"
+                        value={searchModelQuery}
+                        onChange={(e) => setSearchModelQuery(e.target.value)}
+                        placeholder={t("searchModels")}
+                        className="w-full bg-transparent text-xs text-white placeholder:text-[#666666] outline-none font-sans"
+                        autoFocus
+                      />
+                      {searchModelQuery && (
+                        <button
+                          type="button"
+                          onClick={() => setSearchModelQuery("")}
+                          className="p-0.5 hover:bg-[#333335] rounded text-[#888888] hover:text-white transition-colors cursor-pointer"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Scrollable Model List */}
+                    <ScrollArea className="max-h-[260px] w-full" viewportClassName="pr-1">
+                      <div className="space-y-1 py-0.5">
+                        {filteredModels.length > 0 ? (
+                          filteredModels.map((m) => {
+                            const isSelected = selectedModelId === m.id;
+                            return (
+                              <button
+                                key={m.id}
+                                type="button"
+                                onClick={() => {
+                                  setSelectedModelId(m.id);
+                                  setIsModelDropdownOpen(false);
+                                  setSearchModelQuery("");
+                                }}
+                                className={cn(
+                                  "w-full text-left px-3 py-2 rounded-xl text-xs flex flex-col cursor-pointer transition-colors",
+                                  isSelected
+                                    ? "bg-[#2b2b2b] text-white font-medium"
+                                    : "text-[#969696] hover:text-white hover:bg-[#262628]"
+                                )}
+                              >
+                                <div className="flex items-center justify-between w-full">
+                                  <span className="font-sans text-[13px] font-medium text-white">{m.name}</span>
+                                  {isSelected && (
+                                    <Check className="w-3.5 h-3.5 text-white shrink-0 ml-auto" />
+                                  )}
+                                </div>
+                                {m.description && (
+                                  <span className="text-[11px] text-[#777777] mt-0.5 leading-snug line-clamp-2">
+                                    {m.description}
+                                  </span>
+                                )}
+                              </button>
+                            );
+                          })
+                        ) : (
+                          <div className="py-6 px-3 text-center text-xs text-[#888888]">
+                            {t("noModelsFound")}
+                          </div>
                         )}
                       </div>
-                      <span className="text-[10px] text-[#5d5d5d] mt-0.5">
-                        {m.description}
+                    </ScrollArea>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Right: Context Window Indicator (Bulatan SVG di sebelah kanan) with Minimalist Dropdown */}
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => {
+                  const next = !isContextDropdownOpen;
+                  if (next) setIsModelDropdownOpen(false);
+                  setIsContextDropdownOpen(next);
+                }}
+                className={cn(
+                  "w-7 h-7 flex items-center justify-center rounded-xl bg-[#2b2b2b] hover:bg-[#383838] border border-[#383838] transition-colors cursor-pointer shrink-0 active:scale-95",
+                  contextUsage.rawPercentUsed >= 90
+                    ? "text-red-400"
+                    : contextUsage.rawPercentUsed >= 75
+                    ? "text-[#e79737]"
+                    : "text-[#a9a9a9] hover:text-[#d4d4d4]"
+                )}
+                title={`Context: ${contextUsage.rawPercentUsed === 0 ? "0%" : contextUsage.percentUsed}`}
+                aria-label="Context & session info"
+              >
+                <svg className="w-3.5 h-3.5 transform -rotate-90" viewBox="0 0 24 24">
+                  <circle
+                    cx="12"
+                    cy="12"
+                    r="9"
+                    fill="none"
+                    stroke="#383838"
+                    strokeWidth="2.5"
+                  />
+                  <circle
+                    cx="12"
+                    cy="12"
+                    r="9"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    strokeDasharray={56.55}
+                    strokeDashoffset={56.55 - (56.55 * contextUsage.safePercent) / 100}
+                    strokeLinecap="round"
+                  />
+                </svg>
+              </button>
+
+              {/* Minimalist Dropdown Info (No bulky cards, clean and clear) */}
+              {isContextDropdownOpen && (
+                <>
+                  <div
+                    className="fixed inset-0 z-40"
+                    onClick={() => setIsContextDropdownOpen(false)}
+                  />
+                  <div className="absolute right-0 mt-1.5 w-72 max-w-[calc(100vw-32px)] rounded-2xl bg-[#1e1e20] border border-[#383838] shadow-2xl p-3 z-50 animate-in fade-in duration-100 flex flex-col font-sans select-none">
+                    {/* Header: % of context used and tokens */}
+                    <div className="flex items-center justify-between pb-2 border-b border-[#2d2d30]">
+                      <span className="text-xs font-semibold text-white">
+                        {contextUsage.rawPercentUsed === 0 ? "0%" : contextUsage.percentUsed} {t("contextUsed")}
                       </span>
-                    </button>
-                  ))}
-                </div>
+                      <span className="font-mono text-[11px] text-[#888888]">
+                        ~{formatTokenDisplay(contextUsage.usedTokens)} / {formatTokenDisplay(contextUsage.totalTokens)}
+                      </span>
+                    </div>
+
+                    {/* Thin progress bar */}
+                    <div className="w-full h-1.5 bg-[#2d2d30] rounded-full overflow-hidden flex gap-0.5 my-2">
+                      {contextUsage.sourcesTokens > 0 && (
+                        <div
+                          className="bg-[#10b981] h-full transition-all"
+                          style={{ width: `${Math.max(1, (contextUsage.sourcesTokens / contextUsage.totalTokens) * 100)}%` }}
+                        />
+                      )}
+                      {contextUsage.systemPromptTokens > 0 && (
+                        <div
+                          className="bg-[#71717a] h-full transition-all"
+                          style={{ width: `${Math.max(1, (contextUsage.systemPromptTokens / contextUsage.totalTokens) * 100)}%` }}
+                        />
+                      )}
+                      {contextUsage.messagesTokens > 0 && (
+                        <div
+                          className="bg-[#3b82f6] h-full transition-all"
+                          style={{ width: `${Math.max(1, (contextUsage.messagesTokens / contextUsage.totalTokens) * 100)}%` }}
+                        />
+                      )}
+                      {contextUsage.draftInputTokens > 0 && (
+                        <div
+                          className="bg-[#a855f7] h-full transition-all"
+                          style={{ width: `${Math.max(1, (contextUsage.draftInputTokens / contextUsage.totalTokens) * 100)}%` }}
+                        />
+                      )}
+                    </div>
+
+                    {/* Breakdown list */}
+                    <div className="flex flex-col gap-1.5 text-[11px]">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5 text-[#a0a0a0]">
+                          <span className="w-2 h-2 rounded-xs bg-[#10b981]" />
+                          <span>{t("learningSources")} ({learn?.sourcesCount || 0})</span>
+                        </div>
+                        <span className="font-mono text-[#888888]">~{formatTokenDisplay(contextUsage.sourcesTokens)}</span>
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5 text-[#a0a0a0]">
+                          <span className="w-2 h-2 rounded-xs bg-[#71717a]" />
+                          <span>{t("tutorInstructions")}</span>
+                        </div>
+                        <span className="font-mono text-[#888888]">~{formatTokenDisplay(contextUsage.systemPromptTokens)}</span>
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-1.5 text-[#a0a0a0]">
+                          <span className="w-2 h-2 rounded-xs bg-[#3b82f6]" />
+                          <span>{t("chatHistory")}</span>
+                        </div>
+                        <span className="font-mono text-[#888888]">~{formatTokenDisplay(contextUsage.messagesTokens)}</span>
+                      </div>
+
+                      {contextUsage.draftInputTokens > 0 && (
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5 text-[#a855f7]">
+                            <span className="w-2 h-2 rounded-xs bg-[#a855f7]" />
+                            <span>{t("currentInput")}</span>
+                          </div>
+                          <span className="font-mono text-[#a855f7]">~{formatTokenDisplay(contextUsage.draftInputTokens)}</span>
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-between pt-1 border-t border-[#2d2d30] text-[#777777]">
+                        <span>{t("availableContext")}</span>
+                        <span className="font-mono">~{formatTokenDisplay(contextUsage.availableTokens)}</span>
+                      </div>
+                    </div>
+
+                    {/* Session Telemetry (Clean & minimal) */}
+                    {conversationMetrics && (
+                      <div className="mt-2.5 pt-2 border-t border-[#2d2d30] flex flex-col gap-1.5">
+                        <div className="text-[10px] uppercase font-semibold text-[#666666] tracking-wider">
+                          {t("sessionTelemetry")}
+                        </div>
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="text-[#a0a0a0]">Turns & Steps</span>
+                          <span className="font-mono text-white">{conversationMetrics.turns} turns · {conversationMetrics.steps} steps</span>
+                        </div>
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="text-[#a0a0a0]">Speed & Time</span>
+                          <span className="font-mono text-white">LLM {formatDurationDisplay(conversationMetrics.llmDurationMs)} · {conversationMetrics.tokPerSec} tok/s</span>
+                        </div>
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="text-[#a0a0a0]">Cache & Tokens</span>
+                          <span className="font-mono text-white">{conversationMetrics.cacheHitRate}% cache · ↑{formatTokenDisplay(conversationMetrics.inputTokens)} ↓{formatTokenDisplay(conversationMetrics.outputTokens)}</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </>
               )}
             </div>
           </div>
