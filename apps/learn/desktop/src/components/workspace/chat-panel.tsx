@@ -200,26 +200,6 @@ function formatThinkingLabel(level?: string): string {
   return clean.charAt(0).toUpperCase() + clean.slice(1);
 }
 
-function getThinkingDescription(level: string, lang: string): string {
-  const isId = lang === "id";
-  switch (level.toLowerCase()) {
-    case "low":
-      return isId ? "Respons cepat, penalaran ringkas" : "Fastest response, light reasoning";
-    case "medium":
-      return isId ? "Penalaran dan kecepatan seimbang" : "Balanced reasoning and speed";
-    case "high":
-      return isId ? "Analisis mendalam untuk tugas kompleks" : "Deep reasoning for complex tasks";
-    case "xhigh":
-    case "extra_high":
-    case "extra-high":
-      return isId ? "Penalaran intensif ekstra" : "Extra intensive reasoning";
-    case "max":
-      return isId ? "Kedalaman penalaran maksimum" : "Maximum reasoning depth";
-    default:
-      return "";
-  }
-}
-
 export function ChatPanel({
   learnId,
   workspacePath,
@@ -2423,14 +2403,9 @@ export function ChatPanel({
                             : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
                         )}
                       >
-                        <div className="flex flex-col min-w-0 pr-2">
-                          <span className="font-medium text-foreground">
-                            {formatThinkingLabel(lvl)}
-                          </span>
-                          <span className="text-[10px] text-muted-foreground/70 leading-tight mt-0.5">
-                            {getThinkingDescription(lvl, language)}
-                          </span>
-                        </div>
+                        <span className="font-medium text-foreground">
+                          {formatThinkingLabel(lvl)}
+                        </span>
                         {isSelected && (
                           <Check className="w-3.5 h-3.5 text-foreground shrink-0 ml-auto" />
                         )}
