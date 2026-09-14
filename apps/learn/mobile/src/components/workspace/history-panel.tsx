@@ -136,7 +136,7 @@ export function HistoryPanel({
         className="w-full sm:max-w-[420px] p-0 flex flex-col bg-card border-l border-border/70 shadow-2xl z-50 gap-0"
       >
         {/* Header */}
-        <div className="p-4 sm:p-5 flex items-center justify-between border-b border-border/40">
+        <div className="p-4 sm:p-5 pb-2 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <History className="h-4 w-4 text-foreground" />
             <SheetTitle className="font-sans text-base sm:text-lg font-semibold text-foreground">
@@ -170,7 +170,7 @@ export function HistoryPanel({
         </div>
 
         {/* Sessions List */}
-        <div className="flex-1 overflow-y-auto p-3 space-y-4">
+        <div className="flex-1 overflow-y-auto p-3 pb-6 space-y-4">
           {filteredSessions.length === 0 ? (
             <div className="py-12 text-center text-xs text-muted-foreground font-light">
               {t("noHistoryTitle") || "No chat history found"}
@@ -336,21 +336,6 @@ export function HistoryPanel({
               );
             })
           )}
-        </div>
-
-        {/* Footer */}
-        <div className="p-3 px-5 bg-secondary/30 flex items-center justify-between text-xs text-muted-foreground border-t border-border/40">
-          <span className="font-mono text-[11px] text-muted-foreground/80">
-            {filteredSessions.length} {language === "id" ? "sesi tersimpan" : "chats saved"}
-          </span>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={onClose}
-            className="h-8 px-4 rounded-full text-xs font-medium cursor-pointer border-border/70"
-          >
-            {t("done") || "Done"}
-          </Button>
         </div>
       </SheetContent>
     </Sheet>

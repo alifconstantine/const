@@ -96,19 +96,14 @@ export function ChatHistoryPanel({
         className="w-full sm:max-w-[400px] p-0 flex flex-col bg-card border-l border-border/70 shadow-2xl z-50 gap-0 select-none"
       >
         {/* Header */}
-        <div className="p-4 sm:p-5 pb-3 flex items-center justify-between border-b border-border/40">
+        <div className="p-4 sm:p-5 pb-2 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
-            <div className="h-7 w-7 rounded-lg bg-primary/10 text-primary flex items-center justify-center shrink-0">
+            <div className="h-8 w-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
               <History className="h-4 w-4" />
             </div>
-            <div>
-              <SheetTitle className="font-serif text-base font-semibold text-foreground">
-                {t("chatHistory")}
-              </SheetTitle>
-              <p className="text-[11px] text-muted-foreground">
-                {t("historySubtitle")}
-              </p>
-            </div>
+            <SheetTitle className="font-serif text-base font-semibold text-foreground">
+              {t("chatHistory")}
+            </SheetTitle>
           </div>
 
           <div className="flex items-center gap-1.5">
@@ -163,7 +158,7 @@ export function ChatHistoryPanel({
         </div>
 
         {/* Sessions List */}
-        <div className="flex-1 overflow-y-auto px-3 py-1 space-y-4">
+        <div className="flex-1 overflow-y-auto px-3 py-1 pb-6 space-y-4">
           {filteredSessions.length === 0 ? (
             <div className="py-16 text-center text-xs text-muted-foreground">
               <MessageSquare className="h-8 w-8 mx-auto mb-2 text-muted-foreground/40 stroke-[1.5]" />
@@ -196,23 +191,23 @@ export function ChatHistoryPanel({
                           onClose();
                         }}
                         className={cn(
-                          "group relative flex items-start justify-between p-2.5 rounded-xl text-xs cursor-pointer transition-colors select-none",
+                          "group relative flex items-center justify-between px-3.5 py-2.5 rounded-2xl text-xs cursor-pointer transition-all select-none min-h-[44px]",
                           isActive
                             ? "bg-foreground text-background font-medium shadow-xs"
                             : "hover:bg-muted text-foreground"
                         )}
                       >
-                        <div className="flex items-start gap-2.5 min-w-0 pr-2 flex-1">
+                        <div className="flex items-center gap-3 min-w-0 pr-2 flex-1">
                           <MessageSquare
                             className={cn(
-                              "h-3.5 w-3.5 shrink-0 mt-0.5",
+                              "h-4 w-4 shrink-0",
                               isActive ? "text-background/80" : "text-muted-foreground"
                             )}
                           />
-                          <div className="min-w-0 flex-1">
+                          <div className="min-w-0 flex-1 flex flex-col justify-center">
                             <p
                               className={cn(
-                                "truncate font-medium",
+                                "truncate font-medium leading-normal",
                                 isActive ? "text-background" : "text-foreground"
                               )}
                             >
@@ -221,7 +216,7 @@ export function ChatHistoryPanel({
                             {session.lastMessageSnippet && (
                               <p
                                 className={cn(
-                                  "text-[11px] truncate mt-0.5 line-clamp-1",
+                                  "text-[11px] truncate mt-0.5 line-clamp-1 leading-normal",
                                   isActive
                                     ? "text-background/70"
                                     : "text-muted-foreground/80"
@@ -242,7 +237,7 @@ export function ChatHistoryPanel({
                               onDeleteSession(session.id);
                             }}
                             className={cn(
-                              "opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-lg hover:bg-destructive/10 cursor-pointer",
+                              "opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-lg hover:bg-destructive/10 cursor-pointer",
                               isActive
                                 ? "text-background/80 hover:text-rose-300"
                                 : "text-muted-foreground hover:text-destructive"
@@ -260,21 +255,6 @@ export function ChatHistoryPanel({
               );
             })
           )}
-        </div>
-
-        {/* Footer */}
-        <div className="p-3 px-4 bg-muted/30 border-t border-border/40 flex items-center justify-between text-xs text-muted-foreground">
-          <span className="font-mono text-[11px] text-muted-foreground/80">
-            {t("sessionsSavedCount", { count: filteredSessions.length })}
-          </span>
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={onClose}
-            className="h-7 px-3 rounded-lg text-xs font-medium cursor-pointer border-border/70"
-          >
-            {t("done")}
-          </Button>
         </div>
       </SheetContent>
     </Sheet>
