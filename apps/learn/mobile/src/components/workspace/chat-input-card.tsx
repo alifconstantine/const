@@ -7,8 +7,9 @@ import {
   X,
   FileText,
   Video,
+  Mic,
 } from "lucide-react";
-import { ScrollArea, cn } from "@const/ui";
+import { ScrollArea, cn, toast } from "@const/ui";
 import { useI18n } from "../../lib/i18n";
 
 export const MAX_ATTACHMENTS = 5;
@@ -253,27 +254,30 @@ export function ChatInputCard({
   );
 
   // Render source badge (icon and number only, muted color, no "sumber" text)
-  const renderSourceBadge = () => (
-    <button
-      type="button"
-      onClick={onOpenSources}
-      className="inline-flex items-center gap-1 px-1.5 py-1 rounded-full text-xs text-[#888888] hover:text-[#d4d4d4] transition-colors cursor-pointer select-none"
-      title={t("learningSources")}
-      aria-label={t("learningSources")}
-    >
-      <FolderOpen className="w-3.5 h-3.5 text-[#888888]" />
-      <span className="font-sans text-[11px] text-[#888888]">{sourcesCount}</span>
-    </button>
-  );
+  const renderSourceBadge = () => {
+    if (!sourcesCount || sourcesCount <= 0) return null;
+    return (
+      <button
+        type="button"
+        onClick={onOpenSources}
+        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs text-[#8e8e93] hover:text-[#d4d4d4] hover:bg-white/5 transition-colors cursor-pointer select-none"
+        title={t("learningSources")}
+        aria-label={t("learningSources")}
+      >
+        <FolderOpen className="w-3.5 h-3.5 text-[#8e8e93]" />
+        <span className="font-sans text-[11px] text-[#8e8e93] font-medium">{sourcesCount}</span>
+      </button>
+    );
+  };
 
-  // Render send or stop action button
+  // Render send or stop action button (ChatGPT mobile layout)
   const renderSendButton = () => {
     if (isStreaming) {
       return (
         <button
           type="button"
           onClick={onStop}
-          className="w-8 h-8 rounded-full bg-[#383838] hover:bg-[#48484e] text-[#f87171] hover:text-white flex items-center justify-center transition-colors cursor-pointer border border-[#48484e] shrink-0"
+          className="w-8 h-8 rounded-full bg-[#383838] hover:bg-[#48484e] text-[#f87171] hover:text-white flex items-center justify-center transition-colors cursor-pointer border border-[#48484e] shrink-0 active:scale-95"
           title={t("stopGenerating")}
           aria-label={t("stopGenerating")}
         >
@@ -282,22 +286,50 @@ export function ChatInputCard({
       );
     }
 
+    if (!canSend) {
+      // In empty mode, display Mic and ChatGPT voice waveform button
+      return (
+        <div className="flex items-center gap-1 shrink-0">
+          <button
+            type="button"
+            onClick={() => toast.info(t("voiceInputNotAvailable") || "Input suara akan segera hadir!")}
+            className="w-8 h-8 rounded-full hover:bg-white/10 text-[#9ca3af] hover:text-white flex items-center justify-center transition-colors cursor-pointer shrink-0 active:scale-95"
+            title={t("voiceInput") || "Input Suara"}
+            aria-label={t("voiceInput") || "Input Suara"}
+          >
+            <Mic className="w-[18px] h-[18px] stroke-[1.8]" />
+          </button>
+          <button
+            type="button"
+            onClick={() => toast.info(t("voiceModeNotAvailable"))}
+            className="w-8 h-8 rounded-full bg-[#0066ff] hover:bg-[#0052cc] text-white flex items-center justify-center transition-transform active:scale-95 cursor-pointer shrink-0 shadow-xs"
+            title="Mode Suara"
+            aria-label="Mode Suara"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+              <path d="M12 3v18" />
+              <path d="M8 7v10" />
+              <path d="M4 10v4" />
+              <path d="M16 7v10" />
+              <path d="M20 10v4" />
+            </svg>
+          </button>
+        </div>
+      );
+    }
+
     return (
-      <button
-        type="button"
-        onClick={() => onSend(inputMessage, attachments)}
-        disabled={!canSend}
-        className={cn(
-          "w-8 h-8 rounded-full flex items-center justify-center transition-colors duration-150 shrink-0 select-none",
-          canSend
-            ? "bg-[#d4d4d4] text-[#161616] hover:bg-white cursor-pointer active:scale-95 shadow-sm"
-            : "bg-[#2b2b2b] text-[#555555] cursor-not-allowed border border-[#383838]"
-        )}
-        title={t("sendMessage")}
-        aria-label={t("sendMessage")}
-      >
-        <ArrowUp className="w-3.5 h-3.5 stroke-[2.5]" />
-      </button>
+      <div className="flex items-center gap-1 shrink-0">
+        <button
+          type="button"
+          onClick={() => onSend(inputMessage, attachments)}
+          className="w-8 h-8 rounded-full bg-[#0066ff] hover:bg-[#0052cc] text-white flex items-center justify-center transition-all cursor-pointer active:scale-95 shrink-0 shadow-xs"
+          title={t("sendMessage")}
+          aria-label={t("sendMessage")}
+        >
+          <ArrowUp className="w-4 h-4 stroke-[2.5]" />
+        </button>
+      </div>
     );
   };
 
@@ -311,10 +343,10 @@ export function ChatInputCard({
         }
       }}
       className={cn(
-        "w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center transition-colors shrink-0",
+        "w-8 h-8 rounded-full flex items-center justify-center transition-colors shrink-0",
         isMaxReached
           ? "opacity-35 cursor-not-allowed text-[#666666]"
-          : "hover:bg-[#2b2b2b] text-[#888888] hover:text-[#e0e0e0] cursor-pointer"
+          : "hover:bg-white/10 text-[#d1d5db] hover:text-white cursor-pointer active:scale-95"
       )}
       title={
         isMaxReached
@@ -323,7 +355,7 @@ export function ChatInputCard({
       }
       aria-label={t("addMediaOrDoc")}
     >
-      <Plus className="w-4 h-4" />
+      <Plus className="w-5 h-5 stroke-[2]" />
     </button>
   );
 
@@ -451,10 +483,10 @@ export function ChatInputCard({
 
       <div
         className={cn(
-          "w-full bg-[#1e1e1e] border border-[#333333] transition-[border-color,border-radius,padding] duration-150 focus-within:border-[#555555] shadow-xs",
+          "w-full bg-[#212121] border border-[#303030] transition-[border-color,border-radius,padding] duration-150 focus-within:border-[#484848] shadow-sm",
           isMultiline
             ? "rounded-[24px] p-2.5 sm:p-3"
-            : "rounded-full px-2.5 py-1.5"
+            : "rounded-full px-2.5 py-1.5 min-h-[48px]"
         )}
         style={{
           display: "grid",
@@ -477,7 +509,7 @@ export function ChatInputCard({
         )}
 
         {/* Textarea - Persistent across single-line & multi-line modes (NEVER UNMOUNTED) */}
-        <div style={{ gridArea: "input" }} className="min-w-0 w-full">
+        <div style={{ gridArea: "input" }} className="min-w-0 w-full flex items-center">
           <textarea
             ref={textareaRef}
             rows={isMultiline ? 2 : 1}
@@ -496,10 +528,10 @@ export function ChatInputCard({
                 : t("askModel", { model: selectedModelName || "Const" })
             }
             className={cn(
-              "w-full bg-transparent text-[14px] text-[#ececec] placeholder:text-[#666666] outline-none resize-none font-sans block",
+              "w-full bg-transparent text-[15px] sm:text-[15px] text-[#f3f4f6] placeholder:text-[#8e8e93] outline-none resize-none font-sans block",
               isMultiline
-                ? "leading-5 py-1 min-h-[44px] max-h-36 overflow-y-auto px-0.5"
-                : "leading-5 py-1 h-[28px] max-h-[28px] overflow-hidden px-1"
+                ? "leading-5 py-1 min-h-[44px] max-h-36 overflow-y-auto px-1"
+                : "leading-6 py-0.5 h-[28px] max-h-[28px] overflow-hidden px-1.5"
             )}
             style={{
               height: isMultiline ? undefined : `${SINGLE_LINE_HEIGHT}px`,
@@ -513,7 +545,7 @@ export function ChatInputCard({
         </div>
 
         {/* Right Action Items: Source count & Send button */}
-        <div style={{ gridArea: "actions" }} className="flex items-center gap-2 shrink-0 justify-self-end self-center">
+        <div style={{ gridArea: "actions" }} className="flex items-center gap-1.5 shrink-0 justify-self-end self-center">
           {renderSourceBadge()}
           {renderSendButton()}
         </div>

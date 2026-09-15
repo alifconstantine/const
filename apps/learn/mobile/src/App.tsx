@@ -56,7 +56,7 @@ function AuthenticatedContent({
   }
 
   return (
-    <div className="h-screen w-full flex flex-col bg-background text-foreground overflow-hidden">
+    <div className="h-full w-full flex flex-col bg-background text-foreground overflow-hidden">
       <Navbar
         user={user}
         onSignOut={onSignOut}

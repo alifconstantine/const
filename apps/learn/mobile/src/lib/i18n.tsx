@@ -157,6 +157,8 @@ export const translations = {
     copyMessage: "Copy message",
     copied: "Copied",
     voiceInput: "Voice Input",
+    voiceInputNotAvailable: "Voice input will be available soon!",
+    voiceModeNotAvailable: "Interactive voice mode will be available soon!",
     attachFileMedia: "Attach files or media",
 
     // Workspace: Studio Panel
@@ -491,6 +493,8 @@ export const translations = {
     copyMessage: "Salin pesan",
     copied: "Disalin",
     voiceInput: "Input Suara",
+    voiceInputNotAvailable: "Input suara akan segera hadir!",
+    voiceModeNotAvailable: "Mode suara interaktif akan segera hadir!",
     attachFileMedia: "Lampirkan File atau Media",
 
     // Workspace: Studio Panel

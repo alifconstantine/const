@@ -179,21 +179,22 @@ export function WorkspaceSidebar({
       {/* 1. Backdrop Overlay with smooth fade-in/fade-out */}
       <div
         className={cn(
-          "fixed inset-0 z-50 bg-black/65 backdrop-blur-[2px] transition-opacity duration-300 ease-out",
-          open ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+          "fixed inset-0 z-50 bg-black/65 backdrop-blur-[2px] transition-[opacity,visibility] duration-300 ease-out",
+          open ? "opacity-100 visible pointer-events-auto" : "opacity-0 invisible pointer-events-none"
         )}
         onClick={onClose}
         aria-hidden="true"
       />
 
-      {/* 2. Sidebar Drawer: Balanced mobile scale, rounded-tr/br-3xl, pure studio layout */}
       {/* 2. Sidebar Drawer: Perfectly calibrated mobile scale, rounded-tr/br-[24px] */}
       <aside
         className={cn(
           "fixed inset-y-0 left-0 z-50 w-[80vw] max-w-[310px] h-full bg-[#1c1c1e] text-[#d4d4d4]",
-          "border-r border-[#333336] rounded-tr-[24px] rounded-br-[24px] shadow-2xl flex flex-col will-change-transform font-sans overflow-hidden select-none",
-          "transition-transform duration-300 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)]",
-          open ? "translate-x-0" : "-translate-x-full"
+          "border-r border-[#333336] rounded-tr-[24px] rounded-br-[24px] flex flex-col will-change-transform font-sans overflow-hidden select-none",
+          "transition-[transform,visibility] duration-300 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)]",
+          open
+            ? "translate-x-0 visible pointer-events-auto shadow-2xl"
+            : "-translate-x-[calc(100%+60px)] invisible pointer-events-none shadow-none"
         )}
         style={{
           WebkitOverflowScrolling: "touch",

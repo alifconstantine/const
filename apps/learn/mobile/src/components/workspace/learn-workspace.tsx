@@ -315,6 +315,50 @@ export function MobileLearnWorkspace({
   const [searchModelQuery, setSearchModelQuery] = useState("");
   const [isAddSourceOpen, setIsAddSourceOpen] = useState(initialSourceModalOpen);
 
+  // Dynamic visualViewport tracking to adjust cleanly when software keyboard opens/closes
+  const [viewportHeight, setViewportHeight] = useState<number | null>(null);
+  const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const updateViewport = () => {
+      if (window.visualViewport) {
+        const vv = window.visualViewport;
+        const screenH = window.innerHeight;
+        const isKb = screenH - vv.height > 100;
+        setIsKeyboardOpen(isKb);
+        setViewportHeight(vv.height);
+
+        // Auto-scroll messages into view when keyboard opens
+        if (isKb && messagesEndRef.current) {
+          setTimeout(() => {
+            messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+          }, 80);
+        }
+      } else {
+        setViewportHeight(window.innerHeight);
+      }
+    };
+
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener("resize", updateViewport);
+      window.visualViewport.addEventListener("scroll", updateViewport);
+    } else {
+      window.addEventListener("resize", updateViewport);
+    }
+    updateViewport();
+
+    return () => {
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener("resize", updateViewport);
+        window.visualViewport.removeEventListener("scroll", updateViewport);
+      } else {
+        window.removeEventListener("resize", updateViewport);
+      }
+    };
+  }, []);
+
   // Dynamic telemetry metrics for active conversation
   const conversationMetrics = useMemo(() => {
     return calculateConversationMetrics(messages);
@@ -954,7 +998,13 @@ export function MobileLearnWorkspace({
     DEFAULT_MOBILE_MODELS[0]!;
 
   return (
-    <div className="h-screen w-screen flex flex-col bg-[#161616] text-[#d4d4d4] overflow-hidden select-none">
+    <div
+      className="w-full flex flex-col bg-[#161616] text-[#d4d4d4] overflow-hidden select-none fixed inset-0"
+      style={{
+        height: viewportHeight ? `${viewportHeight}px` : "100dvh",
+        maxHeight: viewportHeight ? `${viewportHeight}px` : "100dvh",
+      }}
+    >
       {/* Top Mobile Header with Garis 2, Model Selector, Context Window, New Chat, and Titik 3 */}
       <header className="h-14 px-3 sm:px-4 bg-[#222222] border-b border-[#383838] flex items-center justify-between shrink-0 z-20 select-none">
         {/* Left Section: Garis 2 (Sidebar Toggle) & Model Selector */}
@@ -1301,7 +1351,7 @@ export function MobileLearnWorkspace({
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden max-w-lg mx-auto w-full relative">
 
           {/* Scrollable Conversation Stream */}
-          <div className="flex-1 overflow-y-auto px-3 sm:px-4 py-3 space-y-5 min-h-0">
+          <div className="flex-1 overflow-y-auto px-3 sm:px-4 py-3 space-y-5 min-h-0 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden overscroll-contain">
             {messages.length === 0 ? (
               carriedSources.length > 0 ? (
                 /* Mobile NotebookLM Source Guide View */
@@ -1619,8 +1669,15 @@ export function MobileLearnWorkspace({
           <div ref={messagesEndRef} />
         </div>
 
-          {/* Sticky Bottom Chat Input Bar - Pinned right at bottom */}
-          <div className="p-3 pt-1 shrink-0 bg-[#161616]/95 backdrop-blur-xs z-10 w-full">
+          {/* Sticky Bottom Chat Input Bar - Pinned right above keyboard or safe-area */}
+          <div
+            className={cn(
+              "px-3 pt-1.5 shrink-0 bg-[#161616]/95 backdrop-blur-xs z-10 w-full transition-[padding] duration-150",
+              isKeyboardOpen
+                ? "pb-1.5"
+                : "pb-[max(0.75rem,env(safe-area-inset-bottom))]"
+            )}
+          >
             <ChatInputCard
               inputMessage={inputMessage}
               onChangeInput={setInputMessage}
