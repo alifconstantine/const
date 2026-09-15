@@ -29,22 +29,58 @@ export function parseSourceReferences(text: string): ParsedReference[] {
   return matches;
 }
 
+export function normalizeSourceId(id: string): string {
+  if (!id) return "";
+  return id.replace(/^\[?source:/i, "").replace(/^source_/i, "").replace(/\]$/, "").trim();
+}
+
 /**
- * Convert [source:id] references in markdown to custom hashtag links
- * before passing into ReactMarkdown/marked:
- * e.g. [source:abc] -> [[source:abc]](#ref-source-abc)
+ * Convert [source:id] references in markdown to compact numbered badges [1], [2]
+ * with informative hover tooltips and hashtag links, matching NotebookLM and Open-Notebook.
  */
 export function convertReferencesToMarkdownLinks(
   text: string,
-  sourcesMap?: Map<string, { title: string }>
+  sourcesMap?: Map<string, { title: string; type?: string }>
 ): string {
   if (!text) return text;
 
-  const pattern = /\[source:([a-zA-Z0-9_\-]+)\]/g;
-  return text.replace(pattern, (fullMatch, id) => {
-    const matchedSource = sourcesMap?.get(id) || sourcesMap?.get(`source:${id}`);
-    const label = matchedSource ? `📄 ${matchedSource.title}` : `[source:${id.slice(0, 8)}]`;
-    return `<a href="#ref-source-${id}" class="source-ref-badge" data-source-id="${id}">${label}</a>`;
+  // Regex to detect [source:id], [Source: id], [sumber: id], [source_id], or (source: id)
+  const pattern = /(?:\[\[?(?:source|sumber):\s*([a-zA-Z0-9_\-]+)\]?\]|\[(source_[a-zA-Z0-9_\-]+)\]|\((?:source|sumber):\s*([a-zA-Z0-9_\-]+)\)|(?:source|sumber):\s*([a-zA-Z0-9_\-]+))/gi;
+
+  // Pre-pass: Map each unique source to an incremental citation number [1], [2], [3]
+  const sourceNumberMap = new Map<string, number>();
+  let nextNumber = 1;
+
+  let scanMatch: RegExpExecArray | null;
+  const tempText = text;
+  while ((scanMatch = pattern.exec(tempText)) !== null) {
+    const rawId = scanMatch[1] || scanMatch[2] || scanMatch[3] || scanMatch[4];
+    if (!rawId) continue;
+    const cleanKey = rawId.replace(/^source_/, "").replace(/^source:/i, "").replace(/^sumber:/i, "");
+    if (!sourceNumberMap.has(cleanKey)) {
+      sourceNumberMap.set(cleanKey, nextNumber++);
+    }
+  }
+
+  // Reset pattern index
+  pattern.lastIndex = 0;
+
+  // Replace each reference with compact numbered citation badge
+  return text.replace(pattern, (_fullMatch, id1, id2, id3, id4) => {
+    const rawId = id1 || id2 || id3 || id4;
+    const cleanKey = rawId.replace(/^source_/, "").replace(/^source:/i, "").replace(/^sumber:/i, "");
+    const num = sourceNumberMap.get(cleanKey) || 1;
+
+    const matchedSource =
+      sourcesMap?.get(rawId) ||
+      sourcesMap?.get(cleanKey) ||
+      sourcesMap?.get(`source_${cleanKey}`) ||
+      sourcesMap?.get(`source:${rawId}`);
+
+    const title = matchedSource?.title || `Sumber #${num}`;
+    const tooltip = `${title} (Sumber [${num}])`;
+
+    return `<a href="#ref-source-${cleanKey}" class="source-ref-badge" data-source-id="${cleanKey}" data-source-number="${num}" title="${tooltip.replace(/"/g, "&quot;")}">[${num}]</a>`;
   });
 }
 

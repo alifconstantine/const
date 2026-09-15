@@ -55,7 +55,7 @@ export function MarkdownContent({
       onClick={handleClick}
       className={cn(
         "space-y-2.5 text-[13px] sm:text-[14px] leading-[1.65] text-[#d4d4d4] select-text font-sans [&_strong]:font-semibold [&_b]:font-semibold [&_strong]:text-[#ffffff] [&_b]:text-[#ffffff]",
-        "[&_.source-ref-badge]:inline-flex [&_.source-ref-badge]:items-center [&_.source-ref-badge]:gap-1 [&_.source-ref-badge]:px-2 [&_.source-ref-badge]:py-0.5 [&_.source-ref-badge]:mx-0.5 [&_.source-ref-badge]:rounded-md [&_.source-ref-badge]:bg-white/10 [&_.source-ref-badge]:hover:bg-white/15 [&_.source-ref-badge]:border [&_.source-ref-badge]:border-white/20 [&_.source-ref-badge]:text-white [&_.source-ref-badge]:text-[11px] [&_.source-ref-badge]:font-medium [&_.source-ref-badge]:no-underline [&_.source-ref-badge]:cursor-pointer [&_.source-ref-badge]:select-none",
+        "[&_.source-ref-badge]:inline-flex [&_.source-ref-badge]:items-center [&_.source-ref-badge]:justify-center [&_.source-ref-badge]:min-w-[18px] [&_.source-ref-badge]:h-[17px] [&_.source-ref-badge]:px-1 [&_.source-ref-badge]:mx-0.5 [&_.source-ref-badge]:-translate-y-0.5 [&_.source-ref-badge]:rounded-md [&_.source-ref-badge]:bg-white/10 [&_.source-ref-badge]:hover:bg-white/20 [&_.source-ref-badge]:border [&_.source-ref-badge]:border-white/25 [&_.source-ref-badge]:text-white [&_.source-ref-badge]:text-[10.5px] [&_.source-ref-badge]:font-semibold [&_.source-ref-badge]:tracking-tight [&_.source-ref-badge]:no-underline [&_.source-ref-badge]:cursor-pointer [&_.source-ref-badge]:select-none [&_.source-ref-badge]:align-middle [&_.source-ref-badge]:transition-all [&_.source-ref-badge]:active:scale-90 shadow-2xs",
         className
       )}
     >

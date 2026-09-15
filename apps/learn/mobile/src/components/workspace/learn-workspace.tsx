@@ -88,6 +88,9 @@ import {
   History,
   MessageCirclePlus,
   Pencil,
+  Pin,
+  ThumbsUp,
+  ThumbsDown,
   MoreVertical,
 } from "lucide-react";
 
@@ -267,7 +270,11 @@ export function MobileLearnWorkspace({
     const map = new Map<string, LocalSource>();
     for (const s of sources) {
       map.set(s.id, s);
+      const clean = s.id.replace(/^source_/, "").replace(/^source:/, "");
+      map.set(clean, s);
       map.set(`source:${s.id}`, s);
+      map.set(`source_${clean}`, s);
+      map.set(`source:${clean}`, s);
     }
     return map;
   }, [sources]);
@@ -276,12 +283,16 @@ export function MobileLearnWorkspace({
     useState<LocalSource | null>(null);
 
   const handleCitationClick = (sourceId: string) => {
-    const cleanId = sourceId.replace(/^source:/, "");
-    const src = sourcesMap.get(cleanId) || sourcesMap.get(`source:${cleanId}`);
+    const cleanId = sourceId.replace(/^\[?source:/i, "").replace(/^source_/, "").replace(/\]$/, "");
+    const src =
+      sourcesMap.get(cleanId) ||
+      sourcesMap.get(`source_${cleanId}`) ||
+      sourcesMap.get(`source:${cleanId}`) ||
+      sourcesMap.get(sourceId);
     if (src) {
       setSelectedSourceForPreview(src);
     } else {
-      toast.info(`Source ID: ${sourceId}`);
+      toast.info(`Sumber ID: ${sourceId}`);
     }
   };
 
@@ -1291,7 +1302,129 @@ export function MobileLearnWorkspace({
 
           {/* Scrollable Conversation Stream */}
           <div className="flex-1 overflow-y-auto px-3 sm:px-4 py-3 space-y-5 min-h-0">
-            {messages.map((msg) => (
+            {messages.length === 0 ? (
+              carriedSources.length > 0 ? (
+                /* Mobile NotebookLM Source Guide View */
+                <div className="flex flex-col justify-start py-3 animate-in fade-in duration-200 select-none">
+                  {/* Title */}
+                  <h1 className="text-lg sm:text-xl font-semibold tracking-tight text-white mb-1 leading-snug">
+                    {learn?.title || carriedSources[0]?.title || "Panduan Sumber Belajar"}
+                  </h1>
+
+                  {/* Meta */}
+                  <div className="flex items-center gap-2 text-xs text-[#969696] font-sans mb-3.5">
+                    <span>{carriedSources.length} sumber</span>
+                    <span>•</span>
+                    <span>
+                      {new Date(carriedSources[0]?.createdAt || Date.now()).toLocaleDateString(
+                        "id-ID",
+                        { day: "numeric", month: "short", year: "numeric" }
+                      )}
+                    </span>
+                  </div>
+
+                  {/* Source Guide Summary */}
+                  <div className="text-[13px] leading-relaxed text-[#d4d4d4] font-sans mb-3.5">
+                    <MarkdownContent
+                      content={
+                        learn?.description?.trim() ||
+                        `Sumber ini menyajikan materi komprehensif mengenai **${carriedSources[0]?.title}**${
+                          carriedSources.length > 1
+                            ? ` beserta ${carriedSources.length - 1} dokumen pendukung lainnya`
+                            : ""
+                        }. Materi ini menguraikan parameter kunci, metodologi, dan prinsip dasar yang dapat dijadikan rujukan utama dalam sesi belajar ini. Secara keseluruhan, teks tersebut berfungsi sebagai **panduan teknis** bagi Anda untuk memahami konsep secara mendalam dan terverifikasi.`
+                      }
+                      sourcesMap={sourcesMap}
+                      onSourceClick={handleCitationClick}
+                    />
+                  </div>
+
+                  {/* Action Bar */}
+                  <div className="flex items-center gap-2 mb-4">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        toast.info(
+                          "Fitur 'Simpan ke Catatan' (Notes as Sources) akan hadir pada pembaruan berikutnya."
+                        );
+                      }}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#242424] hover:bg-[#2e2e2e] border border-white/10 text-xs font-medium text-white transition-all cursor-pointer active:scale-95"
+                    >
+                      <Pin className="h-3.5 w-3.5 text-[#969696]" />
+                      <span>Simpan ke catatan</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const textToCopy =
+                          learn?.description?.trim() ||
+                          `Ringkasan Sumber: ${carriedSources[0]?.title}`;
+                        navigator.clipboard.writeText(textToCopy);
+                        toast.success("Ringkasan sumber disalin!");
+                      }}
+                      className="p-1.5 rounded-full hover:bg-[#242424] text-[#969696] hover:text-white transition-colors cursor-pointer"
+                      title="Salin ringkasan"
+                    >
+                      <Copy className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => toast.success("Terima kasih atas masukannya!")}
+                      className="p-1.5 rounded-full hover:bg-[#242424] text-[#969696] hover:text-white transition-colors cursor-pointer"
+                      title="Bagus"
+                    >
+                      <ThumbsUp className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => toast.info("Masukan dicatat.")}
+                      className="p-1.5 rounded-full hover:bg-[#242424] text-[#969696] hover:text-white transition-colors cursor-pointer"
+                      title="Kurang relevan"
+                    >
+                      <ThumbsDown className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+
+                  {/* Suggested Question Chips */}
+                  <div className="flex flex-col gap-2 font-sans">
+                    {[
+                      `Jelaskan konsep dan poin utama dari "${carriedSources[0]?.title}" secara ringkas.`,
+                      `Bandingkan model atau argumen penting yang dijelaskan dalam sumber ini.`,
+                      `Apa saja kesimpulan kunci atau penerapan praktis menurut dokumen ini?`,
+                    ].map((question, qIdx) => (
+                      <button
+                        key={qIdx}
+                        type="button"
+                        onClick={() => handleSend(question)}
+                        className="w-full text-left px-3.5 py-2.5 rounded-xl bg-[#242424]/70 hover:bg-[#2a2a2a] border border-white/10 text-xs text-[#e0e0e0] transition-all cursor-pointer active:scale-[0.99] leading-relaxed"
+                      >
+                        <span>{question}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center text-center py-12 px-4 text-[#969696]">
+                  <div className="text-3xl mb-2">👋</div>
+                  <h2 className="text-base font-medium text-white mb-1">
+                    Mulai Belajar dengan Sumber
+                  </h2>
+                  <p className="text-xs leading-relaxed max-w-xs mb-4">
+                    Tambahkan tautan web, dokumen PDF, atau video YouTube untuk membuka sitasi dan pembelajaran terverifikasi.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setIsAddSourceOpen(true)}
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-white text-black font-medium text-xs cursor-pointer active:scale-95 shadow-xs"
+                  >
+                    <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
+                    <span>Tambahkan Sumber</span>
+                  </button>
+                </div>
+              )
+            ) : (
+              messages.map((msg) => (
               <div
                 key={msg.id}
                 className={`flex flex-col ${
@@ -1481,9 +1614,10 @@ export function MobileLearnWorkspace({
                   </div>
                 )}
               </div>
-            ))}
-            <div ref={messagesEndRef} />
-          </div>
+            ))
+          )}
+          <div ref={messagesEndRef} />
+        </div>
 
           {/* Sticky Bottom Chat Input Bar - Pinned right at bottom */}
           <div className="p-3 pt-1 shrink-0 bg-[#161616]/95 backdrop-blur-xs z-10 w-full">

@@ -25,6 +25,10 @@ import {
   Cpu,
   ChevronLeft,
   ChevronRight,
+  Pin,
+  ThumbsUp,
+  ThumbsDown,
+  Sparkles,
 } from "lucide-react";
 import {
   ScrollArea,
@@ -534,22 +538,33 @@ export function ChatPanel({
   const sourcesDropdownRef = useRef<HTMLDivElement>(null);
   const [selectedSourceForPreview, setSelectedSourceForPreview] = useState<LocalSource | null>(null);
 
+  // Current Learn query to fetch notebook title
+  const currentLearn = useLiveQuery(() => (learnId ? db.learns.get(learnId) : undefined), [learnId]);
+
   const sourcesMap = useMemo(() => {
     const map = new Map<string, LocalSource>();
     for (const s of sources) {
       map.set(s.id, s);
+      const clean = s.id.replace(/^source_/, "").replace(/^source:/, "");
+      map.set(clean, s);
       map.set(`source:${s.id}`, s);
+      map.set(`source_${clean}`, s);
+      map.set(`source:${clean}`, s);
     }
     return map;
   }, [sources]);
 
   const handleCitationClick = (sourceId: string) => {
-    const cleanId = sourceId.replace(/^source:/, "");
-    const src = sourcesMap.get(cleanId) || sourcesMap.get(`source:${cleanId}`);
+    const cleanId = sourceId.replace(/^\[?source:/i, "").replace(/^source_/, "").replace(/\]$/, "");
+    const src =
+      sourcesMap.get(cleanId) ||
+      sourcesMap.get(`source_${cleanId}`) ||
+      sourcesMap.get(`source:${cleanId}`) ||
+      sourcesMap.get(sourceId);
     if (src) {
       setSelectedSourceForPreview(src);
     } else {
-      toast.info(`Source ID: ${sourceId}`);
+      toast.info(`Sumber ID: ${sourceId}`);
     }
   };
 
@@ -2842,42 +2857,153 @@ export function ChatPanel({
       {/* Main Conversation Stream using Radix ScrollArea */}
       <ScrollArea className="flex-1 w-full" viewportClassName="px-4 sm:px-8 py-6 max-w-3xl mx-auto w-full">
         {messages.length === 0 ? (
-          /* Welcome Empty State */
-          <div className="flex-1 flex flex-col justify-center my-auto py-10">
-            <div className="text-3xl sm:text-4xl mb-3 select-none">👋</div>
+          carriedSources.length > 0 ? (
+            /* NotebookLM Source Guide View (Panduan Sumber) */
+            <div className="flex-1 flex flex-col justify-start py-4 max-w-2xl animate-in fade-in duration-200">
+              {/* Notebook Title */}
+              <h1 className="text-xl sm:text-2xl lg:text-3xl font-sans font-semibold tracking-tight text-foreground mb-1.5 leading-snug">
+                {currentLearn?.title || carriedSources[0]?.title || t("welcomeNotebookTitle")}
+              </h1>
 
-            <h1 className="text-2xl sm:text-3xl font-sans font-medium tracking-tight text-foreground mb-2">
-              {t("welcomeNotebookTitle")}
-            </h1>
+              {/* Meta: Source count and date */}
+              <div className="flex items-center gap-2 text-xs text-muted-foreground/80 font-sans mb-5 select-none">
+                <span>{carriedSources.length} sumber</span>
+                <span>•</span>
+                <span>
+                  {new Date(carriedSources[0]?.createdAt || Date.now()).toLocaleDateString(
+                    "id-ID",
+                    { day: "numeric", month: "short", year: "numeric" }
+                  )}
+                </span>
+              </div>
 
-            <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed mb-4 max-w-xl font-sans">
-              {t("welcomeNotebookDesc")}
-            </p>
+              {/* Source Guide Summary */}
+              <div className="text-[13.5px] sm:text-[14px] leading-relaxed text-foreground/90 font-sans mb-4">
+                <MarkdownContent
+                  content={
+                    currentLearn?.description?.trim() ||
+                    `Sumber ini menyajikan materi komprehensif mengenai **${carriedSources[0]?.title}**${
+                      carriedSources.length > 1
+                        ? ` beserta ${carriedSources.length - 1} dokumen pendukung lainnya`
+                        : ""
+                    }. Materi ini menguraikan parameter kunci, metodologi, dan prinsip dasar yang dapat dijadikan rujukan utama dalam sesi belajar ini. Secara keseluruhan, teks tersebut berfungsi sebagai **panduan teknis** bagi Anda untuk memahami konsep secara mendalam dan terverifikasi.`
+                  }
+                  sourcesMap={sourcesMap}
+                  onSourceClick={handleCitationClick}
+                />
+              </div>
 
-            <p className="text-xs text-muted-foreground/80 font-medium mb-3 font-sans">
-              {t("welcomeNotebookPrompt")}
-            </p>
-
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2.5 font-sans">
-              {[
-                t("chipLearnNewTopic"),
-                t("chipCreateContent"),
-                t("chipContinueProject"),
-              ].map((chip) => (
+              {/* Action Bar (Simpan ke Catatan & Feedback) */}
+              <div className="flex items-center gap-2 mb-6 select-none">
                 <button
-                  key={chip}
                   type="button"
                   onClick={() => {
-                    onSelectPromptChip?.(chip);
-                    handleSend(chip);
+                    toast.info(
+                      "Fitur 'Simpan ke Catatan' (Notes as Sources) akan hadir pada pembaruan berikutnya."
+                    );
                   }}
-                  className="px-4 py-2 rounded-full bg-muted/60 hover:bg-muted border border-border/50 text-xs text-foreground transition-all cursor-pointer shadow-xs active:scale-98"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-secondary/80 hover:bg-secondary border border-border/60 text-xs font-medium text-foreground transition-all cursor-pointer shadow-2xs hover:shadow-xs active:scale-95 group"
+                  title="Simpan ringkasan ke catatan"
                 >
-                  {chip}
+                  <Pin className="h-3.5 w-3.5 text-muted-foreground group-hover:text-foreground transition-colors" />
+                  <span>Simpan ke catatan</span>
                 </button>
-              ))}
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    const textToCopy =
+                      currentLearn?.description?.trim() ||
+                      `Ringkasan Sumber: ${carriedSources[0]?.title}`;
+                    navigator.clipboard.writeText(textToCopy);
+                    toast.success("Ringkasan sumber disalin!");
+                  }}
+                  className="p-1.5 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                  title="Salin ringkasan"
+                >
+                  <Copy className="h-3.5 w-3.5" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => toast.success("Terima kasih atas masukannya!")}
+                  className="p-1.5 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                  title="Bagus"
+                >
+                  <ThumbsUp className="h-3.5 w-3.5" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => toast.info("Masukan Anda telah dicatat.")}
+                  className="p-1.5 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                  title="Kurang relevan"
+                >
+                  <ThumbsDown className="h-3.5 w-3.5" />
+                </button>
+              </div>
+
+              {/* Suggested Questions Stack (Chips) */}
+              <div className="flex flex-col gap-2.5 max-w-xl font-sans">
+                {[
+                  `Jelaskan konsep dan poin utama dari "${carriedSources[0]?.title}" secara ringkas.`,
+                  `Bandingkan model atau argumen penting yang dijelaskan dalam sumber ini.`,
+                  `Apa saja kesimpulan kunci atau penerapan praktis menurut dokumen ini?`,
+                ].map((question, qIdx) => (
+                  <button
+                    key={qIdx}
+                    type="button"
+                    onClick={() => {
+                      onSelectPromptChip?.(question);
+                      handleSend(question);
+                    }}
+                    className="w-full text-left px-4 py-3 rounded-2xl bg-muted/35 hover:bg-muted/70 border border-border/50 hover:border-border text-xs sm:text-[13px] text-foreground transition-all cursor-pointer shadow-2xs hover:shadow-xs active:scale-[0.99] group leading-relaxed"
+                  >
+                    <span className="group-hover:text-primary transition-colors">
+                      {question}
+                    </span>
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
+          ) : (
+            /* Welcome Empty State when no sources attached yet */
+            <div className="flex-1 flex flex-col justify-center my-auto py-10">
+              <div className="text-3xl sm:text-4xl mb-3 select-none">👋</div>
+
+              <h1 className="text-2xl sm:text-3xl font-sans font-medium tracking-tight text-foreground mb-2">
+                {t("welcomeNotebookTitle")}
+              </h1>
+
+              <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed mb-4 max-w-xl font-sans">
+                {t("welcomeNotebookDesc")}
+              </p>
+
+              <p className="text-xs text-muted-foreground/80 font-medium mb-3 font-sans">
+                {t("welcomeNotebookPrompt")}
+              </p>
+
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2.5 font-sans">
+                {[
+                  t("chipLearnNewTopic"),
+                  t("chipCreateContent"),
+                  t("chipContinueProject"),
+                ].map((chip) => (
+                  <button
+                    key={chip}
+                    type="button"
+                    onClick={() => {
+                      onSelectPromptChip?.(chip);
+                      handleSend(chip);
+                    }}
+                    className="px-4 py-2 rounded-full bg-muted/60 hover:bg-muted border border-border/50 text-xs text-foreground transition-all cursor-pointer shadow-xs active:scale-98"
+                  >
+                    {chip}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )
         ) : (
           <div className="flex flex-col space-y-6 w-full pb-4">
             {messages.map((msg, idx) => {

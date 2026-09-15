@@ -36,6 +36,8 @@ contextBridge.exposeInMainWorld("electron", {
       mode?: "ask_before_changes" | "full_access";
       thinkingLevel?: string;
       maxOutputTokens?: number;
+      systemPrompt?: string;
+      temperature?: number;
     }) => ipcRenderer.invoke("agent:send-message", payload),
     abort: () => ipcRenderer.invoke("agent:abort"),
     answerQuestion: (toolCallId: string, answer: any) =>

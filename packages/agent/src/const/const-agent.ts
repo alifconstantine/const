@@ -380,8 +380,6 @@ CRITICAL LOOP PREVENTION & ERROR RECOVERY PROTOCOL:
 }
 
 export function buildLearnSystemPrompt(workspacePath: string, customPrompt?: string): string {
-  if (customPrompt) return customPrompt;
-
   const normalizedCwd = workspacePath.replace(/\\/g, "/");
 
   // Check for learning context files
@@ -407,7 +405,7 @@ export function buildLearnSystemPrompt(workspacePath: string, customPrompt?: str
     }
   }
 
-  return `You are Const Learn Agent, an expert adaptive educational research tutor, academic mentor, and interactive learning producer operating inside Const Learn.
+  const basePrompt = `You are Const Learn Agent, an expert adaptive educational research tutor, academic mentor, and interactive learning producer operating inside Const Learn.
 
 Current learning workspace directory: ${normalizedCwd}
 
@@ -439,6 +437,12 @@ PEDAGOGICAL & INTERACTION PRINCIPLES (SOCRATIC METHOD):
    - Explain the output clearly to the student in conversation.
 4. Error Recovery:
    - If a tool call fails, read error details and adjust. Do not blindly repeat failing arguments.${projectContext ? `\n\n<learning_context>${projectContext}</learning_context>` : ""}`;
+
+  if (customPrompt) {
+    return `${customPrompt}\n\n---\n# WORKSPACE TOOLS & EXECUTION ENVIRONMENT\n${basePrompt}`;
+  }
+
+  return basePrompt;
 }
 
 // ---------------------------------------------------------------------------

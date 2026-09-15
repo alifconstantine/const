@@ -609,6 +609,8 @@ app.on("second-instance", (_event, commandLine) => {
         mode?: "ask_before_changes" | "full_access";
         thinkingLevel?: string;
         maxOutputTokens?: number;
+        systemPrompt?: string;
+        temperature?: number;
       }
     ) => {
       const config = loadUserConfig();
@@ -660,6 +662,7 @@ app.on("second-instance", (_event, commandLine) => {
         model,
         workspacePath: targetWorkspace,
         preset: "learn",
+        systemPrompt: payload.systemPrompt,
         mode: payload.mode || "ask_before_changes",
         thinkingLevel: payload.thinkingLevel as any,
         maxOutputTokens: payload.maxOutputTokens ?? (modelDef as any)?.maxOutputTokens,

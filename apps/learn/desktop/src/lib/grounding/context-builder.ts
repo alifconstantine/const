@@ -49,7 +49,7 @@ export function buildGroundedContext(
   let isTruncated = false;
 
   for (const src of activeSources) {
-    const rawId = src.id.startsWith("source:") ? src.id : `source:${src.id}`;
+    const rawId = src.id;
     sourceIds.push(rawId);
 
     const contentText = (src.content || "").trim();
@@ -83,7 +83,7 @@ export function buildGroundedContext(
 
   const formattedContext = `## SOURCE CONTEXT\nBelow is the verified study material provided by the student. Use this material as your primary factual ground truth:\n\n${renderedBlocks.join(
     "\n"
-  )}`;
+  )}\n\n[MANDATORY CITATION INSTRUCTION:\nEvery time you explain, summarize, or reference information from these sources, you MUST append the exact source citation tag [source:<id>] (for example: [source:${sourceIds[0] || "source_123"}]) directly after the sentence or bullet point. Do not omit citations!]`;
 
   return {
     formattedContext,
