@@ -1502,6 +1502,10 @@ export function MobileLearnWorkspace({
       <SourcesSheet
         open={isSourcesSheetOpen}
         onClose={() => setIsSourcesSheetOpen(false)}
+        onBack={() => {
+          setIsSourcesSheetOpen(false);
+          setIsSidebarOpen(true);
+        }}
         sourcesCount={learn?.sourcesCount || 0}
         onOpenAddSource={() => setIsAddSourceOpen(true)}
         searchQuery={searchQuery}
@@ -1521,6 +1525,10 @@ export function MobileLearnWorkspace({
       <StudioSheet
         open={isStudioSheetOpen}
         onClose={() => setIsStudioSheetOpen(false)}
+        onBack={() => {
+          setIsStudioSheetOpen(false);
+          setIsSidebarOpen(true);
+        }}
         tools={STUDIO_TOOLS}
         toolNameMap={toolNameMap}
         artifacts={artifacts}

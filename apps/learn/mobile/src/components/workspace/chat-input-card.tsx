@@ -3,7 +3,7 @@ import {
   ArrowUp,
   Square,
   Plus,
-  Layers,
+  FolderOpen,
   X,
   FileText,
   Video,
@@ -227,8 +227,8 @@ export function ChatInputCard({
       title={t("learningSources")}
       aria-label={t("learningSources")}
     >
-      <Layers className="w-3.5 h-3.5 text-[#888888]" />
-      <span className="font-mono text-[11px] text-[#888888]">{sourcesCount}</span>
+      <FolderOpen className="w-3.5 h-3.5 text-[#888888]" />
+      <span className="font-sans text-[11px] text-[#888888]">{sourcesCount}</span>
     </button>
   );
 
