@@ -6,13 +6,19 @@ import {
   SquarePen,
   ChevronRight,
   Plus,
+  Package,
+  FileText,
+  Download,
 } from "lucide-react";
 import { TabHeader } from "./tab-header";
 import { ReviewTab } from "./review-tab";
 import { FileDiffTab } from "./file-diff-tab";
+import { FilePreviewTab } from "./file-preview-tab";
+import { OpenTabView } from "./open-tab-view";
+import { BrowserTab } from "./browser-tab";
 import { STUDIO_TOOLS } from "../workspace/studio-panel";
 import { useI18n } from "../../lib/i18n";
-import type { RightPaneTab } from "./types";
+import type { RightPaneTab, RightPaneTabType } from "./types";
 import type { FileMutationRecord } from "@const/agent";
 
 export interface RightPaneProps {
@@ -24,14 +30,21 @@ export interface RightPaneProps {
   onModeChange: (mode: "studio" | "preview") => void;
   tabs: RightPaneTab[];
   activeTabId: string | null;
+  isOpeningNewTab?: boolean;
   onSelectTab: (tabId: string) => void;
   onCloseTab: (tabId: string, e: React.MouseEvent) => void;
+  onNewTab?: () => void;
+  onOpenTabType?: (type: RightPaneTabType) => void;
+  onReorderTabs?: (fromIndex: number, toIndex: number) => void;
+  onUpdateTab?: (tabId: string, updates: Partial<RightPaneTab>) => void;
   mutations?: FileMutationRecord[];
   onRollbackFile?: (record: FileMutationRecord) => Promise<any> | void;
   onRollbackAll?: (records: FileMutationRecord[]) => Promise<any> | void;
   onOpenFileDiff?: (record: FileMutationRecord) => void;
   onSelectStudioTool?: (toolId: string) => void;
   onAddNote?: () => void;
+  artifacts?: any[];
+  onDownloadArtifact?: (art: any) => void;
 }
 
 export function RightPane({
@@ -43,14 +56,21 @@ export function RightPane({
   onModeChange,
   tabs,
   activeTabId,
+  isOpeningNewTab = false,
   onSelectTab,
   onCloseTab,
+  onNewTab,
+  onOpenTabType,
+  onReorderTabs,
+  onUpdateTab,
   mutations = [],
   onRollbackFile,
   onRollbackAll,
   onOpenFileDiff,
   onSelectStudioTool,
   onAddNote,
+  artifacts,
+  onDownloadArtifact,
 }: RightPaneProps) {
   const { t } = useI18n();
 
@@ -143,7 +163,7 @@ export function RightPane({
 
         {/* Vertical Stack of Studio Tools Icons */}
         <div className="flex flex-col items-center gap-1.5 mt-2">
-          {STUDIO_TOOLS.slice(0, 7).map((tool) => {
+          {STUDIO_TOOLS.map((tool) => {
             const Icon = tool.icon;
             const toolName = t(tool.translationKey);
             return (
@@ -195,9 +215,13 @@ export function RightPane({
         <div className="w-0.5 h-full bg-transparent group-hover:bg-[#0066ff]/50" />
       </div>
 
-      {/* Top Header with 2 Menus: Studio & Preview */}
-      <div className="h-12 px-3 bg-[#1e1e20] border-b border-[#333335] flex items-center justify-between shrink-0 select-none">
-        {/* Segmented Control: [ Studio ] [ Preview (N) ] */}
+      {/* Top Header with 2 Menus: Studio & Review */}
+      <div
+        className={`h-12 px-3 bg-[#1e1e20] flex items-center justify-between shrink-0 select-none ${
+          mode === "studio" ? "border-b-0" : "border-b border-[#282828]"
+        }`}
+      >
+        {/* Segmented Control: [ Studio ] [ Review (N) ] */}
         <div className="flex items-center gap-1 bg-[#141416] p-0.5 rounded-xl border border-[#2d2d30]">
           <button
             type="button"
@@ -222,7 +246,7 @@ export function RightPane({
             }`}
           >
             <Layers className="w-3.5 h-3.5" />
-            <span>{t("preview") || "Preview"}</span>
+            <span>{t("review") || "Review"}</span>
             {mutations.length > 0 && (
               <span className="px-1.5 py-0.5 rounded-full bg-[#10b981]/20 text-[#10b981] font-mono text-[10px] font-semibold ml-0.5">
                 {mutations.length}
@@ -279,6 +303,58 @@ export function RightPane({
             })}
           </div>
 
+          {/* Section: Artifacts / Downloads (matching mobile StudioSheet) */}
+          {artifacts && (
+            <div className="pt-2 space-y-2.5 mb-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-foreground">
+                  {t("artifacts") || "Hasil Artefak & Unduhan"}
+                </span>
+                {artifacts.length > 0 && (
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary/80 border border-border/60 font-mono text-muted-foreground">
+                    {artifacts.length === 1
+                      ? t("filesCountSingle") || "1 file"
+                      : t("filesCount", { count: artifacts.length }) || `${artifacts.length} files`}
+                  </span>
+                )}
+              </div>
+
+              {artifacts.length > 0 ? (
+                <div className="space-y-2">
+                  {artifacts.map((art) => (
+                    <div
+                      key={art.id}
+                      className="p-2.5 rounded-xl bg-secondary/30 border border-border/50 flex items-center justify-between gap-2.5"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="h-7 w-7 rounded-lg bg-secondary text-muted-foreground border border-border/40 flex items-center justify-center shrink-0">
+                          {art.isZip ? <Package className="h-3.5 w-3.5" /> : <FileText className="h-3.5 w-3.5" />}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-xs font-medium text-foreground truncate">
+                            {art.title}
+                          </div>
+                          <div className="text-[10px] text-muted-foreground">
+                            {art.isZip ? "ZIP Archive / Folder" : art.type || "Document"}
+                          </div>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => onDownloadArtifact?.(art)}
+                        className="h-7 px-2.5 rounded-lg bg-muted hover:bg-muted/80 text-foreground text-xs flex items-center gap-1.5 transition-colors cursor-pointer border border-border/60 shrink-0"
+                      >
+                        <Download className="h-3 w-3" />
+                        <span>{t("download") || "Unduh"}</span>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          )}
+
           {/* Empty State Studio Output */}
           <div className="flex-1 flex flex-col items-center justify-center text-center p-4 min-h-[160px]">
             <div className="h-12 w-12 rounded-2xl bg-secondary/80 border border-border/50 flex items-center justify-center text-muted-foreground/80 mb-3 shadow-2xs">
@@ -305,28 +381,36 @@ export function RightPane({
           </div>
         </div>
       ) : (
-        /* Preview / Harness Right-Pane Content */
+        /* Review Sidepanel matching apps/harness/desktop */
         <div className="flex-1 w-full h-full min-h-0 flex flex-col overflow-hidden bg-[#141414]">
-          {/* Harness Tab Header */}
+          {/* Harness Tab Header with +, Search Dropdown, Drag & Drop */}
           <TabHeader
             tabs={tabs}
             activeTabId={activeTabId}
+            isOpeningNewTab={Boolean(isOpeningNewTab)}
             onSelectTab={onSelectTab}
             onCloseTab={onCloseTab}
-            onToggleSidebar={onToggleCollapse}
+            onNewTab={onNewTab || (() => {})}
+            onReorderTabs={onReorderTabs}
           />
 
-          {/* Active Tab Body */}
-          <div className="flex-1 w-full h-[calc(100%-36px)] min-h-0 flex flex-col overflow-hidden">
-            {activeTab && activeTab.type === "file_diff" ? (
+          {/* Active Tab Body matching apps/harness/desktop */}
+          <div className="flex-1 w-full h-[calc(100%-40px)] min-h-0 relative overflow-hidden flex flex-col bg-[#141414]">
+            {isOpeningNewTab || tabs.length === 0 || !activeTab ? (
+              <OpenTabView onSelectTabType={onOpenTabType || (() => {})} />
+            ) : activeTab.type === "file_diff" ? (
               <FileDiffTab
                 key={activeTab.id}
                 tab={activeTab}
                 onRollbackFile={onRollbackFile}
               />
+            ) : activeTab.type === "file_preview" ? (
+              <FilePreviewTab key={activeTab.id} tab={activeTab} />
+            ) : activeTab.type === "browser" ? (
+              <BrowserTab key={activeTab.id} tab={activeTab} onUpdateTab={onUpdateTab} />
             ) : (
               <ReviewTab
-                key="review_tab"
+                key={activeTab.id || "review_tab"}
                 mutations={mutations}
                 onRollbackFile={onRollbackFile}
                 onRollbackAll={onRollbackAll}

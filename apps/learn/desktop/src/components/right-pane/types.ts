@@ -1,6 +1,6 @@
 import type { FileMutationRecord } from "@const/agent";
 
-export type RightPaneTabType = "review" | "file_diff" | "file_preview";
+export type RightPaneTabType = "review" | "file_diff" | "file_preview" | "browser";
 
 export interface RightPaneTab {
   id: string;
@@ -13,4 +13,6 @@ export interface RightPaneTab {
   previewMode?: "formatted" | "raw";
   cwd?: string;
   createdAt?: number;
+  url?: string;
+  favicon?: string;
 }

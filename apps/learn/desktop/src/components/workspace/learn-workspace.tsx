@@ -39,7 +39,7 @@ import {
 import { useI18n, LANGUAGE_OPTIONS } from "../../lib/i18n";
 import { SourcesPanel } from "./sources-panel";
 import { ChatPanel } from "./chat-panel";
-import { RightPane, type RightPaneTab } from "../right-pane";
+import { RightPane, type RightPaneTab, type RightPaneTabType } from "../right-pane";
 import { AddSourceDialog } from "./add-source-dialog";
 import { SettingsView } from "../settings/settings-view";
 import { ErrorBoundary } from "../ui/error-boundary";
@@ -72,23 +72,30 @@ export function LearnWorkspace({
     return await db.learns.get(learnId);
   }, [learnId]);
 
+  // Live artifacts from Dexie
+  const artifacts = useLiveQuery(async () => {
+    return await db.artifacts.where("learnId").equals(learnId).toArray();
+  }, [learnId]);
+
   // Dialog & Panel states
   const [isAddSourceOpen, setIsAddSourceOpen] = useState(initialSourceModalOpen);
   const [isSourcesCollapsed, setIsSourcesCollapsed] = useState(false);
   const [isStudioCollapsed, setIsStudioCollapsed] = useState(false);
   const [pendingStudioPrompt, setPendingStudioPrompt] = useState<string | null>(null);
 
-  // Right Pane: Dual Studio & Preview state
+  // Right Pane: Dual Studio & Preview/Review state
   const [rightPaneMode, setRightPaneMode] = useState<"studio" | "preview">("studio");
   const [rightPaneTabs, setRightPaneTabs] = useState<RightPaneTab[]>([
     { id: "review", type: "review", title: "Review" },
   ]);
   const [activeRightPaneTabId, setActiveRightPaneTabId] = useState<string>("review");
+  const [isOpeningNewTab, setIsOpeningNewTab] = useState(false);
   const [sessionMutations, setSessionMutations] = useState<FileMutationRecord[]>([]);
 
   const handleOpenFileDiff = (mutation: FileMutationRecord) => {
     setIsStudioCollapsed(false);
     setRightPaneMode("preview");
+    setIsOpeningNewTab(false);
 
     const filePath = mutation.filePath || mutation.targetFile || "";
     const fileName =
@@ -136,6 +143,7 @@ export function LearnWorkspace({
   };
 
   const handleSelectTab = (tabId: string) => {
+    setIsOpeningNewTab(false);
     setActiveRightPaneTabId(tabId);
   };
 
@@ -154,6 +162,78 @@ export function LearnWorkspace({
       }
       return next;
     });
+  };
+
+  const handleNewTab = () => {
+    setIsStudioCollapsed(false);
+    setRightPaneMode("preview");
+    setIsOpeningNewTab(true);
+  };
+
+  const handleOpenTabType = (type: RightPaneTabType) => {
+    setIsOpeningNewTab(false);
+    if (type === "review") {
+      const existing = rightPaneTabs.find((t) => t.type === "review");
+      if (existing) {
+        setActiveRightPaneTabId(existing.id);
+      } else {
+        const reviewTab: RightPaneTab = {
+          id: "review",
+          type: "review",
+          title: "Review",
+        };
+        setRightPaneTabs((prev) => [reviewTab, ...prev]);
+        setActiveRightPaneTabId("review");
+      }
+    } else if (type === "browser") {
+      const browserTab: RightPaneTab = {
+        id: `browser_${Date.now()}`,
+        type: "browser",
+        title: "Browser",
+        url: "https://google.com",
+      };
+      setRightPaneTabs((prev) => [...prev, browserTab]);
+      setActiveRightPaneTabId(browserTab.id);
+    } else if (type === "file_preview") {
+      const previewTab: RightPaneTab = {
+        id: `preview_${Date.now()}`,
+        type: "file_preview",
+        title: "Untitled",
+      };
+      setRightPaneTabs((prev) => [...prev, previewTab]);
+      setActiveRightPaneTabId(previewTab.id);
+    }
+  };
+
+  const handleReorderTabs = (fromIndex: number, toIndex: number) => {
+    setRightPaneTabs((prev) => {
+      const result = Array.from(prev);
+      const [removed] = result.splice(fromIndex, 1);
+      if (removed) {
+        result.splice(toIndex, 0, removed);
+      }
+      return result;
+    });
+  };
+
+  const handleUpdateTab = (tabId: string, updates: Partial<RightPaneTab>) => {
+    setRightPaneTabs((prev) =>
+      prev.map((t) => (t.id === tabId ? { ...t, ...updates } : t))
+    );
+  };
+
+  const handleDownloadArtifact = (art: any) => {
+    if (art.content) {
+      const blob = new Blob([art.content], { type: "text/markdown;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${art.title || "artifact"}.md`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
   };
 
   const handleRollbackFile = async (record: FileMutationRecord) => {
@@ -797,8 +877,13 @@ export function LearnWorkspace({
             onModeChange={setRightPaneMode}
             tabs={rightPaneTabs}
             activeTabId={activeRightPaneTabId}
+            isOpeningNewTab={isOpeningNewTab}
             onSelectTab={handleSelectTab}
             onCloseTab={handleCloseTab}
+            onNewTab={handleNewTab}
+            onOpenTabType={handleOpenTabType}
+            onReorderTabs={handleReorderTabs}
+            onUpdateTab={handleUpdateTab}
             mutations={sessionMutations}
             onRollbackFile={handleRollbackFile}
             onRollbackAll={handleRollbackAll}
@@ -807,6 +892,8 @@ export function LearnWorkspace({
             onAddNote={() => {
               console.log("Add note clicked");
             }}
+            artifacts={artifacts || []}
+            onDownloadArtifact={handleDownloadArtifact}
           />
         </ErrorBoundary>
       </div>

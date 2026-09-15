@@ -1,23 +1,59 @@
-import React, { useRef, useEffect } from "react";
-import { X, Layers, FileText } from "lucide-react";
+import React, { useState, useRef, useEffect } from "react";
+import {
+  ChevronsDown,
+  Plus,
+  X,
+  FileText,
+  Globe,
+  Search,
+  Layers,
+} from "lucide-react";
 import { FileIcon } from "../workspace/file-icon";
-import type { RightPaneTab } from "./types";
+import type { RightPaneTab, RightPaneTabType } from "./types";
 
 interface TabHeaderProps {
   tabs: RightPaneTab[];
   activeTabId: string | null;
+  isOpeningNewTab: boolean;
   onSelectTab: (tabId: string) => void;
   onCloseTab: (tabId: string, e: React.MouseEvent) => void;
-  onToggleSidebar?: () => void;
+  onNewTab: () => void;
+  onReorderTabs?: (fromIndex: number, toIndex: number) => void;
+}
+
+function getTabIcon(type: RightPaneTabType) {
+  switch (type) {
+    case "review":
+      return Layers;
+    case "file_diff":
+    case "file_preview":
+      return FileText;
+    case "browser":
+      return Globe;
+    default:
+      return Layers;
+  }
 }
 
 export function TabHeader({
   tabs,
   activeTabId,
+  isOpeningNewTab,
   onSelectTab,
   onCloseTab,
+  onNewTab,
+  onReorderTabs,
 }: TabHeaderProps) {
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const tabListRef = useRef<HTMLDivElement>(null);
+
+  // Drag and drop state
+  const isDraggingRef = useRef(false);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [dragOverIndex, setDragOverIndex] = useState<number | null>(null);
+  const [dropPosition, setDropPosition] = useState<"left" | "right" | null>(null);
 
   // Auto-scroll when new tabs are appended
   const prevTabsLengthRef = useRef(tabs.length);
@@ -31,57 +67,294 @@ export function TabHeader({
     prevTabsLengthRef.current = tabs.length;
   }, [tabs.length]);
 
+  const handleDragStart = (e: React.DragEvent<HTMLDivElement>, index: number) => {
+    isDraggingRef.current = true;
+    setDraggedIndex(index);
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", String(index));
+  };
+
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>, index: number) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    if (draggedIndex === null) return;
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const midX = rect.left + rect.width / 2;
+    const position = e.clientX < midX ? "left" : "right";
+
+    if (dragOverIndex !== index || dropPosition !== position) {
+      setDragOverIndex(index);
+      setDropPosition(position);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>, index: number) => {
+    e.preventDefault();
+    if (draggedIndex === null || !onReorderTabs) {
+      handleDragEnd();
+      return;
+    }
+
+    if (draggedIndex === index) {
+      handleDragEnd();
+      return;
+    }
+
+    let targetIndex = index;
+    if (draggedIndex < index) {
+      targetIndex = dropPosition === "left" ? index - 1 : index;
+    } else {
+      targetIndex = dropPosition === "left" ? index : index + 1;
+    }
+    targetIndex = Math.max(0, Math.min(tabs.length - 1, targetIndex));
+
+    onReorderTabs(draggedIndex, targetIndex);
+    handleDragEnd();
+  };
+
+  const handleDragEnd = () => {
+    setDraggedIndex(null);
+    setDragOverIndex(null);
+    setDropPosition(null);
+    setTimeout(() => {
+      isDraggingRef.current = false;
+    }, 60);
+  };
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    if (!isDropdownOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [isDropdownOpen]);
+
+  // Filter tabs for the dropdown search
+  const filteredTabs = tabs.filter((t) =>
+    t.title.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
-    <div className="h-9 px-1.5 bg-[#1a1a1a] border-b border-[#282828] flex items-center justify-between shrink-0 select-none text-xs">
-      {/* Scrollable Tab Strip */}
+    <div className="h-10 w-full border-b border-[#282828] bg-[#141414] flex items-center px-2 shrink-0 select-none relative z-20">
+      {/* 1. Leftmost: ChevronsDown Button for Searching / Switching Open Tabs */}
+      <div className="relative shrink-0" ref={dropdownRef}>
+        <button
+          type="button"
+          onClick={() => {
+            setIsDropdownOpen((prev) => !prev);
+            setSearchQuery("");
+          }}
+          className={`w-6 h-6 rounded flex items-center justify-center transition-colors cursor-pointer ${
+            isDropdownOpen
+              ? "bg-white/10 text-white"
+              : "text-[#8e8e8e] hover:text-white hover:bg-white/5"
+          }`}
+          title="Switch and search open tabs"
+          aria-label="Switch and search open tabs"
+        >
+          <ChevronsDown className="w-3.5 h-3.5" />
+        </button>
+
+        {/* Dropdown Popover */}
+        {isDropdownOpen && (
+          <div className="absolute top-8 left-0 w-64 rounded-xl bg-[#1e1e1e] border border-[#333333] shadow-2xl p-2 z-50 animate-in fade-in zoom-in-95 duration-150 font-sans">
+            {/* Search Input */}
+            <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-[#282828] border border-[#383838] mb-2 text-xs">
+              <Search className="w-3.5 h-3.5 text-[#888888] shrink-0" />
+              <input
+                type="text"
+                autoFocus
+                placeholder="Search open tabs..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-transparent text-white placeholder-[#666666] outline-none text-xs"
+              />
+            </div>
+
+            {/* List of tabs */}
+            <div className="max-h-56 overflow-y-auto space-y-0.5">
+              {filteredTabs.length === 0 ? (
+                <div className="text-center py-4 text-xs text-[#666666]">
+                  No tabs found
+                </div>
+              ) : (
+                filteredTabs.map((t) => {
+                  const Icon = getTabIcon(t.type);
+                  const isActive = !isOpeningNewTab && t.id === activeTabId;
+                  return (
+                    <div
+                      key={t.id}
+                      onClick={() => {
+                        onSelectTab(t.id);
+                        setIsDropdownOpen(false);
+                      }}
+                      className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs cursor-pointer group transition-colors ${
+                        isActive
+                          ? "bg-white/10 text-white font-medium"
+                          : "text-[#a0a0a0] hover:text-white hover:bg-white/5"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        {t.type === "file_diff" || t.type === "file_preview" ? (
+                          <FileIcon filename={t.filePath || t.title} className="w-3.5 h-3.5 shrink-0" />
+                        ) : (
+                          <Icon className="w-3.5 h-3.5 shrink-0" />
+                        )}
+                        <span className="truncate">{t.title}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onCloseTab(t.id, e);
+                        }}
+                        className="p-0.5 rounded hover:bg-white/10 text-[#666666] hover:text-white transition-colors cursor-pointer shrink-0 opacity-0 group-hover:opacity-100"
+                        title="Close tab"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Quick Action: Open new tab */}
+            <div className="mt-2 pt-2 border-t border-[#333333]">
+              <button
+                type="button"
+                onClick={() => {
+                  onNewTab();
+                  setIsDropdownOpen(false);
+                }}
+                className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-[#8e8e8e] hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5 shrink-0" />
+                <span>Open new tab...</span>
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* 2. Middle: Scrollable Tab Strip with tabs and '+' button immediately following the last tab */}
       <div
         ref={tabListRef}
-        onWheel={(e) => {
-          if (e.deltaY !== 0 && tabListRef.current) {
-            tabListRef.current.scrollLeft += e.deltaY;
+        onDragOver={(e) => {
+          if (draggedIndex !== null) {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = "move";
           }
         }}
-        className="flex items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden flex-1 h-full py-1"
+        onDrop={(e) => {
+          if (e.target === tabListRef.current && draggedIndex !== null && onReorderTabs) {
+            e.preventDefault();
+            onReorderTabs(draggedIndex, tabs.length - 1);
+            handleDragEnd();
+          }
+        }}
+        className="flex-1 flex items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden min-w-0 px-1.5"
       >
-        {tabs.map((tab) => {
-          const isActive = tab.id === activeTabId;
-          const isReview = tab.type === "review";
+        {tabs.map((tab, index) => {
+          const Icon = getTabIcon(tab.type);
+          const isActive = !isOpeningNewTab && tab.id === activeTabId;
+          const isBeingDragged = draggedIndex === index;
+          const isDropTarget = dragOverIndex === index && draggedIndex !== index;
 
           return (
             <div
               key={tab.id}
-              onClick={() => onSelectTab(tab.id)}
-              className={`flex items-center gap-1.5 px-2.5 h-7 rounded-lg text-xs font-sans transition-all cursor-pointer border shrink-0 group select-none ${
-                isActive
-                  ? "bg-[#252528] text-white border-[#383838] font-medium shadow-2xs"
-                  : "bg-transparent text-[#999999] hover:text-white hover:bg-white/[0.04] border-transparent"
+              draggable
+              onDragStart={(e) => handleDragStart(e, index)}
+              onDragOver={(e) => handleDragOver(e, index)}
+              onDrop={(e) => handleDrop(e, index)}
+              onDragEnd={handleDragEnd}
+              onClick={() => {
+                if (!isDraggingRef.current) {
+                  onSelectTab(tab.id);
+                }
+              }}
+              className={`relative h-7 px-2.5 rounded-md flex items-center gap-1.5 text-xs shrink-0 cursor-grab active:cursor-grabbing transition-all group select-none ${
+                isBeingDragged
+                  ? "opacity-35 scale-95 border border-dashed border-[#555]"
+                  : isActive
+                  ? "bg-[#252525] border border-[#383838] text-white shadow-sm font-medium"
+                  : "text-[#8e8e8e] hover:text-white hover:bg-white/5 border border-transparent"
               }`}
-              title={tab.filePath || tab.title}
             >
-              {isReview ? (
-                <Layers className={`w-3.5 h-3.5 shrink-0 ${isActive ? "text-[#0066ff]" : "text-[#888888]"}`} />
-              ) : tab.filePath || tab.title ? (
-                <FileIcon filename={tab.filePath || tab.title} className="w-3.5 h-3.5 shrink-0" />
+              {/* Drop position indicator lines */}
+              {isDropTarget && dropPosition === "left" && (
+                <div className="absolute -left-[3px] top-1 bottom-1 w-[2.5px] bg-blue-500 rounded-full shadow-[0_0_8px_rgba(59,130,246,0.9)] z-30 pointer-events-none" />
+              )}
+              {isDropTarget && dropPosition === "right" && (
+                <div className="absolute -right-[3px] top-1 bottom-1 w-[2.5px] bg-blue-500 rounded-full shadow-[0_0_8px_rgba(59,130,246,0.9)] z-30 pointer-events-none" />
+              )}
+
+              {tab.type === "file_diff" || tab.type === "file_preview" ? (
+                <FileIcon filename={tab.filePath || tab.title} className="w-3.5 h-3.5 shrink-0 pointer-events-none" />
               ) : (
-                <FileText className="w-3.5 h-3.5 shrink-0 text-[#888888]" />
+                <Icon
+                  className={`w-3.5 h-3.5 shrink-0 pointer-events-none ${
+                    isActive ? "text-white" : "text-[#8e8e8e] group-hover:text-white"
+                  }`}
+                />
               )}
-
-              <span className="truncate max-w-[140px]">{tab.title}</span>
-
-              {/* Close Button for non-review tabs */}
-              {!isReview && (
-                <button
-                  type="button"
-                  onClick={(e) => onCloseTab(tab.id, e)}
-                  className="w-4 h-4 rounded hover:bg-white/10 flex items-center justify-center opacity-60 hover:opacity-100 transition-opacity ml-0.5"
-                  title="Close tab"
-                >
-                  <X className="w-3 h-3 text-[#aaaaaa]" />
-                </button>
-              )}
+              <span className="truncate max-w-[130px] pointer-events-none">{tab.title}</span>
+              <button
+                type="button"
+                draggable={false}
+                onDragStart={(e) => e.stopPropagation()}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onCloseTab(tab.id, e);
+                }}
+                className={`p-0.5 rounded ml-0.5 cursor-pointer transition-colors ${
+                  isActive
+                    ? "text-[#888888] hover:text-white hover:bg-white/10"
+                    : "text-transparent group-hover:text-[#888888] hover:!text-white hover:bg-white/10"
+                }`}
+                title="Close tab"
+              >
+                <X className="w-3 h-3 pointer-events-none" />
+              </button>
             </div>
           );
         })}
+
+        {/* 3. '+' Button located immediately to the right of the last tab pill */}
+        <button
+          type="button"
+          onClick={onNewTab}
+          onDragOver={(e) => {
+            if (draggedIndex !== null) {
+              e.preventDefault();
+              e.dataTransfer.dropEffect = "move";
+              setDragOverIndex(-1);
+              setDropPosition("right");
+            }
+          }}
+          onDrop={(e) => {
+            e.preventDefault();
+            if (draggedIndex !== null && onReorderTabs) {
+              onReorderTabs(draggedIndex, tabs.length - 1);
+            }
+            handleDragEnd();
+          }}
+          className={`w-6 h-6 rounded flex items-center justify-center transition-colors cursor-pointer shrink-0 ${
+            isOpeningNewTab
+              ? "bg-white/10 text-white"
+              : "text-[#8e8e8e] hover:text-white hover:bg-white/10"
+          }`}
+          title="Open new tab"
+          aria-label="Open new tab"
+        >
+          <Plus className="w-3.5 h-3.5" />
+        </button>
       </div>
     </div>
   );

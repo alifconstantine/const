@@ -3,4 +3,7 @@ export * from "./diff-viewer";
 export * from "./tab-header";
 export * from "./review-tab";
 export * from "./file-diff-tab";
+export * from "./file-preview-tab";
+export * from "./open-tab-view";
+export * from "./browser-tab";
 export * from "./right-pane";
