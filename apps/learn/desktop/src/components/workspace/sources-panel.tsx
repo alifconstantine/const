@@ -18,6 +18,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
+  cn,
 } from "@const/ui";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db, localDb, type LocalSource } from "@/lib/db";
@@ -32,6 +33,7 @@ interface SourcesPanelProps {
   onDropFiles?: (files: File[]) => void;
   onToggleCollapse?: () => void;
   isCollapsed?: boolean;
+  isResizing?: boolean;
 }
 
 function formatFileSize(bytes?: number): string {
@@ -98,6 +100,7 @@ export function SourcesPanel({
   onDropFiles,
   onToggleCollapse,
   isCollapsed = false,
+  isResizing = false,
 }: SourcesPanelProps) {
   const { t } = useI18n();
   const [searchQuery, setSearchQuery] = useState("");
@@ -147,44 +150,56 @@ export function SourcesPanel({
     }
   };
 
-  if (isCollapsed) {
-    return (
-      <div className="w-12 h-full flex flex-col items-center py-3 bg-card rounded-2xl border border-border/50 text-muted-foreground shrink-0 select-none shadow-xs">
-        <button
-          type="button"
-          onClick={onToggleCollapse}
-          className="h-8 w-8 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
-          title={t("openSourcesPanel")}
-          aria-label={t("sourcesPanelTitle")}
-        >
-          <PanelLeft className="h-4 w-4" />
-        </button>
-
-        <button
-          type="button"
-          onClick={onAddSource}
-          className="h-8 w-8 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer mt-1"
-          title={t("addSource")}
-          aria-label={t("addSource")}
-        >
-          <Plus className="h-4 w-4" />
-        </button>
-      </div>
-    );
-  }
-
   return (
     <>
       <aside
-      onDragOver={handleDragOver}
-      onDragLeave={handleDragLeave}
-      onDrop={handleDrop}
-      style={{ width: isCollapsed ? undefined : width ? `${width}px` : undefined }}
-      className={`w-[250px] sm:w-[280px] lg:w-[320px] xl:w-[360px] 2xl:w-[400px] h-full flex flex-col bg-card rounded-2xl border ${
-        isDraggingOver ? "border-primary/80 ring-2 ring-primary/20" : "border-border/50"
-      } text-foreground p-3 sm:p-3.5 shrink-0 select-none overflow-hidden shadow-xs font-sans transition-colors`}
-    >
-      {/* Header */}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+        style={{ width: isCollapsed ? 48 : (width || 330) }}
+        className={cn(
+          "h-full flex flex-col relative bg-card rounded-2xl border text-foreground shrink-0 select-none overflow-hidden shadow-xs font-sans",
+          isDraggingOver ? "border-primary/80 ring-2 ring-primary/20" : "border-border/50",
+          !isResizing && "transition-[width] duration-300 ease-[cubic-bezier(0.2,0,0,1)]"
+        )}
+      >
+        {/* Collapsed Rail View */}
+        <div
+          className={cn(
+            "w-12 h-full flex flex-col items-center py-3 bg-card text-muted-foreground select-none absolute top-0 left-0 z-10 transition-opacity duration-200",
+            isCollapsed ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+          )}
+        >
+          <button
+            type="button"
+            onClick={onToggleCollapse}
+            className="h-8 w-8 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
+            title={t("openSourcesPanel")}
+            aria-label={t("sourcesPanelTitle")}
+          >
+            <PanelLeft className="h-4 w-4" />
+          </button>
+
+          <button
+            type="button"
+            onClick={onAddSource}
+            className="h-8 w-8 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer mt-1"
+            title={t("addSource")}
+            aria-label={t("addSource")}
+          >
+            <Plus className="h-4 w-4" />
+          </button>
+        </div>
+
+        {/* Expanded Content View */}
+        <div
+          style={{ width: `${width || 330}px`, minWidth: `${width || 330}px` }}
+          className={cn(
+            "h-full flex flex-col p-3 sm:p-3.5 transition-opacity duration-200",
+            isCollapsed ? "opacity-0 pointer-events-none" : "opacity-100 pointer-events-auto"
+          )}
+        >
+          {/* Header */}
       <div className="flex items-center justify-between mb-3 px-1">
         <div className="flex items-center gap-2">
           <span className="text-sm font-semibold tracking-tight text-foreground">{t("sourcesPanelTitle")}</span>
@@ -456,6 +471,7 @@ export function SourcesPanel({
             </p>
           </div>
         )}
+        </div>
       </aside>
 
       {/* Source Detail Modal */}

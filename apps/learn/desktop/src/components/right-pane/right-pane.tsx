@@ -1,4 +1,4 @@
-import React, { useRef } from "react";
+import React, { useRef, useState, useEffect } from "react";
 import {
   PanelRight,
   PenTool,
@@ -10,6 +10,7 @@ import {
   FileText,
   Download,
 } from "lucide-react";
+import { cn } from "@const/ui";
 import { TabHeader } from "./tab-header";
 import { ReviewTab } from "./review-tab";
 import { FileDiffTab } from "./file-diff-tab";
@@ -25,6 +26,7 @@ export interface RightPaneProps {
   width?: number;
   onWidthChange?: (width: number) => void;
   isCollapsed?: boolean;
+  isResizing?: boolean;
   onToggleCollapse?: () => void;
   mode: "studio" | "preview";
   onModeChange: (mode: "studio" | "preview") => void;
@@ -51,6 +53,7 @@ export function RightPane({
   width,
   onWidthChange,
   isCollapsed = false,
+  isResizing = false,
   onToggleCollapse,
   mode,
   onModeChange,
@@ -75,12 +78,29 @@ export function RightPane({
   const { t } = useI18n();
 
   const isDraggingRef = useRef(false);
+  const [isInternalDragging, setIsInternalDragging] = useState(false);
   const startXRef = useRef(0);
   const startWidthRef = useRef(width || 400);
+
+  // Tab indicator refs and style for animated sliding pill
+  const studioBtnRef = useRef<HTMLButtonElement>(null);
+  const reviewBtnRef = useRef<HTMLButtonElement>(null);
+  const [indicatorStyle, setIndicatorStyle] = useState<{ left: number; width: number }>({ left: 2, width: 0 });
+
+  useEffect(() => {
+    const activeRef = mode === "studio" ? studioBtnRef.current : reviewBtnRef.current;
+    if (activeRef) {
+      setIndicatorStyle({
+        left: activeRef.offsetLeft,
+        width: activeRef.offsetWidth,
+      });
+    }
+  }, [mode, mutations.length]);
 
   // Resize handler
   const handleMouseDown = (e: React.MouseEvent) => {
     if (!onWidthChange || isCollapsed) return;
+    setIsInternalDragging(true);
     isDraggingRef.current = true;
     startXRef.current = e.clientX;
     startWidthRef.current = width || 400;
@@ -95,6 +115,7 @@ export function RightPane({
     };
 
     const handleMouseUp = () => {
+      setIsInternalDragging(false);
       isDraggingRef.current = false;
       document.body.style.cursor = "";
       document.body.style.userSelect = "";
@@ -108,10 +129,22 @@ export function RightPane({
 
   const activeTab = tabs.find((t) => t.id === activeTabId) || tabs[0];
 
-  // Collapsed Sidebar view
-  if (isCollapsed) {
-    return (
-      <div className="w-12 h-full flex flex-col items-center py-3 bg-card rounded-2xl border border-border/50 text-muted-foreground shrink-0 select-none shadow-xs font-sans">
+  // Unified Sidebar View with smooth width and tab animation
+  return (
+    <aside
+      style={{ width: isCollapsed ? 48 : (width || 400) }}
+      className={cn(
+        "h-full flex flex-col relative bg-card rounded-2xl border border-border/50 text-foreground shrink-0 select-none overflow-hidden shadow-xs font-sans",
+        !isResizing && !isInternalDragging && "transition-[width] duration-300 ease-[cubic-bezier(0.2,0,0,1)]"
+      )}
+    >
+      {/* Collapsed Rail View */}
+      <div
+        className={cn(
+          "w-12 h-full flex flex-col items-center py-3 bg-card text-muted-foreground select-none font-sans absolute top-0 right-0 z-10 transition-opacity duration-200",
+          isCollapsed ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+        )}
+      >
         {/* Top: Reopen Panel Toggle */}
         <button
           type="button"
@@ -131,11 +164,12 @@ export function RightPane({
               onModeChange("studio");
               onToggleCollapse?.();
             }}
-            className={`h-7 w-7 rounded-lg flex items-center justify-center transition-colors cursor-pointer ${
+            className={cn(
+              "h-7 w-7 rounded-lg flex items-center justify-center transition-colors cursor-pointer",
               mode === "studio"
                 ? "bg-[#0066ff] text-white"
                 : "hover:bg-muted text-muted-foreground hover:text-foreground"
-            }`}
+            )}
             title="Studio"
           >
             <PenTool className="h-3.5 w-3.5" />
@@ -147,11 +181,12 @@ export function RightPane({
               onModeChange("preview");
               onToggleCollapse?.();
             }}
-            className={`relative h-7 w-7 rounded-lg flex items-center justify-center transition-colors cursor-pointer ${
+            className={cn(
+              "relative h-7 w-7 rounded-lg flex items-center justify-center transition-colors cursor-pointer",
               mode === "preview"
                 ? "bg-[#0066ff] text-white"
                 : "hover:bg-muted text-muted-foreground hover:text-foreground"
-            }`}
+            )}
             title={`Preview (${mutations.length} changes)`}
           >
             <Layers className="h-3.5 w-3.5" />
@@ -198,82 +233,97 @@ export function RightPane({
           <SquarePen className="h-4 w-4" />
         </button>
       </div>
-    );
-  }
 
-  // Expanded Sidebar view
-  return (
-    <aside
-      style={{ width: width ? `${width}px` : undefined }}
-      className="w-[290px] sm:w-[320px] lg:w-[370px] xl:w-[430px] 2xl:w-[480px] h-full flex flex-col relative bg-card rounded-2xl border border-border/50 text-foreground shrink-0 select-none overflow-hidden shadow-xs font-sans"
-    >
-      {/* Draggable resize handle on the left edge */}
+      {/* Expanded Content View */}
       <div
-        onMouseDown={handleMouseDown}
-        onDoubleClick={() => onWidthChange?.(400)}
-        className="absolute top-0 left-0 w-1 h-full cursor-col-resize hover:bg-white/20 transition-colors z-30 group"
-        title="Drag to resize, double-click to reset"
+        style={{ width: `${width || 400}px`, minWidth: `${width || 400}px` }}
+        className={cn(
+          "h-full flex flex-col transition-opacity duration-200 relative",
+          isCollapsed ? "opacity-0 pointer-events-none" : "opacity-100 pointer-events-auto"
+        )}
       >
-        <div className="w-0.5 h-full bg-transparent group-hover:bg-[#0066ff]/50" />
-      </div>
-
-      {/* Top Header with 2 Menus: Studio & Review */}
-      <div
-        className={`h-12 px-3 bg-[#1e1e20] flex items-center justify-between shrink-0 select-none ${
-          mode === "studio" ? "border-b-0" : "border-b border-[#282828]"
-        }`}
-      >
-        {/* Segmented Control: [ Studio ] [ Review (N) ] */}
-        <div className="flex items-center gap-1 bg-[#141416] p-0.5 rounded-xl border border-[#2d2d30]">
-          <button
-            type="button"
-            onClick={() => onModeChange("studio")}
-            className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer select-none ${
-              mode === "studio"
-                ? "bg-[#28282b] text-white shadow-2xs"
-                : "text-[#888888] hover:text-[#d4d4d4] hover:bg-white/[0.02]"
-            }`}
-          >
-            <PenTool className="w-3.5 h-3.5" />
-            <span>{t("studio") || "Studio"}</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() => onModeChange("preview")}
-            className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer select-none ${
-              mode === "preview"
-                ? "bg-[#28282b] text-white shadow-2xs"
-                : "text-[#888888] hover:text-[#d4d4d4] hover:bg-white/[0.02]"
-            }`}
-          >
-            <Layers className="w-3.5 h-3.5" />
-            <span>{t("review") || "Review"}</span>
-            {mutations.length > 0 && (
-              <span className="px-1.5 py-0.5 rounded-full bg-[#10b981]/20 text-[#10b981] font-mono text-[10px] font-semibold ml-0.5">
-                {mutations.length}
-              </span>
-            )}
-          </button>
+        {/* Draggable resize handle on the left edge */}
+        <div
+          onMouseDown={handleMouseDown}
+          onDoubleClick={() => onWidthChange?.(400)}
+          className="absolute top-0 left-0 w-1 h-full cursor-col-resize hover:bg-white/20 transition-colors z-30 group"
+          title="Drag to resize, double-click to reset"
+        >
+          <div className="w-0.5 h-full bg-transparent group-hover:bg-[#0066ff]/50" />
         </div>
 
-        {/* Collapse Button */}
-        {onToggleCollapse && (
-          <button
-            type="button"
-            onClick={onToggleCollapse}
-            className="h-7 w-7 rounded-lg hover:bg-[#2c2c30] text-[#969696] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
-            title={t("hidePanel") || "Collapse panel"}
-          >
-            <PanelRight className="h-4 w-4" />
-          </button>
-        )}
-      </div>
+        {/* Top Header with 2 Menus: Studio & Review */}
+        <div
+          className={`h-12 px-3 bg-[#1e1e20] flex items-center justify-between shrink-0 select-none ${
+            mode === "studio" ? "border-b-0" : "border-b border-[#282828]"
+          }`}
+        >
+          {/* Segmented Control: [ Studio ] [ Review (N) ] */}
+          <div className="relative flex items-center bg-[#141416] p-0.5 rounded-xl border border-[#2d2d30]">
+            {/* Animated Sliding Background Pill */}
+            <div
+              className="absolute top-0.5 bottom-0.5 rounded-lg bg-[#28282b] shadow-2xs transition-all duration-200 ease-[cubic-bezier(0.2,0,0,1)] pointer-events-none"
+              style={{
+                left: `${indicatorStyle.left}px`,
+                width: indicatorStyle.width ? `${indicatorStyle.width}px` : undefined,
+                opacity: indicatorStyle.width ? 1 : 0,
+              }}
+            />
 
-      {/* Main Body based on Active Menu */}
-      {mode === "studio" ? (
-        /* Studio Content */
-        <div className="flex-1 flex flex-col p-3 sm:p-3.5 overflow-y-auto min-h-0 select-none">
+            <button
+              ref={studioBtnRef}
+              type="button"
+              onClick={() => onModeChange("studio")}
+              className={cn(
+                "relative z-10 flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium transition-colors duration-150 cursor-pointer select-none",
+                mode === "studio"
+                  ? "text-white"
+                  : "text-[#888888] hover:text-[#d4d4d4]"
+              )}
+            >
+              <PenTool className="w-3.5 h-3.5" />
+              <span>{t("studio") || "Studio"}</span>
+            </button>
+
+            <button
+              ref={reviewBtnRef}
+              type="button"
+              onClick={() => onModeChange("preview")}
+              className={cn(
+                "relative z-10 flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium transition-colors duration-150 cursor-pointer select-none",
+                mode === "preview"
+                  ? "text-white"
+                  : "text-[#888888] hover:text-[#d4d4d4]"
+              )}
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span>{t("review") || "Review"}</span>
+              {mutations.length > 0 && (
+                <span className="px-1.5 py-0.5 rounded-full bg-[#10b981]/20 text-[#10b981] font-mono text-[10px] font-semibold ml-0.5">
+                  {mutations.length}
+                </span>
+              )}
+            </button>
+          </div>
+
+          {/* Collapse Button */}
+          {onToggleCollapse && (
+            <button
+              type="button"
+              onClick={onToggleCollapse}
+              className="h-7 w-7 rounded-lg hover:bg-[#2c2c30] text-[#969696] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+              title={t("hidePanel") || "Collapse panel"}
+            >
+              <PanelRight className="h-4 w-4" />
+            </button>
+          )}
+        </div>
+
+        {/* Main Body based on Active Menu with smooth fade */}
+        <div className="flex-1 flex flex-col min-h-0 relative overflow-hidden">
+          {mode === "studio" ? (
+            /* Studio Content */
+            <div className="flex-1 flex flex-col p-3 sm:p-3.5 overflow-y-auto min-h-0 select-none animate-in fade-in duration-200">
           {/* 3x3 Grid of Studio Tools */}
           <div className="grid grid-cols-3 gap-2 mb-6">
             {STUDIO_TOOLS.map((tool) => {
@@ -384,7 +434,7 @@ export function RightPane({
         </div>
       ) : (
         /* Review Sidepanel matching apps/harness/desktop */
-        <div className="flex-1 w-full h-full min-h-0 flex flex-col overflow-hidden bg-[#141414]">
+        <div className="flex-1 w-full h-full min-h-0 flex flex-col overflow-hidden bg-[#141414] animate-in fade-in duration-200">
           {/* Harness Tab Header with +, Search Dropdown, Drag & Drop */}
           <TabHeader
             tabs={tabs}
@@ -422,6 +472,8 @@ export function RightPane({
           </div>
         </div>
       )}
+        </div>
+      </div>
     </aside>
   );
 }

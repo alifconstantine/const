@@ -2069,12 +2069,12 @@ export function ChatPanel({
             setIsContextOpen(!isContextOpen);
           }}
           className={cn(
-            "w-7 h-7 flex items-center justify-center rounded-lg transition-colors cursor-pointer hover:bg-muted/70",
+            "h-8 w-8 rounded-xl hover:bg-muted text-foreground/80 hover:text-foreground dark:text-white/80 dark:hover:text-white flex items-center justify-center transition-all cursor-pointer border border-border/60 bg-muted/40 shadow-xs active:scale-98 shrink-0",
             rawPercentUsed >= 90
-              ? "text-red-500 hover:text-red-400"
+              ? "text-red-500 hover:text-red-400 dark:text-red-400"
               : rawPercentUsed >= 75
-              ? "text-[#e79737] hover:text-[#ff9838]"
-              : "text-muted-foreground hover:text-foreground"
+              ? "text-[#e79737] hover:text-[#ff9838] dark:text-[#ff9838]"
+              : ""
           )}
           title={`Context window: ${rawPercentUsed === 0 ? "0%" : percentUsed} (~${formatTokenDisplay(usedTokens)} / ${formatTokenDisplay(totalTokens)})`}
           aria-label="Context window usage"
@@ -2106,7 +2106,7 @@ export function ChatPanel({
         {/* Context Window Popover */}
         {isContextOpen && (
           <div
-            className="absolute bottom-full mb-2 right-0 w-72 sm:w-80 max-w-[calc(100vw-32px)] bg-card dark:bg-[#1e1e1e] border border-border/70 dark:border-[#383838] rounded-2xl shadow-2xl p-4 z-50 flex flex-col gap-3 text-left select-none animate-in fade-in zoom-in-95 duration-100 font-sans"
+            className="absolute top-full mt-1.5 right-0 w-72 sm:w-80 max-w-[calc(100vw-32px)] bg-card dark:bg-[#1e1e1e] border border-border/70 dark:border-[#383838] rounded-2xl shadow-2xl p-4 z-50 flex flex-col gap-3 text-left select-none animate-in fade-in zoom-in-95 duration-100 font-sans"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header: % of context used and tokens */}
@@ -2807,6 +2807,9 @@ export function ChatPanel({
             <MessageCirclePlus className="h-4 w-4 stroke-[1.8]" />
           </button>
 
+          {/* Context Window Indicator */}
+          {renderContextIndicator()}
+
           {/* History Button */}
           <button
             type="button"
@@ -3306,9 +3309,8 @@ export function ChatPanel({
               {renderPlusButton()}
             </div>
 
-            {/* Right Action Items: Context + Model Dropdown + Send Button */}
-            <div style={{ gridArea: "actions" }} className="flex items-center gap-2 shrink-0 justify-self-end self-center">
-              {renderContextIndicator()}
+            {/* Right Action Items: Model Dropdown + Send Button */}
+            <div style={{ gridArea: "actions" }} className="flex items-center gap-1.5 shrink-0 justify-self-end self-center">
               {renderModelDropdown()}
               {renderSendButton()}
             </div>

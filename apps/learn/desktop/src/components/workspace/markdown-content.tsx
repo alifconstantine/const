@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { marked, type Token, type Tokens } from "marked";
 import { Check, Copy, Download, Maximize2, X } from "lucide-react";
-import { cn } from "@const/ui";
+import { cn, ScrollArea } from "@const/ui";
 import { useI18n } from "../../lib/i18n";
 import { createMarkedLatexExtension, renderKatex, type MathToken } from "../../lib/marked-latex";
 import { convertReferencesToMarkdownLinks } from "../../lib/grounding/source-references";
@@ -326,7 +326,7 @@ function TableBlock({
           </button>
         </div>
 
-        <div className="overflow-x-auto">
+        <ScrollArea orientation="horizontal" className="w-full">
           <table className="w-full text-left border-collapse text-[13.5px]">
             <thead>
               <tr className="bg-muted/30 border-b border-border/60">
@@ -334,7 +334,7 @@ function TableBlock({
                   <th
                     key={idx}
                     className={cn(
-                      "px-4 py-2.5 text-xs font-medium text-muted-foreground tracking-wider",
+                      "px-4 py-2.5 text-xs font-medium text-muted-foreground tracking-wider whitespace-nowrap",
                       getAlignClass(idx)
                     )}
                   >
@@ -353,7 +353,7 @@ function TableBlock({
                     <td
                       key={cellIdx}
                       className={cn(
-                        "px-4 py-3 leading-relaxed text-foreground dark:text-white align-top",
+                        "px-4 py-3 leading-relaxed text-foreground dark:text-white align-top whitespace-nowrap",
                         cellIdx === 0 && "font-medium text-foreground dark:text-white",
                         getAlignClass(cellIdx)
                       )}
@@ -365,7 +365,7 @@ function TableBlock({
               ))}
             </tbody>
           </table>
-        </div>
+        </ScrollArea>
       </div>
 
       {isExpanded && (
@@ -421,7 +421,7 @@ function TableBlock({
               </div>
             </div>
 
-            <div className="flex-1 overflow-auto p-4">
+            <ScrollArea orientation="both" className="flex-1 p-4">
               <table className="w-full text-left border-collapse text-[13.5px]">
                 <thead>
                   <tr className="bg-muted/30 border-b border-border">
@@ -429,7 +429,7 @@ function TableBlock({
                       <th
                         key={idx}
                         className={cn(
-                          "px-4 py-3 text-xs font-medium text-muted-foreground tracking-wider",
+                          "px-4 py-3 text-xs font-medium text-muted-foreground tracking-wider whitespace-nowrap",
                           getAlignClass(idx)
                         )}
                       >
@@ -448,7 +448,7 @@ function TableBlock({
                         <td
                           key={cellIdx}
                           className={cn(
-                            "px-4 py-3 leading-relaxed text-foreground dark:text-white align-top",
+                            "px-4 py-3 leading-relaxed text-foreground dark:text-white align-top whitespace-nowrap",
                             cellIdx === 0 && "font-medium text-foreground dark:text-white",
                             getAlignClass(cellIdx)
                           )}
@@ -460,7 +460,7 @@ function TableBlock({
                   ))}
                 </tbody>
               </table>
-            </div>
+            </ScrollArea>
           </div>
         </div>
       )}

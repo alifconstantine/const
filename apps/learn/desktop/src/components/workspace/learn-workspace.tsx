@@ -397,10 +397,14 @@ export function LearnWorkspace({
     return () => window.removeEventListener("resize", handleResize);
   }, [isManualWidth]);
 
+  const [isDraggingSources, setIsDraggingSources] = useState(false);
+  const [isDraggingStudio, setIsDraggingStudio] = useState(false);
+
   // Drag resizing for Sources panel
   const handleSourcesMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
     setIsManualWidth(true);
+    setIsDraggingSources(true);
     const startX = e.clientX;
     const startWidth = sourcesWidth;
 
@@ -411,6 +415,7 @@ export function LearnWorkspace({
     };
 
     const onMouseUp = () => {
+      setIsDraggingSources(false);
       window.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("mouseup", onMouseUp);
     };
@@ -423,6 +428,7 @@ export function LearnWorkspace({
   const handleStudioMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
     setIsManualWidth(true);
+    setIsDraggingStudio(true);
     const startX = e.clientX;
     const startWidth = studioWidth;
 
@@ -434,6 +440,7 @@ export function LearnWorkspace({
     };
 
     const onMouseUp = () => {
+      setIsDraggingStudio(false);
       window.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("mouseup", onMouseUp);
     };
@@ -805,23 +812,25 @@ export function LearnWorkspace({
           onSelectSource={handleSelectSource}
           onDropFiles={handleDropFiles}
           isCollapsed={isSourcesCollapsed}
+          isResizing={isDraggingSources}
           onToggleCollapse={() => setIsSourcesCollapsed(!isSourcesCollapsed)}
         />
 
         {/* Left Resize Handle */}
-        {!isSourcesCollapsed && (
-          <div
-            onMouseDown={handleSourcesMouseDown}
-            onDoubleClick={() => {
-              setIsManualWidth(false);
-              setSourcesWidth(getResponsiveWidths().sources);
-            }}
-            className="w-1.5 hover:w-2 -mx-1 sm:-mx-1.5 h-full cursor-col-resize z-20 group flex items-center justify-center transition-all select-none shrink-0"
-            title="Drag to resize / Double-click to reset"
-          >
-            <div className="w-0.5 h-7 rounded-full bg-border/40 group-hover:bg-primary/70 group-hover:h-12 transition-all" />
-          </div>
-        )}
+        <div
+          onMouseDown={handleSourcesMouseDown}
+          onDoubleClick={() => {
+            setIsManualWidth(false);
+            setSourcesWidth(getResponsiveWidths().sources);
+          }}
+          className={cn(
+            "w-1.5 hover:w-2 -mx-1 sm:-mx-1.5 h-full cursor-col-resize z-20 group flex items-center justify-center transition-all select-none shrink-0",
+            isSourcesCollapsed ? "w-0 opacity-0 pointer-events-none -mx-0 overflow-hidden" : "opacity-100"
+          )}
+          title="Drag to resize / Double-click to reset"
+        >
+          <div className="w-0.5 h-7 rounded-full bg-border/40 group-hover:bg-primary/70 group-hover:h-12 transition-all" />
+        </div>
 
         {/* Center Column: Socratic Chat */}
         <ChatPanel
@@ -844,19 +853,20 @@ export function LearnWorkspace({
         />
 
         {/* Right Resize Handle */}
-        {!isStudioCollapsed && (
-          <div
-            onMouseDown={handleStudioMouseDown}
-            onDoubleClick={() => {
-              setIsManualWidth(false);
-              setStudioWidth(getResponsiveWidths().studio);
-            }}
-            className="w-1.5 hover:w-2 -mx-1 sm:-mx-1.5 h-full cursor-col-resize z-20 group flex items-center justify-center transition-all select-none shrink-0"
-            title="Drag to resize / Double-click to reset"
-          >
-            <div className="w-0.5 h-7 rounded-full bg-border/40 group-hover:bg-primary/70 group-hover:h-12 transition-all" />
-          </div>
-        )}
+        <div
+          onMouseDown={handleStudioMouseDown}
+          onDoubleClick={() => {
+            setIsManualWidth(false);
+            setStudioWidth(getResponsiveWidths().studio);
+          }}
+          className={cn(
+            "w-1.5 hover:w-2 -mx-1 sm:-mx-1.5 h-full cursor-col-resize z-20 group flex items-center justify-center transition-all select-none shrink-0",
+            isStudioCollapsed ? "w-0 opacity-0 pointer-events-none -mx-0 overflow-hidden" : "opacity-100"
+          )}
+          title="Drag to resize / Double-click to reset"
+        >
+          <div className="w-0.5 h-7 rounded-full bg-border/40 group-hover:bg-primary/70 group-hover:h-12 transition-all" />
+        </div>
 
         {/* Right Column: Dual Studio & Preview RightPane */}
         <ErrorBoundary
@@ -870,6 +880,7 @@ export function LearnWorkspace({
               setStudioWidth(w);
             }}
             isCollapsed={isStudioCollapsed}
+            isResizing={isDraggingStudio}
             onToggleCollapse={() => setIsStudioCollapsed(!isStudioCollapsed)}
             mode={rightPaneMode}
             onModeChange={setRightPaneMode}
