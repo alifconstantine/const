@@ -172,7 +172,9 @@ export function RightPane({
                 type="button"
                 onClick={() => {
                   onSelectStudioTool?.(tool.id);
-                  if (mode !== "studio") onModeChange("studio");
+                  if (tool.id !== "browser" && mode !== "studio") {
+                    onModeChange("studio");
+                  }
                   onToggleCollapse?.();
                 }}
                 className="h-7 w-7 rounded-lg hover:bg-muted flex items-center justify-center transition-colors cursor-pointer group"

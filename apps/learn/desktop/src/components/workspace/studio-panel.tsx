@@ -159,14 +159,16 @@ export function StudioPanel({
             const Icon = tool.icon;
             const toolName = t(tool.translationKey);
             return (
-              <div
+              <button
                 key={tool.id}
-                className="h-7 w-7 rounded-lg flex items-center justify-center transition-colors cursor-default"
+                type="button"
+                onClick={() => onSelectTool?.(tool.id)}
+                className="h-7 w-7 rounded-lg flex items-center justify-center transition-colors cursor-pointer hover:bg-muted group"
                 title={toolName}
                 aria-label={toolName}
               >
-                <Icon className={`h-4 w-4 ${tool.iconColor} opacity-75`} />
-              </div>
+                <Icon className={`h-4 w-4 ${tool.iconColor} opacity-75 group-hover:opacity-100 transition-opacity`} />
+              </button>
             );
           })}
         </div>
@@ -214,21 +216,23 @@ export function StudioPanel({
               const Icon = tool.icon;
               const toolName = t(tool.translationKey);
               return (
-                <div
+                <button
                   key={tool.id}
-                  className={`p-2.5 sm:p-3 rounded-2xl border ${tool.cardBg} ${tool.borderColor} transition-all flex flex-col justify-between h-[86px] sm:h-[90px] text-left cursor-default shadow-xs select-none`}
+                  type="button"
+                  onClick={() => onSelectTool?.(tool.id)}
+                  className={`p-2.5 sm:p-3 rounded-2xl border ${tool.cardBg} ${tool.borderColor} ${tool.hoverBg} ${tool.hoverBorder} transition-all flex flex-col justify-between h-[86px] sm:h-[90px] text-left cursor-pointer shadow-xs select-none group active:scale-[0.98]`}
                 >
                   {/* Top Row: Icon on left, Chevron on right */}
                   <div className="flex items-center justify-between w-full">
                     <Icon className={`h-4 w-4 ${tool.iconColor} shrink-0`} />
-                    <ChevronRight className="h-3.5 w-3.5 text-[#888888]/60 shrink-0" />
+                    <ChevronRight className="h-3.5 w-3.5 text-[#888888]/60 group-hover:text-foreground group-hover:translate-x-0.5 transition-all shrink-0" />
                   </div>
 
                   {/* Bottom Row: Tool Name */}
                   <span className={`text-[10.5px] sm:text-xs font-medium ${tool.textColor || "text-foreground"} tracking-tight leading-tight line-clamp-2 mt-auto`}>
                     {toolName}
                   </span>
-                </div>
+                </button>
               );
             })}
           </div>

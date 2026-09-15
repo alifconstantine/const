@@ -186,14 +186,7 @@ export function LearnWorkspace({
         setActiveRightPaneTabId("review");
       }
     } else if (type === "browser") {
-      const browserTab: RightPaneTab = {
-        id: `browser_${Date.now()}`,
-        type: "browser",
-        title: "Browser",
-        url: "https://google.com",
-      };
-      setRightPaneTabs((prev) => [...prev, browserTab]);
-      setActiveRightPaneTabId(browserTab.id);
+      handleOpenBrowser();
     } else if (type === "file_preview") {
       const previewTab: RightPaneTab = {
         id: `preview_${Date.now()}`,
@@ -346,6 +339,51 @@ export function LearnWorkspace({
     setStudioWidth(defaults.studio);
   };
 
+  const handleOpenBrowser = (initialUrl?: string) => {
+    setIsStudioCollapsed(false);
+    setRightPaneMode("preview");
+    setIsOpeningNewTab(false);
+
+    const existingBrowser = rightPaneTabs.find((t) => t.type === "browser");
+    if (existingBrowser) {
+      if (initialUrl && initialUrl !== existingBrowser.url) {
+        handleUpdateTab(existingBrowser.id, { url: initialUrl });
+      }
+      setActiveRightPaneTabId(existingBrowser.id);
+    } else {
+      const browserTab: RightPaneTab = {
+        id: `browser_${Date.now()}`,
+        type: "browser",
+        title: language === "id" ? "Peramban Web" : "Web Browser",
+        url: initialUrl || "", // Tidak buka apa-apa di awal sesuai permintaan user
+      };
+      setRightPaneTabs((prev) => [...prev, browserTab]);
+      setActiveRightPaneTabId(browserTab.id);
+    }
+
+    // Sesuaikan lebar studio/preview agar browser lebih luas dan nyaman (memicu isLayoutModified & tombol refresh di heading)
+    const responsiveDefaults = getResponsiveWidths();
+    const windowWidth = typeof window !== "undefined" ? window.innerWidth : 1280;
+    const targetBrowserWidth = Math.max(
+      studioWidth,
+      Math.min(Math.round(windowWidth * 0.45), 720),
+      600
+    );
+
+    if (studioWidth < targetBrowserWidth) {
+      setStudioWidth(targetBrowserWidth);
+      setIsManualWidth(true);
+    } else if (studioWidth !== responsiveDefaults.studio) {
+      setIsManualWidth(true);
+    }
+  };
+
+  const handleSelectStudioTool = (toolId: string) => {
+    if (toolId === "browser") {
+      handleOpenBrowser();
+    }
+  };
+
   useEffect(() => {
     const handleResize = () => {
       if (!isManualWidth) {
@@ -380,7 +418,7 @@ export function LearnWorkspace({
     window.addEventListener("mouseup", onMouseUp);
   };
 
-  // Drag resizing for Studio panel
+  // Drag resizing for Studio panel (expanded max width to support comfortable webview browsing)
   const handleStudioMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
     setIsManualWidth(true);
@@ -389,7 +427,8 @@ export function LearnWorkspace({
 
     const onMouseMove = (moveEvent: MouseEvent) => {
       const delta = startX - moveEvent.clientX;
-      const newWidth = Math.min(Math.max(startWidth + delta, 260), 580);
+      const maxStudioWidth = Math.min(Math.max(Math.round(window.innerWidth * 0.65), 750), 960);
+      const newWidth = Math.min(Math.max(startWidth + delta, 260), maxStudioWidth);
       setStudioWidth(newWidth);
     };
 
@@ -892,7 +931,7 @@ export function LearnWorkspace({
             onRollbackFile={handleRollbackFile}
             onRollbackAll={handleRollbackAll}
             onOpenFileDiff={handleOpenFileDiff}
-            onSelectStudioTool={undefined}
+            onSelectStudioTool={handleSelectStudioTool}
             onAddNote={() => {
               console.log("Add note clicked");
             }}
