@@ -400,6 +400,20 @@ export const localDb = {
     });
   },
 
+  async deleteMessage(msgId: string, sessionId?: string): Promise<void> {
+    await db.messages.delete(msgId);
+    if (sessionId) {
+      const remaining = await db.messages.where("sessionId").equals(sessionId).sortBy("createdAt");
+      const last = remaining[remaining.length - 1];
+      const snippet = last && typeof last.content === "string" ? last.content.slice(0, 80) : "";
+      await db.chatSessions.update(sessionId, {
+        lastMessageSnippet: snippet,
+        messageCount: remaining.length,
+        updatedAt: Date.now(),
+      });
+    }
+  },
+
   async deleteTurn(userMsgId: string, assistantMsgId?: string, sessionId?: string): Promise<void> {
     const toDelete = [userMsgId];
     if (assistantMsgId) toDelete.push(assistantMsgId);

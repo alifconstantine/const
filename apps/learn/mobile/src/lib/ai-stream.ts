@@ -71,13 +71,21 @@ export function getRouterBaseUrl(): string {
     return envBaseUrl.replace(/\/+$/, "");
   }
 
-  // When running locally in browser, use Vite's dev proxy at /v1
-  if (
-    typeof window !== "undefined" &&
-    (window.location.hostname === "localhost" ||
-      window.location.hostname === "127.0.0.1")
-  ) {
-    return "/v1";
+  // When running in development or on local network IP (e.g. mobile testing on LAN port 3003),
+  // use Vite's dev proxy at relative "/v1" to avoid CORS and connection failures.
+  if (typeof window !== "undefined") {
+    const isDev = Boolean((import.meta as any).env?.DEV);
+    const host = window.location.hostname;
+    const isLocalhost = host === "localhost" || host === "127.0.0.1";
+    const isPrivateIP =
+      /^10\./.test(host) ||
+      /^192\.168\./.test(host) ||
+      /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(host);
+    const isDevPort = window.location.port === "3003" || window.location.port === "5173";
+
+    if (isDev || isLocalhost || isPrivateIP || isDevPort) {
+      return "/v1";
+    }
   }
 
   return "https://router.const.web.id/v1";
@@ -308,7 +316,7 @@ export async function streamChatCompletion({
  * Generates a clean fallback title from the user prompt
  */
 export function fallbackTitle(prompt: string): string {
-  if (!prompt || !prompt.trim()) return "Untitled notebook";
+  if (!prompt || !prompt.trim()) return "New Chat";
   const cleaned = prompt.replace(/\s+/g, " ").trim();
   if (cleaned.length <= 35) return cleaned;
   const words = cleaned.split(" ");
