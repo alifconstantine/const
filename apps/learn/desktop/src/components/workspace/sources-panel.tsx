@@ -23,6 +23,7 @@ import {
 import { useLiveQuery } from "dexie-react-hooks";
 import { db, localDb, type LocalSource } from "@/lib/db";
 import { useI18n } from "../../lib/i18n";
+import { SourceIcon, getSourceCategoryLabel } from "./source-icon";
 
 interface SourcesPanelProps {
   learnId?: string;
@@ -41,54 +42,6 @@ function formatFileSize(bytes?: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function getSourceIcon(type: LocalSource["type"]) {
-  switch (type) {
-    case "url":
-      return (
-        <div className="h-7 w-7 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center shrink-0">
-          <Globe className="h-3.5 w-3.5" />
-        </div>
-      );
-    case "docs":
-      return (
-        <div className="h-7 w-7 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 flex items-center justify-center shrink-0">
-          <Globe className="h-3.5 w-3.5" />
-        </div>
-      );
-    case "youtube":
-      return (
-        <div className="h-7 w-7 rounded-lg bg-red-500/10 border border-red-500/20 text-red-500 flex items-center justify-center shrink-0">
-          <FileText className="h-3.5 w-3.5 text-red-500" />
-        </div>
-      );
-    case "book":
-      return (
-        <div className="h-7 w-7 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
-          <BookOpen className="h-3.5 w-3.5" />
-        </div>
-      );
-    case "drive":
-      return (
-        <div className="h-7 w-7 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
-          <HardDrive className="h-3.5 w-3.5" />
-        </div>
-      );
-    case "text":
-      return (
-        <div className="h-7 w-7 rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-400 flex items-center justify-center shrink-0">
-          <Clipboard className="h-3.5 w-3.5" />
-        </div>
-      );
-    case "file":
-    default:
-      return (
-        <div className="h-7 w-7 rounded-lg bg-muted border border-border/50 text-muted-foreground flex items-center justify-center shrink-0">
-          <FileText className="h-3.5 w-3.5" />
-        </div>
-      );
-  }
 }
 
 export function SourcesPanel({
@@ -390,7 +343,7 @@ export function SourcesPanel({
                       className="rounded border-border h-3.5 w-3.5 text-primary focus:ring-0 cursor-pointer pointer-events-none shrink-0"
                     />
 
-                    {getSourceIcon(source.type)}
+                    <SourceIcon source={source} size="md" />
 
                       <div
                         className="flex-1 min-w-0 pr-6"
@@ -406,7 +359,9 @@ export function SourcesPanel({
                           {source.title}
                         </p>
                         <p className="text-[10px] text-muted-foreground/70 font-mono mt-0.5 truncate flex items-center gap-1">
-                          <span className="capitalize">{source.type}</span>
+                          <span className="capitalize font-medium text-foreground/80">
+                            {getSourceCategoryLabel(source)}
+                          </span>
                           {source.size ? `• ${formatFileSize(source.size)}` : null}
                           {source.subpagesCount && source.subpagesCount > 1
                             ? `• ${source.subpagesCount} pages`
@@ -487,9 +442,9 @@ export function SourcesPanel({
             <div className="flex items-start justify-between gap-4 pb-3 border-b border-border/60">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 mb-1">
-                  {getSourceIcon(selectedSourceForPreview.type)}
+                  <SourceIcon source={selectedSourceForPreview} size="md" />
                   <span className="text-[11px] font-mono uppercase px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
-                    {selectedSourceForPreview.type}
+                    {getSourceCategoryLabel(selectedSourceForPreview)}
                   </span>
                   {selectedSourceForPreview.subpagesCount && selectedSourceForPreview.subpagesCount > 1 ? (
                     <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-primary/10 text-primary">

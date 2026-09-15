@@ -12,6 +12,7 @@ import {
   Upload,
   BookOpen,
   Clipboard,
+  ClipboardPaste,
   ChevronDown,
   Link2,
   Video,
@@ -28,6 +29,7 @@ import { searchWebSources, type SearchSourceResult } from "../../lib/sources/sea
 import { fetchWebContent } from "../../lib/sources/web-fetcher";
 import { fetchYouTubeTranscript, isYouTubeUrl } from "../../lib/sources/youtube-service";
 import { parseUploadedFile } from "../../lib/sources/document-parser";
+import { YouTubeSvgIcon } from "./source-icon";
 
 interface AddSourceDialogProps {
   open: boolean;
@@ -433,7 +435,7 @@ export function AddSourceDialog({
                     onClick={() => setMode("youtube")}
                     className="inline-flex items-center gap-2 px-3.5 py-2 rounded-full bg-secondary/80 hover:bg-secondary border border-border/40 text-xs font-normal text-foreground transition-colors cursor-pointer active:scale-95"
                   >
-                    <Video className="h-3.5 w-3.5 text-red-500" />
+                    <YouTubeSvgIcon className="h-3.5 w-3.5" />
                     <span>YouTube Video</span>
                   </button>
 
@@ -443,7 +445,7 @@ export function AddSourceDialog({
                     onClick={() => setMode("paste")}
                     className="inline-flex items-center gap-2 px-3.5 py-2 rounded-full bg-secondary/80 hover:bg-secondary border border-border/40 text-xs font-normal text-foreground transition-colors cursor-pointer active:scale-95"
                   >
-                    <Clipboard className="h-3.5 w-3.5 text-purple-400" />
+                    <ClipboardPaste className="h-3.5 w-3.5 text-purple-400" />
                     <span>Paste Text</span>
                   </button>
                 </div>
@@ -541,7 +543,7 @@ export function AddSourceDialog({
                 disabled={isLoading || !youtubeInput.trim()}
                 className="w-full py-2.5 rounded-xl bg-primary text-primary-foreground font-medium text-xs flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
               >
-                {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Video className="h-4 w-4" />}
+                {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <YouTubeSvgIcon className="h-4 w-4" />}
                 <span>Extract Transcript</span>
               </button>
             </div>
@@ -582,7 +584,7 @@ export function AddSourceDialog({
                 disabled={!pasteContent.trim()}
                 className="w-full py-2.5 rounded-xl bg-primary text-primary-foreground font-medium text-xs flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50"
               >
-                <Plus className="h-4 w-4" />
+                <ClipboardPaste className="h-4 w-4" />
                 <span>Add Text Source</span>
               </button>
             </div>

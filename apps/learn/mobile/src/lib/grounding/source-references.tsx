@@ -1,6 +1,7 @@
 import React from "react";
-import { FileText, Globe, BookOpen, Video, ExternalLink } from "lucide-react";
+import { FileText, Globe, BookOpen, ExternalLink, ClipboardPaste } from "lucide-react";
 import type { LocalSource } from "../db";
+import { YouTubeSvgIcon } from "../../components/workspace/source-icon";
 
 export interface ParsedReference {
   id: string;
@@ -144,11 +145,12 @@ export function getSourceTypeIcon(type: LocalSource["type"], className = "h-3.5 
     case "docs":
       return <Globe className={className} />;
     case "youtube":
-      return <Video className={className} />;
+      return <YouTubeSvgIcon className={className} />;
     case "book":
       return <BookOpen className={className} />;
-    case "file":
     case "text":
+      return <ClipboardPaste className={className} />;
+    case "file":
     default:
       return <FileText className={className} />;
   }

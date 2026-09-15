@@ -17,6 +17,7 @@ import { cn, ScrollArea } from "@const/ui";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db, localDb, type LocalSource } from "@/lib/db";
 import { useI18n } from "../../lib/i18n";
+import { SourceIcon, getSourceCategoryLabel } from "./source-icon";
 
 export interface SourcesSheetProps {
   open: boolean;
@@ -39,54 +40,6 @@ function formatFileSize(bytes?: number): string {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function getSourceIcon(type: LocalSource["type"]) {
-  switch (type) {
-    case "url":
-      return (
-        <div className="h-6 w-6 rounded-lg bg-blue-500/10 border border-blue-500/20 text-blue-400 flex items-center justify-center shrink-0">
-          <Globe className="h-3 w-3" />
-        </div>
-      );
-    case "docs":
-      return (
-        <div className="h-6 w-6 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 flex items-center justify-center shrink-0">
-          <Globe className="h-3 w-3" />
-        </div>
-      );
-    case "youtube":
-      return (
-        <div className="h-6 w-6 rounded-lg bg-red-500/10 border border-red-500/20 text-red-500 flex items-center justify-center shrink-0">
-          <FileText className="h-3 w-3 text-red-500" />
-        </div>
-      );
-    case "book":
-      return (
-        <div className="h-6 w-6 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
-          <BookOpen className="h-3 w-3" />
-        </div>
-      );
-    case "drive":
-      return (
-        <div className="h-6 w-6 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
-          <HardDrive className="h-3 w-3" />
-        </div>
-      );
-    case "text":
-      return (
-        <div className="h-6 w-6 rounded-lg bg-purple-500/10 border border-purple-500/20 text-purple-400 flex items-center justify-center shrink-0">
-          <Clipboard className="h-3 w-3" />
-        </div>
-      );
-    case "file":
-    default:
-      return (
-        <div className="h-6 w-6 rounded-lg bg-[#28282a] border border-[#38383a] text-[#a1a1aa] flex items-center justify-center shrink-0">
-          <FileText className="h-3 w-3" />
-        </div>
-      );
-  }
 }
 
 export function SourcesSheet({
@@ -146,7 +99,7 @@ export function SourcesSheet({
       {/* Slide-over Panel from Left: Matches workspace sidebar geometry & position */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 w-[80vw] max-w-[310px] h-full bg-[#1c1c1e] text-[#d4d4d4]",
+          "fixed inset-y-0 left-0 z-50 w-[85vw] max-w-[340px] h-full bg-[#1c1c1e] text-[#d4d4d4]",
           "border-r border-[#333336] rounded-tr-[24px] rounded-br-[24px] flex flex-col will-change-transform font-sans overflow-hidden select-none",
           "transition-[transform,visibility] duration-300 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)]",
           open
@@ -193,205 +146,209 @@ export function SourcesSheet({
           </button>
         </div>
 
-        {/* Content Area */}
-        <ScrollArea className="flex-1 p-3 space-y-2.5" viewportClassName="space-y-2.5">
-          {/* "+ Add source" Button */}
-          <button
-            type="button"
-            onClick={() => {
-              onClose();
-              onOpenAddSource();
-            }}
-            className="w-full h-10 px-3 rounded-xl border border-[#383838] hover:border-[#525256] bg-[#262629] hover:bg-[#323236] text-xs font-semibold text-white flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs active:scale-[0.99] shrink-0"
-          >
-            <Plus className="h-4 w-4 text-white" />
-            <span>{t("addSource") || "Add source"}</span>
-          </button>
-
-          {/* Web Research Search Box */}
-          <div className="w-full bg-[#232326] rounded-2xl p-2.5 border border-[#333336] focus-within:border-[#4d4d52] transition-all text-left flex flex-col gap-2 shrink-0">
-            <div className="flex items-center gap-1.5 px-0.5">
-              <Search className="h-3.5 w-3.5 text-[#777777] shrink-0" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => onSearchQueryChange(e.target.value)}
-                placeholder={t("searchWebSources") || "Cari sumber web baru..."}
-                className="w-full bg-transparent text-xs text-white placeholder:text-[#666666] outline-none font-sans"
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && onSearchWeb) {
-                    onSearchWeb();
-                  }
-                }}
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => onSearchQueryChange("")}
-                  className="text-[#888888] hover:text-white p-0.5 rounded-full hover:bg-white/10 transition-colors cursor-pointer shrink-0"
-                  title="Clear"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              )}
-            </div>
-
-            <div className="flex items-center justify-between pt-1.5 border-t border-[#2e2e32]">
-              <div className="flex items-center gap-1 flex-wrap">
-                <button
-                  type="button"
-                  onClick={onToggleWebScope}
-                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-[#2b2b2e] hover:bg-[#38383c] text-[10px] font-sans text-[#a0a0a0] hover:text-white transition-colors cursor-pointer border border-[#38383c]"
-                >
-                  <Globe className="h-2.5 w-2.5" />
-                  <span>{webScope === "Web" ? t("webScopeWeb") : t("webScopeJournal")}</span>
-                  <ChevronDown className="h-2 w-2 opacity-60" />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={onToggleResearchSpeed}
-                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-[#2b2b2e] hover:bg-[#38383c] text-[10px] font-sans text-[#a0a0a0] hover:text-white transition-colors cursor-pointer border border-[#38383c]"
-                >
-                  <Search className="h-2.5 w-2.5" />
-                  <span>
-                    {researchSpeed === "Fast Research" ? t("speedFast") : t("speedDeep")}
-                  </span>
-                  <ChevronDown className="h-2 w-2 opacity-60" />
-                </button>
-              </div>
-
-              {onSearchWeb && (
-                <button
-                  type="button"
-                  onClick={onSearchWeb}
-                  className="h-6 w-6 rounded-lg bg-white/95 hover:bg-white text-black flex items-center justify-center transition-all cursor-pointer active:scale-95 shrink-0 shadow-2xs"
-                  aria-label={t("search")}
-                >
-                  <Search className="h-3 w-3" />
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Sources List or Empty State */}
-          {sources.length > 0 ? (
-            <div className="flex flex-col space-y-2 pt-1">
-              {/* Header selection info & bulk toggle */}
-              <div className="flex items-center justify-between px-1 text-[11px] text-[#969696]">
-                <span>
-                  {t("carriedSourcesHeader", {
-                    carried: carriedCount,
-                    total: sources.length,
-                  }) || `${carriedCount} of ${sources.length} sources active in chat`}
-                </span>
-                {learnId && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const allSelected = carriedCount === sources.length;
-                      localDb.setAllSourcesInChat(learnId, !allSelected);
-                    }}
-                    className="text-[10.5px] text-white hover:underline cursor-pointer font-medium"
-                  >
-                    {carriedCount === sources.length
-                      ? t("deselectAll") || "Deselect all"
-                      : t("selectAll") || "Select all"}
-                  </button>
-                )}
-              </div>
-
-              {/* List of items */}
-              <div className="space-y-1.5">
-                {filteredSources.map((source) => {
-                  const isCarried = source.includedInChat !== false;
-                  return (
-                    <div
-                      key={source.id}
-                      className={cn(
-                        "group relative flex items-center gap-2.5 p-2 rounded-xl border transition-all cursor-pointer",
-                        isCarried
-                          ? "bg-[#252528] hover:bg-[#2c2c30] border-[#38383a] text-white"
-                          : "bg-[#1f1f21]/60 hover:bg-[#252528] border-[#2c2c2f] text-[#888888] opacity-75"
-                      )}
-                      onClick={() => {
-                        localDb.toggleSourceInChat(source.id, !isCarried);
-                      }}
-                    >
-                      <input
-                        type="checkbox"
-                        checked={isCarried}
-                        onChange={() => {}}
-                        className="rounded border-[#444446] bg-[#1a1a1c] h-3.5 w-3.5 text-white focus:ring-0 cursor-pointer pointer-events-none shrink-0 accent-white"
-                      />
-
-                      {getSourceIcon(source.type)}
-
-                      <div
-                        className="flex-1 min-w-0 pr-6"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedSourceForPreview(source);
-                        }}
-                      >
-                        <p
-                          className="text-xs font-medium text-white truncate leading-tight hover:underline"
-                          title={source.title}
-                        >
-                          {source.title}
-                        </p>
-                        <p className="text-[10px] text-[#888888] font-mono mt-0.5 truncate flex items-center gap-1">
-                          <span className="capitalize">{source.type}</span>
-                          {source.size ? `• ${formatFileSize(source.size)}` : null}
-                          {source.subpagesCount && source.subpagesCount > 1
-                            ? `• ${source.subpagesCount} pages`
-                            : null}
-                        </p>
-                      </div>
-
-                      {/* Delete Button */}
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          localDb.deleteSource(source.id);
-                        }}
-                        className="absolute right-2 text-[#777777] hover:text-red-400 p-1 rounded-md hover:bg-white/5 transition-colors cursor-pointer"
-                        title={t("removeSource") || "Hapus sumber"}
-                        aria-label={t("removeSource") || "Hapus sumber"}
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ) : (
-            /* Empty State */
-            <div
+        {/* Content Area with Clean Gap Spacing */}
+        <ScrollArea className="flex-1" viewportClassName="p-3.5">
+          <div className="flex flex-col gap-3">
+            {/* "+ Add source" Button */}
+            <button
+              type="button"
               onClick={() => {
                 onClose();
                 onOpenAddSource();
               }}
-              className="flex-1 min-h-[180px] flex flex-col items-center justify-center text-center p-5 rounded-2xl border border-dashed border-[#333336] bg-[#222225]/40 hover:bg-[#222225]/65 transition-all cursor-pointer group my-0.5"
+              className="w-full h-10 px-3 rounded-xl border border-[#383838] hover:border-[#525256] bg-[#262629] hover:bg-[#323236] text-xs font-semibold text-white flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs active:scale-[0.99] shrink-0"
             >
-              <div className="h-10 w-10 rounded-2xl bg-[#28282b] border border-[#383838] flex items-center justify-center text-[#969696] mb-2.5 group-hover:scale-105 group-hover:text-white transition-all shadow-2xs">
-                <FileText className="h-4.5 w-4.5 stroke-[1.5] text-[#d4d4d4] group-hover:text-white transition-colors" />
+              <Plus className="h-4 w-4 text-white" />
+              <span>{t("addSource") || "Add source"}</span>
+            </button>
+
+            {/* Web Research Search Box */}
+            <div className="w-full bg-[#232326] rounded-2xl p-2.5 border border-[#333336] focus-within:border-[#4d4d52] transition-all text-left flex flex-col gap-2 shrink-0">
+              <div className="flex items-center gap-1.5 px-0.5">
+                <Search className="h-3.5 w-3.5 text-[#777777] shrink-0" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => onSearchQueryChange(e.target.value)}
+                  placeholder={t("searchWebSources") || "Cari sumber web baru..."}
+                  className="w-full bg-transparent text-xs text-white placeholder:text-[#666666] outline-none font-sans"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && onSearchWeb) {
+                      onSearchWeb();
+                    }
+                  }}
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => onSearchQueryChange("")}
+                    className="text-[#888888] hover:text-white p-0.5 rounded-full hover:bg-white/10 transition-colors cursor-pointer shrink-0"
+                    title="Clear"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                )}
               </div>
-              <h3 className="text-xs font-semibold text-white mb-1 tracking-tight">
-                {t("emptySourcesTitle") || "Belum ada sumber"}
-              </h3>
-              <p className="text-[10.5px] text-[#969696] leading-relaxed max-w-[200px] mb-3">
-                {t("emptySourcesDescription") ||
-                  "Tambahkan dokumen, link web, atau teks untuk memperkaya pemahaman AI."}
-              </p>
-              <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded-full bg-[#2b2b2e] group-hover:bg-[#343438] border border-[#3c3c40] text-[11px] font-medium text-white transition-all active:scale-95 shadow-2xs">
-                <Plus className="h-3 w-3" />
-                <span>{t("addFirstSource") || "Tambah sumber pertama"}</span>
-              </span>
+
+              <div className="flex items-center justify-between pt-1.5 border-t border-[#2e2e32]">
+                <div className="flex items-center gap-1 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={onToggleWebScope}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-[#2b2b2e] hover:bg-[#38383c] text-[10px] font-sans text-[#a0a0a0] hover:text-white transition-colors cursor-pointer border border-[#38383c]"
+                  >
+                    <Globe className="h-2.5 w-2.5" />
+                    <span>{webScope === "Web" ? t("webScopeWeb") : t("webScopeJournal")}</span>
+                    <ChevronDown className="h-2 w-2 opacity-60" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={onToggleResearchSpeed}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-[#2b2b2e] hover:bg-[#38383c] text-[10px] font-sans text-[#a0a0a0] hover:text-white transition-colors cursor-pointer border border-[#38383c]"
+                  >
+                    <Search className="h-2.5 w-2.5" />
+                    <span>
+                      {researchSpeed === "Fast Research" ? t("speedFast") : t("speedDeep")}
+                    </span>
+                    <ChevronDown className="h-2 w-2 opacity-60" />
+                  </button>
+                </div>
+
+                {onSearchWeb && (
+                  <button
+                    type="button"
+                    onClick={onSearchWeb}
+                    className="h-6 w-6 rounded-lg bg-white/95 hover:bg-white text-black flex items-center justify-center transition-all cursor-pointer active:scale-95 shrink-0 shadow-2xs"
+                    aria-label={t("search")}
+                  >
+                    <Search className="h-3 w-3" />
+                  </button>
+                )}
+              </div>
             </div>
-          )}
+
+            {/* Sources List or Empty State */}
+            {sources.length > 0 ? (
+              <div className="flex flex-col gap-2 pt-0.5">
+                {/* Header selection info & bulk toggle */}
+                <div className="flex items-center justify-between px-1 text-[11px] text-[#969696]">
+                  <span>
+                    {t("carriedSourcesHeader", {
+                      carried: carriedCount,
+                      total: sources.length,
+                    }) || `${carriedCount} of ${sources.length} sources active in chat`}
+                  </span>
+                  {learnId && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const allSelected = carriedCount === sources.length;
+                        localDb.setAllSourcesInChat(learnId, !allSelected);
+                      }}
+                      className="text-[10.5px] text-white hover:underline cursor-pointer font-medium"
+                    >
+                      {carriedCount === sources.length
+                        ? t("deselectAll") || "Deselect all"
+                        : t("selectAll") || "Select all"}
+                    </button>
+                  )}
+                </div>
+
+                {/* List of items */}
+                <div className="flex flex-col gap-2">
+                  {filteredSources.map((source) => {
+                    const isCarried = source.includedInChat !== false;
+                    return (
+                      <div
+                        key={source.id}
+                        className={cn(
+                          "group relative flex items-center gap-2.5 p-2 rounded-xl border transition-all cursor-pointer",
+                          isCarried
+                            ? "bg-[#252528] hover:bg-[#2c2c30] border-[#38383a] text-white"
+                            : "bg-[#1f1f21]/60 hover:bg-[#252528] border-[#2c2c2f] text-[#888888] opacity-75"
+                        )}
+                        onClick={() => {
+                          localDb.toggleSourceInChat(source.id, !isCarried);
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isCarried}
+                          onChange={() => {}}
+                          className="rounded border-[#444446] bg-[#1a1a1c] h-3.5 w-3.5 text-white focus:ring-0 cursor-pointer pointer-events-none shrink-0 accent-white"
+                        />
+
+                        <SourceIcon source={source} size="sm" />
+
+                        <div
+                          className="flex-1 min-w-0 pr-6"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setSelectedSourceForPreview(source);
+                          }}
+                        >
+                          <p
+                            className="text-xs font-medium text-white truncate leading-tight hover:underline"
+                            title={source.title}
+                          >
+                            {source.title}
+                          </p>
+                          <p className="text-[10px] text-[#888888] font-mono mt-0.5 truncate flex items-center gap-1">
+                            <span className="capitalize font-medium text-[#a1a1aa]">
+                              {getSourceCategoryLabel(source)}
+                            </span>
+                            {source.size ? `• ${formatFileSize(source.size)}` : null}
+                            {source.subpagesCount && source.subpagesCount > 1
+                              ? `• ${source.subpagesCount} pages`
+                              : null}
+                          </p>
+                        </div>
+
+                        {/* Delete Button */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            localDb.deleteSource(source.id);
+                          }}
+                          className="absolute right-2 text-[#777777] hover:text-red-400 p-1 rounded-md hover:bg-white/5 transition-colors cursor-pointer"
+                          title={t("removeSource") || "Hapus sumber"}
+                          aria-label={t("removeSource") || "Hapus sumber"}
+                        >
+                          <Trash2 className="h-3 w-3" />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : (
+              /* Empty State */
+              <div
+                onClick={() => {
+                  onClose();
+                  onOpenAddSource();
+                }}
+                className="flex-1 min-h-[190px] flex flex-col items-center justify-center text-center p-6 rounded-2xl border border-dashed border-[#333336] bg-[#222225]/40 hover:bg-[#222225]/65 transition-all cursor-pointer group"
+              >
+                <div className="h-11 w-11 rounded-2xl bg-[#28282b] border border-[#383838] flex items-center justify-center text-[#969696] mb-3 group-hover:scale-105 group-hover:text-white transition-all shadow-2xs">
+                  <FileText className="h-5 w-5 stroke-[1.5] text-[#d4d4d4] group-hover:text-white transition-colors" />
+                </div>
+                <h3 className="text-xs font-semibold text-white mb-1.5 tracking-tight">
+                  {t("emptySourcesTitle") || "Belum ada sumber"}
+                </h3>
+                <p className="text-[10.5px] text-[#969696] leading-relaxed max-w-[210px] mb-3.5">
+                  {t("emptySourcesDescription") ||
+                    "Tambahkan dokumen, link web, atau teks untuk memperkaya pemahaman AI."}
+                </p>
+                <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#2b2b2e] group-hover:bg-[#343438] border border-[#3c3c40] text-[11px] font-medium text-white transition-all active:scale-95 shadow-2xs">
+                  <Plus className="h-3 w-3" />
+                  <span>{t("addFirstSource") || "Tambah sumber pertama"}</span>
+                </span>
+              </div>
+            )}
+          </div>
         </ScrollArea>
       </aside>
 
@@ -408,9 +365,9 @@ export function SourcesSheet({
             <div className="flex items-start justify-between gap-3 pb-3 border-b border-[#2d2d30]">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 mb-1">
-                  {getSourceIcon(selectedSourceForPreview.type)}
+                  <SourceIcon source={selectedSourceForPreview} size="md" />
                   <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded-full bg-[#252528] text-[#969696] border border-[#383838]">
-                    {selectedSourceForPreview.type}
+                    {getSourceCategoryLabel(selectedSourceForPreview)}
                   </span>
                   {selectedSourceForPreview.subpagesCount &&
                   selectedSourceForPreview.subpagesCount > 1 ? (
