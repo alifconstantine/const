@@ -190,7 +190,7 @@ export function SourcesSheet({
                 )}
               </div>
 
-              <div className="flex items-center justify-between pt-1.5 border-t border-[#2e2e32]">
+              <div className="flex items-center justify-between pt-0.5">
                 <div className="flex items-center gap-1 flex-wrap">
                   <button
                     type="button"
