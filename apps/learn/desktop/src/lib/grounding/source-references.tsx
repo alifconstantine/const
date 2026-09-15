@@ -78,9 +78,9 @@ export function convertReferencesToMarkdownLinks(
       sourcesMap?.get(`source:${rawId}`);
 
     const title = matchedSource?.title || `Sumber #${num}`;
-    const tooltip = `${title} (Sumber [${num}])`;
+    const tooltip = `${title} (Sumber ${num})`;
 
-    return `<a href="#ref-source-${cleanKey}" class="source-ref-badge" data-source-id="${cleanKey}" data-source-number="${num}" title="${tooltip.replace(/"/g, "&quot;")}">[${num}]</a>`;
+    return `<a href="#ref-source-${cleanKey}" class="source-ref-badge" data-source-id="${cleanKey}" data-source-number="${num}" title="${tooltip.replace(/"/g, "&quot;")}">${num}</a>`;
   });
 }
 
@@ -109,11 +109,10 @@ export function createReferenceLinkComponent(
             e.stopPropagation();
             onReferenceClick(sourceId);
           }}
-          className="inline-flex items-center gap-1 px-2 py-0.5 mx-0.5 rounded-md bg-primary/10 hover:bg-primary/20 border border-primary/20 text-primary text-[11px] font-medium transition-all cursor-pointer select-none active:scale-95 group"
+          className="inline-flex items-center justify-center w-4.5 h-4.5 min-w-[18px] min-h-[18px] rounded-full bg-[#e4e4e7] hover:bg-[#d4d4d8] dark:bg-[#26282d] dark:hover:bg-[#34373d] border border-black/10 dark:border-white/15 text-neutral-600 hover:text-neutral-900 dark:text-[#9ca3af] dark:hover:text-white text-[10px] font-medium transition-all cursor-pointer select-none active:scale-90 align-middle -translate-y-[1px] mx-0.5"
           title={`View source details (${sourceId})`}
         >
-          <FileText className="h-3 w-3 inline text-primary/80 group-hover:text-primary" />
-          <span className="truncate max-w-[160px]">{children}</span>
+          {children}
         </button>
       );
     }
