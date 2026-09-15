@@ -204,26 +204,29 @@ export function WorkspaceSidebar({
         aria-label="Sidebar Navigasi"
       >
         {/* TOP BAR: Back to Home Page (Left) + Close Button X (Right) */}
-        <div className="h-14 px-4 border-b border-[#2d2d30] flex items-center justify-between shrink-0 bg-[#202022] rounded-tr-[24px]">
-          <button
-            type="button"
-            onClick={() => {
-              onClose();
-              onBack();
-            }}
-            className="flex items-center gap-2.5 px-3 py-1.5 rounded-full hover:bg-[#2b2b2b] text-white transition-colors cursor-pointer group active:scale-95"
-            title={t("backToHome") || "Kembali ke Beranda"}
-          >
-            <ArrowLeft className="h-4 w-4 text-[#969696] group-hover:text-white transition-colors" />
-            <span className="text-[14px] font-semibold tracking-tight text-white">
+        <div className="h-14 px-3.5 border-b border-[#2d2d30] flex items-center justify-between shrink-0 bg-[#202022] rounded-tr-[24px]">
+          <div className="flex items-center gap-2 min-w-0 pr-2">
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                onBack();
+              }}
+              className="h-8 w-8 rounded-full hover:bg-white/10 text-[#969696] hover:text-white flex items-center justify-center transition-colors cursor-pointer active:scale-95 shrink-0 -ml-1"
+              title={t("backToHome") || "Kembali ke Beranda"}
+              aria-label={t("backToHome") || "Kembali ke Beranda"}
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </button>
+            <span className="text-sm font-semibold text-white tracking-tight truncate">
               Const Learn
             </span>
-          </button>
+          </div>
 
           <button
             type="button"
             onClick={onClose}
-            className="h-8 w-8 rounded-full hover:bg-[#2b2b2b] text-[#969696] hover:text-white flex items-center justify-center transition-colors cursor-pointer active:scale-95"
+            className="h-8 w-8 rounded-full hover:bg-white/10 text-[#969696] hover:text-white flex items-center justify-center transition-colors cursor-pointer active:scale-95 shrink-0"
             aria-label="Tutup Sidebar"
           >
             <X className="h-4 w-4" />
