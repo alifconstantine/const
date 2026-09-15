@@ -318,6 +318,28 @@ export function ChatPanel({
     }
   };
 
+  const SINGLE_LINE_HEIGHT = 28;
+  const MIN_MULTILINE_HEIGHT = 48;
+  const MAX_MULTILINE_HEIGHT = 220;
+
+  // Auto-grow textarea height calculation (only applies to multi-line mode)
+  const adjustHeight = () => {
+    const textarea = textareaRef.current;
+    if (!textarea) return;
+
+    if (!isMultiline && attachments.length === 0) {
+      textarea.style.height = `${SINGLE_LINE_HEIGHT}px`;
+      return;
+    }
+
+    textarea.style.height = "auto";
+    const nextHeight = Math.min(
+      Math.max(MIN_MULTILINE_HEIGHT, textarea.scrollHeight),
+      MAX_MULTILINE_HEIGHT
+    );
+    textarea.style.height = `${nextHeight}px`;
+  };
+
   // Input change handler ensuring reliable return to single-line pill when empty
   const handleInputChange = (val: string) => {
     setInputMessage(val);
@@ -328,71 +350,56 @@ export function ChatPanel({
         setIsMultiline(false);
       }
       if (textareaRef.current) {
-        textareaRef.current.style.height = "auto";
+        textareaRef.current.style.height = `${SINGLE_LINE_HEIGHT}px`;
       }
       return;
     }
 
-    // 2. When text contains newline or is long, switch to multi-line mode
-    if (val.includes("\n") || val.length > 80) {
+    // 2. When text contains newline or has attachments, switch to multi-line mode
+    if (val.includes("\n") || attachments.length > 0) {
       if (!isMultiline) {
         setIsMultiline(true);
       }
       return;
     }
 
-    // 3. When in multi-line mode but text is single line and short (<= 60 chars) without attachments, collapse back
-    if (isMultiline && val.length <= 60 && !val.includes("\n") && attachments.length === 0) {
+    // 3. In single-line mode, detect if text has wrapped beyond single-line width
+    const textarea = textareaRef.current;
+    if (textarea && !isMultiline) {
+      if (textarea.scrollHeight > SINGLE_LINE_HEIGHT + 4) {
+        setIsMultiline(true);
+        return;
+      }
+    }
+
+    // 4. When in multi-line mode but text is single line and short (<= 30 chars) without attachments, collapse back
+    if (isMultiline && val.length <= 30 && !val.includes("\n") && attachments.length === 0) {
       setIsMultiline(false);
-      if (textareaRef.current) {
-        textareaRef.current.style.height = "auto";
+      if (textarea) {
+        textarea.style.height = `${SINGLE_LINE_HEIGHT}px`;
       }
       return;
     }
   };
 
-  // Auto-grow textarea height calculation (only applies to multi-line mode)
-  const adjustHeight = () => {
-    if (!isMultiline) return;
+  useEffect(() => {
     const textarea = textareaRef.current;
     if (!textarea) return;
 
-    const viewport = textarea.closest(
-      "[data-radix-scroll-area-viewport]"
-    ) as HTMLElement | null;
-    const prevScrollTop = viewport ? viewport.scrollTop : 0;
-
-    textarea.style.height = "auto";
-    const nextHeight = Math.max(48, textarea.scrollHeight);
-    textarea.style.height = `${nextHeight}px`;
-
-    if (viewport) {
-      const isNearBottom =
-        viewport.scrollHeight - viewport.clientHeight - prevScrollTop < 40;
-      if (isNearBottom) {
-        viewport.scrollTop = viewport.scrollHeight;
-      } else if (prevScrollTop > 0) {
-        viewport.scrollTop = prevScrollTop;
-      }
+    if (attachments.length > 0) {
+      if (!isMultiline) setIsMultiline(true);
+    } else if (!inputMessage.trim()) {
+      if (isMultiline) setIsMultiline(false);
+      textarea.style.height = `${SINGLE_LINE_HEIGHT}px`;
+      return;
+    } else if (inputMessage.includes("\n")) {
+      if (!isMultiline) setIsMultiline(true);
+    } else if (!isMultiline && textarea.scrollHeight > SINGLE_LINE_HEIGHT + 4) {
+      setIsMultiline(true);
     }
-  };
 
-  useEffect(() => {
-    if (isMultiline) {
-      adjustHeight();
-    } else if (textareaRef.current) {
-      textareaRef.current.style.height = "auto";
-    }
+    adjustHeight();
   }, [inputMessage, attachments.length, isMultiline]);
-
-  // Focus textarea and position cursor at end when switching between single-line and multi-line
-  useEffect(() => {
-    if (textareaRef.current) {
-      textareaRef.current.focus();
-      const len = textareaRef.current.value.length;
-      textareaRef.current.setSelectionRange(len, len);
-    }
-  }, [isMultiline]);
 
   // Execution timing state
   const [liveDurationMs, setLiveDurationMs] = useState(0);
@@ -1364,7 +1371,7 @@ export function ChatPanel({
     setInputMessage("");
     setIsMultiline(false);
     if (textareaRef.current) {
-      textareaRef.current.style.height = "auto";
+      textareaRef.current.style.height = `${SINGLE_LINE_HEIGHT}px`;
     }
     setAttachments([]);
     setIsStreaming(true);
@@ -3217,30 +3224,53 @@ export function ChatPanel({
             isResponding={isRespondingApproval}
             onDecide={handleRespondApproval}
           />
-        ) : isMultiline || attachments.length > 0 ? (
-          /* Multi-line Mode (Image 3): Rounded card with top-level textarea inside ScrollArea + bottom toolbar */
+        ) : (
           <form
-            key="chat-input-multi"
             onSubmit={(e) => {
               e.preventDefault();
               if (!isStreaming && (inputMessage.trim() || attachments.length > 0)) {
                 handleSend(inputMessage);
               }
             }}
-            className="w-full bg-card dark:bg-[#1e1f20] rounded-3xl border border-border/70 focus-within:border-foreground/30 transition-colors p-3 sm:p-3.5 shadow-md flex flex-col gap-2.5"
+            className={cn(
+              "w-full bg-card dark:bg-[#1e1f20] border border-border/70 focus-within:border-foreground/30 transition-[border-color,border-radius,padding] duration-150 shadow-md",
+              isMultiline || attachments.length > 0
+                ? "rounded-3xl p-3 sm:p-3.5"
+                : "rounded-full px-3 py-1.5 sm:py-2"
+            )}
+            style={{
+              display: "grid",
+              gridTemplateAreas: attachments.length > 0
+                ? '"shelf shelf shelf" "input input input" "plus . actions"'
+                : isMultiline
+                ? '"input input input" "plus . actions"'
+                : '"plus input actions"',
+              gridTemplateColumns: "auto 1fr auto",
+              alignItems: isMultiline || attachments.length > 0 ? "stretch" : "center",
+              rowGap: isMultiline || attachments.length > 0 ? "0.625rem" : "0",
+              columnGap: "0.625rem",
+            }}
           >
-            {renderAttachmentsShelf()}
+            {/* Attachments Shelf */}
+            {attachments.length > 0 && (
+              <div style={{ gridArea: "shelf" }} className="w-full overflow-hidden">
+                {renderAttachmentsShelf()}
+              </div>
+            )}
 
-            {/* Top: Full-width Textarea with ScrollArea & max height */}
-            <ScrollArea
-              className="w-full max-h-48 sm:max-h-60 [&>div>div[style]]:!block"
-              viewportClassName="pr-1.5"
-            >
+            {/* Textarea - Persistent across single-line & multi-line modes (NEVER UNMOUNTED) */}
+            <div style={{ gridArea: "input" }} className="min-w-0 w-full">
               <textarea
                 ref={textareaRef}
                 value={inputMessage}
                 onChange={(e) => {
                   handleInputChange(e.target.value);
+                }}
+                onPaste={(e) => {
+                  const text = e.clipboardData.getData("text");
+                  if (text.includes("\n") || text.length > 60) {
+                    setIsMultiline(true);
+                  }
                 }}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
@@ -3248,79 +3278,36 @@ export function ChatPanel({
                     if (!isStreaming && (inputMessage.trim() || attachments.length > 0)) {
                       handleSend(inputMessage);
                     }
+                  } else if (e.key === "Enter" && e.shiftKey) {
+                    setIsMultiline(true);
                   }
                 }}
-                rows={2}
+                rows={isMultiline || attachments.length > 0 ? 2 : 1}
                 disabled={isStreaming}
                 placeholder={
                   isStreaming
                     ? t("inputStreamingPlaceholder")
                     : t("inputPlaceholder")
                 }
-                className="w-full resize-none bg-transparent text-[14px] leading-[1.65] text-foreground placeholder:text-muted-foreground/60 outline-none font-sans py-0.5 block disabled:opacity-50 min-h-[48px]"
+                className={cn(
+                  "w-full resize-none bg-transparent text-[14px] text-foreground placeholder:text-muted-foreground/60 outline-none font-sans block disabled:opacity-50",
+                  isMultiline || attachments.length > 0
+                    ? "leading-[1.65] py-0.5 min-h-[48px] max-h-48 sm:max-h-60 overflow-y-auto"
+                    : "leading-5 py-1 h-[28px] max-h-[28px] overflow-hidden"
+                )}
+                style={{
+                  height: isMultiline || attachments.length > 0 ? undefined : `${SINGLE_LINE_HEIGHT}px`,
+                }}
               />
-            </ScrollArea>
-
-            {/* Bottom Row: Plus on left, Context + Model Dropdown + Send button on right */}
-            <div className="flex items-center justify-between pt-1">
-              <div className="flex items-center gap-2 shrink-0">
-                {renderPlusButton()}
-              </div>
-
-              <div className="flex items-center gap-2 shrink-0">
-                {renderContextIndicator()}
-                {renderModelDropdown()}
-                {renderSendButton()}
-              </div>
             </div>
-          </form>
-        ) : (
-          /* Single-line Mode (Image 2): Compact pill shape with plus on left, input in center, context + model + send on right */
-          <form
-            key="chat-input-single"
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (!isStreaming && (inputMessage.trim() || attachments.length > 0)) {
-                handleSend(inputMessage);
-              }
-            }}
-            className="w-full bg-card dark:bg-[#1e1f20] rounded-full border border-border/70 focus-within:border-foreground/30 transition-colors px-3 py-1.5 sm:py-2 shadow-md flex items-center gap-2.5"
-          >
-            {renderPlusButton()}
 
-            <textarea
-              ref={textareaRef}
-              value={inputMessage}
-              onChange={(e) => {
-                handleInputChange(e.target.value);
-              }}
-              onPaste={(e) => {
-                const text = e.clipboardData.getData("text");
-                if (text.includes("\n") || text.length > 80) {
-                  setIsMultiline(true);
-                }
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  if (!isStreaming && (inputMessage.trim() || attachments.length > 0)) {
-                    handleSend(inputMessage);
-                  }
-                } else if (e.key === "Enter" && e.shiftKey) {
-                  setIsMultiline(true);
-                }
-              }}
-              rows={1}
-              disabled={isStreaming}
-              placeholder={
-                isStreaming
-                  ? t("inputStreamingPlaceholder")
-                  : t("inputPlaceholder")
-              }
-              className="flex-1 bg-transparent text-[14px] leading-5 text-foreground placeholder:text-muted-foreground/60 outline-none font-sans resize-none overflow-hidden h-[28px] max-h-[28px] py-1 block disabled:opacity-50"
-            />
+            {/* Plus Button */}
+            <div style={{ gridArea: "plus" }} className="shrink-0 self-center flex items-center">
+              {renderPlusButton()}
+            </div>
 
-            <div className="flex items-center gap-2 shrink-0">
+            {/* Right Action Items: Context + Model Dropdown + Send Button */}
+            <div style={{ gridArea: "actions" }} className="flex items-center gap-2 shrink-0 justify-self-end self-center">
               {renderContextIndicator()}
               {renderModelDropdown()}
               {renderSendButton()}
