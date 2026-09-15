@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { db, localDb, type LocalMessage, type LocalArtifact, type LocalChatSession } from "../../lib/db";
+import { db, localDb, type LocalMessage, type LocalArtifact, type LocalChatSession, type LocalSource } from "../../lib/db";
+import { buildGroundedContext } from "../../lib/grounding/context-builder";
+import { buildGroundedSystemPrompt } from "../../lib/grounding/grounding-prompt";
 import {
   DEFAULT_MOBILE_MODELS,
   streamChatCompletion,
@@ -249,6 +251,40 @@ export function MobileLearnWorkspace({
     return await db.artifacts.where("learnId").equals(learnId).toArray();
   }, [learnId]);
 
+  // Live sources from local Dexie
+  const sources =
+    useLiveQuery(async () => {
+      return await db.sources
+        .where("learnId")
+        .equals(learnId)
+        .reverse()
+        .sortBy("createdAt");
+    }, [learnId]) || [];
+
+  const carriedSources = sources.filter((s) => s.includedInChat !== false);
+
+  const sourcesMap = useMemo(() => {
+    const map = new Map<string, LocalSource>();
+    for (const s of sources) {
+      map.set(s.id, s);
+      map.set(`source:${s.id}`, s);
+    }
+    return map;
+  }, [sources]);
+
+  const [selectedSourceForPreview, setSelectedSourceForPreview] =
+    useState<LocalSource | null>(null);
+
+  const handleCitationClick = (sourceId: string) => {
+    const cleanId = sourceId.replace(/^source:/, "");
+    const src = sourcesMap.get(cleanId) || sourcesMap.get(`source:${cleanId}`);
+    if (src) {
+      setSelectedSourceForPreview(src);
+    } else {
+      toast.info(`Source ID: ${sourceId}`);
+    }
+  };
+
   // Navigation drawers & sheets
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSourcesSheetOpen, setIsSourcesSheetOpen] = useState(false);
@@ -276,12 +312,13 @@ export function MobileLearnWorkspace({
   // Context window usage estimation for learning sources and discussion history
   const contextUsage = useMemo(() => {
     return calculateContextUsage({
+      sources,
       sourcesCount: learn?.sourcesCount || 0,
       messages,
       draftInput: inputMessage,
       totalTokens: 1048576,
     });
-  }, [learn?.sourcesCount, messages, inputMessage]);
+  }, [sources, learn?.sourcesCount, messages, inputMessage]);
 
   const filteredModels = useMemo(() => {
     const q = searchModelQuery.toLowerCase().trim();
@@ -568,8 +605,12 @@ export function MobileLearnWorkspace({
     let targetSessionId = activeSessionId;
     if (!targetSessionId) {
       const defaultName = language === "id" ? "Percakapan Baru" : "New Chat";
-      targetSessionId = await localDb.createChatSession(learnId, defaultName);
-      setActiveSessionId(targetSessionId);
+      try {
+        targetSessionId = await localDb.createChatSession(learnId, defaultName);
+        setActiveSessionId(targetSessionId);
+      } catch (err) {
+        console.error("Failed to create chat session:", err);
+      }
     }
 
     if (abortControllerRef.current) {
@@ -632,6 +673,17 @@ export function MobileLearnWorkspace({
       promptWithAttachments = `${textToSend ? textToSend + "\n\n" : ""}[Attached media / Lampiran media:\n${mediaList}\n\nNote for AI: The images above are provided in chronological order as Image 1, Image 2, etc. When the user refers to "image 1", "image 2", "gambar 1", "foto 1", etc., refer to the corresponding image listed above.]`;
     }
 
+    // Build NotebookLM-style Grounded Context and System Prompt
+    const groundedResult = buildGroundedContext(carriedSources);
+    const systemPrompt = buildGroundedSystemPrompt({
+      availableSourceIds: groundedResult.sourceIds,
+      hasSources: groundedResult.activeSources.length > 0,
+    });
+
+    if (groundedResult.formattedContext) {
+      promptWithAttachments = `${groundedResult.formattedContext}\n\n---\n## USER QUERY\n${promptWithAttachments}`;
+    }
+
     const newUserMsg: DisplayMessage = {
       id: userMsgId,
       role: "user",
@@ -651,15 +703,19 @@ export function MobileLearnWorkspace({
 
     // Save user message to Dexie with sessionId
     if (learnId && targetSessionId) {
-      await localDb.saveMessage({
-        id: userMsgId,
-        learnId,
-        sessionId: targetSessionId,
-        role: "user",
-        content: textToSend,
-        attachments: processedAttachments,
-        createdAt: now,
-      });
+      try {
+        await localDb.saveMessage({
+          id: userMsgId,
+          learnId,
+          sessionId: targetSessionId,
+          role: "user",
+          content: textToSend,
+          attachments: processedAttachments,
+          createdAt: now,
+        });
+      } catch (err) {
+        console.error("Failed to save user message to Dexie:", err);
+      }
     }
 
     // Auto-generate title with AI (with fallback) for this chat session
@@ -726,6 +782,8 @@ export function MobileLearnWorkspace({
       await streamChatCompletion({
         model: selectedModelId,
         messages: formattedMessages,
+        systemPrompt,
+        temperature: carriedSources.length > 0 ? 0.2 : 0.7,
         signal: controller.signal,
         onThinking: (chunk) => {
           setMessages((prev) =>
@@ -822,8 +880,11 @@ export function MobileLearnWorkspace({
           }
         },
       });
-    } catch {
-      // Errors handled in onError callback
+    } catch (err: any) {
+      console.error("streamChatCompletion error:", err);
+    } finally {
+      setIsStreaming(false);
+      abortControllerRef.current = null;
     }
   };
 
@@ -1388,7 +1449,11 @@ export function MobileLearnWorkspace({
                     {/* Assistant Output Message (Pure clean MarkdownContent, NO card wrapper, matching apps/harness/desktop!) */}
                     {msg.content ? (
                       <div className="px-0.5 text-[14px] text-[#d4d4d4] leading-relaxed select-text font-sans">
-                        <MarkdownContent content={msg.content} />
+                        <MarkdownContent
+                          content={msg.content}
+                          sourcesMap={sourcesMap}
+                          onSourceClick={handleCitationClick}
+                        />
                         {msg.isStreaming && (
                           <span className="inline-block w-1.5 h-3.5 ml-1 bg-white animate-pulse align-middle" />
                         )}
@@ -1502,6 +1567,7 @@ export function MobileLearnWorkspace({
       <SourcesSheet
         open={isSourcesSheetOpen}
         onClose={() => setIsSourcesSheetOpen(false)}
+        learnId={learnId}
         onBack={() => {
           setIsSourcesSheetOpen(false);
           setIsSidebarOpen(true);
@@ -1531,7 +1597,7 @@ export function MobileLearnWorkspace({
         }}
         tools={STUDIO_TOOLS}
         toolNameMap={toolNameMap}
-        artifacts={artifacts}
+        artifacts={artifacts || []}
         onSelectTool={handleSelectStudioTool}
         onDownloadArtifact={handleDownloadArtifact}
       />
@@ -1540,6 +1606,7 @@ export function MobileLearnWorkspace({
       <AddSourceDialog
         open={isAddSourceOpen}
         onOpenChange={setIsAddSourceOpen}
+        learnId={learnId}
         onSelectSource={(sourceType) => {
           setIsAddSourceOpen(false);
         }}
@@ -1555,6 +1622,72 @@ export function MobileLearnWorkspace({
           imageIndex={lightboxItem.imageIndex}
           onClose={() => setLightboxItem(null)}
         />
+      )}
+
+      {/* Source Reference Inspection Modal */}
+      {selectedSourceForPreview && (
+        <div
+          className="fixed inset-0 z-[60] bg-black/75 backdrop-blur-xs flex items-center justify-center p-3"
+          onClick={() => setSelectedSourceForPreview(null)}
+        >
+          <div
+            className="w-full max-w-lg max-h-[85vh] bg-[#1c1c1e] border border-[#333336] rounded-2xl p-4 shadow-2xl flex flex-col text-left font-sans"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3 pb-3 border-b border-[#2d2d30]">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded-full bg-[#252528] text-[#969696] border border-[#383838]">
+                    {selectedSourceForPreview.type}
+                  </span>
+                  {selectedSourceForPreview.subpagesCount &&
+                  selectedSourceForPreview.subpagesCount > 1 ? (
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
+                      {selectedSourceForPreview.subpagesCount} pages
+                    </span>
+                  ) : null}
+                </div>
+                <h3 className="text-sm font-semibold text-white truncate">
+                  {selectedSourceForPreview.title}
+                </h3>
+                {selectedSourceForPreview.url && (
+                  <a
+                    href={selectedSourceForPreview.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-blue-400 hover:underline truncate block mt-0.5"
+                  >
+                    {selectedSourceForPreview.url}
+                  </a>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setSelectedSourceForPreview(null)}
+                className="h-7 w-7 rounded-full bg-[#252528] hover:bg-[#333336] text-[#969696] hover:text-white flex items-center justify-center cursor-pointer shrink-0"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Extracted Text Content */}
+            <div className="flex-1 overflow-y-auto mt-3 pr-1">
+              <div className="flex items-center justify-between text-[11px] text-[#888888] mb-2">
+                <span>Verified Source Content (Ground Truth):</span>
+                <span>
+                  {selectedSourceForPreview.content
+                    ? `${selectedSourceForPreview.content.length.toLocaleString()} characters`
+                    : "No text cached"}
+                </span>
+              </div>
+              <div className="p-3 rounded-xl bg-[#141416] border border-[#28282b] text-[11px] font-mono text-[#d4d4d4] whitespace-pre-wrap leading-relaxed select-text max-h-[50vh] overflow-y-auto">
+                {selectedSourceForPreview.content ||
+                  "[Content is not cached locally. This source was added via link.]"}
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

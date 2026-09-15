@@ -43,7 +43,9 @@ import { DEFAULT_MODELS } from "@const/agent/models";
 import type { ModelConfig, AgentMessage } from "@const/agent/types";
 import type { FileMutationRecord } from "@const/agent";
 import { useLiveQuery } from "dexie-react-hooks";
-import { db, localDb } from "../../lib/db";
+import { db, localDb, type LocalSource } from "../../lib/db";
+import { buildGroundedContext } from "../../lib/grounding/context-builder";
+import { buildGroundedSystemPrompt } from "../../lib/grounding/grounding-prompt";
 import { useI18n } from "../../lib/i18n";
 import {
   calculateConversationMetrics,
@@ -327,16 +329,16 @@ export function ChatPanel({
       return;
     }
 
-    // 2. When text contains newline, switch to multi-line mode
-    if (val.includes("\n")) {
+    // 2. When text contains newline or is long, switch to multi-line mode
+    if (val.includes("\n") || val.length > 80) {
       if (!isMultiline) {
         setIsMultiline(true);
       }
       return;
     }
 
-    // 3. When in multi-line mode but text has shrunk to a short single line (< 35 chars) without attachments, collapse back
-    if (isMultiline && val.length < 35 && attachments.length === 0) {
+    // 3. When in multi-line mode but text is single line and short (<= 60 chars) without attachments, collapse back
+    if (isMultiline && val.length <= 60 && !val.includes("\n") && attachments.length === 0) {
       setIsMultiline(false);
       if (textareaRef.current) {
         textareaRef.current.style.height = "auto";
@@ -530,6 +532,26 @@ export function ChatPanel({
   const carriedSourcesCount = sources.length > 0 ? carriedSources.length : sourcesCount;
   const [isSourcesDropdownOpen, setIsSourcesDropdownOpen] = useState(false);
   const sourcesDropdownRef = useRef<HTMLDivElement>(null);
+  const [selectedSourceForPreview, setSelectedSourceForPreview] = useState<LocalSource | null>(null);
+
+  const sourcesMap = useMemo(() => {
+    const map = new Map<string, LocalSource>();
+    for (const s of sources) {
+      map.set(s.id, s);
+      map.set(`source:${s.id}`, s);
+    }
+    return map;
+  }, [sources]);
+
+  const handleCitationClick = (sourceId: string) => {
+    const cleanId = sourceId.replace(/^source:/, "");
+    const src = sourcesMap.get(cleanId) || sourcesMap.get(`source:${cleanId}`);
+    if (src) {
+      setSelectedSourceForPreview(src);
+    } else {
+      toast.info(`Source ID: ${sourceId}`);
+    }
+  };
 
   // Dynamic telemetry metrics for active conversation (matching apps/harness/desktop)
   const conversationMetrics = useMemo(() => {
@@ -1177,8 +1199,12 @@ export function ChatPanel({
     // 1. Ensure we have an active session
     let currentSessionId = activeSessionId;
     if (!currentSessionId && learnId) {
-      currentSessionId = await localDb.createSession(learnId, t("newSessionTitle"));
-      setActiveSessionId(currentSessionId);
+      try {
+        currentSessionId = await localDb.createSession(learnId, t("newSessionTitle"));
+        setActiveSessionId(currentSessionId);
+      } catch (err) {
+        console.error("Failed to create session:", err);
+      }
     }
 
     // 2. Count prior images in this session to maintain chronological session index (Image 1, Image 2, Image 3...)
@@ -1221,7 +1247,9 @@ export function ChatPanel({
         // Immediate fallback title: first 4-6 words
         const words = textToSend.split(/\s+/).slice(0, 5).join(" ");
         const fallbackTitle = words.length > 35 ? words.slice(0, 32) + "..." : words;
-        await localDb.updateSessionTitle(currentSessionId, fallbackTitle);
+        try {
+          await localDb.updateSessionTitle(currentSessionId, fallbackTitle);
+        } catch {}
 
         // Asynchronous AI refinement
         const electronApi = (window as any).electron;
@@ -1234,7 +1262,7 @@ export function ChatPanel({
             .generateTitle(textToSend, authToken)
             .then((aiTitle: string | null) => {
               if (aiTitle && currentSessionId) {
-                localDb.updateSessionTitle(currentSessionId, aiTitle);
+                localDb.updateSessionTitle(currentSessionId, aiTitle).catch(() => {});
               }
             })
             .catch(() => {});
@@ -1269,14 +1297,15 @@ export function ChatPanel({
       promptWithAttachments = `${promptWithAttachments}\n\n[${attHeader}:\n${attLines.join("\n")}\n${attInstruction}]`;
     }
 
-    // Append active/carried sources summary if any
-    if (carriedSources.length > 0) {
-      const srcLabel = language === "id" ? "Sumber" : "Source";
-      const refLabel = language === "id" ? "Referensi Sumber Dibawa" : "Carried Source References";
-      const sourceList = carriedSources
-        .map((s) => `- [${srcLabel}: ${s.title} (${s.type}${s.url ? ` - ${s.url}` : ""})]`)
-        .join("\n");
-      promptWithAttachments = `${promptWithAttachments}\n\n${refLabel}:\n${sourceList}`;
+    // Build NotebookLM-style Grounded Context and System Prompt
+    const groundedResult = buildGroundedContext(carriedSources);
+    const systemPrompt = buildGroundedSystemPrompt({
+      availableSourceIds: groundedResult.sourceIds,
+      hasSources: groundedResult.activeSources.length > 0,
+    });
+
+    if (groundedResult.formattedContext) {
+      promptWithAttachments = `${groundedResult.formattedContext}\n\n---\n## USER QUERY\n${promptWithAttachments}`;
     }
 
     const newUserMsg: DisplayMessage = {
@@ -1300,15 +1329,19 @@ export function ChatPanel({
 
     // 5. Persist user message to Dexie
     if (learnId) {
-      await localDb.saveMessage({
-        id: userMsgId,
-        learnId,
-        sessionId: currentSessionId || undefined,
-        role: "user",
-        content: textToSend,
-        attachments: currentAttachments,
-        createdAt: now,
-      });
+      try {
+        await localDb.saveMessage({
+          id: userMsgId,
+          learnId,
+          sessionId: currentSessionId || undefined,
+          role: "user",
+          content: textToSend,
+          attachments: currentAttachments,
+          createdAt: now,
+        });
+      } catch (dbErr) {
+        console.error("Failed to persist user message to Dexie:", dbErr);
+      }
     }
 
     const nextMessages = [...messages, newUserMsg];
@@ -1384,7 +1417,7 @@ export function ChatPanel({
               });
             }
           }
-        } else {
+        } else if (m.content && m.content.trim()) {
           formattedMessages.push({
             role: "assistant",
             content: m.content,
@@ -1403,11 +1436,13 @@ export function ChatPanel({
 
         const res = await electron.agent.sendMessage({
           messages: formattedMessages,
+          systemPrompt: systemPrompt,
           model: selectedModelId,
           workspacePath: workspacePath,
           learnId: learnId,
           authToken: authToken || undefined,
           mode: permissionMode || "ask_before_changes",
+          temperature: carriedSources.length > 0 ? 0.2 : 0.7,
           thinkingLevel: currentModel.supportsThinking ? thinkingLevel : undefined,
         });
 
@@ -1436,18 +1471,18 @@ export function ChatPanel({
             )
           );
           if (learnId) {
-            await localDb.saveMessage({
-              id: assistantMsgId,
-              learnId,
-              sessionId: currentSessionId || undefined,
-              role: "assistant",
-              content: errorContent,
-              createdAt: now + 1,
-            });
+            try {
+              await localDb.saveMessage({
+                id: assistantMsgId,
+                learnId,
+                sessionId: currentSessionId || undefined,
+                role: "assistant",
+                content: errorContent,
+                createdAt: now + 1,
+              });
+            } catch {}
           }
-          setIsStreaming(false);
         } else if (res && res.success) {
-          setIsStreaming(false);
           setMessages((prev) =>
             prev.map((msg) => {
               if (msg.id === assistantMsgId) {
@@ -1469,16 +1504,18 @@ export function ChatPanel({
                   isStreaming: false,
                 };
                 if (learnId && finalized.content) {
-                  localDb.saveMessage({
-                    id: finalized.id,
-                    learnId,
-                    sessionId: currentSessionId || undefined,
-                    role: "assistant",
-                    content: finalized.content,
-                    thinking: finalized.thinking,
-                    toolCalls: finalized.toolCalls,
-                    createdAt: finalized.createdAt,
-                  });
+                  try {
+                    localDb.saveMessage({
+                      id: finalized.id,
+                      learnId,
+                      sessionId: currentSessionId || undefined,
+                      role: "assistant",
+                      content: finalized.content,
+                      thinking: finalized.thinking,
+                      toolCalls: finalized.toolCalls,
+                      createdAt: finalized.createdAt,
+                    });
+                  } catch {}
                 }
                 return finalized;
               }
@@ -1502,15 +1539,18 @@ export function ChatPanel({
           )
         );
         if (learnId) {
-          await localDb.saveMessage({
-            id: assistantMsgId,
-            learnId,
-            sessionId: currentSessionId || undefined,
-            role: "assistant",
-            content: errorContent,
-            createdAt: now + 1,
-          });
+          try {
+            await localDb.saveMessage({
+              id: assistantMsgId,
+              learnId,
+              sessionId: currentSessionId || undefined,
+              role: "assistant",
+              content: errorContent,
+              createdAt: now + 1,
+            });
+          } catch {}
         }
+      } finally {
         setIsStreaming(false);
       }
     } else {
@@ -1543,12 +1583,12 @@ export function ChatPanel({
             messages: [
               {
                 role: "system",
-                content:
-                  "You are Const Learn Agent, an expert autonomous coding and learning assistant. You help users understand concepts, analyze files, and write clean, robust code.",
+                content: systemPrompt,
               },
               ...formattedMessages,
             ],
             stream: true,
+            temperature: carriedSources.length > 0 ? 0.2 : 0.7,
             ...(currentModel.supportsThinking && thinkingLevel ? { thinking_level: thinkingLevel } : {}),
           }),
         });
@@ -2500,12 +2540,18 @@ export function ChatPanel({
           </button>
         )}
         <button
-          type="submit"
-          disabled={!hasInput}
+          type="button"
+          onClick={(e) => {
+            e.preventDefault();
+            if (hasInput && !isStreaming) {
+              handleSend(inputMessage);
+            }
+          }}
+          disabled={!hasInput || isStreaming}
           className={cn(
-            "h-8 w-8 rounded-full flex items-center justify-center transition-colors cursor-pointer shrink-0 shadow-xs active:scale-95",
-            hasInput
-              ? "bg-[#1a73e8] hover:bg-[#1557b0] text-white"
+            "h-8 w-8 rounded-full flex items-center justify-center transition-colors shrink-0 shadow-xs active:scale-95",
+            hasInput && !isStreaming
+              ? "bg-[#1a73e8] hover:bg-[#1557b0] text-white cursor-pointer"
               : "bg-muted/60 text-muted-foreground/40 cursor-not-allowed"
           )}
           aria-label={t("sendMessage")}
@@ -2980,7 +3026,11 @@ export function ChatPanel({
                   {/* Formatted Markdown Content Bubble */}
                   {msg.content ? (
                     <div className="px-0.5">
-                      <MarkdownContent content={msg.content} />
+                      <MarkdownContent
+                        content={msg.content}
+                        sourcesMap={sourcesMap}
+                        onSourceClick={handleCitationClick}
+                      />
                       {isLatestAssistant && (
                         <span className="inline-block w-1.5 h-3.5 ml-1 bg-primary animate-pulse align-middle" />
                       )}
@@ -3047,7 +3097,9 @@ export function ChatPanel({
             key="chat-input-multi"
             onSubmit={(e) => {
               e.preventDefault();
-              handleSend();
+              if (!isStreaming && (inputMessage.trim() || attachments.length > 0)) {
+                handleSend(inputMessage);
+              }
             }}
             className="w-full bg-card dark:bg-[#1e1f20] rounded-3xl border border-border/70 focus-within:border-foreground/30 transition-colors p-3 sm:p-3.5 shadow-md flex flex-col gap-2.5"
           >
@@ -3067,7 +3119,9 @@ export function ChatPanel({
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
                     e.preventDefault();
-                    handleSend();
+                    if (!isStreaming && (inputMessage.trim() || attachments.length > 0)) {
+                      handleSend(inputMessage);
+                    }
                   }
                 }}
                 rows={2}
@@ -3100,7 +3154,9 @@ export function ChatPanel({
             key="chat-input-single"
             onSubmit={(e) => {
               e.preventDefault();
-              handleSend();
+              if (!isStreaming && (inputMessage.trim() || attachments.length > 0)) {
+                handleSend(inputMessage);
+              }
             }}
             className="w-full bg-card dark:bg-[#1e1f20] rounded-full border border-border/70 focus-within:border-foreground/30 transition-colors px-3 py-1.5 sm:py-2 shadow-md flex items-center gap-2.5"
           >
@@ -3110,22 +3166,20 @@ export function ChatPanel({
               ref={textareaRef}
               value={inputMessage}
               onChange={(e) => {
-                const val = e.target.value;
-                handleInputChange(val);
-                if (e.target.scrollHeight > 30 || val.includes("\n")) {
-                  setIsMultiline(true);
-                }
+                handleInputChange(e.target.value);
               }}
               onPaste={(e) => {
                 const text = e.clipboardData.getData("text");
-                if (text.includes("\n") || text.length > 50) {
+                if (text.includes("\n") || text.length > 80) {
                   setIsMultiline(true);
                 }
               }}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
-                  handleSend();
+                  if (!isStreaming && (inputMessage.trim() || attachments.length > 0)) {
+                    handleSend(inputMessage);
+                  }
                 } else if (e.key === "Enter" && e.shiftKey) {
                   setIsMultiline(true);
                 }
@@ -3198,6 +3252,72 @@ export function ChatPanel({
           imageIndex={lightboxItem.imageIndex}
           onClose={() => setLightboxItem(null)}
         />
+      )}
+
+      {/* Source Reference Inspection Modal */}
+      {selectedSourceForPreview && (
+        <div
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4"
+          onClick={() => setSelectedSourceForPreview(null)}
+        >
+          <div
+            className="w-full max-w-2xl max-h-[85vh] bg-card border border-border rounded-3xl p-6 shadow-2xl flex flex-col text-left"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4 pb-3 border-b border-border/60">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-[11px] font-mono uppercase px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
+                    {selectedSourceForPreview.type}
+                  </span>
+                  {selectedSourceForPreview.subpagesCount &&
+                  selectedSourceForPreview.subpagesCount > 1 ? (
+                    <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                      {selectedSourceForPreview.subpagesCount} pages
+                    </span>
+                  ) : null}
+                </div>
+                <h3 className="text-base font-semibold text-foreground truncate">
+                  {selectedSourceForPreview.title}
+                </h3>
+                {selectedSourceForPreview.url && (
+                  <a
+                    href={selectedSourceForPreview.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-primary hover:underline truncate block mt-0.5"
+                  >
+                    {selectedSourceForPreview.url}
+                  </a>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setSelectedSourceForPreview(null)}
+                className="h-8 w-8 rounded-full bg-secondary hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Extracted Text Content */}
+            <div className="flex-1 overflow-y-auto mt-4 pr-1">
+              <div className="flex items-center justify-between text-[11px] text-muted-foreground mb-2">
+                <span>Verified Source Content (Ground Truth):</span>
+                <span>
+                  {selectedSourceForPreview.content
+                    ? `${selectedSourceForPreview.content.length.toLocaleString()} characters`
+                    : "No text cached"}
+                </span>
+              </div>
+              <div className="p-4 rounded-2xl bg-muted/40 border border-border/50 text-xs font-mono text-foreground whitespace-pre-wrap leading-relaxed select-text">
+                {selectedSourceForPreview.content ||
+                  "[Content is not cached locally. This source was added via link.]"}
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </main>
   );

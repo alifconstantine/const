@@ -158,6 +158,8 @@ export interface StreamChatParams {
   model: string;
   messages: Array<{ role: "system" | "user" | "assistant"; content: string | any[] }>;
   signal?: AbortSignal;
+  systemPrompt?: string;
+  temperature?: number;
   onToken?: (token: string) => void;
   onThinking?: (thinking: string) => void;
   onDone?: (finalContent: string, finalThinking: string) => void;
@@ -168,6 +170,8 @@ export async function streamChatCompletion({
   model,
   messages,
   signal,
+  systemPrompt,
+  temperature,
   onToken,
   onThinking,
   onDone,
@@ -189,10 +193,11 @@ export async function streamChatCompletion({
     messages: [
       {
         role: "system",
-        content: SOCRATIC_LEARNING_SYSTEM_PROMPT,
+        content: systemPrompt || SOCRATIC_LEARNING_SYSTEM_PROMPT,
       },
       ...messages,
     ],
+    temperature: temperature ?? 0.7,
     stream: true,
   };
 

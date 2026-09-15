@@ -64,11 +64,12 @@ export interface LocalSource {
   id: string;
   learnId: string;
   title: string;
-  type: "file" | "url" | "text" | "drive" | "book" | "github";
+  type: "file" | "url" | "text" | "youtube" | "docs" | "drive" | "book" | "github";
   url?: string;
   path?: string;
   content?: string;
   size?: number;
+  subpagesCount?: number;
   includedInChat: boolean;
   createdAt: number;
   updatedAt: number;
@@ -450,6 +451,7 @@ export const localDb = {
     path?: string;
     content?: string;
     size?: number;
+    subpagesCount?: number;
     includedInChat?: boolean;
   }): Promise<string> {
     const id = "source_" + Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
@@ -463,6 +465,7 @@ export const localDb = {
       path: data.path,
       content: data.content,
       size: data.size,
+      subpagesCount: data.subpagesCount,
       includedInChat: data.includedInChat ?? true,
       createdAt: now,
       updatedAt: now,

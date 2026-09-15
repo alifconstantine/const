@@ -49,9 +49,13 @@ export async function POST(req: NextRequest) {
       "Content-Type": "application/json",
     };
 
-    const authHeader = req.headers.get("authorization")?.trim();
-    if (authHeader && !authHeader.includes("...")) {
-      headers["Authorization"] = authHeader;
+    const authHeader = req.headers.get("authorization")?.trim() || "";
+    // Only forward Authorization if it is explicitly an engine API key (sk-...)
+    // End-users do not need an API key; Const Router provides search natively.
+    if (authHeader.startsWith("Bearer sk-") || authHeader.startsWith("sk-")) {
+      headers["Authorization"] = authHeader.startsWith("Bearer ")
+        ? authHeader
+        : `Bearer ${authHeader}`;
     } else if (constEngineKey) {
       headers["Authorization"] = `Bearer ${constEngineKey}`;
     }
@@ -71,6 +75,7 @@ export async function POST(req: NextRequest) {
       num_results: numResults,
       max_results: numResults,
       search_depth: isDeepResearch ? "deep" : (body.search_depth || "basic"),
+      contents: { text: true },
       ...(body.include_domains ? { include_domains: body.include_domains } : {}),
       ...(body.exclude_domains ? { exclude_domains: body.exclude_domains } : {}),
       ...(body.type ? { type: body.type } : {}),
@@ -105,10 +110,16 @@ export async function POST(req: NextRequest) {
               ? r.content.trim()
               : r.content?.text?.trim() || "";
 
+        const fullContent =
+          typeof r.content === "string" && r.content.trim()
+            ? r.content.trim()
+            : r.content?.text?.trim() || textSnippet;
+
         const normalizedItem: Record<string, any> = {
           ...r,
           title: r.title?.trim() || r.display_url || r.url,
           snippet: textSnippet,
+          content: fullContent,
         };
 
         if (normalizedItem.citation && typeof normalizedItem.citation === "object") {
@@ -154,9 +165,13 @@ export async function GET(req: NextRequest) {
     "Content-Type": "application/json",
   };
 
-  const authHeader = req.headers.get("authorization")?.trim();
-  if (authHeader && !authHeader.includes("...")) {
-    headers["Authorization"] = authHeader;
+  const authHeader = req.headers.get("authorization")?.trim() || "";
+  // Only forward Authorization if it is explicitly an engine API key (sk-...)
+  // End-users do not need an API key; Const Router provides search natively.
+  if (authHeader.startsWith("Bearer sk-") || authHeader.startsWith("sk-")) {
+    headers["Authorization"] = authHeader.startsWith("Bearer ")
+      ? authHeader
+      : `Bearer ${authHeader}`;
   } else if (constEngineKey) {
     headers["Authorization"] = `Bearer ${constEngineKey}`;
   }

@@ -49,6 +49,18 @@ function getSourceIcon(type: LocalSource["type"]) {
           <Globe className="h-3.5 w-3.5" />
         </div>
       );
+    case "docs":
+      return (
+        <div className="h-7 w-7 rounded-lg bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 flex items-center justify-center shrink-0">
+          <Globe className="h-3.5 w-3.5" />
+        </div>
+      );
+    case "youtube":
+      return (
+        <div className="h-7 w-7 rounded-lg bg-red-500/10 border border-red-500/20 text-red-500 flex items-center justify-center shrink-0">
+          <FileText className="h-3.5 w-3.5 text-red-500" />
+        </div>
+      );
     case "book":
       return (
         <div className="h-7 w-7 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
@@ -92,6 +104,7 @@ export function SourcesPanel({
   const [webScope, setWebScope] = useState("Web");
   const [researchSpeed, setResearchSpeed] = useState("Fast");
   const [isDraggingOver, setIsDraggingOver] = useState(false);
+  const [selectedSourceForPreview, setSelectedSourceForPreview] = useState<LocalSource | null>(null);
 
   // Query sources live from Dexie database
   const sources =
@@ -161,7 +174,8 @@ export function SourcesPanel({
   }
 
   return (
-    <aside
+    <>
+      <aside
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -363,76 +377,151 @@ export function SourcesPanel({
 
                     {getSourceIcon(source.type)}
 
-                    <div className="flex-1 min-w-0 pr-6">
-                      <p
-                        className="text-xs font-medium text-foreground truncate leading-tight"
-                        title={source.title}
+                      <div
+                        className="flex-1 min-w-0 pr-6"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedSourceForPreview(source);
+                        }}
                       >
-                        {source.title}
-                      </p>
-                      <p className="text-[10px] text-muted-foreground/70 font-mono mt-0.5 truncate flex items-center gap-1">
-                        <span className="capitalize">{source.type}</span>
-                        {source.size ? `• ${formatFileSize(source.size)}` : null}
-                      </p>
+                        <p
+                          className="text-xs font-medium text-foreground truncate leading-tight hover:underline"
+                          title={source.title}
+                        >
+                          {source.title}
+                        </p>
+                        <p className="text-[10px] text-muted-foreground/70 font-mono mt-0.5 truncate flex items-center gap-1">
+                          <span className="capitalize">{source.type}</span>
+                          {source.size ? `• ${formatFileSize(source.size)}` : null}
+                          {source.subpagesCount && source.subpagesCount > 1
+                            ? `• ${source.subpagesCount} pages`
+                            : null}
+                        </p>
+                      </div>
+
+                      {/* Delete Button */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          localDb.deleteSource(source.id);
+                        }}
+                        className="absolute right-2 opacity-0 group-hover:opacity-100 h-6 w-6 rounded-lg hover:bg-destructive/20 text-muted-foreground hover:text-destructive flex items-center justify-center transition-all cursor-pointer"
+                        title={t("removeSource")}
+                        aria-label={t("removeSource")}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
                     </div>
-
-                    {/* Delete Button */}
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        localDb.deleteSource(source.id);
-                      }}
-                      className="absolute right-2 opacity-0 group-hover:opacity-100 h-6 w-6 rounded-lg hover:bg-destructive/20 text-muted-foreground hover:text-destructive flex items-center justify-center transition-all cursor-pointer"
-                      title={t("removeSource")}
-                      aria-label={t("removeSource")}
-                    >
-                      <Trash2 className="h-3 w-3" />
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      ) : (
-        /* Empty State / Interactive Dropzone */
-        <div
-          onClick={onAddSource}
-          className={`flex-1 flex flex-col items-center justify-center text-center p-6 rounded-2xl border-2 border-dashed transition-all duration-200 cursor-pointer group ${
-            isDraggingOver
-              ? "border-primary bg-primary/5 scale-[0.99]"
-              : "border-border/60 hover:border-border/90 bg-muted/15 hover:bg-muted/25"
-          }`}
-        >
-          <div className="h-12 w-12 rounded-2xl bg-secondary/80 border border-border/60 flex items-center justify-center text-muted-foreground mb-3.5 shadow-2xs group-hover:scale-105 group-hover:text-foreground transition-all">
-            <FileText className="h-6 w-6 stroke-[1.5] text-muted-foreground/80 group-hover:text-foreground transition-colors" />
+                  );
+                })}
+              </div>
+            )}
           </div>
-          <h3 className="text-xs font-semibold text-foreground mb-1.5 tracking-tight">
-            {t("emptySourcesTitle")}
-          </h3>
-          <p className="text-[11px] text-muted-foreground/80 leading-relaxed max-w-[260px] mb-5">
-            {t("emptySourcesDescription")}
-          </p>
-
-          {/* Simple "+ Add Source" Button */}
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onAddSource();
-            }}
-            className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-secondary hover:bg-muted border border-border/70 text-xs font-medium text-foreground transition-all cursor-pointer shadow-2xs hover:shadow-xs active:scale-95 group-hover:border-border"
+        ) : (
+          /* Empty State / Interactive Dropzone */
+          <div
+            onClick={onAddSource}
+            className={`flex-1 flex flex-col items-center justify-center text-center p-6 rounded-2xl border-2 border-dashed transition-all duration-200 cursor-pointer group ${
+              isDraggingOver
+                ? "border-primary bg-primary/5 scale-[0.99]"
+                : "border-border/60 hover:border-border/90 bg-muted/15 hover:bg-muted/25"
+            }`}
           >
-            <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
-            <span>{t("addSource")}</span>
-          </button>
+            <div className="h-12 w-12 rounded-2xl bg-secondary/80 border border-border/60 flex items-center justify-center text-muted-foreground mb-3.5 shadow-2xs group-hover:scale-105 group-hover:text-foreground transition-all">
+              <FileText className="h-6 w-6 stroke-[1.5] text-muted-foreground/80 group-hover:text-foreground transition-colors" />
+            </div>
+            <h3 className="text-xs font-semibold text-foreground mb-1.5 tracking-tight">
+              {t("emptySourcesTitle")}
+            </h3>
+            <p className="text-[11px] text-muted-foreground/80 leading-relaxed max-w-[260px] mb-5">
+              {t("emptySourcesDescription")}
+            </p>
 
-          <p className="text-[11px] text-muted-foreground/60 mt-3.5">
-            {t("orDropFiles")}
-          </p>
+            {/* Simple "+ Add Source" Button */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onAddSource();
+              }}
+              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-secondary hover:bg-muted border border-border/70 text-xs font-medium text-foreground transition-all cursor-pointer shadow-2xs hover:shadow-xs active:scale-95 group-hover:border-border"
+            >
+              <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
+              <span>{t("addSource")}</span>
+            </button>
+
+            <p className="text-[11px] text-muted-foreground/60 mt-3.5">
+              {t("orDropFiles")}
+            </p>
+          </div>
+        )}
+      </aside>
+
+      {/* Source Detail Modal */}
+      {selectedSourceForPreview && (
+        <div
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4"
+          onClick={() => setSelectedSourceForPreview(null)}
+        >
+          <div
+            className="w-full max-w-2xl max-h-[85vh] bg-card border border-border rounded-3xl p-6 shadow-2xl flex flex-col text-left"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-4 pb-3 border-b border-border/60">
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center gap-2 mb-1">
+                  {getSourceIcon(selectedSourceForPreview.type)}
+                  <span className="text-[11px] font-mono uppercase px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
+                    {selectedSourceForPreview.type}
+                  </span>
+                  {selectedSourceForPreview.subpagesCount && selectedSourceForPreview.subpagesCount > 1 ? (
+                    <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-primary/10 text-primary">
+                      {selectedSourceForPreview.subpagesCount} pages
+                    </span>
+                  ) : null}
+                </div>
+                <h3 className="text-base font-semibold text-foreground truncate">
+                  {selectedSourceForPreview.title}
+                </h3>
+                {selectedSourceForPreview.url && (
+                  <a
+                    href={selectedSourceForPreview.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-primary hover:underline truncate block mt-0.5"
+                  >
+                    {selectedSourceForPreview.url}
+                  </a>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setSelectedSourceForPreview(null)}
+                className="h-8 w-8 rounded-full bg-secondary hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center cursor-pointer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Extracted Text Content */}
+            <div className="flex-1 overflow-y-auto mt-4 pr-1">
+              <div className="flex items-center justify-between text-[11px] text-muted-foreground mb-2">
+                <span>Extracted Content & Ground Truth:</span>
+                <span>
+                  {selectedSourceForPreview.content
+                    ? `${selectedSourceForPreview.content.length.toLocaleString()} characters`
+                    : "No text cached"}
+                </span>
+              </div>
+              <div className="p-4 rounded-2xl bg-muted/40 border border-border/50 text-xs font-mono text-foreground whitespace-pre-wrap leading-relaxed select-text">
+                {selectedSourceForPreview.content || "[Content is not cached locally. This source was added via link.]"}
+              </div>
+            </div>
+          </div>
         </div>
       )}
-    </aside>
+    </>
   );
 }

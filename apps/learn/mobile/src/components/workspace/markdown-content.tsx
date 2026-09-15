@@ -3,6 +3,7 @@ import { marked, type Token, type Tokens } from "marked";
 import { Check, Copy, Download, Maximize2, X } from "lucide-react";
 import { cn } from "@const/ui";
 import { createMarkedLatexExtension, renderKatex, type MathToken } from "../../lib/marked-latex";
+import { convertReferencesToMarkdownLinks } from "../../lib/grounding/source-references";
 
 // Configure marked globally once with GitHub Flavored Markdown and LaTeX extensions
 marked.use(createMarkedLatexExtension());
@@ -14,22 +15,47 @@ marked.setOptions({
 interface MarkdownContentProps {
   content: string;
   className?: string;
+  sourcesMap?: Map<string, { title: string }>;
+  onSourceClick?: (sourceId: string) => void;
 }
 
-export function MarkdownContent({ content, className = "" }: MarkdownContentProps) {
+export function MarkdownContent({
+  content,
+  className = "",
+  sourcesMap,
+  onSourceClick,
+}: MarkdownContentProps) {
   if (!content) return null;
 
   // Normalize single-space indented list items so they parse cleanly into nested lists
-  const normalizedContent = content.replace(/\n( +)([*+-]) /g, (match, spaces, bullet) => {
+  let normalizedContent = content.replace(/\n( +)([*+-]) /g, (match, spaces, bullet) => {
     return spaces.length === 1 ? `\n  ${bullet} ` : match;
   });
 
+  // Convert [source:id] citations into markdown anchor links
+  normalizedContent = convertReferencesToMarkdownLinks(normalizedContent, sourcesMap);
+
   const tokens = marked.lexer(normalizedContent);
+
+  const handleClick = (e: React.MouseEvent) => {
+    const target = (e.target as HTMLElement).closest("a");
+    if (target) {
+      const href = target.getAttribute("href");
+      if (href && href.startsWith("#ref-source-")) {
+        e.preventDefault();
+        e.stopPropagation();
+        const sourceId = href.replace("#ref-source-", "");
+        onSourceClick?.(sourceId);
+      }
+    }
+  };
 
   return (
     <div
+      onClick={handleClick}
       className={cn(
         "space-y-2.5 text-[13px] sm:text-[14px] leading-[1.65] text-[#d4d4d4] select-text font-sans [&_strong]:font-semibold [&_b]:font-semibold [&_strong]:text-[#ffffff] [&_b]:text-[#ffffff]",
+        "[&_.source-ref-badge]:inline-flex [&_.source-ref-badge]:items-center [&_.source-ref-badge]:gap-1 [&_.source-ref-badge]:px-2 [&_.source-ref-badge]:py-0.5 [&_.source-ref-badge]:mx-0.5 [&_.source-ref-badge]:rounded-md [&_.source-ref-badge]:bg-white/10 [&_.source-ref-badge]:hover:bg-white/15 [&_.source-ref-badge]:border [&_.source-ref-badge]:border-white/20 [&_.source-ref-badge]:text-white [&_.source-ref-badge]:text-[11px] [&_.source-ref-badge]:font-medium [&_.source-ref-badge]:no-underline [&_.source-ref-badge]:cursor-pointer [&_.source-ref-badge]:select-none",
         className
       )}
     >

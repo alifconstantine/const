@@ -44,4 +44,15 @@ export default defineConfig({
       "@const/agent": path.resolve(__dirname, "../../../packages/agent/src/const/index.ts"),
     },
   },
+  server: {
+    port: 3004,
+    host: true,
+    proxy: {
+      "/v1": {
+        target: "https://router.const.web.id",
+        changeOrigin: true,
+        secure: false,
+      },
+    },
+  },
 });

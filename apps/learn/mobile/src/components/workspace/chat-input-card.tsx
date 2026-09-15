@@ -129,7 +129,7 @@ export function ChatInputCard({
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       if (!isStreaming && (inputMessage.trim() || attachments.length > 0)) {
-        onSend(undefined, attachments);
+        onSend(inputMessage, attachments);
       }
     }
   };
@@ -251,7 +251,7 @@ export function ChatInputCard({
     return (
       <button
         type="button"
-        onClick={() => onSend(undefined, attachments)}
+        onClick={() => onSend(inputMessage, attachments)}
         disabled={!canSend}
         className={cn(
           "w-8 h-8 rounded-full flex items-center justify-center transition-colors duration-150 shrink-0 select-none",

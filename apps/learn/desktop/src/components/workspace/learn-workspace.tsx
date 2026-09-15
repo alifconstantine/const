@@ -475,17 +475,21 @@ export function LearnWorkspace({
 
   const handleDropFiles = async (files: File[]) => {
     if (!learnId || !files || files.length === 0) return;
-    for (const file of files) {
-      const filePath = (file as any).path || file.name;
-      const fileName = file.name || filePath.split(/[\\/]/).pop() || t("sourceFileFallback");
-      await localDb.createSource({
-        learnId,
-        title: fileName,
-        type: "file",
-        path: filePath,
-        size: file.size,
-        includedInChat: true,
-      });
+    try {
+      const { parseUploadedFile } = await import("../../lib/sources/document-parser");
+      for (const file of files) {
+        const parsed = await parseUploadedFile(file);
+        await localDb.createSource({
+          learnId,
+          title: parsed.title,
+          type: "file",
+          content: parsed.content,
+          size: parsed.size,
+          includedInChat: true,
+        });
+      }
+    } catch (err) {
+      console.error("Failed to parse dropped files:", err);
     }
   };
 
@@ -902,6 +906,7 @@ export function LearnWorkspace({
       <AddSourceDialog
         open={isAddSourceOpen}
         onOpenChange={setIsAddSourceOpen}
+        learnId={learnId}
         onSelectSource={handleSelectSource}
       />
 
