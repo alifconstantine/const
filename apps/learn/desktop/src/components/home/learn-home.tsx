@@ -125,10 +125,15 @@ export function LearnHome({
     return allLearns.filter((l) => l.collectionIds && l.collectionIds.includes(activeCollectionId));
   }, [allLearns, activeCollectionId]);
 
-  // Total sources count across all learns
+  // Total sources count across all learns (live from sources table with fallback to learns sum)
+  const rawSourcesCount = useLiveQuery(async () => {
+    return await db.sources.count();
+  });
+
   const totalSourcesCount = useMemo(() => {
+    if (rawSourcesCount !== undefined) return rawSourcesCount;
     return allLearns.reduce((acc, curr) => acc + (curr.sourcesCount || 0), 0);
-  }, [allLearns]);
+  }, [allLearns, rawSourcesCount]);
 
   // Action handlers
   const handleCreateNewLearn = async (_collectionId?: string) => {
@@ -467,6 +472,7 @@ export function LearnHome({
             {activeTab === "sources" && (
               <SourcesView
                 onAddSource={() => handleCreateNewLearn()}
+                onOpenLearn={onOpenLearn}
                 isSidebarOpen={isSidebarOpen}
                 onToggleSidebar={() => setIsSidebarOpen(true)}
               />
