@@ -273,7 +273,7 @@ export function SourcesView({
       <div
         key={source.id}
         onClick={() => onOpenLearn?.(source.learnId)}
-        className="w-full px-3.5 py-2.5 rounded-xl border border-[#dedee2] dark:border-[#383838] hover:border-[#b0b0b0] dark:hover:border-[#4f4f4f] bg-white dark:bg-[#222222] hover:bg-[#f4f4f6] dark:hover:bg-[#282828] transition-all flex items-center justify-between gap-3 group select-none cursor-pointer shadow-none"
+        className="w-full px-3.5 py-2.5 rounded-xl border border-[#dedee2] dark:border-[#383838] hover:border-[#b0b0b0] dark:hover:border-[#4f4f4f] bg-white dark:bg-[#222222] hover:bg-[#f4f4f6] dark:hover:bg-[#282828] transition-colors flex items-center justify-between gap-3 group select-none cursor-pointer shadow-none"
       >
         {/* Left: Icon, Title & Optional Link */}
         <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -478,7 +478,7 @@ export function SourcesView({
 
           {/* Sub-filter if in "Berdasarkan Workspace": Workspace pills */}
           {activeCategory === "workspace" && (
-            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 max-w-full animate-in fade-in-50 duration-200">
+            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 max-w-full">
               <button
                 type="button"
                 onClick={() => setSelectedWorkspaceId("all")}
@@ -553,12 +553,12 @@ export function SourcesView({
         </div>
       ) : activeCategory === "all" ? (
         /* "Semua" View: Flat rows sorted by recent */
-        <div className="space-y-2 animate-in fade-in-50 duration-200">
+        <div className="space-y-2">
           {filteredSources.map((source) => renderSourceRow(source, true))}
         </div>
       ) : (
         /* "Berdasarkan Workspace" View: Grouped by Workspace */
-        <div className="space-y-6 animate-in fade-in-50 duration-200">
+        <div className="space-y-6">
           {workspaceGroups.map(({ workspace, sources: wsSources }) => (
             <div key={workspace.id} className="space-y-2">
               {/* Minimalist Workspace Header */}
