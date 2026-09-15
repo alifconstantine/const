@@ -41,6 +41,7 @@ import { SourcesPanel } from "./sources-panel";
 import { ChatPanel } from "./chat-panel";
 import { RightPane, type RightPaneTab, type RightPaneTabType } from "../right-pane";
 import { AddSourceDialog } from "./add-source-dialog";
+import { WorkspaceTitle } from "./workspace-title";
 import { SettingsView } from "../settings/settings-view";
 import { ErrorBoundary } from "../ui/error-boundary";
 import type { FileMutationRecord } from "@const/agent";
@@ -441,31 +442,7 @@ export function LearnWorkspace({
     window.addEventListener("mouseup", onMouseUp);
   };
 
-  // Editable title state
-  const [isEditingTitle, setIsEditingTitle] = useState(false);
-  const [titleValue, setTitleValue] = useState(t("untitledNotebook"));
 
-  useEffect(() => {
-    if (learn?.title) {
-      setTitleValue(learn.title);
-    }
-  }, [learn?.title]);
-
-  const handleSaveTitle = async () => {
-    setIsEditingTitle(false);
-    const trimmed = titleValue.trim() || t("untitledNotebook");
-    setTitleValue(trimmed);
-    await localDb.updateLearn(learnId, { title: trimmed });
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter") {
-      handleSaveTitle();
-    } else if (e.key === "Escape") {
-      setTitleValue(learn?.title || t("untitledNotebook"));
-      setIsEditingTitle(false);
-    }
-  };
 
   const handleSelectSource = async (sourceType: string) => {
     setIsAddSourceOpen(false);
@@ -548,36 +525,14 @@ export function LearnWorkspace({
             <ArrowLeft className="h-4 w-4" />
           </button>
 
-          {/* Editable Title */}
-          {isEditingTitle ? (
-            <div className="flex items-center gap-1.5">
-              <input
-                type="text"
-                autoFocus
-                value={titleValue}
-                onChange={(e) => setTitleValue(e.target.value)}
-                onBlur={handleSaveTitle}
-                onKeyDown={handleKeyDown}
-                className="text-sm font-medium text-foreground bg-muted/60 rounded-full px-3 py-1 outline-none border border-border/80 min-w-[200px] font-sans"
-              />
-              <button
-                type="button"
-                onClick={handleSaveTitle}
-                className="h-7 w-7 rounded-full bg-primary text-primary-foreground flex items-center justify-center cursor-pointer"
-              >
-                <Check className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setIsEditingTitle(true)}
-              className="text-sm font-semibold text-foreground hover:bg-muted/50 px-2.5 py-1 rounded-full transition-colors cursor-pointer text-left font-sans tracking-tight"
-              title={t("clickToRename")}
-            >
-              {titleValue}
-            </button>
-          )}
+          {/* Workspace Title (Auto-resizing inline input, NotebookLM style) */}
+          <WorkspaceTitle
+            title={learn?.title || t("untitledNotebook")}
+            onSave={async (newTitle) => {
+              await localDb.updateLearn(learnId, { title: newTitle });
+            }}
+            placeholder={t("untitledNotebook")}
+          />
 
           {learn?.projectPath && (
             <span
