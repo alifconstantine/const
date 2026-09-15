@@ -58,7 +58,6 @@ function cleanUserMessageContent(content: string): string {
 }
 import {
   ArrowLeft,
-  AlertCircle,
   Share2,
   Plus,
   FolderOpen,
@@ -507,21 +506,22 @@ export function MobileLearnWorkspace({
       if (saved && saved.length > 0) {
         setMessages(
           saved.map((m) => {
-            const isErrorMessage =
-              Boolean((m as any).isError) ||
-              Boolean(m.content && (m.content.startsWith("Gagal memanggil Const") || m.content.startsWith("Failed to call Const")));
+            const savedRawError = (m as any).rawError;
+            const content =
+              m.content ||
+              (savedRawError
+                ? `${t("failedToCallRouter") || (language === "id" ? "Gagal memanggil Const Router" : "Failed to call Const Router")}: ${savedRawError}`
+                : "");
             return {
               id: m.id,
               role: m.role as "user" | "assistant",
-              content: isErrorMessage ? "" : (m.content || ""),
+              content,
               thinking: m.thinking,
               toolCalls: m.toolCalls,
               durationMs: m.durationMs,
               attachments: m.attachments,
               createdAt: m.createdAt,
               isStreaming: false,
-              isError: isErrorMessage,
-              rawError: (m as any).rawError || (isErrorMessage ? m.content : undefined),
             };
           })
         );
@@ -914,14 +914,18 @@ export function MobileLearnWorkspace({
         onError: async (err) => {
           const finalDuration = Date.now() - now;
           const rawErr = err?.message || String(err);
+          const errorPrefix =
+            t("failedToCallRouter") ||
+            (language === "id"
+              ? "Gagal memanggil Const Router"
+              : "Failed to call Const Router");
+          const errorText = `${errorPrefix}: ${rawErr}`;
           setMessages((prev) =>
             prev.map((msg) =>
               msg.id === assistantMsgId
                 ? {
                     ...msg,
-                    content: "",
-                    isError: true,
-                    rawError: rawErr,
+                    content: errorText,
                     durationMs: finalDuration,
                     isStreaming: false,
                   }
@@ -937,12 +941,10 @@ export function MobileLearnWorkspace({
               learnId,
               sessionId: targetSessionId,
               role: "assistant",
-              content: "",
-              isError: true,
-              rawError: rawErr,
+              content: errorText,
               durationMs: finalDuration,
               createdAt: Date.now(),
-            } as any);
+            });
           }
         },
       });
@@ -952,31 +954,6 @@ export function MobileLearnWorkspace({
       setIsStreaming(false);
       abortControllerRef.current = null;
     }
-  };
-
-  const handleRetry = async (errorMsgId: string) => {
-    if (isStreaming) return;
-    const errorIndex = messages.findIndex((m) => m.id === errorMsgId);
-    if (errorIndex < 0) return;
-
-    let userMsgToRetry: DisplayMessage | undefined;
-    for (let i = errorIndex - 1; i >= 0; i--) {
-      if (messages[i]?.role === "user") {
-        userMsgToRetry = messages[i];
-        break;
-      }
-    }
-
-    if (!userMsgToRetry) return;
-
-    // Delete the failed assistant error message from database and UI
-    if (activeSessionId) {
-      await localDb.deleteMessage(errorMsgId, activeSessionId);
-    }
-    setMessages((prev) => prev.filter((m) => m.id !== errorMsgId));
-
-    // Re-send user prompt
-    handleSend(userMsgToRetry.content, userMsgToRetry.attachments);
   };
 
   const handleDownloadArtifact = (art: LocalArtifact) => {
@@ -1655,85 +1632,47 @@ export function MobileLearnWorkspace({
                   </div>
                 ) : (
                   <div className="w-full flex flex-col gap-2 group select-text">
-                    {msg.isError ? (
-                      /* Sleek Error Card with Retry Button */
-                      <div className="w-full rounded-2xl bg-[#221517] border border-[#4d2228] p-3.5 flex flex-col gap-2.5 font-sans animate-in fade-in duration-150 select-text">
-                        <div className="flex items-start gap-2.5">
-                          <AlertCircle className="w-4 h-4 text-[#f87171] shrink-0 mt-0.5" />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-[13.5px] text-[#fca5a5] font-medium leading-snug">
-                              {t("failedToConnectRouter")}
-                            </p>
-                            {msg.rawError && (
-                              <p className="text-[11px] text-[#f87171]/70 font-mono mt-1 break-words">
-                                {msg.rawError}
-                              </p>
-                            )}
-                          </div>
-                        </div>
+                    {/* Thinking Process (Minimalist, auto-collapses once content begins) */}
+                    <ThinkingProcess
+                      thinking={msg.thinking}
+                      isExecuting={Boolean(msg.isStreaming && !msg.content)}
+                      durationMs={
+                        msg.thinkingDurationMs ||
+                        (msg.isStreaming && !msg.content ? liveDurationMs : undefined)
+                      }
+                    />
 
-                        <div className="flex items-center justify-between pt-1 border-t border-[#4d2228]/60">
-                          <button
-                            type="button"
-                            onClick={() => handleRetry(msg.id)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#361c20] hover:bg-[#452328] text-white text-xs font-medium transition-colors cursor-pointer active:scale-95 border border-[#5c2a32]"
-                          >
-                            <RotateCcw className="w-3.5 h-3.5 text-[#fca5a5]" />
-                            <span>{t("retry")}</span>
-                          </button>
-
-                          {msg.createdAt && (
-                            <span className="text-[10px] font-mono text-[#f87171]/60">
-                              {formatTimestamp(msg.createdAt)}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    ) : (
-                      <>
-                        {/* Thinking Process (Minimalist, auto-collapses once content begins) */}
-                        <ThinkingProcess
-                          thinking={msg.thinking}
-                          isExecuting={Boolean(msg.isStreaming && !msg.content)}
-                          durationMs={
-                            msg.thinkingDurationMs ||
-                            (msg.isStreaming && !msg.content ? liveDurationMs : undefined)
-                          }
+                    {/* Assistant Output Message (Pure clean MarkdownContent, matching apps/harness/desktop!) */}
+                    {msg.content ? (
+                      <div className="px-0.5 text-[14px] text-[#d4d4d4] leading-relaxed select-text font-sans">
+                        <MarkdownContent
+                          content={msg.content}
+                          sourcesMap={sourcesMap}
+                          onSourceClick={handleCitationClick}
                         />
-
-                        {/* Assistant Output Message (Pure clean MarkdownContent, NO card wrapper, matching apps/harness/desktop!) */}
-                        {msg.content ? (
-                          <div className="px-0.5 text-[14px] text-[#d4d4d4] leading-relaxed select-text font-sans">
-                            <MarkdownContent
-                              content={msg.content}
-                              sourcesMap={sourcesMap}
-                              onSourceClick={handleCitationClick}
-                            />
-                            {msg.isStreaming && (
-                              <span className="inline-block w-1.5 h-3.5 ml-1 bg-white animate-pulse align-middle" />
-                            )}
-                          </div>
-                        ) : null}
-
-                        {/* Assistant Action Bar: Timestamp & Copy */}
-                        {!msg.isStreaming && msg.content && (
-                          <div className="flex items-center gap-2 pt-0.5 pl-0.5 text-[10.5px] font-mono text-[#777777] select-none">
-                            {msg.createdAt && <span>{formatTimestamp(msg.createdAt)}</span>}
-                            <button
-                              type="button"
-                              onClick={() => handleCopy(msg.id, msg.content)}
-                              className="p-1 rounded hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
-                              title={t("copyMessage")}
-                            >
-                              {copiedId === msg.id ? (
-                                <Check className="w-3 h-3 text-[#34d399]" />
-                              ) : (
-                                <Copy className="w-3 h-3" />
-                              )}
-                            </button>
-                          </div>
+                        {msg.isStreaming && (
+                          <span className="inline-block w-1.5 h-3.5 ml-1 bg-white animate-pulse align-middle" />
                         )}
-                      </>
+                      </div>
+                    ) : null}
+
+                    {/* Assistant Action Bar: Timestamp & Copy */}
+                    {!msg.isStreaming && msg.content && (
+                      <div className="flex items-center gap-2 pt-0.5 pl-0.5 text-[10.5px] font-mono text-[#777777] select-none">
+                        {msg.createdAt && <span>{formatTimestamp(msg.createdAt)}</span>}
+                        <button
+                          type="button"
+                          onClick={() => handleCopy(msg.id, msg.content)}
+                          className="p-1 rounded hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
+                          title={t("copyMessage")}
+                        >
+                          {copiedId === msg.id ? (
+                            <Check className="w-3 h-3 text-[#34d399]" />
+                          ) : (
+                            <Copy className="w-3 h-3" />
+                          )}
+                        </button>
+                      </div>
                     )}
                   </div>
                 )}
