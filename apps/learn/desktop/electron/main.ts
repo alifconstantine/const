@@ -763,6 +763,83 @@ app.on("second-instance", (_event, commandLine) => {
     }
   });
 
+  ipcMain.handle(
+    "agent:generate-completion",
+    async (
+      _event,
+      payload: {
+        messages: { role: string; content: string }[];
+        model?: string;
+        authToken?: string;
+        temperature?: number;
+      }
+    ) => {
+      try {
+        const config = loadUserConfig();
+        let model = payload.model || config.activeModel || "gemini-3.8-flash";
+        if (model === "gemini-3.6-flash") {
+          model = "gemini-3.8-flash";
+        }
+
+        const allModels = [...DEFAULT_MODELS, ...(config.customModels || [])];
+        const modelDef = allModels.find((m) => m.id === model || m.displayName === model);
+        const providerKey = modelDef?.provider || config.activeProvider || "const";
+        const providerCfg = config.providers[providerKey] || config.providers["const"];
+
+        const baseUrl =
+          modelDef?.baseUrl ||
+          providerCfg?.baseUrl ||
+          process.env.CONST_ROUTER_BASE_URL ||
+          process.env.VITE_CONST_ROUTER_BASE_URL ||
+          "https://router.const.web.id/v1";
+
+        let apiKey = providerCfg?.apiKey || "";
+        if (!apiKey && (providerKey === "const" || providerKey === "const-engine")) {
+          apiKey =
+            payload.authToken ||
+            lastAuthToken ||
+            process.env.CONST_ROUTER_API_KEY ||
+            process.env.CONST_ENGINE_API_KEY ||
+            "const-local-dev-key";
+        }
+
+        const endpoint = baseUrl.endsWith("/chat/completions")
+          ? baseUrl
+          : `${baseUrl.replace(/\/+$/, "")}/chat/completions`;
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 20000);
+
+        const res = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+          },
+          body: JSON.stringify({
+            model,
+            messages: payload.messages,
+            temperature: payload.temperature ?? 0.3,
+            stream: false,
+          }),
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+
+        if (!res.ok) {
+          const errText = await res.text().catch(() => "");
+          return { success: false, error: `HTTP ${res.status}: ${errText}` };
+        }
+
+        const json: any = await res.json();
+        const content = json.choices?.[0]?.message?.content;
+        return { success: true, content };
+      } catch (err: any) {
+        return { success: false, error: err.message || "Failed to generate completion" };
+      }
+    }
+  );
+
   ipcMain.handle("config:get", async () => {
     return loadUserConfig();
   });

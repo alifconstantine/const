@@ -87,6 +87,12 @@ declare global {
           feedback?: string;
         }) => Promise<{ success: boolean; resolved?: boolean; error?: string }>;
         generateTitle?: (prompt: string, authToken?: string) => Promise<string | null>;
+        generateCompletion?: (payload: {
+          messages: { role: string; content: string }[];
+          model?: string;
+          authToken?: string;
+          temperature?: number;
+        }) => Promise<{ success: boolean; content?: string; error?: string }>;
         rollbackFile?: (record: FileMutationRecord) => Promise<{ success: boolean; message: string }>;
         onStreamEvent: (callback: (event: any) => void) => () => void;
       };

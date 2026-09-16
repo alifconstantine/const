@@ -23,12 +23,53 @@ export interface LocalCollection {
   createdAt: number;
 }
 
+export interface QuizOption {
+  id: string; // "A" | "B" | "C" | "D"
+  text: string;
+  explanation?: string;
+  isCorrect: boolean;
+}
+
+export interface QuizQuestion {
+  id: string;
+  question: string;
+  options: QuizOption[];
+  hint?: string;
+}
+
+export interface QuizData {
+  title: string;
+  topic?: string;
+  difficulty?: "easy" | "medium" | "hard";
+  sourceCount: number;
+  sourceTitles?: string[];
+  questions: QuizQuestion[];
+}
+
+export interface FlashcardItem {
+  id: string;
+  front: string;
+  back: string;
+  hint?: string;
+}
+
+export interface FlashcardData {
+  title: string;
+  topic?: string;
+  difficulty?: "easy" | "medium" | "hard";
+  sourceCount: number;
+  sourceTitles?: string[];
+  cards: FlashcardItem[];
+}
+
 export interface LocalArtifact {
   id: string;
   learnId?: string;
   title: string;
   type: string;
   content?: string;
+  data?: QuizData | FlashcardData | any;
+  sourceCount?: number;
   fileUrl?: string;
   isZip?: boolean;
   status?: "generating" | "completed" | "error";
@@ -282,13 +323,14 @@ export const localDb = {
     await db.collections.delete(id);
   },
 
-  // Artifacts
   async createArtifact(data: {
     id?: string;
     learnId?: string;
     title: string;
     type: string;
     content?: string;
+    data?: any;
+    sourceCount?: number;
     fileUrl?: string;
     isZip?: boolean;
     status?: "generating" | "completed" | "error";
@@ -303,6 +345,8 @@ export const localDb = {
       title: data.title.trim() || "Untitled Artifact",
       type: data.type,
       content: data.content,
+      data: data.data,
+      sourceCount: data.sourceCount,
       fileUrl: data.fileUrl,
       isZip: data.isZip,
       status: data.status || "completed",
@@ -324,6 +368,9 @@ export const localDb = {
     });
   },
 
+  async getArtifact(id: string): Promise<LocalArtifact | null> {
+    return (await db.artifacts.get(id)) || null;
+  },
   async deleteArtifact(id: string) {
     await db.artifacts.delete(id);
   },

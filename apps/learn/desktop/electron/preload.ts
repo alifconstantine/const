@@ -50,6 +50,12 @@ contextBridge.exposeInMainWorld("electron", {
     }) => ipcRenderer.invoke("agent:respond-approval", payload),
     generateTitle: (prompt: string, authToken?: string) =>
       ipcRenderer.invoke("agent:generate-title", prompt, authToken),
+    generateCompletion: (payload: {
+      messages: { role: string; content: string }[];
+      model?: string;
+      authToken?: string;
+      temperature?: number;
+    }) => ipcRenderer.invoke("agent:generate-completion", payload),
     rollbackFile: (record: any) =>
       ipcRenderer.invoke("agent:rollback-file", { record }),
     onStreamEvent: (callback: (event: any) => void) => {

@@ -15,7 +15,10 @@ import { ChatInputCard, type AttachedMedia } from "./chat-input-card";
 import { AddSourceDialog } from "./add-source-dialog";
 import { WorkspaceSidebar } from "./workspace-sidebar";
 import { SourcesSheet } from "./sources-sheet";
-import { StudioSheet } from "./studio-sheet";
+import { StudioSheet, type GeneratingArtifactStatus } from "./studio-sheet";
+import { CreateArtifactSheet } from "./create-artifact-sheet";
+import { MobileArtifactReader } from "./mobile-artifact-reader";
+import { generateStudioArtifact } from "../../lib/studio/generator";
 import { ThinkingProcess } from "./working-process";
 import { ImageLightbox } from "./image-lightbox";
 import {
@@ -208,6 +211,7 @@ import {
   Minus,
   RemoveFormatting,
   FilePlus,
+  Layers,
 } from "lucide-react";
 
 type WorkspaceTab = "sources" | "chat" | "tools";
@@ -370,8 +374,8 @@ export function MobileLearnWorkspace({
     video_summary: t("toolsVideo"),
     mind_map: t("toolsMindMap"),
     report: t("toolsReport"),
-    flashcards: t("toolsFlashcards"),
     quiz: t("toolsQuiz"),
+    flashcards: t("toolsFlashcards") || (language === "id" ? "Kartu Tanya-Jawab" : "Flashcards"),
     infographic: t("toolsInfographic"),
     data_table: t("toolsDataTable"),
   };
@@ -434,6 +438,13 @@ export function MobileLearnWorkspace({
   const [isSourcesSheetOpen, setIsSourcesSheetOpen] = useState(false);
   const [isStudioSheetOpen, setIsStudioSheetOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<WorkspaceTab>("chat");
+
+  // Studio Artifact creation, in-progress generating, and full-screen reader states
+  const [isCreateArtifactSheetOpen, setIsCreateArtifactSheetOpen] = useState(false);
+  const [createArtifactType, setCreateArtifactType] = useState<"quiz" | "flashcard">("quiz");
+  const [generatingArtifacts, setGeneratingArtifacts] = useState<GeneratingArtifactStatus[]>([]);
+  const [selectedReaderArtifact, setSelectedReaderArtifact] = useState<LocalArtifact | null>(null);
+  const [isReaderOpen, setIsReaderOpen] = useState(false);
 
   // Local state
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
@@ -1166,6 +1177,10 @@ export function MobileLearnWorkspace({
   };
 
   const handleOpenArtifact = (art: LocalArtifact) => {
+    if (art.type === "quiz" || art.type === "flashcard" || art.data?.questions || art.data?.cards) {
+      handleOpenArtifactReader(art);
+      return;
+    }
     setSelectedNoteArtifact(art);
     setNoteContentInput(art.content || "");
     setNoteTitleInput(art.title || (language === "id" ? "Catatan Baru" : "New Note"));
@@ -1183,6 +1198,10 @@ export function MobileLearnWorkspace({
     await localDb.deleteArtifact(artId);
     if (selectedNoteArtifact?.id === artId) {
       setSelectedNoteArtifact(null);
+    }
+    if (selectedReaderArtifact?.id === artId) {
+      setIsReaderOpen(false);
+      setSelectedReaderArtifact(null);
     }
     toast.success(
       language === "id"
@@ -1445,7 +1464,13 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
 
   const handleSelectStudioTool = (toolId: string, toolTitle: string) => {
     setIsStudioSheetOpen(false);
-    if (toolId === "browser") {
+    if (toolId === "quiz") {
+      setCreateArtifactType("quiz");
+      setIsCreateArtifactSheetOpen(true);
+    } else if (toolId === "flashcards" || toolId === "flashcard") {
+      setCreateArtifactType("flashcard");
+      setIsCreateArtifactSheetOpen(true);
+    } else if (toolId === "browser") {
       handleSend(
         language === "id"
           ? "Tolong gunakan browser untuk mencari referensi web dan riset mendalam terkait topik ini."
@@ -1458,6 +1483,94 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
           : `Please create a ${toolTitle} for this notebook.`
       );
     }
+  };
+
+  const handleGenerateStudioArtifact = async (options: {
+    type: "quiz" | "flashcard";
+    topic: string;
+    difficulty: "easy" | "medium" | "hard";
+    count: number;
+    selectedSourceIds: string[];
+  }) => {
+    const selectedSources = (sources || []).filter((s) => options.selectedSourceIds.includes(s.id));
+    const title = options.topic.trim()
+      ? (options.type === "quiz" ? `Kuis: ${options.topic}` : `Kartu: ${options.topic}`)
+      : (options.type === "quiz"
+          ? (language === "id" ? `Kuis (${options.count} Soal)` : `Quiz (${options.count} Questions)`)
+          : (language === "id" ? `Kartu Hafalan (${options.count} Kartu)` : `Flashcards (${options.count} Cards)`));
+
+    const initialLoadingTitle =
+      options.type === "quiz"
+        ? (language === "id" ? "Membuat Kuis..." : "Creating Quiz...")
+        : (language === "id" ? "Membuat Kartu Tanya-Jawab..." : "Creating Flashcards...");
+
+    // 1. Immediately create in Dexie with status: "generating"
+    const artId = await localDb.createArtifact({
+      learnId,
+      title: initialLoadingTitle,
+      type: options.type,
+      status: "generating",
+      sourcesCount: selectedSources.length,
+      content: "",
+    });
+
+    // Open StudioSheet so user sees progress card immediately
+    setIsStudioSheetOpen(true);
+
+    try {
+      const result = await generateStudioArtifact({
+        learnId,
+        type: options.type,
+        topic: options.topic,
+        sources: selectedSources,
+        count: options.count,
+        difficulty: options.difficulty,
+        language: language === "id" ? "id" : "en",
+      });
+
+      await localDb.updateArtifact(artId, {
+        title: result.title || title,
+        data: result.data,
+        status: "completed",
+      });
+
+      toast.success(
+        language === "id"
+          ? (options.type === "quiz" ? "Kuis berhasil dibuat!" : "Kartu tanya-jawab berhasil dibuat!")
+          : (options.type === "quiz" ? "Quiz created successfully!" : "Flashcards created successfully!")
+      );
+
+      const fullArt = await localDb.getArtifact(artId);
+      if (fullArt) {
+        setIsStudioSheetOpen(false);
+        setSelectedReaderArtifact(fullArt);
+        setIsReaderOpen(true);
+      }
+    } catch (err: any) {
+      console.error("Failed to generate studio artifact on mobile:", err);
+      await localDb.updateArtifact(artId, {
+        title,
+        status: "error",
+        error: err?.message || "Generation failed",
+      });
+      toast.error(
+        language === "id"
+          ? `Gagal membuat materi: ${err?.message || "Terjadi kesalahan"}`
+          : `Failed to create material: ${err?.message || "An error occurred"}`
+      );
+    }
+  };
+
+  const handleOpenArtifactReader = (art: LocalArtifact) => {
+    setIsStudioSheetOpen(false);
+    setSelectedReaderArtifact(art);
+    setIsReaderOpen(true);
+  };
+
+  const handleExplainInChat = (prompt: string) => {
+    setIsReaderOpen(false);
+    setActiveTab("chat");
+    handleSend(prompt);
   };
 
   return (
@@ -2254,11 +2367,30 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
         tools={STUDIO_TOOLS}
         toolNameMap={toolNameMap}
         artifacts={artifacts || []}
+        generatingArtifacts={generatingArtifacts}
         onSelectTool={handleSelectStudioTool}
+        onSelectArtifact={handleOpenArtifactReader}
+        onDeleteArtifact={handleDeleteArtifact}
         onDownloadArtifact={handleDownloadArtifact}
         onOpenArtifact={handleOpenArtifact}
-        onDeleteArtifact={handleDeleteArtifact}
         onAddNote={handleAddNote}
+      />
+
+      {/* Create Studio Artifact (Quiz / Flashcard) Bottom Sheet */}
+      <CreateArtifactSheet
+        open={isCreateArtifactSheetOpen}
+        onClose={() => setIsCreateArtifactSheetOpen(false)}
+        initialType={createArtifactType}
+        sources={sources || []}
+        onGenerate={handleGenerateStudioArtifact}
+      />
+
+      {/* Interactive Full-Screen Reader Overlay */}
+      <MobileArtifactReader
+        open={isReaderOpen}
+        onClose={() => setIsReaderOpen(false)}
+        artifact={selectedReaderArtifact}
+        onExplainInChat={handleExplainInChat}
       />
 
       {/* Add Source Pop-up Modal */}

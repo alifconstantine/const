@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import {
   X,
   LayoutGrid,
@@ -23,6 +23,8 @@ import {
   BarChart3,
   BookOpen,
   Table2,
+  Loader2,
+  Sparkles,
 } from "lucide-react";
 import {
   cn,
@@ -49,6 +51,13 @@ export interface StudioToolItem {
   hasBadge?: boolean;
 }
 
+export interface GeneratingArtifactStatus {
+  id: string;
+  type: "quiz" | "flashcard" | string;
+  title: string;
+  sourceCount?: number;
+}
+
 export interface StudioSheetProps {
   open: boolean;
   onClose: () => void;
@@ -56,11 +65,26 @@ export interface StudioSheetProps {
   tools: StudioToolItem[];
   toolNameMap: Record<string, string>;
   artifacts?: LocalArtifact[];
+  generatingArtifacts?: GeneratingArtifactStatus[];
   onSelectTool: (toolId: string, toolTitle: string) => void;
+  onSelectArtifact?: (art: LocalArtifact) => void;
+  onDeleteArtifact?: (artId: string) => void;
   onDownloadArtifact: (art: LocalArtifact) => void;
   onOpenArtifact?: (art: LocalArtifact) => void;
-  onDeleteArtifact?: (artId: string) => void;
   onAddNote?: () => void;
+}
+
+function formatArtifactTimeAgo(date?: Date | number, isIndo?: boolean): string {
+  if (!date) return "";
+  const d = typeof date === "number" || typeof date === "string" ? new Date(date) : date;
+  const diffSec = Math.max(0, Math.floor((Date.now() - d.getTime()) / 1000));
+  if (diffSec < 60) return isIndo ? "Baru saja" : "Just now";
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return isIndo ? `${diffMin} menit lalu` : `${diffMin}m ago`;
+  const diffHour = Math.floor(diffMin / 60);
+  if (diffHour < 24) return isIndo ? `${diffHour} jam lalu` : `${diffHour}h ago`;
+  const diffDay = Math.floor(diffHour / 24);
+  return isIndo ? `${diffDay} hari lalu` : `${diffDay}d ago`;
 }
 
 export function StudioSheet({
@@ -70,13 +94,16 @@ export function StudioSheet({
   tools,
   toolNameMap,
   artifacts,
+  generatingArtifacts = [],
   onSelectTool,
+  onSelectArtifact,
   onDownloadArtifact,
   onOpenArtifact,
   onDeleteArtifact,
   onAddNote,
 }: StudioSheetProps) {
   const { t, language } = useI18n();
+  const isIndo = language === "id";
 
   const [isBannerDismissed, setIsBannerDismissed] = useState<boolean>(() => {
     try {
@@ -125,6 +152,7 @@ export function StudioSheet({
       case "infographic":
         return BarChart3;
       case "flashcards":
+      case "flashcard":
         return BookOpen;
       case "data_table":
         return Table2;
@@ -278,7 +306,7 @@ export function StudioSheet({
             </div>
           </div>
 
-          {/* Section: Activities & Generated Outputs (Image 1) */}
+          {/* Section: Activities & Generated Outputs */}
           <div className="space-y-2.5 pt-1 flex-1">
             <div className="flex items-center justify-between px-0.5">
               <span className="text-xs font-semibold text-white">
@@ -293,164 +321,190 @@ export function StudioSheet({
               )}
             </div>
 
-            {artifacts && artifacts.length > 0 ? (
-              <div className="space-y-2">
-                {artifacts.map((art) => {
-                  const isGenerating = art.status === "generating";
-                  const ItemIcon = getArtifactIcon(art.type, art.isZip);
+            <div className="space-y-2">
+              {artifacts && artifacts.length > 0 && artifacts.map((art) => {
+                const isGenerating = art.status === "generating";
+                const ItemIcon = getArtifactIcon(art.type, art.isZip);
 
-                  if (isGenerating) {
-                    return (
-                      <div
-                        key={art.id}
-                        className="p-2.5 rounded-2xl bg-[#1c1c1f] border border-blue-500/30 flex items-center gap-2.5 select-none animate-pulse shadow-xs"
-                      >
-                        <div className="h-8 w-8 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 shrink-0">
-                          <RotateCw className="h-4 w-4 animate-spin text-blue-400" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="text-xs font-semibold text-white tracking-tight truncate">
-                            {art.title ||
-                              (language === "id"
-                                ? "Membuat Catatan..."
-                                : "Creating Note...")}
-                          </div>
-                          <div className="text-[10.5px] text-neutral-400 truncate mt-0.5">
-                            {language === "id"
-                              ? `berdasarkan ${art.sourcesCount ?? 1} sumber`
-                              : `based on ${art.sourcesCount ?? 1} source${
-                                  (art.sourcesCount ?? 1) === 1 ? "" : "s"
-                                }`}
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  }
+                if (isGenerating) {
+                  const defaultGenTitle =
+                    art.type === "quiz"
+                      ? (language === "id" ? "Membuat Kuis..." : "Creating Quiz...")
+                      : art.type === "flashcard" || art.type === "flashcards"
+                      ? (language === "id" ? "Membuat Kartu Tanya-Jawab..." : "Creating Flashcards...")
+                      : (language === "id" ? "Membuat Catatan..." : "Creating Note...");
 
                   return (
                     <div
                       key={art.id}
-                      onClick={() => onOpenArtifact?.(art)}
-                      className="p-2.5 rounded-2xl bg-[#242426] hover:bg-[#2c2c2f] border border-[#383838] hover:border-[#4d4d52] transition-all flex items-center justify-between gap-2 cursor-pointer group shadow-xs active:scale-[0.99]"
+                      className="p-2.5 rounded-2xl bg-[#1c1c1f] border border-blue-500/30 flex items-center gap-2.5 select-none animate-pulse shadow-xs"
                     >
-                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                        <div className="h-8 w-8 rounded-xl bg-[#1c1c1e] text-[#d4d4d4] border border-[#333336] flex items-center justify-center shrink-0 group-hover:text-white transition-colors">
-                          <ItemIcon className="h-4 w-4" />
+                      <div className="h-8 w-8 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 shrink-0">
+                        <RotateCw className="h-4 w-4 animate-spin text-blue-400" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xs font-semibold text-white tracking-tight truncate">
+                          {art.title || defaultGenTitle}
                         </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="text-xs font-semibold text-white tracking-tight truncate group-hover:text-blue-400 transition-colors">
-                            {art.title}
-                          </div>
-                          <div className="text-[10.5px] text-[#969696] truncate mt-0.5">
-                            {art.sourcesCount
-                              ? `${art.sourcesCount} ${
-                                  language === "id" ? "sumber" : "sources"
-                                } · `
-                              : ""}
-                            {formatRelativeTime(art.createdAt || art.updatedAt)}
-                          </div>
+                        <div className="text-[10.5px] text-neutral-400 truncate mt-0.5">
+                          {language === "id"
+                            ? `berdasarkan ${art.sourcesCount ?? 1} sumber`
+                            : `based on ${art.sourcesCount ?? 1} source${
+                                (art.sourcesCount ?? 1) === 1 ? "" : "s"
+                              }`}
                         </div>
                       </div>
-
-                      {/* Dropdown Options */}
-                      <DropdownMenu>
-                        <DropdownMenuTrigger
-                          asChild
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <button
-                            type="button"
-                            className="h-7 w-7 rounded-lg hover:bg-white/10 text-[#969696] hover:text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
-                            title="Opsi"
-                          >
-                            <MoreVertical className="h-3.5 w-3.5" />
-                          </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent
-                          align="end"
-                          className="w-44 p-1 shadow-xl bg-[#1e1e22] border-[#333338]"
-                        >
-                          <DropdownMenuItem
-                            className="cursor-pointer flex items-center gap-2 text-xs py-2 px-2.5 text-neutral-300 hover:text-white"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onOpenArtifact?.(art);
-                            }}
-                          >
-                            <Eye className="h-3.5 w-3.5" />
-                            <span>
-                              {language === "id"
-                                ? "Buka Catatan"
-                                : "Open Note"}
-                            </span>
-                          </DropdownMenuItem>
-                          {art.content && (
-                            <DropdownMenuItem
-                              className="cursor-pointer flex items-center gap-2 text-xs py-2 px-2.5 text-neutral-300 hover:text-white"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                navigator.clipboard.writeText(art.content || "");
-                                toast.success(
-                                  language === "id"
-                                    ? "Catatan disalin"
-                                    : "Note copied"
-                                );
-                              }}
-                            >
-                              <Copy className="h-3.5 w-3.5" />
-                              <span>
-                                {language === "id" ? "Salin Teks" : "Copy Text"}
-                              </span>
-                            </DropdownMenuItem>
-                          )}
-                          <DropdownMenuItem
-                            className="cursor-pointer flex items-center gap-2 text-xs py-2 px-2.5 text-neutral-300 hover:text-white"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onDownloadArtifact(art);
-                            }}
-                          >
-                            <Download className="h-3.5 w-3.5" />
-                            <span>
-                              {language === "id"
-                                ? "Unduh .md"
-                                : "Download .md"}
-                            </span>
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator className="bg-[#2e2e34]" />
-                          <DropdownMenuItem
-                            className="cursor-pointer flex items-center gap-2 text-xs py-2 px-2.5 text-destructive focus:text-destructive"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onDeleteArtifact?.(art.id);
-                            }}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                            <span>
-                              {language === "id" ? "Hapus" : "Delete"}
-                            </span>
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
                     </div>
                   );
-                })}
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center text-center p-5 rounded-2xl border border-dashed border-[#333336] bg-[#222225]/40 min-h-[130px]">
-                <div className="h-9 w-9 rounded-2xl bg-[#28282b] border border-[#383838] flex items-center justify-center text-[#969696] mb-2">
-                  <PenTool className="h-4 w-4 stroke-[1.5] text-[#d4d4d4]" />
-                </div>
-                <h3 className="text-xs font-semibold text-white mb-1">
-                  {t("studioEmptyTitle") || "Output studio akan disimpan di sini"}
-                </h3>
-                <p className="text-[10.5px] text-[#969696] leading-relaxed max-w-[220px]">
-                  {t("studioEmptyDesc") ||
-                    "Setelah menambahkan sumber, klik untuk menambahkan Ringkasan Audio, Panduan Belajar, Peta Konsep, dan banyak lagi."}
-                </p>
-              </div>
-            )}
+                }
+
+                const isQuiz = art.type === "quiz";
+                const isFlashcard = art.type === "flashcard" || art.type === "flashcards";
+                const itemCount = isQuiz && art.data?.questions
+                  ? art.data.questions.length
+                  : isFlashcard && art.data?.cards
+                  ? art.data.cards.length
+                  : null;
+                const countText = itemCount !== null && itemCount !== undefined
+                  ? isQuiz
+                    ? (language === "id" ? `${itemCount} soal` : `${itemCount} questions`)
+                    : (language === "id" ? `${itemCount} kartu` : `${itemCount} cards`)
+                  : null;
+
+                const handleOpenThis = () => {
+                  onClose();
+                  if (onOpenArtifact) onOpenArtifact(art);
+                  else if (onSelectArtifact) onSelectArtifact(art);
+                };
+
+                return (
+                  <div
+                    key={art.id}
+                    onClick={handleOpenThis}
+                    className="p-2.5 rounded-2xl bg-[#242426] hover:bg-[#2c2c2f] border border-[#383838] hover:border-[#4d4d52] transition-all flex items-center justify-between gap-2 cursor-pointer group shadow-xs active:scale-[0.99]"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                      <div className="h-8 w-8 rounded-xl bg-[#1c1c1e] text-[#d4d4d4] border border-[#333336] flex items-center justify-center shrink-0 group-hover:text-white transition-colors">
+                        <ItemIcon className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="text-xs font-semibold text-white tracking-tight truncate group-hover:text-blue-400 transition-colors">
+                          {art.title}
+                        </div>
+                        <div className="text-[10.5px] text-[#969696] truncate mt-0.5">
+                          {countText ? `${countText} · ` : art.sourcesCount
+                            ? `${art.sourcesCount} ${
+                                language === "id" ? "sumber" : "sources"
+                              } · `
+                            : ""}
+                          {formatRelativeTime(art.createdAt || art.updatedAt)}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Dropdown Options */}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger
+                        asChild
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <button
+                          type="button"
+                          className="h-7 w-7 rounded-lg hover:bg-white/10 text-[#969696] hover:text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                          title="Opsi"
+                        >
+                          <MoreVertical className="h-3.5 w-3.5" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent
+                        align="end"
+                        className="w-44 p-1 shadow-xl bg-[#1e1e22] border-[#333338]"
+                      >
+                        <DropdownMenuItem
+                          className="cursor-pointer flex items-center gap-2 text-xs py-2 px-2.5 text-neutral-300 hover:text-white"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenThis();
+                          }}
+                        >
+                          <Eye className="h-3.5 w-3.5" />
+                          <span>
+                            {isQuiz
+                              ? (language === "id" ? "Buka Kuis" : "Open Quiz")
+                              : isFlashcard
+                              ? (language === "id" ? "Buka Flashcard" : "Open Flashcards")
+                              : (language === "id" ? "Buka Catatan" : "Open Note")}
+                          </span>
+                        </DropdownMenuItem>
+                        {art.content && (
+                          <DropdownMenuItem
+                            className="cursor-pointer flex items-center gap-2 text-xs py-2 px-2.5 text-neutral-300 hover:text-white"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigator.clipboard.writeText(art.content || "");
+                              toast.success(
+                                language === "id"
+                                  ? "Catatan disalin"
+                                  : "Note copied"
+                              );
+                            }}
+                          >
+                            <Copy className="h-3.5 w-3.5" />
+                            <span>
+                              {language === "id" ? "Salin Teks" : "Copy Text"}
+                            </span>
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuItem
+                          className="cursor-pointer flex items-center gap-2 text-xs py-2 px-2.5 text-neutral-300 hover:text-white"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDownloadArtifact?.(art);
+                          }}
+                        >
+                          <Download className="h-3.5 w-3.5" />
+                          <span>
+                            {language === "id"
+                              ? "Unduh .md"
+                              : "Download .md"}
+                          </span>
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator className="bg-[#2e2e34]" />
+                        <DropdownMenuItem
+                          className="cursor-pointer flex items-center gap-2 text-xs py-2 px-2.5 text-destructive focus:text-destructive"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onDeleteArtifact?.(art.id);
+                          }}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                          <span>
+                            {language === "id" ? "Hapus" : "Delete"}
+                          </span>
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                );
+              })}
+            </div>
           </div>
+
+          {/* Empty State if neither exists */}
+          {(!artifacts || artifacts.length === 0) && (
+            <div className="flex flex-col items-center justify-center text-center p-5 rounded-2xl border border-dashed border-[#333336] bg-[#222225]/40 min-h-[130px]">
+              <div className="h-9 w-9 rounded-2xl bg-[#28282b] border border-[#383838] flex items-center justify-center text-[#969696] mb-2">
+                <PenTool className="h-4 w-4 stroke-[1.5] text-[#d4d4d4]" />
+              </div>
+              <h3 className="text-xs font-semibold text-white mb-1">
+                {t("studioEmptyTitle") || "Output studio akan disimpan di sini"}
+              </h3>
+              <p className="text-[10.5px] text-[#969696] leading-relaxed max-w-[220px]">
+                {t("studioEmptyDesc") ||
+                  "Setelah menambahkan sumber, klik untuk menambahkan Ringkasan Audio, Panduan Belajar, Peta Konsep, dan banyak lagi."}
+              </p>
+            </div>
+          )}
         </div>
 
         {/* "+ Tambahkan catatan" Button pinned at the bottom (Image 1) */}

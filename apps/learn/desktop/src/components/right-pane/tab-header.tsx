@@ -7,6 +7,7 @@ import {
   Globe,
   Search,
   Layers,
+  Sparkles,
 } from "lucide-react";
 import { FileIcon } from "../workspace/file-icon";
 import type { RightPaneTab, RightPaneTabType } from "./types";
@@ -30,6 +31,8 @@ function getTabIcon(type: RightPaneTabType) {
       return FileText;
     case "browser":
       return Globe;
+    case "studio_preview":
+      return Sparkles;
     default:
       return Layers;
   }

@@ -1,6 +1,13 @@
 import type { FileMutationRecord } from "@const/agent";
+import type { LocalArtifact } from "../../lib/db";
 
-export type RightPaneTabType = "review" | "file_diff" | "file_preview" | "browser" | "note_preview";
+export type RightPaneTabType =
+  | "review"
+  | "file_diff"
+  | "file_preview"
+  | "browser"
+  | "note_preview"
+  | "studio_preview";
 
 export interface RightPaneTab {
   id: string;
@@ -16,5 +23,5 @@ export interface RightPaneTab {
   url?: string;
   favicon?: string;
   artifactId?: string;
-  artifact?: any;
+  artifact?: LocalArtifact;
 }

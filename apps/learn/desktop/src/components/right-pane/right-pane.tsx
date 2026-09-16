@@ -1,4 +1,4 @@
-import React, { useRef, useState, useEffect } from "react";
+import React, { useRef, useState, useEffect, useMemo } from "react";
 import {
   PanelRight,
   PenTool,
@@ -23,6 +23,8 @@ import {
   BarChart3,
   Table2,
   BookOpen,
+  Loader2,
+  Sparkles,
 } from "lucide-react";
 import {
   cn,
@@ -40,10 +42,32 @@ import { FilePreviewTab } from "./file-preview-tab";
 import { OpenTabView } from "./open-tab-view";
 import { BrowserTab } from "./browser-tab";
 import { NotePreviewTab } from "./note-preview-tab";
+import { QuizViewer } from "./quiz-viewer";
+import { FlashcardViewer } from "./flashcard-viewer";
 import { STUDIO_TOOLS } from "../workspace/studio-panel";
 import { useI18n } from "../../lib/i18n";
 import type { RightPaneTab, RightPaneTabType } from "./types";
 import type { FileMutationRecord } from "@const/agent";
+import type { LocalArtifact } from "../../lib/db";
+
+export interface GeneratingArtifactStatus {
+  id: string;
+  type: "quiz" | "flashcard" | string;
+  title: string;
+  sourceCount?: number;
+}
+
+function formatArtifactTimeAgo(timestamp?: number, isIndo = true): string {
+  if (!timestamp) return isIndo ? "Baru saja" : "Just now";
+  const diffSec = Math.floor((Date.now() - timestamp) / 1000);
+  if (diffSec < 60) return isIndo ? "Baru saja" : "Just now";
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return isIndo ? `${diffMin} menit lalu` : `${diffMin}m ago`;
+  const diffHour = Math.floor(diffMin / 60);
+  if (diffHour < 24) return isIndo ? `${diffHour} jam lalu` : `${diffHour}h ago`;
+  const diffDay = Math.floor(diffHour / 24);
+  return isIndo ? `${diffDay} hari lalu` : `${diffDay}d ago`;
+}
 
 export interface RightPaneProps {
   width?: number;
@@ -68,13 +92,16 @@ export interface RightPaneProps {
   onOpenFileDiff?: (record: FileMutationRecord) => void;
   onSelectStudioTool?: (toolId: string) => void;
   onAddNote?: () => void;
-  artifacts?: any[];
+  artifacts?: LocalArtifact[];
   onDownloadArtifact?: (art: any) => void;
+  generatingArtifacts?: GeneratingArtifactStatus[];
   onOpenArtifact?: (art: any) => void;
+  onSelectArtifact?: (art: LocalArtifact) => void;
   onDeleteArtifact?: (artId: string) => void;
   activeNoteArtifact?: any | null;
   onCloseNote?: () => void;
   onConvertToSource?: (art: any) => void;
+  onExplainInChat?: (prompt: string) => void;
 }
 
 export function RightPane({
@@ -102,13 +129,17 @@ export function RightPane({
   onAddNote,
   artifacts,
   onDownloadArtifact,
+  generatingArtifacts = [],
   onOpenArtifact,
+  onSelectArtifact,
   onDeleteArtifact,
   activeNoteArtifact,
   onCloseNote,
   onConvertToSource,
+  onExplainInChat,
 }: RightPaneProps) {
   const { t, language } = useI18n();
+  const isIndo = language === "id";
 
   const [isBannerDismissed, setIsBannerDismissed] = useState<boolean>(() => {
     try {
@@ -456,7 +487,7 @@ export function RightPane({
                 </div>
               )}
 
-              {/* 3x3 Grid of Studio Tools (9 Tools matching Image 1) */}
+              {/* Grid of Studio Tools */}
               <div className="grid grid-cols-3 gap-2 mb-4 shrink-0">
                 {STUDIO_TOOLS.map((tool) => {
                   const Icon = tool.icon;
@@ -500,6 +531,13 @@ export function RightPane({
                       const ItemIcon = getArtifactIcon(art.type, art.isZip);
 
                       if (isGenerating) {
+                        const defaultGeneratingTitle =
+                          art.type === "quiz"
+                            ? (language === "id" ? "Membuat Kuis..." : "Creating Quiz...")
+                            : art.type === "flashcard" || art.type === "flashcards"
+                            ? (language === "id" ? "Membuat Kartu Tanya-Jawab..." : "Creating Flashcards...")
+                            : (language === "id" ? "Membuat Catatan..." : "Creating Note...");
+
                         return (
                           <div
                             key={art.id}
@@ -510,10 +548,7 @@ export function RightPane({
                             </div>
                             <div className="min-w-0 flex-1">
                               <div className="text-xs font-semibold text-white tracking-tight truncate">
-                                {art.title ||
-                                  (language === "id"
-                                    ? "Membuat Catatan..."
-                                    : "Creating Note...")}
+                                {art.title || defaultGeneratingTitle}
                               </div>
                               <div className="text-[11px] text-neutral-400 truncate mt-0.5">
                                 {language === "id"
@@ -527,10 +562,28 @@ export function RightPane({
                         );
                       }
 
+                      const isQuiz = art.type === "quiz";
+                      const isFlashcard = art.type === "flashcard" || art.type === "flashcards";
+                      const itemCount = isQuiz && art.data?.questions
+                        ? art.data.questions.length
+                        : isFlashcard && art.data?.cards
+                        ? art.data.cards.length
+                        : null;
+                      const countText = itemCount !== null && itemCount !== undefined
+                        ? isQuiz
+                          ? (language === "id" ? `${itemCount} pertanyaan` : `${itemCount} questions`)
+                          : (language === "id" ? `${itemCount} kartu` : `${itemCount} cards`)
+                        : null;
+
+                      const handleOpenThis = () => {
+                        if (onOpenArtifact) onOpenArtifact(art);
+                        else if (onSelectArtifact) onSelectArtifact(art);
+                      };
+
                       return (
                         <div
                           key={art.id}
-                          onClick={() => onOpenArtifact?.(art)}
+                          onClick={handleOpenThis}
                           className="p-3 rounded-2xl bg-[#1e1e21] hover:bg-[#25252a] border border-[#2d2d32] hover:border-[#3d3d44] transition-all flex items-center justify-between gap-2.5 cursor-pointer group shadow-xs active:scale-[0.99]"
                         >
                           <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -542,7 +595,7 @@ export function RightPane({
                                 {art.title}
                               </div>
                               <div className="text-[11px] text-neutral-400 truncate mt-0.5">
-                                {art.sourcesCount
+                                {countText ? `${countText} · ` : art.sourcesCount
                                   ? `${art.sourcesCount} ${
                                       language === "id" ? "sumber" : "source"
                                     } · `
@@ -705,6 +758,20 @@ export function RightPane({
                     onUpdateTab={onUpdateTab}
                     onDownloadArtifact={onDownloadArtifact}
                   />
+                ) : activeTab.type === "studio_preview" ? (
+                  activeTab.artifact?.type === "quiz" && activeTab.artifact.data ? (
+                    <QuizViewer
+                      key={activeTab.id}
+                      quiz={activeTab.artifact.data}
+                      onExplainInChat={onExplainInChat}
+                    />
+                  ) : activeTab.artifact?.data ? (
+                    <FlashcardViewer
+                      key={activeTab.id}
+                      flashcard={activeTab.artifact.data}
+                      onExplainInChat={onExplainInChat}
+                    />
+                  ) : null
                 ) : (
                   <ReviewTab
                     key={activeTab.id || "review_tab"}

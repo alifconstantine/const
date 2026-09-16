@@ -13,7 +13,6 @@ import {
   Plus,
   SquarePen,
   PenTool,
-  BookOpen,
   Table2,
 } from "lucide-react";
 import { ScrollArea } from "@const/ui";
@@ -89,17 +88,6 @@ export const STUDIO_TOOLS: StudioTool[] = [
     hoverBg: "hover:bg-[#343225]",
     hoverBorder: "hover:border-[#4d4a37]",
     hasBadge: true,
-  },
-  {
-    id: "flashcards",
-    translationKey: "toolsFlashcards",
-    icon: BookOpen,
-    iconColor: "text-[#fb7185]",
-    textColor: "text-[#ffe4e6]",
-    cardBg: "bg-[#2b1f23]",
-    borderColor: "border-[#3e2b32]",
-    hoverBg: "hover:bg-[#38262d]",
-    hoverBorder: "hover:border-[#523741]",
   },
   {
     id: "quiz",

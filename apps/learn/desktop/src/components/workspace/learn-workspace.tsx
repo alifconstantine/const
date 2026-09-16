@@ -40,15 +40,18 @@ import {
 import { useI18n, LANGUAGE_OPTIONS } from "../../lib/i18n";
 import { SourcesPanel } from "./sources-panel";
 import { ChatPanel } from "./chat-panel";
-import { RightPane, type RightPaneTab, type RightPaneTabType } from "../right-pane";
+import { RightPane, type RightPaneTab, type RightPaneTabType, type GeneratingArtifactStatus } from "../right-pane";
 import { AddSourceDialog } from "./add-source-dialog";
+import { CreateStudioArtifactDialog } from "./create-studio-artifact-dialog";
 import { WorkspaceTitle } from "./workspace-title";
 import { SettingsView } from "../settings/settings-view";
 import { ErrorBoundary } from "../ui/error-boundary";
 import { STUDIO_TOOLS } from "./studio-panel";
 import { buildGroundedContext } from "../../lib/grounding/context-builder";
 import { streamChatCompletion } from "../../lib/ai-stream";
+import { generateStudioArtifact } from "../../lib/studio/generator";
 import type { FileMutationRecord } from "@const/agent";
+import type { LocalArtifact } from "../../lib/db";
 
 interface LearnWorkspaceProps {
   learnId: string;
@@ -77,6 +80,11 @@ export function LearnWorkspace({
     return await db.learns.get(learnId);
   }, [learnId]);
 
+  // Live sources from Dexie
+  const sources = useLiveQuery(async () => {
+    return await db.sources.where("learnId").equals(learnId).toArray();
+  }, [learnId]);
+
   // Live artifacts from Dexie
   const artifacts = useLiveQuery(async () => {
     return await db.artifacts.where("learnId").equals(learnId).toArray();
@@ -87,6 +95,11 @@ export function LearnWorkspace({
   const [isSourcesCollapsed, setIsSourcesCollapsed] = useState(false);
   const [isStudioCollapsed, setIsStudioCollapsed] = useState(false);
   const [pendingStudioPrompt, setPendingStudioPrompt] = useState<string | null>(null);
+
+  // Studio Artifact creation & generation states
+  const [isCreateStudioOpen, setIsCreateStudioOpen] = useState(false);
+  const [createStudioType, setCreateStudioType] = useState<"quiz" | "flashcard">("quiz");
+  const [generatingArtifacts, setGeneratingArtifacts] = useState<GeneratingArtifactStatus[]>([]);
 
   // Right Pane: Dual Studio & Preview/Review state
   const [rightPaneMode, setRightPaneMode] = useState<"studio" | "preview">("studio");
@@ -386,9 +399,130 @@ export function LearnWorkspace({
     }
   };
 
+  const handleOpenStudioArtifact = (art: LocalArtifact) => {
+    setIsStudioCollapsed(false);
+    setRightPaneMode("preview");
+    setIsOpeningNewTab(false);
+
+    const existingTab = rightPaneTabs.find(
+      (t) => t.type === "studio_preview" && t.artifact?.id === art.id
+    );
+
+    if (existingTab) {
+      setActiveRightPaneTabId(existingTab.id);
+    } else {
+      const tabId = `studio_${art.id}_${Date.now()}`;
+      const newTab: RightPaneTab = {
+        id: tabId,
+        type: "studio_preview",
+        title: art.title,
+        artifact: art,
+      };
+      setRightPaneTabs((prev) => [...prev, newTab]);
+      setActiveRightPaneTabId(tabId);
+    }
+
+    // Auto-widen studio/preview pane width like handleOpenBrowser
+    const responsiveDefaults = getResponsiveWidths();
+    const windowWidth = typeof window !== "undefined" ? window.innerWidth : 1280;
+    const targetStudioWidth = Math.max(
+      studioWidth,
+      Math.min(Math.round(windowWidth * 0.45), 720),
+      600
+    );
+
+    if (studioWidth < targetStudioWidth) {
+      setStudioWidth(targetStudioWidth);
+      setIsManualWidth(true);
+    } else if (studioWidth !== responsiveDefaults.studio) {
+      setIsManualWidth(true);
+    }
+  };
+
+  const handleGenerateStudioArtifact = async (params: {
+    type: "quiz" | "flashcard";
+    topic: string;
+    selectedSourceIds: string[];
+    count: number;
+    difficulty: "easy" | "medium" | "hard";
+  }) => {
+    // 1. Ensure studio panel is open and in Studio mode so user immediately sees the progress card!
+    setIsStudioCollapsed(false);
+    setRightPaneMode("studio");
+
+    const selectedSources = (sources || []).filter((s) => params.selectedSourceIds.includes(s.id));
+    const title = params.topic.trim()
+      ? (params.type === "quiz" ? `Kuis: ${params.topic}` : `Kartu: ${params.topic}`)
+      : (params.type === "quiz"
+          ? (language === "id" ? `Kuis (${params.count} Soal)` : `Quiz (${params.count} Questions)`)
+          : (language === "id" ? `Kartu Hafalan (${params.count} Kartu)` : `Flashcards (${params.count} Cards)`));
+
+    const initialLoadingTitle =
+      params.type === "quiz"
+        ? (language === "id" ? "Membuat Kuis..." : "Creating Quiz...")
+        : (language === "id" ? "Membuat Kartu Tanya-Jawab..." : "Creating Flashcards...");
+
+    // 2. Immediately create in Dexie with status: "generating" (appears instantly in Artifacts list)
+    const artId = await localDb.createArtifact({
+      learnId,
+      title: initialLoadingTitle,
+      type: params.type,
+      status: "generating",
+      sourcesCount: selectedSources.length,
+      content: "",
+    });
+
+    try {
+      // Call background AI generator
+      const result = await generateStudioArtifact({
+        learnId,
+        type: params.type,
+        topic: params.topic,
+        sources: selectedSources,
+        count: params.count,
+        difficulty: params.difficulty,
+        language: language === "id" ? "id" : "en",
+      });
+
+      // Update Dexie artifact to completed
+      await localDb.updateArtifact(artId, {
+        title: result.title || title,
+        data: result.data,
+        status: "completed",
+      });
+
+      toast.success(
+        language === "id"
+          ? (params.type === "quiz" ? "Kuis berhasil dibuat!" : "Kartu tanya-jawab berhasil dibuat!")
+          : (params.type === "quiz" ? "Quiz created successfully!" : "Flashcards created successfully!")
+      );
+
+      // Auto-open in preview & auto-widen
+      const fullArt = await localDb.getArtifact(artId);
+      if (fullArt) {
+        handleOpenStudioArtifact(fullArt);
+      }
+    } catch (err: any) {
+      console.error("Failed to generate studio artifact:", err);
+      await localDb.updateArtifact(artId, {
+        title,
+        status: "error",
+        error: err?.message || "Generation failed",
+      });
+      toast.error(
+        language === "id"
+          ? `Gagal membuat kuis: ${err?.message || "Terjadi kesalahan"}`
+          : `Failed to create quiz: ${err?.message || "An error occurred"}`
+      );
+    }
+  };
+
   const handleSelectStudioTool = (toolId: string) => {
     if (toolId === "browser") {
       handleOpenBrowser();
+    } else if (toolId === "quiz" || toolId === "flashcards" || toolId === "flashcard") {
+      setCreateStudioType(toolId === "flashcards" || toolId === "flashcard" ? "flashcard" : "quiz");
+      setIsCreateStudioOpen(true);
     } else {
       const tool = STUDIO_TOOLS.find((t) => t.id === toolId);
       const toolName = tool ? t(tool.translationKey) : toolId;
@@ -401,6 +535,10 @@ export function LearnWorkspace({
   };
 
   const handleOpenArtifact = (art: any) => {
+    if (art.type === "quiz" || art.type === "flashcard" || art.data?.questions || art.data?.cards) {
+      handleOpenStudioArtifact(art);
+      return;
+    }
     setIsStudioCollapsed(false);
     setRightPaneMode("studio");
     setActiveNoteArtifactId(art.id);
@@ -454,7 +592,10 @@ export function LearnWorkspace({
     }
     setRightPaneTabs((prev) =>
       prev.filter(
-        (t) => t.artifactId !== artId && t.id !== `note_${artId}`
+        (t) =>
+          !(t.type === "studio_preview" && t.artifact?.id === artId) &&
+          t.artifactId !== artId &&
+          t.id !== `note_${artId}`
       )
     );
   };
@@ -1088,6 +1229,9 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
             onConvertToSource={handleConvertToSource}
             artifacts={artifacts || []}
             onDownloadArtifact={handleDownloadArtifact}
+            generatingArtifacts={generatingArtifacts}
+            onSelectArtifact={handleOpenStudioArtifact}
+            onExplainInChat={(prompt) => setPendingStudioPrompt(prompt)}
           />
         </ErrorBoundary>
       </div>
@@ -1098,6 +1242,15 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
         onOpenChange={setIsAddSourceOpen}
         learnId={learnId}
         onSelectSource={handleSelectSource}
+      />
+
+      {/* Create Studio Artifact (Quiz / Flashcard) Dialog */}
+      <CreateStudioArtifactDialog
+        open={isCreateStudioOpen}
+        onOpenChange={setIsCreateStudioOpen}
+        initialType={createStudioType}
+        sources={sources || []}
+        onGenerate={handleGenerateStudioArtifact}
       />
 
       {/* Settings Modal / Overlay */}
