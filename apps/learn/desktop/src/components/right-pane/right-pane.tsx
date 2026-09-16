@@ -9,14 +9,37 @@ import {
   Package,
   FileText,
   Download,
+  RotateCw,
+  MoreVertical,
+  X,
+  Eye,
+  Copy,
+  Trash2,
+  HelpCircle,
+  GitFork,
+  Presentation,
+  AudioLines,
+  Video,
+  BarChart3,
+  Table2,
+  BookOpen,
 } from "lucide-react";
-import { cn } from "@const/ui";
+import {
+  cn,
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  toast,
+} from "@const/ui";
 import { TabHeader } from "./tab-header";
 import { ReviewTab } from "./review-tab";
 import { FileDiffTab } from "./file-diff-tab";
 import { FilePreviewTab } from "./file-preview-tab";
 import { OpenTabView } from "./open-tab-view";
 import { BrowserTab } from "./browser-tab";
+import { NotePreviewTab } from "./note-preview-tab";
 import { STUDIO_TOOLS } from "../workspace/studio-panel";
 import { useI18n } from "../../lib/i18n";
 import type { RightPaneTab, RightPaneTabType } from "./types";
@@ -47,6 +70,11 @@ export interface RightPaneProps {
   onAddNote?: () => void;
   artifacts?: any[];
   onDownloadArtifact?: (art: any) => void;
+  onOpenArtifact?: (art: any) => void;
+  onDeleteArtifact?: (artId: string) => void;
+  activeNoteArtifact?: any | null;
+  onCloseNote?: () => void;
+  onConvertToSource?: (art: any) => void;
 }
 
 export function RightPane({
@@ -74,8 +102,68 @@ export function RightPane({
   onAddNote,
   artifacts,
   onDownloadArtifact,
+  onOpenArtifact,
+  onDeleteArtifact,
+  activeNoteArtifact,
+  onCloseNote,
+  onConvertToSource,
 }: RightPaneProps) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
+
+  const [isBannerDismissed, setIsBannerDismissed] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem("const_learn_report_banner_dismissed") === "true";
+    } catch {
+      return false;
+    }
+  });
+
+  const handleDismissBanner = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsBannerDismissed(true);
+    try {
+      localStorage.setItem("const_learn_report_banner_dismissed", "true");
+    } catch {}
+  };
+
+  const formatRelativeTime = (ts: number) => {
+    const diffSec = Math.floor((Date.now() - ts) / 1000);
+    if (diffSec < 60) return language === "id" ? "baru saja" : "just now";
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `${diffMin}m ${language === "id" ? "lalu" : "ago"}`;
+    const diffHr = Math.floor(diffMin / 60);
+    if (diffHr < 24) return `${diffHr}h ${language === "id" ? "lalu" : "ago"}`;
+    const diffDay = Math.floor(diffHr / 24);
+    return `${diffDay}d ${language === "id" ? "lalu" : "ago"}`;
+  };
+
+  const getArtifactIcon = (type: string, isZip?: boolean) => {
+    if (isZip) return Package;
+    switch (type) {
+      case "note":
+        return SquarePen;
+      case "mind_map":
+        return GitFork;
+      case "quiz":
+        return HelpCircle;
+      case "slides":
+        return Presentation;
+      case "audio_summary":
+        return AudioLines;
+      case "video_summary":
+        return Video;
+      case "report":
+        return FileText;
+      case "infographic":
+        return BarChart3;
+      case "flashcards":
+        return BookOpen;
+      case "data_table":
+        return Table2;
+      default:
+        return SquarePen;
+    }
+  };
 
   const isDraggingRef = useRef(false);
   const [isInternalDragging, setIsInternalDragging] = useState(false);
@@ -252,19 +340,30 @@ export function RightPane({
           <div className="w-0.5 h-full bg-transparent group-hover:bg-[#0066ff]/50" />
         </div>
 
-        {/* Top Header with 2 Menus: Studio & Review */}
-        <div
-          className={`h-12 px-3 bg-[#1e1e20] flex items-center justify-between shrink-0 select-none ${
-            mode === "studio" ? "border-b-0" : "border-b border-[#282828]"
-          }`}
-        >
-          {/* Segmented Control: [ Studio ] [ Review (N) ] */}
-          <div className="relative flex items-center bg-[#141416] p-0.5 rounded-xl border border-[#2d2d30]">
-            {/* Animated Sliding Background Pill */}
+        {/* Conditional View: When Note is Active in Studio (Image 3) vs Studio/Review Overview */}
+        {mode === "studio" && activeNoteArtifact ? (
+          <NotePreviewTab
+            artifact={activeNoteArtifact}
+            onClose={onCloseNote}
+            onDeleteArtifact={onDeleteArtifact}
+            onConvertToSource={onConvertToSource}
+            onToggleCollapse={onToggleCollapse}
+          />
+        ) : (
+          <>
+            {/* Top Header with 2 Menus: Studio & Review */}
             <div
-              className="absolute top-0.5 bottom-0.5 rounded-lg bg-[#28282b] shadow-2xs transition-all duration-200 ease-[cubic-bezier(0.2,0,0,1)] pointer-events-none"
-              style={{
-                left: `${indicatorStyle.left}px`,
+              className={`h-12 px-3 bg-[#1e1e20] flex items-center justify-between shrink-0 select-none ${
+                mode === "studio" ? "border-b-0" : "border-b border-[#282828]"
+              }`}
+            >
+              {/* Segmented Control: [ Studio ] [ Review (N) ] */}
+              <div className="relative flex items-center bg-[#141416] p-0.5 rounded-xl border border-[#2d2d30]">
+                {/* Animated Sliding Background Pill */}
+                <div
+                  className="absolute top-0.5 bottom-0.5 rounded-lg bg-[#28282b] shadow-2xs transition-all duration-200 ease-[cubic-bezier(0.2,0,0,1)] pointer-events-none"
+                  style={{
+                    left: `${indicatorStyle.left}px`,
                 width: indicatorStyle.width ? `${indicatorStyle.width}px` : undefined,
                 opacity: indicatorStyle.width ? 1 : 0,
               }}
@@ -324,156 +423,304 @@ export function RightPane({
           {mode === "studio" ? (
             /* Studio Content */
             <div className="flex-1 flex flex-col p-3 sm:p-3.5 overflow-y-auto min-h-0 select-none animate-in fade-in duration-200">
-          {/* 3x3 Grid of Studio Tools */}
-          <div className="grid grid-cols-3 gap-2 mb-6">
-            {STUDIO_TOOLS.map((tool) => {
-              const Icon = tool.icon;
-              const toolName = t(tool.translationKey);
-              return (
-                <button
-                  key={tool.id}
-                  type="button"
-                  onClick={() => onSelectStudioTool?.(tool.id)}
-                  className={`p-3 rounded-2xl border ${tool.cardBg} ${tool.borderColor} ${tool.hoverBg} ${tool.hoverBorder} transition-all flex flex-col justify-between h-[86px] sm:h-[90px] text-left group cursor-pointer shadow-xs active:scale-[0.98]`}
-                >
-                  <div className="flex items-center justify-between w-full">
-                    <div className="flex items-center gap-1.5">
-                      <Icon className={`h-4 w-4 ${tool.iconColor} shrink-0`} />
-                      {tool.hasBadge && (
-                        <span className="bg-[#ededed] text-[#141414] text-[9.5px] font-bold px-1.5 py-0.5 rounded-full leading-none shadow-2xs">
-                          {t("badgeNew")}
-                        </span>
-                      )}
-                    </div>
-                    <ChevronRight className="h-3.5 w-3.5 text-[#888888]/60 group-hover:text-[#d4d4d4] group-hover:translate-x-0.5 transition-all shrink-0" />
+              {/* Banner: Laporan Interaktif (Image 1) */}
+              {!isBannerDismissed && (
+                <div className="mb-3.5 p-2.5 rounded-2xl bg-gradient-to-r from-[#1f2824] via-[#1a2e22] to-[#1e2622] border border-[#2d4d38]/60 flex items-center justify-between gap-2 shadow-xs select-none shrink-0">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <span className="text-base select-none shrink-0" role="img" aria-label="Celebration">
+                      🎆
+                    </span>
+                    <span className="text-[11.5px] font-medium text-[#e2e8f0] leading-snug">
+                      {language === "id"
+                        ? "Baru: Anda kini dapat membuat Laporan Interaktif."
+                        : "New: You can now create Interactive Reports."}
+                    </span>
                   </div>
-                  <span className={`text-[11px] sm:text-xs font-medium ${tool.textColor || "text-foreground"} tracking-tight leading-snug line-clamp-2 mt-auto`}>
-                    {toolName}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => onSelectStudioTool?.("report")}
+                      className="px-3 py-1 rounded-full bg-white text-neutral-900 text-[11px] font-semibold hover:bg-neutral-200 transition-all cursor-pointer shadow-xs active:scale-95"
+                    >
+                      {language === "id" ? "Coba" : "Try"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleDismissBanner}
+                      className="h-6 w-6 rounded-full hover:bg-white/10 text-neutral-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+                      title={language === "id" ? "Tutup banner" : "Dismiss banner"}
+                    >
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                </div>
+              )}
 
-          {/* Section: Artifacts / Downloads (matching mobile StudioSheet) */}
-          {artifacts && (
-            <div className="pt-2 space-y-2.5 mb-4">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-foreground">
-                  {t("artifacts") || "Hasil Artefak & Unduhan"}
-                </span>
-                {artifacts.length > 0 && (
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary/80 border border-border/60 font-mono text-muted-foreground">
-                    {artifacts.length === 1
-                      ? t("filesCountSingle") || "1 file"
-                      : t("filesCount", { count: artifacts.length }) || `${artifacts.length} files`}
-                  </span>
+              {/* 3x3 Grid of Studio Tools (9 Tools matching Image 1) */}
+              <div className="grid grid-cols-3 gap-2 mb-4 shrink-0">
+                {STUDIO_TOOLS.map((tool) => {
+                  const Icon = tool.icon;
+                  const toolName = t(tool.translationKey);
+                  return (
+                    <button
+                      key={tool.id}
+                      type="button"
+                      onClick={() => onSelectStudioTool?.(tool.id)}
+                      className={`p-3 rounded-2xl border ${tool.cardBg} ${tool.borderColor} ${tool.hoverBg} ${tool.hoverBorder} transition-all flex flex-col justify-between h-[86px] sm:h-[90px] text-left group cursor-pointer shadow-xs active:scale-[0.98]`}
+                    >
+                      <div className="flex items-center justify-between w-full">
+                        <div className="flex items-center gap-1.5">
+                          <Icon className={`h-4 w-4 ${tool.iconColor} shrink-0`} />
+                          {tool.hasBadge && (
+                            <span className="bg-[#ededed] text-[#141414] text-[9.5px] font-bold px-1.5 py-0.5 rounded-full leading-none shadow-2xs">
+                              {t("badgeNew")}
+                            </span>
+                          )}
+                        </div>
+                        <ChevronRight className="h-3.5 w-3.5 text-[#888888]/60 group-hover:text-[#d4d4d4] group-hover:translate-x-0.5 transition-all shrink-0" />
+                      </div>
+                      <span
+                        className={`text-[11px] sm:text-xs font-medium ${
+                          tool.textColor || "text-foreground"
+                        } tracking-tight leading-snug line-clamp-2 mt-auto`}
+                      >
+                        {toolName}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Studio Activities & Generated Outputs List (Image 1) */}
+              <div className="flex-1 flex flex-col min-h-0 space-y-2 mb-4">
+                {artifacts && artifacts.length > 0 ? (
+                  <div className="space-y-2">
+                    {artifacts.map((art) => {
+                      const isGenerating = art.status === "generating";
+                      const ItemIcon = getArtifactIcon(art.type, art.isZip);
+
+                      if (isGenerating) {
+                        return (
+                          <div
+                            key={art.id}
+                            className="p-3 rounded-2xl bg-[#1c1c1f] border border-blue-500/30 flex items-center gap-3 select-none animate-pulse shadow-xs"
+                          >
+                            <div className="h-9 w-9 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 shrink-0">
+                              <RotateCw className="h-4 w-4 animate-spin text-blue-400" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="text-xs font-semibold text-white tracking-tight truncate">
+                                {art.title ||
+                                  (language === "id"
+                                    ? "Membuat Catatan..."
+                                    : "Creating Note...")}
+                              </div>
+                              <div className="text-[11px] text-neutral-400 truncate mt-0.5">
+                                {language === "id"
+                                  ? `berdasarkan ${art.sourcesCount ?? 1} sumber`
+                                  : `based on ${art.sourcesCount ?? 1} source${
+                                      (art.sourcesCount ?? 1) === 1 ? "" : "s"
+                                    }`}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div
+                          key={art.id}
+                          onClick={() => onOpenArtifact?.(art)}
+                          className="p-3 rounded-2xl bg-[#1e1e21] hover:bg-[#25252a] border border-[#2d2d32] hover:border-[#3d3d44] transition-all flex items-center justify-between gap-2.5 cursor-pointer group shadow-xs active:scale-[0.99]"
+                        >
+                          <div className="flex items-center gap-3 min-w-0 flex-1">
+                            <div className="h-9 w-9 rounded-xl bg-[#28282e] border border-[#383842] flex items-center justify-center text-[#d4d4d4] group-hover:text-white shrink-0 transition-colors">
+                              <ItemIcon className="h-4 w-4" />
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <div className="text-xs font-semibold text-white tracking-tight truncate group-hover:text-blue-400 transition-colors">
+                                {art.title}
+                              </div>
+                              <div className="text-[11px] text-neutral-400 truncate mt-0.5">
+                                {art.sourcesCount
+                                  ? `${art.sourcesCount} ${
+                                      language === "id" ? "sumber" : "source"
+                                    } · `
+                                  : ""}
+                                {formatRelativeTime(art.createdAt || art.updatedAt)}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Dropdown Menu */}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger
+                              asChild
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <button
+                                type="button"
+                                className="h-8 w-8 rounded-lg hover:bg-white/10 text-neutral-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                                title="Opsi"
+                              >
+                                <MoreVertical className="h-4 w-4" />
+                              </button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent
+                              align="end"
+                              className="w-44 p-1 shadow-xl bg-[#1e1e22] border-[#333338]"
+                            >
+                              <DropdownMenuItem
+                                className="cursor-pointer flex items-center gap-2 text-xs py-2 px-2.5 text-neutral-300 hover:text-white"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onOpenArtifact?.(art);
+                                }}
+                              >
+                                <Eye className="h-3.5 w-3.5" />
+                                <span>
+                                  {language === "id"
+                                    ? "Buka Pratinjau"
+                                    : "Open Preview"}
+                                </span>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="cursor-pointer flex items-center gap-2 text-xs py-2 px-2.5 text-neutral-300 hover:text-white"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (art.content) {
+                                    navigator.clipboard.writeText(art.content);
+                                    toast.success(
+                                      language === "id"
+                                        ? "Catatan disalin"
+                                        : "Note copied"
+                                    );
+                                  }
+                                }}
+                              >
+                                <Copy className="h-3.5 w-3.5" />
+                                <span>
+                                  {language === "id"
+                                    ? "Salin Catatan"
+                                    : "Copy Note"}
+                                </span>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="cursor-pointer flex items-center gap-2 text-xs py-2 px-2.5 text-neutral-300 hover:text-white"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onDownloadArtifact?.(art);
+                                }}
+                              >
+                                <Download className="h-3.5 w-3.5" />
+                                <span>
+                                  {language === "id"
+                                    ? "Unduh .md"
+                                    : "Download .md"}
+                                </span>
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator className="bg-[#2e2e34]" />
+                              <DropdownMenuItem
+                                className="cursor-pointer flex items-center gap-2 text-xs py-2 px-2.5 text-destructive focus:text-destructive"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onDeleteArtifact?.(art.id);
+                                }}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                                <span>
+                                  {language === "id" ? "Hapus" : "Delete"}
+                                </span>
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  /* Empty State Studio Output */
+                  <div className="flex-1 flex flex-col items-center justify-center text-center p-4 min-h-[160px]">
+                    <div className="h-12 w-12 rounded-2xl bg-secondary/80 border border-border/50 flex items-center justify-center text-muted-foreground/80 mb-3 shadow-2xs">
+                      <PenTool className="h-6 w-6 stroke-[1.5]" />
+                    </div>
+                    <h3 className="text-xs font-semibold text-foreground mb-1.5 tracking-tight">
+                      {t("studioEmptyTitle")}
+                    </h3>
+                    <p className="text-[11px] text-muted-foreground/80 leading-relaxed max-w-[280px]">
+                      {t("studioEmptyDesc")}
+                    </p>
+                  </div>
                 )}
               </div>
 
-              {artifacts.length > 0 ? (
-                <div className="space-y-2">
-                  {artifacts.map((art) => (
-                    <div
-                      key={art.id}
-                      className="p-2.5 rounded-xl bg-secondary/30 border border-border/50 flex items-center justify-between gap-2.5"
-                    >
-                      <div className="flex items-center gap-2 min-w-0">
-                        <div className="h-7 w-7 rounded-lg bg-secondary text-muted-foreground border border-border/40 flex items-center justify-center shrink-0">
-                          {art.isZip ? <Package className="h-3.5 w-3.5" /> : <FileText className="h-3.5 w-3.5" />}
-                        </div>
-                        <div className="min-w-0">
-                          <div className="text-xs font-medium text-foreground truncate">
-                            {art.title}
-                          </div>
-                          <div className="text-[10px] text-muted-foreground">
-                            {art.isZip ? "ZIP Archive / Folder" : art.type || "Document"}
-                          </div>
-                        </div>
-                      </div>
+              {/* "+ Tambahkan catatan" Button pinned at the bottom (Image 1) */}
+              <div className="pt-3 pb-1 flex justify-center mt-auto shrink-0 sticky bottom-0 bg-gradient-to-t from-card via-card/95 to-transparent">
+                <button
+                  type="button"
+                  onClick={onAddNote}
+                  className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-white text-neutral-900 hover:bg-neutral-100 text-xs font-semibold transition-all shadow-md active:scale-98 cursor-pointer border border-white/20"
+                >
+                  <SquarePen className="h-4 w-4 stroke-[2]" />
+                  <span>{t("addNote")}</span>
+                </button>
+              </div>
+            </div>
+          ) : (
+            /* Review Sidepanel matching apps/harness/desktop */
+            <div className="flex-1 w-full h-full min-h-0 flex flex-col overflow-hidden bg-[#141414] animate-in fade-in duration-200">
+              {/* Harness Tab Header with +, Search Dropdown, Drag & Drop */}
+              <TabHeader
+                tabs={tabs}
+                activeTabId={activeTabId}
+                isOpeningNewTab={Boolean(isOpeningNewTab)}
+                onSelectTab={onSelectTab}
+                onCloseTab={onCloseTab}
+                onNewTab={onNewTab || (() => {})}
+                onReorderTabs={onReorderTabs}
+              />
 
-                      <button
-                        type="button"
-                        onClick={() => onDownloadArtifact?.(art)}
-                        className="h-7 px-2.5 rounded-lg bg-muted hover:bg-muted/80 text-foreground text-xs flex items-center gap-1.5 transition-colors cursor-pointer border border-border/60 shrink-0"
-                      >
-                        <Download className="h-3 w-3" />
-                        <span>{t("download") || "Unduh"}</span>
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              ) : null}
+              {/* Active Tab Body matching apps/harness/desktop */}
+              <div className="flex-1 w-full h-[calc(100%-40px)] min-h-0 relative overflow-hidden flex flex-col bg-[#141414]">
+                {isOpeningNewTab || tabs.length === 0 || !activeTab ? (
+                  <OpenTabView onSelectTabType={onOpenTabType || (() => {})} />
+                ) : activeTab.type === "file_diff" ? (
+                  <FileDiffTab
+                    key={activeTab.id}
+                    tab={activeTab}
+                    onRollbackFile={onRollbackFile}
+                  />
+                ) : activeTab.type === "file_preview" ? (
+                  <FilePreviewTab key={activeTab.id} tab={activeTab} />
+                ) : activeTab.type === "browser" ? (
+                  <BrowserTab
+                    key={activeTab.id}
+                    tab={activeTab}
+                    onUpdateTab={onUpdateTab}
+                  />
+                ) : activeTab.type === "note_preview" ? (
+                  <NotePreviewTab
+                    key={activeTab.id}
+                    tab={activeTab}
+                    onUpdateTab={onUpdateTab}
+                    onDownloadArtifact={onDownloadArtifact}
+                  />
+                ) : (
+                  <ReviewTab
+                    key={activeTab.id || "review_tab"}
+                    mutations={mutations}
+                    onRollbackFile={onRollbackFile}
+                    onRollbackAll={onRollbackAll}
+                    onOpenFileDiff={onOpenFileDiff}
+                  />
+                )}
+              </div>
             </div>
           )}
-
-          {/* Empty State Studio Output */}
-          <div className="flex-1 flex flex-col items-center justify-center text-center p-4 min-h-[160px]">
-            <div className="h-12 w-12 rounded-2xl bg-secondary/80 border border-border/50 flex items-center justify-center text-muted-foreground/80 mb-3 shadow-2xs">
-              <PenTool className="h-6 w-6 stroke-[1.5]" />
-            </div>
-            <h3 className="text-xs font-semibold text-foreground mb-1.5 tracking-tight">
-              {t("studioEmptyTitle")}
-            </h3>
-            <p className="text-[11px] text-muted-foreground/80 leading-relaxed max-w-[280px]">
-              {t("studioEmptyDesc")}
-            </p>
-          </div>
-
-          {/* "+ Tambahkan catatan" Button */}
-          <div className="pt-3 flex justify-center mt-auto">
-            <button
-              type="button"
-              onClick={onAddNote}
-              className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-foreground hover:bg-foreground/90 text-background text-xs font-medium transition-all shadow-xs active:scale-98 cursor-pointer"
-            >
-              <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
-              <span>{t("addNote")}</span>
-            </button>
-          </div>
         </div>
-      ) : (
-        /* Review Sidepanel matching apps/harness/desktop */
-        <div className="flex-1 w-full h-full min-h-0 flex flex-col overflow-hidden bg-[#141414] animate-in fade-in duration-200">
-          {/* Harness Tab Header with +, Search Dropdown, Drag & Drop */}
-          <TabHeader
-            tabs={tabs}
-            activeTabId={activeTabId}
-            isOpeningNewTab={Boolean(isOpeningNewTab)}
-            onSelectTab={onSelectTab}
-            onCloseTab={onCloseTab}
-            onNewTab={onNewTab || (() => {})}
-            onReorderTabs={onReorderTabs}
-          />
-
-          {/* Active Tab Body matching apps/harness/desktop */}
-          <div className="flex-1 w-full h-[calc(100%-40px)] min-h-0 relative overflow-hidden flex flex-col bg-[#141414]">
-            {isOpeningNewTab || tabs.length === 0 || !activeTab ? (
-              <OpenTabView onSelectTabType={onOpenTabType || (() => {})} />
-            ) : activeTab.type === "file_diff" ? (
-              <FileDiffTab
-                key={activeTab.id}
-                tab={activeTab}
-                onRollbackFile={onRollbackFile}
-              />
-            ) : activeTab.type === "file_preview" ? (
-              <FilePreviewTab key={activeTab.id} tab={activeTab} />
-            ) : activeTab.type === "browser" ? (
-              <BrowserTab key={activeTab.id} tab={activeTab} onUpdateTab={onUpdateTab} />
-            ) : (
-              <ReviewTab
-                key={activeTab.id || "review_tab"}
-                mutations={mutations}
-                onRollbackFile={onRollbackFile}
-                onRollbackAll={onRollbackAll}
-                onOpenFileDiff={onOpenFileDiff}
-              />
-            )}
-          </div>
-        </div>
-      )}
-        </div>
-      </div>
-    </aside>
+      </>
+    )}
+  </div>
+</aside>
   );
 }

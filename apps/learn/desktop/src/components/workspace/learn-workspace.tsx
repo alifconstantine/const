@@ -35,6 +35,7 @@ import {
   TooltipTrigger,
   TooltipContent,
   TooltipProvider,
+  toast,
 } from "@const/ui";
 import { useI18n, LANGUAGE_OPTIONS } from "../../lib/i18n";
 import { SourcesPanel } from "./sources-panel";
@@ -44,6 +45,9 @@ import { AddSourceDialog } from "./add-source-dialog";
 import { WorkspaceTitle } from "./workspace-title";
 import { SettingsView } from "../settings/settings-view";
 import { ErrorBoundary } from "../ui/error-boundary";
+import { STUDIO_TOOLS } from "./studio-panel";
+import { buildGroundedContext } from "../../lib/grounding/context-builder";
+import { streamChatCompletion } from "../../lib/ai-stream";
 import type { FileMutationRecord } from "@const/agent";
 
 interface LearnWorkspaceProps {
@@ -86,12 +90,15 @@ export function LearnWorkspace({
 
   // Right Pane: Dual Studio & Preview/Review state
   const [rightPaneMode, setRightPaneMode] = useState<"studio" | "preview">("studio");
+  const [activeNoteArtifactId, setActiveNoteArtifactId] = useState<string | null>(null);
   const [rightPaneTabs, setRightPaneTabs] = useState<RightPaneTab[]>([
     { id: "review", type: "review", title: "Review" },
   ]);
   const [activeRightPaneTabId, setActiveRightPaneTabId] = useState<string>("review");
   const [isOpeningNewTab, setIsOpeningNewTab] = useState(false);
   const [sessionMutations, setSessionMutations] = useState<FileMutationRecord[]>([]);
+
+  const activeNoteArtifact = (artifacts || []).find((a) => a.id === activeNoteArtifactId) || null;
 
   const handleOpenFileDiff = (mutation: FileMutationRecord) => {
     setIsStudioCollapsed(false);
@@ -382,6 +389,181 @@ export function LearnWorkspace({
   const handleSelectStudioTool = (toolId: string) => {
     if (toolId === "browser") {
       handleOpenBrowser();
+    } else {
+      const tool = STUDIO_TOOLS.find((t) => t.id === toolId);
+      const toolName = tool ? t(tool.translationKey) : toolId;
+      setPendingStudioPrompt(
+        language === "id"
+          ? `Tolong buatkan ${toolName} berdasarkan sumber di notebook ini.`
+          : `Please generate a ${toolName} based on the sources in this notebook.`
+      );
+    }
+  };
+
+  const handleOpenArtifact = (art: any) => {
+    setIsStudioCollapsed(false);
+    setRightPaneMode("studio");
+    setActiveNoteArtifactId(art.id);
+
+    // Auto-widen studio/preview width comfortably (matching Image 3)
+    const windowWidth = typeof window !== "undefined" ? window.innerWidth : 1280;
+    const targetPreviewWidth = Math.max(
+      studioWidth,
+      Math.min(Math.round(windowWidth * 0.45), 720),
+      620
+    );
+    if (studioWidth < targetPreviewWidth) {
+      setStudioWidth(targetPreviewWidth);
+      setIsManualWidth(true);
+    }
+  };
+
+  const handleCloseNote = () => {
+    setActiveNoteArtifactId(null);
+  };
+
+  const handleConvertToSource = async (art: any) => {
+    if (!learnId || !art) return;
+    try {
+      await localDb.createSource({
+        learnId,
+        title: art.title || (language === "id" ? "Catatan Baru" : "New Note"),
+        content: art.content || "",
+        type: "text",
+        includedInChat: true,
+      });
+      toast.success(
+        language === "id"
+          ? "Catatan berhasil dikonversikan menjadi sumber!"
+          : "Note converted to source successfully!"
+      );
+    } catch (err) {
+      console.error("Failed to convert note to source:", err);
+      toast.error(
+        language === "id"
+          ? "Gagal mengonversikan catatan menjadi sumber."
+          : "Failed to convert note to source."
+      );
+    }
+  };
+
+  const handleDeleteArtifact = async (artId: string) => {
+    await localDb.deleteArtifact(artId);
+    if (activeNoteArtifactId === artId) {
+      setActiveNoteArtifactId(null);
+    }
+    setRightPaneTabs((prev) =>
+      prev.filter(
+        (t) => t.artifactId !== artId && t.id !== `note_${artId}`
+      )
+    );
+  };
+
+  const handleAddNote = async () => {
+    if (!learnId) return;
+
+    const allSources = await db.sources.where("learnId").equals(learnId).toArray();
+    const activeSources = allSources.filter((s) => s.includedInChat !== false);
+    const sourcesCount = activeSources.length;
+
+    // 1. Create generating artifact in Dexie (instantly shows loading state with spinner in Image 1)
+    const defaultTitle = language === "id" ? "Catatan Baru" : "New Note";
+    const artId = await localDb.createArtifact({
+      learnId,
+      title: sourcesCount > 0 ? (language === "id" ? "Membuat Catatan..." : "Creating Note...") : defaultTitle,
+      type: "note",
+      status: sourcesCount > 0 ? "generating" : "completed",
+      content: "",
+      sourcesCount,
+    });
+
+    if (sourcesCount === 0) {
+      // If no sources to synthesize, open blank note immediately
+      setActiveNoteArtifactId(artId);
+      setIsStudioCollapsed(false);
+      setRightPaneMode("studio");
+      const windowWidth = typeof window !== "undefined" ? window.innerWidth : 1280;
+      const targetPreviewWidth = Math.max(
+        studioWidth,
+        Math.min(Math.round(windowWidth * 0.45), 720),
+        620
+      );
+      if (studioWidth < targetPreviewWidth) {
+        setStudioWidth(targetPreviewWidth);
+        setIsManualWidth(true);
+      }
+      return;
+    }
+
+    // 2. Synthesize note using AI in background
+    try {
+      const grounded = buildGroundedContext(activeSources);
+      const activeModelId =
+        localStorage.getItem("const_learn_active_model") || "gemini-3.8-flash";
+
+      const systemPrompt = `You are Const Learn AI Tutor — an expert educational researcher and synthesizer.
+Your task is to generate a comprehensive, structured study note synthesizing the provided sources.
+Format the note in clear, beautiful Markdown:
+- An engaging, descriptive title (H1)
+- Key Concepts / Ringkasan Intisari (bullet points)
+- In-depth Explanation / Pembahasan Mendalam (H2, H3, code/tables if applicable)
+- Key Takeaways & Study Questions / Poin Penting & Pertanyaan Refleksi
+- Rujukan Sumber / Source References
+Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
+
+      const userPrompt = `Mohon buatkan catatan sintesis komprehensif berdasarkan materi sumber berikut:\n\n${grounded.formattedContext}\n\nBuat catatan yang rapi, padat wawasan, terstruktur, dan mudah dipahami.`;
+
+      let noteContent = "";
+      await streamChatCompletion({
+        model: activeModelId,
+        systemPrompt,
+        messages: [{ role: "user", content: userPrompt }],
+        onToken: (token) => {
+          noteContent += token;
+        },
+        onDone: async (finalContent) => {
+          const contentToSave = finalContent || noteContent;
+          let noteTitle = language === "id" ? "Catatan: Ringkasan Sumber" : "Study Note: Summary";
+          const h1Match = contentToSave.match(/^#\s+(.+)$/m);
+          if (h1Match && h1Match[1]) {
+            noteTitle = h1Match[1].replace(/[*_~`]/g, "").trim();
+          } else if (learn?.title) {
+            noteTitle = `${language === "id" ? "Catatan: " : "Note: "}${learn.title}`;
+          }
+
+          await localDb.updateArtifact(artId, {
+            title: noteTitle,
+            content: contentToSave,
+            status: "completed",
+          });
+
+          toast.success(
+            language === "id"
+              ? `Catatan "${noteTitle}" selesai dibuat!`
+              : `Note "${noteTitle}" completed!`
+          );
+        },
+        onError: async (err) => {
+          console.error("Failed to generate note:", err);
+          await localDb.updateArtifact(artId, {
+            title: defaultTitle,
+            status: "completed",
+            error: err.message,
+          });
+          toast.error(
+            language === "id"
+              ? "Gagal menghasilkan ringkasan AI, catatan kosong tetap dibuat."
+              : "Failed to generate AI note, blank note created."
+          );
+        },
+      });
+    } catch (err: any) {
+      console.error("Error initiating note generation:", err);
+      await localDb.updateArtifact(artId, {
+        title: defaultTitle,
+        status: "completed",
+        error: err.message,
+      });
     }
   };
 
@@ -898,9 +1080,12 @@ export function LearnWorkspace({
             onRollbackAll={handleRollbackAll}
             onOpenFileDiff={handleOpenFileDiff}
             onSelectStudioTool={handleSelectStudioTool}
-            onAddNote={() => {
-              console.log("Add note clicked");
-            }}
+            onAddNote={handleAddNote}
+            onOpenArtifact={handleOpenArtifact}
+            onDeleteArtifact={handleDeleteArtifact}
+            activeNoteArtifact={activeNoteArtifact}
+            onCloseNote={handleCloseNote}
+            onConvertToSource={handleConvertToSource}
             artifacts={artifacts || []}
             onDownloadArtifact={handleDownloadArtifact}
           />

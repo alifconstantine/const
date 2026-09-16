@@ -244,6 +244,10 @@ export async function streamChatCompletion({
         res = await executeFetch(endpoint);
       }
     }
+    if (!res.ok && endpoint.startsWith("/v1")) {
+      endpoint = "https://router.const.web.id/v1/chat/completions";
+      res = await executeFetch(endpoint);
+    }
 
     if (!res.ok) {
       const errorBody = await res.text().catch(() => "");

@@ -31,6 +31,11 @@ export interface LocalArtifact {
   title: string;
   type: string;
   content?: string;
+  fileUrl?: string;
+  isZip?: boolean;
+  status?: "generating" | "completed" | "error";
+  sourcesCount?: number;
+  error?: string;
   updatedAt: number;
   createdAt: number;
 }
@@ -285,12 +290,18 @@ export const localDb = {
 
   // Artifacts
   async createArtifact(data: {
+    id?: string;
     learnId?: string;
     title: string;
     type: string;
     content?: string;
+    fileUrl?: string;
+    isZip?: boolean;
+    status?: "generating" | "completed" | "error";
+    sourcesCount?: number;
+    error?: string;
   }): Promise<string> {
-    const id = "art_" + Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
+    const id = data.id || "art_" + Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
     const now = Date.now();
     await db.artifacts.add({
       id,
@@ -298,10 +309,25 @@ export const localDb = {
       title: data.title.trim() || "Untitled Artifact",
       type: data.type,
       content: data.content,
+      fileUrl: data.fileUrl,
+      isZip: data.isZip,
+      status: data.status || "completed",
+      sourcesCount: data.sourcesCount,
+      error: data.error,
       updatedAt: now,
       createdAt: now,
     });
     return id;
+  },
+
+  async updateArtifact(
+    id: string,
+    updates: Partial<Omit<LocalArtifact, "id" | "createdAt">>
+  ): Promise<void> {
+    await db.artifacts.update(id, {
+      ...updates,
+      updatedAt: Date.now(),
+    });
   },
 
   async deleteArtifact(id: string) {

@@ -1753,6 +1753,14 @@ export function ChatPanel({
     );
   };
 
+  // Consume external prompt (e.g. from Studio tools)
+  useEffect(() => {
+    if (externalPrompt && externalPrompt.trim()) {
+      handleSend(externalPrompt.trim());
+      onExternalPromptConsumed?.();
+    }
+  }, [externalPrompt]);
+
   const handleClearHistory = async () => {
     if (learnId) {
       await localDb.clearMessages(learnId, activeSessionId || undefined);

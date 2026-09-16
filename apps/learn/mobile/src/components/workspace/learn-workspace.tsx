@@ -37,6 +37,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
 } from "@const/ui";
+import { marked } from "marked";
 import { useI18n } from "../../lib/i18n";
 
 function formatFileSize(bytes: number): string {
@@ -55,6 +56,104 @@ function cleanUserMessageContent(content: string): string {
   cleaned = cleaned.replace(/\n\n- \[(?:Sumber|Source):[\s\S]*$/, "");
   cleaned = cleaned.replace(/^\[(?:Attached media \/ Lampiran media|Lampiran [Mm]edia|Attached [Mm]edia)[\s\S]*?\]\n*/, "");
   return cleaned.trim();
+}
+
+function markdownToHtml(md: string): string {
+  if (!md || !md.trim()) return "";
+  try {
+    const raw = marked.parse(md, { gfm: true, breaks: true });
+    return typeof raw === "string" ? raw : "";
+  } catch {
+    return md;
+  }
+}
+
+function htmlToMarkdown(element: HTMLElement | null): string {
+  if (!element) return "";
+
+  const text = element.innerText || element.textContent || "";
+  if (!text.trim() && !element.querySelector("img, hr, br")) {
+    return "";
+  }
+
+  function serialize(node: Node): string {
+    if (node.nodeType === Node.TEXT_NODE) {
+      return node.textContent || "";
+    }
+    if (node.nodeType !== Node.ELEMENT_NODE) {
+      return "";
+    }
+
+    const el = node as HTMLElement;
+    const tag = el.tagName.toLowerCase();
+    const children = Array.from(el.childNodes).map(serialize).join("");
+
+    switch (tag) {
+      case "h1":
+        return `\n\n# ${children.trim()}\n\n`;
+      case "h2":
+        return `\n\n## ${children.trim()}\n\n`;
+      case "h3":
+        return `\n\n### ${children.trim()}\n\n`;
+      case "h4":
+        return `\n\n#### ${children.trim()}\n\n`;
+      case "h5":
+        return `\n\n##### ${children.trim()}\n\n`;
+      case "h6":
+        return `\n\n###### ${children.trim()}\n\n`;
+      case "p":
+        return children.trim() ? `\n\n${children.trim()}\n\n` : "\n";
+      case "strong":
+      case "b":
+        return children.trim() ? `**${children}**` : "";
+      case "em":
+      case "i":
+        return children.trim() ? `*${children}*` : "";
+      case "s":
+      case "strike":
+      case "del":
+        return children.trim() ? `~~${children}~~` : "";
+      case "code": {
+        if (el.parentElement?.tagName.toLowerCase() === "pre") {
+          return children;
+        }
+        return children.trim() ? `\`${children}\`` : "";
+      }
+      case "pre":
+        return `\n\n\`\`\`\n${children.trim()}\n\`\`\`\n\n`;
+      case "ul": {
+        const items = Array.from(el.children)
+          .map((child) => `- ${serialize(child).trim()}`)
+          .join("\n");
+        return `\n\n${items}\n\n`;
+      }
+      case "ol": {
+        const items = Array.from(el.children)
+          .map((child, idx) => `${idx + 1}. ${serialize(child).trim()}`)
+          .join("\n");
+        return `\n\n${items}\n\n`;
+      }
+      case "li":
+        return children;
+      case "blockquote":
+        return `\n\n> ${children.trim().replace(/\n+/g, "\n> ")}\n\n`;
+      case "hr":
+        return `\n\n---\n\n`;
+      case "a": {
+        const href = el.getAttribute("href") || "#";
+        return `[${children.trim() || href}](${href})`;
+      }
+      case "br":
+        return "\n";
+      case "div":
+        return children.trim() ? `\n${children}\n` : "\n";
+      default:
+        return children;
+    }
+  }
+
+  const result = Array.from(element.childNodes).map(serialize).join("");
+  return result.replace(/\n{3,}/g, "\n\n").trim();
 }
 import {
   ArrowLeft,
@@ -79,6 +178,7 @@ import {
   PenTool,
   Check,
   RotateCcw,
+  RotateCw,
   X,
   Brain,
   Download,
@@ -92,6 +192,22 @@ import {
   ThumbsUp,
   ThumbsDown,
   MoreVertical,
+  SquarePen,
+  Eye,
+  Trash2,
+  BookOpen,
+  Undo2,
+  Redo2,
+  Bold,
+  Italic,
+  Link as LinkIcon,
+  Code,
+  List,
+  ListOrdered,
+  Quote,
+  Minus,
+  RemoveFormatting,
+  FilePlus,
 } from "lucide-react";
 
 type WorkspaceTab = "sources" | "chat" | "tools";
@@ -106,6 +222,7 @@ interface StudioTool {
   borderColor: string;
   hoverBg: string;
   hoverBorder: string;
+  hasBadge?: boolean;
 }
 
 const STUDIO_TOOLS: StudioTool[] = [
@@ -163,17 +280,18 @@ const STUDIO_TOOLS: StudioTool[] = [
     borderColor: "border-[#3c3a2b]",
     hoverBg: "hover:bg-[#343225]",
     hoverBorder: "hover:border-[#4d4a37]",
+    hasBadge: true,
   },
   {
-    id: "browser",
-    name: "Browser",
-    icon: Globe,
-    iconColor: "text-[#38bdf8]",
-    textColor: "text-[#e0f2fe]",
-    cardBg: "bg-[#1e262f]",
-    borderColor: "border-[#2c3947]",
-    hoverBg: "hover:bg-[#25313d]",
-    hoverBorder: "hover:border-[#38495a]",
+    id: "flashcards",
+    name: "Flashcards",
+    icon: BookOpen,
+    iconColor: "text-[#fb7185]",
+    textColor: "text-[#ffe4e6]",
+    cardBg: "bg-[#2b1f23]",
+    borderColor: "border-[#3e2b32]",
+    hoverBg: "hover:bg-[#38262d]",
+    hoverBorder: "hover:border-[#523741]",
   },
   {
     id: "quiz",
@@ -196,6 +314,17 @@ const STUDIO_TOOLS: StudioTool[] = [
     borderColor: "border-[#3a2d42]",
     hoverBg: "hover:bg-[#322739]",
     hoverBorder: "hover:border-[#4b3a55]",
+  },
+  {
+    id: "data_table",
+    name: "Data Table",
+    icon: Table2,
+    iconColor: "text-[#38bdf8]",
+    textColor: "text-[#e0f2fe]",
+    cardBg: "bg-[#1a252f]",
+    borderColor: "border-[#263746]",
+    hoverBg: "hover:bg-[#22303d]",
+    hoverBorder: "hover:border-[#334a5e]",
   },
 ];
 
@@ -241,9 +370,10 @@ export function MobileLearnWorkspace({
     video_summary: t("toolsVideo"),
     mind_map: t("toolsMindMap"),
     report: t("toolsReport"),
-    browser: t("toolsBrowser"),
+    flashcards: t("toolsFlashcards"),
     quiz: t("toolsQuiz"),
     infographic: t("toolsInfographic"),
+    data_table: t("toolsDataTable"),
   };
 
   // Live notebook data from local Dexie
@@ -253,7 +383,8 @@ export function MobileLearnWorkspace({
 
   // Live artifacts from local Dexie
   const artifacts = useLiveQuery(async () => {
-    return await db.artifacts.where("learnId").equals(learnId).toArray();
+    const list = await db.artifacts.where("learnId").equals(learnId).toArray();
+    return list.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   }, [learnId]);
 
   // Live sources from local Dexie
@@ -316,6 +447,39 @@ export function MobileLearnWorkspace({
   const [isContextDropdownOpen, setIsContextDropdownOpen] = useState(false);
   const [searchModelQuery, setSearchModelQuery] = useState("");
   const [isAddSourceOpen, setIsAddSourceOpen] = useState(initialSourceModalOpen);
+
+  // Note Direct Editor State (Image 3)
+  const [selectedNoteArtifact, setSelectedNoteArtifact] = useState<LocalArtifact | null>(null);
+  const [noteContentInput, setNoteContentInput] = useState("");
+  const [noteTitleInput, setNoteTitleInput] = useState("");
+  const noteEditorRef = useRef<HTMLDivElement>(null);
+  const isNoteInitializedRef = useRef(false);
+  const currentNoteArtifactIdRef = useRef<string | null>(null);
+  const noteDebounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Sync selectedNoteArtifact with Dexie live query
+  useEffect(() => {
+    if (selectedNoteArtifact) {
+      const fresh = artifacts?.find((a) => a.id === selectedNoteArtifact.id);
+      if (fresh && fresh.id !== selectedNoteArtifact.id) {
+        setSelectedNoteArtifact(fresh);
+      }
+      if (
+        noteEditorRef.current &&
+        (!isNoteInitializedRef.current || currentNoteArtifactIdRef.current !== selectedNoteArtifact.id)
+      ) {
+        isNoteInitializedRef.current = true;
+        currentNoteArtifactIdRef.current = selectedNoteArtifact.id;
+        noteEditorRef.current.innerHTML = markdownToHtml(selectedNoteArtifact.content || "");
+      }
+      if (selectedNoteArtifact.title) {
+        setNoteTitleInput(selectedNoteArtifact.title);
+      }
+    } else {
+      isNoteInitializedRef.current = false;
+      currentNoteArtifactIdRef.current = null;
+    }
+  }, [artifacts, selectedNoteArtifact?.id, selectedNoteArtifact?.title]);
 
   // Dynamic visualViewport tracking to adjust cleanly when software keyboard opens/closes
   const [viewportHeight, setViewportHeight] = useState<number | null>(null);
@@ -976,7 +1140,11 @@ export function MobileLearnWorkspace({
     }
   };
 
-  const handleDownloadArtifact = (art: LocalArtifact) => {
+  const handleDownloadArtifact = (art: LocalArtifact | null) => {
+    if (!art) return;
+    const content = noteEditorRef.current
+      ? htmlToMarkdown(noteEditorRef.current)
+      : (art.content || "");
     if (art.fileUrl) {
       const a = document.createElement("a");
       a.href = art.fileUrl;
@@ -984,8 +1152,8 @@ export function MobileLearnWorkspace({
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-    } else if (art.content) {
-      const blob = new Blob([art.content], { type: "text/markdown;charset=utf-8" });
+    } else if (content) {
+      const blob = new Blob([content], { type: "text/markdown;charset=utf-8" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -994,6 +1162,273 @@ export function MobileLearnWorkspace({
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
+    }
+  };
+
+  const handleOpenArtifact = (art: LocalArtifact) => {
+    setSelectedNoteArtifact(art);
+    setNoteContentInput(art.content || "");
+    setNoteTitleInput(art.title || (language === "id" ? "Catatan Baru" : "New Note"));
+    setIsStudioSheetOpen(false);
+    setTimeout(() => {
+      if (noteEditorRef.current) {
+        isNoteInitializedRef.current = true;
+        currentNoteArtifactIdRef.current = art.id;
+        noteEditorRef.current.innerHTML = markdownToHtml(art.content || "");
+      }
+    }, 0);
+  };
+
+  const handleDeleteArtifact = async (artId: string) => {
+    await localDb.deleteArtifact(artId);
+    if (selectedNoteArtifact?.id === artId) {
+      setSelectedNoteArtifact(null);
+    }
+    toast.success(
+      language === "id"
+        ? "Catatan berhasil dihapus"
+        : "Note deleted successfully"
+    );
+  };
+
+  const handleCopyNote = () => {
+    const textToCopy = noteEditorRef.current
+      ? htmlToMarkdown(noteEditorRef.current)
+      : (noteContentInput || selectedNoteArtifact?.content || "");
+    if (!textToCopy) return;
+    navigator.clipboard.writeText(textToCopy);
+    toast.success(
+      language === "id" ? "Catatan disalin ke papan klip" : "Note copied to clipboard"
+    );
+  };
+
+  const handleNoteTitleChange = (newTitle: string) => {
+    setNoteTitleInput(newTitle);
+    if (selectedNoteArtifact) {
+      localDb.updateArtifact(selectedNoteArtifact.id, {
+        title: newTitle || (language === "id" ? "Catatan Baru" : "New Note"),
+      });
+    }
+  };
+
+  const handleNoteInput = () => {
+    if (!noteEditorRef.current || !selectedNoteArtifact) return;
+    const md = htmlToMarkdown(noteEditorRef.current);
+    setNoteContentInput(md);
+
+    if (noteDebounceTimerRef.current) clearTimeout(noteDebounceTimerRef.current);
+    noteDebounceTimerRef.current = setTimeout(async () => {
+      if (selectedNoteArtifact) {
+        try {
+          await localDb.updateArtifact(selectedNoteArtifact.id, { content: md });
+        } catch (err) {
+          console.error("Failed to auto-save note:", err);
+        }
+      }
+    }, 450);
+  };
+
+  const applyNoteFormat = (action: string, param?: string) => {
+    const editor = noteEditorRef.current;
+    if (!editor) return;
+
+    editor.focus();
+
+    switch (action) {
+      case "undo":
+        document.execCommand("undo", false);
+        break;
+      case "redo":
+        document.execCommand("redo", false);
+        break;
+      case "heading": {
+        if (param === "h1") {
+          document.execCommand("formatBlock", false, "<h1>");
+        } else if (param === "h2") {
+          document.execCommand("formatBlock", false, "<h2>");
+        } else if (param === "h3") {
+          document.execCommand("formatBlock", false, "<h3>");
+        } else {
+          document.execCommand("formatBlock", false, "<p>");
+        }
+        break;
+      }
+      case "bold":
+        document.execCommand("bold", false);
+        break;
+      case "italic":
+        document.execCommand("italic", false);
+        break;
+      case "link": {
+        const url = window.prompt(
+          language === "id" ? "Masukkan URL tautan:" : "Enter link URL:",
+          "https://"
+        );
+        if (url) {
+          document.execCommand("createLink", false, url);
+        }
+        break;
+      }
+      case "code": {
+        const selection = window.getSelection();
+        if (selection && selection.rangeCount > 0 && !selection.isCollapsed) {
+          const range = selection.getRangeAt(0);
+          const selectedText = range.toString();
+          const codeEl = document.createElement("code");
+          codeEl.textContent = selectedText;
+          range.deleteContents();
+          range.insertNode(codeEl);
+          selection.removeAllRanges();
+        } else {
+          document.execCommand("formatBlock", false, "<pre>");
+        }
+        break;
+      }
+      case "bullet":
+        document.execCommand("insertUnorderedList", false);
+        break;
+      case "ordered":
+        document.execCommand("insertOrderedList", false);
+        break;
+      case "quote":
+        document.execCommand("formatBlock", false, "<blockquote>");
+        break;
+      case "rule":
+        document.execCommand("insertHorizontalRule", false);
+        break;
+      case "clear":
+        document.execCommand("removeFormat", false);
+        break;
+      default:
+        break;
+    }
+
+    handleNoteInput();
+  };
+
+  const handleConvertToSource = async (art: LocalArtifact | null) => {
+    if (!learnId || !art) return;
+    const md = noteEditorRef.current
+      ? htmlToMarkdown(noteEditorRef.current)
+      : (noteContentInput || art.content || "");
+    try {
+      await localDb.createSource({
+        learnId,
+        title: noteTitleInput || art.title || (language === "id" ? "Catatan Baru" : "New Note"),
+        content: md,
+        type: "text",
+        includedInChat: true,
+      });
+      toast.success(
+        language === "id"
+          ? "Catatan berhasil dikonversikan menjadi sumber!"
+          : "Note converted to source successfully!"
+      );
+    } catch (err) {
+      console.error("Failed to convert note to source:", err);
+      toast.error(
+        language === "id"
+          ? "Gagal mengonversikan catatan menjadi sumber."
+          : "Failed to convert note to source."
+      );
+    }
+  };
+
+  const handleAddNote = async () => {
+    if (!learnId) return;
+
+    const allSources = await db.sources.where("learnId").equals(learnId).toArray();
+    const activeSources = allSources.filter((s) => s.includedInChat !== false);
+    const sourcesCount = activeSources.length;
+
+    // 1. Create generating artifact in Dexie (instantly shows loading state with spinner in Image 1)
+    const defaultTitle = language === "id" ? "Catatan Baru" : "New Note";
+    const artId = await localDb.createArtifact({
+      learnId,
+      title: sourcesCount > 0 ? (language === "id" ? "Membuat Catatan..." : "Creating Note...") : defaultTitle,
+      type: "note",
+      status: sourcesCount > 0 ? "generating" : "completed",
+      content: "",
+      sourcesCount,
+    });
+
+    if (sourcesCount === 0) {
+      const created = await db.artifacts.get(artId);
+      if (created) {
+        handleOpenArtifact(created);
+      }
+      return;
+    }
+
+    // 2. Synthesize note using AI in background
+    try {
+      const grounded = buildGroundedContext(activeSources);
+      const activeModelId =
+        localStorage.getItem("const_learn_active_model") || selectedModelId || "gemini-3.8-flash";
+
+      const systemPrompt = `You are Const Learn AI Tutor — an expert educational researcher and synthesizer.
+Your task is to generate a comprehensive, structured study note synthesizing the provided sources.
+Format the note in clear, beautiful Markdown:
+- An engaging, descriptive title (H1)
+- Key Concepts / Ringkasan Intisari (bullet points)
+- In-depth Explanation / Pembahasan Mendalam (H2, H3, code/tables if applicable)
+- Key Takeaways & Study Questions / Poin Penting & Pertanyaan Refleksi
+- Rujukan Sumber / Source References
+Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
+
+      const userPrompt = `Mohon buatkan catatan sintesis komprehensif berdasarkan materi sumber berikut:\n\n${grounded.formattedContext}\n\nBuat catatan yang rapi, padat wawasan, terstruktur, dan mudah dipahami.`;
+
+      let noteContent = "";
+      await streamChatCompletion({
+        model: activeModelId,
+        systemPrompt,
+        messages: [{ role: "user", content: userPrompt }],
+        onToken: (token) => {
+          noteContent += token;
+        },
+        onDone: async (finalContent) => {
+          const contentToSave = finalContent || noteContent;
+          let noteTitle = language === "id" ? "Catatan: Ringkasan Sumber" : "Study Note: Summary";
+          const h1Match = contentToSave.match(/^#\s+(.+)$/m);
+          if (h1Match && h1Match[1]) {
+            noteTitle = h1Match[1].replace(/[*_~`]/g, "").trim();
+          } else if (learn?.title) {
+            noteTitle = `${language === "id" ? "Catatan: " : "Note: "}${learn.title}`;
+          }
+
+          await localDb.updateArtifact(artId, {
+            title: noteTitle,
+            content: contentToSave,
+            status: "completed",
+          });
+
+          toast.success(
+            language === "id"
+              ? `Catatan "${noteTitle}" selesai dibuat!`
+              : `Note "${noteTitle}" created successfully!`
+          );
+        },
+        onError: async (err) => {
+          console.error("Failed to generate note:", err);
+          await localDb.updateArtifact(artId, {
+            title: defaultTitle,
+            status: "completed",
+            error: err.message,
+          });
+          toast.error(
+            language === "id"
+              ? "Gagal menghasilkan ringkasan AI, catatan kosong tetap dibuat."
+              : "Failed to generate AI note, blank note created."
+          );
+        },
+      });
+    } catch (err: any) {
+      console.error("Error initiating note generation:", err);
+      await localDb.updateArtifact(artId, {
+        title: defaultTitle,
+        status: "completed",
+        error: err.message,
+      });
     }
   };
 
@@ -1821,6 +2256,9 @@ export function MobileLearnWorkspace({
         artifacts={artifacts || []}
         onSelectTool={handleSelectStudioTool}
         onDownloadArtifact={handleDownloadArtifact}
+        onOpenArtifact={handleOpenArtifact}
+        onDeleteArtifact={handleDeleteArtifact}
+        onAddNote={handleAddNote}
       />
 
       {/* Add Source Pop-up Modal */}
@@ -1905,6 +2343,298 @@ export function MobileLearnWorkspace({
               <div className="p-3 rounded-xl bg-[#141416] border border-[#28282b] text-[11px] font-mono text-[#d4d4d4] whitespace-pre-wrap leading-relaxed select-text max-h-[50vh] overflow-y-auto">
                 {selectedSourceForPreview.content ||
                   "[Content is not cached locally. This source was added via link.]"}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Full-Screen Note Direct Editor Modal (Matching Image 3) */}
+      {selectedNoteArtifact && (
+        <div
+          className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-xs flex flex-col justify-end sm:justify-center sm:items-center animate-in fade-in duration-200"
+          onClick={() => setSelectedNoteArtifact(null)}
+        >
+          <div
+            className="w-full h-[95vh] sm:h-[90vh] sm:max-w-2xl bg-[#18181b] border-t sm:border border-[#2e2e34] rounded-t-[24px] sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden text-left font-sans"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Top Breadcrumb & Actions Header (Image 3) */}
+            <div className="h-12 px-3 sm:px-4 border-b border-white/5 flex items-center justify-between shrink-0 bg-[#1c1c20] rounded-t-[24px] sm:rounded-t-2xl">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <button
+                  type="button"
+                  onClick={() => setSelectedNoteArtifact(null)}
+                  className="text-xs font-medium text-neutral-400 hover:text-white transition-colors cursor-pointer"
+                >
+                  Studio
+                </button>
+                <ChevronRight className="h-3.5 w-3.5 text-neutral-500 shrink-0" />
+                <span className="text-xs font-semibold text-white truncate">
+                  {language === "id" ? "Catatan" : "Note"}
+                </span>
+              </div>
+
+              {/* Top Right Action Icons */}
+              <div className="flex items-center gap-1 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => handleDeleteArtifact(selectedNoteArtifact.id)}
+                  className="h-8 w-8 rounded-lg hover:bg-red-500/10 text-neutral-400 hover:text-red-400 flex items-center justify-center transition-colors cursor-pointer"
+                  title={language === "id" ? "Hapus Catatan" : "Delete Note"}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleCopyNote}
+                  className="h-8 w-8 rounded-lg hover:bg-white/10 text-neutral-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+                  title={language === "id" ? "Salin" : "Copy"}
+                >
+                  <Copy className="h-4 w-4" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleDownloadArtifact(selectedNoteArtifact)}
+                  className="h-8 w-8 rounded-lg hover:bg-white/10 text-neutral-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+                  title={language === "id" ? "Unduh .md" : "Download .md"}
+                >
+                  <Download className="h-4 w-4" />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedNoteArtifact(null)}
+                  className="h-8 w-8 rounded-lg hover:bg-white/10 text-neutral-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+                  title={language === "id" ? "Tutup" : "Close"}
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Note Title Input (Image 3) */}
+            <div className="px-4 pt-3 pb-1 border-b border-white/5">
+              <input
+                type="text"
+                value={noteTitleInput}
+                onChange={(e) => handleNoteTitleChange(e.target.value)}
+                placeholder={language === "id" ? "Catatan Baru" : "New Note"}
+                className="text-lg sm:text-xl font-bold text-white bg-transparent border-none outline-none focus:outline-none w-full placeholder:text-neutral-500 tracking-tight"
+              />
+            </div>
+
+            {/* Formatting Toolbar (Image 3) */}
+            <div className="px-3 py-1.5 border-b border-white/5 bg-[#17171a] flex items-center gap-0.5 overflow-x-auto no-scrollbar shrink-0 select-none">
+              <button
+                type="button"
+                onClick={() => applyNoteFormat("undo")}
+                className="h-7 w-7 rounded-md hover:bg-white/10 text-neutral-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                title="Undo (Ctrl+Z)"
+              >
+                <Undo2 className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => applyNoteFormat("redo")}
+                className="h-7 w-7 rounded-md hover:bg-white/10 text-neutral-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                title="Redo (Ctrl+Y)"
+              >
+                <Redo2 className="h-3.5 w-3.5" />
+              </button>
+
+              <div className="w-px h-4 bg-white/10 mx-1 shrink-0" />
+
+              {/* Headings Dropdown */}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button
+                    type="button"
+                    className="h-7 px-2 rounded-md hover:bg-white/10 text-neutral-300 hover:text-white text-xs font-medium flex items-center gap-1 transition-colors cursor-pointer shrink-0"
+                  >
+                    <span>Normal</span>
+                    <ChevronDown className="h-3 w-3 opacity-60" />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent
+                  align="start"
+                  className="w-36 bg-[#222226] border-[#333338] text-neutral-200"
+                >
+                  <DropdownMenuItem
+                    className="text-xs cursor-pointer"
+                    onClick={() => applyNoteFormat("heading", "p")}
+                  >
+                    Normal
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="text-xs cursor-pointer font-bold"
+                    onClick={() => applyNoteFormat("heading", "h1")}
+                  >
+                    Judul 1
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="text-xs cursor-pointer font-semibold"
+                    onClick={() => applyNoteFormat("heading", "h2")}
+                  >
+                    Judul 2
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="text-xs cursor-pointer font-medium"
+                    onClick={() => applyNoteFormat("heading", "h3")}
+                  >
+                    Judul 3
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              <div className="w-px h-4 bg-white/10 mx-1 shrink-0" />
+
+              <button
+                type="button"
+                onClick={() => applyNoteFormat("bold")}
+                className="h-7 w-7 rounded-md hover:bg-white/10 text-neutral-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                title="Tebal"
+              >
+                <Bold className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => applyNoteFormat("italic")}
+                className="h-7 w-7 rounded-md hover:bg-white/10 text-neutral-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                title="Miring"
+              >
+                <Italic className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => applyNoteFormat("link")}
+                className="h-7 w-7 rounded-md hover:bg-white/10 text-neutral-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                title="Tautan"
+              >
+                <LinkIcon className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => applyNoteFormat("code")}
+                className="h-7 w-7 rounded-md hover:bg-white/10 text-neutral-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                title="Kode"
+              >
+                <Code className="h-3.5 w-3.5" />
+              </button>
+
+              <div className="w-px h-4 bg-white/10 mx-1 shrink-0" />
+
+              <button
+                type="button"
+                onClick={() => applyNoteFormat("bullet")}
+                className="h-7 w-7 rounded-md hover:bg-white/10 text-neutral-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                title="Daftar Butir"
+              >
+                <List className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => applyNoteFormat("ordered")}
+                className="h-7 w-7 rounded-md hover:bg-white/10 text-neutral-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                title="Daftar Bernomor"
+              >
+                <ListOrdered className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => applyNoteFormat("quote")}
+                className="h-7 w-7 rounded-md hover:bg-white/10 text-neutral-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                title="Kutipan"
+              >
+                <Quote className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => applyNoteFormat("rule")}
+                className="h-7 w-7 rounded-md hover:bg-white/10 text-neutral-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                title="Garis Pemisah"
+              >
+                <Minus className="h-3.5 w-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => applyNoteFormat("clear")}
+                className="h-7 w-7 rounded-md hover:bg-white/10 text-neutral-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                title="Hapus Format"
+              >
+                <RemoveFormatting className="h-3.5 w-3.5" />
+              </button>
+            </div>
+
+            {/* Direct Note Editor Body (Live rendered markdown, no yellow block!) */}
+            <div className="flex-1 min-h-0 overflow-y-auto p-4 select-text">
+              <div
+                ref={noteEditorRef}
+                contentEditable
+                suppressContentEditableWarning
+                onInput={handleNoteInput}
+                data-placeholder={
+                  language === "id"
+                    ? "Tulis catatan atau tempel konten di sini..."
+                    : "Write note or paste content here..."
+                }
+                style={{
+                  outline: "none",
+                  border: "none",
+                  boxShadow: "none",
+                }}
+                className={cn(
+                  "w-full h-full min-h-[350px] bg-transparent text-[#e2e8f0] text-sm font-sans leading-relaxed select-text",
+                  "border-none outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 ring-0 shadow-none",
+                  "empty:before:content-[attr(data-placeholder)] empty:before:text-neutral-500 empty:before:pointer-events-none empty:before:block",
+                  "[&_h1]:text-2xl [&_h1]:font-bold [&_h1]:text-white [&_h1]:mt-4 [&_h1]:mb-2 [&_h1]:tracking-tight",
+                  "[&_h2]:text-xl [&_h2]:font-bold [&_h2]:text-white [&_h2]:mt-3 [&_h2]:mb-1.5 [&_h2]:tracking-tight",
+                  "[&_h3]:text-lg [&_h3]:font-semibold [&_h3]:text-white [&_h3]:mt-2.5 [&_h3]:mb-1",
+                  "[&_p]:mb-2 [&_p]:leading-relaxed",
+                  "[&_strong]:font-bold [&_strong]:text-white",
+                  "[&_b]:font-bold [&_b]:text-white",
+                  "[&_em]:italic [&_em]:text-neutral-200",
+                  "[&_i]:italic [&_i]:text-neutral-200",
+                  "[&_a]:text-blue-400 [&_a]:underline hover:[&_a]:text-blue-300",
+                  "[&_code]:bg-[#27272a] [&_code]:text-[#93c5fd] [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-xs [&_code]:font-mono",
+                  "[&_pre]:bg-[#18181b] [&_pre]:border [&_pre]:border-[#27272a] [&_pre]:p-3 [&_pre]:rounded-xl [&_pre]:my-2.5 [&_pre]:overflow-x-auto",
+                  "[&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-2 [&_ul]:space-y-1",
+                  "[&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:my-2 [&_ol]:space-y-1",
+                  "[&_li]:leading-relaxed",
+                  "[&_blockquote]:border-l-2 [&_blockquote]:border-blue-500 [&_blockquote]:pl-3 [&_blockquote]:py-0.5 [&_blockquote]:my-2.5 [&_blockquote]:italic [&_blockquote]:text-neutral-400",
+                  "[&_hr]:border-[#27272a] [&_hr]:my-4"
+                )}
+              />
+            </div>
+
+            {/* Footer / Convert to Source Button (Image 3) */}
+            <div className="px-4 py-2.5 border-t border-white/5 flex items-center justify-between bg-[#161619] shrink-0">
+              <button
+                type="button"
+                onClick={() => handleConvertToSource(selectedNoteArtifact)}
+                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold transition-all shadow-xs cursor-pointer active:scale-98"
+              >
+                <FilePlus className="h-4 w-4 stroke-[2]" />
+                <span>
+                  {language === "id" ? "Konversikan menjadi sumber" : "Convert to source"}
+                </span>
+              </button>
+
+              <div className="flex items-center gap-2 text-[11px] text-neutral-400">
+                <span className="text-emerald-400 flex items-center gap-1 font-medium">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
+                  {language === "id" ? "Tersimpan otomatis" : "Auto-saved"}
+                </span>
+                <span className="text-neutral-500">•</span>
+                <span>
+                  {noteContentInput
+                    ? `${noteContentInput.length.toLocaleString()} ${
+                        language === "id" ? "karakter" : "chars"
+                      }`
+                    : "0 karakter"}
+                </span>
               </div>
             </div>
           </div>

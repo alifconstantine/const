@@ -13,6 +13,8 @@ import {
   Plus,
   SquarePen,
   PenTool,
+  BookOpen,
+  Table2,
 } from "lucide-react";
 import { ScrollArea } from "@const/ui";
 
@@ -86,17 +88,18 @@ export const STUDIO_TOOLS: StudioTool[] = [
     borderColor: "border-[#3c3a2b]",
     hoverBg: "hover:bg-[#343225]",
     hoverBorder: "hover:border-[#4d4a37]",
+    hasBadge: true,
   },
   {
-    id: "browser",
-    translationKey: "toolsBrowser",
-    icon: Globe,
-    iconColor: "text-[#38bdf8]",
-    textColor: "text-[#e0f2fe]",
-    cardBg: "bg-[#1e262f]",
-    borderColor: "border-[#2c3947]",
-    hoverBg: "hover:bg-[#25313d]",
-    hoverBorder: "hover:border-[#38495a]",
+    id: "flashcards",
+    translationKey: "toolsFlashcards",
+    icon: BookOpen,
+    iconColor: "text-[#fb7185]",
+    textColor: "text-[#ffe4e6]",
+    cardBg: "bg-[#2b1f23]",
+    borderColor: "border-[#3e2b32]",
+    hoverBg: "hover:bg-[#38262d]",
+    hoverBorder: "hover:border-[#523741]",
   },
   {
     id: "quiz",
@@ -119,6 +122,17 @@ export const STUDIO_TOOLS: StudioTool[] = [
     borderColor: "border-[#3a2d42]",
     hoverBg: "hover:bg-[#322739]",
     hoverBorder: "hover:border-[#4b3a55]",
+  },
+  {
+    id: "data_table",
+    translationKey: "toolsDataTable",
+    icon: Table2,
+    iconColor: "text-[#38bdf8]",
+    textColor: "text-[#e0f2fe]",
+    cardBg: "bg-[#1a252f]",
+    borderColor: "border-[#263746]",
+    hoverBg: "hover:bg-[#22303d]",
+    hoverBorder: "hover:border-[#334a5e]",
   },
 ];
 
