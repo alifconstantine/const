@@ -1,7 +1,7 @@
 ---
 version: beta
 name: Const Design System
-description: Master design language and interface architecture for the Const Studio Platform (Const Harness & Const Learn) — local-first AI workspaces and developer studios. Built on an austere studio monochrome palette (#161616 canvas, #2b2b2b sidebar & input fields, #222222 card headers, #ffffff crisp white reading ink, #d4d4d4 secondary interface ink, and #969696 utility chips). Seamless borderless panels, hairline boundaries, 16px/24px geometry, pure sans-serif UI typography, and high-contrast readable markdown.
+description: Master design language and interface architecture for the Const Studio Platform (Const Harness & Const Learn) — local-first AI workspaces and developer studios. Built on an austere studio monochrome palette (#161616 canvas, #2b2b2b sidebar & input fields, #222222 card headers, #ffffff crisp white reading ink, #d4d4d4 secondary interface ink, and #969696 utility chips). Seamless borderless panels, zero divider lines, mandatory Radix ScrollArea, hairline boundaries, 16px/24px geometry, pure sans-serif UI typography, and high-contrast readable markdown.
 
 colors:
   canvas: "#161616"
@@ -126,7 +126,8 @@ The interface prioritizes **clarity, reading comfort, and zero visual noise**:
 - **Secondary Ink (`#d4d4d4`)**: Chrome labels, secondary icons, and subtle interface text.
 - **Faint Accent & Placeholders (`#5d5d5d`)**: De-emphasized input hints and folder glyphs.
 - **Action Chips (`#969696` / `#ffffff`)**: Interactive utility controls.
-- **Seamless Paneling**: Panel headers have **no dividing border lines** (`border-b`). Elevation is achieved strictly through fill variations and hairline boundaries.
+- **Seamless Paneling & Zero Divider Lines**: Panel headers, dropdowns, and popovers have **no dividing border lines** (no `border-b`, `border-t`, or `divide-y`). Elevation is achieved strictly through fill variations and hairline boundaries.
+- **Custom Radix ScrollArea**: Native browser scrollbars are prohibited; all scrollable views use `@const/ui`'s `ScrollArea`.
 
 ---
 
@@ -183,12 +184,18 @@ Drop shadows on internal cards are strictly prohibited.
 
 ## Workspace & Header Architecture
 
-### 1. Seamless Borderless Headers
-- Inside floating cards and panels (such as the Central Chat Panel, Sources Panel, Studio Panel, and File Explorer), the top toolbar must **never** have a bottom border divider (`border-b border-border`).
-- The header sits seamlessly atop the content area without any dividing line (`h-12 px-4 sm:px-5 flex items-center justify-between shrink-0 select-none`).
-- Content scrolls naturally beneath the header without arbitrary horizontal lines.
+### 1. Seamless Borderless Surfaces & Zero Divider Lines
+- Inside floating cards, panels, popovers, and dropdown menus (such as the Central Chat Panel, Sources Panel, Studio Panel, File Explorer, and Carried Sources popovers), sections must **never** have arbitrary dividing borders (`border-b`, `border-t`, `divide-y`).
+- The top toolbar sits seamlessly atop the content area without any dividing line (`h-12 px-4 sm:px-5 flex items-center justify-between shrink-0 select-none`).
+- Inside dropdowns and popovers, headers and footer action buttons must flow naturally with padding/margins instead of harsh horizontal lines (`border-b` / `border-t`).
+- Content flows and scrolls naturally beneath headers without decorative or structural partition lines. Elevation and grouping are established strictly through fill variations (Level 0–3) and breathing room.
 
-### 2. Panel Geometry & Layout
+### 2. Mandatory ScrollArea for All Scrollable Containers
+- **Strict Rule**: Raw browser scrollbars via native `overflow-y-auto` or `overflow-x-auto` are strictly **prohibited** on desktop interfaces (to prevent Windows' default boxy, white-tracked scrollbars with up/down arrows).
+- All scrollable viewports, lists, popover menus, dialog bodies, and sidebars MUST use the custom `ScrollArea` component (`@const/ui` / `packages/ui/src/components/ui/scroll-area.tsx`).
+- `ScrollArea` automatically hides native browser scrollbars (`[scrollbar-width:none]` and `[&::-webkit-scrollbar]:hidden`) and renders minimalist, dark-calibrated Radix thumbs with smooth interaction.
+
+### 3. Panel Geometry & Layout
 - **Studio Sidebar**: Fixed 224px (`w-56`), `#2b2b2b`.
 - **Floating Cards**: 16px/24px geometry (`rounded-2xl`).
 - **Multi-column Layouts**: Floating studio columns (Sources, Central Chat, and Studio/Tools) sit on the `#161616` canvas with hairline boundaries.
@@ -217,7 +224,8 @@ Drop shadows on internal cards are strictly prohibited.
 ### Do
 - **Do** use `font-sans` (`Inter`) for all button labels, pills, dropdowns, and counter badges.
 - **Do** render AI response text and active header pills in crisp `#ffffff` (`dark:text-white`) for crystal-clear readability.
-- **Do** keep panel headers seamless and borderless — remove all `border-b` lines separating headers from content.
+- **Do** keep panel headers, dropdowns, and popovers seamless and borderless — eliminate all dividing lines (`border-b`, `border-t`, `divide-y`).
+- **Do** always use `ScrollArea` (`@const/ui` / `packages/ui/src/components/ui/scroll-area.tsx`) for all scrollable containers and popover lists instead of raw `overflow-y-auto`.
 - **Do** use `Layers` for the Artifacts tab and empty states.
 - **Do** wrap empty state icons in minimalist rounded squircles (`rounded-2xl`).
 - **Do** maintain the exact palette: `#161616` for canvas, `#2b2b2b` for sidebar and input, `#222222` for top header, `#ffffff` for primary reading text.
@@ -225,7 +233,8 @@ Drop shadows on internal cards are strictly prohibited.
 ### Don't
 - **Don't** apply `font-mono` to UI buttons, project selectors, sources pills, or list numbers.
 - **Don't** use muddy or dim gray (`#969696` or `text-foreground/90`) for primary AI reading copy.
-- **Don't** add horizontal dividing lines (`border-b`) under the top header of workspace panels.
+- **Don't** add horizontal dividing lines (`border-b`, `border-t`) under workspace headers or inside dropdown/popover menus.
+- **Don't** use raw native `overflow-y-auto` or `overflow-x-auto` which exposes Windows' default boxy/arrow scrollbars. Always use `ScrollArea`.
 - **Don't** use `Sparkles` for Artifacts or non-AI feature tabs.
 - **Don't** use emojis as interface icons or empty state visual representations.
 - **Don't** use heavy drop shadows (`shadow-md`, `shadow-xl`) on workspace panels.
