@@ -9,17 +9,17 @@ import {
   FileText,
   GitFork,
 } from "lucide-react";
-import { Dialog, DialogContent } from "@const/ui";
+import { Dialog, DialogContent, ScrollArea } from "@const/ui";
 import { useI18n } from "../../lib/i18n";
 import type { LocalSource } from "../../lib/db";
 
 export interface CreateStudioArtifactDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  initialType?: "quiz" | "flashcard" | "mind_map";
+  initialType?: "quiz" | "flashcard";
   sources: LocalSource[];
   onGenerate: (options: {
-    type: "quiz" | "flashcard" | "mind_map";
+    type: "quiz" | "flashcard";
     topic: string;
     difficulty: "easy" | "medium" | "hard";
     count: number;
@@ -37,7 +37,7 @@ export function CreateStudioArtifactDialog({
   const { t, language } = useI18n();
   const isIndo = language === "id";
 
-  const [artifactType, setArtifactType] = useState<"quiz" | "flashcard" | "mind_map">(initialType);
+  const [artifactType, setArtifactType] = useState<"quiz" | "flashcard">(initialType);
   const [countLevel, setCountLevel] = useState<"less" | "standard" | "more">("standard");
   const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard">("medium");
   const [topic, setTopic] = useState("");
@@ -119,10 +119,8 @@ export function CreateStudioArtifactDialog({
             <div className="h-7 w-7 rounded-lg bg-[#28282e] border border-[#38383e] flex items-center justify-center">
               {artifactType === "quiz" ? (
                 <HelpCircle className="h-4 w-4 text-[#5eead4]" />
-              ) : artifactType === "flashcard" ? (
-                <Layers className="h-4 w-4 text-[#f472b6]" />
               ) : (
-                <GitFork className="h-4 w-4 text-[#c084fc]" />
+                <Layers className="h-4 w-4 text-[#f472b6]" />
               )}
             </div>
             <span className="text-sm font-semibold text-white tracking-tight">
@@ -130,13 +128,9 @@ export function CreateStudioArtifactDialog({
                 ? isIndo
                   ? "Kuis Interaktif"
                   : "Interactive Quiz"
-                : artifactType === "flashcard"
-                ? isIndo
-                  ? "Kartu Tanya-Jawab (Flashcards)"
-                  : "Flashcards Deck"
                 : isIndo
-                ? "Peta Pikiran (Mind Map)"
-                : "Interactive Mind Map"}
+                ? "Kartu Tanya-Jawab (Flashcards)"
+                : "Flashcards Deck"}
             </span>
           </div>
 
@@ -150,54 +144,41 @@ export function CreateStudioArtifactDialog({
         </div>
 
         <form onSubmit={handleSubmit} className="p-5 space-y-5">
-          {/* Top Switcher: Quiz vs Flashcards vs Mind Map */}
+          {/* Top Switcher: Quiz vs Flashcards */}
           <div className="space-y-1.5">
             <label className="text-[11.5px] font-medium text-[#999999] uppercase tracking-wider">
-              {isIndo ? "Pilih Tipe Generator" : "Choose Artifact Type"}
+              {isIndo ? "Pilih Format Belajar" : "Choose Learning Format"}
             </label>
-            <div className="grid grid-cols-3 gap-1.5 p-1 rounded-xl bg-[#141416] border border-[#28282d]">
+            <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-[#141416] border border-[#28282d]">
               <button
                 type="button"
                 onClick={() => setArtifactType("quiz")}
-                className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                className={`flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${
                   artifactType === "quiz"
                     ? "bg-[#28282e] text-white shadow-xs border border-[#3d3d45]"
                     : "text-[#888888] hover:text-[#d4d4d4]"
                 }`}
               >
                 <HelpCircle className="h-3.5 w-3.5 text-[#5eead4]" />
-                <span className="truncate">{isIndo ? "Kuis" : "Quiz"}</span>
+                <span className="truncate">{isIndo ? "Kuis Pilihan Ganda" : "Interactive Quiz"}</span>
               </button>
               <button
                 type="button"
                 onClick={() => setArtifactType("flashcard")}
-                className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                className={`flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${
                   artifactType === "flashcard"
                     ? "bg-[#28282e] text-white shadow-xs border border-[#3d3d45]"
                     : "text-[#888888] hover:text-[#d4d4d4]"
                 }`}
               >
                 <Layers className="h-3.5 w-3.5 text-[#f472b6]" />
-                <span className="truncate">{isIndo ? "Kartu" : "Cards"}</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setArtifactType("mind_map")}
-                className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-                  artifactType === "mind_map"
-                    ? "bg-[#28282e] text-white shadow-xs border border-[#3d3d45]"
-                    : "text-[#888888] hover:text-[#d4d4d4]"
-                }`}
-              >
-                <GitFork className="h-3.5 w-3.5 text-[#c084fc]" />
-                <span className="truncate">{isIndo ? "Peta Pikiran" : "Mind Map"}</span>
+                <span className="truncate">{isIndo ? "Kartu Flashcards" : "Flashcards Deck"}</span>
               </button>
             </div>
           </div>
 
-          {/* Row: Jumlah Pertanyaan & Tingkat Kesulitan (for quiz & flashcards) */}
-          {artifactType !== "mind_map" && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {/* Row: Jumlah Pertanyaan & Tingkat Kesulitan */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* Jumlah Pertanyaan */}
               <div className="space-y-1.5">
                 <label className="text-[11.5px] font-medium text-[#999999]">
@@ -292,7 +273,6 @@ export function CreateStudioArtifactDialog({
                 </div>
               </div>
             </div>
-          )}
 
           {/* Sumber Dropdown */}
           <div className="space-y-1.5 relative">
@@ -318,31 +298,33 @@ export function CreateStudioArtifactDialog({
               </button>
 
               {isSourceDropdownOpen && (
-                <div className="absolute top-full mt-1.5 left-0 right-0 z-30 bg-[#1a1a1d] border border-[#333338] rounded-xl p-2 shadow-2xl max-h-48 overflow-y-auto space-y-1">
-                  <button
-                    type="button"
-                    onClick={handleSelectAllSources}
-                    className="w-full text-left px-2 py-1.5 rounded-lg text-xs hover:bg-white/5 flex items-center justify-between font-medium text-[#5eead4] cursor-pointer"
-                  >
-                    <span>{selectedSourceIds.length === sources.length ? (isIndo ? "Batalkan Semua" : "Deselect All") : (isIndo ? "Pilih Semua Sumber" : "Select All")}</span>
-                  </button>
-                  <div className="h-px bg-[#28282d] my-1" />
-                  {sources.map((s) => (
+                <div className="absolute top-full mt-1.5 left-0 right-0 z-30 bg-[#1a1a1d] border border-[#333338] rounded-xl p-2 shadow-2xl">
+                  <ScrollArea className="max-h-48 w-full" viewportClassName="space-y-1 pr-1">
                     <button
-                      key={s.id}
                       type="button"
-                      onClick={() => handleToggleSource(s.id)}
-                      className="w-full text-left px-2 py-1.5 rounded-lg text-xs hover:bg-white/5 flex items-center justify-between gap-2 cursor-pointer text-[#d4d4d4]"
+                      onClick={handleSelectAllSources}
+                      className="w-full text-left px-2 py-1.5 rounded-lg text-xs hover:bg-white/5 flex items-center justify-between font-medium text-[#5eead4] cursor-pointer"
                     >
-                      <div className="flex items-center gap-2 truncate">
-                        <FileText className="h-3.5 w-3.5 text-[#888888] shrink-0" />
-                        <span className="truncate">{s.title}</span>
-                      </div>
-                      {selectedSourceIds.includes(s.id) && (
-                        <Check className="h-3.5 w-3.5 text-[#5eead4] shrink-0" />
-                      )}
+                      <span>{selectedSourceIds.length === sources.length ? (isIndo ? "Batalkan Semua" : "Deselect All") : (isIndo ? "Pilih Semua Sumber" : "Select All")}</span>
                     </button>
-                  ))}
+                    <div className="h-px bg-[#28282d] my-1" />
+                    {sources.map((s) => (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => handleToggleSource(s.id)}
+                        className="w-full text-left px-2 py-1.5 rounded-lg text-xs hover:bg-white/5 flex items-center justify-between gap-2 cursor-pointer text-[#d4d4d4]"
+                      >
+                        <div className="flex items-center gap-2 truncate">
+                          <FileText className="h-3.5 w-3.5 text-[#888888] shrink-0" />
+                          <span className="truncate">{s.title}</span>
+                        </div>
+                        {selectedSourceIds.includes(s.id) && (
+                          <Check className="h-3.5 w-3.5 text-[#5eead4] shrink-0" />
+                        )}
+                      </button>
+                    ))}
+                  </ScrollArea>
                 </div>
               )}
             </div>

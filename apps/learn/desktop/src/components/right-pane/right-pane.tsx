@@ -34,6 +34,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   toast,
+  ScrollArea,
 } from "@const/ui";
 import { TabHeader } from "./tab-header";
 import { ReviewTab } from "./review-tab";
@@ -438,8 +439,9 @@ export function RightPane({
         <div className="flex-1 flex flex-col min-h-0 relative overflow-hidden">
           {mode === "studio" ? (
             /* Studio Content */
-            <div className="flex-1 flex flex-col p-3 sm:p-3.5 overflow-y-auto min-h-0 select-none animate-in fade-in duration-200">
-              {/* Grid of Studio Tools */}
+            <div className="flex-1 flex flex-col min-h-0 select-none animate-in fade-in duration-200">
+              <ScrollArea className="flex-1 w-full min-h-0" viewportClassName="p-3 sm:p-3.5">
+                {/* Grid of Studio Tools */}
               <div className="grid grid-cols-3 gap-2 mb-4 shrink-0">
                 {STUDIO_TOOLS.map((tool) => {
                   const Icon = tool.icon;
@@ -684,8 +686,8 @@ export function RightPane({
                 ) : (
                   /* Empty State Studio Output */
                   <div className="flex-1 flex flex-col items-center justify-center text-center p-4 min-h-[160px]">
-                    <div className="h-12 w-12 rounded-2xl bg-secondary/80 border border-border/50 flex items-center justify-center text-muted-foreground/80 mb-3 shadow-2xs">
-                      <PenTool className="h-6 w-6 stroke-[1.5]" />
+                    <div className="h-12 w-12 rounded-2xl bg-[#252528] border border-[#383838] flex items-center justify-center text-[#969696] mb-3 shadow-2xs">
+                      <Layers className="h-6 w-6 stroke-[1.5]" />
                     </div>
                     <h3 className="text-xs font-semibold text-foreground mb-1.5 tracking-tight">
                       {t("studioEmptyTitle")}
@@ -696,20 +698,21 @@ export function RightPane({
                   </div>
                 )}
               </div>
+            </ScrollArea>
 
-              {/* "+ Tambahkan catatan" Button pinned at the bottom (Image 1) */}
-              <div className="pt-3 pb-1 flex justify-center mt-auto shrink-0 sticky bottom-0 bg-gradient-to-t from-card via-card/95 to-transparent">
-                <button
-                  type="button"
-                  onClick={onAddNote}
-                  className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-white text-neutral-900 hover:bg-neutral-100 text-xs font-semibold transition-all shadow-md active:scale-98 cursor-pointer border border-white/20"
-                >
-                  <SquarePen className="h-4 w-4 stroke-[2]" />
-                  <span>{t("addNote")}</span>
-                </button>
-              </div>
+            {/* "+ Tambahkan catatan" Clean Fixed Footer (Never buggy on scroll) */}
+            <div className="p-3 pt-2 flex justify-center shrink-0 border-t border-transparent bg-gradient-to-t from-[#1b1b1d] via-[#1b1b1d]/90 to-transparent">
+              <button
+                type="button"
+                onClick={onAddNote}
+                className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-white text-neutral-900 hover:bg-neutral-100 text-xs font-semibold transition-all shadow-md active:scale-98 cursor-pointer border border-white/20"
+              >
+                <SquarePen className="h-4 w-4 stroke-[2]" />
+                <span>{t("addNote")}</span>
+              </button>
             </div>
-          ) : (
+          </div>
+        ) : (
             /* Review Sidepanel matching apps/harness/desktop */
             <div className="flex-1 w-full h-full min-h-0 flex flex-col overflow-hidden bg-[#141414] animate-in fade-in duration-200">
               {/* Harness Tab Header with +, Search Dropdown, Drag & Drop */}

@@ -12,6 +12,7 @@ import {
   Layers,
   Award,
 } from "lucide-react";
+import { ScrollArea } from "@const/ui";
 import type { FlashcardData, FlashcardItem } from "../../lib/db";
 import { useI18n } from "../../lib/i18n";
 
@@ -157,7 +158,7 @@ Based on the notebook sources, explain how this concept applies with concrete ex
       </div>
 
       {/* Card Body Area */}
-      <div className="flex-1 overflow-y-auto p-4 sm:p-6 flex flex-col justify-center items-center">
+      <ScrollArea className="flex-1 w-full min-h-0" viewportClassName="p-4 sm:p-6 flex flex-col justify-center items-center">
         {!isCompleted && currentCard ? (
           <div className="w-full max-w-lg flex flex-col items-center gap-4">
             {/* Counter */}
@@ -303,7 +304,7 @@ Based on the notebook sources, explain how this concept applies with concrete ex
             </div>
           </div>
         )}
-      </div>
+      </ScrollArea>
     </div>
   );
 }

@@ -43,6 +43,7 @@ import { ChatPanel } from "./chat-panel";
 import { RightPane, type RightPaneTab, type RightPaneTabType, type GeneratingArtifactStatus } from "../right-pane";
 import { AddSourceDialog } from "./add-source-dialog";
 import { CreateStudioArtifactDialog } from "./create-studio-artifact-dialog";
+import { CreateMindMapDialog } from "./create-mind-map-dialog";
 import { WorkspaceTitle } from "./workspace-title";
 import { SettingsView } from "../settings/settings-view";
 import { ErrorBoundary } from "../ui/error-boundary";
@@ -85,9 +86,14 @@ export function LearnWorkspace({
     return await db.sources.where("learnId").equals(learnId).toArray();
   }, [learnId]);
 
-  // Live artifacts from Dexie
+  // Live artifacts from Dexie sorted by recent activity
   const artifacts = useLiveQuery(async () => {
-    return await db.artifacts.where("learnId").equals(learnId).toArray();
+    const list = await db.artifacts.where("learnId").equals(learnId).toArray();
+    return list.sort((a, b) => {
+      const timeA = Math.max(a.updatedAt || 0, a.createdAt || 0);
+      const timeB = Math.max(b.updatedAt || 0, b.createdAt || 0);
+      return timeB - timeA;
+    });
   }, [learnId]);
 
   // Dialog & Panel states
@@ -98,7 +104,8 @@ export function LearnWorkspace({
 
   // Studio Artifact creation & generation states
   const [isCreateStudioOpen, setIsCreateStudioOpen] = useState(false);
-  const [createStudioType, setCreateStudioType] = useState<"quiz" | "flashcard" | "mind_map">("quiz");
+  const [createStudioType, setCreateStudioType] = useState<"quiz" | "flashcard">("quiz");
+  const [isCreateMindMapOpen, setIsCreateMindMapOpen] = useState(false);
   const [generatingArtifacts, setGeneratingArtifacts] = useState<GeneratingArtifactStatus[]>([]);
 
   // Right Pane: Dual Studio & Preview/Review state
@@ -541,25 +548,19 @@ export function LearnWorkspace({
     } else if (
       toolId === "quiz" ||
       toolId === "flashcards" ||
-      toolId === "flashcard" ||
-      toolId === "mind_map"
+      toolId === "flashcard"
     ) {
       setCreateStudioType(
         toolId === "flashcards" || toolId === "flashcard"
           ? "flashcard"
-          : toolId === "mind_map"
-          ? "mind_map"
           : "quiz"
       );
       setIsCreateStudioOpen(true);
+    } else if (toolId === "mind_map") {
+      setIsCreateMindMapOpen(true);
     } else {
-      const tool = STUDIO_TOOLS.find((t) => t.id === toolId);
-      const toolName = tool ? t(tool.translationKey) : toolId;
-      setPendingStudioPrompt(
-        language === "id"
-          ? `Tolong buatkan ${toolName} berdasarkan sumber di notebook ini.`
-          : `Please generate a ${toolName} based on the sources in this notebook.`
-      );
+      // Menu lain selain Quiz & Flashcard, MindMap tidak melakukan apa-apa (no-op)
+      return;
     }
   };
 
@@ -1284,11 +1285,19 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
         onSelectSource={handleSelectSource}
       />
 
-      {/* Create Studio Artifact (Quiz / Flashcard / Mind Map) Dialog */}
+      {/* Create Studio Artifact (Quiz / Flashcard) Dialog */}
       <CreateStudioArtifactDialog
         open={isCreateStudioOpen}
         onOpenChange={setIsCreateStudioOpen}
         initialType={createStudioType}
+        sources={sources || []}
+        onGenerate={handleGenerateStudioArtifact}
+      />
+
+      {/* Dedicated Create Mind Map Dialog */}
+      <CreateMindMapDialog
+        open={isCreateMindMapOpen}
+        onOpenChange={setIsCreateMindMapOpen}
         sources={sources || []}
         onGenerate={handleGenerateStudioArtifact}
       />

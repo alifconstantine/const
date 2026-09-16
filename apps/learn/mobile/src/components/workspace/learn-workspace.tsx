@@ -17,6 +17,7 @@ import { WorkspaceSidebar } from "./workspace-sidebar";
 import { SourcesSheet } from "./sources-sheet";
 import { StudioSheet, type GeneratingArtifactStatus } from "./studio-sheet";
 import { CreateArtifactSheet } from "./create-artifact-sheet";
+import { CreateMindMapSheet } from "./create-mind-map-sheet";
 import { MobileArtifactReader } from "./mobile-artifact-reader";
 import { generateStudioArtifact } from "../../lib/studio/generator";
 import { ThinkingProcess } from "./working-process";
@@ -376,7 +377,11 @@ export function MobileLearnWorkspace({
   // Live artifacts from local Dexie
   const artifacts = useLiveQuery(async () => {
     const list = await db.artifacts.where("learnId").equals(learnId).toArray();
-    return list.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+    return list.sort((a, b) => {
+      const timeA = Math.max(a.updatedAt || 0, a.createdAt || 0);
+      const timeB = Math.max(b.updatedAt || 0, b.createdAt || 0);
+      return timeB - timeA;
+    });
   }, [learnId]);
 
   // Live sources from local Dexie
@@ -429,7 +434,8 @@ export function MobileLearnWorkspace({
 
   // Studio Artifact creation, in-progress generating, and full-screen reader states
   const [isCreateArtifactSheetOpen, setIsCreateArtifactSheetOpen] = useState(false);
-  const [createArtifactType, setCreateArtifactType] = useState<"quiz" | "flashcard" | "mind_map">("quiz");
+  const [createArtifactType, setCreateArtifactType] = useState<"quiz" | "flashcard">("quiz");
+  const [isCreateMindMapSheetOpen, setIsCreateMindMapSheetOpen] = useState(false);
   const [generatingArtifacts, setGeneratingArtifacts] = useState<GeneratingArtifactStatus[]>([]);
   const [selectedReaderArtifact, setSelectedReaderArtifact] = useState<LocalArtifact | null>(null);
   const [isReaderOpen, setIsReaderOpen] = useState(false);
@@ -1468,30 +1474,23 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
     setSearchQuery("");
   };
 
-  const handleSelectStudioTool = (toolId: string, toolTitle: string) => {
-    setIsStudioSheetOpen(false);
+  const handleSelectStudioTool = (toolId: string, _toolTitle: string) => {
     if (toolId === "quiz") {
       setCreateArtifactType("quiz");
       setIsCreateArtifactSheetOpen(true);
-    } else if (toolId === "flashcards" || toolId === "flashcard") {
+      return;
+    }
+    if (toolId === "flashcards" || toolId === "flashcard") {
       setCreateArtifactType("flashcard");
       setIsCreateArtifactSheetOpen(true);
-    } else if (toolId === "mind_map") {
-      setCreateArtifactType("mind_map");
-      setIsCreateArtifactSheetOpen(true);
-    } else if (toolId === "browser") {
-      handleSend(
-        language === "id"
-          ? "Tolong gunakan browser untuk mencari referensi web dan riset mendalam terkait topik ini."
-          : "Please use the browser to search the web and research in-depth references for this topic."
-      );
-    } else {
-      handleSend(
-        language === "id"
-          ? `Tolong buatkan ${toolTitle} untuk notebook ini.`
-          : `Please create a ${toolTitle} for this notebook.`
-      );
+      return;
     }
+    if (toolId === "mind_map") {
+      setIsCreateMindMapSheetOpen(true);
+      return;
+    }
+    // Other tools: strictly no-op as requested
+    return;
   };
 
   const handleGenerateStudioArtifact = async (options: {
@@ -2407,6 +2406,14 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
         open={isCreateArtifactSheetOpen}
         onClose={() => setIsCreateArtifactSheetOpen(false)}
         initialType={createArtifactType}
+        sources={sources || []}
+        onGenerate={handleGenerateStudioArtifact}
+      />
+
+      {/* Create Mind Map Bottom Sheet */}
+      <CreateMindMapSheet
+        open={isCreateMindMapSheetOpen}
+        onClose={() => setIsCreateMindMapSheetOpen(false)}
         sources={sources || []}
         onGenerate={handleGenerateStudioArtifact}
       />

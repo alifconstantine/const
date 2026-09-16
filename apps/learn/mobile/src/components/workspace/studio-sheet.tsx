@@ -222,7 +222,6 @@ export function StudioSheet({
                     key={tool.id}
                     type="button"
                     onClick={() => {
-                      onClose();
                       onSelectTool(tool.id, toolTitle);
                     }}
                     className={`p-2.5 rounded-2xl border ${tool.cardBg} ${tool.borderColor} ${tool.hoverBg} ${tool.hoverBorder} transition-all flex flex-col justify-between min-h-[82px] text-left cursor-pointer active:scale-[0.98] shadow-xs group`}

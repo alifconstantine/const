@@ -24,6 +24,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
+  ScrollArea,
 } from "@const/ui";
 import { marked } from "marked";
 import { localDb, type LocalArtifact } from "../../lib/db";
@@ -553,7 +554,7 @@ export function NotePreviewTab({
       </div>
 
       {/* Clean, Borderless WYSIWYG Editor Area (Live rendered markdown, no yellow block!) */}
-      <div className="flex-1 min-h-0 px-5 py-4 overflow-y-auto flex flex-col select-text">
+      <ScrollArea className="flex-1 min-h-0 w-full select-text" viewportClassName="px-5 py-4 flex flex-col">
         <div
           ref={editorRef}
           contentEditable
@@ -591,7 +592,7 @@ export function NotePreviewTab({
             "[&_hr]:border-[#27272a] [&_hr]:my-4"
           )}
         />
-      </div>
+      </ScrollArea>
 
       {/* Bottom Bar: Konversikan menjadi sumber (Image 3) */}
       <div className="h-12 px-5 border-t border-[#282828] bg-[#161618] flex items-center justify-between shrink-0">

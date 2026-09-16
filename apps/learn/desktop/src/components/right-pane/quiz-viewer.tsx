@@ -17,6 +17,7 @@ import {
   HelpCircle,
   Award,
 } from "lucide-react";
+import { ScrollArea } from "@const/ui";
 import type { QuizData, QuizQuestion } from "../../lib/db";
 import { useI18n } from "../../lib/i18n";
 
@@ -216,7 +217,7 @@ Based on the learning sources, explain why this is the correct answer and provid
       )}
 
       {/* Scrollable Question Body or Completion Screen */}
-      <div className="flex-1 overflow-y-auto p-4 sm:p-6 flex flex-col justify-start">
+      <ScrollArea className="flex-1 w-full min-h-0" viewportClassName="p-4 sm:p-6 flex flex-col justify-start">
         {!isCompleted && currentQ ? (
           <div className="w-full max-w-2xl mx-auto space-y-4">
             {/* Question Counter & Meta */}
@@ -424,7 +425,7 @@ Based on the learning sources, explain why this is the correct answer and provid
             </div>
           </div>
         )}
-      </div>
+      </ScrollArea>
 
       {/* Footer Feedback Bar */}
       <div className="h-11 px-5 border-t border-[#242428] bg-[#1a1a1d] flex items-center justify-between shrink-0 text-xs">

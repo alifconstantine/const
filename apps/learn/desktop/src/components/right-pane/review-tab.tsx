@@ -6,7 +6,7 @@ import {
   Layers,
   Check,
 } from "lucide-react";
-import { cn } from "@const/ui";
+import { cn, ScrollArea } from "@const/ui";
 import { DiffViewer } from "./diff-viewer";
 import { FileIcon } from "../workspace/file-icon";
 import { getMutationDiffStats } from "../workspace/execution-trace";
@@ -110,11 +110,12 @@ export function ReviewTab({
       </div>
 
       {/* Accordion List of Mutated Files */}
-      <div
+      <ScrollArea
         className={cn(
-          "flex-1 w-full min-h-0 overflow-y-auto divide-y divide-[#222222]",
+          "flex-1 w-full min-h-0",
           mutations.length === 1 && "flex flex-col"
         )}
+        viewportClassName="space-y-0"
       >
         {mutations.map((mut, idx) => {
           const key = mut.id || `mut_${idx}`;
@@ -230,7 +231,7 @@ export function ReviewTab({
             </div>
           );
         })}
-      </div>
+      </ScrollArea>
     </div>
   );
 }
