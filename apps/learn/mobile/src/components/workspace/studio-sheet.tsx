@@ -105,22 +105,6 @@ export function StudioSheet({
   const { t, language } = useI18n();
   const isIndo = language === "id";
 
-  const [isBannerDismissed, setIsBannerDismissed] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem("const_learn_report_banner_dismissed") === "true";
-    } catch {
-      return false;
-    }
-  });
-
-  const handleDismissBanner = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    setIsBannerDismissed(true);
-    try {
-      localStorage.setItem("const_learn_report_banner_dismissed", "true");
-    } catch {}
-  };
-
   const formatRelativeTime = (ts: number) => {
     const diffSec = Math.floor((Date.now() - ts) / 1000);
     if (diffSec < 60) return language === "id" ? "baru saja" : "just now";
@@ -223,42 +207,6 @@ export function StudioSheet({
 
         {/* Content Area */}
         <div className="flex-1 px-3 pt-2.5 pb-3 flex flex-col gap-3 min-h-0 overflow-y-auto">
-          {/* Banner: Laporan Interaktif (Image 1) */}
-          {!isBannerDismissed && (
-            <div className="p-2.5 rounded-2xl bg-gradient-to-r from-[#1f2824] via-[#1a2e22] to-[#1e2622] border border-[#2d4d38]/60 flex items-center justify-between gap-2 shadow-xs select-none shrink-0">
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="text-base select-none shrink-0" role="img" aria-label="Celebration">
-                  🎆
-                </span>
-                <span className="text-[11px] font-medium text-[#e2e8f0] leading-snug">
-                  {language === "id"
-                    ? "Baru: Anda kini dapat membuat Laporan Interaktif."
-                    : "New: You can now create Interactive Reports."}
-                </span>
-              </div>
-              <div className="flex items-center gap-1.5 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => {
-                    const reportTitle = toolNameMap["report"] || (language === "id" ? "Laporan" : "Report");
-                    onSelectTool("report", reportTitle);
-                  }}
-                  className="px-2.5 py-0.5 rounded-full bg-white text-neutral-900 text-[10.5px] font-semibold hover:bg-neutral-200 transition-all cursor-pointer shadow-xs active:scale-95"
-                >
-                  {language === "id" ? "Coba" : "Try"}
-                </button>
-                <button
-                  type="button"
-                  onClick={handleDismissBanner}
-                  className="h-5 w-5 rounded-full hover:bg-white/10 text-neutral-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
-                  title={language === "id" ? "Tutup banner" : "Dismiss banner"}
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </div>
-            </div>
-          )}
-
           {/* Section: Tools Grid (Matching Image 1) */}
           <div className="space-y-2 shrink-0">
             <div className="text-[11px] font-sans uppercase tracking-wider font-semibold text-[#888888] px-0.5">

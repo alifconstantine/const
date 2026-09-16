@@ -87,7 +87,6 @@ export const STUDIO_TOOLS: StudioTool[] = [
     borderColor: "border-[#3c3a2b]",
     hoverBg: "hover:bg-[#343225]",
     hoverBorder: "hover:border-[#4d4a37]",
-    hasBadge: true,
   },
   {
     id: "quiz",
@@ -121,6 +120,17 @@ export const STUDIO_TOOLS: StudioTool[] = [
     borderColor: "border-[#263746]",
     hoverBg: "hover:bg-[#22303d]",
     hoverBorder: "hover:border-[#334a5e]",
+  },
+  {
+    id: "browser",
+    translationKey: "toolsBrowser",
+    icon: Globe,
+    iconColor: "text-[#60a5fa]",
+    textColor: "text-[#dbeafe]",
+    cardBg: "bg-[#172133]",
+    borderColor: "border-[#22334f]",
+    hoverBg: "hover:bg-[#1d2b42]",
+    hoverBorder: "hover:border-[#2f456b]",
   },
 ];
 
