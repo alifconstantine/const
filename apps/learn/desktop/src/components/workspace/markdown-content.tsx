@@ -8,6 +8,21 @@ import { convertReferencesToMarkdownLinks } from "../../lib/grounding/source-ref
 
 // Configure marked globally once with GitHub Flavored Markdown and LaTeX extensions
 marked.use(createMarkedLatexExtension());
+marked.use({
+  renderer: {
+    link({ href, title, tokens }) {
+      const text = tokens ? this.parser.parseInline(tokens) : "";
+      if (href && (href.startsWith("#ref-source-") || href.startsWith("#ref-"))) {
+        const sourceId = href.replace(/^#ref-(?:source-)?/, "");
+        return `<a href="#ref-source-${sourceId}" class="source-ref-badge" data-source-id="${sourceId}" data-source-number="${text}" title="${title || ""}">${text}</a>`;
+      }
+      return `<a href="${href}"${title ? ` title="${title}"` : ""} target="_blank" rel="noopener noreferrer">${text}</a>`;
+    },
+    html({ text }) {
+      return text;
+    },
+  },
+});
 marked.setOptions({
   gfm: true,
   breaks: true,
@@ -42,10 +57,10 @@ export function MarkdownContent({
     const target = (e.target as HTMLElement).closest("a");
     if (target) {
       const href = target.getAttribute("href");
-      if (href && href.startsWith("#ref-source-")) {
+      if (href && (href.startsWith("#ref-source-") || href.startsWith("#ref-"))) {
         e.preventDefault();
         e.stopPropagation();
-        const sourceId = href.replace("#ref-source-", "");
+        const sourceId = href.replace(/^#ref-(?:source-)?/, "");
         onSourceClick?.(sourceId);
       }
     }
@@ -61,13 +76,28 @@ export function MarkdownContent({
       )}
     >
       {tokens.map((token, index) => (
-        <TokenRenderer key={index} token={token} />
+        <TokenRenderer
+          key={index}
+          token={token}
+          sourcesMap={sourcesMap}
+          onSourceClick={onSourceClick}
+        />
       ))}
     </div>
   );
 }
 
-function TokenRenderer({ token, isNested }: { token: Token; isNested?: boolean }) {
+function TokenRenderer({
+  token,
+  isNested,
+  sourcesMap,
+  onSourceClick,
+}: {
+  token: Token;
+  isNested?: boolean;
+  sourcesMap?: Map<string, { title: string }>;
+  onSourceClick?: (sourceId: string) => void;
+}) {
   switch (token.type) {
     case "heading": {
       const heading = token as Tokens.Heading;
@@ -82,7 +112,7 @@ function TokenRenderer({ token, isNested }: { token: Token; isNested?: boolean }
           : "text-[13.5px] font-semibold text-foreground dark:text-white mt-3 mb-1";
       return (
         <Tag className={`${sizeClasses} font-sans`}>
-          <InlineRenderer text={heading.text} />
+          <InlineRenderer text={heading.text} sourcesMap={sourcesMap} />
         </Tag>
       );
     }
@@ -91,7 +121,7 @@ function TokenRenderer({ token, isNested }: { token: Token; isNested?: boolean }
       const paragraph = token as Tokens.Paragraph;
       return (
         <p className="leading-[1.68] text-foreground dark:text-white my-2 font-sans">
-          <InlineRenderer text={paragraph.text} />
+          <InlineRenderer text={paragraph.text} sourcesMap={sourcesMap} />
         </p>
       );
     }
@@ -103,6 +133,8 @@ function TokenRenderer({ token, isNested }: { token: Token; isNested?: boolean }
           header={tableToken.header}
           rows={tableToken.rows}
           align={tableToken.align}
+          sourcesMap={sourcesMap}
+          onSourceClick={onSourceClick}
         />
       );
     }
@@ -133,7 +165,11 @@ function TokenRenderer({ token, isNested }: { token: Token; isNested?: boolean }
                   {start + idx}.
                 </span>
                 <div className="flex-1 min-w-0">
-                  <ListItemContent item={item} />
+                  <ListItemContent
+                    item={item}
+                    sourcesMap={sourcesMap}
+                    onSourceClick={onSourceClick}
+                  />
                 </div>
               </li>
             ))}
@@ -143,7 +179,7 @@ function TokenRenderer({ token, isNested }: { token: Token; isNested?: boolean }
       return (
         <ul className={cn("space-y-2 my-2.5 pl-0.5 text-foreground dark:text-white", isNested && "my-1.5 pl-3 space-y-1.5")}>
           {list.items.map((item: Tokens.ListItem, idx: number) => (
-            <li key={idx} className="flex items-start gap-2 leading-[1.65]">
+            <li key={idx} className="flex items-start gap-2.5 leading-[1.65]">
               {item.task ? (
                 <input
                   type="checkbox"
@@ -154,13 +190,17 @@ function TokenRenderer({ token, isNested }: { token: Token; isNested?: boolean }
               ) : (
                 <span className={cn(
                   "select-none text-muted-foreground dark:text-white/60 shrink-0 font-medium",
-                  isNested ? "text-[13px] leading-[1.65]" : "text-[15px] leading-[1.6]"
+                  isNested ? "text-[12px] leading-[1.65]" : "text-[14px] leading-[1.5]"
                 )}>
-                  {isNested ? "-" : "•"}
+                  {isNested ? "–" : "•"}
                 </span>
               )}
               <div className="flex-1 min-w-0">
-                <ListItemContent item={item} />
+                <ListItemContent
+                  item={item}
+                  sourcesMap={sourcesMap}
+                  onSourceClick={onSourceClick}
+                />
               </div>
             </li>
           ))}
@@ -171,14 +211,14 @@ function TokenRenderer({ token, isNested }: { token: Token; isNested?: boolean }
     case "blockquote": {
       const bq = token as Tokens.Blockquote;
       return (
-        <blockquote className="border-l-2 border-primary/80 pl-3.5 py-1.5 my-3 text-muted-foreground dark:text-white/80 bg-muted/20 rounded-r-lg italic">
-          <InlineRenderer text={bq.text} />
+        <blockquote className="border-l-2 border-primary/60 pl-3.5 py-1 my-3 text-foreground/90 dark:text-white/90 bg-muted/30 rounded-r-lg italic text-[13.5px]">
+          <InlineRenderer text={bq.text} sourcesMap={sourcesMap} />
         </blockquote>
       );
     }
 
     case "hr":
-      return <div className="h-[1px] bg-border my-5" />;
+      return <div className="h-[1px] bg-border/80 my-4" />;
 
     case "space":
       return null;
@@ -187,7 +227,7 @@ function TokenRenderer({ token, isNested }: { token: Token; isNested?: boolean }
       if ("text" in token && typeof (token as any).text === "string") {
         return (
           <p className="leading-[1.68] text-foreground dark:text-white my-1.5 font-sans">
-            <InlineRenderer text={(token as any).text} />
+            <InlineRenderer text={(token as any).text} sourcesMap={sourcesMap} />
           </p>
         );
       }
@@ -196,13 +236,21 @@ function TokenRenderer({ token, isNested }: { token: Token; isNested?: boolean }
   }
 }
 
-function ListItemContent({ item }: { item: Tokens.ListItem }) {
+function ListItemContent({
+  item,
+  sourcesMap,
+  onSourceClick,
+}: {
+  item: Tokens.ListItem;
+  sourcesMap?: Map<string, { title: string }>;
+  onSourceClick?: (sourceId: string) => void;
+}) {
   if (!item.tokens || item.tokens.length === 0) {
-    return <InlineRenderer text={item.text} />;
+    return <InlineRenderer text={item.text} sourcesMap={sourcesMap} />;
   }
 
   if (item.tokens.length === 1 && item.tokens[0]?.type === "text") {
-    return <InlineRenderer text={item.tokens[0].text} />;
+    return <InlineRenderer text={item.tokens[0].text} sourcesMap={sourcesMap} />;
   }
 
   return (
@@ -211,25 +259,38 @@ function ListItemContent({ item }: { item: Tokens.ListItem }) {
         if (childToken.type === "text") {
           return (
             <div key={cIdx} className="leading-[1.65]">
-              <InlineRenderer text={childToken.text} />
+              <InlineRenderer text={childToken.text} sourcesMap={sourcesMap} />
             </div>
           );
         }
         if (childToken.type === "paragraph") {
           return (
             <div key={cIdx} className="leading-[1.65] my-0.5">
-              <InlineRenderer text={(childToken as Tokens.Paragraph).text} />
+              <InlineRenderer text={(childToken as Tokens.Paragraph).text} sourcesMap={sourcesMap} />
             </div>
           );
         }
         if (childToken.type === "list") {
           return (
             <div key={cIdx} className="mt-1">
-              <TokenRenderer token={childToken} isNested />
+              <TokenRenderer
+                token={childToken}
+                isNested
+                sourcesMap={sourcesMap}
+                onSourceClick={onSourceClick}
+              />
             </div>
           );
         }
-        return <TokenRenderer key={cIdx} token={childToken} isNested />;
+        return (
+          <TokenRenderer
+            key={cIdx}
+            token={childToken}
+            isNested
+            sourcesMap={sourcesMap}
+            onSourceClick={onSourceClick}
+          />
+        );
       })}
     </div>
   );
@@ -239,14 +300,31 @@ function TableBlock({
   header,
   rows,
   align,
+  sourcesMap,
+  onSourceClick,
 }: {
   header: Tokens.TableCell[];
   rows: Tokens.TableCell[][];
   align: Array<"center" | "left" | "right" | null>;
+  sourcesMap?: Map<string, { title: string }>;
+  onSourceClick?: (sourceId: string) => void;
 }) {
   const { t } = useI18n();
   const [copied, setCopied] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
+
+  const handleCitationClick = (e: React.MouseEvent) => {
+    const target = (e.target as HTMLElement).closest("a");
+    if (target) {
+      const href = target.getAttribute("href");
+      if (href && (href.startsWith("#ref-source-") || href.startsWith("#ref-"))) {
+        e.preventDefault();
+        e.stopPropagation();
+        const sourceId = href.replace(/^#ref-(?:source-)?/, "");
+        onSourceClick?.(sourceId);
+      }
+    }
+  };
 
   const getTableAsTsv = () => {
     const h = header.map((c) => c.text.replace(/\t/g, " ")).join("\t");
@@ -294,7 +372,10 @@ function TableBlock({
 
   return (
     <>
-      <div className="relative group/tbl my-4 rounded-xl border border-border/70 bg-card overflow-hidden select-text">
+      <div
+        onClick={handleCitationClick}
+        className="relative group/tbl my-4 rounded-xl border border-border/70 bg-card overflow-hidden select-text"
+      >
         <div className="flex items-center justify-end px-3 py-2 bg-muted/40 border-b border-border/50 gap-1">
           <button
             type="button"
@@ -334,11 +415,12 @@ function TableBlock({
                   <th
                     key={idx}
                     className={cn(
-                      "px-4 py-2.5 text-xs font-medium text-muted-foreground tracking-wider whitespace-nowrap",
+                      "px-4 py-2.5 text-xs font-medium text-muted-foreground tracking-wider",
+                      idx === 0 ? "whitespace-nowrap w-12 text-center" : "min-w-[140px]",
                       getAlignClass(idx)
                     )}
                   >
-                    <InlineRenderer text={col.text} />
+                    <InlineRenderer text={col.text} sourcesMap={sourcesMap} />
                   </th>
                 ))}
               </tr>
@@ -353,12 +435,14 @@ function TableBlock({
                     <td
                       key={cellIdx}
                       className={cn(
-                        "px-4 py-3 leading-relaxed text-foreground dark:text-white align-top whitespace-nowrap",
-                        cellIdx === 0 && "font-medium text-foreground dark:text-white",
+                        "px-4 py-3 leading-relaxed text-foreground dark:text-white align-top",
+                        cellIdx === 0
+                          ? "font-medium text-foreground dark:text-white whitespace-nowrap w-12 text-center"
+                          : "min-w-[140px] whitespace-normal break-words",
                         getAlignClass(cellIdx)
                       )}
                     >
-                      <InlineRenderer text={cell.text} />
+                      <InlineRenderer text={cell.text} sourcesMap={sourcesMap} />
                     </td>
                   ))}
                 </tr>
@@ -373,7 +457,8 @@ function TableBlock({
           role="dialog"
           aria-modal="true"
           aria-label="Expanded Table View"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-8 bg-black/70 backdrop-blur-sm animate-in fade-in duration-150"
+          onClick={handleCitationClick}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-8 bg-black/70 backdrop-blur-sm animate-in fade-in duration-150 [&_.source-ref-badge]:inline-flex [&_.source-ref-badge]:items-center [&_.source-ref-badge]:justify-center [&_.source-ref-badge]:w-4.5 [&_.source-ref-badge]:h-4.5 [&_.source-ref-badge]:min-w-[18px] [&_.source-ref-badge]:min-h-[18px] [&_.source-ref-badge]:rounded-full [&_.source-ref-badge]:bg-[#e4e4e7] hover:[&_.source-ref-badge]:bg-[#d4d4d8] [&_.source-ref-badge]:border [&_.source-ref-badge]:border-black/10 [&_.source-ref-badge]:text-neutral-600 hover:[&_.source-ref-badge]:text-neutral-900 dark:[&_.source-ref-badge]:bg-[#26282d] dark:hover:[&_.source-ref-badge]:bg-[#34373d] dark:[&_.source-ref-badge]:border-white/15 dark:[&_.source-ref-badge]:text-[#9ca3af] dark:hover:[&_.source-ref-badge]:text-white [&_.source-ref-badge]:text-[10px] [&_.source-ref-badge]:font-medium [&_.source-ref-badge]:no-underline [&_.source-ref-badge]:cursor-pointer [&_.source-ref-badge]:select-none [&_.source-ref-badge]:align-middle [&_.source-ref-badge]:-translate-y-[1px] [&_.source-ref-badge]:mx-0.5 [&_.source-ref-badge]:transition-all [&_.source-ref-badge]:active:scale-90 shadow-2xs"
         >
           <div className="w-full max-w-5xl max-h-[85vh] flex flex-col bg-card border border-border rounded-2xl overflow-hidden shadow-2xl">
             <div className="flex items-center justify-between px-5 py-3.5 bg-muted/40 border-b border-border">
@@ -429,11 +514,12 @@ function TableBlock({
                       <th
                         key={idx}
                         className={cn(
-                          "px-4 py-3 text-xs font-medium text-muted-foreground tracking-wider whitespace-nowrap",
+                          "px-4 py-3 text-xs font-medium text-muted-foreground tracking-wider",
+                          idx === 0 ? "whitespace-nowrap w-12 text-center" : "min-w-[140px]",
                           getAlignClass(idx)
                         )}
                       >
-                        <InlineRenderer text={col.text} />
+                        <InlineRenderer text={col.text} sourcesMap={sourcesMap} />
                       </th>
                     ))}
                   </tr>
@@ -448,12 +534,14 @@ function TableBlock({
                         <td
                           key={cellIdx}
                           className={cn(
-                            "px-4 py-3 leading-relaxed text-foreground dark:text-white align-top whitespace-nowrap",
-                            cellIdx === 0 && "font-medium text-foreground dark:text-white",
+                            "px-4 py-3 leading-relaxed text-foreground dark:text-white align-top",
+                            cellIdx === 0
+                              ? "font-medium text-foreground dark:text-white whitespace-nowrap w-12 text-center"
+                              : "min-w-[140px] whitespace-normal break-words",
                             getAlignClass(cellIdx)
                           )}
                         >
-                          <InlineRenderer text={cell.text} />
+                          <InlineRenderer text={cell.text} sourcesMap={sourcesMap} />
                         </td>
                       ))}
                     </tr>
@@ -583,13 +671,20 @@ function MathBlock({
   );
 }
 
-function InlineRenderer({ text }: { text: string }) {
-  const html = marked.parseInline(text);
+function InlineRenderer({
+  text,
+  sourcesMap,
+}: {
+  text: string;
+  sourcesMap?: Map<string, { title: string }>;
+}) {
+  const normalized = convertReferencesToMarkdownLinks(text, sourcesMap);
+  const html = marked.parseInline(normalized);
   if (typeof html === "string") {
     return (
       <span
         dangerouslySetInnerHTML={{ __html: html }}
-        className="[&_code]:bg-muted/80 [&_code]:text-foreground dark:[&_code]:text-white [&_code]:font-mono [&_code]:text-[12.5px] [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:border [&_code]:border-border/60 [&_strong]:font-semibold [&_b]:font-semibold [&_strong]:text-foreground dark:[&_strong]:text-white [&_b]:text-foreground dark:[&_b]:text-white [&_em]:italic [&_em]:text-foreground/90 dark:[&_em]:text-white [&_a]:text-primary dark:[&_a]:text-sky-400 [&_a]:hover:underline cursor-text"
+        className="[&_code]:bg-muted/80 [&_code]:text-foreground dark:[&_code]:text-white [&_code]:font-mono [&_code]:text-[12.5px] [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:border [&_code]:border-border/60 [&_strong]:font-semibold [&_b]:font-semibold [&_strong]:text-foreground dark:[&_strong]:text-white [&_b]:text-foreground dark:[&_b]:text-white [&_em]:italic [&_em]:text-foreground/90 dark:[&_em]:text-white [&_a:not(.source-ref-badge)]:text-primary dark:[&_a:not(.source-ref-badge)]:text-sky-400 [&_a:not(.source-ref-badge)]:hover:underline cursor-text [&_.source-ref-badge]:inline-flex [&_.source-ref-badge]:items-center [&_.source-ref-badge]:justify-center [&_.source-ref-badge]:w-4.5 [&_.source-ref-badge]:h-4.5 [&_.source-ref-badge]:min-w-[18px] [&_.source-ref-badge]:min-h-[18px] [&_.source-ref-badge]:rounded-full [&_.source-ref-badge]:bg-[#e4e4e7] hover:[&_.source-ref-badge]:bg-[#d4d4d8] [&_.source-ref-badge]:border [&_.source-ref-badge]:border-black/10 [&_.source-ref-badge]:text-neutral-600 hover:[&_.source-ref-badge]:text-neutral-900 dark:[&_.source-ref-badge]:bg-[#26282d] dark:hover:[&_.source-ref-badge]:bg-[#34373d] dark:[&_.source-ref-badge]:border-white/15 dark:[&_.source-ref-badge]:text-[#9ca3af] dark:hover:[&_.source-ref-badge]:text-white [&_.source-ref-badge]:text-[10px] [&_.source-ref-badge]:font-medium [&_.source-ref-badge]:no-underline [&_.source-ref-badge]:cursor-pointer [&_.source-ref-badge]:select-none [&_.source-ref-badge]:align-middle [&_.source-ref-badge]:-translate-y-[1px] [&_.source-ref-badge]:mx-0.5 [&_.source-ref-badge]:transition-all [&_.source-ref-badge]:active:scale-90"
       />
     );
   }
