@@ -327,20 +327,38 @@ export function StudioSheet({
                 const ItemIcon = getArtifactIcon(art.type, art.isZip);
 
                 if (isGenerating) {
+                  const isMindMap = art.type === "mind_map";
                   const defaultGenTitle =
                     art.type === "quiz"
                       ? (language === "id" ? "Membuat Kuis..." : "Creating Quiz...")
                       : art.type === "flashcard" || art.type === "flashcards"
                       ? (language === "id" ? "Membuat Kartu Tanya-Jawab..." : "Creating Flashcards...")
+                      : isMindMap
+                      ? (language === "id" ? "Membuat Peta Pikiran..." : "Creating Mind Map...")
                       : (language === "id" ? "Membuat Catatan..." : "Creating Note...");
 
                   return (
                     <div
                       key={art.id}
-                      className="p-2.5 rounded-2xl bg-[#1c1c1f] border border-blue-500/30 flex items-center gap-2.5 select-none animate-pulse shadow-xs"
+                      className={cn(
+                        "p-2.5 rounded-2xl bg-[#1c1c1f] flex items-center gap-2.5 select-none animate-pulse shadow-xs border",
+                        isMindMap ? "border-purple-500/30" : "border-blue-500/30"
+                      )}
                     >
-                      <div className="h-8 w-8 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 shrink-0">
-                        <RotateCw className="h-4 w-4 animate-spin text-blue-400" />
+                      <div
+                        className={cn(
+                          "h-8 w-8 rounded-xl flex items-center justify-center shrink-0 border",
+                          isMindMap
+                            ? "bg-purple-500/10 border-purple-500/20 text-purple-400"
+                            : "bg-blue-500/10 border-blue-500/20 text-blue-400"
+                        )}
+                      >
+                        <RotateCw
+                          className={cn(
+                            "h-4 w-4 animate-spin",
+                            isMindMap ? "text-purple-400" : "text-blue-400"
+                          )}
+                        />
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="text-xs font-semibold text-white tracking-tight truncate">
@@ -360,6 +378,7 @@ export function StudioSheet({
 
                 const isQuiz = art.type === "quiz";
                 const isFlashcard = art.type === "flashcard" || art.type === "flashcards";
+                const isMindMap = art.type === "mind_map";
                 const itemCount = isQuiz && art.data?.questions
                   ? art.data.questions.length
                   : isFlashcard && art.data?.cards
@@ -369,6 +388,8 @@ export function StudioSheet({
                   ? isQuiz
                     ? (language === "id" ? `${itemCount} soal` : `${itemCount} questions`)
                     : (language === "id" ? `${itemCount} kartu` : `${itemCount} cards`)
+                  : isMindMap
+                  ? (language === "id" ? "Peta Konsep" : "Concept Map")
                   : null;
 
                 const handleOpenThis = () => {
@@ -433,6 +454,8 @@ export function StudioSheet({
                               ? (language === "id" ? "Buka Kuis" : "Open Quiz")
                               : isFlashcard
                               ? (language === "id" ? "Buka Flashcard" : "Open Flashcards")
+                              : isMindMap
+                              ? (language === "id" ? "Buka Peta Pikiran" : "Open Mind Map")
                               : (language === "id" ? "Buka Catatan" : "Open Note")}
                           </span>
                         </DropdownMenuItem>

@@ -441,7 +441,7 @@ export function MobileLearnWorkspace({
 
   // Studio Artifact creation, in-progress generating, and full-screen reader states
   const [isCreateArtifactSheetOpen, setIsCreateArtifactSheetOpen] = useState(false);
-  const [createArtifactType, setCreateArtifactType] = useState<"quiz" | "flashcard">("quiz");
+  const [createArtifactType, setCreateArtifactType] = useState<"quiz" | "flashcard" | "mind_map">("quiz");
   const [generatingArtifacts, setGeneratingArtifacts] = useState<GeneratingArtifactStatus[]>([]);
   const [selectedReaderArtifact, setSelectedReaderArtifact] = useState<LocalArtifact | null>(null);
   const [isReaderOpen, setIsReaderOpen] = useState(false);
@@ -471,6 +471,10 @@ export function MobileLearnWorkspace({
   // Sync selectedNoteArtifact with Dexie live query
   useEffect(() => {
     if (selectedNoteArtifact) {
+      if (selectedNoteArtifact.type !== "note") {
+        setSelectedNoteArtifact(null);
+        return;
+      }
       const fresh = artifacts?.find((a) => a.id === selectedNoteArtifact.id);
       if (fresh && fresh.id !== selectedNoteArtifact.id) {
         setSelectedNoteArtifact(fresh);
@@ -1177,21 +1181,35 @@ export function MobileLearnWorkspace({
   };
 
   const handleOpenArtifact = (art: LocalArtifact) => {
-    if (art.type === "quiz" || art.type === "flashcard" || art.data?.questions || art.data?.cards) {
+    if (
+      art.type === "quiz" ||
+      art.type === "flashcard" ||
+      art.type === "mind_map" ||
+      art.data?.questions ||
+      art.data?.cards ||
+      art.data?.root
+    ) {
       handleOpenArtifactReader(art);
       return;
     }
-    setSelectedNoteArtifact(art);
-    setNoteContentInput(art.content || "");
-    setNoteTitleInput(art.title || (language === "id" ? "Catatan Baru" : "New Note"));
-    setIsStudioSheetOpen(false);
-    setTimeout(() => {
-      if (noteEditorRef.current) {
-        isNoteInitializedRef.current = true;
-        currentNoteArtifactIdRef.current = art.id;
-        noteEditorRef.current.innerHTML = markdownToHtml(art.content || "");
-      }
-    }, 0);
+
+    if (art.type === "note") {
+      setSelectedNoteArtifact(art);
+      setNoteContentInput(art.content || "");
+      setNoteTitleInput(art.title || (language === "id" ? "Catatan Baru" : "New Note"));
+      setIsStudioSheetOpen(false);
+      setTimeout(() => {
+        if (noteEditorRef.current) {
+          isNoteInitializedRef.current = true;
+          currentNoteArtifactIdRef.current = art.id;
+          noteEditorRef.current.innerHTML = markdownToHtml(art.content || "");
+        }
+      }, 0);
+      return;
+    }
+
+    // Other artifact types
+    toast(art.title || "Artifact");
   };
 
   const handleDeleteArtifact = async (artId: string) => {
@@ -1470,6 +1488,9 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
     } else if (toolId === "flashcards" || toolId === "flashcard") {
       setCreateArtifactType("flashcard");
       setIsCreateArtifactSheetOpen(true);
+    } else if (toolId === "mind_map") {
+      setCreateArtifactType("mind_map");
+      setIsCreateArtifactSheetOpen(true);
     } else if (toolId === "browser") {
       handleSend(
         language === "id"
@@ -1486,7 +1507,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
   };
 
   const handleGenerateStudioArtifact = async (options: {
-    type: "quiz" | "flashcard";
+    type: "quiz" | "flashcard" | "mind_map";
     topic: string;
     difficulty: "easy" | "medium" | "hard";
     count: number;
@@ -1494,15 +1515,23 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
   }) => {
     const selectedSources = (sources || []).filter((s) => options.selectedSourceIds.includes(s.id));
     const title = options.topic.trim()
-      ? (options.type === "quiz" ? `Kuis: ${options.topic}` : `Kartu: ${options.topic}`)
+      ? (options.type === "quiz"
+          ? `Kuis: ${options.topic}`
+          : options.type === "flashcard"
+          ? `Kartu: ${options.topic}`
+          : `Peta Pikiran: ${options.topic}`)
       : (options.type === "quiz"
           ? (language === "id" ? `Kuis (${options.count} Soal)` : `Quiz (${options.count} Questions)`)
-          : (language === "id" ? `Kartu Hafalan (${options.count} Kartu)` : `Flashcards (${options.count} Cards)`));
+          : options.type === "flashcard"
+          ? (language === "id" ? `Kartu Hafalan (${options.count} Kartu)` : `Flashcards (${options.count} Cards)`)
+          : (language === "id" ? "Peta Pikiran" : "Mind Map"));
 
     const initialLoadingTitle =
       options.type === "quiz"
         ? (language === "id" ? "Membuat Kuis..." : "Creating Quiz...")
-        : (language === "id" ? "Membuat Kartu Tanya-Jawab..." : "Creating Flashcards...");
+        : options.type === "flashcard"
+        ? (language === "id" ? "Membuat Kartu Tanya-Jawab..." : "Creating Flashcards...")
+        : (language === "id" ? "Membuat Peta Pikiran..." : "Creating Mind Map...");
 
     // 1. Immediately create in Dexie with status: "generating"
     const artId = await localDb.createArtifact({
@@ -1531,13 +1560,22 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
       await localDb.updateArtifact(artId, {
         title: result.title || title,
         data: result.data,
+        content: JSON.stringify(result.data),
         status: "completed",
       });
 
       toast.success(
         language === "id"
-          ? (options.type === "quiz" ? "Kuis berhasil dibuat!" : "Kartu tanya-jawab berhasil dibuat!")
-          : (options.type === "quiz" ? "Quiz created successfully!" : "Flashcards created successfully!")
+          ? (options.type === "quiz"
+              ? "Kuis berhasil dibuat!"
+              : options.type === "flashcard"
+              ? "Kartu tanya-jawab berhasil dibuat!"
+              : "Peta pikiran berhasil dibuat!")
+          : (options.type === "quiz"
+              ? "Quiz created successfully!"
+              : options.type === "flashcard"
+              ? "Flashcards created successfully!"
+              : "Mind map created successfully!")
       );
 
       const fullArt = await localDb.getArtifact(artId);
@@ -2403,6 +2441,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
         }}
       />
 
+
       {/* Media Lightbox */}
       {lightboxItem && (
         <ImageLightbox
@@ -2482,7 +2521,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
       )}
 
       {/* Full-Screen Note Direct Editor Modal (Matching Image 3) */}
-      {selectedNoteArtifact && (
+      {selectedNoteArtifact && selectedNoteArtifact.type === "note" && (
         <div
           className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-xs flex flex-col justify-end sm:justify-center sm:items-center animate-in fade-in duration-200"
           onClick={() => setSelectedNoteArtifact(null)}

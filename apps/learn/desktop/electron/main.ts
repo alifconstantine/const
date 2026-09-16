@@ -808,7 +808,7 @@ app.on("second-instance", (_event, commandLine) => {
           : `${baseUrl.replace(/\/+$/, "")}/chat/completions`;
 
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 20000);
+        const timeoutId = setTimeout(() => controller.abort(), 35000);
 
         const res = await fetch(endpoint, {
           method: "POST",

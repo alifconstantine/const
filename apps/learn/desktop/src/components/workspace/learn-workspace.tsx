@@ -98,7 +98,7 @@ export function LearnWorkspace({
 
   // Studio Artifact creation & generation states
   const [isCreateStudioOpen, setIsCreateStudioOpen] = useState(false);
-  const [createStudioType, setCreateStudioType] = useState<"quiz" | "flashcard">("quiz");
+  const [createStudioType, setCreateStudioType] = useState<"quiz" | "flashcard" | "mind_map">("quiz");
   const [generatingArtifacts, setGeneratingArtifacts] = useState<GeneratingArtifactStatus[]>([]);
 
   // Right Pane: Dual Studio & Preview/Review state
@@ -348,6 +348,7 @@ export function LearnWorkspace({
   const [isManualWidth, setIsManualWidth] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settingsInitialTab, setSettingsInitialTab] = useState<string>("general");
+  const [isMindMapDialogOpen, setIsMindMapDialogOpen] = useState(false);
 
   const responsiveDefaults = getResponsiveWidths();
   const isLayoutModified =
@@ -440,7 +441,7 @@ export function LearnWorkspace({
   };
 
   const handleGenerateStudioArtifact = async (params: {
-    type: "quiz" | "flashcard";
+    type: "quiz" | "flashcard" | "mind_map";
     topic: string;
     selectedSourceIds: string[];
     count: number;
@@ -452,15 +453,23 @@ export function LearnWorkspace({
 
     const selectedSources = (sources || []).filter((s) => params.selectedSourceIds.includes(s.id));
     const title = params.topic.trim()
-      ? (params.type === "quiz" ? `Kuis: ${params.topic}` : `Kartu: ${params.topic}`)
+      ? (params.type === "quiz"
+          ? `Kuis: ${params.topic}`
+          : params.type === "flashcard"
+          ? `Kartu: ${params.topic}`
+          : `Peta Pikiran: ${params.topic}`)
       : (params.type === "quiz"
           ? (language === "id" ? `Kuis (${params.count} Soal)` : `Quiz (${params.count} Questions)`)
-          : (language === "id" ? `Kartu Hafalan (${params.count} Kartu)` : `Flashcards (${params.count} Cards)`));
+          : params.type === "flashcard"
+          ? (language === "id" ? `Kartu Hafalan (${params.count} Kartu)` : `Flashcards (${params.count} Cards)`)
+          : (language === "id" ? "Peta Pikiran" : "Mind Map"));
 
     const initialLoadingTitle =
       params.type === "quiz"
         ? (language === "id" ? "Membuat Kuis..." : "Creating Quiz...")
-        : (language === "id" ? "Membuat Kartu Tanya-Jawab..." : "Creating Flashcards...");
+        : params.type === "flashcard"
+        ? (language === "id" ? "Membuat Kartu Tanya-Jawab..." : "Creating Flashcards...")
+        : (language === "id" ? "Membuat Peta Pikiran..." : "Creating Mind Map...");
 
     // 2. Immediately create in Dexie with status: "generating" (appears instantly in Artifacts list)
     const artId = await localDb.createArtifact({
@@ -488,13 +497,22 @@ export function LearnWorkspace({
       await localDb.updateArtifact(artId, {
         title: result.title || title,
         data: result.data,
+        content: JSON.stringify(result.data),
         status: "completed",
       });
 
       toast.success(
         language === "id"
-          ? (params.type === "quiz" ? "Kuis berhasil dibuat!" : "Kartu tanya-jawab berhasil dibuat!")
-          : (params.type === "quiz" ? "Quiz created successfully!" : "Flashcards created successfully!")
+          ? (params.type === "quiz"
+              ? "Kuis berhasil dibuat!"
+              : params.type === "flashcard"
+              ? "Kartu tanya-jawab berhasil dibuat!"
+              : "Peta pikiran berhasil dibuat!")
+          : (params.type === "quiz"
+              ? "Quiz created successfully!"
+              : params.type === "flashcard"
+              ? "Flashcards created successfully!"
+              : "Mind map created successfully!")
       );
 
       // Auto-open in preview & auto-widen
@@ -511,8 +529,8 @@ export function LearnWorkspace({
       });
       toast.error(
         language === "id"
-          ? `Gagal membuat kuis: ${err?.message || "Terjadi kesalahan"}`
-          : `Failed to create quiz: ${err?.message || "An error occurred"}`
+          ? `Gagal membuat materi: ${err?.message || "Terjadi kesalahan"}`
+          : `Failed to create material: ${err?.message || "An error occurred"}`
       );
     }
   };
@@ -520,8 +538,19 @@ export function LearnWorkspace({
   const handleSelectStudioTool = (toolId: string) => {
     if (toolId === "browser") {
       handleOpenBrowser();
-    } else if (toolId === "quiz" || toolId === "flashcards" || toolId === "flashcard") {
-      setCreateStudioType(toolId === "flashcards" || toolId === "flashcard" ? "flashcard" : "quiz");
+    } else if (
+      toolId === "quiz" ||
+      toolId === "flashcards" ||
+      toolId === "flashcard" ||
+      toolId === "mind_map"
+    ) {
+      setCreateStudioType(
+        toolId === "flashcards" || toolId === "flashcard"
+          ? "flashcard"
+          : toolId === "mind_map"
+          ? "mind_map"
+          : "quiz"
+      );
       setIsCreateStudioOpen(true);
     } else {
       const tool = STUDIO_TOOLS.find((t) => t.id === toolId);
@@ -535,24 +564,35 @@ export function LearnWorkspace({
   };
 
   const handleOpenArtifact = (art: any) => {
-    if (art.type === "quiz" || art.type === "flashcard" || art.data?.questions || art.data?.cards) {
+    if (
+      art.type === "quiz" ||
+      art.type === "flashcard" ||
+      art.type === "mind_map" ||
+      art.data?.questions ||
+      art.data?.cards ||
+      art.data?.root
+    ) {
       handleOpenStudioArtifact(art);
       return;
     }
-    setIsStudioCollapsed(false);
-    setRightPaneMode("studio");
-    setActiveNoteArtifactId(art.id);
 
-    // Auto-widen studio/preview width comfortably (matching Image 3)
-    const windowWidth = typeof window !== "undefined" ? window.innerWidth : 1280;
-    const targetPreviewWidth = Math.max(
-      studioWidth,
-      Math.min(Math.round(windowWidth * 0.45), 720),
-      620
-    );
-    if (studioWidth < targetPreviewWidth) {
-      setStudioWidth(targetPreviewWidth);
-      setIsManualWidth(true);
+    if (art.type === "note") {
+      setIsStudioCollapsed(false);
+      setRightPaneMode("studio");
+      setActiveNoteArtifactId(art.id);
+
+      // Auto-widen studio/preview width comfortably (matching Image 3)
+      const windowWidth = typeof window !== "undefined" ? window.innerWidth : 1280;
+      const targetPreviewWidth = Math.max(
+        studioWidth,
+        Math.min(Math.round(windowWidth * 0.45), 720),
+        620
+      );
+      if (studioWidth < targetPreviewWidth) {
+        setStudioWidth(targetPreviewWidth);
+        setIsManualWidth(true);
+      }
+      return;
     }
   };
 
@@ -1244,7 +1284,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
         onSelectSource={handleSelectSource}
       />
 
-      {/* Create Studio Artifact (Quiz / Flashcard) Dialog */}
+      {/* Create Studio Artifact (Quiz / Flashcard / Mind Map) Dialog */}
       <CreateStudioArtifactDialog
         open={isCreateStudioOpen}
         onOpenChange={setIsCreateStudioOpen}

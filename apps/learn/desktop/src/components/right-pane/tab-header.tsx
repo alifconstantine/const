@@ -8,6 +8,8 @@ import {
   Search,
   Layers,
   Sparkles,
+  GitFork,
+  SquarePen,
 } from "lucide-react";
 import { FileIcon } from "../workspace/file-icon";
 import type { RightPaneTab, RightPaneTabType } from "./types";
@@ -33,6 +35,10 @@ function getTabIcon(type: RightPaneTabType) {
       return Globe;
     case "studio_preview":
       return Sparkles;
+    case "mind_map":
+      return GitFork;
+    case "note_preview":
+      return SquarePen;
     default:
       return Layers;
   }

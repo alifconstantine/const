@@ -44,6 +44,7 @@ import { BrowserTab } from "./browser-tab";
 import { NotePreviewTab } from "./note-preview-tab";
 import { QuizViewer } from "./quiz-viewer";
 import { FlashcardViewer } from "./flashcard-viewer";
+import { MindMapTab } from "./mind-map-tab";
 import { STUDIO_TOOLS } from "../workspace/studio-panel";
 import { useI18n } from "../../lib/i18n";
 import type { RightPaneTab, RightPaneTabType } from "./types";
@@ -372,7 +373,7 @@ export function RightPane({
         </div>
 
         {/* Conditional View: When Note is Active in Studio (Image 3) vs Studio/Review Overview */}
-        {mode === "studio" && activeNoteArtifact ? (
+        {mode === "studio" && activeNoteArtifact && activeNoteArtifact.type === "note" ? (
           <NotePreviewTab
             artifact={activeNoteArtifact}
             onClose={onCloseNote}
@@ -531,20 +532,55 @@ export function RightPane({
                       const ItemIcon = getArtifactIcon(art.type, art.isZip);
 
                       if (isGenerating) {
-                        const defaultGeneratingTitle =
-                          art.type === "quiz"
-                            ? (language === "id" ? "Membuat Kuis..." : "Creating Quiz...")
-                            : art.type === "flashcard" || art.type === "flashcards"
-                            ? (language === "id" ? "Membuat Kartu Tanya-Jawab..." : "Creating Flashcards...")
-                            : (language === "id" ? "Membuat Catatan..." : "Creating Note...");
+                        const isMindMap = art.type === "mind_map";
+                        const isQuiz = art.type === "quiz";
+                        const isFlashcard = art.type === "flashcard" || art.type === "flashcards";
+                        const defaultGeneratingTitle = isMindMap
+                          ? (language === "id" ? "Membuat Peta Pikiran..." : "Creating Mind Map...")
+                          : isQuiz
+                          ? (language === "id" ? "Membuat Kuis..." : "Creating Quiz...")
+                          : isFlashcard
+                          ? (language === "id" ? "Membuat Kartu Tanya-Jawab..." : "Creating Flashcards...")
+                          : (language === "id" ? "Membuat Catatan..." : "Creating Note...");
 
                         return (
                           <div
                             key={art.id}
-                            className="p-3 rounded-2xl bg-[#1c1c1f] border border-blue-500/30 flex items-center gap-3 select-none animate-pulse shadow-xs"
+                            className={cn(
+                              "p-3 rounded-2xl bg-[#1c1c1f] flex items-center gap-3 select-none animate-pulse shadow-xs border",
+                              isMindMap
+                                ? "border-purple-500/30"
+                                : isQuiz
+                                ? "border-amber-500/30"
+                                : isFlashcard
+                                ? "border-emerald-500/30"
+                                : "border-blue-500/30"
+                            )}
                           >
-                            <div className="h-9 w-9 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 shrink-0">
-                              <RotateCw className="h-4 w-4 animate-spin text-blue-400" />
+                            <div
+                              className={cn(
+                                "h-9 w-9 rounded-xl flex items-center justify-center shrink-0 border",
+                                isMindMap
+                                  ? "bg-purple-500/10 border-purple-500/20 text-purple-400"
+                                  : isQuiz
+                                  ? "bg-amber-500/10 border-amber-500/20 text-amber-400"
+                                  : isFlashcard
+                                  ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
+                                  : "bg-blue-500/10 border-blue-500/20 text-blue-400"
+                              )}
+                            >
+                              <RotateCw
+                                className={cn(
+                                  "h-4 w-4 animate-spin",
+                                  isMindMap
+                                    ? "text-purple-400"
+                                    : isQuiz
+                                    ? "text-amber-400"
+                                    : isFlashcard
+                                    ? "text-emerald-400"
+                                    : "text-blue-400"
+                                )}
+                              />
                             </div>
                             <div className="min-w-0 flex-1">
                               <div className="text-xs font-semibold text-white tracking-tight truncate">
@@ -564,6 +600,7 @@ export function RightPane({
 
                       const isQuiz = art.type === "quiz";
                       const isFlashcard = art.type === "flashcard" || art.type === "flashcards";
+                      const isMindMap = art.type === "mind_map";
                       const itemCount = isQuiz && art.data?.questions
                         ? art.data.questions.length
                         : isFlashcard && art.data?.cards
@@ -573,6 +610,8 @@ export function RightPane({
                         ? isQuiz
                           ? (language === "id" ? `${itemCount} pertanyaan` : `${itemCount} questions`)
                           : (language === "id" ? `${itemCount} kartu` : `${itemCount} cards`)
+                        : isMindMap
+                        ? (language === "id" ? "Peta Konsep" : "Concept Map")
                         : null;
 
                       const handleOpenThis = () => {
@@ -765,13 +804,23 @@ export function RightPane({
                       quiz={activeTab.artifact.data}
                       onExplainInChat={onExplainInChat}
                     />
-                  ) : activeTab.artifact?.data ? (
+                  ) : (activeTab.artifact?.type === "flashcard" || activeTab.artifact?.type === "flashcards") && activeTab.artifact.data ? (
                     <FlashcardViewer
                       key={activeTab.id}
                       flashcard={activeTab.artifact.data}
                       onExplainInChat={onExplainInChat}
                     />
+                  ) : activeTab.artifact?.type === "mind_map" ? (
+                    <MindMapTab
+                      key={activeTab.id}
+                      tab={activeTab}
+                    />
                   ) : null
+                ) : activeTab.type === "mind_map" ? (
+                  <MindMapTab
+                    key={activeTab.id}
+                    tab={activeTab}
+                  />
                 ) : (
                   <ReviewTab
                     key={activeTab.id || "review_tab"}

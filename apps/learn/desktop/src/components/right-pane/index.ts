@@ -7,4 +7,5 @@ export * from "./file-preview-tab";
 export * from "./open-tab-view";
 export * from "./browser-tab";
 export * from "./note-preview-tab";
+export * from "./mind-map-tab";
 export * from "./right-pane";

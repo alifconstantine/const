@@ -7,7 +7,8 @@ export type RightPaneTabType =
   | "file_preview"
   | "browser"
   | "note_preview"
-  | "studio_preview";
+  | "studio_preview"
+  | "mind_map";
 
 export interface RightPaneTab {
   id: string;
@@ -24,4 +25,5 @@ export interface RightPaneTab {
   favicon?: string;
   artifactId?: string;
   artifact?: LocalArtifact;
+  mindMapData?: any;
 }

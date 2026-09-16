@@ -62,13 +62,36 @@ export interface FlashcardData {
   cards: FlashcardItem[];
 }
 
+export interface MindMapNode {
+  id: string;
+  label: string;
+  description?: string;
+  children?: MindMapNode[];
+}
+
+export interface MindMapData {
+  id?: string;
+  learnId?: string;
+  title: string;
+  topic?: string;
+  root: MindMapNode;
+  sourceCount?: number;
+  sourceTitles?: string[];
+  sourceIds?: string[];
+  sourceNames?: string[];
+  prompt?: string;
+  feedback?: "good" | "bad";
+  createdAt?: number;
+  updatedAt?: number;
+}
+
 export interface LocalArtifact {
   id: string;
   learnId?: string;
   title: string;
   type: string;
   content?: string;
-  data?: QuizData | FlashcardData | any;
+  data?: QuizData | FlashcardData | MindMapData | any;
   sourceCount?: number;
   fileUrl?: string;
   isZip?: boolean;

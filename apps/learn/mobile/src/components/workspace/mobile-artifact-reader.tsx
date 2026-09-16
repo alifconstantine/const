@@ -10,10 +10,12 @@ import {
   RotateCcw,
   Award,
   ChevronDown,
+  GitFork,
 } from "lucide-react";
 import { cn } from "@const/ui";
 import { useI18n } from "../../lib/i18n";
 import type { LocalArtifact, QuizData, QuizQuestion, FlashcardData, FlashcardItem } from "../../lib/db";
+import { MobileMindMapViewer } from "./mobile-mind-map-viewer";
 
 export interface MobileArtifactReaderProps {
   open: boolean;
@@ -34,8 +36,28 @@ export function MobileArtifactReader({
   if (!open || !artifact) return null;
 
   const isQuiz = artifact.type === "quiz";
+  const isFlashcard = artifact.type === "flashcard" || artifact.type === "flashcards";
+  const isMindMap = artifact.type === "mind_map" || Boolean(artifact.data?.root);
+
   const quizData = isQuiz ? (artifact.data as QuizData) : null;
-  const flashcardData = !isQuiz ? (artifact.data as FlashcardData) : null;
+  const flashcardData = isFlashcard ? (artifact.data as FlashcardData) : null;
+  const mindMapData = isMindMap
+    ? artifact.data?.root
+      ? (artifact.data as any)
+      : (() => {
+          try {
+            return typeof artifact.content === "string"
+              ? JSON.parse(artifact.content)
+              : artifact.content;
+          } catch {
+            return null;
+          }
+        })()
+    : null;
+
+  if (isMindMap && mindMapData) {
+    return <MobileMindMapViewer data={mindMapData} onClose={onClose} />;
+  }
 
   return (
     <div

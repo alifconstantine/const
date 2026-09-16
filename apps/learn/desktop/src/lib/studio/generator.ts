@@ -1,7 +1,7 @@
-import type { LocalSource, QuizData, FlashcardData } from "../db";
+import type { LocalSource, QuizData, FlashcardData, MindMapData, MindMapNode } from "../db";
 
 export interface GenerateStudioArtifactOptions {
-  type: "quiz" | "flashcard";
+  type: "quiz" | "flashcard" | "mind_map";
   learnId: string;
   topic?: string;
   difficulty?: "easy" | "medium" | "hard";
@@ -127,7 +127,7 @@ export async function generateStudioArtifact({
   language = "id",
 }: GenerateStudioArtifactOptions): Promise<{
   title: string;
-  data: QuizData | FlashcardData;
+  data: QuizData | FlashcardData | MindMapData;
 }> {
   // Aggregate source texts for grounding context
   const sourceSnippets = sources
@@ -243,7 +243,7 @@ Critical Rules:
         null,
         2
       );
-  } else {
+  } else if (type === "flashcard") {
     // Flashcards
     systemPrompt = isIndo
       ? `Anda adalah pembuat flashcard edukatif ahli. Tugas Anda adalah mengekstrak konsep kunci, definisi, atau tanya-jawab penting dari materi sumber yang diberikan.
@@ -279,6 +279,79 @@ Rules:
         null,
         2
       );
+  } else {
+    // Mind Map
+    systemPrompt = isIndo
+      ? `Anda adalah pembuat peta pikiran (mind map) terstruktur ahli untuk Const Learn.
+Tugas Anda adalah menyusun hierarki konsep komprehensif, logis, dan bersih dalam format JSON berdasarkan materi sumber belajar.
+Aturan Penting:
+1. Kembalikan HANYA objek JSON valid sesuai interface TypeScript:
+{
+  "title": string,
+  "root": {
+    "id": "root",
+    "label": string,
+    "children": [
+      {
+        "id": string,
+        "label": string,
+        "children": [
+          {
+            "id": string,
+            "label": string,
+            "children": [
+              { "id": string, "label": string }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
+2. Panduan Hirarki:
+   - Root memiliki 4 sampai 6 cabang utama (Level 1).
+   - Setiap cabang Level 1 memiliki 2 sampai 4 sub-cabang (Level 2).
+   - Label simpul ringkas dan padat (2 sampai 6 kata).
+   - Gunakan ID alfanumerik unik untuk setiap simpul (misal: "c1", "c1_1").
+3. Bahasa: Gunakan Bahasa Indonesia.
+4. Output HANYA JSON valid tanpa teks pengantar atau markdown.`
+      : `You are an expert hierarchical knowledge-structuring engine for Const Learn.
+Your task is to analyze study materials and output a clean, comprehensive hierarchical Mind Map in valid JSON.
+Rules:
+1. Return ONLY a valid JSON object matching:
+{
+  "title": string,
+  "root": {
+    "id": "root",
+    "label": string,
+    "children": [
+      {
+        "id": string,
+        "label": string,
+        "children": [
+          {
+            "id": string,
+            "label": string,
+            "children": [
+              { "id": string, "label": string }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}
+2. Hierarchy Guidelines:
+   - Root has 4 to 6 main Level 1 branches.
+   - Each Level 1 branch has 2 to 4 Level 2 children.
+   - Concise node labels (2 to 6 words max).
+   - Unique alphanumeric IDs for each node.
+3. Language: English.
+4. STRICT: Pure JSON only without markdown or introductory text.`;
+
+    userPrompt = `Materi Sumber Belajar:\n${sourceSnippets || "Topik: " + (topic || "Pengetahuan Umum")}\n\n` +
+      (topic ? `Fokus Topik Spesifik / Instruksi: ${topic}\n\n` : "") +
+      `Silakan buatkan Peta Pikiran hierarkis dalam format JSON yang valid.`;
   }
 
   // 1. Attempt generation via Electron agent isolated completion (Stateless, never leaks into Chat AI / Ask AI)
@@ -335,6 +408,21 @@ Rules:
               })),
             };
             return { title: flashcardData.title, data: flashcardData };
+          } else if (type === "mind_map" && parsed.root && Array.isArray(parsed.root.children)) {
+            const mindMapData: MindMapData = {
+              id: `mindmap_${Date.now()}`,
+              title: parsed.title || (topic ? `Peta Pikiran: ${topic}` : `Peta Pikiran: ${sources[0]?.title || "Materi Belajar"}`),
+              topic,
+              root: parsed.root,
+              sourceCount: sources.length,
+              sourceTitles: sources.map((s) => s.title),
+              sourceIds: sources.map((s) => s.id),
+              sourceNames: sources.map((s) => s.title),
+              prompt: topic,
+              createdAt: Date.now(),
+              updatedAt: Date.now(),
+            };
+            return { title: mindMapData.title, data: mindMapData };
           }
         }
       }
@@ -368,7 +456,7 @@ Rules:
       "gemini-3.8-flash";
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 12000);
+    const timeoutId = setTimeout(() => controller.abort(), 35000);
 
     const response = await fetch(endpoint, {
       method: "POST",
@@ -421,6 +509,21 @@ Rules:
               })),
             };
             return { title: flashcardData.title, data: flashcardData };
+          } else if (type === "mind_map" && parsed.root && Array.isArray(parsed.root.children)) {
+            const mindMapData: MindMapData = {
+              id: `mindmap_${Date.now()}`,
+              title: parsed.title || (topic ? `Peta Pikiran: ${topic}` : `Peta Pikiran: ${sources[0]?.title || "Materi Belajar"}`),
+              topic,
+              root: parsed.root,
+              sourceCount: sources.length,
+              sourceTitles: sources.map((s) => s.title),
+              sourceIds: sources.map((s) => s.id),
+              sourceNames: sources.map((s) => s.title),
+              prompt: topic,
+              createdAt: Date.now(),
+              updatedAt: Date.now(),
+            };
+            return { title: mindMapData.title, data: mindMapData };
           }
         }
       }
@@ -431,10 +534,10 @@ Rules:
 
   // Graceful offline/fallback generator so user flow NEVER breaks
   const fallbackTitle = topic
-    ? (type === "quiz" ? `AI Kuis: ${topic}` : `Flashcard: ${topic}`)
+    ? (type === "quiz" ? `AI Kuis: ${topic}` : type === "flashcard" ? `Flashcard: ${topic}` : `Peta Pikiran: ${topic}`)
     : sources.length > 0
-    ? (type === "quiz" ? `AI Kuis: ${sources[0]!.title}` : `Flashcard: ${sources[0]!.title}`)
-    : type === "quiz" ? "AI Kuis Mandiri" : "Flashcard Mandiri";
+    ? (type === "quiz" ? `AI Kuis: ${sources[0]!.title}` : type === "flashcard" ? `Flashcard: ${sources[0]!.title}` : `Peta Pikiran: ${sources[0]!.title}`)
+    : type === "quiz" ? "AI Kuis Mandiri" : type === "flashcard" ? "Flashcard Mandiri" : "Peta Pikiran Mandiri";
 
   if (type === "quiz") {
     const rawSampleQuestions = [
@@ -605,4 +708,63 @@ Rules:
     };
     return { title: fallbackTitle, data: fallbackFlashcard };
   }
+
+  // Mind Map fallback
+  const rootTitle = topic?.trim() || sources[0]?.title || (isIndo ? "Peta Pikiran" : "Mind Map");
+  const children: MindMapNode[] = [];
+  if (sources.length > 0) {
+    sources.slice(0, 5).forEach((src, sIdx) => {
+      children.push({
+        id: `branch_${sIdx}`,
+        label: src.title.slice(0, 26),
+        children: [
+          { id: `c_${sIdx}_1`, label: isIndo ? "Konsep Utama" : "Key Concepts" },
+          { id: `c_${sIdx}_2`, label: isIndo ? "Rincian & Fakta" : "Details & Facts" },
+          { id: `c_${sIdx}_3`, label: isIndo ? "Penerapan" : "Applications" },
+        ],
+      });
+    });
+  } else {
+    children.push(
+      {
+        id: "b1",
+        label: isIndo ? "Konsep Inti" : "Core Concepts",
+        children: [
+          { id: "b1_1", label: isIndo ? "Definisi & Ruang Lingkup" : "Definition & Scope" },
+          { id: "b1_2", label: isIndo ? "Fokus Utama" : "Primary Focus" },
+        ],
+      },
+      {
+        id: "b2",
+        label: isIndo ? "Analisis & Parameter" : "Analysis & Parameters",
+        children: [
+          { id: "b2_1", label: isIndo ? "Karakteristik Kunci" : "Key Characteristics" },
+          { id: "b2_2", label: isIndo ? "Metrik Kinerja" : "Performance Metrics" },
+        ],
+      },
+      {
+        id: "b3",
+        label: isIndo ? "Penerapan & Hasil" : "Applications & Results",
+        children: [
+          { id: "b3_1", label: isIndo ? "Temuan Utama" : "Key Findings" },
+          { id: "b3_2", label: isIndo ? "Langkah Lanjutan" : "Next Steps" },
+        ],
+      }
+    );
+  }
+
+  const fallbackMindMap: MindMapData = {
+    id: `mindmap_${Date.now()}`,
+    title: fallbackTitle,
+    topic,
+    root: { id: "root", label: rootTitle, children },
+    sourceCount: sources.length,
+    sourceTitles: sources.map((s) => s.title),
+    sourceIds: sources.map((s) => s.id),
+    sourceNames: sources.map((s) => s.title),
+    prompt: topic,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  };
+  return { title: fallbackTitle, data: fallbackMindMap };
 }

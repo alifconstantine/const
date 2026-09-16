@@ -8,6 +8,7 @@ import {
   FileText,
   Sliders,
   ChevronDown,
+  GitFork,
 } from "lucide-react";
 import { cn } from "@const/ui";
 import { useI18n } from "../../lib/i18n";
@@ -16,10 +17,10 @@ import type { LocalSource } from "../../lib/db";
 export interface CreateArtifactSheetProps {
   open: boolean;
   onClose: () => void;
-  initialType?: "quiz" | "flashcard";
+  initialType?: "quiz" | "flashcard" | "mind_map";
   sources: LocalSource[];
   onGenerate: (options: {
-    type: "quiz" | "flashcard";
+    type: "quiz" | "flashcard" | "mind_map";
     topic: string;
     difficulty: "easy" | "medium" | "hard";
     count: number;
@@ -37,7 +38,7 @@ export function CreateArtifactSheet({
   const { t, language } = useI18n();
   const isIndo = language === "id";
 
-  const [artifactType, setArtifactType] = useState<"quiz" | "flashcard">(initialType);
+  const [artifactType, setArtifactType] = useState<"quiz" | "flashcard" | "mind_map">(initialType);
   const [topic, setTopic] = useState("");
   const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard">("medium");
   const [count, setCount] = useState<number>(10);
@@ -108,8 +109,10 @@ export function CreateArtifactSheet({
               <div className="h-7 w-7 rounded-lg bg-[#2b2b2e] border border-[#3a3a3e] flex items-center justify-center text-[#ededed]">
                 {artifactType === "quiz" ? (
                   <HelpCircle className="h-4 w-4" />
-                ) : (
+                ) : artifactType === "flashcard" ? (
                   <Layers className="h-4 w-4" />
+                ) : (
+                  <GitFork className="h-4 w-4 text-purple-400" />
                 )}
               </div>
               <h2 className="text-sm font-semibold text-white tracking-tight">
@@ -117,9 +120,13 @@ export function CreateArtifactSheet({
                   ? isIndo
                     ? "Buat Kuis Interaktif"
                     : "Create Interactive Quiz"
+                  : artifactType === "flashcard"
+                  ? isIndo
+                    ? "Buat Kartu Tanya-Jawab"
+                    : "Create Flashcards"
                   : isIndo
-                  ? "Buat Kartu Tanya-Jawab"
-                  : "Create Flashcards"}
+                  ? "Buat Peta Pikiran"
+                  : "Create Mind Map"}
               </h2>
             </div>
             <button
@@ -134,17 +141,17 @@ export function CreateArtifactSheet({
 
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 space-y-4 text-xs">
-          {/* Toggle Type: Kuis vs Kartu Tanya-Jawab */}
+          {/* Toggle Type: Kuis vs Kartu Tanya-Jawab vs Peta Pikiran */}
           <div>
             <label className="block text-[11px] font-semibold text-[#888888] uppercase tracking-wider mb-2">
               {isIndo ? "Tipe Alat" : "Tool Type"}
             </label>
-            <div className="grid grid-cols-2 gap-2 bg-[#222225] p-1 rounded-xl border border-[#333336]">
+            <div className="grid grid-cols-3 gap-1.5 bg-[#222225] p-1 rounded-xl border border-[#333336]">
               <button
                 type="button"
                 onClick={() => setArtifactType("quiz")}
                 className={cn(
-                  "py-2 px-3 rounded-lg font-medium transition-all flex items-center justify-center gap-2 text-xs",
+                  "py-2 px-2 rounded-lg font-medium transition-all flex items-center justify-center gap-1.5 text-xs",
                   artifactType === "quiz"
                     ? "bg-[#2f2f33] text-white shadow-xs border border-[#44444a]"
                     : "text-[#888888] hover:text-[#d4d4d4]"
@@ -157,14 +164,27 @@ export function CreateArtifactSheet({
                 type="button"
                 onClick={() => setArtifactType("flashcard")}
                 className={cn(
-                  "py-2 px-3 rounded-lg font-medium transition-all flex items-center justify-center gap-2 text-xs",
+                  "py-2 px-2 rounded-lg font-medium transition-all flex items-center justify-center gap-1.5 text-xs",
                   artifactType === "flashcard"
                     ? "bg-[#2f2f33] text-white shadow-xs border border-[#44444a]"
                     : "text-[#888888] hover:text-[#d4d4d4]"
                 )}
               >
                 <Layers className="h-3.5 w-3.5" />
-                <span>{isIndo ? "Kartu Flashcard" : "Flashcards"}</span>
+                <span>{isIndo ? "Kartu" : "Cards"}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setArtifactType("mind_map")}
+                className={cn(
+                  "py-2 px-2 rounded-lg font-medium transition-all flex items-center justify-center gap-1.5 text-xs",
+                  artifactType === "mind_map"
+                    ? "bg-[#2f2f33] text-purple-300 shadow-xs border border-purple-500/40"
+                    : "text-[#888888] hover:text-[#d4d4d4]"
+                )}
+              >
+                <GitFork className="h-3.5 w-3.5" />
+                <span>{isIndo ? "Peta Pikiran" : "Mind Map"}</span>
               </button>
             </div>
           </div>
@@ -192,76 +212,84 @@ export function CreateArtifactSheet({
             />
           </div>
 
-          {/* Counts & Difficulty Row */}
-          <div className="grid grid-cols-2 gap-3">
-            {/* Question / Card Count */}
-            <div>
-              <label className="block text-[11px] font-semibold text-[#888888] uppercase tracking-wider mb-1.5">
-                {artifactType === "quiz"
-                  ? isIndo
-                    ? "Jumlah Soal"
-                    : "Question Count"
-                  : isIndo
-                  ? "Jumlah Kartu"
-                  : "Card Count"}
-              </label>
-              <div className="flex items-center gap-1.5">
-                {[5, 10, 15].map((cnt) => (
-                  <button
-                    key={cnt}
-                    type="button"
-                    onClick={() => setCount(cnt)}
-                    className={cn(
-                      "flex-1 py-1.5 rounded-lg border text-center font-mono font-medium transition-all text-xs",
-                      count === cnt
-                        ? "bg-[#2f2f33] border-[#ededed]/60 text-white shadow-xs"
-                        : "bg-[#222225] border-[#333336] text-[#888888] hover:text-[#d4d4d4]"
-                    )}
-                  >
-                    {cnt}
-                  </button>
-                ))}
-              </div>
+          {/* Mind Map Notice or Counts & Difficulty Row */}
+          {artifactType === "mind_map" ? (
+            <div className="p-3 rounded-xl bg-purple-500/10 border border-purple-500/20 text-[11.5px] text-purple-200/90 leading-relaxed">
+              {isIndo
+                ? "AI akan membuat diagram hierarkis interaktif yang memetakan konsep utama, cabang gagasan, dan keterkaitan materi dari sumber yang Anda tentukan."
+                : "AI will generate an interactive hierarchical diagram mapping core concepts, key branches, and conceptual relationships from your selected sources."}
             </div>
-
-            {/* Difficulty */}
-            <div>
-              <label className="block text-[11px] font-semibold text-[#888888] uppercase tracking-wider mb-1.5">
-                {isIndo ? "Tingkat Kesulitan" : "Difficulty"}
-              </label>
-              <div className="flex items-center gap-1">
-                {(["easy", "medium", "hard"] as const).map((diff) => {
-                  const label =
-                    diff === "easy"
-                      ? isIndo
-                        ? "Mudah"
-                        : "Easy"
-                      : diff === "medium"
-                      ? isIndo
-                        ? "Sedang"
-                        : "Medium"
-                      : isIndo
-                      ? "Sulit"
-                      : "Hard";
-                  return (
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              {/* Question / Card Count */}
+              <div>
+                <label className="block text-[11px] font-semibold text-[#888888] uppercase tracking-wider mb-1.5">
+                  {artifactType === "quiz"
+                    ? isIndo
+                      ? "Jumlah Soal"
+                      : "Question Count"
+                    : isIndo
+                    ? "Jumlah Kartu"
+                    : "Card Count"}
+                </label>
+                <div className="flex items-center gap-1.5">
+                  {[5, 10, 15].map((cnt) => (
                     <button
-                      key={diff}
+                      key={cnt}
                       type="button"
-                      onClick={() => setDifficulty(diff)}
+                      onClick={() => setCount(cnt)}
                       className={cn(
-                        "flex-1 py-1.5 rounded-lg border text-center font-medium transition-all text-[11px]",
-                        difficulty === diff
+                        "flex-1 py-1.5 rounded-lg border text-center font-mono font-medium transition-all text-xs",
+                        count === cnt
                           ? "bg-[#2f2f33] border-[#ededed]/60 text-white shadow-xs"
                           : "bg-[#222225] border-[#333336] text-[#888888] hover:text-[#d4d4d4]"
                       )}
                     >
-                      {label}
+                      {cnt}
                     </button>
-                  );
-                })}
+                  ))}
+                </div>
+              </div>
+
+              {/* Difficulty */}
+              <div>
+                <label className="block text-[11px] font-semibold text-[#888888] uppercase tracking-wider mb-1.5">
+                  {isIndo ? "Tingkat Kesulitan" : "Difficulty"}
+                </label>
+                <div className="flex items-center gap-1">
+                  {(["easy", "medium", "hard"] as const).map((diff) => {
+                    const label =
+                      diff === "easy"
+                        ? isIndo
+                          ? "Mudah"
+                          : "Easy"
+                        : diff === "medium"
+                        ? isIndo
+                          ? "Sedang"
+                          : "Medium"
+                        : isIndo
+                        ? "Sulit"
+                        : "Hard";
+                    return (
+                      <button
+                        key={diff}
+                        type="button"
+                        onClick={() => setDifficulty(diff)}
+                        className={cn(
+                          "flex-1 py-1.5 rounded-lg border text-center font-medium transition-all text-[11px]",
+                          difficulty === diff
+                            ? "bg-[#2f2f33] border-[#ededed]/60 text-white shadow-xs"
+                            : "bg-[#222225] border-[#333336] text-[#888888] hover:text-[#d4d4d4]"
+                        )}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Sources Scope Selector */}
           <div>

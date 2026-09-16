@@ -7,6 +7,7 @@ import {
   Check,
   ChevronDown,
   FileText,
+  GitFork,
 } from "lucide-react";
 import { Dialog, DialogContent } from "@const/ui";
 import { useI18n } from "../../lib/i18n";
@@ -15,10 +16,10 @@ import type { LocalSource } from "../../lib/db";
 export interface CreateStudioArtifactDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  initialType?: "quiz" | "flashcard";
+  initialType?: "quiz" | "flashcard" | "mind_map";
   sources: LocalSource[];
   onGenerate: (options: {
-    type: "quiz" | "flashcard";
+    type: "quiz" | "flashcard" | "mind_map";
     topic: string;
     difficulty: "easy" | "medium" | "hard";
     count: number;
@@ -36,7 +37,7 @@ export function CreateStudioArtifactDialog({
   const { t, language } = useI18n();
   const isIndo = language === "id";
 
-  const [artifactType, setArtifactType] = useState<"quiz" | "flashcard">(initialType);
+  const [artifactType, setArtifactType] = useState<"quiz" | "flashcard" | "mind_map">(initialType);
   const [countLevel, setCountLevel] = useState<"less" | "standard" | "more">("standard");
   const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard">("medium");
   const [topic, setTopic] = useState("");
@@ -115,11 +116,13 @@ export function CreateStudioArtifactDialog({
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-[#28282d] bg-[#1d1d21]">
           <div className="flex items-center gap-2.5">
-            <div className="h-7 w-7 rounded-lg bg-[#28282e] border border-[#38383e] flex items-center justify-center text-[#5eead4]">
+            <div className="h-7 w-7 rounded-lg bg-[#28282e] border border-[#38383e] flex items-center justify-center">
               {artifactType === "quiz" ? (
                 <HelpCircle className="h-4 w-4 text-[#5eead4]" />
-              ) : (
+              ) : artifactType === "flashcard" ? (
                 <Layers className="h-4 w-4 text-[#f472b6]" />
+              ) : (
+                <GitFork className="h-4 w-4 text-[#c084fc]" />
               )}
             </div>
             <span className="text-sm font-semibold text-white tracking-tight">
@@ -127,9 +130,13 @@ export function CreateStudioArtifactDialog({
                 ? isIndo
                   ? "Kuis Interaktif"
                   : "Interactive Quiz"
+                : artifactType === "flashcard"
+                ? isIndo
+                  ? "Kartu Tanya-Jawab (Flashcards)"
+                  : "Flashcards Deck"
                 : isIndo
-                ? "Kartu Tanya-Jawab (Flashcards)"
-                : "Flashcards Deck"}
+                ? "Peta Pikiran (Mind Map)"
+                : "Interactive Mind Map"}
             </span>
           </div>
 
@@ -143,133 +150,149 @@ export function CreateStudioArtifactDialog({
         </div>
 
         <form onSubmit={handleSubmit} className="p-5 space-y-5">
-          {/* Top Switcher: Quiz vs Flashcards */}
+          {/* Top Switcher: Quiz vs Flashcards vs Mind Map */}
           <div className="space-y-1.5">
             <label className="text-[11.5px] font-medium text-[#999999] uppercase tracking-wider">
               {isIndo ? "Pilih Tipe Generator" : "Choose Artifact Type"}
             </label>
-            <div className="grid grid-cols-2 gap-2 p-1 rounded-xl bg-[#141416] border border-[#28282d]">
+            <div className="grid grid-cols-3 gap-1.5 p-1 rounded-xl bg-[#141416] border border-[#28282d]">
               <button
                 type="button"
                 onClick={() => setArtifactType("quiz")}
-                className={`flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${
                   artifactType === "quiz"
                     ? "bg-[#28282e] text-white shadow-xs border border-[#3d3d45]"
                     : "text-[#888888] hover:text-[#d4d4d4]"
                 }`}
               >
                 <HelpCircle className="h-3.5 w-3.5 text-[#5eead4]" />
-                <span>{isIndo ? "Kuis Pilihan Ganda" : "Quiz"}</span>
+                <span className="truncate">{isIndo ? "Kuis" : "Quiz"}</span>
               </button>
               <button
                 type="button"
                 onClick={() => setArtifactType("flashcard")}
-                className={`flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${
                   artifactType === "flashcard"
                     ? "bg-[#28282e] text-white shadow-xs border border-[#3d3d45]"
                     : "text-[#888888] hover:text-[#d4d4d4]"
                 }`}
               >
                 <Layers className="h-3.5 w-3.5 text-[#f472b6]" />
-                <span>{isIndo ? "Kartu Belajar (Flashcards)" : "Flashcards"}</span>
+                <span className="truncate">{isIndo ? "Kartu" : "Cards"}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setArtifactType("mind_map")}
+                className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                  artifactType === "mind_map"
+                    ? "bg-[#28282e] text-white shadow-xs border border-[#3d3d45]"
+                    : "text-[#888888] hover:text-[#d4d4d4]"
+                }`}
+              >
+                <GitFork className="h-3.5 w-3.5 text-[#c084fc]" />
+                <span className="truncate">{isIndo ? "Peta Pikiran" : "Mind Map"}</span>
               </button>
             </div>
           </div>
 
-          {/* Row: Jumlah Pertanyaan & Tingkat Kesulitan */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {/* Jumlah Pertanyaan */}
-            <div className="space-y-1.5">
-              <label className="text-[11.5px] font-medium text-[#999999]">
-                {artifactType === "quiz"
-                  ? isIndo
-                    ? "Jumlah Pertanyaan"
-                    : "Number of Questions"
-                  : isIndo
-                  ? "Jumlah Kartu"
-                  : "Number of Cards"}
-              </label>
-              <div className="inline-flex w-full rounded-xl bg-[#141416] border border-[#28282d] p-0.5">
-                <button
-                  type="button"
-                  onClick={() => setCountLevel("less")}
-                  className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-                    countLevel === "less"
-                      ? "bg-[#28282e] text-white shadow-xs"
-                      : "text-[#888888] hover:text-[#d4d4d4]"
-                  }`}
-                >
-                  {isIndo ? "Sedikit (5)" : "Few (5)"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setCountLevel("standard")}
-                  className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer flex items-center justify-center gap-1 ${
-                    countLevel === "standard"
-                      ? "bg-[#28282e] text-white shadow-xs"
-                      : "text-[#888888] hover:text-[#d4d4d4]"
-                  }`}
-                >
-                  {countLevel === "standard" && <Check className="h-3 w-3 text-[#5eead4]" />}
-                  <span>{isIndo ? "Standar (10)" : "Default (10)"}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setCountLevel("more")}
-                  className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-                    countLevel === "more"
-                      ? "bg-[#28282e] text-white shadow-xs"
-                      : "text-[#888888] hover:text-[#d4d4d4]"
-                  }`}
-                >
-                  {isIndo ? "Banyak (15)" : "More (15)"}
-                </button>
+          {/* Row: Jumlah Pertanyaan & Tingkat Kesulitan (for quiz & flashcards) */}
+          {artifactType !== "mind_map" && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {/* Jumlah Pertanyaan */}
+              <div className="space-y-1.5">
+                <label className="text-[11.5px] font-medium text-[#999999]">
+                  {artifactType === "quiz"
+                    ? isIndo
+                      ? "Jumlah Pertanyaan"
+                      : "Number of Questions"
+                    : isIndo
+                    ? "Jumlah Kartu"
+                    : "Number of Cards"}
+                </label>
+                <div className="inline-flex w-full rounded-xl bg-[#141416] border border-[#28282d] p-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setCountLevel("less")}
+                    className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                      countLevel === "less"
+                        ? "bg-[#28282e] text-white shadow-xs"
+                        : "text-[#888888] hover:text-[#d4d4d4]"
+                    }`}
+                  >
+                    {isIndo ? "Sedikit (5)" : "Few (5)"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCountLevel("standard")}
+                    className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer flex items-center justify-center gap-1 ${
+                      countLevel === "standard"
+                        ? "bg-[#28282e] text-white shadow-xs"
+                        : "text-[#888888] hover:text-[#d4d4d4]"
+                    }`}
+                  >
+                    {countLevel === "standard" && (
+                      <Check className="h-3 w-3 text-[#5eead4]" />
+                    )}
+                    <span>{isIndo ? "Standar (10)" : "Standard (10)"}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCountLevel("more")}
+                    className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                      countLevel === "more"
+                        ? "bg-[#28282e] text-white shadow-xs"
+                        : "text-[#888888] hover:text-[#d4d4d4]"
+                    }`}
+                  >
+                    {isIndo ? "Banyak (15)" : "Many (15)"}
+                  </button>
+                </div>
               </div>
-            </div>
 
-            {/* Tingkat Kesulitan */}
-            <div className="space-y-1.5">
-              <label className="text-[11.5px] font-medium text-[#999999]">
-                {isIndo ? "Tingkat Kesulitan" : "Difficulty Level"}
-              </label>
-              <div className="inline-flex w-full rounded-xl bg-[#141416] border border-[#28282d] p-0.5">
-                <button
-                  type="button"
-                  onClick={() => setDifficulty("easy")}
-                  className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-                    difficulty === "easy"
-                      ? "bg-[#28282e] text-white shadow-xs"
-                      : "text-[#888888] hover:text-[#d4d4d4]"
-                  }`}
-                >
-                  {isIndo ? "Mudah" : "Easy"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDifficulty("medium")}
-                  className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer flex items-center justify-center gap-1 ${
-                    difficulty === "medium"
-                      ? "bg-[#28282e] text-white shadow-xs"
-                      : "text-[#888888] hover:text-[#d4d4d4]"
-                  }`}
-                >
-                  {difficulty === "medium" && <Check className="h-3 w-3 text-[#5eead4]" />}
-                  <span>{isIndo ? "Sedang" : "Medium"}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDifficulty("hard")}
-                  className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-                    difficulty === "hard"
-                      ? "bg-[#28282e] text-white shadow-xs"
-                      : "text-[#888888] hover:text-[#d4d4d4]"
-                  }`}
-                >
-                  {isIndo ? "Sulit" : "Hard"}
-                </button>
+              {/* Tingkat Kesulitan */}
+              <div className="space-y-1.5">
+                <label className="text-[11.5px] font-medium text-[#999999]">
+                  {isIndo ? "Tingkat Kesulitan" : "Difficulty Level"}
+                </label>
+                <div className="inline-flex w-full rounded-xl bg-[#141416] border border-[#28282d] p-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setDifficulty("easy")}
+                    className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                      difficulty === "easy"
+                        ? "bg-[#28282e] text-white shadow-xs"
+                        : "text-[#888888] hover:text-[#d4d4d4]"
+                    }`}
+                  >
+                    {isIndo ? "Mudah" : "Easy"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDifficulty("medium")}
+                    className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer flex items-center justify-center gap-1 ${
+                      difficulty === "medium"
+                        ? "bg-[#28282e] text-white shadow-xs"
+                        : "text-[#888888] hover:text-[#d4d4d4]"
+                    }`}
+                  >
+                    {difficulty === "medium" && <Check className="h-3 w-3 text-[#5eead4]" />}
+                    <span>{isIndo ? "Sedang" : "Medium"}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setDifficulty("hard")}
+                    className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                      difficulty === "hard"
+                        ? "bg-[#28282e] text-white shadow-xs"
+                        : "text-[#888888] hover:text-[#d4d4d4]"
+                    }`}
+                  >
+                    {isIndo ? "Sulit" : "Hard"}
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Sumber Dropdown */}
           <div className="space-y-1.5 relative">
