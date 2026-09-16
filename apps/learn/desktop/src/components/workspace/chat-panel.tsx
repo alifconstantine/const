@@ -582,13 +582,25 @@ export function ChatPanel({
 
   // Context window usage estimation for learning sources and discussion history
   const contextUsage = useMemo(() => {
+    const totalTokens = (currentModel as any)?.contextWindow || 1048576;
     return calculateContextUsage({
       sources,
       messages,
       draftInput: inputMessage,
-      totalTokens: 1048576,
+      totalTokens,
     });
-  }, [sources, messages, inputMessage]);
+  }, [sources, messages, inputMessage, currentModel]);
+
+  // Context window indicator visibility: only show once user has sent their first message
+  const hasStartedChat = useMemo(() => {
+    return messages.some((m) => m.role === "user");
+  }, [messages]);
+
+  useEffect(() => {
+    if (!hasStartedChat && isContextOpen) {
+      setIsContextOpen(false);
+    }
+  }, [hasStartedChat, isContextOpen]);
 
   // Multi-session chat support: query sessions from Dexie
   const rawSessions = useLiveQuery(
@@ -2052,6 +2064,9 @@ export function ChatPanel({
   );
 
   const renderContextIndicator = () => {
+    // Only show Context Window indicator once user has sent their first message
+    if (!hasStartedChat) return null;
+
     const rawPercentUsed = contextUsage.rawPercentUsed;
     const percentUsed = contextUsage.percentUsed;
     const usedTokens = contextUsage.usedTokens;
