@@ -25,6 +25,7 @@ import {
 
 import { LearnCard, LearnItem } from "./learn-card";
 import { CollectionCard, CollectionItem } from "./collection-card";
+import { SourcesView } from "./sources-view";
 import { CreateLearnDialog } from "./dialogs/create-learn-dialog";
 import { CreateCollectionDialog } from "./dialogs/create-collection-dialog";
 import { ManageCollectionDialog } from "./dialogs/manage-collection-dialog";
@@ -99,6 +100,7 @@ export function LearnHome({
   const [isCreateCollectionOpen, setIsCreateCollectionOpen] = useState(false);
   const [editingCollection, setEditingCollection] = useState<CollectionItem | null>(null);
   const [managingLearn, setManagingLearn] = useState<LearnItem | null>(null);
+  const [isAddSourceModalOpen, setIsAddSourceModalOpen] = useState(false);
 
   const handleCreateNewLearn = async (collectionId?: string) => {
     if (onOpenLearn) {
@@ -111,6 +113,18 @@ export function LearnHome({
     } else {
       setEditingLearn(null);
       setIsCreateLearnOpen(true);
+    }
+  };
+
+  const handleTriggerAddSource = async () => {
+    if (learns.length === 0) {
+      const id = await localDb.createLearn({
+        title: t("untitledNotebook"),
+        emoji: "📘",
+      });
+      onOpenLearn?.(id, true);
+    } else {
+      setIsAddSourceModalOpen(true);
     }
   };
   const [deleteTarget, setDeleteTarget] = useState<{
@@ -181,6 +195,16 @@ export function LearnHome({
     return learns.filter((l) => l.collectionIds && l.collectionIds.includes(activeCollectionId));
   }, [learns, activeCollectionId]);
 
+  // Total sources count across all learns (live from sources table with fallback to learns sum)
+  const rawSourcesCount = useLiveQuery(async () => {
+    return await db.sources.count();
+  });
+
+  const totalSourcesCount = useMemo(() => {
+    if (rawSourcesCount !== undefined) return rawSourcesCount;
+    return learns.reduce((acc, curr) => acc + (curr.sourcesCount || 0), 0);
+  }, [learns, rawSourcesCount]);
+
   const getItemCountForActiveTab = () => {
     switch (activeTab) {
       case "all":
@@ -188,7 +212,7 @@ export function LearnHome({
       case "learns":
         return learns.length;
       case "sources":
-        return sourcesLearns.length;
+        return totalSourcesCount;
       case "collections":
         return activeCollectionId ? collectionLearns.length : collections.length;
       case "artifact":
@@ -601,62 +625,15 @@ export function LearnHome({
             TAB 3: SOURCES
             ========================================================= */}
         {activeTab === "sources" && (
-          <section className="space-y-2.5">
-            <div className="flex items-center justify-between px-0.5">
-              <div className="flex items-center gap-2">
-                <h2 className="font-sans text-sm font-semibold tracking-tight text-foreground">
-                  {t("sources")}
-                </h2>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#222222] border border-[#383838] text-[#969696] font-mono">
-                  {sourcesLearns.length}
-                </span>
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              {sourcesLearns.length > 0 ? (
-                sourcesLearns.map((learn) => (
-                  <div
-                    key={learn.id}
-                    onClick={() => onOpenLearn?.(learn.id, false)}
-                    className="w-full px-4 py-3.5 rounded-2xl border border-[#383838] bg-[#1e1e24] hover:bg-[#25252b] active:bg-[#282832] transition-all duration-200 flex items-center justify-between gap-3.5 cursor-pointer select-none"
-                  >
-                    <div className="flex items-center gap-3.5 min-w-0 flex-1">
-                      <div className="h-10 w-10 rounded-xl bg-[#2b2b2b] border border-[#383838] flex items-center justify-center text-xl shrink-0">
-                        {learn.emoji || "📚"}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <h4 className="text-sm font-medium text-foreground truncate leading-snug">
-                          {learn.title}
-                        </h4>
-                        <span className="text-xs text-[#969696] mt-0.5 block">
-                          {(learn.sourcesCount || 0) === 1
-                            ? t("sourcesCountSingle")
-                            : t("sourcesCount", { count: learn.sourcesCount || 0 })}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-xs text-[#969696] shrink-0">
-                      <span>{t("openLearn")}</span>
-                      <ChevronRight className="h-3.5 w-3.5" />
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="text-center py-14 px-4 border border-[#2e2e2e] rounded-2xl bg-[#1b1b1b]">
-                  <div className="h-10 w-10 rounded-xl bg-[#222222] border border-[#383838] flex items-center justify-center text-[#969696] mx-auto mb-3">
-                    <FileText className="h-5 w-5 stroke-[1.5]" />
-                  </div>
-                  <h3 className="text-sm font-medium text-foreground mb-1">
-                    {t("sourcesEmptyWorkspaceTitle")}
-                  </h3>
-                  <p className="text-xs text-[#969696] leading-relaxed max-w-xs mx-auto">
-                    {t("sourcesEmptyWorkspaceDesc")}
-                  </p>
-                </div>
-              )}
-            </div>
-          </section>
+          <SourcesView
+            onAddSource={handleTriggerAddSource}
+            onOpenLearn={onOpenLearn}
+            searchQuery={searchQuery}
+            onClearSearch={() => setSearchQuery("")}
+            sortOption={sortOption}
+            isAddSourceModalOpen={isAddSourceModalOpen}
+            onAddSourceModalOpenChange={setIsAddSourceModalOpen}
+          />
         )}
 
         {/* =========================================================
@@ -841,19 +818,30 @@ export function LearnHome({
       </main>
 
       {/* -------------------------------------------------------------
-          FLOATING ACTION BUTTON (+ New Learn) AT BOTTOM
-          Directly creates and opens a new learn (no modal / dropdown)
+          FLOATING ACTION BUTTON (+ New Learn / + New Sources) AT BOTTOM
           ------------------------------------------------------------- */}
       <div className="fixed bottom-6 right-5 z-40 safe-area-bottom">
-        <button
-          type="button"
-          onClick={() => handleCreateNewLearn()}
-          className="h-12 px-5 rounded-full bg-foreground text-background hover:opacity-95 active:scale-95 transition-all duration-200 flex items-center gap-2 font-medium text-xs border border-background/20 cursor-pointer select-none"
-          aria-label={t("newLearn")}
-        >
-          <Plus className="h-4 w-4 stroke-[2.5]" />
-          <span>{t("newLearn")}</span>
-        </button>
+        {activeTab === "sources" ? (
+          <button
+            type="button"
+            onClick={handleTriggerAddSource}
+            className="h-12 px-5 rounded-full bg-foreground text-background hover:opacity-95 active:scale-95 transition-all duration-200 flex items-center gap-2 font-medium text-xs border border-background/20 cursor-pointer select-none shadow-lg"
+            aria-label={t("newSources")}
+          >
+            <Plus className="h-4 w-4 stroke-[2.5]" />
+            <span>{t("newSources")}</span>
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => handleCreateNewLearn()}
+            className="h-12 px-5 rounded-full bg-foreground text-background hover:opacity-95 active:scale-95 transition-all duration-200 flex items-center gap-2 font-medium text-xs border border-background/20 cursor-pointer select-none shadow-lg"
+            aria-label={t("newLearn")}
+          >
+            <Plus className="h-4 w-4 stroke-[2.5]" />
+            <span>{t("newLearn")}</span>
+          </button>
+        )}
       </div>
 
       {/* Dialogs */}
