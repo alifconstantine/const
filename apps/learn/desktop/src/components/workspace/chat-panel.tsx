@@ -1975,7 +1975,7 @@ export function ChatPanel({
           onClick={(e) => e.stopPropagation()}
         >
           {/* Header */}
-          <div className="flex items-center justify-between px-1.5 pb-2 mb-1.5 border-b border-border/50">
+          <div className="flex items-center justify-between px-1.5 pb-1.5 mb-1">
             <span className="text-[11px] font-semibold text-foreground tracking-tight">
               {t("carriedSourcesTitle", { carried: carriedSourcesCount, total: sources.length })}
             </span>
@@ -1996,55 +1996,57 @@ export function ChatPanel({
           </div>
 
           {/* List of sources */}
-          <div className="max-h-48 overflow-y-auto space-y-1 py-0.5">
-            {sources.length === 0 ? (
-              <div className="py-4 px-2 text-center text-muted-foreground">
-                <FileText className="h-6 w-6 mx-auto mb-1.5 opacity-40" />
-                <p className="text-xs font-medium text-foreground">{t("noSourcesInChat")}</p>
-                <p className="text-[10px] text-muted-foreground/80 mt-0.5">
-                  {t("noSourcesInChatDesc")}
-                </p>
-              </div>
-            ) : (
-              sources.map((source) => {
-                const isCarried = source.includedInChat !== false;
-                return (
-                  <div
-                    key={source.id}
-                    onClick={() => {
-                      localDb.toggleSourceInChat(source.id, !isCarried);
-                    }}
-                    className={cn(
-                      "w-full flex items-center gap-2 px-2 py-1.5 rounded-xl text-left cursor-pointer transition-colors select-none text-xs",
-                      isCarried
-                        ? "bg-secondary/70 hover:bg-secondary text-foreground"
-                        : "hover:bg-muted/50 text-muted-foreground opacity-60 hover:opacity-100"
-                    )}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={isCarried}
-                      onChange={() => {}}
-                      className="rounded border-border h-3.5 w-3.5 text-primary focus:ring-0 cursor-pointer pointer-events-none"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div className="truncate text-[11.5px] font-medium text-foreground">
-                        {source.title}
-                      </div>
-                      <div className="text-[9.5px] text-muted-foreground/70 font-mono flex items-center gap-1">
-                        <span className="capitalize">{source.type}</span>
-                        {source.size ? `• ${formatFileSize(source.size)}` : null}
+          <ScrollArea className="max-h-48 w-full" viewportClassName="pr-1">
+            <div className="space-y-1 py-0.5">
+              {sources.length === 0 ? (
+                <div className="py-4 px-2 text-center text-muted-foreground">
+                  <FileText className="h-6 w-6 mx-auto mb-1.5 opacity-40" />
+                  <p className="text-xs font-medium text-foreground">{t("noSourcesInChat")}</p>
+                  <p className="text-[10px] text-muted-foreground/80 mt-0.5">
+                    {t("noSourcesInChatDesc")}
+                  </p>
+                </div>
+              ) : (
+                sources.map((source) => {
+                  const isCarried = source.includedInChat !== false;
+                  return (
+                    <div
+                      key={source.id}
+                      onClick={() => {
+                        localDb.toggleSourceInChat(source.id, !isCarried);
+                      }}
+                      className={cn(
+                        "w-full flex items-center gap-2 px-2 py-1.5 rounded-xl text-left cursor-pointer transition-colors select-none text-xs",
+                        isCarried
+                          ? "bg-secondary/70 hover:bg-secondary text-foreground"
+                          : "hover:bg-muted/50 text-muted-foreground opacity-60 hover:opacity-100"
+                      )}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={isCarried}
+                        onChange={() => {}}
+                        className="rounded border-border h-3.5 w-3.5 text-primary focus:ring-0 cursor-pointer pointer-events-none"
+                      />
+                      <div className="flex-1 min-w-0">
+                        <div className="truncate text-[11.5px] font-medium text-foreground">
+                          {source.title}
+                        </div>
+                        <div className="text-[9.5px] text-muted-foreground/70 font-mono flex items-center gap-1">
+                          <span className="capitalize">{source.type}</span>
+                          {source.size ? `• ${formatFileSize(source.size)}` : null}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })
-            )}
-          </div>
+                  );
+                })
+              )}
+            </div>
+          </ScrollArea>
 
           {/* Footer action: Add new source */}
           {onAddSource && (
-            <div className="pt-2 mt-1.5 border-t border-border/40">
+            <div className="pt-1.5 mt-1">
               <button
                 type="button"
                 onClick={() => {
