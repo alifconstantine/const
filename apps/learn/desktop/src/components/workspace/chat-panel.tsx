@@ -2094,11 +2094,11 @@ export function ChatPanel({
             setIsContextOpen(!isContextOpen);
           }}
           className={cn(
-            "h-8 w-8 rounded-xl hover:bg-muted text-foreground/80 hover:text-foreground dark:text-white/80 dark:hover:text-white flex items-center justify-center transition-all cursor-pointer border border-border/60 bg-muted/40 shadow-xs active:scale-98 shrink-0",
+            "h-8 w-8 rounded-xl hover:bg-muted text-foreground/80 hover:text-foreground flex items-center justify-center transition-all cursor-pointer border border-border bg-muted/40 shadow-xs active:scale-98 shrink-0",
             rawPercentUsed >= 90
-              ? "text-red-500 hover:text-red-400 dark:text-red-400"
+              ? "text-destructive hover:text-destructive/80"
               : rawPercentUsed >= 75
-              ? "text-[#e79737] hover:text-[#ff9838] dark:text-[#ff9838]"
+              ? "text-amber-500 hover:text-amber-400"
               : ""
           )}
           title={`Context window: ${rawPercentUsed === 0 ? "0%" : percentUsed} (~${formatTokenDisplay(usedTokens)} / ${formatTokenDisplay(totalTokens)})`}
@@ -2111,7 +2111,7 @@ export function ChatPanel({
               r="9"
               fill="none"
               stroke="currentColor"
-              className="text-border/70 dark:text-[#383838]"
+              className="text-border"
               strokeWidth="2.5"
             />
             <circle
@@ -2131,24 +2131,24 @@ export function ChatPanel({
         {/* Context Window Popover */}
         {isContextOpen && (
           <div
-            className="absolute top-full mt-1.5 right-0 w-72 sm:w-80 max-w-[calc(100vw-32px)] bg-card dark:bg-[#1e1e1e] border border-border/70 dark:border-[#383838] rounded-2xl shadow-2xl p-4 z-50 flex flex-col gap-3 text-left select-none animate-in fade-in zoom-in-95 duration-100 font-sans"
+            className="absolute top-full mt-1.5 right-0 w-72 sm:w-80 max-w-[calc(100vw-32px)] bg-card border border-border rounded-2xl shadow-2xl p-4 z-50 flex flex-col gap-3 text-left select-none animate-in fade-in zoom-in-95 duration-100 font-sans"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Header: % of context used and tokens */}
             <div className="flex items-center justify-between text-[13px]">
-              <span className="text-foreground dark:text-white font-medium">
+              <span className="text-foreground font-medium">
                 {rawPercentUsed === 0 ? "0%" : rawPercentUsed < 0.1 ? "<0.1%" : `${percentUsed}`} {t("contextUsed") || "of context used"}
               </span>
-              <span className="font-mono text-[12px] text-muted-foreground dark:text-[#a0a0a0]">
+              <span className="font-mono text-[12px] text-muted-foreground">
                 ~{formatTokenDisplay(usedTokens)} / {formatTokenDisplay(totalTokens)}
               </span>
             </div>
 
             {/* Multi-segment Horizontal Progress Bar */}
-            <div className="w-full h-2 bg-muted/60 dark:bg-[#2d2d2d] rounded-full overflow-hidden flex gap-0.5">
+            <div className="w-full h-2 bg-muted rounded-full overflow-hidden flex gap-0.5">
               {contextUsage.sourcesTokens > 0 && (
                 <div
-                  className="bg-[#10b981] h-full transition-all"
+                  className="bg-emerald-500 h-full transition-all"
                   style={{
                     width: `${Math.max(0.5, (contextUsage.sourcesTokens / totalTokens) * 100)}%`,
                   }}
@@ -2157,7 +2157,7 @@ export function ChatPanel({
               )}
               {contextUsage.systemPromptTokens > 0 && (
                 <div
-                  className="bg-[#71717a] h-full transition-all"
+                  className="bg-muted-foreground/60 h-full transition-all"
                   style={{
                     width: `${Math.max(0.5, (contextUsage.systemPromptTokens / totalTokens) * 100)}%`,
                   }}
@@ -2166,7 +2166,7 @@ export function ChatPanel({
               )}
               {contextUsage.messagesTokens > 0 && (
                 <div
-                  className="bg-[#3b82f6] h-full transition-all"
+                  className="bg-sky-500 h-full transition-all"
                   style={{
                     width: `${Math.max(0.5, (contextUsage.messagesTokens / totalTokens) * 100)}%`,
                   }}
@@ -2175,7 +2175,7 @@ export function ChatPanel({
               )}
               {contextUsage.draftInputTokens > 0 && (
                 <div
-                  className="bg-[#a855f7] h-full transition-all"
+                  className="bg-purple-500 h-full transition-all"
                   style={{
                     width: `${Math.max(0.5, (contextUsage.draftInputTokens / totalTokens) * 100)}%`,
                   }}
@@ -2188,30 +2188,30 @@ export function ChatPanel({
             <div className="flex flex-col gap-2 pt-1">
               <div className="flex items-center justify-between text-[12px]">
                 <div className="flex items-center gap-2">
-                  <div className="w-2.5 h-2.5 rounded-xs bg-[#10b981] shrink-0" />
-                  <span className="text-foreground/90 dark:text-[#d4d4d4]">{t("learningSources") || "Learning Sources"}</span>
+                  <div className="w-2.5 h-2.5 rounded-xs bg-emerald-500 shrink-0" />
+                  <span className="text-foreground">{t("learningSources") || "Learning Sources"}</span>
                 </div>
-                <span className="font-mono text-foreground/90 dark:text-[#d4d4d4]">
+                <span className="font-mono text-foreground">
                   ~{formatTokenDisplay(contextUsage.sourcesTokens)}
                 </span>
               </div>
 
               <div className="flex items-center justify-between text-[12px]">
                 <div className="flex items-center gap-2">
-                  <div className="w-2.5 h-2.5 rounded-xs bg-[#71717a] shrink-0" />
-                  <span className="text-foreground/90 dark:text-[#d4d4d4]">{t("tutorInstructions") || "Socratic Tutor"}</span>
+                  <div className="w-2.5 h-2.5 rounded-xs bg-muted-foreground/60 shrink-0" />
+                  <span className="text-foreground">{t("tutorInstructions") || "Socratic Tutor"}</span>
                 </div>
-                <span className="font-mono text-foreground/90 dark:text-[#d4d4d4]">
+                <span className="font-mono text-foreground">
                   ~{formatTokenDisplay(contextUsage.systemPromptTokens)}
                 </span>
               </div>
 
               <div className="flex items-center justify-between text-[12px]">
                 <div className="flex items-center gap-2">
-                  <div className="w-2.5 h-2.5 rounded-xs bg-[#3b82f6] shrink-0" />
-                  <span className="text-foreground/90 dark:text-[#d4d4d4]">{t("chatHistory") || "Discussion History"}</span>
+                  <div className="w-2.5 h-2.5 rounded-xs bg-sky-500 shrink-0" />
+                  <span className="text-foreground">{t("chatHistory") || "Discussion History"}</span>
                 </div>
-                <span className="font-mono text-foreground/90 dark:text-[#d4d4d4]">
+                <span className="font-mono text-foreground">
                   ~{formatTokenDisplay(contextUsage.messagesTokens)}
                 </span>
               </div>
@@ -2219,18 +2219,18 @@ export function ChatPanel({
               {contextUsage.draftInputTokens > 0 && (
                 <div className="flex items-center justify-between text-[12px]">
                   <div className="flex items-center gap-2">
-                    <div className="w-2.5 h-2.5 rounded-xs bg-[#a855f7] shrink-0" />
-                    <span className="text-[#a855f7] font-medium">{t("currentInput") || "Current Input"}</span>
+                    <div className="w-2.5 h-2.5 rounded-xs bg-purple-500 shrink-0" />
+                    <span className="text-purple-600 dark:text-purple-400 font-medium">{t("currentInput") || "Current Input"}</span>
                   </div>
-                  <span className="font-mono text-[#a855f7]">
+                  <span className="font-mono text-purple-600 dark:text-purple-400">
                     ~{formatTokenDisplay(contextUsage.draftInputTokens)}
                   </span>
                 </div>
               )}
 
-              <div className="flex items-center justify-between text-[12px] pt-1 border-t border-border/50 dark:border-[#383838]/60">
+              <div className="flex items-center justify-between text-[12px] pt-1 border-t border-border">
                 <div className="flex items-center gap-2">
-                  <div className="w-2.5 h-2.5 rounded-xs bg-muted/60 dark:bg-[#383838] shrink-0" />
+                  <div className="w-2.5 h-2.5 rounded-xs bg-muted shrink-0" />
                   <span className="text-muted-foreground">{t("availableContext") || "Available Context"}</span>
                 </div>
                 <span className="font-mono text-muted-foreground">
@@ -2403,7 +2403,7 @@ export function ChatPanel({
                           {filteredGroupedModels.map((group) => (
                             <div key={group.providerId} className="flex flex-col">
                               {/* Provider Header */}
-                              <div className="px-2 pt-1 pb-0.5 text-[11px] font-medium text-[#1a73e8] dark:text-[#5ea0e8] select-none tracking-wide">
+                              <div className="px-2 pt-1 pb-0.5 text-[11px] font-medium text-primary select-none tracking-wide">
                                 {group.providerName}
                               </div>
 
@@ -2598,7 +2598,7 @@ export function ChatPanel({
           className={cn(
             "h-8 w-8 rounded-full flex items-center justify-center transition-colors shrink-0 shadow-xs active:scale-95",
             hasInput && !isStreaming
-              ? "bg-[#1a73e8] hover:bg-[#1557b0] text-white cursor-pointer"
+              ? "bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer"
               : "bg-muted/60 text-muted-foreground/40 cursor-not-allowed"
           )}
           aria-label={t("sendMessage")}
@@ -3261,7 +3261,7 @@ export function ChatPanel({
               }
             }}
             className={cn(
-              "w-full bg-card dark:bg-[#1e1f20] border border-border/70 focus-within:border-foreground/30 transition-[border-color,border-radius,padding] duration-150 shadow-md",
+              "w-full bg-card border border-border focus-within:border-primary/50 transition-[border-color,border-radius,padding] duration-150 shadow-md",
               isMultiline || attachments.length > 0
                 ? "rounded-3xl p-3 sm:p-3.5"
                 : "rounded-full px-3 py-1.5 sm:py-2"
@@ -3345,25 +3345,25 @@ export function ChatPanel({
         {/* Active Conversation Footer Telemetry Bar (Matching apps/harness/desktop) */}
         {conversationMetrics && (
           <div
-            className="w-full flex flex-wrap items-center justify-center gap-x-2 gap-y-0.5 text-[11px] font-mono text-[#a9a9a9] dark:text-[#888888] pt-2 pb-0.5 select-none overflow-hidden"
+            className="w-full flex flex-wrap items-center justify-center gap-x-2 gap-y-0.5 text-[11px] font-mono text-muted-foreground pt-2 pb-0.5 select-none overflow-hidden"
             title="Session telemetry metrics"
           >
             <span title={`${conversationMetrics.turns} conversation turns, ${conversationMetrics.steps} tool execution steps`}>
               {conversationMetrics.turns} turns · {conversationMetrics.steps} steps
             </span>
-            <span className="text-[#d5d5d9] dark:text-[#444444]">|</span>
+            <span className="text-border">|</span>
             <span title={`LLM duration: ${formatDurationDisplay(conversationMetrics.llmDurationMs)} · Tools duration: ${formatDurationDisplay(conversationMetrics.toolDurationMs)}`}>
               LLM {formatDurationDisplay(conversationMetrics.llmDurationMs)} · Tools {formatDurationDisplay(conversationMetrics.toolDurationMs)}
             </span>
-            <span className="text-[#d5d5d9] dark:text-[#444444]">|</span>
+            <span className="text-border">|</span>
             <span title={`Average TTFT: ${conversationMetrics.ttftSeconds.toFixed(1)}s · Generation speed: ${conversationMetrics.tokPerSec} tok/s`}>
               {conversationMetrics.tokPerSec} tok/s
             </span>
-            <span className="text-[#d5d5d9] dark:text-[#444444]">|</span>
+            <span className="text-border">|</span>
             <span title={`Prompt cache hit rate: ${conversationMetrics.cacheHitRate}%`}>
               {conversationMetrics.cacheHitRate}% cache
             </span>
-            <span className="text-[#d5d5d9] dark:text-[#444444]">|</span>
+            <span className="text-border">|</span>
             <span title={`Input: ${conversationMetrics.inputTokens.toLocaleString()} tokens · Output: ${conversationMetrics.outputTokens.toLocaleString()} tokens`}>
               ↑{formatTokenDisplay(conversationMetrics.inputTokens)} · ↓{formatTokenDisplay(conversationMetrics.outputTokens)} tok
             </span>

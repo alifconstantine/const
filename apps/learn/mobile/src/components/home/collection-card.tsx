@@ -38,10 +38,10 @@ export function CollectionCard({
     return (
       <div
         onClick={() => onClick?.(collection)}
-        className="w-full px-4 py-3.5 rounded-2xl border border-border/80 dark:border-white/10 bg-[#1e1e22] dark:bg-[#1e1e24] hover:bg-[#25252b] active:bg-gradient-to-r active:from-[#282832] active:to-[#1e1e24] active:scale-[0.99] transition-all duration-200 flex items-center justify-between gap-3.5 cursor-pointer select-none"
+        className="w-full px-4 py-3.5 rounded-2xl border border-border/80 hover:border-border bg-card hover:bg-secondary/60 active:bg-secondary/80 text-card-foreground active:scale-[0.99] transition-all duration-200 flex items-center justify-between gap-3.5 cursor-pointer select-none shadow-2xs"
       >
         <div className="flex items-center gap-3.5 min-w-0 flex-1">
-          <div className="h-10 w-10 rounded-xl bg-secondary/80 flex items-center justify-center text-xl shrink-0 border border-white/10 shadow-2xs">
+          <div className="h-10 w-10 rounded-xl bg-secondary/80 flex items-center justify-center text-xl shrink-0 border border-border/60 shadow-2xs">
             {collection.emoji || "📁"}
           </div>
           <div className="min-w-0 flex-1">

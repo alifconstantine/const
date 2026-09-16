@@ -149,7 +149,7 @@ export function TabHeader({
   );
 
   return (
-    <div className="h-10 w-full border-b border-[#282828] bg-[#141414] flex items-center px-2 shrink-0 select-none relative z-20">
+    <div className="h-10 w-full border-b border-border bg-card flex items-center px-2 shrink-0 select-none relative z-20">
       {/* 1. Leftmost: ChevronsDown Button for Searching / Switching Open Tabs */}
       <div className="relative shrink-0" ref={dropdownRef}>
         <button
@@ -160,8 +160,8 @@ export function TabHeader({
           }}
           className={`w-6 h-6 rounded flex items-center justify-center transition-colors cursor-pointer ${
             isDropdownOpen
-              ? "bg-white/10 text-white"
-              : "text-[#8e8e8e] hover:text-white hover:bg-white/5"
+              ? "bg-secondary text-foreground"
+              : "text-muted-foreground hover:text-foreground hover:bg-secondary/70"
           }`}
           title="Switch and search open tabs"
           aria-label="Switch and search open tabs"
@@ -171,24 +171,24 @@ export function TabHeader({
 
         {/* Dropdown Popover */}
         {isDropdownOpen && (
-          <div className="absolute top-8 left-0 w-64 rounded-xl bg-[#1e1e1e] border border-[#333333] shadow-2xl p-2 z-50 animate-in fade-in zoom-in-95 duration-150 font-sans">
+          <div className="absolute top-8 left-0 w-64 rounded-xl bg-popover border border-border shadow-2xl p-2 z-50 animate-in fade-in zoom-in-95 duration-150 font-sans">
             {/* Search Input */}
-            <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-[#282828] border border-[#383838] mb-2 text-xs">
-              <Search className="w-3.5 h-3.5 text-[#888888] shrink-0" />
+            <div className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg bg-secondary border border-border mb-2 text-xs">
+              <Search className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
               <input
                 type="text"
                 autoFocus
                 placeholder="Search open tabs..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-transparent text-white placeholder-[#666666] outline-none text-xs"
+                className="w-full bg-transparent text-foreground placeholder-muted-foreground outline-none text-xs"
               />
             </div>
 
             {/* List of tabs */}
             <div className="max-h-56 overflow-y-auto space-y-0.5">
               {filteredTabs.length === 0 ? (
-                <div className="text-center py-4 text-xs text-[#666666]">
+                <div className="text-center py-4 text-xs text-muted-foreground">
                   No tabs found
                 </div>
               ) : (
@@ -204,8 +204,8 @@ export function TabHeader({
                       }}
                       className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs cursor-pointer group transition-colors ${
                         isActive
-                          ? "bg-white/10 text-white font-medium"
-                          : "text-[#a0a0a0] hover:text-white hover:bg-white/5"
+                          ? "bg-secondary text-foreground font-medium"
+                          : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
                       }`}
                     >
                       <div className="flex items-center gap-2 min-w-0">
@@ -222,7 +222,7 @@ export function TabHeader({
                           e.stopPropagation();
                           onCloseTab(t.id, e);
                         }}
-                        className="p-0.5 rounded hover:bg-white/10 text-[#666666] hover:text-white transition-colors cursor-pointer shrink-0 opacity-0 group-hover:opacity-100"
+                        className="p-0.5 rounded hover:bg-background text-muted-foreground hover:text-foreground transition-colors cursor-pointer shrink-0 opacity-0 group-hover:opacity-100"
                         title="Close tab"
                       >
                         <X className="w-3 h-3" />
@@ -234,14 +234,14 @@ export function TabHeader({
             </div>
 
             {/* Quick Action: Open new tab */}
-            <div className="mt-2 pt-2 border-t border-[#333333]">
+            <div className="mt-2 pt-2 border-t border-border">
               <button
                 type="button"
                 onClick={() => {
                   onNewTab();
                   setIsDropdownOpen(false);
                 }}
-                className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-[#8e8e8e] hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
+                className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-secondary/70 transition-colors cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5 shrink-0" />
                 <span>Open new tab...</span>
@@ -290,10 +290,10 @@ export function TabHeader({
               }}
               className={`relative h-7 px-2.5 rounded-md flex items-center gap-1.5 text-xs shrink-0 cursor-grab active:cursor-grabbing transition-all group select-none ${
                 isBeingDragged
-                  ? "opacity-35 scale-95 border border-dashed border-[#555]"
+                  ? "opacity-35 scale-95 border border-dashed border-border"
                   : isActive
-                  ? "bg-[#252525] border border-[#383838] text-white shadow-sm font-medium"
-                  : "text-[#8e8e8e] hover:text-white hover:bg-white/5 border border-transparent"
+                  ? "bg-background border border-border text-foreground shadow-xs font-medium"
+                  : "text-muted-foreground hover:text-foreground hover:bg-secondary/70 border border-transparent"
               }`}
             >
               {/* Drop position indicator lines */}
@@ -309,7 +309,7 @@ export function TabHeader({
               ) : (
                 <Icon
                   className={`w-3.5 h-3.5 shrink-0 pointer-events-none ${
-                    isActive ? "text-white" : "text-[#8e8e8e] group-hover:text-white"
+                    isActive ? "text-foreground" : "text-muted-foreground group-hover:text-foreground"
                   }`}
                 />
               )}
@@ -324,8 +324,8 @@ export function TabHeader({
                 }}
                 className={`p-0.5 rounded ml-0.5 cursor-pointer transition-colors ${
                   isActive
-                    ? "text-[#888888] hover:text-white hover:bg-white/10"
-                    : "text-transparent group-hover:text-[#888888] hover:!text-white hover:bg-white/10"
+                    ? "text-muted-foreground hover:text-foreground hover:bg-secondary"
+                    : "text-transparent group-hover:text-muted-foreground hover:!text-foreground hover:bg-secondary"
                 }`}
                 title="Close tab"
               >
@@ -356,8 +356,8 @@ export function TabHeader({
           }}
           className={`w-6 h-6 rounded flex items-center justify-center transition-colors cursor-pointer shrink-0 ${
             isOpeningNewTab
-              ? "bg-white/10 text-white"
-              : "text-[#8e8e8e] hover:text-white hover:bg-white/10"
+              ? "bg-secondary text-foreground"
+              : "text-muted-foreground hover:text-foreground hover:bg-secondary/70"
           }`}
           title="Open new tab"
           aria-label="Open new tab"

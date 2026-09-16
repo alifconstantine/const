@@ -197,27 +197,27 @@ export function MobileMindMapViewer({ data, onClose }: MobileMindMapViewerProps)
           className={cn(
             "p-2.5 rounded-xl border flex items-center justify-between gap-2 transition-colors",
             depth === 0
-              ? "bg-[#25272f] border-[#424858] text-white font-semibold text-xs"
+              ? "bg-card border-border text-foreground font-semibold text-xs"
               : depth === 1
-              ? "bg-[#1f2026] border-[#343640] text-[#eaecef] font-medium text-xs"
-              : "bg-[#19191d] border-[#292a30] text-[#c0c4ce] text-[11.5px]",
-            hasChildren && "cursor-pointer active:bg-white/5"
+              ? "bg-secondary/70 border-border text-foreground font-medium text-xs"
+              : "bg-secondary/40 border-border text-muted-foreground text-[11.5px]",
+            hasChildren && "cursor-pointer active:bg-secondary"
           )}
         >
           <div className="flex items-center gap-2 truncate">
             {depth === 0 ? (
-              <span className="w-2 h-2 rounded-full bg-[#0066ff] shrink-0" />
+              <span className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
             ) : depth === 1 ? (
-              <span className="w-1.5 h-1.5 rounded-full bg-[#f472b6] shrink-0" />
+              <span className="w-1.5 h-1.5 rounded-full bg-pink-500 shrink-0" />
             ) : (
-              <span className="w-1 h-1 rounded-full bg-[#888890] shrink-0" />
+              <span className="w-1 h-1 rounded-full bg-muted-foreground shrink-0" />
             )}
             <span className="truncate">{node.label}</span>
           </div>
 
           {hasChildren && (
-            <div className="flex items-center gap-1.5 shrink-0 text-[#888892]">
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/5 font-mono">
+            <div className="flex items-center gap-1.5 shrink-0 text-muted-foreground">
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-secondary font-mono">
                 {node.children?.length}
               </span>
               <ChevronDown
@@ -232,7 +232,7 @@ export function MobileMindMapViewer({ data, onClose }: MobileMindMapViewerProps)
 
         {/* Children branches */}
         {hasChildren && !isCollapsed && (
-          <div className="border-l border-[#2e303a] pl-2 space-y-1.5 mt-1">
+          <div className="border-l border-border pl-2 space-y-1.5 mt-1">
             {node.children?.map((c) => renderOutlineNode(c, depth + 1))}
           </div>
         )}
@@ -243,23 +243,23 @@ export function MobileMindMapViewer({ data, onClose }: MobileMindMapViewerProps)
   const sourceCount = data.sourceCount || (data.sourceIds ? data.sourceIds.length : 1);
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#141416] text-[#d4d4d4] flex flex-col font-sans select-none overflow-hidden animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 bg-background text-foreground flex flex-col font-sans select-none overflow-hidden animate-in fade-in duration-200">
       {/* Top Header */}
-      <div className="h-14 px-3.5 border-b border-[#26262a] bg-[#1a1a1e] flex items-center justify-between shrink-0">
+      <div className="h-14 px-3.5 border-b border-border bg-card flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2.5 min-w-0 pr-2">
           <button
             type="button"
             onClick={onClose}
-            className="h-8 w-8 rounded-full hover:bg-white/10 text-[#969696] hover:text-white flex items-center justify-center transition-colors -ml-1 shrink-0 active:scale-95"
+            className="h-8 w-8 rounded-full hover:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors -ml-1 shrink-0 active:scale-95"
           >
             <ArrowLeft className="w-4 h-4" />
           </button>
 
           <div className="min-w-0">
-            <h2 className="text-xs sm:text-sm font-semibold text-white tracking-tight truncate">
+            <h2 className="text-xs sm:text-sm font-semibold text-foreground tracking-tight truncate">
               {data.title}
             </h2>
-            <div className="text-[10px] text-[#888890] flex items-center gap-1.5">
+            <div className="text-[10px] text-muted-foreground flex items-center gap-1.5">
               <span>{t("toolsMindMap") || "Peta Pikiran"}</span>
               <span>•</span>
               <span>{sourceCount} sumber</span>
@@ -269,13 +269,13 @@ export function MobileMindMapViewer({ data, onClose }: MobileMindMapViewerProps)
 
         {/* Header Right: Dual-Mode Switcher [Kanvas | Outline] */}
         <div className="flex items-center gap-2 shrink-0">
-          <div className="flex items-center bg-[#25252a] p-0.5 rounded-xl border border-[#34343a]">
+          <div className="flex items-center bg-secondary/60 p-0.5 rounded-xl border border-border">
             <button
               type="button"
               onClick={() => setViewMode("canvas")}
               className={cn(
                 "flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors",
-                viewMode === "canvas" ? "bg-[#343640] text-white shadow-xs" : "text-[#888892] hover:text-white"
+                viewMode === "canvas" ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground"
               )}
             >
               <LayoutGrid className="w-3 h-3" />
@@ -287,7 +287,7 @@ export function MobileMindMapViewer({ data, onClose }: MobileMindMapViewerProps)
               onClick={() => setViewMode("outline")}
               className={cn(
                 "flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors",
-                viewMode === "outline" ? "bg-[#343640] text-white shadow-xs" : "text-[#888892] hover:text-white"
+                viewMode === "outline" ? "bg-card text-foreground shadow-xs" : "text-muted-foreground hover:text-foreground"
               )}
             >
               <ListTree className="w-3 h-3" />
@@ -298,7 +298,7 @@ export function MobileMindMapViewer({ data, onClose }: MobileMindMapViewerProps)
           <button
             type="button"
             onClick={handleExportMarkdown}
-            className="h-8 w-8 rounded-lg hover:bg-white/10 text-[#a0a0a8] hover:text-white flex items-center justify-center transition-colors"
+            className="h-8 w-8 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors"
             title="Ekspor Markdown"
           >
             <Download className="w-3.5 h-3.5" />
@@ -307,7 +307,7 @@ export function MobileMindMapViewer({ data, onClose }: MobileMindMapViewerProps)
       </div>
 
       {/* Main Body */}
-      <div className="flex-1 w-full min-h-0 relative overflow-hidden bg-[#161618]">
+      <div className="flex-1 w-full min-h-0 relative overflow-hidden bg-background">
         {viewMode === "canvas" ? (
           /* Mode A: Interactive Touch Canvas */
           <div
@@ -315,25 +315,25 @@ export function MobileMindMapViewer({ data, onClose }: MobileMindMapViewerProps)
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
-            className="w-full h-full relative overflow-hidden bg-[#151517]"
+            className="w-full h-full relative overflow-hidden bg-background"
           >
             {/* Floating Mobile Controls Toolbar (Bottom-Right) */}
-            <div className="absolute bottom-5 right-4 z-20 flex items-center bg-[#202024]/90 backdrop-blur-md rounded-2xl border border-[#36363c] p-1 shadow-lg space-x-1">
+            <div className="absolute bottom-5 right-4 z-20 flex items-center bg-card/90 backdrop-blur-md rounded-2xl border border-border p-1 shadow-lg space-x-1">
               <button
                 type="button"
                 onClick={handleFitToView}
-                className="h-8 w-8 rounded-xl flex items-center justify-center text-[#a0a0a8] hover:text-white hover:bg-white/10"
+                className="h-8 w-8 rounded-xl flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary"
                 title="Pusatkan"
               >
                 <Maximize className="w-3.5 h-3.5" />
               </button>
 
-              <div className="w-[1px] h-4 bg-[#36363c]" />
+              <div className="w-[1px] h-4 bg-border" />
 
               <button
                 type="button"
                 onClick={() => setZoom((z) => Math.min(z * 1.25, 2.2))}
-                className="h-8 w-8 rounded-xl flex items-center justify-center text-[#a0a0a8] hover:text-white hover:bg-white/10"
+                className="h-8 w-8 rounded-xl flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary"
               >
                 <Plus className="w-3.5 h-3.5" />
               </button>
@@ -341,7 +341,7 @@ export function MobileMindMapViewer({ data, onClose }: MobileMindMapViewerProps)
               <button
                 type="button"
                 onClick={() => setZoom((z) => Math.max(z / 1.25, 0.25))}
-                className="h-8 w-8 rounded-xl flex items-center justify-center text-[#a0a0a8] hover:text-white hover:bg-white/10"
+                className="h-8 w-8 rounded-xl flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary"
               >
                 <Minus className="w-3.5 h-3.5" />
               </button>
@@ -364,7 +364,8 @@ export function MobileMindMapViewer({ data, onClose }: MobileMindMapViewerProps)
                     key={curve.id}
                     d={curve.path}
                     fill="none"
-                    stroke="#505666"
+                    stroke="currentColor"
+                    className="text-border"
                     strokeWidth="2"
                     strokeLinecap="round"
                   />
@@ -388,16 +389,21 @@ export function MobileMindMapViewer({ data, onClose }: MobileMindMapViewerProps)
                         height={posNode.height}
                         rx="16"
                         ry="16"
-                        fill={isRoot ? "#24262d" : "#222328"}
-                        stroke={isRoot ? "#4c556b" : "#363840"}
+                        stroke="currentColor"
                         strokeWidth={isRoot ? "1.6" : "1"}
-                        className="active:fill-[#2d2f38]"
+                        className={cn(
+                          isRoot
+                            ? "fill-card text-border"
+                            : "fill-secondary text-border",
+                          "transition-colors active:opacity-80"
+                        )}
                       />
 
                       <text
                         x={isRoot ? 20 : 16}
                         y={posNode.height / 2 + 4}
-                        fill="#ffffff"
+                        fill="currentColor"
+                        className="text-foreground"
                         fontSize={isRoot ? "13px" : "11.5px"}
                         fontWeight={isRoot ? "600" : "500"}
                         fontFamily="Inter, -apple-system, sans-serif"
@@ -421,13 +427,14 @@ export function MobileMindMapViewer({ data, onClose }: MobileMindMapViewerProps)
                             height="18"
                             rx="8"
                             ry="8"
-                            fill="#30323a"
+                            className="fill-secondary/80 stroke-border"
                           />
                           <text
                             x="8"
                             y="13"
                             textAnchor="middle"
-                            fill="#d0d4dc"
+                            fill="currentColor"
+                            className="text-muted-foreground"
                             fontSize="10px"
                             fontWeight="bold"
                           >
@@ -444,7 +451,7 @@ export function MobileMindMapViewer({ data, onClose }: MobileMindMapViewerProps)
         ) : (
           /* Mode B: Hierarchical Outline Accordion List */
           <div className="w-full h-full overflow-y-auto p-4 space-y-2">
-            <div className="text-[11px] text-[#888892] px-1 mb-2">
+            <div className="text-[11px] text-muted-foreground px-1 mb-2">
               Daftar struktur hierarki materi (ketuk untuk ciutkan/mekarkan cabang):
             </div>
             {renderOutlineNode(data.root, 0)}
@@ -453,14 +460,14 @@ export function MobileMindMapViewer({ data, onClose }: MobileMindMapViewerProps)
       </div>
 
       {/* Footer with Thumbs Up/Down */}
-      <div className="px-4 py-2 border-t border-[#242428] bg-[#18181b] flex items-center justify-between shrink-0">
+      <div className="px-4 py-2 border-t border-border bg-card flex items-center justify-between shrink-0">
         <div className="flex items-center gap-1.5">
           <button
             type="button"
             onClick={() => handleFeedback("good")}
             className={cn(
               "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-colors",
-              feedback === "good" ? "bg-[#0066ff]/20 text-white" : "text-[#888892]"
+              feedback === "good" ? "bg-primary/20 text-primary" : "text-muted-foreground"
             )}
           >
             <ThumbsUp className="w-3.5 h-3.5" />
@@ -472,7 +479,7 @@ export function MobileMindMapViewer({ data, onClose }: MobileMindMapViewerProps)
             onClick={() => handleFeedback("bad")}
             className={cn(
               "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-colors",
-              feedback === "bad" ? "bg-rose-500/20 text-rose-300" : "text-[#888892]"
+              feedback === "bad" ? "bg-destructive/20 text-destructive" : "text-muted-foreground"
             )}
           >
             <ThumbsDown className="w-3.5 h-3.5" />
@@ -480,7 +487,7 @@ export function MobileMindMapViewer({ data, onClose }: MobileMindMapViewerProps)
           </button>
         </div>
 
-        <div className="text-[10px] text-[#606068]">
+        <div className="text-[10px] text-muted-foreground">
           Const Learn Mobile
         </div>
       </div>

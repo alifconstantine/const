@@ -112,18 +112,18 @@ export function CreateStudioArtifactDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[580px] p-0 bg-[#19191b] border border-[#2e2e33] text-[#e0e0e0] rounded-2xl shadow-2xl overflow-hidden font-sans [&>button]:hidden">
+      <DialogContent className="max-w-[580px] p-0 bg-card border border-border text-foreground rounded-2xl shadow-2xl overflow-hidden font-sans [&>button]:hidden">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-[#28282d] bg-[#1d1d21]">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border bg-card">
           <div className="flex items-center gap-2.5">
-            <div className="h-7 w-7 rounded-lg bg-[#28282e] border border-[#38383e] flex items-center justify-center">
+            <div className="h-7 w-7 rounded-lg bg-secondary border border-border flex items-center justify-center">
               {artifactType === "quiz" ? (
-                <HelpCircle className="h-4 w-4 text-[#5eead4]" />
+                <HelpCircle className="h-4 w-4 text-teal-500" />
               ) : (
-                <Layers className="h-4 w-4 text-[#f472b6]" />
+                <Layers className="h-4 w-4 text-pink-500" />
               )}
             </div>
-            <span className="text-sm font-semibold text-white tracking-tight">
+            <span className="text-sm font-semibold text-foreground tracking-tight">
               {artifactType === "quiz"
                 ? isIndo
                   ? "Kuis Interaktif"
@@ -137,7 +137,7 @@ export function CreateStudioArtifactDialog({
           <button
             type="button"
             onClick={() => onOpenChange(false)}
-            className="h-7 w-7 rounded-lg hover:bg-white/10 text-[#888888] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+            className="h-7 w-7 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
           >
             <X className="h-4 w-4" />
           </button>
@@ -146,20 +146,20 @@ export function CreateStudioArtifactDialog({
         <form onSubmit={handleSubmit} className="p-5 space-y-5">
           {/* Top Switcher: Quiz vs Flashcards */}
           <div className="space-y-1.5">
-            <label className="text-[11.5px] font-medium text-[#999999] uppercase tracking-wider">
+            <label className="text-[11.5px] font-medium text-muted-foreground uppercase tracking-wider">
               {isIndo ? "Pilih Format Belajar" : "Choose Learning Format"}
             </label>
-            <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-[#141416] border border-[#28282d]">
+            <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-secondary/60 border border-border">
               <button
                 type="button"
                 onClick={() => setArtifactType("quiz")}
                 className={`flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${
                   artifactType === "quiz"
-                    ? "bg-[#28282e] text-white shadow-xs border border-[#3d3d45]"
-                    : "text-[#888888] hover:text-[#d4d4d4]"
+                    ? "bg-card text-foreground shadow-xs border border-border"
+                    : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                <HelpCircle className="h-3.5 w-3.5 text-[#5eead4]" />
+                <HelpCircle className="h-3.5 w-3.5 text-teal-500" />
                 <span className="truncate">{isIndo ? "Kuis Pilihan Ganda" : "Interactive Quiz"}</span>
               </button>
               <button
@@ -167,11 +167,11 @@ export function CreateStudioArtifactDialog({
                 onClick={() => setArtifactType("flashcard")}
                 className={`flex items-center justify-center gap-2 py-2 rounded-lg text-xs font-medium transition-all cursor-pointer ${
                   artifactType === "flashcard"
-                    ? "bg-[#28282e] text-white shadow-xs border border-[#3d3d45]"
-                    : "text-[#888888] hover:text-[#d4d4d4]"
+                    ? "bg-card text-foreground shadow-xs border border-border"
+                    : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                <Layers className="h-3.5 w-3.5 text-[#f472b6]" />
+                <Layers className="h-3.5 w-3.5 text-pink-500" />
                 <span className="truncate">{isIndo ? "Kartu Flashcards" : "Flashcards Deck"}</span>
               </button>
             </div>
@@ -181,7 +181,7 @@ export function CreateStudioArtifactDialog({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* Jumlah Pertanyaan */}
               <div className="space-y-1.5">
-                <label className="text-[11.5px] font-medium text-[#999999]">
+                <label className="text-[11.5px] font-medium text-muted-foreground">
                   {artifactType === "quiz"
                     ? isIndo
                       ? "Jumlah Pertanyaan"
@@ -190,14 +190,14 @@ export function CreateStudioArtifactDialog({
                     ? "Jumlah Kartu"
                     : "Number of Cards"}
                 </label>
-                <div className="inline-flex w-full rounded-xl bg-[#141416] border border-[#28282d] p-0.5">
+                <div className="inline-flex w-full rounded-xl bg-secondary/60 border border-border p-0.5">
                   <button
                     type="button"
                     onClick={() => setCountLevel("less")}
                     className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
                       countLevel === "less"
-                        ? "bg-[#28282e] text-white shadow-xs"
-                        : "text-[#888888] hover:text-[#d4d4d4]"
+                        ? "bg-card text-foreground shadow-xs"
+                        : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
                     {isIndo ? "Sedikit (5)" : "Few (5)"}
@@ -207,12 +207,12 @@ export function CreateStudioArtifactDialog({
                     onClick={() => setCountLevel("standard")}
                     className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer flex items-center justify-center gap-1 ${
                       countLevel === "standard"
-                        ? "bg-[#28282e] text-white shadow-xs"
-                        : "text-[#888888] hover:text-[#d4d4d4]"
+                        ? "bg-card text-foreground shadow-xs"
+                        : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
                     {countLevel === "standard" && (
-                      <Check className="h-3 w-3 text-[#5eead4]" />
+                      <Check className="h-3 w-3 text-teal-500" />
                     )}
                     <span>{isIndo ? "Standar (10)" : "Standard (10)"}</span>
                   </button>
@@ -221,8 +221,8 @@ export function CreateStudioArtifactDialog({
                     onClick={() => setCountLevel("more")}
                     className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
                       countLevel === "more"
-                        ? "bg-[#28282e] text-white shadow-xs"
-                        : "text-[#888888] hover:text-[#d4d4d4]"
+                        ? "bg-card text-foreground shadow-xs"
+                        : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
                     {isIndo ? "Banyak (15)" : "Many (15)"}
@@ -232,17 +232,17 @@ export function CreateStudioArtifactDialog({
 
               {/* Tingkat Kesulitan */}
               <div className="space-y-1.5">
-                <label className="text-[11.5px] font-medium text-[#999999]">
+                <label className="text-[11.5px] font-medium text-muted-foreground">
                   {isIndo ? "Tingkat Kesulitan" : "Difficulty Level"}
                 </label>
-                <div className="inline-flex w-full rounded-xl bg-[#141416] border border-[#28282d] p-0.5">
+                <div className="inline-flex w-full rounded-xl bg-secondary/60 border border-border p-0.5">
                   <button
                     type="button"
                     onClick={() => setDifficulty("easy")}
                     className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
                       difficulty === "easy"
-                        ? "bg-[#28282e] text-white shadow-xs"
-                        : "text-[#888888] hover:text-[#d4d4d4]"
+                        ? "bg-card text-foreground shadow-xs"
+                        : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
                     {isIndo ? "Mudah" : "Easy"}
@@ -252,11 +252,11 @@ export function CreateStudioArtifactDialog({
                     onClick={() => setDifficulty("medium")}
                     className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer flex items-center justify-center gap-1 ${
                       difficulty === "medium"
-                        ? "bg-[#28282e] text-white shadow-xs"
-                        : "text-[#888888] hover:text-[#d4d4d4]"
+                        ? "bg-card text-foreground shadow-xs"
+                        : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
-                    {difficulty === "medium" && <Check className="h-3 w-3 text-[#5eead4]" />}
+                    {difficulty === "medium" && <Check className="h-3 w-3 text-teal-500" />}
                     <span>{isIndo ? "Sedang" : "Medium"}</span>
                   </button>
                   <button
@@ -264,8 +264,8 @@ export function CreateStudioArtifactDialog({
                     onClick={() => setDifficulty("hard")}
                     className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
                       difficulty === "hard"
-                        ? "bg-[#28282e] text-white shadow-xs"
-                        : "text-[#888888] hover:text-[#d4d4d4]"
+                        ? "bg-card text-foreground shadow-xs"
+                        : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
                     {isIndo ? "Sulit" : "Hard"}
@@ -276,16 +276,16 @@ export function CreateStudioArtifactDialog({
 
           {/* Sumber Dropdown */}
           <div className="space-y-1.5 relative">
-            <label className="text-[11.5px] font-medium text-[#999999]">
+            <label className="text-[11.5px] font-medium text-muted-foreground">
               {isIndo ? "Sumber Rujukan" : "Source Scope"}
             </label>
             <div className="relative">
               <button
                 type="button"
                 onClick={() => setIsSourceDropdownOpen(!isSourceDropdownOpen)}
-                className="w-full h-9 px-3 rounded-xl bg-[#141416] border border-[#28282d] hover:border-[#38383e] flex items-center justify-between text-xs text-left cursor-pointer transition-colors"
+                className="w-full h-9 px-3 rounded-xl bg-card border border-border hover:border-primary/50 flex items-center justify-between text-xs text-left cursor-pointer transition-colors"
               >
-                <span className="text-white font-medium truncate">
+                <span className="text-foreground font-medium truncate">
                   {selectedSourceIds.length === sources.length
                     ? isIndo
                       ? `Semua sumber (${sources.length} sumber)`
@@ -294,33 +294,33 @@ export function CreateStudioArtifactDialog({
                     ? `${selectedSourceIds.length} dari ${sources.length} sumber terpilih`
                     : `${selectedSourceIds.length} of ${sources.length} sources selected`}
                 </span>
-                <ChevronDown className="h-3.5 w-3.5 text-[#888888] shrink-0" />
+                <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
               </button>
 
               {isSourceDropdownOpen && (
-                <div className="absolute top-full mt-1.5 left-0 right-0 z-30 bg-[#1a1a1d] border border-[#333338] rounded-xl p-2 shadow-2xl">
+                <div className="absolute top-full mt-1.5 left-0 right-0 z-30 bg-popover border border-border rounded-xl p-2 shadow-2xl text-popover-foreground">
                   <ScrollArea className="max-h-48 w-full" viewportClassName="space-y-1 pr-1">
                     <button
                       type="button"
                       onClick={handleSelectAllSources}
-                      className="w-full text-left px-2 py-1.5 rounded-lg text-xs hover:bg-white/5 flex items-center justify-between font-medium text-[#5eead4] cursor-pointer"
+                      className="w-full text-left px-2 py-1.5 rounded-lg text-xs hover:bg-muted flex items-center justify-between font-medium text-teal-600 dark:text-teal-400 cursor-pointer"
                     >
                       <span>{selectedSourceIds.length === sources.length ? (isIndo ? "Batalkan Semua" : "Deselect All") : (isIndo ? "Pilih Semua Sumber" : "Select All")}</span>
                     </button>
-                    <div className="h-px bg-[#28282d] my-1" />
+                    <div className="h-px bg-border my-1" />
                     {sources.map((s) => (
                       <button
                         key={s.id}
                         type="button"
                         onClick={() => handleToggleSource(s.id)}
-                        className="w-full text-left px-2 py-1.5 rounded-lg text-xs hover:bg-white/5 flex items-center justify-between gap-2 cursor-pointer text-[#d4d4d4]"
+                        className="w-full text-left px-2 py-1.5 rounded-lg text-xs hover:bg-muted flex items-center justify-between gap-2 cursor-pointer text-foreground"
                       >
                         <div className="flex items-center gap-2 truncate">
-                          <FileText className="h-3.5 w-3.5 text-[#888888] shrink-0" />
+                          <FileText className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                           <span className="truncate">{s.title}</span>
                         </div>
                         {selectedSourceIds.includes(s.id) && (
-                          <Check className="h-3.5 w-3.5 text-[#5eead4] shrink-0" />
+                          <Check className="h-3.5 w-3.5 text-teal-500 shrink-0" />
                         )}
                       </button>
                     ))}
@@ -333,10 +333,10 @@ export function CreateStudioArtifactDialog({
           {/* Apa topiknya? (Textarea Input) */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
-              <label className="text-[11.5px] font-medium text-[#999999]">
+              <label className="text-[11.5px] font-medium text-muted-foreground">
                 {isIndo ? "Apa topiknya? (Opsional)" : "What is the topic? (Optional)"}
               </label>
-              <span className="text-[10px] text-[#777777]">
+              <span className="text-[10px] text-muted-foreground/80">
                 {isIndo ? "Kosongkan untuk merangkum seluruh materi" : "Leave blank for general summary"}
               </span>
             </div>
@@ -349,7 +349,7 @@ export function CreateStudioArtifactDialog({
                   ? "Contoh: Identifikasi 5 perbedaan utama antara model reasoning dan non-reasoning berdasarkan data rujukan."
                   : "E.g., Compare 5 key differences between reasoning and non-reasoning models."
               }
-              className="w-full p-3 rounded-xl bg-[#141416] border border-[#28282d] text-xs text-white placeholder-[#555555] focus:outline-none focus:border-[#0066ff] resize-none transition-colors"
+              className="w-full p-3 rounded-xl bg-card border border-border text-xs text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-primary resize-none transition-colors"
             />
 
             {/* Quick Topic Chips */}
@@ -359,7 +359,7 @@ export function CreateStudioArtifactDialog({
                   key={idx}
                   type="button"
                   onClick={() => handleChipClick(chip)}
-                  className="px-2.5 py-1 rounded-lg bg-[#202024] hover:bg-[#28282e] border border-[#2f2f35] hover:border-[#3f3f48] text-[11px] text-[#a0a0a0] hover:text-white transition-all cursor-pointer active:scale-98"
+                  className="px-2.5 py-1 rounded-lg bg-secondary/70 hover:bg-secondary border border-border hover:border-border/80 text-[11px] text-muted-foreground hover:text-foreground transition-all cursor-pointer active:scale-98"
                 >
                   {chip}
                 </button>
@@ -368,10 +368,10 @@ export function CreateStudioArtifactDialog({
           </div>
 
           {/* Footer */}
-          <div className="pt-2 flex items-center justify-between border-t border-[#28282d]">
+          <div className="pt-2 flex items-center justify-between border-t border-border">
             {/* AI Estimation Indicator */}
-            <div className="flex items-center gap-2 text-[11px] text-[#888888]">
-              <Sparkles className="h-3.5 w-3.5 text-[#5eead4]" />
+            <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
+              <Sparkles className="h-3.5 w-3.5 text-teal-500" />
               <span>
                 {isIndo ? "Penggunaan AI Terverifikasi" : "Verified AI Generation"}
               </span>
@@ -381,14 +381,14 @@ export function CreateStudioArtifactDialog({
               <button
                 type="button"
                 onClick={() => onOpenChange(false)}
-                className="px-3.5 py-2 rounded-xl bg-[#202024] hover:bg-[#28282d] text-xs font-medium text-[#a0a0a0] hover:text-white transition-colors cursor-pointer"
+                className="px-3.5 py-2 rounded-xl bg-secondary hover:bg-secondary/80 text-xs font-medium text-secondary-foreground transition-colors cursor-pointer"
               >
                 {isIndo ? "Buat nanti" : "Cancel"}
               </button>
               <button
                 type="submit"
                 onClick={handleSubmit as any}
-                className="px-4 py-2 rounded-xl bg-[#0066ff] hover:bg-[#1a75ff] text-xs font-semibold text-white shadow-md transition-all cursor-pointer active:scale-98 flex items-center gap-1.5"
+                className="px-4 py-2 rounded-xl bg-primary hover:bg-primary/90 text-xs font-semibold text-primary-foreground shadow-md transition-all cursor-pointer active:scale-98 flex items-center gap-1.5"
               >
                 <Sparkles className="h-3.5 w-3.5" />
                 <span>{isIndo ? "Buat sekarang" : "Generate Now"}</span>
@@ -398,5 +398,6 @@ export function CreateStudioArtifactDialog({
         </form>
       </DialogContent>
     </Dialog>
+
   );
 }

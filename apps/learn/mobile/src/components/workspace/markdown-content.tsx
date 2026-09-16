@@ -69,8 +69,8 @@ export function MarkdownContent({
     <div
       onClick={handleClick}
       className={cn(
-        "space-y-2.5 text-[13px] sm:text-[14px] leading-[1.65] text-[#d4d4d4] select-text font-sans [&_strong]:font-semibold [&_b]:font-semibold [&_strong]:text-[#ffffff] [&_b]:text-[#ffffff]",
-        "[&_.source-ref-badge]:inline-flex [&_.source-ref-badge]:items-center [&_.source-ref-badge]:justify-center [&_.source-ref-badge]:w-4.5 [&_.source-ref-badge]:h-4.5 [&_.source-ref-badge]:min-w-[18px] [&_.source-ref-badge]:min-h-[18px] [&_.source-ref-badge]:rounded-full [&_.source-ref-badge]:bg-[#26282d] [&_.source-ref-badge]:hover:bg-[#34373d] [&_.source-ref-badge]:border [&_.source-ref-badge]:border-white/15 [&_.source-ref-badge]:text-[#9ca3af] hover:[&_.source-ref-badge]:text-white [&_.source-ref-badge]:text-[10px] [&_.source-ref-badge]:font-medium [&_.source-ref-badge]:no-underline [&_.source-ref-badge]:cursor-pointer [&_.source-ref-badge]:select-none [&_.source-ref-badge]:align-middle [&_.source-ref-badge]:-translate-y-[1px] [&_.source-ref-badge]:mx-0.5 [&_.source-ref-badge]:transition-all [&_.source-ref-badge]:active:scale-90 shadow-2xs",
+        "space-y-2.5 text-[13px] sm:text-[14px] leading-[1.65] text-foreground dark:text-white select-text font-sans [&_strong]:font-semibold [&_b]:font-semibold [&_strong]:text-foreground dark:[&_strong]:text-white [&_b]:text-foreground dark:[&_b]:text-white",
+        "[&_.source-ref-badge]:inline-flex [&_.source-ref-badge]:items-center [&_.source-ref-badge]:justify-center [&_.source-ref-badge]:w-4.5 [&_.source-ref-badge]:h-4.5 [&_.source-ref-badge]:min-w-[18px] [&_.source-ref-badge]:min-h-[18px] [&_.source-ref-badge]:rounded-full [&_.source-ref-badge]:bg-secondary hover:[&_.source-ref-badge]:bg-secondary/80 [&_.source-ref-badge]:border [&_.source-ref-badge]:border-border [&_.source-ref-badge]:text-muted-foreground hover:[&_.source-ref-badge]:text-foreground [&_.source-ref-badge]:text-[10px] [&_.source-ref-badge]:font-medium [&_.source-ref-badge]:no-underline [&_.source-ref-badge]:cursor-pointer [&_.source-ref-badge]:select-none [&_.source-ref-badge]:align-middle [&_.source-ref-badge]:-translate-y-[1px] [&_.source-ref-badge]:mx-0.5 [&_.source-ref-badge]:transition-all [&_.source-ref-badge]:active:scale-90 shadow-2xs",
         className
       )}
     >
@@ -103,12 +103,12 @@ function TokenRenderer({
       const Tag = `h${Math.min(heading.depth, 6)}` as keyof React.JSX.IntrinsicElements;
       const sizeClasses =
         heading.depth === 1
-          ? "text-[16px] font-semibold text-[#ffffff] mt-3.5 mb-1.5 tracking-tight"
+          ? "text-[16px] font-semibold text-foreground dark:text-white mt-3.5 mb-1.5 tracking-tight"
           : heading.depth === 2
-          ? "text-[14.5px] font-semibold text-[#f0f0f0] mt-3 mb-1 tracking-tight"
+          ? "text-[14.5px] font-semibold text-foreground dark:text-white mt-3 mb-1 tracking-tight"
           : heading.depth === 3
-          ? "text-[13.5px] font-medium text-[#e4e4e4] mt-2.5 mb-1 tracking-tight"
-          : "text-[13px] font-medium text-[#d4d4d4] mt-2 mb-1";
+          ? "text-[13.5px] font-medium text-foreground dark:text-white mt-2.5 mb-1 tracking-tight"
+          : "text-[13px] font-medium text-foreground dark:text-white mt-2 mb-1";
       return (
         <Tag className={`${sizeClasses} font-sans`}>
           <InlineRenderer text={heading.text} sourcesMap={sourcesMap} />
@@ -119,7 +119,7 @@ function TokenRenderer({
     case "paragraph": {
       const paragraph = token as Tokens.Paragraph;
       return (
-        <p className="leading-[1.65] text-[#d4d4d4] my-1.5 font-sans">
+        <p className="leading-[1.65] text-foreground dark:text-white my-1.5 font-sans">
           <InlineRenderer text={paragraph.text} sourcesMap={sourcesMap} />
         </p>
       );
@@ -157,10 +157,10 @@ function TokenRenderer({
       if (list.ordered) {
         const start = list.start || 1;
         return (
-          <ol className={cn("space-y-1.5 my-2 pl-0.5 text-[#d4d4d4]", isNested && "my-1 pl-2 space-y-1")}>
+          <ol className={cn("space-y-1.5 my-2 pl-0.5 text-foreground dark:text-white", isNested && "my-1 pl-2 space-y-1")}>
             {list.items.map((item: Tokens.ListItem, idx: number) => (
               <li key={idx} className="flex items-start gap-2 leading-[1.6]">
-                <span className="select-none font-mono text-[11px] text-[#969696] pt-0.5 w-4 text-right shrink-0">
+                <span className="select-none font-mono text-[11px] text-muted-foreground pt-0.5 w-4 text-right shrink-0">
                   {start + idx}.
                 </span>
                 <div className="flex-1 min-w-0">
@@ -176,10 +176,10 @@ function TokenRenderer({
         );
       }
       return (
-        <ul className={cn("space-y-1.5 my-2 pl-0.5 text-[#d4d4d4]", isNested && "my-1 pl-2.5 space-y-1")}>
+        <ul className={cn("space-y-1.5 my-2 pl-0.5 text-foreground dark:text-white", isNested && "my-1 pl-2.5 space-y-1")}>
           {list.items.map((item: Tokens.ListItem, idx: number) => (
             <li key={idx} className="flex items-start gap-2.5 leading-[1.6]">
-              <span className="select-none text-[#969696] text-[13px] leading-none pt-1 shrink-0">
+              <span className="select-none text-muted-foreground text-[13px] leading-none pt-1 shrink-0">
                 •
               </span>
               <div className="flex-1 min-w-0">
@@ -198,7 +198,7 @@ function TokenRenderer({
     case "blockquote": {
       const bq = token as Tokens.Blockquote;
       return (
-        <blockquote className="border-l-2 border-primary/60 pl-3 my-2 text-[#b0b0b0] italic font-sans">
+        <blockquote className="border-l-2 border-primary/60 pl-3 my-2 text-muted-foreground italic font-sans">
           {bq.tokens ? (
             bq.tokens.map((subToken, subIdx) => (
               <TokenRenderer
@@ -216,7 +216,7 @@ function TokenRenderer({
     }
 
     case "hr":
-      return <hr className="border-[#333333] my-4" />;
+      return <hr className="border-border my-4" />;
 
     case "space":
       return null;
@@ -382,12 +382,12 @@ function TableBlock({
     <>
       <div
         onClick={handleCitationClick}
-        className="relative group/tbl my-3.5 rounded-xl border border-[#383838] bg-[#1b1b1b] overflow-hidden select-text"
+        className="relative group/tbl my-3.5 rounded-xl border border-border/80 bg-card overflow-hidden select-text"
       >
-        <div className="flex items-center justify-between px-3 py-1.5 bg-[#222222] border-b border-[#383838] gap-1">
+        <div className="flex items-center justify-between px-3 py-1.5 bg-muted/40 border-b border-border/60 gap-1">
           <div className="flex items-center gap-1.5">
-            <span className="text-[11px] font-mono text-[#969696]">Table</span>
-            <span className="text-[10px] text-[#777777] font-mono">
+            <span className="text-[11px] font-mono text-muted-foreground">Table</span>
+            <span className="text-[10px] text-muted-foreground/80 font-mono">
               ({rows.length} rows)
             </span>
           </div>
@@ -395,11 +395,11 @@ function TableBlock({
             <button
               type="button"
               onClick={handleCopy}
-              className="p-1 rounded text-[#969696] hover:text-[#ffffff] hover:bg-white/5 transition-colors cursor-pointer"
+              className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
               title={copied ? "Copied" : "Copy TSV"}
             >
               {copied ? (
-                <Check className="w-3.5 h-3.5 text-[#4ade80]" />
+                <Check className="w-3.5 h-3.5 text-emerald-500" />
               ) : (
                 <Copy className="w-3.5 h-3.5" />
               )}
@@ -407,7 +407,7 @@ function TableBlock({
             <button
               type="button"
               onClick={handleDownloadCsv}
-              className="p-1 rounded text-[#969696] hover:text-[#ffffff] hover:bg-white/5 transition-colors cursor-pointer"
+              className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
               title="Download CSV"
             >
               <Download className="w-3.5 h-3.5" />
@@ -415,7 +415,7 @@ function TableBlock({
             <button
               type="button"
               onClick={() => setIsExpanded(true)}
-              className="p-1 rounded text-[#969696] hover:text-[#ffffff] hover:bg-white/5 transition-colors cursor-pointer"
+              className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
               title="Expand table"
             >
               <Maximize2 className="w-3.5 h-3.5" />
@@ -426,12 +426,12 @@ function TableBlock({
         <div className="overflow-x-auto touch-pan-x scrollbar-thin">
           <table className="w-full text-left border-collapse text-[12.5px]">
             <thead>
-              <tr className="bg-[#222222] border-b border-[#383838]">
+              <tr className="bg-muted/30 border-b border-border/60">
                 {header.map((col, idx) => (
                   <th
                     key={idx}
                     className={cn(
-                      "px-3 py-2 text-[11px] font-medium text-[#969696] tracking-wider",
+                      "px-3 py-2 text-[11px] font-medium text-muted-foreground tracking-wider",
                       idx === 0 ? "whitespace-nowrap w-12 text-center" : "min-w-[130px]",
                       getAlignClass(idx)
                     )}
@@ -445,15 +445,15 @@ function TableBlock({
               {rows.map((row, rowIdx) => (
                 <tr
                   key={rowIdx}
-                  className="border-b border-[#2e2e2e] last:border-b-0 hover:bg-white/[0.02] transition-colors"
+                  className="border-b border-border/40 last:border-b-0 hover:bg-muted/20 transition-colors"
                 >
                   {row.map((cell, cellIdx) => (
                     <td
                       key={cellIdx}
                       className={cn(
-                        "px-3 py-2 leading-relaxed text-[#d4d4d4] align-top",
+                        "px-3 py-2 leading-relaxed text-foreground dark:text-white align-top",
                         cellIdx === 0
-                          ? "font-medium text-[#ffffff] whitespace-nowrap w-12 text-center"
+                          ? "font-medium text-foreground dark:text-white whitespace-nowrap w-12 text-center"
                           : "min-w-[130px] whitespace-normal break-words",
                         getAlignClass(cellIdx)
                       )}
@@ -473,26 +473,26 @@ function TableBlock({
           role="dialog"
           aria-modal="true"
           onClick={handleCitationClick}
-          className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150 [&_.source-ref-badge]:inline-flex [&_.source-ref-badge]:items-center [&_.source-ref-badge]:justify-center [&_.source-ref-badge]:w-4.5 [&_.source-ref-badge]:h-4.5 [&_.source-ref-badge]:min-w-[18px] [&_.source-ref-badge]:min-h-[18px] [&_.source-ref-badge]:rounded-full [&_.source-ref-badge]:bg-[#26282d] [&_.source-ref-badge]:hover:bg-[#34373d] [&_.source-ref-badge]:border [&_.source-ref-badge]:border-white/15 [&_.source-ref-badge]:text-[#9ca3af] hover:[&_.source-ref-badge]:text-white [&_.source-ref-badge]:text-[10px] [&_.source-ref-badge]:font-medium [&_.source-ref-badge]:no-underline [&_.source-ref-badge]:cursor-pointer [&_.source-ref-badge]:select-none [&_.source-ref-badge]:align-middle [&_.source-ref-badge]:-translate-y-[1px] [&_.source-ref-badge]:mx-0.5 [&_.source-ref-badge]:transition-all [&_.source-ref-badge]:active:scale-90 shadow-2xs"
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-black/70 backdrop-blur-sm animate-in fade-in duration-150 [&_.source-ref-badge]:inline-flex [&_.source-ref-badge]:items-center [&_.source-ref-badge]:justify-center [&_.source-ref-badge]:w-4.5 [&_.source-ref-badge]:h-4.5 [&_.source-ref-badge]:min-w-[18px] [&_.source-ref-badge]:min-h-[18px] [&_.source-ref-badge]:rounded-full [&_.source-ref-badge]:bg-secondary hover:[&_.source-ref-badge]:bg-secondary/80 [&_.source-ref-badge]:border [&_.source-ref-badge]:border-border [&_.source-ref-badge]:text-muted-foreground hover:[&_.source-ref-badge]:text-foreground [&_.source-ref-badge]:text-[10px] [&_.source-ref-badge]:font-medium [&_.source-ref-badge]:no-underline [&_.source-ref-badge]:cursor-pointer [&_.source-ref-badge]:select-none [&_.source-ref-badge]:align-middle [&_.source-ref-badge]:-translate-y-[1px] [&_.source-ref-badge]:mx-0.5 [&_.source-ref-badge]:transition-all [&_.source-ref-badge]:active:scale-90 shadow-2xs"
         >
-          <div className="w-full max-h-[85vh] flex flex-col bg-[#161616] border border-[#383838] rounded-2xl overflow-hidden">
-            <div className="flex items-center justify-between px-4 py-2.5 bg-[#222222] border-b border-[#383838]">
-              <span className="text-xs font-medium text-[#ffffff]">
+          <div className="w-full max-h-[85vh] flex flex-col bg-card border border-border rounded-2xl overflow-hidden shadow-2xl">
+            <div className="flex items-center justify-between px-4 py-2.5 bg-muted/40 border-b border-border">
+              <span className="text-xs font-medium text-foreground">
                 Table ({rows.length} rows)
               </span>
               <div className="flex items-center gap-1.5">
                 <button
                   type="button"
                   onClick={handleCopy}
-                  className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-lg border border-[#383838] hover:bg-white/5 text-[#d4d4d4] cursor-pointer"
+                  className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-lg border border-border hover:bg-muted text-foreground cursor-pointer"
                 >
-                  {copied ? <Check className="w-3 h-3 text-[#4ade80]" /> : <Copy className="w-3 h-3" />}
+                  {copied ? <Check className="w-3 h-3 text-emerald-500" /> : <Copy className="w-3 h-3" />}
                   <span>{copied ? "Copied" : "Copy"}</span>
                 </button>
                 <button
                   type="button"
                   onClick={handleDownloadCsv}
-                  className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-lg border border-[#383838] hover:bg-white/5 text-[#d4d4d4] cursor-pointer"
+                  className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-lg border border-border hover:bg-muted text-foreground cursor-pointer"
                 >
                   <Download className="w-3 h-3" />
                   <span>CSV</span>
@@ -500,7 +500,7 @@ function TableBlock({
                 <button
                   type="button"
                   onClick={() => setIsExpanded(false)}
-                  className="p-1 rounded-lg hover:bg-white/10 text-[#969696] hover:text-[#ffffff] cursor-pointer ml-0.5"
+                  className="p-1 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground cursor-pointer ml-0.5"
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -509,12 +509,12 @@ function TableBlock({
             <div className="flex-1 overflow-auto touch-pan-x p-3">
               <table className="w-full text-left border-collapse text-[12.5px]">
                 <thead>
-                  <tr className="bg-[#222222] border-b border-[#383838]">
+                  <tr className="bg-muted/30 border-b border-border/60">
                     {header.map((col, idx) => (
                       <th
                         key={idx}
                         className={cn(
-                          "px-3 py-2 text-[11px] font-medium text-[#969696] tracking-wider",
+                          "px-3 py-2 text-[11px] font-medium text-muted-foreground tracking-wider",
                           idx === 0 ? "whitespace-nowrap w-12 text-center" : "min-w-[130px]",
                           getAlignClass(idx)
                         )}
@@ -526,14 +526,14 @@ function TableBlock({
                 </thead>
                 <tbody>
                   {rows.map((row, rowIdx) => (
-                    <tr key={rowIdx} className="border-b border-[#2e2e2e] last:border-b-0">
+                    <tr key={rowIdx} className="border-b border-border/40 last:border-b-0">
                       {row.map((cell, cellIdx) => (
                         <td
                           key={cellIdx}
                           className={cn(
-                            "px-3 py-2 leading-relaxed text-[#d4d4d4] align-top",
+                            "px-3 py-2 leading-relaxed text-foreground dark:text-white align-top",
                             cellIdx === 0
-                              ? "font-medium text-[#ffffff] whitespace-nowrap w-12 text-center"
+                              ? "font-medium text-foreground dark:text-white whitespace-nowrap w-12 text-center"
                               : "min-w-[130px] whitespace-normal break-words",
                             getAlignClass(cellIdx)
                           )}
@@ -567,21 +567,21 @@ function CodeBlock({ code, language }: { code: string; language: string }) {
   };
 
   return (
-    <div className="rounded-xl overflow-hidden bg-[#1b1b1b] border border-[#2e2e2e] my-2.5 select-none">
-      <div className="flex items-center justify-between px-3 py-1.5 bg-[#222222] border-b border-[#2e2e2e] text-xs">
-        <span className="font-mono text-[10px] text-[#969696] lowercase">
+    <div className="rounded-xl overflow-hidden bg-muted/30 border border-border/60 my-2.5 select-none">
+      <div className="flex items-center justify-between px-3 py-1.5 bg-muted/60 border-b border-border/50 text-xs">
+        <span className="font-mono text-[10px] text-muted-foreground lowercase">
           {language}
         </span>
         <button
           type="button"
           onClick={handleCopy}
-          className="flex items-center gap-1 text-[11px] text-[#969696] hover:text-[#ffffff] transition-colors cursor-pointer py-0.5 px-1.5 rounded hover:bg-white/5"
+          className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer py-0.5 px-1.5 rounded hover:bg-muted"
           title="Copy code"
         >
           {copied ? (
             <>
-              <Check className="w-3 h-3 text-[#4ade80]" />
-              <span className="text-[#4ade80]">Copied</span>
+              <Check className="w-3 h-3 text-emerald-500" />
+              <span className="text-emerald-500">Copied</span>
             </>
           ) : (
             <>
@@ -592,7 +592,7 @@ function CodeBlock({ code, language }: { code: string; language: string }) {
         </button>
       </div>
 
-      <pre className="p-3 overflow-x-auto text-[12px] leading-relaxed font-mono text-[#d4d4d4] select-text">
+      <pre className="p-3 overflow-x-auto text-[12px] leading-relaxed font-mono text-foreground/90 select-text">
         <code>{code}</code>
       </pre>
     </div>
@@ -622,29 +622,29 @@ function MathBlock({
   const html = renderKatex(math, displayMode);
 
   return (
-    <div className="rounded-xl overflow-hidden bg-[#1b1b1b] border border-[#2e2e2e] my-2.5 select-none">
-      <div className="flex items-center justify-between px-3 py-1.5 bg-[#222222] border-b border-[#2e2e2e] text-xs">
-        <span className="font-mono text-[10px] text-[#969696] uppercase tracking-wider">
+    <div className="rounded-xl overflow-hidden bg-muted/25 border border-border/60 my-2.5 select-none">
+      <div className="flex items-center justify-between px-3 py-1.5 bg-muted/50 border-b border-border/40 text-xs">
+        <span className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider">
           LaTeX
         </span>
         <div className="flex items-center gap-1.5">
           <button
             type="button"
             onClick={() => setShowSource(!showSource)}
-            className="text-[11px] text-[#969696] hover:text-[#ffffff] transition-colors cursor-pointer py-0.5 px-1.5 rounded hover:bg-white/5"
+            className="text-[11px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer py-0.5 px-1.5 rounded hover:bg-muted"
           >
             {showSource ? "Rendered" : "TeX"}
           </button>
           <button
             type="button"
             onClick={handleCopy}
-            className="flex items-center gap-1 text-[11px] text-[#969696] hover:text-[#ffffff] transition-colors cursor-pointer py-0.5 px-1.5 rounded hover:bg-white/5"
+            className="flex items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer py-0.5 px-1.5 rounded hover:bg-muted"
             title="Copy LaTeX"
           >
             {copied ? (
               <>
-                <Check className="w-3 h-3 text-[#4ade80]" />
-                <span className="text-[#4ade80]">Copied</span>
+                <Check className="w-3 h-3 text-emerald-500" />
+                <span className="text-emerald-500">Copied</span>
               </>
             ) : (
               <>
@@ -657,12 +657,12 @@ function MathBlock({
       </div>
 
       {showSource ? (
-        <pre className="p-3 overflow-x-auto text-[12px] leading-relaxed font-mono text-[#d4d4d4] select-text bg-black/20">
+        <pre className="p-3 overflow-x-auto text-[12px] leading-relaxed font-mono text-foreground/90 select-text bg-muted/10">
           <code>{math}</code>
         </pre>
       ) : (
         <div
-          className="p-3 overflow-x-auto text-center leading-normal text-[#e4e4e4] select-text font-sans touch-pan-x [&_.katex-display]:my-0"
+          className="p-3 overflow-x-auto text-center leading-normal text-foreground select-text font-sans touch-pan-x [&_.katex-display]:my-0"
           dangerouslySetInnerHTML={{ __html: html }}
         />
       )}
@@ -683,7 +683,7 @@ function InlineRenderer({
     return (
       <span
         dangerouslySetInnerHTML={{ __html: html }}
-        className="[&_code]:bg-[#242424] [&_code]:text-[#ececec] [&_code]:font-mono [&_code]:text-[11.5px] [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:border [&_code]:border-[#383838] [&_strong]:font-semibold [&_b]:font-semibold [&_strong]:text-[#ffffff] [&_em]:italic [&_em]:text-[#d4d4d4] [&_a:not(.source-ref-badge)]:text-[#ffffff] [&_a:not(.source-ref-badge)]:underline [&_a:not(.source-ref-badge)]:decoration-[#666666] [&_a:not(.source-ref-badge)]:hover:decoration-white cursor-text [&_.source-ref-badge]:inline-flex [&_.source-ref-badge]:items-center [&_.source-ref-badge]:justify-center [&_.source-ref-badge]:w-4.5 [&_.source-ref-badge]:h-4.5 [&_.source-ref-badge]:min-w-[18px] [&_.source-ref-badge]:min-h-[18px] [&_.source-ref-badge]:rounded-full [&_.source-ref-badge]:bg-[#26282d] [&_.source-ref-badge]:hover:bg-[#34373d] [&_.source-ref-badge]:border [&_.source-ref-badge]:border-white/15 [&_.source-ref-badge]:text-[#9ca3af] hover:[&_.source-ref-badge]:text-white [&_.source-ref-badge]:text-[10px] [&_.source-ref-badge]:font-medium [&_.source-ref-badge]:no-underline [&_.source-ref-badge]:cursor-pointer [&_.source-ref-badge]:select-none [&_.source-ref-badge]:align-middle [&_.source-ref-badge]:-translate-y-[1px] [&_.source-ref-badge]:mx-0.5 [&_.source-ref-badge]:transition-all [&_.source-ref-badge]:active:scale-90"
+        className="[&_code]:bg-muted/80 [&_code]:text-foreground dark:[&_code]:text-white [&_code]:font-mono [&_code]:text-[11.5px] [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:border [&_code]:border-border/60 [&_strong]:font-semibold [&_b]:font-semibold [&_strong]:text-foreground dark:[&_strong]:text-white [&_b]:text-foreground dark:[&_b]:text-white [&_em]:italic [&_em]:text-foreground/90 dark:[&_em]:text-white [&_a:not(.source-ref-badge)]:text-primary dark:[&_a:not(.source-ref-badge)]:text-sky-400 [&_a:not(.source-ref-badge)]:underline [&_a:not(.source-ref-badge)]:decoration-primary/40 [&_a:not(.source-ref-badge)]:hover:decoration-primary cursor-text [&_.source-ref-badge]:inline-flex [&_.source-ref-badge]:items-center [&_.source-ref-badge]:justify-center [&_.source-ref-badge]:w-4.5 [&_.source-ref-badge]:h-4.5 [&_.source-ref-badge]:min-w-[18px] [&_.source-ref-badge]:min-h-[18px] [&_.source-ref-badge]:rounded-full [&_.source-ref-badge]:bg-secondary hover:[&_.source-ref-badge]:bg-secondary/80 [&_.source-ref-badge]:border [&_.source-ref-badge]:border-border [&_.source-ref-badge]:text-muted-foreground hover:[&_.source-ref-badge]:text-foreground [&_.source-ref-badge]:text-[10px] [&_.source-ref-badge]:font-medium [&_.source-ref-badge]:no-underline [&_.source-ref-badge]:cursor-pointer [&_.source-ref-badge]:select-none [&_.source-ref-badge]:align-middle [&_.source-ref-badge]:-translate-y-[1px] [&_.source-ref-badge]:mx-0.5 [&_.source-ref-badge]:transition-all [&_.source-ref-badge]:active:scale-90"
       />
     );
   }

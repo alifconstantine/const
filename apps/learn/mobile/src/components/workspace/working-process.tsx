@@ -103,26 +103,26 @@ export function ThinkingProcess({
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
-        className="inline-flex items-center gap-1.5 text-[12.5px] text-[#888888] hover:text-[#d4d4d4] transition-colors cursor-pointer w-fit py-0.5 select-none"
+        className="inline-flex items-center gap-1.5 text-[12.5px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer w-fit py-0.5 select-none"
       >
         <span>{thoughtLabel()}</span>
         <ChevronDown
-          className="w-3 h-3 text-[#777777] transition-transform duration-200 ease-out shrink-0"
+          className="w-3 h-3 text-muted-foreground transition-transform duration-200 ease-out shrink-0"
           style={{ transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)" }}
         />
       </button>
 
       <SmoothCollapse isOpen={isOpen}>
-        <div className="pt-1.5 pb-2 text-[12px] leading-relaxed text-[#888888] select-text">
+        <div className="pt-1.5 pb-2 text-[12px] leading-relaxed text-muted-foreground select-text">
           <ScrollArea className="w-full max-h-56 pr-2.5 [&>div>div[style]]:!block">
             {hasThinking ? (
               <MarkdownContent
                 content={thinking}
-                className="text-[12px] leading-relaxed text-[#888888] [&_strong]:font-semibold [&_strong]:text-[#d4d4d4] [&_strong]:block [&_strong]:mb-0.5 [&_h1]:text-[13px] [&_h1]:font-semibold [&_h1]:text-[#d4d4d4] [&_h1]:mb-1 [&_h2]:text-[12.5px] [&_h2]:font-semibold [&_h2]:text-[#d4d4d4] [&_h2]:mb-1 [&_h3]:text-[12px] [&_h3]:font-semibold [&_h3]:text-[#d4d4d4] [&_h3]:mb-0.5 [&_p]:my-1"
+                className="text-[12px] leading-relaxed text-muted-foreground [&_strong]:font-semibold [&_strong]:text-foreground [&_strong]:block [&_strong]:mb-0.5 [&_h1]:text-[13px] [&_h1]:font-semibold [&_h1]:text-foreground [&_h1]:mb-1 [&_h2]:text-[12.5px] [&_h2]:font-semibold [&_h2]:text-foreground [&_h2]:mb-1 [&_h3]:text-[12px] [&_h3]:font-semibold [&_h3]:text-foreground [&_h3]:mb-0.5 [&_p]:my-1"
               />
             ) : (
-              <div className="flex items-center gap-2 py-1 text-xs text-[#777777]">
-                <Loader2 className="w-3 h-3 animate-spin text-[#e79737]" />
+              <div className="flex items-center gap-2 py-1 text-xs text-muted-foreground">
+                <Loader2 className="w-3 h-3 animate-spin text-amber-500" />
                 <span>Thinking...</span>
               </div>
             )}

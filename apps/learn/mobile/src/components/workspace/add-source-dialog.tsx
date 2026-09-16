@@ -296,7 +296,7 @@ export function AddSourceDialog({
             <div className="mt-2 mb-5 max-w-[340px]">
               <h2 className="text-lg sm:text-xl font-medium tracking-tight text-foreground leading-snug">
                 {t("addSourceDialogTitle")}{" "}
-                <span className="text-[#34d399] font-medium">{t("addSourceDialogHighlight")}</span>
+                <span className="text-emerald-500 font-medium">{t("addSourceDialogHighlight")}</span>
               </h2>
             </div>
           )}

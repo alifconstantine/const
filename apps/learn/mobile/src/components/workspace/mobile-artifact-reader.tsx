@@ -61,21 +61,21 @@ export function MobileArtifactReader({
 
   return (
     <div
-      className="fixed inset-0 z-50 bg-[#141416] text-[#ededed] flex flex-col font-sans select-none animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 bg-background text-foreground flex flex-col font-sans select-none animate-in fade-in duration-200"
       role="dialog"
       aria-modal="true"
     >
       {/* Top Navigation Bar */}
-      <header className="h-14 px-3 border-b border-[#2d2d32] bg-[#1a1a1d] flex items-center justify-between shrink-0">
+      <header className="h-14 px-3 border-b border-border bg-card flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2.5 min-w-0 flex-1 mr-2">
-          <div className="h-8 w-8 rounded-xl bg-[#26262a] border border-[#38383e] flex items-center justify-center text-white shrink-0">
+          <div className="h-8 w-8 rounded-xl bg-secondary border border-border flex items-center justify-center text-foreground shrink-0">
             {isQuiz ? <HelpCircle className="h-4 w-4" /> : <Layers className="h-4 w-4" />}
           </div>
           <div className="min-w-0 flex-1">
-            <h1 className="text-xs font-semibold text-white truncate">
+            <h1 className="text-xs font-semibold text-foreground truncate">
               {artifact.title}
             </h1>
-            <div className="text-[10px] text-[#888888] flex items-center gap-1.5">
+            <div className="text-[10px] text-muted-foreground flex items-center gap-1.5">
               <span>{isQuiz ? (isIndo ? "Kuis Interaktif" : "Quiz") : (isIndo ? "Kartu Flashcard" : "Flashcards")}</span>
             </div>
           </div>
@@ -84,7 +84,7 @@ export function MobileArtifactReader({
         <button
           type="button"
           onClick={onClose}
-          className="h-8 w-8 rounded-full bg-[#26262a] hover:bg-[#34343a] text-[#969696] hover:text-white flex items-center justify-center transition-colors cursor-pointer active:scale-95 shrink-0"
+          className="h-8 w-8 rounded-full bg-secondary hover:bg-secondary/80 text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer active:scale-95 shrink-0"
           aria-label="Tutup"
         >
           <X className="h-4 w-4" />
@@ -197,13 +197,13 @@ function MobileQuizBody({
 
     return (
       <div className="p-5 flex flex-col items-center justify-center min-h-[70vh] text-center">
-        <div className="h-16 w-16 rounded-full bg-[#27272a] border border-[#3f3f46] flex items-center justify-center mb-4 text-[#eab308]">
+        <div className="h-16 w-16 rounded-full bg-secondary border border-border flex items-center justify-center mb-4 text-amber-500">
           <Award className="h-8 w-8" />
         </div>
-        <h2 className="text-lg font-bold text-white mb-1">
+        <h2 className="text-lg font-bold text-foreground mb-1">
           {isIndo ? "Kuis Selesai!" : "Quiz Completed!"}
         </h2>
-        <p className="text-xs text-[#888888] mb-6">
+        <p className="text-xs text-muted-foreground mb-6">
           {isIndo
             ? `Anda menjawab ${correctCount} dari ${totalQ} soal dengan benar (${scorePct}%).`
             : `You scored ${correctCount} out of ${totalQ} questions correctly (${scorePct}%).`}
@@ -213,7 +213,7 @@ function MobileQuizBody({
           <button
             type="button"
             onClick={handleRestart}
-            className="w-full py-3 rounded-xl bg-[#27272a] hover:bg-[#323238] border border-[#3f3f46] text-white font-medium text-xs flex items-center justify-center gap-2 cursor-pointer active:scale-98"
+            className="w-full py-3 rounded-xl bg-secondary hover:bg-secondary/80 border border-border text-foreground font-medium text-xs flex items-center justify-center gap-2 cursor-pointer active:scale-98"
           >
             <RotateCcw className="h-4 w-4" />
             <span>{isIndo ? "Ulangi Kuis" : "Retry Quiz"}</span>
@@ -228,9 +228,9 @@ function MobileQuizBody({
   return (
     <div className="p-4 space-y-4 max-w-lg mx-auto">
       {/* Progress Counter & Hint Toggle */}
-      <div className="flex items-center justify-between text-xs text-[#888888]">
+      <div className="flex items-center justify-between text-xs text-muted-foreground">
         <div className="flex items-center gap-2">
-          <span className="font-semibold text-white">
+          <span className="font-semibold text-foreground">
             {isIndo ? "Pertanyaan" : "Question"} {currentIndex + 1}
           </span>
           <span>/</span>
@@ -243,7 +243,7 @@ function MobileQuizBody({
             onClick={() =>
               setShowHint((prev) => ({ ...prev, [currentQ.id]: !prev[currentQ.id] }))
             }
-            className="text-[11px] text-[#ededed] hover:underline flex items-center gap-1 cursor-pointer"
+            className="text-[11px] text-foreground hover:underline flex items-center gap-1 cursor-pointer"
           >
             <span>{isIndo ? "Petunjuk" : "Hint"}</span>
             <ChevronDown
@@ -258,14 +258,14 @@ function MobileQuizBody({
 
       {/* Hint Pill */}
       {showHint[currentQ.id] && currentQ.hint && (
-        <div className="p-3 rounded-xl bg-[#222226] border border-[#38383e] text-xs text-[#d4d4d4] animate-in fade-in">
+        <div className="p-3 rounded-xl bg-secondary/60 border border-border text-xs text-foreground animate-in fade-in">
           💡 {currentQ.hint}
         </div>
       )}
 
       {/* Question Card */}
-      <div className="p-4 rounded-2xl bg-[#1b1b1e] border border-[#2e2e32] shadow-sm">
-        <p className="text-sm font-medium text-white leading-relaxed">
+      <div className="p-4 rounded-2xl bg-card border border-border shadow-sm">
+        <p className="text-sm font-medium text-foreground leading-relaxed">
           {currentQ.question}
         </p>
       </div>
@@ -277,8 +277,8 @@ function MobileQuizBody({
           const isCorrect = opt.isCorrect;
 
           let optionStyle =
-            "bg-[#1e1e21] border-[#2e2e32] text-[#d4d4d4] hover:bg-[#252529]";
-          let letterStyle = "bg-[#28282c] text-[#888888] border-[#38383e]";
+            "bg-card border-border text-foreground hover:bg-secondary/70";
+          let letterStyle = "bg-secondary text-muted-foreground border-border";
 
           if (isAnswered) {
             if (isCorrect) {
@@ -323,9 +323,9 @@ function MobileQuizBody({
 
       {/* Feedback & Explanation Box with "Jelaskan" button */}
       {isAnswered && (
-        <div className="p-4 rounded-2xl bg-[#1e1e22] border border-[#333338] space-y-3 animate-in fade-in">
+        <div className="p-4 rounded-2xl bg-card border border-border space-y-3 animate-in fade-in">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-white flex items-center gap-1.5">
+            <span className="text-xs font-bold text-foreground flex items-center gap-1.5">
               {currentQ.options.find((o) => o.id === currentAnswer)?.isCorrect ? (
                 <>
                   <span className="text-emerald-400">✓</span>
@@ -343,14 +343,14 @@ function MobileQuizBody({
             <button
               type="button"
               onClick={handleExplain}
-              className="px-3 py-1.5 rounded-full bg-[#2c2c30] hover:bg-[#38383e] text-white text-[11px] font-medium border border-[#44444a] flex items-center gap-1.5 transition-colors cursor-pointer active:scale-95"
+              className="px-3 py-1.5 rounded-full bg-secondary hover:bg-secondary/80 text-foreground text-[11px] font-medium border border-border flex items-center gap-1.5 transition-colors cursor-pointer active:scale-95"
             >
               <Sparkles className="h-3.5 w-3.5 text-amber-300" />
               <span>{isIndo ? "Jelaskan" : "Explain"}</span>
             </button>
           </div>
 
-          <p className="text-xs text-[#b5b5b5] leading-relaxed">
+          <p className="text-xs text-muted-foreground leading-relaxed">
             {currentQ.options.find((o) => o.id === currentAnswer)?.explanation ||
               currentQ.options.find((o) => o.isCorrect)?.explanation ||
               (isIndo
@@ -366,7 +366,7 @@ function MobileQuizBody({
           type="button"
           onClick={handlePrev}
           disabled={currentIndex === 0}
-          className="px-4 py-2 rounded-xl bg-[#202023] border border-[#303034] text-xs font-medium text-white disabled:opacity-30 disabled:pointer-events-none flex items-center gap-1.5 cursor-pointer active:scale-95"
+          className="px-4 py-2 rounded-xl bg-secondary border border-border text-xs font-medium text-foreground disabled:opacity-30 disabled:pointer-events-none flex items-center gap-1.5 cursor-pointer active:scale-95"
         >
           <ChevronLeft className="h-4 w-4" />
           <span>{isIndo ? "Sebelumnya" : "Previous"}</span>
@@ -375,7 +375,7 @@ function MobileQuizBody({
         <button
           type="button"
           onClick={handleNext}
-          className="px-4 py-2 rounded-xl bg-white text-black text-xs font-semibold flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-xs"
+          className="px-4 py-2 rounded-xl bg-foreground text-background text-xs font-semibold flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-xs"
         >
           <span>
             {currentIndex === totalQ - 1
@@ -441,9 +441,9 @@ function MobileFlashcardBody({
   return (
     <div className="p-4 space-y-4 max-w-lg mx-auto">
       {/* Progress Counter & Action */}
-      <div className="flex items-center justify-between text-xs text-[#888888]">
+      <div className="flex items-center justify-between text-xs text-muted-foreground">
         <div className="flex items-center gap-1.5 font-medium">
-          <span className="text-white">{currentIndex + 1}</span>
+          <span className="text-foreground">{currentIndex + 1}</span>
           <span>/</span>
           <span>{totalCards}</span>
         </div>
@@ -451,7 +451,7 @@ function MobileFlashcardBody({
         <button
           type="button"
           onClick={handleExplain}
-          className="text-[11px] text-[#ededed] hover:underline flex items-center gap-1 cursor-pointer"
+          className="text-[11px] text-foreground hover:underline flex items-center gap-1 cursor-pointer"
         >
           <Sparkles className="h-3 w-3 text-amber-300" />
           <span>{isIndo ? "Jelaskan dengan AI" : "Explain with AI"}</span>
@@ -461,19 +461,19 @@ function MobileFlashcardBody({
       {/* 3D Flip Card */}
       <div
         onClick={() => setIsFlipped(!isFlipped)}
-        className="w-full min-h-[260px] p-6 rounded-3xl bg-[#1b1b1e] border border-[#333338] shadow-lg flex flex-col justify-between text-center cursor-pointer transition-all active:scale-[0.99]"
+        className="w-full min-h-[260px] p-6 rounded-3xl bg-card border border-border shadow-md flex flex-col justify-between text-center cursor-pointer transition-all active:scale-[0.99]"
       >
-        <div className="text-[10px] uppercase tracking-wider font-semibold text-[#666666]">
+        <div className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">
           {isFlipped ? (isIndo ? "Jawaban / Belakang" : "Back / Answer") : (isIndo ? "Pertanyaan / Depan" : "Front / Question")}
         </div>
 
         <div className="my-auto py-4">
-          <p className="text-base font-semibold text-white leading-relaxed">
+          <p className="text-base font-semibold text-foreground leading-relaxed">
             {isFlipped ? currentCard.back : currentCard.front}
           </p>
         </div>
 
-        <div className="text-[10px] text-[#888888]">
+        <div className="text-[10px] text-muted-foreground">
           {isIndo ? "Ketuk untuk membalik kartu" : "Tap to flip card"}
         </div>
       </div>
@@ -496,8 +496,8 @@ function MobileFlashcardBody({
               className={cn(
                 "py-2 rounded-xl text-xs font-medium border transition-all cursor-pointer active:scale-95",
                 isSelected
-                  ? "bg-[#2f2f34] border-[#ededed] text-white shadow-xs"
-                  : "bg-[#1f1f22] border-[#2e2e32] text-[#888888] hover:text-[#d4d4d4]"
+                  ? "bg-card border-border text-foreground shadow-xs font-semibold"
+                  : "bg-secondary/60 border-border text-muted-foreground hover:text-foreground"
               )}
             >
               {label}
@@ -512,7 +512,7 @@ function MobileFlashcardBody({
           type="button"
           onClick={handlePrev}
           disabled={currentIndex === 0}
-          className="px-4 py-2 rounded-xl bg-[#202023] border border-[#303034] text-xs font-medium text-white disabled:opacity-30 disabled:pointer-events-none flex items-center gap-1.5 cursor-pointer active:scale-95"
+          className="px-4 py-2 rounded-xl bg-secondary border border-border text-xs font-medium text-foreground disabled:opacity-30 disabled:pointer-events-none flex items-center gap-1.5 cursor-pointer active:scale-95"
         >
           <ChevronLeft className="h-4 w-4" />
           <span>{isIndo ? "Sebelumnya" : "Previous"}</span>
@@ -522,7 +522,7 @@ function MobileFlashcardBody({
           type="button"
           onClick={handleNext}
           disabled={currentIndex === totalCards - 1}
-          className="px-4 py-2 rounded-xl bg-white text-black text-xs font-semibold disabled:opacity-30 disabled:pointer-events-none flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-xs"
+          className="px-4 py-2 rounded-xl bg-foreground text-background text-xs font-semibold disabled:opacity-30 disabled:pointer-events-none flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-xs"
         >
           <span>{isIndo ? "Selanjutnya" : "Next"}</span>
           <ChevronRight className="h-4 w-4" />

@@ -156,17 +156,17 @@ export function DiffViewer({
   }
 
   return (
-    <div className={cn("w-full max-w-full h-full flex-1 min-h-0 flex flex-col font-mono text-xs select-text bg-[#141414] overflow-hidden", className)}>
+    <div className={cn("w-full max-w-full h-full flex-1 min-h-0 flex flex-col font-mono text-xs select-text bg-background text-foreground overflow-hidden", className)}>
       {/* Global Toggle Toolbar if folded chunks exist */}
       {hasAnyFolded && (
-        <div className="flex items-center justify-end px-3 py-1 bg-[#1a1a1a] border-b border-[#282828] select-none text-[11px] text-neutral-400 shrink-0">
+        <div className="flex items-center justify-end px-3 py-1 bg-card border-b border-border select-none text-[11px] text-muted-foreground shrink-0">
           <button
             type="button"
             onClick={handleToggleAllFolds}
-            className="flex items-center gap-1 hover:text-white transition-colors cursor-pointer py-0.5 px-1.5 rounded hover:bg-white/5"
+            className="flex items-center gap-1 hover:text-foreground transition-colors cursor-pointer py-0.5 px-1.5 rounded hover:bg-muted"
             title={allUnfolded ? "Collapse unchanged blocks" : "Expand all unchanged blocks"}
           >
-            <ChevronsUpDown className="w-3 h-3 text-neutral-400" />
+            <ChevronsUpDown className="w-3 h-3 text-muted-foreground" />
             <span>{allUnfolded ? "Collapse context" : "Expand all lines"}</span>
           </button>
         </div>
@@ -205,11 +205,11 @@ export function DiffViewer({
                   ))}
 
                   {remainingCount > 0 ? (
-                    <div className="w-full flex items-center justify-between px-3 py-1 my-0.5 bg-[#1e1e22] hover:bg-[#25252b] border-y border-[#2d2d35] text-[11.5px] text-neutral-400 transition-colors">
+                    <div className="w-full flex items-center justify-between px-3 py-1 my-0.5 bg-muted/70 hover:bg-muted border-y border-border text-[11.5px] text-muted-foreground transition-colors">
                       <button
                         type="button"
                         onClick={() => handleExpandChunk(block.id, 10)}
-                        className="px-2 py-0.5 rounded text-[11px] font-mono text-neutral-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                        className="px-2 py-0.5 rounded text-[11px] font-mono text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
                         title="Show 10 more lines above"
                       >
                         +10
@@ -218,7 +218,7 @@ export function DiffViewer({
                       <button
                         type="button"
                         onClick={() => handleToggleFold(block.id)}
-                        className="flex-1 text-center py-0.5 font-sans font-medium text-neutral-300 hover:text-white transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                        className="flex-1 text-center py-0.5 font-sans font-medium text-foreground/80 hover:text-foreground transition-colors cursor-pointer flex items-center justify-center gap-1.5"
                       >
                         <span>+{remainingCount} more lines</span>
                       </button>
@@ -226,7 +226,7 @@ export function DiffViewer({
                       <button
                         type="button"
                         onClick={() => handleExpandChunk(block.id, 10)}
-                        className="px-2 py-0.5 rounded text-[11px] font-mono text-neutral-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+                        className="px-2 py-0.5 rounded text-[11px] font-mono text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
                         title="Show 10 more lines below"
                       >
                         +10
@@ -263,16 +263,16 @@ function DiffLineRow({ line }: { line: DiffLine }) {
   return (
     <div
       className={cn(
-        "flex items-start w-full max-w-full leading-5 font-mono text-[12px] group hover:bg-white/[0.03] transition-colors",
-        isAdded && "bg-[#238636]/15 text-[#e6edf3]",
-        isRemoved && "bg-[#da3633]/15 text-[#e6edf3]"
+        "flex items-start w-full max-w-full leading-5 font-mono text-[12px] group hover:bg-muted/40 transition-colors",
+        isAdded && "bg-emerald-500/10 text-emerald-700 dark:text-emerald-300",
+        isRemoved && "bg-red-500/10 text-red-700 dark:text-red-300"
       )}
     >
       {/* Old Line Number */}
       <div
         className={cn(
-          "w-10 sm:w-12 px-2 text-right select-none text-[11px] shrink-0 border-r border-[#262626] self-stretch",
-          isRemoved ? "text-[#ff5c5c] font-medium" : "text-[#555555]"
+          "w-10 sm:w-12 px-2 text-right select-none text-[11px] shrink-0 border-r border-border self-stretch",
+          isRemoved ? "text-red-600 dark:text-red-400 font-medium" : "text-muted-foreground/60"
         )}
       >
         {line.oldNum ?? ""}
@@ -281,8 +281,8 @@ function DiffLineRow({ line }: { line: DiffLine }) {
       {/* New Line Number */}
       <div
         className={cn(
-          "w-10 sm:w-12 px-2 text-right select-none text-[11px] shrink-0 border-r border-[#262626] self-stretch",
-          isAdded ? "text-[#409D62] font-medium" : "text-[#555555]"
+          "w-10 sm:w-12 px-2 text-right select-none text-[11px] shrink-0 border-r border-border self-stretch",
+          isAdded ? "text-emerald-600 dark:text-emerald-400 font-medium" : "text-muted-foreground/60"
         )}
       >
         {line.newNum ?? ""}
@@ -292,8 +292,8 @@ function DiffLineRow({ line }: { line: DiffLine }) {
       <div
         className={cn(
           "w-5 text-center select-none font-mono text-xs shrink-0 font-bold self-stretch",
-          isAdded && "text-[#409D62]",
-          isRemoved && "text-[#ff5c5c]",
+          isAdded && "text-emerald-600 dark:text-emerald-400",
+          isRemoved && "text-red-600 dark:text-red-400",
           !isAdded && !isRemoved && "text-transparent"
         )}
       >

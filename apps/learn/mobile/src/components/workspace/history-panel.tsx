@@ -217,7 +217,7 @@ export function HistoryPanel({
                             type="button"
                             size="icon"
                             variant="default"
-                            className="h-8 w-8 shrink-0 bg-white hover:bg-[#e8e8e8] text-black rounded-lg cursor-pointer"
+                            className="h-8 w-8 shrink-0 bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg cursor-pointer"
                             onClick={() => handleSaveRename(session.id)}
                             title="Simpan"
                           >
@@ -285,16 +285,16 @@ export function HistoryPanel({
                             <DropdownMenuContent
                               align="end"
                               sideOffset={4}
-                              className="w-44 rounded-xl bg-[#222222] border border-[#383838] p-1 text-[#d4d4d4] shadow-2xl z-50"
+                              className="w-44 rounded-xl bg-popover border border-border p-1 text-popover-foreground shadow-2xl z-50"
                             >
                               <DropdownMenuItem
                                 onClick={() => {
                                   setEditingSessionId(session.id);
                                   setEditTitleValue(session.title || "");
                                 }}
-                                className="flex items-center gap-2 px-2.5 py-1.5 text-xs rounded-lg text-[#d4d4d4] hover:text-white hover:bg-[#2b2b2b] cursor-pointer"
+                                className="flex items-center gap-2 px-2.5 py-1.5 text-xs rounded-lg text-foreground hover:bg-muted cursor-pointer"
                               >
-                                <Pencil className="h-3.5 w-3.5 text-[#969696]" />
+                                <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
                                 <span>{language === "id" ? "Ubah Nama" : "Edit Name"}</span>
                               </DropdownMenuItem>
 
@@ -302,22 +302,22 @@ export function HistoryPanel({
                                 onClick={() => {
                                   onTogglePinChat?.(session.id, !session.isPinned);
                                 }}
-                                className="flex items-center gap-2 px-2.5 py-1.5 text-xs rounded-lg text-[#d4d4d4] hover:text-white hover:bg-[#2b2b2b] cursor-pointer"
+                                className="flex items-center gap-2 px-2.5 py-1.5 text-xs rounded-lg text-foreground hover:bg-muted cursor-pointer"
                               >
                                 {session.isPinned ? (
                                   <>
-                                    <PinOff className="h-3.5 w-3.5 text-[#969696]" />
+                                    <PinOff className="h-3.5 w-3.5 text-muted-foreground" />
                                     <span>{language === "id" ? "Lepas Sematan" : "Unpin Chat"}</span>
                                   </>
                                 ) : (
                                   <>
-                                    <Pin className="h-3.5 w-3.5 text-[#969696]" />
+                                    <Pin className="h-3.5 w-3.5 text-muted-foreground" />
                                     <span>{language === "id" ? "Sematkan Chat" : "Pin Chat"}</span>
                                   </>
                                 )}
                               </DropdownMenuItem>
 
-                              <DropdownMenuSeparator className="bg-[#383838] my-1" />
+                              <DropdownMenuSeparator className="bg-border my-1" />
 
                               <DropdownMenuItem
                                 onClick={() => onDeleteChat(session.id)}

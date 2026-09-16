@@ -87,7 +87,7 @@ export function Sidebar({
   ];
 
   return (
-    <aside className="w-56 h-full flex flex-col justify-between shrink-0 select-none bg-[#ececee] dark:bg-[#2b2b2b] text-[#262626] dark:text-[#d4d4d4] p-3">
+    <aside className="w-56 h-full flex flex-col justify-between shrink-0 select-none bg-secondary/70 text-foreground p-3">
       {/* Top Section */}
       <div className="flex flex-col gap-3">
         {/* Brand Header & Sidebar Close Icon */}
@@ -100,12 +100,12 @@ export function Sidebar({
             className="flex items-center gap-2"
             style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
           >
-            <ConstLogoIcon size="sm" className="w-5 h-5 text-[#262626] dark:text-white shrink-0" />
+            <ConstLogoIcon size="sm" className="w-5 h-5 text-foreground shrink-0" />
             <div className="flex items-center gap-1.5">
-              <span className="font-serif text-base font-normal tracking-tight text-[#262626] dark:text-white">
+              <span className="font-serif text-base font-normal tracking-tight text-foreground">
                 Const
               </span>
-              <span className="text-[10px] font-mono tracking-wider uppercase px-1.5 py-0.5 rounded bg-[#dedee2] dark:bg-[#383838] text-[#5d5d5d] dark:text-[#969696]">
+              <span className="text-[10px] font-mono tracking-wider uppercase px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
                 Learn
               </span>
             </div>
@@ -116,7 +116,7 @@ export function Sidebar({
             type="button"
             onClick={onCollapse}
             style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
-            className="p-1.5 rounded-lg hover:bg-[#dedee2] dark:hover:bg-[#383838] text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white transition-colors cursor-pointer"
+            className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
             title={t("closeSidebarKeyboard")}
             aria-label={t("closeSidebar")}
           >
@@ -130,7 +130,7 @@ export function Sidebar({
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
-                className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-[#262626] dark:bg-white text-white dark:text-black font-medium text-xs hover:bg-black dark:hover:bg-zinc-200 transition-all cursor-pointer shadow-none"
+                className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-primary text-primary-foreground font-medium text-xs hover:bg-primary/90 transition-all cursor-pointer shadow-none"
               >
                 <div className="flex items-center gap-2">
                   <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
@@ -142,20 +142,20 @@ export function Sidebar({
             <DropdownMenuContent
               align="start"
               sideOffset={6}
-              className="w-48 p-1.5 bg-white dark:bg-[#222222] border border-[#dedee2] dark:border-[#383838] text-[#262626] dark:text-[#d4d4d4] rounded-xl shadow-xl z-50 text-xs"
+              className="w-48 p-1.5 bg-popover border border-border text-popover-foreground rounded-xl shadow-xl z-50 text-xs"
             >
               <DropdownMenuItem
                 onClick={onCreateNewLearn}
-                className="cursor-pointer flex items-center gap-2.5 py-2 px-2.5 rounded-lg hover:bg-[#f4f4f5] dark:hover:bg-[#2e2e2e] focus:bg-[#f4f4f5] dark:focus:bg-[#2e2e2e]"
+                className="cursor-pointer flex items-center gap-2.5 py-2 px-2.5 rounded-lg hover:bg-secondary focus:bg-secondary"
               >
-                <BookOpen className="w-4 h-4 text-[#0066ff]" />
+                <BookOpen className="w-4 h-4 text-primary" />
                 <span>{t("newLearn")}</span>
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={onCreateNewCollection}
-                className="cursor-pointer flex items-center gap-2.5 py-2 px-2.5 rounded-lg hover:bg-[#f4f4f5] dark:hover:bg-[#2e2e2e] focus:bg-[#f4f4f5] dark:focus:bg-[#2e2e2e]"
+                className="cursor-pointer flex items-center gap-2.5 py-2 px-2.5 rounded-lg hover:bg-secondary focus:bg-secondary"
               >
-                <FolderPlus className="w-4 h-4 text-[#0066ff]" />
+                <FolderPlus className="w-4 h-4 text-primary" />
                 <span>{t("newCollection")}</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -175,8 +175,8 @@ export function Sidebar({
                 className={cn(
                   "w-full flex items-center justify-between px-2.5 py-2 rounded-xl text-xs font-medium transition-colors cursor-pointer",
                   isActive
-                    ? "bg-[#dedee2] dark:bg-[#383838] text-[#111111] dark:text-white font-medium"
-                    : "text-[#262626] dark:text-[#d4d4d4] hover:bg-[#dedee2]/60 dark:hover:bg-[#383838]/60 hover:text-black dark:hover:text-white"
+                    ? "bg-background text-foreground font-medium shadow-xs"
+                    : "text-muted-foreground hover:bg-muted/70 hover:text-foreground"
                 )}
               >
                 <div className="flex items-center gap-2.5 min-w-0">
@@ -184,8 +184,8 @@ export function Sidebar({
                     className={cn(
                       "w-4 h-4 shrink-0",
                       isActive
-                        ? "text-[#111111] dark:text-white"
-                        : "text-[#737373] dark:text-[#969696]"
+                        ? "text-foreground"
+                        : "text-muted-foreground"
                     )}
                   />
                   <span className="truncate">{item.label}</span>
@@ -195,8 +195,8 @@ export function Sidebar({
                     className={cn(
                       "text-[10px] font-mono px-1.5 py-0.5 rounded-full",
                       isActive
-                        ? "bg-white/40 dark:bg-black/40 text-black dark:text-white"
-                        : "text-[#8a8a8a] dark:text-[#777777]"
+                        ? "bg-secondary text-foreground"
+                        : "text-muted-foreground"
                     )}
                   >
                     {item.count}
@@ -214,28 +214,28 @@ export function Sidebar({
           <DropdownMenuTrigger asChild>
             <button
               type="button"
-              className="w-full flex items-center justify-between gap-2.5 p-1.5 rounded-xl hover:bg-[#dedee2] dark:hover:bg-[#383838] transition-colors text-left outline-none cursor-pointer group"
+              className="w-full flex items-center justify-between gap-2.5 p-1.5 rounded-xl hover:bg-muted transition-colors text-left outline-none cursor-pointer group"
               aria-label="Account menu"
             >
               <div className="flex items-center gap-2.5 min-w-0">
-                <Avatar className="h-7 w-7 rounded-full border border-[#d5d5d9] dark:border-[#383838] shrink-0">
+                <Avatar className="h-7 w-7 rounded-full border border-border shrink-0">
                   {user?.image ? (
                     <AvatarImage src={user.image} alt={user.name || "Avatar"} />
                   ) : null}
-                  <AvatarFallback className="bg-[#dedee2] dark:bg-[#383838] text-[#262626] dark:text-[#d4d4d4] font-sans text-xs font-medium">
+                  <AvatarFallback className="bg-muted text-foreground font-sans text-xs font-medium">
                     {initials}
                   </AvatarFallback>
                 </Avatar>
                 <div className="min-w-0 flex-1">
-                  <p className="text-xs font-medium text-[#262626] dark:text-[#d4d4d4] truncate">
+                  <p className="text-xs font-medium text-foreground truncate">
                     {user?.name || "Const User"}
                   </p>
-                  <p className="text-[10px] text-[#8a8a8a] dark:text-[#969696] truncate">
+                  <p className="text-[10px] text-muted-foreground truncate">
                     {user?.email || "Workspace"}
                   </p>
                 </div>
               </div>
-              <ChevronsUpDown className="w-3.5 h-3.5 text-[#8a8a8a] dark:text-[#969696] group-hover:text-black dark:group-hover:text-white shrink-0" />
+              <ChevronsUpDown className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground shrink-0" />
             </button>
           </DropdownMenuTrigger>
 
@@ -243,24 +243,24 @@ export function Sidebar({
             align="start"
             side="top"
             sideOffset={8}
-            className="w-52 p-1.5 mb-1 bg-white dark:bg-[#222222] border border-[#dedee2] dark:border-[#383838] text-[#262626] dark:text-[#d4d4d4] rounded-2xl shadow-xl select-none text-xs"
+            className="w-52 p-1.5 mb-1 bg-popover border border-border text-popover-foreground rounded-2xl shadow-xl select-none text-xs"
           >
             {/* 1. Settings */}
             <DropdownMenuItem
               onClick={onOpenSettings}
-              className="cursor-pointer flex items-center gap-2.5 py-2 px-2.5 rounded-xl hover:bg-[#f4f4f5] dark:hover:bg-[#2e2e2e] focus:bg-[#f4f4f5] dark:focus:bg-[#2e2e2e] text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white"
+              className="cursor-pointer flex items-center gap-2.5 py-2 px-2.5 rounded-xl hover:bg-secondary focus:bg-secondary text-popover-foreground hover:text-foreground"
             >
-              <Settings className="w-4 h-4 text-[#737373] dark:text-[#8e8e93] shrink-0" />
+              <Settings className="w-4 h-4 text-muted-foreground shrink-0" />
               <span>{t("settings")}</span>
             </DropdownMenuItem>
 
             {/* 2. App theme (Submenu) */}
             <DropdownMenuSub>
-              <DropdownMenuSubTrigger className="cursor-pointer flex items-center gap-2.5 py-2 px-2.5 rounded-xl hover:bg-[#f4f4f5] dark:hover:bg-[#2e2e2e] focus:bg-[#f4f4f5] dark:focus:bg-[#2e2e2e] text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white">
-                <Sun className="w-4 h-4 text-[#737373] dark:text-[#8e8e93] shrink-0" />
+              <DropdownMenuSubTrigger className="cursor-pointer flex items-center gap-2.5 py-2 px-2.5 rounded-xl hover:bg-secondary focus:bg-secondary text-popover-foreground hover:text-foreground">
+                <Sun className="w-4 h-4 text-muted-foreground shrink-0" />
                 <span>{t("theme")}</span>
               </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent className="min-w-[140px] p-1.5 rounded-xl bg-white dark:bg-[#222222] border border-[#dedee2] dark:border-[#383838] text-[#262626] dark:text-[#d4d4d4] shadow-xl text-xs">
+              <DropdownMenuSubContent className="min-w-[140px] p-1.5 rounded-xl bg-popover border border-border text-popover-foreground shadow-xl text-xs">
                 {[
                   { value: "system", label: t("themeSystem"), icon: Laptop },
                   { value: "light", label: t("themeLight"), icon: Sun },
@@ -271,14 +271,14 @@ export function Sidebar({
                     <DropdownMenuItem
                       key={item.value}
                       onClick={() => setTheme(item.value as any)}
-                      className="cursor-pointer flex items-center justify-between py-1.5 px-2.5 rounded-lg hover:bg-[#f4f4f5] dark:hover:bg-[#2e2e2e] text-[#262626] dark:text-[#d4d4d4]"
+                      className="cursor-pointer flex items-center justify-between py-1.5 px-2.5 rounded-lg hover:bg-secondary text-popover-foreground"
                     >
                       <div className="flex items-center gap-2">
                         <Icon className="w-3.5 h-3.5" />
                         <span>{item.label}</span>
                       </div>
                       {theme === item.value && (
-                        <Check className="w-3.5 h-3.5 text-[#111111] dark:text-white ml-2 shrink-0" />
+                        <Check className="w-3.5 h-3.5 text-foreground ml-2 shrink-0" />
                       )}
                     </DropdownMenuItem>
                   );
@@ -288,35 +288,35 @@ export function Sidebar({
 
             {/* 3. Language (Submenu) */}
             <DropdownMenuSub>
-              <DropdownMenuSubTrigger className="cursor-pointer flex items-center gap-2.5 py-2 px-2.5 rounded-xl hover:bg-[#f4f4f5] dark:hover:bg-[#2e2e2e] focus:bg-[#f4f4f5] dark:focus:bg-[#2e2e2e] text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white">
-                <Globe className="w-4 h-4 text-[#737373] dark:text-[#8e8e93] shrink-0" />
+              <DropdownMenuSubTrigger className="cursor-pointer flex items-center gap-2.5 py-2 px-2.5 rounded-xl hover:bg-secondary focus:bg-secondary text-popover-foreground hover:text-foreground">
+                <Globe className="w-4 h-4 text-muted-foreground shrink-0" />
                 <span>{t("language")}</span>
               </DropdownMenuSubTrigger>
-              <DropdownMenuSubContent className="min-w-[160px] p-1.5 rounded-xl bg-white dark:bg-[#222222] border border-[#dedee2] dark:border-[#383838] text-[#262626] dark:text-[#d4d4d4] shadow-xl text-xs">
+              <DropdownMenuSubContent className="min-w-[160px] p-1.5 rounded-xl bg-popover border border-border text-popover-foreground shadow-xl text-xs">
                 {LANGUAGE_OPTIONS.map((lang) => (
                   <DropdownMenuItem
                     key={lang.code}
                     onClick={() => setLanguage(lang.code)}
-                    className="cursor-pointer flex items-center justify-between py-1.5 px-2.5 rounded-lg hover:bg-[#f4f4f5] dark:hover:bg-[#2e2e2e] text-[#262626] dark:text-[#d4d4d4]"
+                    className="cursor-pointer flex items-center justify-between py-1.5 px-2.5 rounded-lg hover:bg-secondary text-popover-foreground"
                   >
                     <span>{lang.label}</span>
                     {language === lang.code && (
-                      <Check className="w-3.5 h-3.5 text-[#111111] dark:text-white ml-2 shrink-0" />
+                      <Check className="w-3.5 h-3.5 text-foreground ml-2 shrink-0" />
                     )}
                   </DropdownMenuItem>
                 ))}
               </DropdownMenuSubContent>
             </DropdownMenuSub>
 
-            <DropdownMenuSeparator className="my-1 bg-[#dedee2] dark:bg-[#333333]" />
+            <DropdownMenuSeparator className="my-1 bg-border" />
 
             {/* 4. Switch account */}
             {onSwitchAccount && (
               <DropdownMenuItem
                 onClick={onSwitchAccount}
-                className="cursor-pointer flex items-center gap-2.5 py-2 px-2.5 rounded-xl hover:bg-[#f4f4f5] dark:hover:bg-[#2e2e2e] focus:bg-[#f4f4f5] dark:focus:bg-[#2e2e2e] text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white"
+                className="cursor-pointer flex items-center gap-2.5 py-2 px-2.5 rounded-xl hover:bg-secondary focus:bg-secondary text-popover-foreground hover:text-foreground"
               >
-                <ArrowLeftRight className="w-4 h-4 text-[#737373] dark:text-[#8e8e93] shrink-0" />
+                <ArrowLeftRight className="w-4 h-4 text-muted-foreground shrink-0" />
                 <span>{t("switchAccount")}</span>
               </DropdownMenuItem>
             )}

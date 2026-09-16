@@ -229,7 +229,7 @@ export function LearnHome({
       <button
         type="button"
         onClick={() => setIsSidebarOpen(true)}
-        className="p-1.5 -ml-1 rounded-xl bg-[#dedee2]/60 hover:bg-[#dedee2] dark:bg-[#2b2b2b] dark:hover:bg-[#383838] text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white transition-all cursor-pointer flex items-center justify-center shrink-0 shadow-none"
+        className="p-1.5 -ml-1 rounded-xl bg-muted hover:bg-secondary text-muted-foreground hover:text-foreground transition-all cursor-pointer flex items-center justify-center shrink-0 shadow-none"
         title={t("openSidebarKeyboard")}
         aria-label={t("openSidebar")}
       >
@@ -251,7 +251,7 @@ export function LearnHome({
   }
 
   return (
-    <div className="h-screen w-full flex bg-[#ececee] dark:bg-[#2b2b2b] text-[#262626] dark:text-[#d4d4d4] overflow-hidden select-none">
+    <div className="h-screen w-full flex bg-secondary/50 text-foreground overflow-hidden select-none">
       {/* 1. Left Sidebar (Collapsible) */}
       {isSidebarOpen && (
         <Sidebar
@@ -277,9 +277,9 @@ export function LearnHome({
         />
       )}
 
-      {/* 2. Main Canvas (Left rounded against sidebar, bg #161616 per DESIGN.md - no dividing lines) */}
+      {/* 2. Main Canvas (Left rounded against sidebar, bg-background per DESIGN.md - no dividing lines) */}
       <main
-        className={`flex-1 min-w-0 h-full bg-[#f8f8f8] dark:bg-[#161616] text-[#262626] dark:text-[#d4d4d4] overflow-hidden flex flex-col relative transition-[border-radius] duration-200 ${
+        className={`flex-1 min-w-0 h-full bg-background text-foreground overflow-hidden flex flex-col relative transition-[border-radius] duration-200 ${
           isSidebarOpen ? "rounded-l-2xl sm:rounded-l-3xl" : ""
         }`}
       >
@@ -296,10 +296,10 @@ export function LearnHome({
                   {/* Left: Heading & Total Count */}
                   <div className="flex items-center gap-2.5">
                     {renderSidebarToggle()}
-                    <h1 className="font-serif text-2xl sm:text-3xl font-normal tracking-tight text-[#262626] dark:text-white">
+                    <h1 className="font-serif text-2xl sm:text-3xl font-normal tracking-tight text-foreground">
                       {t("learns")}
                     </h1>
-                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-[#dedee2] dark:bg-[#2b2b2b] text-[#737373] dark:text-[#969696] font-mono">
+                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-secondary text-muted-foreground font-mono">
                       {filteredLearns.length}
                     </span>
                   </div>
@@ -307,14 +307,14 @@ export function LearnHome({
                   {/* Right: Grid/List Toggle, Search, New Learns */}
                   <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
                     {/* View Mode Toggle (Grid vs List/Rows) */}
-                    <div className="flex items-center p-0.5 rounded-xl bg-[#ececee] dark:bg-[#222222] border border-[#dedee2] dark:border-[#383838]">
+                    <div className="flex items-center p-0.5 rounded-xl bg-muted/70 border border-border">
                       <button
                         type="button"
                         onClick={() => setViewMode("grid")}
                         className={`p-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
                           viewMode === "grid"
-                            ? "bg-white dark:bg-[#383838] text-[#111111] dark:text-white shadow-none"
-                            : "text-[#737373] dark:text-[#969696] hover:text-black dark:hover:text-white"
+                            ? "bg-background text-foreground shadow-2xs"
+                            : "text-muted-foreground hover:text-foreground"
                         }`}
                         title="Grid"
                         aria-label="Grid"
@@ -326,8 +326,8 @@ export function LearnHome({
                         onClick={() => setViewMode("list")}
                         className={`p-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
                           viewMode === "list"
-                            ? "bg-white dark:bg-[#383838] text-[#111111] dark:text-white shadow-none"
-                            : "text-[#737373] dark:text-[#969696] hover:text-black dark:hover:text-white"
+                            ? "bg-background text-foreground shadow-2xs"
+                            : "text-muted-foreground hover:text-foreground"
                         }`}
                         title="List"
                         aria-label="List"
@@ -338,19 +338,19 @@ export function LearnHome({
 
                     {/* Search Input */}
                     <div className="relative">
-                      <Search className="w-3.5 h-3.5 text-[#8a8a8a] dark:text-[#777777] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      <Search className="w-3.5 h-3.5 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                       <Input
                         type="text"
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         placeholder={t("searchLearns")}
-                        className="h-8 w-44 sm:w-56 pl-8 pr-7 text-xs rounded-xl bg-white dark:bg-[#222222] border-[#dedee2] dark:border-[#383838] text-[#262626] dark:text-[#d4d4d4] placeholder-[#8a8a8a] dark:placeholder-[#777777] focus-visible:ring-1 focus-visible:ring-[#888888] shadow-none"
+                        className="h-8 w-44 sm:w-56 pl-8 pr-7 text-xs rounded-xl bg-card border-border text-foreground placeholder-muted-foreground focus-visible:ring-1 focus-visible:ring-primary/40 shadow-none"
                       />
                       {searchQuery && (
                         <button
                           type="button"
                           onClick={() => setSearchQuery("")}
-                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#8a8a8a] dark:text-[#777777] hover:text-[#262626] dark:hover:text-white"
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                         >
                           <X className="w-3.5 h-3.5" />
                         </button>
@@ -361,7 +361,7 @@ export function LearnHome({
                     <Button
                       size="sm"
                       onClick={() => handleCreateNewLearn()}
-                      className="h-8 px-3.5 rounded-xl text-xs font-medium gap-1.5 bg-[#262626] dark:bg-white text-white dark:text-black hover:bg-black dark:hover:bg-zinc-200 transition-all cursor-pointer shadow-none"
+                      className="h-8 px-3.5 rounded-xl text-xs font-medium gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 transition-all cursor-pointer shadow-none"
                     >
                       <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
                       <span>{t("newLearn")}</span>
@@ -372,7 +372,7 @@ export function LearnHome({
                 {/* Section 1: Recently Viewed (Smaller Cards) */}
                 {recentlyViewedLearns.length > 0 && !searchQuery && (
                   <section className="space-y-3">
-                    <div className="flex items-center gap-1.5 text-[#8a8a8a] dark:text-[#777777]">
+                    <div className="flex items-center gap-1.5 text-muted-foreground">
                       <Clock className="w-3.5 h-3.5" />
                       <span className="text-[11px] font-medium uppercase tracking-wider">
                         {t("recentlyViewed")}
@@ -394,11 +394,11 @@ export function LearnHome({
                 {/* Section 2: All Learns */}
                 <section className="space-y-3.5">
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-medium uppercase tracking-wider text-[#8a8a8a] dark:text-[#777777]">
+                    <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
                       {t("allLearns")}
                     </span>
                     {searchQuery && (
-                      <span className="text-xs text-[#8a8a8a] dark:text-[#777777]">
+                      <span className="text-xs text-muted-foreground">
                         {t("searchResultsFor", { query: searchQuery })}
                       </span>
                     )}
@@ -444,8 +444,8 @@ export function LearnHome({
                   </div>
 
                   {filteredLearns.length === 0 && (
-                    <div className="text-center py-14 px-4 rounded-2xl border border-dashed border-[#dedee2] dark:border-[#383838] bg-white/40 dark:bg-[#1e1e1e]/40">
-                      <p className="text-xs text-[#8a8a8a] dark:text-[#888888]">
+                    <div className="text-center py-14 px-4 rounded-2xl border border-dashed border-border bg-card/40">
+                      <p className="text-xs text-muted-foreground">
                         {searchQuery ? t("noLearnsMatchSearch", { query: searchQuery }) : "Belum ada notebook tersimpan"}
                       </p>
                       {!searchQuery && (
@@ -453,9 +453,9 @@ export function LearnHome({
                           <Button
                             size="sm"
                             onClick={() => handleCreateNewLearn()}
-                            className="h-8 px-3.5 rounded-xl text-xs font-medium gap-1.5 cursor-pointer"
+                            className="h-8 px-3 rounded-xl text-xs font-medium cursor-pointer"
                           >
-                            <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                            <Plus className="w-3.5 h-3.5 mr-1" />
                             <span>{t("newLearn")}</span>
                           </Button>
                         </div>
@@ -471,8 +471,7 @@ export function LearnHome({
             {/* ============================================================ */}
             {activeTab === "sources" && (
               <SourcesView
-                onAddSource={() => handleCreateNewLearn()}
-                onOpenLearn={onOpenLearn}
+                onOpenLearn={(learnId) => onOpenLearn?.(learnId, false)}
                 isSidebarOpen={isSidebarOpen}
                 onToggleSidebar={() => setIsSidebarOpen(true)}
               />
@@ -492,7 +491,7 @@ export function LearnHome({
                         <button
                           type="button"
                           onClick={() => setActiveCollectionId(null)}
-                          className="h-8 w-8 rounded-full border border-[#dedee2] dark:border-[#383838] flex items-center justify-center text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white hover:bg-[#eaeaea] dark:hover:bg-[#282828] cursor-pointer transition-colors"
+                          className="h-8 w-8 rounded-full border border-border flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary cursor-pointer transition-colors"
                           title={t("backToAllCollections")}
                         >
                           <ArrowLeft className="h-4 w-4" />
@@ -500,12 +499,12 @@ export function LearnHome({
                         <div>
                           <div className="flex items-center gap-2">
                             <span className="text-xl">{activeCollection.emoji || "📁"}</span>
-                            <h2 className="font-serif text-2xl font-normal text-[#262626] dark:text-white">
+                            <h2 className="font-serif text-2xl font-normal text-foreground">
                               {activeCollection.name}
                             </h2>
                           </div>
                           {activeCollection.description && (
-                            <p className="text-xs text-[#8a8a8a] dark:text-[#888888] mt-0.5">
+                            <p className="text-xs text-muted-foreground mt-0.5">
                               {activeCollection.description}
                             </p>
                           )}
@@ -520,7 +519,7 @@ export function LearnHome({
                             setEditingCollection(activeCollection);
                             setIsCreateCollectionOpen(true);
                           }}
-                          className="rounded-xl h-8 text-xs border-[#dedee2] dark:border-[#383838] cursor-pointer"
+                          className="rounded-xl h-8 text-xs border-border cursor-pointer"
                         >
                           {t("editCollection")}
                         </Button>
@@ -581,8 +580,8 @@ export function LearnHome({
                     </div>
 
                     {collectionLearns.length === 0 && (
-                      <div className="text-center py-14 px-4 bg-white/40 dark:bg-[#1e1e1e]/40 rounded-2xl border border-dashed border-[#dedee2] dark:border-[#383838]">
-                        <p className="text-xs text-[#8a8a8a] dark:text-[#888888]">
+                      <div className="text-center py-14 px-4 bg-card/40 rounded-2xl border border-dashed border-border">
+                        <p className="text-xs text-muted-foreground">
                           {t("noLearnsInCollection")}
                         </p>
                       </div>
@@ -594,10 +593,10 @@ export function LearnHome({
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2.5">
                         {renderSidebarToggle()}
-                        <h2 className="font-serif text-2xl font-normal text-[#262626] dark:text-white">
+                        <h2 className="font-serif text-2xl font-normal text-foreground">
                           {t("collections")}
                         </h2>
-                        <span className="text-xs px-2.5 py-0.5 rounded-full bg-[#dedee2] dark:bg-[#2b2b2b] text-[#737373] dark:text-[#969696] font-mono">
+                        <span className="text-xs px-2.5 py-0.5 rounded-full bg-secondary text-muted-foreground font-mono">
                           {t("collectionsCountText", { count: collections.length })}
                         </span>
                       </div>
@@ -654,10 +653,10 @@ export function LearnHome({
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
                     {renderSidebarToggle()}
-                    <h2 className="font-serif text-2xl font-normal text-[#262626] dark:text-white">
+                    <h2 className="font-serif text-2xl font-normal text-foreground">
                       {t("artifacts")}
                     </h2>
-                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-[#dedee2] dark:bg-[#2b2b2b] text-[#737373] dark:text-[#969696] font-mono">
+                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-secondary text-muted-foreground font-mono">
                       {artifacts.length}
                     </span>
                   </div>
@@ -668,16 +667,16 @@ export function LearnHome({
                     {artifacts.map((art) => (
                       <div
                         key={art.id}
-                        className="p-4 rounded-2xl border border-[#dedee2] dark:border-[#383838] bg-white dark:bg-[#222222] hover:border-[#b0b0b0] dark:hover:border-[#4f4f4f] transition-all flex flex-col justify-between shadow-none"
+                        className="p-4 rounded-2xl border border-border bg-card hover:border-foreground/20 hover:bg-secondary/40 transition-all flex flex-col justify-between shadow-none"
                       >
                         <div className="flex items-start justify-between">
-                          <div className="h-9 w-9 rounded-xl bg-[#f4f4f6] dark:bg-[#2b2b2b] border border-[#dedee2] dark:border-[#383838] flex items-center justify-center text-lg shrink-0">
+                          <div className="h-9 w-9 rounded-xl bg-secondary border border-border flex items-center justify-center text-lg shrink-0">
                             {art.type === "slide" ? "📊" : art.type === "diagram" ? "📐" : "⚡"}
                           </div>
                           <button
                             type="button"
                             onClick={() => localDb.deleteArtifact(art.id)}
-                            className="h-7 w-7 rounded-lg flex items-center justify-center text-[#8a8a8a] hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                            className="h-7 w-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
                             title={t("delete")}
                           >
                             <Trash2 className="h-3.5 w-3.5" />
@@ -685,15 +684,15 @@ export function LearnHome({
                         </div>
 
                         <div className="my-3">
-                          <h4 className="text-sm font-medium text-[#262626] dark:text-[#d4d4d4] line-clamp-2">
+                          <h4 className="text-sm font-medium text-card-foreground line-clamp-2">
                             {art.title}
                           </h4>
-                          <span className="inline-block mt-1 text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-[#f4f4f6] dark:bg-[#2b2b2b] text-[#737373] dark:text-[#969696] border border-[#dedee2] dark:border-[#383838]">
+                          <span className="inline-block mt-1 text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-secondary text-muted-foreground border border-border">
                             {art.type}
                           </span>
                         </div>
 
-                        <div className="text-[11px] text-[#8a8a8a] dark:text-[#777777] pt-1">
+                        <div className="text-[11px] text-muted-foreground pt-1">
                           {new Intl.DateTimeFormat(language === "id" ? "id-ID" : "en-US", {
                             day: "numeric",
                             month: "short",
@@ -704,14 +703,14 @@ export function LearnHome({
                     ))}
                   </div>
                 ) : (
-                  <div className="text-center py-16 px-4 rounded-2xl border border-dashed border-[#dedee2] dark:border-[#383838] bg-white/40 dark:bg-[#1e1e1e]/40">
-                    <div className="h-12 w-12 rounded-2xl bg-[#f4f4f6] dark:bg-[#2b2b2b] border border-[#dedee2] dark:border-[#383838] flex items-center justify-center mx-auto mb-3">
-                      <Layers className="w-5 h-5 text-[#737373] dark:text-[#a3a3a3]" />
+                  <div className="text-center py-16 px-4 rounded-2xl border border-dashed border-border bg-card/40">
+                    <div className="h-12 w-12 rounded-2xl bg-secondary border border-border flex items-center justify-center mx-auto mb-3">
+                      <Layers className="w-5 h-5 text-muted-foreground" />
                     </div>
-                    <h3 className="font-serif text-lg text-[#262626] dark:text-white font-medium">
+                    <h3 className="font-serif text-lg text-foreground font-medium">
                       {t("noArtifactsTitle")}
                     </h3>
-                    <p className="text-xs text-[#8a8a8a] dark:text-[#888888] mt-1 max-w-sm mx-auto leading-relaxed">
+                    <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto leading-relaxed">
                       {t("noArtifactsDesc")}
                     </p>
                   </div>

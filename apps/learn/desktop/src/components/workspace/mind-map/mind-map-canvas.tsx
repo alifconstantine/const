@@ -188,28 +188,28 @@ export function MindMapCanvas({ root, title = "Mind Map", onDownload }: MindMapC
       onMouseLeave={handleMouseUp}
       onWheel={handleWheel}
       className={cn(
-        "w-full h-full relative overflow-hidden bg-[#161618] select-none font-sans",
+        "w-full h-full relative overflow-hidden bg-background select-none font-sans",
         isPanning ? "cursor-grabbing" : "cursor-grab"
       )}
     >
       {/* Floating Canvas Controls Toolbar (Left Edge, as shown in video) */}
-      <div className="absolute top-6 left-5 z-20 flex flex-col items-center bg-[#202023]/90 backdrop-blur-md rounded-2xl border border-[#343438] p-1 shadow-lg space-y-1">
+      <div className="absolute top-6 left-5 z-20 flex flex-col items-center bg-card/90 backdrop-blur-md rounded-2xl border border-border p-1 shadow-md space-y-1">
         <button
           type="button"
           onClick={handleFitToView}
-          className="h-8 w-8 rounded-xl flex items-center justify-center text-[#a0a0a5] hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+          className="h-8 w-8 rounded-xl flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
           title={t("fitToView") || "Fit to view"}
           aria-label={t("fitToView") || "Fit to view"}
         >
           <Maximize className="h-4 w-4" />
         </button>
 
-        <div className="w-5 h-[1px] bg-[#343438]" />
+        <div className="w-5 h-[1px] bg-border" />
 
         <button
           type="button"
           onClick={handleZoomIn}
-          className="h-8 w-8 rounded-xl flex items-center justify-center text-[#a0a0a5] hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+          className="h-8 w-8 rounded-xl flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
           title={t("zoomIn") || "Zoom in"}
           aria-label={t("zoomIn") || "Zoom in"}
         >
@@ -219,39 +219,39 @@ export function MindMapCanvas({ root, title = "Mind Map", onDownload }: MindMapC
         <button
           type="button"
           onClick={handleZoomOut}
-          className="h-8 w-8 rounded-xl flex items-center justify-center text-[#a0a0a5] hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+          className="h-8 w-8 rounded-xl flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
           title={t("zoomOut") || "Zoom out"}
           aria-label={t("zoomOut") || "Zoom out"}
         >
           <Minus className="h-4 w-4" />
         </button>
 
-        <div className="w-5 h-[1px] bg-[#343438]" />
+        <div className="w-5 h-[1px] bg-border" />
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
               type="button"
-              className="h-8 w-8 rounded-xl flex items-center justify-center text-[#a0a0a5] hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+              className="h-8 w-8 rounded-xl flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
               title={t("downloadMindMap") || "Export Mind Map"}
               aria-label={t("downloadMindMap") || "Export Mind Map"}
             >
               <Download className="h-4 w-4" />
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" side="right" className="w-48 bg-[#202023] border-[#343438] text-white">
+          <DropdownMenuContent align="start" side="right" className="w-48 bg-popover border-border text-popover-foreground">
             <DropdownMenuItem
               onClick={handleExportMarkdown}
-              className="cursor-pointer text-xs flex items-center gap-2 hover:bg-white/10"
+              className="cursor-pointer text-xs flex items-center gap-2 hover:bg-muted"
             >
-              <FileCode className="h-3.5 w-3.5 text-sky-400" />
+              <FileCode className="h-3.5 w-3.5 text-sky-500" />
               <span>Export as Markdown</span>
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={handleExportSvg}
-              className="cursor-pointer text-xs flex items-center gap-2 hover:bg-white/10"
+              className="cursor-pointer text-xs flex items-center gap-2 hover:bg-muted"
             >
-              <FileDown className="h-3.5 w-3.5 text-emerald-400" />
+              <FileDown className="h-3.5 w-3.5 text-emerald-500" />
               <span>Export as SVG</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -276,10 +276,9 @@ export function MindMapCanvas({ root, title = "Mind Map", onDownload }: MindMapC
               key={curve.id}
               d={curve.path}
               fill="none"
-              stroke="#545b6b"
               strokeWidth="2.2"
               strokeLinecap="round"
-              className="transition-all duration-300"
+              className="stroke-muted-foreground/60 transition-all duration-300"
             />
           ))}
 
@@ -303,20 +302,23 @@ export function MindMapCanvas({ root, title = "Mind Map", onDownload }: MindMapC
                   height={posNode.height}
                   rx="18"
                   ry="18"
-                  fill={isRoot ? "#25272e" : "#24252a"}
-                  stroke={isRoot ? "#4c556b" : "#383a42"}
                   strokeWidth={isRoot ? "1.8" : "1.2"}
-                  className="transition-all duration-200 hover:stroke-[#5b6885] hover:fill-[#2a2c34] filter drop-shadow-xs"
+                  className={cn(
+                    "transition-all duration-200 filter drop-shadow-xs",
+                    isRoot
+                      ? "fill-card stroke-primary/60 hover:stroke-primary hover:fill-secondary/60"
+                      : "fill-card stroke-border hover:stroke-border/80 hover:fill-secondary/60"
+                  )}
                 />
 
                 {/* Node Label Text */}
                 <text
                   x={isRoot ? 22 : 18}
                   y={posNode.height / 2 + 4.5}
-                  fill="#ffffff"
                   fontSize={isRoot ? "13.5px" : "12.5px"}
                   fontWeight={isRoot ? "600" : "500"}
                   fontFamily="Inter, -apple-system, sans-serif"
+                  className="fill-foreground"
                   style={{ pointerEvents: "none" }}
                 >
                   {posNode.label.length > 24
@@ -339,8 +341,7 @@ export function MindMapCanvas({ root, title = "Mind Map", onDownload }: MindMapC
                       height="20"
                       rx="9"
                       ry="9"
-                      fill="#303239"
-                      className="group-hover:fill-[#444752] transition-colors"
+                      className="fill-muted group-hover:fill-secondary transition-colors"
                     />
 
                     {/* Chevron glyph: '<' when expanded, '>' when collapsed */}
@@ -348,11 +349,10 @@ export function MindMapCanvas({ root, title = "Mind Map", onDownload }: MindMapC
                       x="9"
                       y="14"
                       textAnchor="middle"
-                      fill="#d0d4dc"
                       fontSize="11px"
                       fontWeight="bold"
                       fontFamily="Inter, -apple-system, sans-serif"
-                      className="group-hover:fill-white select-none transition-colors"
+                      className="fill-muted-foreground group-hover:fill-foreground select-none transition-colors"
                     >
                       {isCollapsed ? ">" : "<"}
                     </text>

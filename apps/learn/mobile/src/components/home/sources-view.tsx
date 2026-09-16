@@ -75,39 +75,39 @@ function getSourceIcon(type: LocalSource["type"]) {
     case "url":
     case "docs":
       return (
-        <div className="h-8 w-8 rounded-xl bg-[#2b2b2b] border border-[#383838] text-[#a0a0a0] flex items-center justify-center shrink-0">
+        <div className="h-8 w-8 rounded-xl bg-secondary border border-border/70 text-muted-foreground flex items-center justify-center shrink-0">
           <Globe className="h-4 w-4 text-blue-400" />
         </div>
       );
     case "youtube":
       return (
-        <div className="h-8 w-8 rounded-xl bg-[#2b2b2b] border border-[#383838] text-rose-400 flex items-center justify-center shrink-0">
+        <div className="h-8 w-8 rounded-xl bg-secondary border border-border/70 text-rose-400 flex items-center justify-center shrink-0">
           <Video className="h-4 w-4 text-rose-400" />
         </div>
       );
     case "book":
       return (
-        <div className="h-8 w-8 rounded-xl bg-[#2b2b2b] border border-[#383838] text-amber-400 flex items-center justify-center shrink-0">
+        <div className="h-8 w-8 rounded-xl bg-secondary border border-border/70 text-amber-400 flex items-center justify-center shrink-0">
           <BookOpen className="h-4 w-4 text-amber-400" />
         </div>
       );
     case "drive":
       return (
-        <div className="h-8 w-8 rounded-xl bg-[#2b2b2b] border border-[#383838] text-emerald-400 flex items-center justify-center shrink-0">
+        <div className="h-8 w-8 rounded-xl bg-secondary border border-border/70 text-emerald-400 flex items-center justify-center shrink-0">
           <HardDrive className="h-4 w-4 text-emerald-400" />
         </div>
       );
     case "text":
       return (
-        <div className="h-8 w-8 rounded-xl bg-[#2b2b2b] border border-[#383838] text-indigo-400 flex items-center justify-center shrink-0">
+        <div className="h-8 w-8 rounded-xl bg-secondary border border-border/70 text-indigo-400 flex items-center justify-center shrink-0">
           <Clipboard className="h-4 w-4 text-indigo-400" />
         </div>
       );
     case "file":
     default:
       return (
-        <div className="h-8 w-8 rounded-xl bg-[#2b2b2b] border border-[#383838] text-[#969696] flex items-center justify-center shrink-0">
-          <FileText className="h-4 w-4 text-[#969696]" />
+        <div className="h-8 w-8 rounded-xl bg-secondary border border-border/70 text-muted-foreground flex items-center justify-center shrink-0">
+          <FileText className="h-4 w-4 text-muted-foreground" />
         </div>
       );
   }
@@ -296,7 +296,7 @@ export function SourcesView({
       <div
         key={source.id}
         onClick={() => onOpenLearn?.(source.learnId)}
-        className="w-full p-3 rounded-2xl border border-[#383838] bg-[#1e1e24] hover:bg-[#25252b] active:bg-[#282832] transition-all flex flex-col gap-2.5 cursor-pointer select-none"
+        className="w-full p-3 rounded-2xl border border-border/80 bg-card hover:bg-secondary/60 active:bg-secondary/80 transition-all flex flex-col gap-2.5 cursor-pointer select-none shadow-2xs"
       >
         {/* Top Row: Icon, Title, & Actions */}
         <div className="flex items-start justify-between gap-2.5">
@@ -313,7 +313,7 @@ export function SourcesView({
 
               {source.url && (
                 <p
-                  className="text-[11px] text-[#969696] truncate font-mono mt-0.5"
+                  className="text-[11px] text-muted-foreground truncate font-mono mt-0.5"
                   title={source.url}
                 >
                   {source.url.replace(/^https?:\/\//, "")}
@@ -331,7 +331,7 @@ export function SourcesView({
               <button
                 type="button"
                 onClick={() => handleOpenSourceUrl(source.url)}
-                className="h-7 w-7 rounded-lg flex items-center justify-center text-[#969696] hover:text-foreground hover:bg-[#2b2b2b] cursor-pointer transition-colors active:scale-95"
+                className="h-7 w-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary cursor-pointer transition-colors active:scale-95"
                 title={source.url}
                 aria-label="Open URL"
               >
@@ -342,7 +342,7 @@ export function SourcesView({
             <button
               type="button"
               onClick={() => onOpenLearn?.(source.learnId)}
-              className="h-7 w-7 rounded-lg flex items-center justify-center text-[#969696] hover:text-foreground hover:bg-[#2b2b2b] cursor-pointer transition-colors active:scale-95"
+              className="h-7 w-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary cursor-pointer transition-colors active:scale-95"
               title={t("openInWorkspace")}
               aria-label={t("openInWorkspace")}
             >
@@ -352,7 +352,7 @@ export function SourcesView({
             <button
               type="button"
               onClick={() => setDeleteTarget(source)}
-              className="h-7 w-7 rounded-lg flex items-center justify-center text-[#969696] hover:text-destructive hover:bg-destructive/10 cursor-pointer transition-colors active:scale-95"
+              className="h-7 w-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-destructive hover:bg-destructive/10 cursor-pointer transition-colors active:scale-95"
               title={t("delete")}
               aria-label={t("delete")}
             >
@@ -362,7 +362,7 @@ export function SourcesView({
         </div>
 
         {/* Bottom Metadata Row: Workspace Badge, Type, Date */}
-        <div className="flex items-center justify-between gap-2 text-[11px] text-[#969696]">
+        <div className="flex items-center justify-between gap-2 text-[11px] text-muted-foreground">
           <div className="flex items-center gap-2 min-w-0 flex-1">
             {showWorkspaceTag && (
               <button
@@ -371,7 +371,7 @@ export function SourcesView({
                   e.stopPropagation();
                   onOpenLearn?.(source.learnId);
                 }}
-                className="font-medium px-2 py-0.5 rounded-md bg-[#25252b] border border-[#383838] text-[#d4d4d4] hover:text-white hover:border-[#555555] transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 max-w-[170px] truncate active:scale-95"
+                className="font-medium px-2 py-0.5 rounded-md bg-secondary border border-border/70 text-foreground hover:bg-secondary/80 hover:border-border transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 max-w-[170px] truncate active:scale-95"
                 title={workspaceTitle}
               >
                 <span className="shrink-0">{workspaceEmoji}</span>
@@ -386,7 +386,7 @@ export function SourcesView({
           </div>
 
           {dateFormatted && (
-            <span className="text-[10px] text-[#777777] shrink-0 font-mono">
+            <span className="text-[10px] text-muted-foreground/80 shrink-0 font-mono">
               {dateFormatted}
             </span>
           )}
@@ -405,7 +405,7 @@ export function SourcesView({
             <h2 className="font-sans text-sm font-semibold tracking-tight text-foreground">
               {t("sources")}
             </h2>
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#222222] border border-[#383838] text-[#969696] font-mono">
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary border border-border/60 text-muted-foreground font-mono">
               {filteredSources.length}
             </span>
           </div>
@@ -413,10 +413,10 @@ export function SourcesView({
 
         {/* Category Switcher Tabs: "Semua" (All) vs "Berdasarkan Workspace" (By Workspace) */}
         <div className="flex flex-col gap-2">
-          <div className="relative flex items-center p-0.5 rounded-xl bg-[#222222] border border-[#383838] w-full">
+          <div className="relative flex items-center p-0.5 rounded-xl bg-secondary/80 border border-border/70 w-full">
             {/* Smooth animated sliding pill background */}
             <div
-              className="absolute top-0.5 bottom-0.5 rounded-lg bg-[#333333] border border-[#444444] transition-all duration-300 pointer-events-none"
+              className="absolute top-0.5 bottom-0.5 rounded-lg bg-card border border-border shadow-2xs transition-all duration-300 pointer-events-none"
               style={{
                 left: `${indicatorStyle.left}px`,
                 width: `${indicatorStyle.width}px`,
@@ -431,8 +431,8 @@ export function SourcesView({
               onClick={() => setActiveCategory("all")}
               className={`relative z-10 flex-1 py-1.5 rounded-lg text-xs font-medium text-center transition-colors duration-200 cursor-pointer select-none ${
                 activeCategory === "all"
-                  ? "text-white"
-                  : "text-[#969696] hover:text-[#d4d4d4]"
+                  ? "text-foreground font-semibold"
+                  : "text-muted-foreground hover:text-foreground"
               }`}
             >
               {t("allSources")}
@@ -443,8 +443,8 @@ export function SourcesView({
               onClick={() => setActiveCategory("workspace")}
               className={`relative z-10 flex-1 py-1.5 rounded-lg text-xs font-medium text-center transition-colors duration-200 cursor-pointer select-none ${
                 activeCategory === "workspace"
-                  ? "text-white"
-                  : "text-[#969696] hover:text-[#d4d4d4]"
+                  ? "text-foreground font-semibold"
+                  : "text-muted-foreground hover:text-foreground"
               }`}
             >
               {t("byWorkspace")}
@@ -460,7 +460,7 @@ export function SourcesView({
                 className={`px-3 py-1.5 rounded-xl text-xs font-medium shrink-0 transition-all cursor-pointer border ${
                   selectedWorkspaceId === "all"
                     ? "bg-foreground text-background border-transparent font-semibold shadow-sm"
-                    : "bg-[#222222] border-[#383838] text-[#969696] hover:text-foreground active:scale-95"
+                    : "bg-secondary/70 border-border/70 text-muted-foreground hover:text-foreground hover:bg-secondary active:scale-95"
                 }`}
               >
                 {t("allWorkspaces")}
@@ -474,7 +474,7 @@ export function SourcesView({
                   className={`px-3 py-1.5 rounded-xl text-xs font-medium shrink-0 transition-all cursor-pointer border flex items-center gap-1.5 ${
                     selectedWorkspaceId === ws.id
                       ? "bg-foreground text-background border-transparent font-semibold shadow-sm"
-                      : "bg-[#222222] border-[#383838] text-[#969696] hover:text-foreground active:scale-95"
+                      : "bg-secondary/70 border-border/70 text-muted-foreground hover:text-foreground hover:bg-secondary active:scale-95"
                   }`}
                 >
                   <span>{ws.emoji || "📘"}</span>
@@ -492,21 +492,21 @@ export function SourcesView({
       {/* 2. Main Content: Source Rows */}
       {sources.length === 0 ? (
         /* Empty State: Zero Sources in App */
-        <div className="flex-1 flex flex-col items-center justify-center text-center p-8 rounded-2xl border border-dashed border-[#2e2e2e] bg-[#1b1b1b] min-h-[260px]">
-          <div className="w-12 h-12 rounded-2xl bg-[#222222] border border-[#383838] flex items-center justify-center text-[#969696] mb-3">
+        <div className="flex-1 flex flex-col items-center justify-center text-center p-8 rounded-2xl border border-dashed border-border/80 bg-card min-h-[260px]">
+          <div className="w-12 h-12 rounded-2xl bg-secondary border border-border/60 flex items-center justify-center text-muted-foreground mb-3">
             <FileText className="w-6 h-6 stroke-[1.5]" />
           </div>
           <h3 className="text-sm font-medium text-foreground mb-1">
             {t("noSavedSourcesTitle")}
           </h3>
-          <p className="text-xs text-[#969696] max-w-xs leading-relaxed mb-4">
+          <p className="text-xs text-muted-foreground max-w-xs leading-relaxed mb-4">
             {t("noSavedSourcesDesc")}
           </p>
           <Button
             variant="outline"
             size="sm"
             onClick={handleTriggerAddSource}
-            className="rounded-full text-xs border-[#383838] hover:bg-[#2c2c2c] cursor-pointer"
+            className="rounded-full text-xs border-border hover:bg-secondary cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5 mr-1.5" />
             <span>{t("addFirstSource")}</span>
@@ -514,8 +514,8 @@ export function SourcesView({
         </div>
       ) : filteredSources.length === 0 ? (
         /* Empty State: Zero Search Results */
-        <div className="py-12 text-center rounded-2xl border border-dashed border-[#2e2e2e] bg-[#1b1b1b] px-4">
-          <p className="text-xs text-[#969696]">
+        <div className="py-12 text-center rounded-2xl border border-dashed border-border/80 bg-card px-4">
+          <p className="text-xs text-muted-foreground">
             {t("noSourcesMatching", { query: searchQuery })}
           </p>
           {onClearSearch && (
@@ -545,7 +545,7 @@ export function SourcesView({
                   <span className="font-semibold text-foreground truncate max-w-[180px] sm:max-w-xs">
                     {workspace.title}
                   </span>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[#222222] border border-[#383838] text-[#969696]">
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-secondary border border-border/60 text-muted-foreground">
                     {wsSources.length}
                   </span>
                 </div>
@@ -553,7 +553,7 @@ export function SourcesView({
                 <button
                   type="button"
                   onClick={() => onOpenLearn?.(workspace.id)}
-                  className="text-xs text-[#969696] hover:text-foreground flex items-center gap-1 transition-colors cursor-pointer active:scale-95"
+                  className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 transition-colors cursor-pointer active:scale-95"
                 >
                   <span>{t("openInWorkspace")}</span>
                   <ArrowUpRight className="w-3 h-3" />
@@ -566,7 +566,7 @@ export function SourcesView({
                   {wsSources.map((source) => renderSourceRow(source, false))}
                 </div>
               ) : (
-                <div className="py-4 text-center text-[11px] text-[#777777] rounded-xl border border-dashed border-[#2e2e2e] bg-[#1b1b1b]/50">
+                <div className="py-4 text-center text-[11px] text-muted-foreground rounded-xl border border-dashed border-border/80 bg-card/50">
                   {t("noSourcesInWorkspace")}
                 </div>
               )}
@@ -591,12 +591,12 @@ export function SourcesView({
         open={isAddSourceModalOpen}
         onOpenChange={setIsAddSourceModalOpen}
       >
-        <DialogContent className="w-[92vw] max-w-[420px] p-5 rounded-2xl border border-[#383838] bg-[#1e1e24] text-foreground shadow-xl">
+        <DialogContent className="w-[92vw] max-w-[420px] p-5 rounded-2xl border border-border bg-card text-foreground shadow-xl">
           <DialogHeader>
             <DialogTitle className="font-sans text-base font-semibold tracking-tight text-foreground">
               {t("selectWorkspaceToAddSource")}
             </DialogTitle>
-            <DialogDescription className="text-xs text-[#969696] pt-1 leading-relaxed">
+            <DialogDescription className="text-xs text-muted-foreground pt-1 leading-relaxed">
               {t("selectWorkspaceToAddSourceDesc")}
             </DialogDescription>
           </DialogHeader>
@@ -611,7 +611,7 @@ export function SourcesView({
                     setIsAddSourceModalOpen(false);
                     onOpenLearn?.(l.id, true);
                   }}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-[#383838] hover:border-[#555555] bg-[#222222] hover:bg-[#2b2b2b] active:bg-[#333333] transition-all flex items-center justify-between text-left cursor-pointer group select-none"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-border hover:border-border/80 bg-secondary/40 hover:bg-secondary active:bg-secondary/90 transition-all flex items-center justify-between text-left cursor-pointer group select-none"
                 >
                   <div className="flex items-center gap-2.5 min-w-0 flex-1">
                     <span className="text-lg shrink-0">{l.emoji || "📘"}</span>
@@ -620,17 +620,17 @@ export function SourcesView({
                         {l.title}
                       </p>
                       {l.description && (
-                        <p className="text-[11px] text-[#969696] truncate mt-0.5">
+                        <p className="text-[11px] text-muted-foreground truncate mt-0.5">
                           {l.description}
                         </p>
                       )}
                     </div>
                   </div>
-                  <ArrowUpRight className="w-3.5 h-3.5 text-[#969696] group-hover:text-foreground shrink-0 ml-2" />
+                  <ArrowUpRight className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground shrink-0 ml-2" />
                 </button>
               ))
             ) : (
-              <div className="text-center py-6 text-xs text-[#969696]">
+              <div className="text-center py-6 text-xs text-muted-foreground">
                 {t("noLearnsFound")}
               </div>
             )}
@@ -642,7 +642,7 @@ export function SourcesView({
               variant="outline"
               size="sm"
               onClick={handleCreateNewWorkspaceAndAddSource}
-              className="rounded-full h-9 px-4 text-xs border-[#383838] text-foreground hover:bg-[#2b2b2b] cursor-pointer flex items-center justify-center gap-1.5 w-full sm:w-auto"
+              className="rounded-full h-9 px-4 text-xs border border-border text-foreground hover:bg-secondary cursor-pointer flex items-center justify-center gap-1.5 w-full sm:w-auto"
             >
               <FolderPlus className="w-3.5 h-3.5" />
               <span>{t("createCardLearn")}</span>
@@ -652,7 +652,7 @@ export function SourcesView({
               variant="ghost"
               size="sm"
               onClick={() => setIsAddSourceModalOpen(false)}
-              className="rounded-full h-9 px-4 text-xs text-[#969696] hover:text-foreground cursor-pointer w-full sm:w-auto"
+              className="rounded-full h-9 px-4 text-xs text-muted-foreground hover:text-foreground cursor-pointer w-full sm:w-auto"
             >
               {t("cancel")}
             </Button>

@@ -197,7 +197,7 @@ export function createReferenceLinkComponent(
             e.stopPropagation();
             onReferenceClick(sourceId);
           }}
-          className="inline-flex items-center justify-center w-4.5 h-4.5 min-w-[18px] min-h-[18px] rounded-full bg-[#e4e4e7] hover:bg-[#d4d4d8] dark:bg-[#26282d] dark:hover:bg-[#34373d] border border-black/10 dark:border-white/15 text-neutral-600 hover:text-neutral-900 dark:text-[#9ca3af] dark:hover:text-white text-[10px] font-medium transition-all cursor-pointer select-none active:scale-90 align-middle -translate-y-[1px] mx-0.5"
+          className="inline-flex items-center justify-center w-4.5 h-4.5 min-w-[18px] min-h-[18px] rounded-full bg-secondary hover:bg-secondary/80 border border-border text-muted-foreground hover:text-foreground text-[10px] font-medium transition-all cursor-pointer select-none active:scale-90 align-middle -translate-y-[1px] mx-0.5"
           title={`View source details (${sourceId})`}
         >
           {children}

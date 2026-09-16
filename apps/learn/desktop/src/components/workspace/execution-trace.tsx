@@ -193,12 +193,12 @@ export function ExecutionTrace({
           <button
             type="button"
             onClick={() => setIsMainOpen((prev) => !prev)}
-            className="inline-flex items-center gap-1.5 text-[13px] text-[#a9a9a9] dark:text-[#969696] hover:text-[#262626] dark:hover:text-[#e0e0e0] transition-colors cursor-pointer py-0.5 w-fit select-none group"
+            className="inline-flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer py-0.5 w-fit select-none group"
           >
             <span>{formatDuration()}</span>
             <ChevronRight
               className={cn(
-                "w-3.5 h-3.5 text-[#a9a9a9] dark:text-[#777777] group-hover:text-foreground transition-transform duration-200 ease-out",
+                "w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground transition-transform duration-200 ease-out",
                 isMainOpen && "rotate-90"
               )}
             />
@@ -206,7 +206,7 @@ export function ExecutionTrace({
 
           {/* Smooth Collapsible Content matching apps/harness/desktop */}
           <SmoothCollapse isOpen={isMainOpen}>
-            <div className="flex flex-col gap-1.5 pl-3 ml-1 border-l border-[#e2e2e4] dark:border-[#2e2e2e]/70 text-[13px] text-[#a9a9a9] dark:text-[#888888] pt-1">
+            <div className="flex flex-col gap-1.5 pl-3 ml-1 border-l border-border text-[13px] text-muted-foreground pt-1">
               {steps.map((step, idx) => {
                 if (step.type === "thought") {
                   return (
@@ -332,8 +332,8 @@ export function ExecutionTrace({
 
           {/* Active executing spinner */}
           {isExecuting && (
-            <div className="flex items-center gap-2 text-xs text-[#a9a9a9] dark:text-[#777777] py-1">
-              <Loader2 className="w-3 h-3 animate-spin text-[#e79737] dark:text-[#ff7a00]" />
+            <div className="flex items-center gap-2 text-xs text-muted-foreground py-1">
+              <Loader2 className="w-3 h-3 animate-spin text-primary" />
               <span>Working...</span>
             </div>
           )}
@@ -417,21 +417,21 @@ function ThoughtItem({
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
-        className="inline-flex items-center gap-1.5 text-[13px] text-[#888888] hover:text-[#262626] dark:hover:text-[#d4d4d4] transition-colors cursor-pointer w-fit py-0.5 select-none"
+        className="inline-flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer w-fit py-0.5 select-none"
       >
         <span>{thoughtLabel()}</span>
         <ChevronDown
-          className="w-3.5 h-3.5 text-[#777777] transition-transform duration-200 ease-out"
+          className="w-3.5 h-3.5 text-muted-foreground transition-transform duration-200 ease-out"
           style={{ transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)" }}
         />
       </button>
 
       <SmoothCollapse isOpen={isOpen}>
-        <div className="pt-1.5 pb-2 pl-0.5 text-[12.5px] leading-relaxed text-[#888888] select-text">
+        <div className="pt-1.5 pb-2 pl-0.5 text-[12.5px] leading-relaxed text-muted-foreground select-text">
           <ScrollArea className="w-full max-h-56 pr-2.5 [&>div>div[style]]:!block">
             <MarkdownContent
               content={thinking}
-              className="text-[12.5px] leading-relaxed text-[#888888] [&_strong]:font-semibold [&_strong]:text-foreground [&_strong]:block [&_strong]:mb-1 [&_h1]:text-[13px] [&_h1]:font-semibold [&_h1]:text-foreground [&_h1]:mb-1 [&_h2]:text-[13px] [&_h2]:font-semibold [&_h2]:text-foreground [&_h2]:mb-1 [&_h3]:text-[12.5px] [&_h3]:font-semibold [&_h3]:text-foreground [&_h3]:mb-1 [&_p]:my-1"
+              className="text-[12.5px] leading-relaxed text-muted-foreground [&_strong]:font-semibold [&_strong]:text-foreground [&_strong]:block [&_strong]:mb-1 [&_h1]:text-[13px] [&_h1]:font-semibold [&_h1]:text-foreground [&_h1]:mb-1 [&_h2]:text-[13px] [&_h2]:font-semibold [&_h2]:text-foreground [&_h2]:mb-1 [&_h3]:text-[12.5px] [&_h3]:font-semibold [&_h3]:text-foreground [&_h3]:mb-1 [&_p]:my-1"
             />
           </ScrollArea>
         </div>
@@ -499,40 +499,40 @@ function TerminalCard({
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
-        className="w-full text-left inline-flex items-center gap-1.5 text-[13px] text-[#888888] hover:text-[#262626] dark:hover:text-[#d4d4d4] transition-colors cursor-pointer py-1 px-1.5 rounded hover:bg-black/5 dark:hover:bg-white/5 min-w-0 max-w-full justify-start select-none"
+        className="w-full text-left inline-flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer py-1 px-1.5 rounded hover:bg-muted min-w-0 max-w-full justify-start select-none"
       >
-        <TerminalIcon className="w-3.5 h-3.5 text-[#777777] shrink-0" />
-        <span className="font-mono text-xs text-foreground/90 dark:text-[#d4d4d4] truncate flex-1 min-w-0 text-left">
+        <TerminalIcon className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+        <span className="font-mono text-xs text-foreground truncate flex-1 min-w-0 text-left">
           {cmd || "command"}
         </span>
         {isFailed ? (
-          <span className="w-1.5 h-1.5 rounded-full bg-[#ff5c5c] shrink-0" title="Failed" />
+          <span className="w-1.5 h-1.5 rounded-full bg-destructive shrink-0" title="Failed" />
         ) : tool.result !== undefined || (tool as any).status === "completed" ? (
-          <span className="w-1.5 h-1.5 rounded-full bg-[#409D62] shrink-0" title="Success" />
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" title="Success" />
         ) : (
-          <span className="w-1.5 h-1.5 rounded-full bg-[#e79737] dark:bg-[#ff7a00] animate-pulse shrink-0" title="Running command..." />
+          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse shrink-0" title="Running command..." />
         )}
         <ChevronDown
-          className="w-3 h-3 text-[#666666] shrink-0 ml-1 transition-transform duration-200 ease-out"
+          className="w-3 h-3 text-muted-foreground shrink-0 ml-1 transition-transform duration-200 ease-out"
           style={{ transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)" }}
         />
       </button>
 
       {/* Expanded Terminal Panel */}
       <SmoothCollapse isOpen={isOpen}>
-        <div className="mt-1 p-2.5 rounded-xl bg-[#0e0e10] border border-[#232328] font-mono text-[12px] leading-relaxed select-text shadow-xs w-full min-w-0">
+        <div className="mt-1 p-2.5 rounded-xl bg-secondary/80 border border-border font-mono text-[12px] leading-relaxed select-text shadow-xs w-full min-w-0">
           {/* Header line: $ command */}
-          <div className="text-[#cccccc] flex items-start gap-1.5 pb-1.5 mb-1.5 border-b border-[#202024] min-w-0">
-            <span className="text-[#ff7a00] font-bold shrink-0">$</span>
-            <span className="font-mono text-xs text-[#e0e0e0] break-all leading-snug">
+          <div className="text-foreground flex items-start gap-1.5 pb-1.5 mb-1.5 border-b border-border min-w-0">
+            <span className="text-amber-500 font-bold shrink-0">$</span>
+            <span className="font-mono text-xs text-foreground break-all leading-snug">
               {cmd}
             </span>
           </div>
 
           {/* Exit code banner */}
           {exitCodeDisplay && (
-            <div className="text-xs text-[#ff5c5c] font-mono font-semibold mb-1.5 flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#ff5c5c]" />
+            <div className="text-xs text-destructive font-mono font-semibold mb-1.5 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-destructive" />
               <span>{exitCodeDisplay}</span>
             </div>
           )}
@@ -540,7 +540,7 @@ function TerminalCard({
           {/* Output stdout/stderr wrapped in ScrollArea */}
           <ScrollArea className="max-h-60 w-full">
             {tool.result === undefined && (tool as any).status === "running" ? (
-              <div className="text-[#e79737] dark:text-[#ff7a00] flex items-center gap-1.5 text-xs italic py-0.5">
+              <div className="text-amber-500 flex items-center gap-1.5 text-xs italic py-0.5">
                 <Loader2 className="w-3 h-3 animate-spin shrink-0" />
                 <span>Running command...</span>
               </div>
@@ -548,14 +548,14 @@ function TerminalCard({
               <div
                 className={
                   isFailed
-                    ? "text-[#ff5c5c] whitespace-pre-wrap text-[11.5px] font-mono leading-relaxed"
-                    : "text-[#999999] whitespace-pre-wrap text-[11.5px] font-mono leading-relaxed"
+                    ? "text-destructive whitespace-pre-wrap text-[11.5px] font-mono leading-relaxed"
+                    : "text-muted-foreground whitespace-pre-wrap text-[11.5px] font-mono leading-relaxed"
                 }
               >
                 {cleanResult}
               </div>
             ) : (
-              <div className="text-[#555555] italic text-xs">(Command completed with no output)</div>
+              <div className="text-muted-foreground/70 italic text-xs">(Command completed with no output)</div>
             )}
           </ScrollArea>
         </div>
@@ -599,22 +599,22 @@ function GrepSearchCard({ tool }: { tool: TraceStep | DisplayToolCall }) {
     <div className="w-full min-w-0 flex flex-col my-0.5">
       <div
         onClick={() => hasResult && setIsOpen((prev) => !prev)}
-        className={`flex items-center gap-2 py-1 px-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/5 text-[13px] text-[#888888] min-w-0 select-none ${
+        className={`flex items-center gap-2 py-1 px-1.5 rounded-md hover:bg-muted text-[13px] text-muted-foreground min-w-0 select-none ${
           hasResult ? "cursor-pointer" : ""
         }`}
       >
-        <Search className="w-3.5 h-3.5 text-[#777777] shrink-0" />
+        <Search className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
         <span className="shrink-0">Searched</span>
-        <span className="text-foreground/90 dark:text-[#d4d4d4] font-medium truncate">
+        <span className="text-foreground font-medium truncate">
           *{query}*
         </span>
         <div className="ml-auto flex items-center gap-1.5 shrink-0">
           {resultCount && (
-            <span className="text-[#666666] text-xs font-mono">{resultCount}</span>
+            <span className="text-muted-foreground text-xs font-mono">{resultCount}</span>
           )}
           {hasResult && (
             <ChevronDown
-              className="w-3 h-3 text-[#666666] transition-transform duration-200 ease-out"
+              className="w-3 h-3 text-muted-foreground transition-transform duration-200 ease-out"
               style={{ transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)" }}
             />
           )}
@@ -623,8 +623,8 @@ function GrepSearchCard({ tool }: { tool: TraceStep | DisplayToolCall }) {
 
       {hasResult && (
         <SmoothCollapse isOpen={isOpen}>
-          <div className="mt-1 p-2 rounded-xl bg-[#0e0e10] border border-[#232328] text-xs font-mono select-text">
-            <ScrollArea className="max-h-40 w-full text-[11px] text-[#999999]">
+          <div className="mt-1 p-2 rounded-xl bg-secondary/80 border border-border text-xs font-mono select-text">
+            <ScrollArea className="max-h-40 w-full text-[11px] text-muted-foreground">
               <pre className="whitespace-pre-wrap">
                 {typeof tool.result === "string"
                   ? tool.result.slice(0, 1500)
@@ -677,23 +677,23 @@ function FileReadCard({ tool }: { tool: TraceStep | DisplayToolCall }) {
     <div className="w-full min-w-0 flex flex-col my-0.5">
       <div
         onClick={() => hasResult && setIsOpen((prev) => !prev)}
-        className={`flex items-center justify-between py-1 px-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/5 text-[13px] text-[#888888] min-w-0 select-none ${
+        className={`flex items-center justify-between py-1 px-1.5 rounded-md hover:bg-muted text-[13px] text-muted-foreground min-w-0 select-none ${
           hasResult ? "cursor-pointer group" : ""
         }`}
       >
         <div className="flex items-center gap-2 min-w-0 pr-2">
           <FileIcon filename={fileName} />
-          <span className="text-foreground/90 dark:text-[#d4d4d4] group-hover:text-foreground dark:group-hover:text-white truncate font-sans">
+          <span className="text-foreground group-hover:text-foreground truncate font-sans">
             {fileName}
           </span>
           {lineRange && (
-            <span className="text-xs text-[#666666] shrink-0 font-mono">{lineRange}</span>
+            <span className="text-xs text-muted-foreground shrink-0 font-mono">{lineRange}</span>
           )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {hasResult && (
             <ChevronDown
-              className="w-3 h-3 text-[#666666] transition-transform duration-200 ease-out"
+              className="w-3 h-3 text-muted-foreground transition-transform duration-200 ease-out"
               style={{ transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)" }}
             />
           )}
@@ -702,8 +702,8 @@ function FileReadCard({ tool }: { tool: TraceStep | DisplayToolCall }) {
 
       {hasResult && (
         <SmoothCollapse isOpen={isOpen}>
-          <div className="mt-1 p-2 rounded-xl bg-[#0e0e10] border border-[#232328] text-xs font-mono select-text">
-            <ScrollArea className="max-h-40 w-full text-[11px] text-[#999999]">
+          <div className="mt-1 p-2 rounded-xl bg-secondary/80 border border-border text-xs font-mono select-text">
+            <ScrollArea className="max-h-40 w-full text-[11px] text-muted-foreground">
               <pre className="whitespace-pre-wrap">
                 {typeof tool.result === "string"
                   ? tool.result.slice(0, 1500)
@@ -775,21 +775,21 @@ function FileMutationCard({
     <div className="w-full min-w-0 flex flex-col my-0.5">
       <div
         onClick={() => hasSnippet && setIsOpen((prev) => !prev)}
-        className={`flex items-center justify-between py-1 px-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/5 text-[13px] min-w-0 select-none ${
+        className={`flex items-center justify-between py-1 px-1.5 rounded-md hover:bg-muted text-[13px] min-w-0 select-none ${
           hasSnippet ? "cursor-pointer group" : ""
         }`}
       >
         <div className="flex items-center gap-2 min-w-0 pr-2">
           <FileIcon filename={fileName} />
-          <span className="text-foreground/90 dark:text-[#d4d4d4] group-hover:text-foreground dark:group-hover:text-white truncate font-sans">
+          <span className="text-foreground group-hover:text-foreground truncate font-sans">
             {fileName}
           </span>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {(added > 0 || removed > 0) && (
             <div className="flex items-center gap-1.5 font-mono text-xs">
-              {added > 0 && <span className="text-[#409D62]">+{added}</span>}
-              {removed > 0 && <span className="text-[#ff5c5c]">-{removed}</span>}
+              {added > 0 && <span className="text-emerald-500">+{added}</span>}
+              {removed > 0 && <span className="text-destructive">-{removed}</span>}
             </div>
           )}
           {matchedMutation && onOpenFileDiff && (
@@ -799,7 +799,7 @@ function FileMutationCard({
                 e.stopPropagation();
                 onOpenFileDiff(matchedMutation);
               }}
-              className="px-1.5 py-0.5 rounded text-[10.5px] text-neutral-400 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+              className="px-1.5 py-0.5 rounded text-[10.5px] text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
               title="Open diff in Preview panel"
             >
               Focus ↗
@@ -807,7 +807,7 @@ function FileMutationCard({
           )}
           {hasSnippet && (
             <ChevronDown
-              className="w-3 h-3 text-[#666666] transition-transform duration-200 ease-out"
+              className="w-3 h-3 text-muted-foreground transition-transform duration-200 ease-out"
               style={{ transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)" }}
             />
           )}
@@ -816,8 +816,8 @@ function FileMutationCard({
 
       {hasSnippet && (
         <SmoothCollapse isOpen={isOpen}>
-          <div className="mt-1 p-2 rounded-xl bg-[#0e0e10] border border-[#232328] text-xs font-mono select-text">
-            <ScrollArea className="max-h-40 w-full text-[11px] text-[#999999]">
+          <div className="mt-1 p-2 rounded-xl bg-secondary/80 border border-border text-xs font-mono select-text">
+            <ScrollArea className="max-h-40 w-full text-[11px] text-muted-foreground">
               <pre className="whitespace-pre-wrap">
                 {String(
                   tool.args?.ReplacementContent ||
@@ -923,16 +923,16 @@ function AskedQuestionsTraceItem({
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
-        className="inline-flex items-center gap-1.5 text-[13px] text-[#666666] dark:text-[#888888] hover:text-[#111111] dark:hover:text-[#d4d4d4] transition-colors cursor-pointer w-fit py-0.5 select-none"
+        className="inline-flex items-center gap-1.5 text-[13px] text-muted-foreground hover:text-foreground transition-colors cursor-pointer w-fit py-0.5 select-none"
       >
-        <HelpCircle className="w-3.5 h-3.5 text-[#777777] shrink-0" />
+        <HelpCircle className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
         <span>
           {isCompleted
             ? `Asked ${questionCount} question${questionCount > 1 ? "s" : ""}`
             : "Asking questions"}
         </span>
         <ChevronDown
-          className="w-3.5 h-3.5 text-[#777777] transition-transform duration-200 ease-out"
+          className="w-3.5 h-3.5 text-muted-foreground transition-transform duration-200 ease-out"
           style={{ transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)" }}
         />
       </button>
@@ -942,10 +942,10 @@ function AskedQuestionsTraceItem({
           {isCompleted ? (
             qaPairs.map((pair, idx) => (
               <div key={idx} className="space-y-0.5 text-left">
-                <div className="font-semibold text-[12.5px] text-foreground dark:text-[#d4d4d4] leading-snug">
+                <div className="font-semibold text-[12.5px] text-foreground leading-snug">
                   {pair.question}
                 </div>
-                <div className="text-[12px] text-[#666666] dark:text-[#888888] leading-snug">
+                <div className="text-[12px] text-muted-foreground leading-snug">
                   {pair.answer}
                 </div>
               </div>
@@ -957,7 +957,7 @@ function AskedQuestionsTraceItem({
                 const options: string[] = Array.isArray(qObj?.options) ? qObj.options : [];
                 return (
                   <div key={qIdx} className="space-y-2">
-                    <div className="font-semibold text-[12.5px] text-foreground dark:text-[#d4d4d4] leading-snug">
+                    <div className="font-semibold text-[12.5px] text-foreground leading-snug">
                       {questionText}
                     </div>
                     {options.length > 0 && (
@@ -971,8 +971,8 @@ function AskedQuestionsTraceItem({
                             className={cn(
                               "w-full text-left p-2 rounded-lg border transition-all text-xs font-medium flex items-center justify-between cursor-pointer",
                               selectedOption === opt
-                                ? "bg-sky-500/20 border-sky-400 text-sky-200"
-                                : "bg-background/60 hover:bg-black/5 dark:hover:bg-white/5 border-border/60 text-foreground"
+                                ? "bg-primary/20 border-primary text-primary"
+                                : "bg-card hover:bg-muted border-border text-foreground"
                             )}
                           >
                             <div className="flex items-center gap-2">
@@ -997,12 +997,12 @@ function AskedQuestionsTraceItem({
                   onChange={(e) => setCustomInput(e.target.value)}
                   disabled={isSubmitting}
                   placeholder={t("customAnswerPlaceholder")}
-                  className="flex-1 bg-background/80 border border-border/60 rounded-lg px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground/60 outline-none focus:border-sky-500 transition-all"
+                  className="flex-1 bg-card border border-border rounded-lg px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground/60 outline-none focus:border-primary transition-all"
                 />
                 <button
                   type="submit"
                   disabled={!customInput.trim() || isSubmitting}
-                  className="px-3 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white disabled:opacity-40 transition-all flex items-center justify-center cursor-pointer shadow-xs"
+                  className="px-3 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground disabled:opacity-40 transition-all flex items-center justify-center cursor-pointer shadow-xs"
                 >
                   <Send className="h-3 w-3" />
                 </button>
@@ -1069,31 +1069,31 @@ function PythonRunnerTraceItem({ tool }: { tool: TraceStep | DisplayToolCall }) 
     <div className="w-full min-w-0 flex flex-col my-0.5">
       <div
         onClick={() => setIsOpen((prev) => !prev)}
-        className="flex items-center justify-between py-1 px-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/5 text-[13px] text-[#888888] min-w-0 cursor-pointer select-none"
+        className="flex items-center justify-between py-1 px-1.5 rounded-md hover:bg-muted text-[13px] text-muted-foreground min-w-0 cursor-pointer select-none"
       >
         <div className="flex items-center gap-2 min-w-0 pr-2">
           <FileIcon filename="script.py" />
-          <span className="font-mono text-xs text-foreground/90 dark:text-[#d4d4d4] truncate">
+          <span className="font-mono text-xs text-foreground truncate">
             {code ? code.split("\n")[0]?.slice(0, 35) + "..." : "Python calculation"}
           </span>
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {isRunning ? (
-            <span className="w-1.5 h-1.5 rounded-full bg-[#e79737] dark:bg-[#ff7a00] animate-pulse" />
+            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
           ) : isError ? (
-            <span className="w-1.5 h-1.5 rounded-full bg-[#ff5c5c]" />
+            <span className="w-1.5 h-1.5 rounded-full bg-destructive" />
           ) : (
-            <span className="w-1.5 h-1.5 rounded-full bg-[#409D62]" />
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
           )}
           <ChevronDown
-            className="w-3 h-3 text-[#666666] transition-transform duration-200 ease-out"
+            className="w-3 h-3 text-muted-foreground transition-transform duration-200 ease-out"
             style={{ transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)" }}
           />
         </div>
       </div>
 
       <SmoothCollapse isOpen={isOpen}>
-        <div className="mt-1 p-2.5 rounded-xl bg-[#0e0e10] border border-[#232328] font-mono text-[12px] leading-relaxed select-text shadow-xs w-full min-w-0 space-y-2">
+        <div className="mt-1 p-2.5 rounded-xl bg-secondary/80 border border-border font-mono text-[12px] leading-relaxed select-text shadow-xs w-full min-w-0 space-y-2">
           {/* Visual chart artifacts */}
           {artifacts.length > 0 && (
             <div className="space-y-2">
@@ -1104,11 +1104,11 @@ function PythonRunnerTraceItem({ tool }: { tool: TraceStep | DisplayToolCall }) 
                 return (
                   <div
                     key={artPath}
-                    className="p-2 rounded-lg bg-[#161618] border border-[#27272b] space-y-1.5"
+                    className="p-2 rounded-lg bg-card border border-border space-y-1.5"
                   >
                     <div className="flex items-center justify-between text-[11px]">
-                      <span className="text-[#e0e0e0] flex items-center gap-1.5">
-                        <Sparkles className="h-3 w-3 text-yellow-500" />
+                      <span className="text-foreground flex items-center gap-1.5">
+                        <Sparkles className="h-3 w-3 text-amber-500" />
                         <strong>{fileName}</strong>
                       </span>
                       <button
@@ -1122,7 +1122,7 @@ function PythonRunnerTraceItem({ tool }: { tool: TraceStep | DisplayToolCall }) 
                     </div>
 
                     {dataUri && (
-                      <div className="rounded overflow-hidden border border-[#2f2f35] bg-[#000000] p-1">
+                      <div className="rounded overflow-hidden border border-border bg-background p-1">
                         <img
                           src={dataUri}
                           alt={fileName}
@@ -1138,8 +1138,8 @@ function PythonRunnerTraceItem({ tool }: { tool: TraceStep | DisplayToolCall }) 
 
           {code && (
             <div>
-              <div className="text-[#777777] text-[10px] mb-1">Python script:</div>
-              <pre className="p-2 rounded-lg bg-[#161618] border border-[#27272b] overflow-x-auto text-[#ffd438] max-h-40 overflow-y-auto whitespace-pre">
+              <div className="text-muted-foreground text-[10px] mb-1">Python script:</div>
+              <pre className="p-2 rounded-lg bg-card border border-border overflow-x-auto text-amber-500 max-h-40 overflow-y-auto whitespace-pre">
                 {code}
               </pre>
             </div>
@@ -1147,8 +1147,8 @@ function PythonRunnerTraceItem({ tool }: { tool: TraceStep | DisplayToolCall }) 
 
           {stdout && (
             <div>
-              <div className="text-[#777777] text-[10px] mb-1">stdout:</div>
-              <pre className="p-2 rounded-lg bg-[#161618] border border-[#27272b] overflow-x-auto text-[#409D62] max-h-40 overflow-y-auto whitespace-pre-wrap">
+              <div className="text-muted-foreground text-[10px] mb-1">stdout:</div>
+              <pre className="p-2 rounded-lg bg-card border border-border overflow-x-auto text-emerald-500 max-h-40 overflow-y-auto whitespace-pre-wrap">
                 {stdout}
               </pre>
             </div>
@@ -1156,8 +1156,8 @@ function PythonRunnerTraceItem({ tool }: { tool: TraceStep | DisplayToolCall }) 
 
           {stderr && (
             <div>
-              <div className="text-[#ff5c5c] text-[10px] mb-1">stderr:</div>
-              <pre className="p-2 rounded-lg bg-[#ff5c5c]/10 border border-[#ff5c5c]/30 overflow-x-auto text-[#ff5c5c] max-h-40 overflow-y-auto whitespace-pre-wrap">
+              <div className="text-destructive text-[10px] mb-1">stderr:</div>
+              <pre className="p-2 rounded-lg bg-destructive/10 border border-destructive/30 overflow-x-auto text-destructive max-h-40 overflow-y-auto whitespace-pre-wrap">
                 {stderr}
               </pre>
             </div>
@@ -1183,22 +1183,22 @@ function TodoWriteTraceItem({ tool }: { tool: TraceStep | DisplayToolCall }) {
     <div className="w-full min-w-0 flex flex-col my-0.5">
       <div
         onClick={() => setIsOpen((prev) => !prev)}
-        className="flex items-center justify-between py-1 px-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/5 text-[13px] text-[#888888] min-w-0 cursor-pointer select-none"
+        className="flex items-center justify-between py-1 px-1.5 rounded-md hover:bg-muted text-[13px] text-muted-foreground min-w-0 cursor-pointer select-none"
       >
         <div className="flex items-center gap-2 min-w-0 pr-2">
           <ListTodo className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-          <span className="font-sans text-foreground/90 dark:text-[#d4d4d4] truncate">
+          <span className="font-sans text-foreground truncate">
             Roadmap ({completedCount}/{tasks.length})
           </span>
         </div>
         <ChevronDown
-          className="w-3 h-3 text-[#666666] transition-transform duration-200 ease-out"
+          className="w-3 h-3 text-muted-foreground transition-transform duration-200 ease-out"
           style={{ transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)" }}
         />
       </div>
 
       <SmoothCollapse isOpen={isOpen}>
-        <div className="mt-1 p-2 rounded-xl bg-[#0e0e10] border border-[#232328] text-xs font-sans space-y-1.5">
+        <div className="mt-1 p-2 rounded-xl bg-secondary/80 border border-border text-xs font-sans space-y-1.5">
           {tasks.map((task, idx) => {
             const text = task.content || task.text || `Task ${idx + 1}`;
             return (
@@ -1207,18 +1207,18 @@ function TodoWriteTraceItem({ tool }: { tool: TraceStep | DisplayToolCall }) {
                 className={cn(
                   "flex items-start gap-2 p-1.5 rounded border text-xs",
                   task.status === "completed"
-                    ? "bg-[#161618]/50 border-[#27272b] text-[#666666] line-through"
+                    ? "bg-muted/50 border-border text-muted-foreground line-through"
                     : task.status === "in_progress"
-                    ? "bg-cyan-950/20 border-cyan-500/40 text-cyan-300 font-medium"
-                    : "bg-[#161618] border-[#27272b] text-[#d4d4d4]"
+                    ? "bg-sky-500/10 border-sky-500/30 text-sky-600 dark:text-sky-300 font-medium"
+                    : "bg-card border-border text-foreground"
                 )}
               >
                 {task.status === "completed" ? (
-                  <CheckCircle2 className="h-3.5 w-3.5 text-[#409D62] shrink-0 mt-0.5" />
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0 mt-0.5" />
                 ) : task.status === "in_progress" ? (
-                  <Loader2 className="h-3.5 w-3.5 text-cyan-400 shrink-0 animate-spin mt-0.5" />
+                  <Loader2 className="h-3.5 w-3.5 text-sky-500 shrink-0 animate-spin mt-0.5" />
                 ) : (
-                  <div className="h-3.5 w-3.5 rounded-full border border-[#555555] shrink-0 mt-0.5" />
+                  <div className="h-3.5 w-3.5 rounded-full border border-muted-foreground/40 shrink-0 mt-0.5" />
                 )}
                 <span>{text}</span>
               </div>
@@ -1244,11 +1244,11 @@ function GenericToolItem({ tool }: { tool: TraceStep | DisplayToolCall }) {
   }
 
   return (
-    <div className="flex items-center gap-2 py-1 px-1.5 rounded-md hover:bg-black/5 dark:hover:bg-white/5 text-[13px] text-[#888888] min-w-0 select-none">
-      <Layers className="w-3.5 h-3.5 text-[#777777] shrink-0" />
+    <div className="flex items-center gap-2 py-1 px-1.5 rounded-md hover:bg-muted text-[13px] text-muted-foreground min-w-0 select-none">
+      <Layers className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
       <span className="capitalize shrink-0">{tool.name}</span>
       {targetArg && (
-        <span className="text-foreground/90 dark:text-[#d4d4d4] truncate">
+        <span className="text-foreground truncate">
           {typeof targetArg === "string" ? targetArg : JSON.stringify(targetArg)}
         </span>
       )}
@@ -1446,25 +1446,25 @@ export function MutationsSummaryCard({
   const unrolledCount = mutations.filter((m) => !m.rolledBack).length;
 
   return (
-    <div className="w-full rounded-xl bg-card dark:bg-[#141414] border border-border/70 dark:border-[#2b2b2b] my-2 select-none font-sans overflow-hidden transition-all shadow-xs animate-in fade-in-0 duration-200">
+    <div className="w-full rounded-xl bg-card border border-border my-2 select-none font-sans overflow-hidden transition-all shadow-xs animate-in fade-in-0 duration-200">
       <div
         className={cn(
           "flex items-center justify-between px-3.5 py-2 transition-all",
-          isOpen && "border-b border-border/60 dark:border-[#242424]"
+          isOpen && "border-b border-border"
         )}
       >
         <button
           type="button"
           onClick={() => setIsOpen((prev) => !prev)}
-          className="inline-flex items-center gap-2 text-[13px] text-foreground/90 dark:text-[#cccccc] hover:text-foreground dark:hover:text-white transition-colors cursor-pointer group/card"
+          className="inline-flex items-center gap-2 text-[13px] text-foreground hover:text-foreground/80 transition-colors cursor-pointer group/card"
         >
-          <span className="font-normal text-foreground/90 dark:text-[#d4d4d4]">
+          <span className="font-normal text-foreground">
             {mutations.length === 1
               ? t("fileChangedSingle")
               : t("filesChanged", { count: mutations.length })}
           </span>
-          <span className="font-mono text-xs text-[#409D62] font-medium">+{totalAdded}</span>
-          <span className="font-mono text-xs text-[#ff5c5c] font-medium">-{totalRemoved}</span>
+          <span className="font-mono text-xs text-emerald-500 font-medium">+{totalAdded}</span>
+          <span className="font-mono text-xs text-destructive font-medium">-{totalRemoved}</span>
           <ChevronRight
             className={cn(
               "w-3.5 h-3.5 text-muted-foreground/60 transition-transform duration-200 ease-out",
@@ -1478,7 +1478,7 @@ export function MutationsSummaryCard({
             <button
               type="button"
               onClick={() => onRollbackAll(mutations)}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-muted/60 hover:bg-muted dark:bg-[#1e1e1e] dark:hover:bg-[#282828] border border-border/80 dark:border-[#333333] text-[11.5px] text-foreground/90 hover:text-foreground dark:text-[#d4d4d4] dark:hover:text-white transition-all cursor-pointer font-medium shadow-xs"
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-muted hover:bg-muted/80 border border-border text-[11.5px] text-foreground hover:text-foreground transition-all cursor-pointer font-medium shadow-xs"
               title={t("undoAllChangesInTurn")}
             >
               <RotateCcw className="w-3 h-3 text-muted-foreground" />
@@ -1529,7 +1529,7 @@ function MutationRowItem({
   return (
     <div
       onClick={() => onOpenFileDiff?.(mut)}
-      className={`flex items-center justify-between group py-1.5 px-2 rounded-lg hover:bg-black/[0.04] dark:hover:bg-white/[0.04] transition-colors ${
+      className={`flex items-center justify-between group py-1.5 px-2 rounded-lg hover:bg-muted transition-colors ${
         onOpenFileDiff ? "cursor-pointer" : ""
       }`}
     >
@@ -1538,14 +1538,14 @@ function MutationRowItem({
         <span
           className={`text-[13px] truncate font-sans ${
             mut.rolledBack
-              ? "line-through text-muted-foreground/60 dark:text-[#666666]"
-              : "text-foreground/90 dark:text-[#d4d4d4]"
+              ? "line-through text-muted-foreground/60"
+              : "text-foreground"
           }`}
         >
           {fileName}
         </span>
         {dirPath && (
-          <span className="text-[11px] text-muted-foreground/60 dark:text-[#555555] font-mono truncate max-w-[240px]">
+          <span className="text-[11px] text-muted-foreground/60 font-mono truncate max-w-[240px]">
             /{dirPath}
           </span>
         )}
@@ -1553,8 +1553,8 @@ function MutationRowItem({
 
       <div className="shrink-0 ml-2 flex items-center gap-2">
         <div className="flex items-center gap-1.5 font-mono text-xs">
-          <span className="text-[#409D62]">+{fileStats.added}</span>
-          <span className="text-[#ff5c5c]">-{fileStats.removed}</span>
+          <span className="text-emerald-500">+{fileStats.added}</span>
+          <span className="text-destructive">-{fileStats.removed}</span>
         </div>
 
         {onOpenFileDiff && !mut.rolledBack && (
@@ -1564,7 +1564,7 @@ function MutationRowItem({
               e.stopPropagation();
               onOpenFileDiff(mut);
             }}
-            className="opacity-0 group-hover:opacity-100 flex items-center gap-1 px-1.5 py-0.5 rounded bg-muted/70 hover:bg-muted dark:bg-[#202020] dark:hover:bg-[#2e2e2e] border border-border/80 dark:border-[#333333] text-[10.5px] text-neutral-400 hover:text-white transition-all cursor-pointer shadow-xs"
+            className="opacity-0 group-hover:opacity-100 flex items-center gap-1 px-1.5 py-0.5 rounded bg-secondary hover:bg-secondary/80 border border-border text-[10.5px] text-muted-foreground hover:text-foreground transition-all cursor-pointer shadow-xs"
             title="Focus in Preview panel"
           >
             Focus ↗
@@ -1572,8 +1572,8 @@ function MutationRowItem({
         )}
 
         {mut.rolledBack ? (
-          <span className="text-[10.5px] text-[#409D62] font-medium flex items-center gap-0.5">
-            <Check className="w-3 h-3 text-[#409D62]" />
+          <span className="text-[10.5px] text-emerald-500 font-medium flex items-center gap-0.5">
+            <Check className="w-3 h-3 text-emerald-500" />
             <span>{t("undone")}</span>
           </span>
         ) : onRollback ? (
@@ -1583,7 +1583,7 @@ function MutationRowItem({
               e.stopPropagation();
               onRollback(mut);
             }}
-            className="opacity-0 group-hover:opacity-100 flex items-center gap-1 px-2 py-0.5 rounded bg-muted/70 hover:bg-muted dark:bg-[#202020] dark:hover:bg-[#2e2e2e] border border-border/80 dark:border-[#333333] text-[10.5px] text-foreground/80 hover:text-foreground dark:text-[#d4d4d4] dark:hover:text-white transition-all cursor-pointer shadow-xs"
+            className="opacity-0 group-hover:opacity-100 flex items-center gap-1 px-2 py-0.5 rounded bg-secondary hover:bg-secondary/80 border border-border text-[10.5px] text-foreground hover:text-foreground transition-all cursor-pointer shadow-xs"
             title={language === "id" ? "Undo perubahan pada berkas ini" : "Undo changes to this file"}
           >
             <RotateCcw className="w-2.5 h-2.5 text-muted-foreground" />
@@ -1594,4 +1594,5 @@ function MutationRowItem({
     </div>
   );
 }
+
 

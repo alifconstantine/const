@@ -75,7 +75,7 @@ export function LearnCard({
         className={`w-full px-4 py-3.5 rounded-2xl border transition-all duration-200 flex items-center justify-between gap-3.5 cursor-pointer select-none ${
           isSelected
             ? "border-primary/80 bg-secondary/90 ring-1 ring-primary/40"
-            : "border-border/80 dark:border-white/10 bg-[#1e1e22] dark:bg-[#1e1e24] hover:bg-[#25252b] active:bg-gradient-to-r active:from-[#282832] active:to-[#1e1e24] active:scale-[0.99]"
+            : "border-border/80 hover:border-border bg-card hover:bg-secondary/60 active:bg-secondary/80 text-card-foreground shadow-2xs active:scale-[0.99]"
         }`}
       >
         <div className="flex items-center gap-3.5 min-w-0 flex-1">
@@ -88,7 +88,7 @@ export function LearnCard({
               />
             </div>
           ) : (
-            <div className="h-10 w-10 rounded-xl bg-secondary/80 flex items-center justify-center text-xl shrink-0 border border-white/10 shadow-2xs">
+            <div className="h-10 w-10 rounded-xl bg-secondary/80 flex items-center justify-center text-xl shrink-0 border border-border/60 shadow-2xs">
               {learn.emoji || "🚀"}
             </div>
           )}

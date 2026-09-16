@@ -86,11 +86,11 @@ export function ImageLightbox({
             />
           </div>
         ) : (
-          <div className="bg-[#1e1e1e] border border-[#383838] rounded-2xl p-6 shadow-2xl flex flex-col items-center gap-3 text-white">
-            <div className="w-12 h-12 rounded-xl bg-[#2a2a2a] flex items-center justify-center text-white">
+          <div className="bg-card border border-border rounded-2xl p-6 shadow-2xl flex flex-col items-center gap-3 text-foreground">
+            <div className="w-12 h-12 rounded-xl bg-muted flex items-center justify-center text-foreground">
               <FileText className="w-6 h-6" />
             </div>
-            <span className="text-sm font-medium text-white truncate max-w-[240px]" title={alt}>
+            <span className="text-sm font-medium text-foreground truncate max-w-[240px]" title={alt}>
               {alt}
             </span>
           </div>

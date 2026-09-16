@@ -70,8 +70,8 @@ export function LearnCard({
         onClick={handleCardClick}
         className={`w-full px-4 py-3 rounded-xl border transition-all flex items-center justify-between gap-4 cursor-pointer select-none group shadow-none ${
           isSelected
-            ? "border-primary/60 bg-[#f4f4f6] dark:bg-[#2b2b2b]"
-            : "border-[#dedee2] dark:border-[#383838] hover:border-[#b0b0b0] dark:hover:border-[#4f4f4f] bg-white dark:bg-[#222222] hover:bg-[#f4f4f6] dark:hover:bg-[#2b2b2b]"
+            ? "border-primary/60 bg-secondary"
+            : "border-border hover:border-foreground/20 bg-card hover:bg-secondary/70"
         }`}
       >
         <div className="flex items-center gap-3.5 min-w-0 flex-1">
@@ -84,23 +84,23 @@ export function LearnCard({
               />
             </div>
           ) : (
-            <div className="h-9 w-9 rounded-xl bg-[#f4f4f6] dark:bg-[#2b2b2b] flex items-center justify-center text-lg shrink-0 border border-[#dedee2] dark:border-[#383838]">
+            <div className="h-9 w-9 rounded-xl bg-secondary flex items-center justify-center text-lg shrink-0 border border-border">
               {learn.emoji || "🚀"}
             </div>
           )}
           <div className="min-w-0 flex-1">
-            <h4 className="text-sm font-medium text-[#262626] dark:text-[#d4d4d4] truncate group-hover:text-black dark:group-hover:text-white transition-colors">
+            <h4 className="text-sm font-medium text-card-foreground truncate group-hover:text-foreground transition-colors">
               {learn.title}
             </h4>
             {learn.description && (
-              <p className="text-xs text-[#8a8a8a] dark:text-[#777777] truncate">
+              <p className="text-xs text-muted-foreground truncate">
                 {learn.description}
               </p>
             )}
           </div>
         </div>
 
-        <div className="flex items-center gap-4 shrink-0 text-xs text-[#8a8a8a] dark:text-[#777777]">
+        <div className="flex items-center gap-4 shrink-0 text-xs text-muted-foreground">
           <span className="hidden sm:inline">
             {formattedDate} • {sourcesText}
           </span>
@@ -110,34 +110,34 @@ export function LearnCard({
               <button
                 type="button"
                 onClick={(e) => e.stopPropagation()}
-                className="h-7 w-7 rounded-lg flex items-center justify-center hover:bg-[#dedee2] dark:hover:bg-[#383838] text-[#8a8a8a] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white cursor-pointer transition-colors"
+                className="h-7 w-7 rounded-lg flex items-center justify-center hover:bg-secondary text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
               >
                 <MoreVertical className="h-4 w-4" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48 p-1.5 shadow-xl bg-white dark:bg-[#222222] border-[#dedee2] dark:border-[#383838] text-[#262626] dark:text-[#d4d4d4]">
+            <DropdownMenuContent align="end" className="w-48 p-1.5 shadow-xl bg-popover border-border text-popover-foreground">
               <DropdownMenuItem
-                className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2 hover:bg-[#f4f4f5] dark:hover:bg-[#2e2e2e]"
+                className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2 hover:bg-secondary"
                 onClick={() => onClick?.(learn)}
               >
                 <ExternalLink className="h-3.5 w-3.5" />
                 <span>{t("openLearn")}</span>
               </DropdownMenuItem>
               <DropdownMenuItem
-                className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2 hover:bg-[#f4f4f5] dark:hover:bg-[#2e2e2e]"
+                className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2 hover:bg-secondary"
                 onClick={() => onManageCollections?.(learn)}
               >
                 <FolderPlus className="h-3.5 w-3.5" />
                 <span>{t("manageCollections")}</span>
               </DropdownMenuItem>
               <DropdownMenuItem
-                className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2 hover:bg-[#f4f4f5] dark:hover:bg-[#2e2e2e]"
+                className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2 hover:bg-secondary"
                 onClick={() => onEdit?.(learn)}
               >
                 <Edit3 className="h-3.5 w-3.5" />
                 <span>{t("editLearn")}</span>
               </DropdownMenuItem>
-              <DropdownMenuSeparator className="my-1 bg-[#dedee2] dark:bg-[#383838]" />
+              <DropdownMenuSeparator className="my-1 bg-border" />
               <DropdownMenuItem
                 className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2 text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 dark:hover:bg-rose-500/10 focus:bg-rose-500/10 focus:text-rose-600"
                 onClick={() => onDelete?.(learn)}
@@ -158,13 +158,13 @@ export function LearnCard({
       onClick={handleCardClick}
       className={`min-h-[170px] w-full p-5 rounded-2xl border transition-all flex flex-col justify-between cursor-pointer select-none group relative shadow-none ${
         isSelected
-          ? "border-primary/70 bg-[#f4f4f6] dark:bg-[#2b2b2b] ring-1 ring-primary/40"
-          : "border-[#dedee2] dark:border-[#383838] hover:border-[#b0b0b0] dark:hover:border-[#4f4f4f] bg-white dark:bg-[#222222] hover:bg-[#f4f4f6] dark:hover:bg-[#2b2b2b]"
+          ? "border-primary/70 bg-secondary ring-1 ring-primary/40"
+          : "border-border hover:border-foreground/20 bg-card hover:bg-secondary/70"
       }`}
     >
       {/* Top row: Squircle emoji & Menu / Selection Checkbox */}
       <div className="flex items-start justify-between">
-        <div className="h-10 w-10 rounded-xl bg-[#f4f4f6] dark:bg-[#2b2b2b] border border-[#dedee2] dark:border-[#383838] flex items-center justify-center text-xl group-hover:scale-105 transition-transform shrink-0">
+        <div className="h-10 w-10 rounded-xl bg-secondary border border-border flex items-center justify-center text-xl group-hover:scale-105 transition-transform shrink-0">
           {learn.emoji || "🚀"}
         </div>
 
@@ -182,35 +182,35 @@ export function LearnCard({
               <button
                 type="button"
                 onClick={(e) => e.stopPropagation()}
-                className="h-7 w-7 rounded-lg flex items-center justify-center hover:bg-[#dedee2] dark:hover:bg-[#383838] text-[#8a8a8a] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white cursor-pointer transition-colors"
+                className="h-7 w-7 rounded-lg flex items-center justify-center hover:bg-secondary text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
                 aria-label={t("moreOptions")}
               >
                 <MoreVertical className="h-4 w-4" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48 p-1.5 shadow-xl bg-white dark:bg-[#222222] border-[#dedee2] dark:border-[#383838] text-[#262626] dark:text-[#d4d4d4]">
+            <DropdownMenuContent align="end" className="w-48 p-1.5 shadow-xl bg-popover border-border text-popover-foreground">
               <DropdownMenuItem
-                className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2 hover:bg-[#f4f4f5] dark:hover:bg-[#2e2e2e]"
+                className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2 hover:bg-secondary"
                 onClick={() => onClick?.(learn)}
               >
                 <ExternalLink className="h-3.5 w-3.5" />
                 <span>{t("openLearn")}</span>
               </DropdownMenuItem>
               <DropdownMenuItem
-                className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2 hover:bg-[#f4f4f5] dark:hover:bg-[#2e2e2e]"
+                className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2 hover:bg-secondary"
                 onClick={() => onManageCollections?.(learn)}
               >
                 <FolderPlus className="h-3.5 w-3.5" />
                 <span>{t("manageCollections")}</span>
               </DropdownMenuItem>
               <DropdownMenuItem
-                className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2 hover:bg-[#f4f4f5] dark:hover:bg-[#2e2e2e]"
+                className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2 hover:bg-secondary"
                 onClick={() => onEdit?.(learn)}
               >
                 <Edit3 className="h-3.5 w-3.5" />
                 <span>{t("editLearn")}</span>
               </DropdownMenuItem>
-              <DropdownMenuSeparator className="my-1 bg-[#dedee2] dark:bg-[#383838]" />
+              <DropdownMenuSeparator className="my-1 bg-border" />
               <DropdownMenuItem
                 className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2 text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 dark:hover:bg-rose-500/10 focus:bg-rose-500/10 focus:text-rose-600"
                 onClick={() => onDelete?.(learn)}
@@ -225,18 +225,18 @@ export function LearnCard({
 
       {/* Middle: Title */}
       <div className="my-2.5">
-        <h4 className="text-sm font-medium text-[#262626] dark:text-[#d4d4d4] line-clamp-2 leading-snug group-hover:text-black dark:group-hover:text-white transition-colors">
+        <h4 className="text-sm font-medium text-card-foreground line-clamp-2 leading-snug group-hover:text-foreground transition-colors">
           {learn.title}
         </h4>
         {learn.description && (
-          <p className="text-xs text-[#8a8a8a] dark:text-[#777777] line-clamp-1 mt-0.5">
+          <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">
             {learn.description}
           </p>
         )}
       </div>
 
       {/* Bottom: Date & Source count */}
-      <div className="text-[11px] font-normal text-[#8a8a8a] dark:text-[#777777] flex items-center gap-1.5 pt-1">
+      <div className="text-[11px] font-normal text-muted-foreground flex items-center gap-1.5 pt-1">
         <span>{formattedDate}</span>
         <span>•</span>
         <span>{sourcesText}</span>

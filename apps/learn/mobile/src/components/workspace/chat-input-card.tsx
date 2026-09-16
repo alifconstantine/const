@@ -260,12 +260,12 @@ export function ChatInputCard({
       <button
         type="button"
         onClick={onOpenSources}
-        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs text-[#8e8e93] hover:text-[#d4d4d4] hover:bg-white/5 transition-colors cursor-pointer select-none"
+        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer select-none"
         title={t("learningSources")}
         aria-label={t("learningSources")}
       >
-        <FolderOpen className="w-3.5 h-3.5 text-[#8e8e93]" />
-        <span className="font-sans text-[11px] text-[#8e8e93] font-medium">{sourcesCount}</span>
+        <FolderOpen className="w-3.5 h-3.5 text-muted-foreground" />
+        <span className="font-sans text-[11px] text-muted-foreground font-medium">{sourcesCount}</span>
       </button>
     );
   };
@@ -277,7 +277,7 @@ export function ChatInputCard({
         <button
           type="button"
           onClick={onStop}
-          className="w-8 h-8 rounded-full bg-[#383838] hover:bg-[#48484e] text-[#f87171] hover:text-white flex items-center justify-center transition-colors cursor-pointer border border-[#48484e] shrink-0 active:scale-95"
+          className="w-8 h-8 rounded-full bg-secondary hover:bg-secondary/80 text-destructive hover:text-destructive flex items-center justify-center transition-colors cursor-pointer border border-border shrink-0 active:scale-95"
           title={t("stopGenerating")}
           aria-label={t("stopGenerating")}
         >
@@ -293,7 +293,7 @@ export function ChatInputCard({
           <button
             type="button"
             onClick={() => toast.info(t("voiceInputNotAvailable") || "Input suara akan segera hadir!")}
-            className="w-8 h-8 rounded-full hover:bg-white/10 text-[#9ca3af] hover:text-white flex items-center justify-center transition-colors cursor-pointer shrink-0 active:scale-95"
+            className="w-8 h-8 rounded-full hover:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer shrink-0 active:scale-95"
             title={t("voiceInput") || "Input Suara"}
             aria-label={t("voiceInput") || "Input Suara"}
           >
@@ -302,7 +302,7 @@ export function ChatInputCard({
           <button
             type="button"
             onClick={() => toast.info(t("voiceModeNotAvailable"))}
-            className="w-8 h-8 rounded-full bg-[#0066ff] hover:bg-[#0052cc] text-white flex items-center justify-center transition-transform active:scale-95 cursor-pointer shrink-0 shadow-xs"
+            className="w-8 h-8 rounded-full bg-foreground text-background flex items-center justify-center transition-transform active:scale-95 cursor-pointer shrink-0 shadow-xs"
             title="Mode Suara"
             aria-label="Mode Suara"
           >
@@ -323,7 +323,7 @@ export function ChatInputCard({
         <button
           type="button"
           onClick={() => onSend(inputMessage, attachments)}
-          className="w-8 h-8 rounded-full bg-[#0066ff] hover:bg-[#0052cc] text-white flex items-center justify-center transition-all cursor-pointer active:scale-95 shrink-0 shadow-xs"
+          className="w-8 h-8 rounded-full bg-foreground text-background flex items-center justify-center transition-all cursor-pointer active:scale-95 shrink-0 shadow-xs"
           title={t("sendMessage")}
           aria-label={t("sendMessage")}
         >
@@ -345,8 +345,8 @@ export function ChatInputCard({
       className={cn(
         "w-8 h-8 rounded-full flex items-center justify-center transition-colors shrink-0",
         isMaxReached
-          ? "opacity-35 cursor-not-allowed text-[#666666]"
-          : "hover:bg-white/10 text-[#d1d5db] hover:text-white cursor-pointer active:scale-95"
+          ? "opacity-35 cursor-not-allowed text-muted-foreground/40"
+          : "hover:bg-secondary text-muted-foreground hover:text-foreground cursor-pointer active:scale-95"
       )}
       title={
         isMaxReached
@@ -385,7 +385,7 @@ export function ChatInputCard({
                   }
                 }}
                 className={cn(
-                  "relative group shrink-0 rounded-xl border border-[#383838] bg-[#1a1917] shadow-xs select-none",
+                  "relative group shrink-0 rounded-xl border border-border bg-secondary/50 shadow-xs select-none",
                   isMedia
                     ? "w-16 h-16 sm:w-20 sm:h-20 cursor-pointer active:scale-95 transition-transform"
                     : "w-32 sm:w-36 h-16 sm:h-20"
@@ -406,7 +406,7 @@ export function ChatInputCard({
                   </div>
                 ) : isVideo && att.url ? (
                   <div className="w-full h-full rounded-xl overflow-hidden bg-black relative flex items-center justify-center">
-                    <Video className="w-5 h-5 text-[#969696]" />
+                    <Video className="w-5 h-5 text-muted-foreground" />
                     <span className="absolute bottom-1 right-1 text-[7px] font-mono bg-black/70 text-white px-1 rounded uppercase font-bold">
                       VID
                     </span>
@@ -417,28 +417,28 @@ export function ChatInputCard({
                     </div>
                   </div>
                 ) : (
-                  <div className="w-full h-full p-1.5 flex flex-col justify-between rounded-xl bg-[#262626]/80 text-left">
+                  <div className="w-full h-full p-1.5 flex flex-col justify-between rounded-xl bg-secondary/80 text-left">
                     <div className="flex items-center justify-between">
-                      <span className="text-[8px] font-bold text-[#888888] font-mono uppercase">
+                      <span className="text-[8px] font-bold text-muted-foreground font-mono uppercase">
                         {ext}
                       </span>
-                      <FileText className="w-3 h-3 text-[#d4d4d4] shrink-0" />
+                      <FileText className="w-3 h-3 text-foreground shrink-0" />
                     </div>
                     <div className="w-full flex-1 my-0.5 min-h-0 overflow-hidden">
                       <ScrollArea className="w-full h-full max-h-[30px] sm:max-h-[36px]">
-                        <span className="text-[9.5px] font-medium text-[#d4d4d4] leading-tight break-words block pr-1">
+                        <span className="text-[9.5px] font-medium text-foreground leading-tight break-words block pr-1">
                           {att.name}
                         </span>
                       </ScrollArea>
                     </div>
-                    <span className="text-[7.5px] text-[#777777] font-mono block truncate">
+                    <span className="text-[7.5px] text-muted-foreground font-mono block truncate">
                       {formatFileSize(att.size)}
                     </span>
                   </div>
                 )}
 
                 {/* Hover tooltip tag showing filename */}
-                <div className="pointer-events-none absolute -top-7 left-1/2 -translate-x-1/2 z-30 px-2 py-0.5 bg-[#2a2a2a] text-[#ededed] text-[9.5px] font-sans rounded-md shadow-lg border border-[#444444] opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap max-w-[180px] truncate">
+                <div className="pointer-events-none absolute -top-7 left-1/2 -translate-x-1/2 z-30 px-2 py-0.5 bg-popover text-popover-foreground text-[9.5px] font-sans rounded-md shadow-lg border border-border opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap max-w-[180px] truncate">
                   {att.name}
                 </div>
 
@@ -449,7 +449,7 @@ export function ChatInputCard({
                     e.stopPropagation();
                     handleRemoveAttachment(att.id);
                   }}
-                  className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-[#2b2b2b] hover:bg-[#e11d48] border border-[#444444] text-[#a9a9a9] hover:text-white flex items-center justify-center transition-all cursor-pointer shadow-sm z-20"
+                  className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-secondary hover:bg-destructive border border-border text-muted-foreground hover:text-destructive-foreground flex items-center justify-center transition-all cursor-pointer shadow-sm z-20"
                   title={t("removeAttachment")}
                   aria-label={t("removeAttachment")}
                 >
@@ -463,11 +463,11 @@ export function ChatInputCard({
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="w-16 h-16 sm:w-20 sm:h-20 shrink-0 rounded-xl border border-dashed border-[#383838] hover:border-[#666666] text-[#888888] hover:text-[#d4d4d4] flex flex-col items-center justify-center gap-1 transition-colors cursor-pointer text-[10px] select-none"
+              className="w-16 h-16 sm:w-20 sm:h-20 shrink-0 rounded-xl border border-dashed border-border hover:border-foreground/40 text-muted-foreground hover:text-foreground flex flex-col items-center justify-center gap-1 transition-colors cursor-pointer text-[10px] select-none"
               title={t("addMediaWithCount", { count: attachments.length, max: MAX_ATTACHMENTS })}
             >
-              <Plus className="w-4 h-4 text-[#888888]" />
-              <span className="font-mono text-[8px] text-[#777777]">
+              <Plus className="w-4 h-4 text-muted-foreground" />
+              <span className="font-mono text-[8px] text-muted-foreground">
                 {attachments.length}/{MAX_ATTACHMENTS}
               </span>
             </button>
@@ -483,7 +483,7 @@ export function ChatInputCard({
 
       <div
         className={cn(
-          "w-full bg-[#212121] border border-[#303030] transition-[border-color,border-radius,padding] duration-150 focus-within:border-[#484848] shadow-sm",
+          "w-full bg-card border border-border transition-[border-color,border-radius,padding] duration-150 focus-within:border-foreground/30 shadow-xs",
           isMultiline
             ? "rounded-[24px] p-2.5 sm:p-3"
             : "rounded-full px-2.5 py-1.5 min-h-[48px]"
@@ -528,7 +528,7 @@ export function ChatInputCard({
                 : t("askModel", { model: selectedModelName || "Const" })
             }
             className={cn(
-              "w-full bg-transparent text-[15px] sm:text-[15px] text-[#f3f4f6] placeholder:text-[#8e8e93] outline-none resize-none font-sans block",
+              "w-full bg-transparent text-[15px] sm:text-[15px] text-foreground placeholder:text-muted-foreground outline-none resize-none font-sans block",
               isMultiline
                 ? "leading-5 py-1 min-h-[44px] max-h-36 overflow-y-auto px-1"
                 : "leading-6 py-0.5 h-[28px] max-h-[28px] overflow-hidden px-1.5"

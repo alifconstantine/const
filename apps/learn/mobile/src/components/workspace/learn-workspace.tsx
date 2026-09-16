@@ -235,89 +235,89 @@ const STUDIO_TOOLS: StudioTool[] = [
     id: "audio_summary",
     name: "Audio Overview",
     icon: AudioLines,
-    iconColor: "text-[#a5b4fc]",
-    textColor: "text-[#dbeafe]",
-    cardBg: "bg-[#21232d]",
-    borderColor: "border-[#303444]",
-    hoverBg: "hover:bg-[#282b37]",
-    hoverBorder: "hover:border-[#3d4257]",
+    iconColor: "text-indigo-600 dark:text-[#a5b4fc]",
+    textColor: "text-indigo-950 dark:text-[#dbeafe]",
+    cardBg: "bg-indigo-50/70 dark:bg-[#21232d]",
+    borderColor: "border-indigo-200/70 dark:border-[#303444]",
+    hoverBg: "hover:bg-indigo-100/70 dark:hover:bg-[#282b37]",
+    hoverBorder: "hover:border-indigo-300 dark:hover:border-[#3d4257]",
   },
   {
     id: "slides",
     name: "Presentation Slides",
     icon: Presentation,
-    iconColor: "text-[#fde047]",
-    textColor: "text-[#fef9c3]",
-    cardBg: "bg-[#2b291d]",
-    borderColor: "border-[#3e3b2a]",
-    hoverBg: "hover:bg-[#353224]",
-    hoverBorder: "hover:border-[#4f4b36]",
+    iconColor: "text-amber-600 dark:text-[#fde047]",
+    textColor: "text-amber-950 dark:text-[#fef9c3]",
+    cardBg: "bg-amber-50/70 dark:bg-[#2b291d]",
+    borderColor: "border-amber-200/70 dark:border-[#3e3b2a]",
+    hoverBg: "hover:bg-amber-100/70 dark:hover:bg-[#353224]",
+    hoverBorder: "hover:border-amber-300 dark:hover:border-[#4f4b36]",
   },
   {
     id: "video_summary",
     name: "Video Summary",
     icon: Video,
-    iconColor: "text-[#86efac]",
-    textColor: "text-[#dcfce7]",
-    cardBg: "bg-[#1d2820]",
-    borderColor: "border-[#2b3d30]",
-    hoverBg: "hover:bg-[#243329]",
-    hoverBorder: "hover:border-[#384e3e]",
+    iconColor: "text-emerald-600 dark:text-[#86efac]",
+    textColor: "text-emerald-950 dark:text-[#dcfce7]",
+    cardBg: "bg-emerald-50/70 dark:bg-[#1d2820]",
+    borderColor: "border-emerald-200/70 dark:border-[#2b3d30]",
+    hoverBg: "hover:bg-emerald-100/70 dark:hover:bg-[#243329]",
+    hoverBorder: "hover:border-emerald-300 dark:hover:border-[#384e3e]",
   },
   {
     id: "mind_map",
     name: "Mind Map",
     icon: GitFork,
-    iconColor: "text-[#f472b6]",
-    textColor: "text-[#fce7f3]",
-    cardBg: "bg-[#2e212b]",
-    borderColor: "border-[#422f3e]",
-    hoverBg: "hover:bg-[#372834]",
-    hoverBorder: "hover:border-[#543b4f]",
+    iconColor: "text-pink-600 dark:text-[#f472b6]",
+    textColor: "text-pink-950 dark:text-[#fce7f3]",
+    cardBg: "bg-pink-50/70 dark:bg-[#2e212b]",
+    borderColor: "border-pink-200/70 dark:border-[#422f3e]",
+    hoverBg: "hover:bg-pink-100/70 dark:hover:bg-[#372834]",
+    hoverBorder: "hover:border-pink-300 dark:hover:border-[#543b4f]",
   },
   {
     id: "report",
     name: "Report",
     icon: FileText,
-    iconColor: "text-[#dedac2]",
-    textColor: "text-[#f5f4eb]",
-    cardBg: "bg-[#29281e]",
-    borderColor: "border-[#3c3a2b]",
-    hoverBg: "hover:bg-[#343225]",
-    hoverBorder: "hover:border-[#4d4a37]",
+    iconColor: "text-stone-600 dark:text-[#dedac2]",
+    textColor: "text-stone-950 dark:text-[#f5f4eb]",
+    cardBg: "bg-stone-100/80 dark:bg-[#29281e]",
+    borderColor: "border-stone-200/80 dark:border-[#3c3a2b]",
+    hoverBg: "hover:bg-stone-200/70 dark:hover:bg-[#343225]",
+    hoverBorder: "hover:border-stone-300 dark:hover:border-[#4d4a37]",
   },
   {
     id: "quiz",
     name: "Quiz & Flashcards",
     icon: HelpCircle,
-    iconColor: "text-[#5eead4]",
-    textColor: "text-[#ccfbf1]",
-    cardBg: "bg-[#1c2628]",
-    borderColor: "border-[#29383c]",
-    hoverBg: "hover:bg-[#233235]",
-    hoverBorder: "hover:border-[#364b50]",
+    iconColor: "text-teal-600 dark:text-[#5eead4]",
+    textColor: "text-teal-950 dark:text-[#ccfbf1]",
+    cardBg: "bg-teal-50/70 dark:bg-[#1c2628]",
+    borderColor: "border-teal-200/70 dark:border-[#29383c]",
+    hoverBg: "hover:bg-teal-100/70 dark:hover:bg-[#233235]",
+    hoverBorder: "hover:border-teal-300 dark:hover:border-[#364b50]",
   },
   {
     id: "infographic",
     name: "Infographic",
     icon: BarChart3,
-    iconColor: "text-[#c084fc]",
-    textColor: "text-[#f3e8ff]",
-    cardBg: "bg-[#28202d]",
-    borderColor: "border-[#3a2d42]",
-    hoverBg: "hover:bg-[#322739]",
-    hoverBorder: "hover:border-[#4b3a55]",
+    iconColor: "text-purple-600 dark:text-[#c084fc]",
+    textColor: "text-purple-950 dark:text-[#f3e8ff]",
+    cardBg: "bg-purple-50/70 dark:bg-[#28202d]",
+    borderColor: "border-purple-200/70 dark:border-[#3a2d42]",
+    hoverBg: "hover:bg-purple-100/70 dark:hover:bg-[#322739]",
+    hoverBorder: "hover:border-purple-300 dark:hover:border-[#4b3a55]",
   },
   {
     id: "data_table",
     name: "Data Table",
     icon: Table2,
-    iconColor: "text-[#38bdf8]",
-    textColor: "text-[#e0f2fe]",
-    cardBg: "bg-[#1a252f]",
-    borderColor: "border-[#263746]",
-    hoverBg: "hover:bg-[#22303d]",
-    hoverBorder: "hover:border-[#334a5e]",
+    iconColor: "text-sky-600 dark:text-[#38bdf8]",
+    textColor: "text-sky-950 dark:text-[#e0f2fe]",
+    cardBg: "bg-sky-50/70 dark:bg-[#1a252f]",
+    borderColor: "border-sky-200/70 dark:border-[#263746]",
+    hoverBg: "hover:bg-sky-100/70 dark:hover:bg-[#22303d]",
+    hoverBorder: "hover:border-sky-300 dark:hover:border-[#334a5e]",
   },
 ];
 
@@ -1600,21 +1600,21 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
 
   return (
     <div
-      className="w-full flex flex-col bg-[#161616] text-[#d4d4d4] overflow-hidden select-none fixed inset-0"
+      className="w-full flex flex-col bg-background text-foreground overflow-hidden select-none fixed inset-0"
       style={{
         height: viewportHeight ? `${viewportHeight}px` : "100dvh",
         maxHeight: viewportHeight ? `${viewportHeight}px` : "100dvh",
       }}
     >
       {/* Top Mobile Header with Garis 2, Model Selector, Context Window, New Chat, and Titik 3 */}
-      <header className="h-14 px-3 sm:px-4 bg-[#222222] border-b border-[#383838] flex items-center justify-between shrink-0 z-20 select-none">
+      <header className="h-14 px-3 sm:px-4 bg-card/90 border-b border-border flex items-center justify-between shrink-0 z-20 select-none">
         {/* Left Section: Garis 2 (Sidebar Toggle) & Model Selector */}
         <div className="flex items-center gap-2 min-w-0 flex-1 mr-2">
           {/* Tombol Garis Dua */}
           <button
             type="button"
             onClick={() => setIsSidebarOpen(true)}
-            className="h-9 w-9 rounded-xl hover:bg-[#2b2b2b] text-[#d4d4d4] hover:text-white flex items-center justify-center transition-colors cursor-pointer border border-transparent hover:border-[#383838] shrink-0 active:scale-95"
+            className="h-9 w-9 rounded-xl hover:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer border border-transparent hover:border-border shrink-0 active:scale-95"
             title="Buka Menu"
             aria-label="Buka Menu"
           >
@@ -1636,11 +1636,11 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
                 }
                 setIsModelDropdownOpen(next);
               }}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-[#2b2b2b] hover:bg-[#383838] border border-[#383838] text-xs font-medium text-[#d4d4d4] hover:text-white transition-colors duration-150 cursor-pointer max-w-[135px] sm:max-w-[200px]"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-secondary hover:bg-secondary/80 border border-border text-xs font-medium text-foreground transition-colors duration-150 cursor-pointer max-w-[135px] sm:max-w-[200px]"
               title={currentModel.name}
             >
               <span className="font-sans text-[12px] truncate">{currentModel.name}</span>
-              <ChevronDown className="h-3 w-3 text-[#969696] shrink-0" />
+              <ChevronDown className="h-3 w-3 text-muted-foreground shrink-0" />
             </button>
 
             {isModelDropdownOpen && (
@@ -1652,23 +1652,23 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
                     setSearchModelQuery("");
                   }}
                 />
-                <div className="absolute left-0 mt-1.5 w-72 max-w-[calc(100vw-32px)] rounded-2xl bg-[#1e1e20] border border-[#383838] shadow-2xl p-2 z-50 animate-in fade-in duration-100 flex flex-col gap-1 font-sans">
+                <div className="absolute left-0 mt-1.5 w-72 max-w-[calc(100vw-32px)] rounded-2xl bg-popover border border-border text-popover-foreground shadow-2xl p-2 z-50 animate-in fade-in duration-100 flex flex-col gap-1 font-sans">
                   {/* Search Input (Matching Desktop) */}
-                  <div className="flex items-center gap-2 px-2.5 py-1.5 mb-1 rounded-xl bg-[#262628] border border-[#333335]">
-                    <Search className="w-3.5 h-3.5 text-[#888888] shrink-0" />
+                  <div className="flex items-center gap-2 px-2.5 py-1.5 mb-1 rounded-xl bg-secondary/60 border border-border/70">
+                    <Search className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                     <input
                       type="text"
                       value={searchModelQuery}
                       onChange={(e) => setSearchModelQuery(e.target.value)}
                       placeholder={t("searchModels")}
-                      className="w-full bg-transparent text-xs text-white placeholder:text-[#666666] outline-none font-sans"
+                      className="w-full bg-transparent text-xs text-foreground placeholder:text-muted-foreground outline-none font-sans"
                       autoFocus
                     />
                     {searchModelQuery && (
                       <button
                         type="button"
                         onClick={() => setSearchModelQuery("")}
-                        className="p-0.5 hover:bg-[#333335] rounded text-[#888888] hover:text-white transition-colors cursor-pointer"
+                        className="p-0.5 hover:bg-secondary rounded text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
                       >
                         <X className="w-3 h-3" />
                       </button>
@@ -1693,18 +1693,18 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
                               className={cn(
                                 "w-full text-left px-3 py-2 rounded-xl text-xs flex flex-col cursor-pointer transition-colors",
                                 isSelected
-                                  ? "bg-[#2b2b2b] text-white font-medium"
-                                  : "text-[#969696] hover:text-white hover:bg-[#262628]"
+                                  ? "bg-secondary text-foreground font-medium"
+                                  : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
                               )}
                             >
                               <div className="flex items-center justify-between w-full">
-                                <span className="font-sans text-[13px] font-medium text-white">{m.name}</span>
+                                <span className="font-sans text-[13px] font-medium text-foreground">{m.name}</span>
                                 {isSelected && (
-                                  <Check className="w-3.5 h-3.5 text-white shrink-0 ml-auto" />
+                                  <Check className="w-3.5 h-3.5 text-foreground shrink-0 ml-auto" />
                                 )}
                               </div>
                               {m.description && (
-                                <span className="text-[11px] text-[#777777] mt-0.5 leading-snug line-clamp-2">
+                                <span className="text-[11px] text-muted-foreground mt-0.5 leading-snug line-clamp-2">
                                   {m.description}
                                 </span>
                               )}
@@ -1712,7 +1712,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
                           );
                         })
                       ) : (
-                        <div className="py-6 px-3 text-center text-xs text-[#888888]">
+                        <div className="py-6 px-3 text-center text-xs text-muted-foreground">
                           {t("noModelsFound")}
                         </div>
                       )}
@@ -1737,12 +1737,12 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
                   setIsContextDropdownOpen(next);
                 }}
                 className={cn(
-                  "w-8 h-8 flex items-center justify-center rounded-xl bg-[#2b2b2b] hover:bg-[#383838] border border-[#383838] transition-colors cursor-pointer shrink-0 active:scale-95",
+                  "w-8 h-8 flex items-center justify-center rounded-xl bg-secondary hover:bg-secondary/80 border border-border transition-colors cursor-pointer shrink-0 active:scale-95",
                   contextUsage.rawPercentUsed >= 90
-                    ? "text-red-400"
+                    ? "text-red-500"
                     : contextUsage.rawPercentUsed >= 75
-                    ? "text-[#e79737]"
-                    : "text-[#a9a9a9] hover:text-[#d4d4d4]"
+                    ? "text-amber-500"
+                    : "text-muted-foreground hover:text-foreground"
                 )}
                 title={`Context: ${contextUsage.rawPercentUsed === 0 ? "0%" : contextUsage.percentUsed}`}
                 aria-label="Context & session info"
@@ -1753,7 +1753,8 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
                     cy="12"
                     r="9"
                     fill="none"
-                    stroke="#383838"
+                    stroke="currentColor"
+                    strokeOpacity={0.2}
                     strokeWidth="2.5"
                   />
                   <circle
@@ -1777,40 +1778,40 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
                     className="fixed inset-0 z-40"
                     onClick={() => setIsContextDropdownOpen(false)}
                   />
-                  <div className="absolute right-0 mt-1.5 w-72 max-w-[calc(100vw-32px)] rounded-2xl bg-[#1e1e20] border border-[#383838] shadow-2xl p-3 z-50 animate-in fade-in duration-100 flex flex-col font-sans select-none">
+                  <div className="absolute right-0 mt-1.5 w-72 max-w-[calc(100vw-32px)] rounded-2xl bg-popover border border-border text-popover-foreground shadow-2xl p-3 z-50 animate-in fade-in duration-100 flex flex-col font-sans select-none">
                     {/* Header: % of context used and tokens */}
-                    <div className="flex items-center justify-between pb-2 border-b border-[#2d2d30]">
-                      <span className="text-xs font-semibold text-white">
+                    <div className="flex items-center justify-between pb-2 border-b border-border">
+                      <span className="text-xs font-semibold text-foreground">
                         {contextUsage.rawPercentUsed === 0 ? "0%" : contextUsage.percentUsed} {t("contextUsed")}
                       </span>
-                      <span className="font-mono text-[11px] text-[#888888]">
+                      <span className="font-mono text-[11px] text-muted-foreground">
                         ~{formatTokenDisplay(contextUsage.usedTokens)} / {formatTokenDisplay(contextUsage.totalTokens)}
                       </span>
                     </div>
 
                     {/* Thin progress bar */}
-                    <div className="w-full h-1.5 bg-[#2d2d30] rounded-full overflow-hidden flex gap-0.5 my-2">
+                    <div className="w-full h-1.5 bg-secondary rounded-full overflow-hidden flex gap-0.5 my-2">
                       {contextUsage.sourcesTokens > 0 && (
                         <div
-                          className="bg-[#10b981] h-full transition-all"
+                          className="bg-emerald-500 h-full transition-all"
                           style={{ width: `${Math.max(1, (contextUsage.sourcesTokens / contextUsage.totalTokens) * 100)}%` }}
                         />
                       )}
                       {contextUsage.systemPromptTokens > 0 && (
                         <div
-                          className="bg-[#71717a] h-full transition-all"
+                          className="bg-muted-foreground h-full transition-all"
                           style={{ width: `${Math.max(1, (contextUsage.systemPromptTokens / contextUsage.totalTokens) * 100)}%` }}
                         />
                       )}
                       {contextUsage.messagesTokens > 0 && (
                         <div
-                          className="bg-[#3b82f6] h-full transition-all"
+                          className="bg-blue-500 h-full transition-all"
                           style={{ width: `${Math.max(1, (contextUsage.messagesTokens / contextUsage.totalTokens) * 100)}%` }}
                         />
                       )}
                       {contextUsage.draftInputTokens > 0 && (
                         <div
-                          className="bg-[#a855f7] h-full transition-all"
+                          className="bg-purple-500 h-full transition-all"
                           style={{ width: `${Math.max(1, (contextUsage.draftInputTokens / contextUsage.totalTokens) * 100)}%` }}
                         />
                       )}
@@ -1819,40 +1820,40 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
                     {/* Breakdown list */}
                     <div className="flex flex-col gap-1.5 text-[11px]">
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1.5 text-[#a0a0a0]">
-                          <span className="w-2 h-2 rounded-xs bg-[#10b981]" />
+                        <div className="flex items-center gap-1.5 text-muted-foreground">
+                          <span className="w-2 h-2 rounded-xs bg-emerald-500" />
                           <span>{t("learningSources")} ({learn?.sourcesCount || 0})</span>
                         </div>
-                        <span className="font-mono text-[#888888]">~{formatTokenDisplay(contextUsage.sourcesTokens)}</span>
+                        <span className="font-mono text-muted-foreground">~{formatTokenDisplay(contextUsage.sourcesTokens)}</span>
                       </div>
 
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1.5 text-[#a0a0a0]">
-                          <span className="w-2 h-2 rounded-xs bg-[#71717a]" />
+                        <div className="flex items-center gap-1.5 text-muted-foreground">
+                          <span className="w-2 h-2 rounded-xs bg-muted-foreground" />
                           <span>{t("tutorInstructions")}</span>
                         </div>
-                        <span className="font-mono text-[#888888]">~{formatTokenDisplay(contextUsage.systemPromptTokens)}</span>
+                        <span className="font-mono text-muted-foreground">~{formatTokenDisplay(contextUsage.systemPromptTokens)}</span>
                       </div>
 
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1.5 text-[#a0a0a0]">
-                          <span className="w-2 h-2 rounded-xs bg-[#3b82f6]" />
+                        <div className="flex items-center gap-1.5 text-muted-foreground">
+                          <span className="w-2 h-2 rounded-xs bg-blue-500" />
                           <span>{t("chatHistory")}</span>
                         </div>
-                        <span className="font-mono text-[#888888]">~{formatTokenDisplay(contextUsage.messagesTokens)}</span>
+                        <span className="font-mono text-muted-foreground">~{formatTokenDisplay(contextUsage.messagesTokens)}</span>
                       </div>
 
                       {contextUsage.draftInputTokens > 0 && (
                         <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-1.5 text-[#a855f7]">
-                            <span className="w-2 h-2 rounded-xs bg-[#a855f7]" />
+                          <div className="flex items-center gap-1.5 text-purple-500">
+                            <span className="w-2 h-2 rounded-xs bg-purple-500" />
                             <span>{t("currentInput")}</span>
                           </div>
-                          <span className="font-mono text-[#a855f7]">~{formatTokenDisplay(contextUsage.draftInputTokens)}</span>
+                          <span className="font-mono text-purple-500">~{formatTokenDisplay(contextUsage.draftInputTokens)}</span>
                         </div>
                       )}
 
-                      <div className="flex items-center justify-between pt-1 border-t border-[#2d2d30] text-[#777777]">
+                      <div className="flex items-center justify-between pt-1 border-t border-border text-muted-foreground">
                         <span>{t("availableContext")}</span>
                         <span className="font-mono">~{formatTokenDisplay(contextUsage.availableTokens)}</span>
                       </div>
@@ -1860,21 +1861,21 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
 
                     {/* Session Telemetry */}
                     {conversationMetrics && (
-                      <div className="mt-2.5 pt-2 border-t border-[#2d2d30] flex flex-col gap-1.5">
-                        <div className="text-[10px] uppercase font-semibold text-[#666666] tracking-wider">
+                      <div className="mt-2.5 pt-2 border-t border-border flex flex-col gap-1.5">
+                        <div className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">
                           {t("sessionTelemetry")}
                         </div>
                         <div className="flex items-center justify-between text-[11px]">
-                          <span className="text-[#a0a0a0]">Turns & Steps</span>
-                          <span className="font-mono text-white">{conversationMetrics.turns} turns · {conversationMetrics.steps} steps</span>
+                          <span className="text-muted-foreground">Turns & Steps</span>
+                          <span className="font-mono text-foreground">{conversationMetrics.turns} turns · {conversationMetrics.steps} steps</span>
                         </div>
                         <div className="flex items-center justify-between text-[11px]">
-                          <span className="text-[#a0a0a0]">Speed & Time</span>
-                          <span className="font-mono text-white">LLM {formatDurationDisplay(conversationMetrics.llmDurationMs)} · {conversationMetrics.tokPerSec} tok/s</span>
+                          <span className="text-muted-foreground">Speed & Time</span>
+                          <span className="font-mono text-foreground">LLM {formatDurationDisplay(conversationMetrics.llmDurationMs)} · {conversationMetrics.tokPerSec} tok/s</span>
                         </div>
                         <div className="flex items-center justify-between text-[11px]">
-                          <span className="text-[#a0a0a0]">Cache & Tokens</span>
-                          <span className="font-mono text-white">{conversationMetrics.cacheHitRate}% cache · ↑{formatTokenDisplay(conversationMetrics.inputTokens)} ↓{formatTokenDisplay(conversationMetrics.outputTokens)}</span>
+                          <span className="text-muted-foreground">Cache & Tokens</span>
+                          <span className="font-mono text-foreground">{conversationMetrics.cacheHitRate}% cache · ↑{formatTokenDisplay(conversationMetrics.inputTokens)} ↓{formatTokenDisplay(conversationMetrics.outputTokens)}</span>
                         </div>
                       </div>
                     )}
@@ -1888,7 +1889,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
           <button
             type="button"
             onClick={handleNewChat}
-            className="h-8 w-8 rounded-xl bg-[#2b2b2b] hover:bg-[#383838] text-[#d4d4d4] hover:text-white flex items-center justify-center transition-colors cursor-pointer border border-[#383838] shrink-0 active:scale-95"
+            className="h-8 w-8 rounded-xl bg-secondary hover:bg-secondary/80 text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer border border-border shrink-0 active:scale-95"
             title={t("newChat") || "Chat Baru"}
             aria-label={t("newChat") || "Chat Baru"}
           >
@@ -1900,7 +1901,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
-                className="h-8 w-8 rounded-xl bg-[#2b2b2b] hover:bg-[#383838] text-[#d4d4d4] hover:text-white flex items-center justify-center transition-colors cursor-pointer border border-[#383838] shrink-0 active:scale-95"
+                className="h-8 w-8 rounded-xl bg-secondary hover:bg-secondary/80 text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer border border-border shrink-0 active:scale-95"
                 title={t("moreOptions") || "Opsi lainnya"}
                 aria-label={t("moreOptions") || "Opsi lainnya"}
               >
@@ -1910,39 +1911,39 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
             <DropdownMenuContent
               align="end"
               sideOffset={6}
-              className="w-52 rounded-xl bg-[#222222] border border-[#383838] p-1 text-[#d4d4d4] shadow-2xl z-50 font-sans"
+              className="w-52 rounded-xl bg-popover border border-border p-1 text-popover-foreground shadow-2xl z-50 font-sans"
             >
               <DropdownMenuItem
                 onClick={() => setIsEditingTitle(true)}
-                className="flex items-center gap-2 px-2.5 py-1.5 text-xs rounded-lg text-[#d4d4d4] hover:text-white hover:bg-[#2b2b2b] cursor-pointer"
+                className="flex items-center gap-2 px-2.5 py-1.5 text-xs rounded-lg text-foreground hover:bg-secondary cursor-pointer"
               >
-                <Pencil className="h-3.5 w-3.5 text-[#969696]" />
+                <Pencil className="h-3.5 w-3.5 text-muted-foreground" />
                 <span>{t("editChatName") || "Ubah Nama"}</span>
               </DropdownMenuItem>
 
               <DropdownMenuItem
                 onClick={() => setIsSourcesSheetOpen(true)}
-                className="flex items-center gap-2 px-2.5 py-1.5 text-xs rounded-lg text-[#d4d4d4] hover:text-white hover:bg-[#2b2b2b] cursor-pointer"
+                className="flex items-center gap-2 px-2.5 py-1.5 text-xs rounded-lg text-foreground hover:bg-secondary cursor-pointer"
               >
-                <FolderOpen className="h-3.5 w-3.5 text-[#969696]" />
+                <FolderOpen className="h-3.5 w-3.5 text-muted-foreground" />
                 <span>{t("sources") || "Sumber Belajar"}</span>
               </DropdownMenuItem>
 
               <DropdownMenuItem
                 onClick={() => setIsStudioSheetOpen(true)}
-                className="flex items-center gap-2 px-2.5 py-1.5 text-xs rounded-lg text-[#d4d4d4] hover:text-white hover:bg-[#2b2b2b] cursor-pointer"
+                className="flex items-center gap-2 px-2.5 py-1.5 text-xs rounded-lg text-foreground hover:bg-secondary cursor-pointer"
               >
-                <LayoutGrid className="h-3.5 w-3.5 text-[#969696]" />
+                <LayoutGrid className="h-3.5 w-3.5 text-muted-foreground" />
                 <span>{t("studioTitle") || "Studio Tools"}</span>
               </DropdownMenuItem>
 
-              <DropdownMenuSeparator className="bg-[#383838] my-1" />
+              <DropdownMenuSeparator className="bg-border my-1" />
 
               <DropdownMenuItem
                 onClick={handleNewChat}
-                className="flex items-center gap-2 px-2.5 py-1.5 text-xs rounded-lg text-[#d4d4d4] hover:text-white hover:bg-[#2b2b2b] cursor-pointer"
+                className="flex items-center gap-2 px-2.5 py-1.5 text-xs rounded-lg text-foreground hover:bg-secondary cursor-pointer"
               >
-                <RotateCcw className="h-3.5 w-3.5 text-[#969696]" />
+                <RotateCcw className="h-3.5 w-3.5 text-muted-foreground" />
                 <span>{t("newChat") || "Chat Baru"}</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -1960,12 +1961,12 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
                 /* Mobile NotebookLM Source Guide View */
                 <div className="flex flex-col justify-start py-3 animate-in fade-in duration-200 select-none">
                   {/* Title */}
-                  <h1 className="text-lg sm:text-xl font-semibold tracking-tight text-white mb-1 leading-snug">
+                  <h1 className="text-lg sm:text-xl font-semibold tracking-tight text-foreground mb-1 leading-snug">
                     {learn?.title || carriedSources[0]?.title || "Panduan Sumber Belajar"}
                   </h1>
 
                   {/* Meta */}
-                  <div className="flex items-center gap-2 text-xs text-[#969696] font-sans mb-3.5">
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground font-sans mb-3.5">
                     <span>{carriedSources.length} sumber</span>
                     <span>•</span>
                     <span>
@@ -1977,7 +1978,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
                   </div>
 
                   {/* Source Guide Summary */}
-                  <div className="text-[13px] leading-relaxed text-[#d4d4d4] font-sans mb-3.5">
+                  <div className="text-[13px] leading-relaxed text-foreground/90 font-sans mb-3.5">
                     <MarkdownContent
                       content={
                         learn?.description?.trim() ||
@@ -2001,9 +2002,9 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
                           "Fitur 'Simpan ke Catatan' (Notes as Sources) akan hadir pada pembaruan berikutnya."
                         );
                       }}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#242424] hover:bg-[#2e2e2e] border border-white/10 text-xs font-medium text-white transition-all cursor-pointer active:scale-95"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-secondary hover:bg-secondary/80 border border-border text-xs font-medium text-foreground transition-all cursor-pointer active:scale-95"
                     >
-                      <Pin className="h-3.5 w-3.5 text-[#969696]" />
+                      <Pin className="h-3.5 w-3.5 text-muted-foreground" />
                       <span>Simpan ke catatan</span>
                     </button>
 
@@ -2016,7 +2017,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
                         navigator.clipboard.writeText(textToCopy);
                         toast.success("Ringkasan sumber disalin!");
                       }}
-                      className="p-1.5 rounded-full hover:bg-[#242424] text-[#969696] hover:text-white transition-colors cursor-pointer"
+                      className="p-1.5 rounded-full hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
                       title="Salin ringkasan"
                     >
                       <Copy className="h-3.5 w-3.5" />
@@ -2024,7 +2025,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
                     <button
                       type="button"
                       onClick={() => toast.success("Terima kasih atas masukannya!")}
-                      className="p-1.5 rounded-full hover:bg-[#242424] text-[#969696] hover:text-white transition-colors cursor-pointer"
+                      className="p-1.5 rounded-full hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
                       title="Bagus"
                     >
                       <ThumbsUp className="h-3.5 w-3.5" />
@@ -2032,7 +2033,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
                     <button
                       type="button"
                       onClick={() => toast.info("Masukan dicatat.")}
-                      className="p-1.5 rounded-full hover:bg-[#242424] text-[#969696] hover:text-white transition-colors cursor-pointer"
+                      className="p-1.5 rounded-full hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
                       title="Kurang relevan"
                     >
                       <ThumbsDown className="h-3.5 w-3.5" />
@@ -2050,7 +2051,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
                         key={qIdx}
                         type="button"
                         onClick={() => handleSend(question)}
-                        className="w-full text-left px-3.5 py-2.5 rounded-xl bg-[#242424]/70 hover:bg-[#2a2a2a] border border-white/10 text-xs text-[#e0e0e0] transition-all cursor-pointer active:scale-[0.99] leading-relaxed"
+                        className="w-full text-left px-3.5 py-2.5 rounded-xl bg-secondary/60 hover:bg-secondary border border-border text-xs text-foreground transition-all cursor-pointer active:scale-[0.99] leading-relaxed"
                       >
                         <span>{question}</span>
                       </button>
@@ -2058,9 +2059,9 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
                   </div>
                 </div>
               ) : (
-                <div className="flex-1 flex flex-col items-center justify-center text-center py-12 px-4 text-[#969696]">
+                <div className="flex-1 flex flex-col items-center justify-center text-center py-12 px-4 text-muted-foreground">
                   <div className="text-3xl mb-2">👋</div>
-                  <h2 className="text-base font-medium text-white mb-1">
+                  <h2 className="text-base font-medium text-foreground mb-1">
                     Mulai Belajar dengan Sumber
                   </h2>
                   <p className="text-xs leading-relaxed max-w-xs mb-4">
@@ -2069,7 +2070,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
                   <button
                     type="button"
                     onClick={() => setIsAddSourceOpen(true)}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-white text-black font-medium text-xs cursor-pointer active:scale-95 shadow-xs"
+                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-foreground text-background font-medium text-xs cursor-pointer active:scale-95 shadow-xs"
                   >
                     <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
                     <span>Tambahkan Sumber</span>
@@ -2111,7 +2112,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
                                 }
                               }}
                               className={cn(
-                                "relative rounded-xl border border-[#383838] bg-[#1a1917] overflow-hidden shadow-xs select-none",
+                                "relative rounded-xl border border-border bg-secondary/50 overflow-hidden shadow-xs select-none",
                                 isMedia
                                   ? "w-16 h-16 sm:w-20 sm:h-20 cursor-pointer active:scale-95 transition-transform"
                                   : "w-28 sm:w-32 h-16 sm:h-20"
@@ -2126,27 +2127,27 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
                                 />
                               ) : isVideo && att.url ? (
                                 <div className="w-full h-full relative flex items-center justify-center bg-black">
-                                  <Video className="w-5 h-5 text-[#969696]" />
+                                  <Video className="w-5 h-5 text-muted-foreground" />
                                   <span className="absolute bottom-1 right-1 text-[7px] font-mono bg-black/70 text-white px-1 rounded uppercase font-bold">
                                     VID
                                   </span>
                                 </div>
                               ) : (
-                                <div className="w-full h-full p-1.5 flex flex-col justify-between rounded-xl bg-[#262626]/80 text-left">
+                                <div className="w-full h-full p-1.5 flex flex-col justify-between rounded-xl bg-secondary/80 text-left">
                                   <div className="flex items-center justify-between">
-                                    <span className="text-[8px] font-bold text-[#888888] font-mono uppercase">
+                                    <span className="text-[8px] font-bold text-muted-foreground font-mono uppercase">
                                       {ext}
                                     </span>
-                                    <FileText className="w-3 h-3 text-[#d4d4d4] shrink-0" />
+                                    <FileText className="w-3 h-3 text-foreground shrink-0" />
                                   </div>
                                   <div className="w-full flex-1 my-0.5 min-h-0 overflow-hidden">
                                     <ScrollArea className="w-full h-full max-h-[30px] sm:max-h-[34px]">
-                                      <span className="text-[9px] font-medium text-[#d4d4d4] leading-tight break-words block pr-1">
+                                      <span className="text-[9px] font-medium text-foreground leading-tight break-words block pr-1">
                                         {att.name}
                                       </span>
                                     </ScrollArea>
                                   </div>
-                                  <span className="text-[7.5px] text-[#777777] font-mono block truncate">
+                                  <span className="text-[7.5px] text-muted-foreground font-mono block truncate">
                                     {formatFileSize(att.size)}
                                   </span>
                                 </div>
@@ -2174,8 +2175,8 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
                             }
                           }}
                           className={cn(
-                            "max-w-[88%] rounded-2xl bg-[#222222] border border-[#383838] px-3.5 py-2.5 text-[13.5px] text-[#ececec] select-text leading-relaxed whitespace-pre-wrap break-words [overflow-wrap:anywhere] [word-break:break-word] shadow-xs font-sans transition-colors duration-150",
-                            isLongPrompt && !isExpanded && "cursor-pointer hover:border-[#555555]"
+                            "max-w-[88%] rounded-2xl bg-secondary text-secondary-foreground border border-border px-3.5 py-2.5 text-[13.5px] select-text leading-relaxed whitespace-pre-wrap break-words [overflow-wrap:anywhere] [word-break:break-word] shadow-xs font-sans transition-colors duration-150",
+                            isLongPrompt && !isExpanded && "cursor-pointer hover:border-foreground/30"
                           )}
                         >
                           {isLongPrompt ? (
@@ -2196,16 +2197,16 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
                     })()}
 
                     {/* User Message Action Bar: Timestamp, Copy, Edit */}
-                    <div className="flex items-center gap-2 pt-1 pr-1 text-[10.5px] font-mono text-[#777777] select-none">
+                    <div className="flex items-center gap-2 pt-1 pr-1 text-[10.5px] font-mono text-muted-foreground select-none">
                       {msg.createdAt && <span>{formatTimestamp(msg.createdAt)}</span>}
                       <button
                         type="button"
                         onClick={() => handleCopy(msg.id, cleanUserMessageContent(msg.content) || msg.content)}
-                        className="p-1 rounded hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
+                        className="p-1 rounded hover:bg-secondary hover:text-foreground transition-colors cursor-pointer"
                         title={t("copyMessage")}
                       >
                         {copiedId === msg.id ? (
-                          <Check className="w-3 h-3 text-[#34d399]" />
+                          <Check className="w-3 h-3 text-emerald-500" />
                         ) : (
                           <Copy className="w-3 h-3" />
                         )}
@@ -2213,7 +2214,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
                       <button
                         type="button"
                         onClick={() => handleEditAndUndoTurn(msg)}
-                        className="p-1 rounded hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
+                        className="p-1 rounded hover:bg-secondary hover:text-foreground transition-colors cursor-pointer"
                         title={t("editMessage")}
                       >
                         <Pencil className="w-3 h-3" />
@@ -2234,30 +2235,30 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
 
                     {/* Assistant Output Message (Pure clean MarkdownContent, matching apps/harness/desktop!) */}
                     {msg.content ? (
-                      <div className="px-0.5 text-[14px] text-[#d4d4d4] leading-relaxed select-text font-sans">
+                      <div className="px-0.5 text-[14px] text-foreground leading-relaxed select-text font-sans">
                         <MarkdownContent
                           content={msg.content}
                           sourcesMap={sourcesMap}
                           onSourceClick={handleCitationClick}
                         />
                         {msg.isStreaming && (
-                          <span className="inline-block w-1.5 h-3.5 ml-1 bg-white animate-pulse align-middle" />
+                          <span className="inline-block w-1.5 h-3.5 ml-1 bg-foreground animate-pulse align-middle" />
                         )}
                       </div>
                     ) : null}
 
                     {/* Assistant Action Bar: Timestamp & Copy */}
                     {!msg.isStreaming && msg.content && (
-                      <div className="flex items-center gap-2 pt-0.5 pl-0.5 text-[10.5px] font-mono text-[#777777] select-none">
+                      <div className="flex items-center gap-2 pt-0.5 pl-0.5 text-[10.5px] font-mono text-muted-foreground select-none">
                         {msg.createdAt && <span>{formatTimestamp(msg.createdAt)}</span>}
                         <button
                           type="button"
                           onClick={() => handleCopy(msg.id, msg.content)}
-                          className="p-1 rounded hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
+                          className="p-1 rounded hover:bg-secondary hover:text-foreground transition-colors cursor-pointer"
                           title={t("copyMessage")}
                         >
                           {copiedId === msg.id ? (
-                            <Check className="w-3 h-3 text-[#34d399]" />
+                            <Check className="w-3 h-3 text-emerald-500" />
                           ) : (
                             <Copy className="w-3 h-3" />
                           )}
@@ -2275,7 +2276,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
           {/* Sticky Bottom Chat Input Bar - Pinned right above keyboard or safe-area */}
           <div
             className={cn(
-              "px-3 pt-1.5 shrink-0 bg-[#161616]/95 backdrop-blur-xs z-10 w-full transition-[padding] duration-150",
+              "px-3 pt-1.5 shrink-0 bg-background/95 backdrop-blur-xs z-10 w-full transition-[padding] duration-150",
               isKeyboardOpen
                 ? "pb-1.5"
                 : "pb-[max(0.75rem,env(safe-area-inset-bottom))]"
@@ -2299,7 +2300,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
 
       {/* Rename Notebook Dialog */}
       <Dialog open={isEditingTitle} onOpenChange={setIsEditingTitle}>
-        <DialogContent className="w-[90vw] max-w-[360px] p-5 rounded-2xl bg-[#1e1e20] border border-[#383838] text-white [&>button]:hidden font-sans">
+        <DialogContent className="w-[90vw] max-w-[360px] p-5 rounded-2xl bg-card border border-border text-foreground [&>button]:hidden font-sans">
           <DialogTitle className="text-sm font-semibold">{t("renameChatDialogTitle") || "Ubah Nama Percakapan"}</DialogTitle>
           <div className="mt-3 space-y-3">
             <input
@@ -2311,20 +2312,20 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
                 if (e.key === "Escape") setIsEditingTitle(false);
               }}
               autoFocus
-              className="w-full px-3 py-2 text-xs bg-[#262628] border border-[#383838] rounded-xl text-white outline-none focus:border-[#555555]"
+              className="w-full px-3 py-2 text-xs bg-secondary/60 border border-border rounded-xl text-foreground outline-none focus:border-foreground/40"
             />
             <div className="flex items-center justify-end gap-2 pt-1">
               <button
                 type="button"
                 onClick={() => setIsEditingTitle(false)}
-                className="px-3 py-1.5 text-xs text-[#969696] hover:text-white rounded-lg transition-colors cursor-pointer"
+                className="px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground rounded-lg transition-colors cursor-pointer"
               >
                 {t("cancel")}
               </button>
               <button
                 type="button"
                 onClick={handleSaveTitle}
-                className="px-3.5 py-1.5 text-xs bg-white hover:bg-neutral-200 text-[#141414] font-semibold rounded-lg transition-colors cursor-pointer"
+                className="px-3.5 py-1.5 text-xs bg-foreground hover:bg-foreground/90 text-background font-semibold rounded-lg transition-colors cursor-pointer"
               >
                 {t("save")}
               </button>
@@ -2456,13 +2457,13 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
           onClick={() => setSelectedSourceForPreview(null)}
         >
           <div
-            className="w-full max-w-lg max-h-[85vh] bg-[#1c1c1e] border border-[#333336] rounded-2xl p-4 shadow-2xl flex flex-col text-left font-sans"
+            className="w-full max-w-lg max-h-[85vh] bg-card border border-border rounded-2xl p-4 shadow-2xl flex flex-col text-left font-sans"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-start justify-between gap-3 pb-3 border-b border-[#2d2d30]">
+            <div className="flex items-start justify-between gap-3 pb-3 border-b border-border">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 mb-1">
-                  <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded-full bg-[#252528] text-[#969696] border border-[#383838]">
+                  <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded-full bg-secondary text-muted-foreground border border-border">
                     {selectedSourceForPreview.type}
                   </span>
                   {selectedSourceForPreview.subpagesCount &&
@@ -2472,7 +2473,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
                     </span>
                   ) : null}
                 </div>
-                <h3 className="text-sm font-semibold text-white truncate">
+                <h3 className="text-sm font-semibold text-foreground truncate">
                   {selectedSourceForPreview.title}
                 </h3>
                 {selectedSourceForPreview.url && (
@@ -2490,7 +2491,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
               <button
                 type="button"
                 onClick={() => setSelectedSourceForPreview(null)}
-                className="h-7 w-7 rounded-full bg-[#252528] hover:bg-[#333336] text-[#969696] hover:text-white flex items-center justify-center cursor-pointer shrink-0"
+                className="h-7 w-7 rounded-full bg-secondary hover:bg-secondary/80 text-muted-foreground hover:text-foreground flex items-center justify-center cursor-pointer shrink-0"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -2498,7 +2499,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
 
             {/* Extracted Text Content */}
             <div className="flex-1 overflow-y-auto mt-3 pr-1">
-              <div className="flex items-center justify-between text-[11px] text-[#888888] mb-2">
+              <div className="flex items-center justify-between text-[11px] text-muted-foreground mb-2">
                 <span>Verified Source Content (Ground Truth):</span>
                 <span>
                   {selectedSourceForPreview.content
@@ -2506,7 +2507,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
                     : "No text cached"}
                 </span>
               </div>
-              <div className="p-3 rounded-xl bg-[#141416] border border-[#28282b] text-[11px] font-mono text-[#d4d4d4] whitespace-pre-wrap leading-relaxed select-text max-h-[50vh] overflow-y-auto">
+              <div className="p-3 rounded-xl bg-secondary/40 border border-border text-[11px] font-mono text-foreground whitespace-pre-wrap leading-relaxed select-text max-h-[50vh] overflow-y-auto">
                 {selectedSourceForPreview.content ||
                   "[Content is not cached locally. This source was added via link.]"}
               </div>
@@ -2522,21 +2523,21 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
           onClick={() => setSelectedNoteArtifact(null)}
         >
           <div
-            className="w-full h-[95vh] sm:h-[90vh] sm:max-w-2xl bg-[#18181b] border-t sm:border border-[#2e2e34] rounded-t-[24px] sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden text-left font-sans"
+            className="w-full h-[95vh] sm:h-[90vh] sm:max-w-2xl bg-card border-t sm:border border-border rounded-t-[24px] sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden text-left font-sans"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Top Breadcrumb & Actions Header (Image 3) */}
-            <div className="h-12 px-3 sm:px-4 border-b border-white/5 flex items-center justify-between shrink-0 bg-[#1c1c20] rounded-t-[24px] sm:rounded-t-2xl">
+            <div className="h-12 px-3 sm:px-4 border-b border-border flex items-center justify-between shrink-0 bg-card rounded-t-[24px] sm:rounded-t-2xl">
               <div className="flex items-center gap-1.5 min-w-0">
                 <button
                   type="button"
                   onClick={() => setSelectedNoteArtifact(null)}
-                  className="text-xs font-medium text-neutral-400 hover:text-white transition-colors cursor-pointer"
+                  className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
                 >
                   Studio
                 </button>
-                <ChevronRight className="h-3.5 w-3.5 text-neutral-500 shrink-0" />
-                <span className="text-xs font-semibold text-white truncate">
+                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                <span className="text-xs font-semibold text-foreground truncate">
                   {language === "id" ? "Catatan" : "Note"}
                 </span>
               </div>
@@ -2546,7 +2547,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
                 <button
                   type="button"
                   onClick={() => handleDeleteArtifact(selectedNoteArtifact.id)}
-                  className="h-8 w-8 rounded-lg hover:bg-red-500/10 text-neutral-400 hover:text-red-400 flex items-center justify-center transition-colors cursor-pointer"
+                  className="h-8 w-8 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive flex items-center justify-center transition-colors cursor-pointer"
                   title={language === "id" ? "Hapus Catatan" : "Delete Note"}
                 >
                   <Trash2 className="h-4 w-4" />
@@ -2555,7 +2556,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
                 <button
                   type="button"
                   onClick={handleCopyNote}
-                  className="h-8 w-8 rounded-lg hover:bg-white/10 text-neutral-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+                  className="h-8 w-8 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
                   title={language === "id" ? "Salin" : "Copy"}
                 >
                   <Copy className="h-4 w-4" />
@@ -2564,7 +2565,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
                 <button
                   type="button"
                   onClick={() => handleDownloadArtifact(selectedNoteArtifact)}
-                  className="h-8 w-8 rounded-lg hover:bg-white/10 text-neutral-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+                  className="h-8 w-8 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
                   title={language === "id" ? "Unduh .md" : "Download .md"}
                 >
                   <Download className="h-4 w-4" />
@@ -2573,7 +2574,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
                 <button
                   type="button"
                   onClick={() => setSelectedNoteArtifact(null)}
-                  className="h-8 w-8 rounded-lg hover:bg-white/10 text-neutral-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+                  className="h-8 w-8 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
                   title={language === "id" ? "Tutup" : "Close"}
                 >
                   <X className="h-4 w-4" />
@@ -2582,22 +2583,22 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
             </div>
 
             {/* Note Title Input (Image 3) */}
-            <div className="px-4 pt-3 pb-1 border-b border-white/5">
+            <div className="px-4 pt-3 pb-1 border-b border-border">
               <input
                 type="text"
                 value={noteTitleInput}
                 onChange={(e) => handleNoteTitleChange(e.target.value)}
                 placeholder={language === "id" ? "Catatan Baru" : "New Note"}
-                className="text-lg sm:text-xl font-bold text-white bg-transparent border-none outline-none focus:outline-none w-full placeholder:text-neutral-500 tracking-tight"
+                className="text-lg sm:text-xl font-bold text-foreground bg-transparent border-none outline-none focus:outline-none w-full placeholder:text-muted-foreground tracking-tight"
               />
             </div>
 
             {/* Formatting Toolbar (Image 3) */}
-            <div className="px-3 py-1.5 border-b border-white/5 bg-[#17171a] flex items-center gap-0.5 overflow-x-auto no-scrollbar shrink-0 select-none">
+            <div className="px-3 py-1.5 border-b border-border bg-secondary/40 flex items-center gap-0.5 overflow-x-auto no-scrollbar shrink-0 select-none">
               <button
                 type="button"
                 onClick={() => applyNoteFormat("undo")}
-                className="h-7 w-7 rounded-md hover:bg-white/10 text-neutral-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                className="h-7 w-7 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer shrink-0"
                 title="Undo (Ctrl+Z)"
               >
                 <Undo2 className="h-3.5 w-3.5" />
@@ -2605,20 +2606,20 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
               <button
                 type="button"
                 onClick={() => applyNoteFormat("redo")}
-                className="h-7 w-7 rounded-md hover:bg-white/10 text-neutral-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                className="h-7 w-7 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer shrink-0"
                 title="Redo (Ctrl+Y)"
               >
                 <Redo2 className="h-3.5 w-3.5" />
               </button>
 
-              <div className="w-px h-4 bg-white/10 mx-1 shrink-0" />
+              <div className="w-px h-4 bg-border mx-1 shrink-0" />
 
               {/* Headings Dropdown */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <button
                     type="button"
-                    className="h-7 px-2 rounded-md hover:bg-white/10 text-neutral-300 hover:text-white text-xs font-medium flex items-center gap-1 transition-colors cursor-pointer shrink-0"
+                    className="h-7 px-2 rounded-md hover:bg-secondary text-foreground text-xs font-medium flex items-center gap-1 transition-colors cursor-pointer shrink-0"
                   >
                     <span>Normal</span>
                     <ChevronDown className="h-3 w-3 opacity-60" />
@@ -2626,7 +2627,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
                 </DropdownMenuTrigger>
                 <DropdownMenuContent
                   align="start"
-                  className="w-36 bg-[#222226] border-[#333338] text-neutral-200"
+                  className="w-36 bg-popover border-border text-popover-foreground"
                 >
                   <DropdownMenuItem
                     className="text-xs cursor-pointer"
@@ -2655,12 +2656,12 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
                 </DropdownMenuContent>
               </DropdownMenu>
 
-              <div className="w-px h-4 bg-white/10 mx-1 shrink-0" />
+              <div className="w-px h-4 bg-border mx-1 shrink-0" />
 
               <button
                 type="button"
                 onClick={() => applyNoteFormat("bold")}
-                className="h-7 w-7 rounded-md hover:bg-white/10 text-neutral-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                className="h-7 w-7 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer shrink-0"
                 title="Tebal"
               >
                 <Bold className="h-3.5 w-3.5" />
@@ -2668,7 +2669,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
               <button
                 type="button"
                 onClick={() => applyNoteFormat("italic")}
-                className="h-7 w-7 rounded-md hover:bg-white/10 text-neutral-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                className="h-7 w-7 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer shrink-0"
                 title="Miring"
               >
                 <Italic className="h-3.5 w-3.5" />
@@ -2676,7 +2677,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
               <button
                 type="button"
                 onClick={() => applyNoteFormat("link")}
-                className="h-7 w-7 rounded-md hover:bg-white/10 text-neutral-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                className="h-7 w-7 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer shrink-0"
                 title="Tautan"
               >
                 <LinkIcon className="h-3.5 w-3.5" />
@@ -2684,18 +2685,18 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
               <button
                 type="button"
                 onClick={() => applyNoteFormat("code")}
-                className="h-7 w-7 rounded-md hover:bg-white/10 text-neutral-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                className="h-7 w-7 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer shrink-0"
                 title="Kode"
               >
                 <Code className="h-3.5 w-3.5" />
               </button>
 
-              <div className="w-px h-4 bg-white/10 mx-1 shrink-0" />
+              <div className="w-px h-4 bg-border mx-1 shrink-0" />
 
               <button
                 type="button"
                 onClick={() => applyNoteFormat("bullet")}
-                className="h-7 w-7 rounded-md hover:bg-white/10 text-neutral-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                className="h-7 w-7 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer shrink-0"
                 title="Daftar Butir"
               >
                 <List className="h-3.5 w-3.5" />
@@ -2703,7 +2704,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
               <button
                 type="button"
                 onClick={() => applyNoteFormat("ordered")}
-                className="h-7 w-7 rounded-md hover:bg-white/10 text-neutral-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                className="h-7 w-7 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer shrink-0"
                 title="Daftar Bernomor"
               >
                 <ListOrdered className="h-3.5 w-3.5" />
@@ -2711,7 +2712,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
               <button
                 type="button"
                 onClick={() => applyNoteFormat("quote")}
-                className="h-7 w-7 rounded-md hover:bg-white/10 text-neutral-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                className="h-7 w-7 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer shrink-0"
                 title="Kutipan"
               >
                 <Quote className="h-3.5 w-3.5" />
@@ -2719,7 +2720,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
               <button
                 type="button"
                 onClick={() => applyNoteFormat("rule")}
-                className="h-7 w-7 rounded-md hover:bg-white/10 text-neutral-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                className="h-7 w-7 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer shrink-0"
                 title="Garis Pemisah"
               >
                 <Minus className="h-3.5 w-3.5" />
@@ -2727,7 +2728,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
               <button
                 type="button"
                 onClick={() => applyNoteFormat("clear")}
-                className="h-7 w-7 rounded-md hover:bg-white/10 text-neutral-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                className="h-7 w-7 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer shrink-0"
                 title="Hapus Format"
               >
                 <RemoveFormatting className="h-3.5 w-3.5" />
@@ -2752,31 +2753,31 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
                   boxShadow: "none",
                 }}
                 className={cn(
-                  "w-full h-full min-h-[350px] bg-transparent text-[#e2e8f0] text-sm font-sans leading-relaxed select-text",
+                  "w-full h-full min-h-[350px] bg-transparent text-foreground text-sm font-sans leading-relaxed select-text",
                   "border-none outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 ring-0 shadow-none",
-                  "empty:before:content-[attr(data-placeholder)] empty:before:text-neutral-500 empty:before:pointer-events-none empty:before:block",
-                  "[&_h1]:text-2xl [&_h1]:font-bold [&_h1]:text-white [&_h1]:mt-4 [&_h1]:mb-2 [&_h1]:tracking-tight",
-                  "[&_h2]:text-xl [&_h2]:font-bold [&_h2]:text-white [&_h2]:mt-3 [&_h2]:mb-1.5 [&_h2]:tracking-tight",
-                  "[&_h3]:text-lg [&_h3]:font-semibold [&_h3]:text-white [&_h3]:mt-2.5 [&_h3]:mb-1",
+                  "empty:before:content-[attr(data-placeholder)] empty:before:text-muted-foreground empty:before:pointer-events-none empty:before:block",
+                  "[&_h1]:text-2xl [&_h1]:font-bold [&_h1]:text-foreground [&_h1]:mt-4 [&_h1]:mb-2 [&_h1]:tracking-tight",
+                  "[&_h2]:text-xl [&_h2]:font-bold [&_h2]:text-foreground [&_h2]:mt-3 [&_h2]:mb-1.5 [&_h2]:tracking-tight",
+                  "[&_h3]:text-lg [&_h3]:font-semibold [&_h3]:text-foreground [&_h3]:mt-2.5 [&_h3]:mb-1",
                   "[&_p]:mb-2 [&_p]:leading-relaxed",
-                  "[&_strong]:font-bold [&_strong]:text-white",
-                  "[&_b]:font-bold [&_b]:text-white",
-                  "[&_em]:italic [&_em]:text-neutral-200",
-                  "[&_i]:italic [&_i]:text-neutral-200",
+                  "[&_strong]:font-bold [&_strong]:text-foreground",
+                  "[&_b]:font-bold [&_b]:text-foreground",
+                  "[&_em]:italic [&_em]:text-foreground/90",
+                  "[&_i]:italic [&_i]:text-foreground/90",
                   "[&_a]:text-blue-400 [&_a]:underline hover:[&_a]:text-blue-300",
-                  "[&_code]:bg-[#27272a] [&_code]:text-[#93c5fd] [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-xs [&_code]:font-mono",
-                  "[&_pre]:bg-[#18181b] [&_pre]:border [&_pre]:border-[#27272a] [&_pre]:p-3 [&_pre]:rounded-xl [&_pre]:my-2.5 [&_pre]:overflow-x-auto",
+                  "[&_code]:bg-secondary [&_code]:text-foreground [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-xs [&_code]:font-mono",
+                  "[&_pre]:bg-secondary/50 [&_pre]:border [&_pre]:border-border [&_pre]:p-3 [&_pre]:rounded-xl [&_pre]:my-2.5 [&_pre]:overflow-x-auto",
                   "[&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-2 [&_ul]:space-y-1",
                   "[&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:my-2 [&_ol]:space-y-1",
                   "[&_li]:leading-relaxed",
-                  "[&_blockquote]:border-l-2 [&_blockquote]:border-blue-500 [&_blockquote]:pl-3 [&_blockquote]:py-0.5 [&_blockquote]:my-2.5 [&_blockquote]:italic [&_blockquote]:text-neutral-400",
-                  "[&_hr]:border-[#27272a] [&_hr]:my-4"
+                  "[&_blockquote]:border-l-2 [&_blockquote]:border-blue-500 [&_blockquote]:pl-3 [&_blockquote]:py-0.5 [&_blockquote]:my-2.5 [&_blockquote]:italic [&_blockquote]:text-muted-foreground",
+                  "[&_hr]:border-border [&_hr]:my-4"
                 )}
               />
             </div>
 
             {/* Footer / Convert to Source Button (Image 3) */}
-            <div className="px-4 py-2.5 border-t border-white/5 flex items-center justify-between bg-[#161619] shrink-0">
+            <div className="px-4 py-2.5 border-t border-border flex items-center justify-between bg-secondary/30 shrink-0">
               <button
                 type="button"
                 onClick={() => handleConvertToSource(selectedNoteArtifact)}
@@ -2788,12 +2789,12 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
                 </span>
               </button>
 
-              <div className="flex items-center gap-2 text-[11px] text-neutral-400">
+              <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
                 <span className="text-emerald-400 flex items-center gap-1 font-medium">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
                   {language === "id" ? "Tersimpan otomatis" : "Auto-saved"}
                 </span>
-                <span className="text-neutral-500">•</span>
+                <span className="text-muted-foreground">•</span>
                 <span>
                   {noteContentInput
                     ? `${noteContentInput.length.toLocaleString()} ${

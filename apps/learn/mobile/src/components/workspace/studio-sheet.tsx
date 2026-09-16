@@ -160,8 +160,8 @@ export function StudioSheet({
       {/* Slide-over Panel from Left: Matches workspace sidebar geometry & position */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 w-[88vw] max-w-[340px] sm:max-w-[360px] h-full bg-[#1c1c1e] text-[#d4d4d4]",
-          "border-r border-[#333336] rounded-tr-[24px] rounded-br-[24px] flex flex-col will-change-transform font-sans overflow-hidden select-none",
+          "fixed inset-y-0 left-0 z-50 w-[88vw] max-w-[340px] sm:max-w-[360px] h-full bg-card text-card-foreground",
+          "border-r border-border rounded-tr-[24px] rounded-br-[24px] flex flex-col will-change-transform font-sans overflow-hidden select-none",
           "transition-[transform,visibility] duration-300 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)]",
           open
             ? "translate-x-0 visible pointer-events-auto shadow-2xl"
@@ -172,25 +172,25 @@ export function StudioSheet({
         aria-label="Panel Studio & Tools"
       >
         {/* Header - Seamless matching sidebar top bar */}
-        <div className="h-14 px-3.5 border-b border-[#2d2d30] flex items-center justify-between shrink-0 bg-[#202022] rounded-tr-[24px]">
+        <div className="h-14 px-3.5 border-b border-border flex items-center justify-between shrink-0 bg-secondary/40 rounded-tr-[24px]">
           <div className="flex items-center gap-2 min-w-0 pr-2">
             {onBack ? (
               <button
                 type="button"
                 onClick={onBack}
-                className="h-8 w-8 rounded-full hover:bg-white/10 text-[#969696] hover:text-white flex items-center justify-center transition-colors cursor-pointer active:scale-95 shrink-0 -ml-1"
+                className="h-8 w-8 rounded-full hover:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer active:scale-95 shrink-0 -ml-1"
                 aria-label="Kembali ke Sidebar"
                 title="Kembali ke Sidebar"
               >
                 <ArrowLeft className="h-4 w-4" />
               </button>
             ) : (
-              <LayoutGrid className="h-4 w-4 text-white shrink-0" />
+              <LayoutGrid className="h-4 w-4 text-foreground shrink-0" />
             )}
-            <span className="text-sm font-semibold text-white tracking-tight truncate">
+            <span className="text-sm font-semibold text-foreground tracking-tight truncate">
               {t("studioTools") || "Studio & Tools"}
             </span>
-            <span className="text-[10.5px] font-sans px-2 py-0.5 rounded-full bg-[#252528] text-[#969696] border border-[#383838] shrink-0">
+            <span className="text-[10.5px] font-sans px-2 py-0.5 rounded-full bg-secondary text-muted-foreground border border-border/70 shrink-0">
               {tools.length} tools
             </span>
           </div>
@@ -198,7 +198,7 @@ export function StudioSheet({
           <button
             type="button"
             onClick={onClose}
-            className="h-8 w-8 rounded-full hover:bg-white/10 text-[#969696] hover:text-white flex items-center justify-center transition-colors cursor-pointer active:scale-95 shrink-0"
+            className="h-8 w-8 rounded-full hover:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer active:scale-95 shrink-0"
             aria-label="Tutup"
           >
             <X className="h-4 w-4" />
@@ -209,7 +209,7 @@ export function StudioSheet({
         <div className="flex-1 px-3 pt-2.5 pb-3 flex flex-col gap-3 min-h-0 overflow-y-auto">
           {/* Section: Tools Grid (Matching Image 1) */}
           <div className="space-y-2 shrink-0">
-            <div className="text-[11px] font-sans uppercase tracking-wider font-semibold text-[#888888] px-0.5">
+            <div className="text-[11px] font-sans uppercase tracking-wider font-semibold text-muted-foreground px-0.5">
               {t("studioTitle") || "Alat Interaktif"}
             </div>
 
@@ -231,18 +231,18 @@ export function StudioSheet({
                       <div className="flex items-center gap-1.5">
                         <Icon className={`h-4 w-4 ${tool.iconColor} shrink-0`} />
                         {tool.hasBadge && (
-                          <span className="bg-[#ededed] text-[#141414] text-[8.5px] font-sans font-bold px-1.5 py-0.5 rounded-full leading-none shadow-2xs">
+                          <span className="bg-foreground text-background text-[8.5px] font-sans font-bold px-1.5 py-0.5 rounded-full leading-none shadow-2xs">
                             {t("badgeNew") || "BARU"}
                           </span>
                         )}
                       </div>
-                      <ChevronRight className="h-3.5 w-3.5 text-[#888888]/40 group-hover:text-white/70 group-hover:translate-x-0.5 transition-all shrink-0" />
+                      <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/50 group-hover:text-foreground/80 group-hover:translate-x-0.5 transition-all shrink-0" />
                     </div>
 
                     {/* Bottom Row: Tool Title */}
                     <span
                       className={`text-[11.5px] font-medium ${
-                        tool.textColor || "text-[#ffffff]"
+                        tool.textColor || "text-foreground"
                       } tracking-tight leading-snug line-clamp-2 mt-auto pt-1`}
                     >
                       {toolTitle}
@@ -256,11 +256,11 @@ export function StudioSheet({
           {/* Section: Activities & Generated Outputs */}
           <div className="space-y-2.5 pt-1 flex-1">
             <div className="flex items-center justify-between px-0.5">
-              <span className="text-xs font-semibold text-white">
+              <span className="text-xs font-semibold text-foreground">
                 {t("artifacts") || "Hasil Artefak & Unduhan"}
               </span>
               {artifacts && artifacts.length > 0 && (
-                <span className="text-[10.5px] font-sans px-2 py-0.5 rounded-full bg-[#252528] border border-[#383838] text-[#969696]">
+                <span className="text-[10.5px] font-sans px-2 py-0.5 rounded-full bg-secondary border border-border/70 text-muted-foreground">
                   {artifacts.length === 1
                     ? t("filesCountSingle")
                     : t("filesCount", { count: artifacts.length })}
@@ -288,7 +288,7 @@ export function StudioSheet({
                     <div
                       key={art.id}
                       className={cn(
-                        "p-2.5 rounded-2xl bg-[#1c1c1f] flex items-center gap-2.5 select-none animate-pulse shadow-xs border",
+                        "p-2.5 rounded-2xl bg-secondary/50 flex items-center gap-2.5 select-none animate-pulse shadow-xs border",
                         isMindMap ? "border-purple-500/30" : "border-blue-500/30"
                       )}
                     >
@@ -308,10 +308,10 @@ export function StudioSheet({
                         />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <div className="text-xs font-semibold text-white tracking-tight truncate">
+                        <div className="text-xs font-semibold text-foreground tracking-tight truncate">
                           {art.title || defaultGenTitle}
                         </div>
-                        <div className="text-[10.5px] text-neutral-400 truncate mt-0.5">
+                        <div className="text-[10.5px] text-muted-foreground truncate mt-0.5">
                           {language === "id"
                             ? `berdasarkan ${art.sourcesCount ?? 1} sumber`
                             : `based on ${art.sourcesCount ?? 1} source${
@@ -349,17 +349,17 @@ export function StudioSheet({
                   <div
                     key={art.id}
                     onClick={handleOpenThis}
-                    className="p-2.5 rounded-2xl bg-[#242426] hover:bg-[#2c2c2f] border border-[#383838] hover:border-[#4d4d52] transition-all flex items-center justify-between gap-2 cursor-pointer group shadow-xs active:scale-[0.99]"
+                    className="p-2.5 rounded-2xl bg-card hover:bg-secondary/60 border border-border hover:border-border/80 transition-all flex items-center justify-between gap-2 cursor-pointer group shadow-2xs active:scale-[0.99]"
                   >
                     <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                      <div className="h-8 w-8 rounded-xl bg-[#1c1c1e] text-[#d4d4d4] border border-[#333336] flex items-center justify-center shrink-0 group-hover:text-white transition-colors">
+                      <div className="h-8 w-8 rounded-xl bg-secondary text-foreground border border-border/70 flex items-center justify-center shrink-0 group-hover:text-foreground transition-colors">
                         <ItemIcon className="h-4 w-4" />
                       </div>
                       <div className="min-w-0 flex-1">
-                        <div className="text-xs font-semibold text-white tracking-tight truncate group-hover:text-blue-400 transition-colors">
+                        <div className="text-xs font-semibold text-foreground tracking-tight truncate group-hover:text-primary transition-colors">
                           {art.title}
                         </div>
-                        <div className="text-[10.5px] text-[#969696] truncate mt-0.5">
+                        <div className="text-[10.5px] text-muted-foreground truncate mt-0.5">
                           {countText ? `${countText} · ` : art.sourcesCount
                             ? `${art.sourcesCount} ${
                                 language === "id" ? "sumber" : "sources"
@@ -378,7 +378,7 @@ export function StudioSheet({
                       >
                         <button
                           type="button"
-                          className="h-7 w-7 rounded-lg hover:bg-white/10 text-[#969696] hover:text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                          className="h-7 w-7 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer shrink-0"
                           title="Opsi"
                         >
                           <MoreVertical className="h-3.5 w-3.5" />
@@ -386,10 +386,10 @@ export function StudioSheet({
                       </DropdownMenuTrigger>
                       <DropdownMenuContent
                         align="end"
-                        className="w-44 p-1 shadow-xl bg-[#1e1e22] border-[#333338]"
+                        className="w-44 p-1 shadow-xl bg-popover border border-border text-popover-foreground"
                       >
                         <DropdownMenuItem
-                          className="cursor-pointer flex items-center gap-2 text-xs py-2 px-2.5 text-neutral-300 hover:text-white"
+                          className="cursor-pointer flex items-center gap-2 text-xs py-2 px-2.5 text-foreground hover:bg-secondary"
                           onClick={(e) => {
                             e.stopPropagation();
                             handleOpenThis();
@@ -408,7 +408,7 @@ export function StudioSheet({
                         </DropdownMenuItem>
                         {art.content && (
                           <DropdownMenuItem
-                            className="cursor-pointer flex items-center gap-2 text-xs py-2 px-2.5 text-neutral-300 hover:text-white"
+                            className="cursor-pointer flex items-center gap-2 text-xs py-2 px-2.5 text-foreground hover:bg-secondary"
                             onClick={(e) => {
                               e.stopPropagation();
                               navigator.clipboard.writeText(art.content || "");
@@ -426,7 +426,7 @@ export function StudioSheet({
                           </DropdownMenuItem>
                         )}
                         <DropdownMenuItem
-                          className="cursor-pointer flex items-center gap-2 text-xs py-2 px-2.5 text-neutral-300 hover:text-white"
+                          className="cursor-pointer flex items-center gap-2 text-xs py-2 px-2.5 text-foreground hover:bg-secondary"
                           onClick={(e) => {
                             e.stopPropagation();
                             onDownloadArtifact?.(art);
@@ -439,7 +439,7 @@ export function StudioSheet({
                               : "Download .md"}
                           </span>
                         </DropdownMenuItem>
-                        <DropdownMenuSeparator className="bg-[#2e2e34]" />
+                        <DropdownMenuSeparator className="bg-border" />
                         <DropdownMenuItem
                           className="cursor-pointer flex items-center gap-2 text-xs py-2 px-2.5 text-destructive focus:text-destructive"
                           onClick={(e) => {
@@ -462,14 +462,14 @@ export function StudioSheet({
 
           {/* Empty State if neither exists */}
           {(!artifacts || artifacts.length === 0) && (
-            <div className="flex flex-col items-center justify-center text-center p-5 rounded-2xl border border-dashed border-[#333336] bg-[#222225]/40 min-h-[130px]">
-              <div className="h-9 w-9 rounded-2xl bg-[#28282b] border border-[#383838] flex items-center justify-center text-[#969696] mb-2">
-                <PenTool className="h-4 w-4 stroke-[1.5] text-[#d4d4d4]" />
+            <div className="flex flex-col items-center justify-center text-center p-5 rounded-2xl border border-dashed border-border/80 bg-card/40 min-h-[130px]">
+              <div className="h-9 w-9 rounded-2xl bg-secondary border border-border/70 flex items-center justify-center text-muted-foreground mb-2">
+                <PenTool className="h-4 w-4 stroke-[1.5] text-foreground" />
               </div>
-              <h3 className="text-xs font-semibold text-white mb-1">
+              <h3 className="text-xs font-semibold text-foreground mb-1">
                 {t("studioEmptyTitle") || "Output studio akan disimpan di sini"}
               </h3>
-              <p className="text-[10.5px] text-[#969696] leading-relaxed max-w-[220px]">
+              <p className="text-[10.5px] text-muted-foreground leading-relaxed max-w-[220px]">
                 {t("studioEmptyDesc") ||
                   "Setelah menambahkan sumber, klik untuk menambahkan Ringkasan Audio, Panduan Belajar, Peta Konsep, dan banyak lagi."}
               </p>
@@ -478,13 +478,13 @@ export function StudioSheet({
         </div>
 
         {/* "+ Tambahkan catatan" Button pinned at the bottom (Image 1) */}
-        <div className="p-3 pt-2 flex justify-center mt-auto shrink-0 sticky bottom-0 bg-gradient-to-t from-[#1c1c1e] via-[#1c1c1e]/95 to-transparent">
+        <div className="p-3 pt-2 flex justify-center mt-auto shrink-0 sticky bottom-0 bg-gradient-to-t from-background via-background/95 to-transparent">
           <button
             type="button"
             onClick={() => {
               onAddNote?.();
             }}
-            className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-white text-neutral-900 hover:bg-neutral-100 text-xs font-semibold transition-all shadow-md active:scale-95 cursor-pointer border border-white/20"
+            className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-foreground text-background hover:opacity-90 text-xs font-semibold transition-all shadow-md active:scale-95 cursor-pointer border border-border/20"
           >
             <SquarePen className="h-4 w-4 stroke-[2]" />
             <span>{t("addNote") || "Tambahkan catatan"}</span>

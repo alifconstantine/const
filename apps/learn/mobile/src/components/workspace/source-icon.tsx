@@ -311,7 +311,7 @@ export function SourceIcon({ source, size = "sm", className }: SourceIconProps) 
         <div
           className={cn(
             cSize,
-            "bg-[#28282a] border border-[#38383a] text-[#a1a1aa] flex items-center justify-center shrink-0",
+            "bg-secondary border border-border text-muted-foreground flex items-center justify-center shrink-0",
             className
           )}
         >

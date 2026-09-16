@@ -53,9 +53,9 @@ export function FileDiffTab({ tab, onRollbackFile }: FileDiffTabProps) {
   };
 
   return (
-    <div className="flex-1 w-full h-full flex flex-col overflow-hidden bg-[#141414] select-none font-sans">
+    <div className="flex-1 w-full h-full flex flex-col overflow-hidden bg-background select-none font-sans">
       {/* Breadcrumb Path & Action Bar */}
-      <div className="flex items-center justify-between px-3.5 py-2 border-b border-[#282828] bg-[#1a1a1a] text-xs text-neutral-400 shrink-0">
+      <div className="flex items-center justify-between px-3.5 py-2 border-b border-border bg-card text-xs text-muted-foreground shrink-0">
         {/* Breadcrumb Navigation */}
         <div
           onWheel={(e) => {
@@ -68,23 +68,23 @@ export function FileDiffTab({ tab, onRollbackFile }: FileDiffTabProps) {
           {hasLeadingEllipsis && (
             <>
               <span
-                className="text-neutral-500 hover:text-neutral-300 transition-colors shrink-0"
+                className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
                 title={rawPath}
               >
                 ...
               </span>
-              <ChevronRight className="w-3 h-3 text-neutral-600 shrink-0" />
+              <ChevronRight className="w-3 h-3 text-muted-foreground/60 shrink-0" />
             </>
           )}
           {pathParts.map((part, idx) => (
             <React.Fragment key={idx}>
-              <span className="text-neutral-500 hover:text-neutral-300 transition-colors shrink-0">
+              <span className="text-muted-foreground hover:text-foreground transition-colors shrink-0">
                 {part}
               </span>
-              <ChevronRight className="w-3 h-3 text-neutral-600 shrink-0" />
+              <ChevronRight className="w-3 h-3 text-muted-foreground/60 shrink-0" />
             </React.Fragment>
           ))}
-          <div className="flex items-center gap-1.5 shrink-0 text-white font-medium" title={rawPath}>
+          <div className="flex items-center gap-1.5 shrink-0 text-foreground font-medium" title={rawPath}>
             <FileIcon filename={fileName} />
             <span className="truncate">{fileName}</span>
           </div>
@@ -93,20 +93,20 @@ export function FileDiffTab({ tab, onRollbackFile }: FileDiffTabProps) {
         {/* Right Action Buttons */}
         <div className="flex items-center gap-2 shrink-0">
           {/* Diff Stats Badge */}
-          <div className="flex items-center gap-1 font-mono text-xs px-2 py-0.5 rounded bg-black/40 border border-[#2a2a2a]">
-            <span className="text-[#409D62]">+{stats.added}</span>
-            <span className="text-[#ff5c5c]">-{stats.removed}</span>
+          <div className="flex items-center gap-1 font-mono text-xs px-2 py-0.5 rounded bg-muted/70 border border-border">
+            <span className="text-emerald-600 dark:text-emerald-400">+{stats.added}</span>
+            <span className="text-red-600 dark:text-red-400">-{stats.removed}</span>
           </div>
 
           {/* Copy Diff Button */}
           <button
             type="button"
             onClick={handleCopy}
-            className="p-1 rounded hover:bg-white/10 text-neutral-400 hover:text-white transition-colors cursor-pointer"
+            className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
             title={t("copyDiff") || "Copy diff"}
           >
             {copied ? (
-              <Check className="w-3.5 h-3.5 text-green-400" />
+              <Check className="w-3.5 h-3.5 text-emerald-500" />
             ) : (
               <Copy className="w-3.5 h-3.5" />
             )}
@@ -115,8 +115,8 @@ export function FileDiffTab({ tab, onRollbackFile }: FileDiffTabProps) {
           {/* Revert / Undo File Button */}
           {mutation && onRollbackFile && (
             mutation.rolledBack ? (
-              <span className="text-[11px] text-[#409D62] font-medium flex items-center gap-1 px-1.5 py-1">
-                <Check className="w-3.5 h-3.5 text-[#409D62]" />
+              <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1 px-1.5 py-1">
+                <Check className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                 <span>{t("undone") || "Undone"}</span>
               </span>
             ) : (
@@ -124,10 +124,10 @@ export function FileDiffTab({ tab, onRollbackFile }: FileDiffTabProps) {
                 type="button"
                 onClick={handleRollback}
                 disabled={isUndoing}
-                className="flex items-center gap-1 px-2 py-1 rounded bg-[#222222] hover:bg-[#2c2c2c] border border-[#333333] hover:border-[#444444] text-[11px] text-neutral-300 hover:text-white transition-all cursor-pointer disabled:opacity-50 font-medium"
+                className="flex items-center gap-1 px-2 py-1 rounded bg-secondary hover:bg-secondary/80 border border-border hover:border-border/80 text-[11px] text-foreground transition-all cursor-pointer disabled:opacity-50 font-medium"
                 title={t("undoFile") || "Revert changes to this file"}
               >
-                <RotateCcw className={`w-3 h-3 text-neutral-400 ${isUndoing ? "animate-spin" : ""}`} />
+                <RotateCcw className={`w-3 h-3 text-muted-foreground ${isUndoing ? "animate-spin" : ""}`} />
                 <span>{t("undo") || "Undo"}</span>
               </button>
             )

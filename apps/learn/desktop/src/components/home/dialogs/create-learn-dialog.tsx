@@ -237,14 +237,14 @@ export function CreateLearnDialog({
                 onClick={() => setPermissionMode("full_access")}
                 className={`p-2.5 rounded-xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
                   permissionMode === "full_access"
-                    ? "border-[#e79737] bg-[#e79737]/10 shadow-xs"
+                    ? "border-amber-500/60 bg-amber-500/10 shadow-xs"
                     : "border-border/70 bg-secondary/20 hover:bg-secondary/40"
                 }`}
               >
                 <div className="flex items-center justify-between w-full mb-1">
-                  <ShieldAlert className="h-4 w-4 text-[#e79737] shrink-0" />
+                  <ShieldAlert className="h-4 w-4 text-amber-500 shrink-0" />
                   {permissionMode === "full_access" && (
-                    <Check className="h-3.5 w-3.5 text-[#e79737] shrink-0" />
+                    <Check className="h-3.5 w-3.5 text-amber-500 shrink-0" />
                   )}
                 </div>
                 <div>

@@ -347,20 +347,20 @@ export function NotePreviewTab({
   };
 
   return (
-    <div className="flex-1 w-full h-full flex flex-col overflow-hidden bg-[#141414] select-none font-sans">
+    <div className="flex-1 w-full h-full flex flex-col overflow-hidden bg-background select-none font-sans">
       {/* Top Breadcrumb Header (Image 3: Studio > Catatan) */}
-      <div className="h-11 px-4 border-b border-[#282828] flex items-center justify-between shrink-0 bg-[#171719] text-xs">
+      <div className="h-11 px-4 border-b border-border flex items-center justify-between shrink-0 bg-card text-xs">
         {/* Left: Studio > Catatan */}
         <div className="flex items-center gap-1.5 min-w-0">
           <button
             type="button"
             onClick={onClose}
-            className="text-xs font-medium text-[#969696] hover:text-white transition-colors cursor-pointer"
+            className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
           >
             {t("studio") || "Studio"}
           </button>
-          <ChevronRight className="h-3.5 w-3.5 text-[#666666] shrink-0" />
-          <span className="text-xs font-medium text-white truncate">
+          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/60 shrink-0" />
+          <span className="text-xs font-medium text-foreground truncate">
             {language === "id" ? "Catatan" : "Note"}
           </span>
         </div>
@@ -370,7 +370,7 @@ export function NotePreviewTab({
           <button
             type="button"
             onClick={handleDelete}
-            className="h-7 w-7 rounded-lg hover:bg-white/10 text-[#969696] hover:text-red-400 flex items-center justify-center transition-colors cursor-pointer"
+            className="h-7 w-7 rounded-lg hover:bg-muted text-muted-foreground hover:text-destructive flex items-center justify-center transition-colors cursor-pointer"
             title={language === "id" ? "Hapus catatan" : "Delete note"}
           >
             <Trash2 className="h-4 w-4" />
@@ -379,7 +379,7 @@ export function NotePreviewTab({
             <button
               type="button"
               onClick={onToggleCollapse}
-              className="h-7 w-7 rounded-lg hover:bg-white/10 text-[#969696] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+              className="h-7 w-7 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
               title={t("hidePanel") || "Collapse panel"}
             >
               <PanelRight className="h-4 w-4" />
@@ -396,17 +396,17 @@ export function NotePreviewTab({
           onChange={(e) => handleTitleChange(e.target.value)}
           placeholder={language === "id" ? "Catatan Baru" : "New Note"}
           style={{ outline: "none", border: "none", boxShadow: "none" }}
-          className="text-xl sm:text-2xl font-bold text-white bg-transparent border-none outline-none focus:outline-none focus:ring-0 focus-visible:outline-none ring-0 w-full placeholder:text-[#555555] tracking-tight"
+          className="text-xl sm:text-2xl font-bold text-foreground bg-transparent border-none outline-none focus:outline-none focus:ring-0 focus-visible:outline-none ring-0 w-full placeholder:text-muted-foreground/50 tracking-tight"
         />
       </div>
 
       {/* Rich Text Formatting Toolbar (Image 3) */}
-      <div className="px-4 py-1.5 flex items-center gap-0.5 border-b border-[#282828] text-neutral-400 flex-wrap shrink-0 select-none bg-[#161618]">
+      <div className="px-4 py-1.5 flex items-center gap-0.5 border-b border-border text-muted-foreground flex-wrap shrink-0 select-none bg-card">
         {/* Undo */}
         <button
           type="button"
           onClick={() => applyFormat("undo")}
-          className="h-7 w-7 rounded-md hover:bg-white/10 text-[#a3a3a3] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+          className="h-7 w-7 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
           title="Undo (Ctrl+Z)"
         >
           <Undo2 className="h-3.5 w-3.5" />
@@ -415,20 +415,20 @@ export function NotePreviewTab({
         <button
           type="button"
           onClick={() => applyFormat("redo")}
-          className="h-7 w-7 rounded-md hover:bg-white/10 text-[#a3a3a3] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+          className="h-7 w-7 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
           title="Redo (Ctrl+Y)"
         >
           <Redo2 className="h-3.5 w-3.5" />
         </button>
 
-        <div className="h-4 w-[1px] bg-[#333336] mx-1" />
+        <div className="h-4 w-[1px] bg-border mx-1" />
 
         {/* Style Dropdown (Normal ▾ / Headings) */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <button
               type="button"
-              className="h-7 px-2 rounded-md hover:bg-white/10 text-[#d4d4d4] hover:text-white text-xs font-medium flex items-center gap-1 transition-colors cursor-pointer"
+              className="h-7 px-2 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground text-xs font-medium flex items-center gap-1 transition-colors cursor-pointer"
             >
               <span>Normal</span>
               <ChevronDown className="h-3 w-3 opacity-60" />
@@ -436,7 +436,7 @@ export function NotePreviewTab({
           </DropdownMenuTrigger>
           <DropdownMenuContent
             align="start"
-            className="w-36 bg-[#202024] border-[#333338] text-neutral-200 shadow-xl"
+            className="w-36 bg-popover border-border text-popover-foreground shadow-xl"
           >
             <DropdownMenuItem
               className="text-xs cursor-pointer py-1.5"
@@ -465,13 +465,13 @@ export function NotePreviewTab({
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <div className="h-4 w-[1px] bg-[#333336] mx-1" />
+        <div className="h-4 w-[1px] bg-border mx-1" />
 
         {/* Bold */}
         <button
           type="button"
           onClick={() => applyFormat("bold")}
-          className="h-7 w-7 rounded-md hover:bg-white/10 text-[#a3a3a3] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+          className="h-7 w-7 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
           title="Bold (Ctrl+B)"
         >
           <Bold className="h-3.5 w-3.5" />
@@ -480,7 +480,7 @@ export function NotePreviewTab({
         <button
           type="button"
           onClick={() => applyFormat("italic")}
-          className="h-7 w-7 rounded-md hover:bg-white/10 text-[#a3a3a3] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+          className="h-7 w-7 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
           title="Italic (Ctrl+I)"
         >
           <Italic className="h-3.5 w-3.5" />
@@ -489,7 +489,7 @@ export function NotePreviewTab({
         <button
           type="button"
           onClick={() => applyFormat("link")}
-          className="h-7 w-7 rounded-md hover:bg-white/10 text-[#a3a3a3] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+          className="h-7 w-7 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
           title="Insert Link"
         >
           <LinkIcon className="h-3.5 w-3.5" />
@@ -498,19 +498,19 @@ export function NotePreviewTab({
         <button
           type="button"
           onClick={() => applyFormat("code")}
-          className="h-7 w-7 rounded-md hover:bg-white/10 text-[#a3a3a3] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+          className="h-7 w-7 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
           title="Code"
         >
           <Code className="h-3.5 w-3.5" />
         </button>
 
-        <div className="h-4 w-[1px] bg-[#333336] mx-1" />
+        <div className="h-4 w-[1px] bg-border mx-1" />
 
         {/* Bullet List */}
         <button
           type="button"
           onClick={() => applyFormat("bullet")}
-          className="h-7 w-7 rounded-md hover:bg-white/10 text-[#a3a3a3] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+          className="h-7 w-7 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
           title="Bullet List"
         >
           <List className="h-3.5 w-3.5" />
@@ -519,7 +519,7 @@ export function NotePreviewTab({
         <button
           type="button"
           onClick={() => applyFormat("ordered")}
-          className="h-7 w-7 rounded-md hover:bg-white/10 text-[#a3a3a3] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+          className="h-7 w-7 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
           title="Numbered List"
         >
           <ListOrdered className="h-3.5 w-3.5" />
@@ -528,7 +528,7 @@ export function NotePreviewTab({
         <button
           type="button"
           onClick={() => applyFormat("quote")}
-          className="h-7 w-7 rounded-md hover:bg-white/10 text-[#a3a3a3] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+          className="h-7 w-7 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
           title="Quote"
         >
           <Quote className="h-3.5 w-3.5" />
@@ -537,7 +537,7 @@ export function NotePreviewTab({
         <button
           type="button"
           onClick={() => applyFormat("rule")}
-          className="h-7 w-7 rounded-md hover:bg-white/10 text-[#a3a3a3] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+          className="h-7 w-7 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
           title="Horizontal Rule"
         >
           <Minus className="h-3.5 w-3.5" />
@@ -546,7 +546,7 @@ export function NotePreviewTab({
         <button
           type="button"
           onClick={() => applyFormat("clear")}
-          className="h-7 w-7 rounded-md hover:bg-white/10 text-[#a3a3a3] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+          className="h-7 w-7 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
           title="Clear formatting"
         >
           <RemoveFormatting className="h-3.5 w-3.5" />
@@ -571,37 +571,37 @@ export function NotePreviewTab({
             boxShadow: "none",
           }}
           className={cn(
-            "w-full flex-1 min-h-[400px] bg-transparent text-[#e2e8f0] text-sm leading-relaxed font-sans",
+            "w-full flex-1 min-h-[400px] bg-transparent text-foreground text-sm leading-relaxed font-sans",
             "border-none outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 ring-0 shadow-none",
-            "empty:before:content-[attr(data-placeholder)] empty:before:text-[#555555] empty:before:pointer-events-none empty:before:block",
-            "[&_h1]:text-2xl [&_h1]:font-bold [&_h1]:text-white [&_h1]:mt-4 [&_h1]:mb-2 [&_h1]:tracking-tight",
-            "[&_h2]:text-xl [&_h2]:font-bold [&_h2]:text-white [&_h2]:mt-3 [&_h2]:mb-1.5 [&_h2]:tracking-tight",
-            "[&_h3]:text-lg [&_h3]:font-semibold [&_h3]:text-white [&_h3]:mt-2.5 [&_h3]:mb-1",
+            "empty:before:content-[attr(data-placeholder)] empty:before:text-muted-foreground/50 empty:before:pointer-events-none empty:before:block",
+            "[&_h1]:text-2xl [&_h1]:font-bold [&_h1]:text-foreground [&_h1]:mt-4 [&_h1]:mb-2 [&_h1]:tracking-tight",
+            "[&_h2]:text-xl [&_h2]:font-bold [&_h2]:text-foreground [&_h2]:mt-3 [&_h2]:mb-1.5 [&_h2]:tracking-tight",
+            "[&_h3]:text-lg [&_h3]:font-semibold [&_h3]:text-foreground [&_h3]:mt-2.5 [&_h3]:mb-1",
             "[&_p]:mb-2 [&_p]:leading-relaxed",
-            "[&_strong]:font-bold [&_strong]:text-white",
-            "[&_b]:font-bold [&_b]:text-white",
-            "[&_em]:italic [&_em]:text-neutral-200",
-            "[&_i]:italic [&_i]:text-neutral-200",
-            "[&_a]:text-blue-400 [&_a]:underline hover:[&_a]:text-blue-300",
-            "[&_code]:bg-[#27272a] [&_code]:text-[#93c5fd] [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-xs [&_code]:font-mono",
-            "[&_pre]:bg-[#18181b] [&_pre]:border [&_pre]:border-[#27272a] [&_pre]:p-3 [&_pre]:rounded-xl [&_pre]:my-2.5 [&_pre]:overflow-x-auto",
+            "[&_strong]:font-bold [&_strong]:text-foreground",
+            "[&_b]:font-bold [&_b]:text-foreground",
+            "[&_em]:italic [&_em]:text-foreground/90",
+            "[&_i]:italic [&_i]:text-foreground/90",
+            "[&_a]:text-primary [&_a]:underline hover:[&_a]:text-primary/80",
+            "[&_code]:bg-muted [&_code]:text-primary [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-xs [&_code]:font-mono",
+            "[&_pre]:bg-muted/70 [&_pre]:border [&_pre]:border-border [&_pre]:p-3 [&_pre]:rounded-xl [&_pre]:my-2.5 [&_pre]:overflow-x-auto",
             "[&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-2 [&_ul]:space-y-1",
             "[&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:my-2 [&_ol]:space-y-1",
             "[&_li]:leading-relaxed",
-            "[&_blockquote]:border-l-2 [&_blockquote]:border-blue-500 [&_blockquote]:pl-3 [&_blockquote]:py-0.5 [&_blockquote]:my-2.5 [&_blockquote]:italic [&_blockquote]:text-neutral-400",
-            "[&_hr]:border-[#27272a] [&_hr]:my-4"
+            "[&_blockquote]:border-l-2 [&_blockquote]:border-primary [&_blockquote]:pl-3 [&_blockquote]:py-0.5 [&_blockquote]:my-2.5 [&_blockquote]:italic [&_blockquote]:text-muted-foreground",
+            "[&_hr]:border-border [&_hr]:my-4"
           )}
         />
       </ScrollArea>
 
       {/* Bottom Bar: Konversikan menjadi sumber (Image 3) */}
-      <div className="h-12 px-5 border-t border-[#282828] bg-[#161618] flex items-center justify-between shrink-0">
+      <div className="h-12 px-5 border-t border-border bg-card flex items-center justify-between shrink-0">
         <button
           type="button"
           onClick={handleConvertToSource}
-          className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium text-[#d4d4d4] hover:text-white bg-[#222226] hover:bg-[#2c2c32] border border-[#38383e] transition-all cursor-pointer shadow-xs active:scale-95"
+          className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium text-foreground bg-secondary hover:bg-secondary/80 border border-border transition-all cursor-pointer shadow-xs active:scale-95"
         >
-          <FilePlus className="h-3.5 w-3.5 text-blue-400" />
+          <FilePlus className="h-3.5 w-3.5 text-primary" />
           <span>
             {language === "id"
               ? "Konversikan menjadi sumber"
@@ -610,7 +610,7 @@ export function NotePreviewTab({
         </button>
 
         {isSaving && (
-          <span className="text-[11px] text-neutral-500 animate-pulse">
+          <span className="text-[11px] text-muted-foreground animate-pulse">
             {language === "id" ? "Menyimpan..." : "Saving..."}
           </span>
         )}

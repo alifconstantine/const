@@ -296,9 +296,9 @@ export function BrowserTab({ tab, onUpdateTab }: BrowserTabProps) {
   ];
 
   return (
-    <div className="flex-1 w-full h-full flex flex-col bg-[#111113] text-white select-none overflow-hidden relative font-sans">
+    <div className="flex-1 w-full h-full flex flex-col bg-background text-foreground select-none overflow-hidden relative font-sans">
       {/* 1. Top Browser Navigation Toolbar */}
-      <div className="h-10 w-full bg-[#1b1b1d] border-b border-[#2d2d30] flex items-center px-2 gap-1.5 shrink-0 z-20">
+      <div className="h-10 w-full bg-card border-b border-border flex items-center px-2 gap-1.5 shrink-0 z-20">
         {/* Back Button */}
         <button
           type="button"
@@ -306,8 +306,8 @@ export function BrowserTab({ tab, onUpdateTab }: BrowserTabProps) {
           disabled={!canGoBack || !currentUrl}
           className={`w-7 h-7 rounded-md flex items-center justify-center transition-colors ${
             canGoBack && currentUrl
-              ? "text-[#a0a0a0] hover:text-white hover:bg-white/10 cursor-pointer"
-              : "text-[#4a4a4a] cursor-not-allowed"
+              ? "text-muted-foreground hover:text-foreground hover:bg-muted cursor-pointer"
+              : "text-muted-foreground/40 cursor-not-allowed"
           }`}
           title={language === "id" ? "Kembali" : "Click to go back"}
           aria-label="Back"
@@ -322,8 +322,8 @@ export function BrowserTab({ tab, onUpdateTab }: BrowserTabProps) {
           disabled={!canGoForward || !currentUrl}
           className={`w-7 h-7 rounded-md flex items-center justify-center transition-colors ${
             canGoForward && currentUrl
-              ? "text-[#a0a0a0] hover:text-white hover:bg-white/10 cursor-pointer"
-              : "text-[#4a4a4a] cursor-not-allowed"
+              ? "text-muted-foreground hover:text-foreground hover:bg-muted cursor-pointer"
+              : "text-muted-foreground/40 cursor-not-allowed"
           }`}
           title={language === "id" ? "Maju" : "Click to go forward"}
           aria-label="Forward"
@@ -336,7 +336,7 @@ export function BrowserTab({ tab, onUpdateTab }: BrowserTabProps) {
           <button
             type="button"
             onClick={handleReloadOrStop}
-            className="w-7 h-7 rounded-md flex items-center justify-center text-[#a0a0a0] hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+            className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
             title={isLoading ? (language === "id" ? "Hentikan muat" : "Stop loading") : (language === "id" ? "Muat ulang" : "Reload")}
             aria-label="Reload or stop"
           >
@@ -352,14 +352,14 @@ export function BrowserTab({ tab, onUpdateTab }: BrowserTabProps) {
           }}
           className="flex-1 flex items-center min-w-0 mx-1"
         >
-          <div className="w-full flex items-center bg-[#141416] hover:bg-[#18181a] focus-within:bg-[#141416] border border-[#2d2d30] focus-within:border-[#0066ff]/80 rounded-lg px-2.5 py-1 text-xs transition-colors group">
-            <Globe className="w-3.5 h-3.5 text-[#737373] group-focus-within:text-[#0066ff] shrink-0 mr-1.5 transition-colors" />
+          <div className="w-full flex items-center bg-muted/70 hover:bg-muted focus-within:bg-background border border-border focus-within:border-primary/80 rounded-lg px-2.5 py-1 text-xs transition-colors group">
+            <Globe className="w-3.5 h-3.5 text-muted-foreground group-focus-within:text-primary shrink-0 mr-1.5 transition-colors" />
             <input
               type="text"
               value={addressBarInput}
               onChange={(e) => setAddressBarInput(e.target.value)}
               placeholder={language === "id" ? "Ketik URL atau cari di Google..." : "Enter web address or search..."}
-              className="flex-1 bg-transparent border-none outline-none text-white placeholder-[#606065] text-xs font-mono select-text truncate"
+              className="flex-1 bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground/50 text-xs font-mono select-text truncate"
             />
             {addressBarInput && (
               <button
@@ -370,10 +370,10 @@ export function BrowserTab({ tab, onUpdateTab }: BrowserTabProps) {
                     handleNavigate("");
                   }
                 }}
-                className="w-4 h-4 flex items-center justify-center text-[#666666] hover:text-white rounded transition-colors ml-1 cursor-pointer"
+                className="w-4 h-4 flex items-center justify-center text-muted-foreground hover:text-foreground rounded transition-colors ml-1 cursor-pointer"
                 title="Clear"
               >
-                <X className="w-3 h-3" />
+                <X className="w-3.5 h-3.5" />
               </button>
             )}
           </div>
@@ -386,8 +386,8 @@ export function BrowserTab({ tab, onUpdateTab }: BrowserTabProps) {
             onClick={() => setIsSizeMenuOpen(!isSizeMenuOpen)}
             className={`w-7 h-7 rounded-md flex items-center justify-center transition-colors cursor-pointer border ${
               isCustomWidth
-                ? "bg-[#0066ff]/20 text-[#38bdf8] border-[#0066ff]/40 hover:bg-[#0066ff]/30"
-                : "bg-transparent text-[#a0a0a0] hover:text-white hover:bg-white/10 border-transparent"
+                ? "bg-primary/20 text-primary border-primary/40 hover:bg-primary/30"
+                : "bg-transparent text-muted-foreground hover:text-foreground hover:bg-muted border-transparent"
             }`}
             title={activePresetConfig ? `Viewport: ${activePresetConfig.label}` : "Viewport size preset"}
             aria-label="Viewport size preset"
@@ -396,8 +396,8 @@ export function BrowserTab({ tab, onUpdateTab }: BrowserTabProps) {
           </button>
 
           {isSizeMenuOpen && (
-            <div className="absolute right-0 top-full mt-1.5 w-52 bg-[#1e1e22] border border-[#333338] rounded-xl shadow-2xl p-1 z-50 flex flex-col gap-0.5">
-              <div className="px-2 py-1 text-[10px] uppercase font-semibold tracking-wider text-[#737373]">
+            <div className="absolute right-0 top-full mt-1.5 w-52 bg-popover border border-border rounded-xl shadow-2xl p-1 z-50 flex flex-col gap-0.5">
+              <div className="px-2 py-1 text-[10px] uppercase font-semibold tracking-wider text-muted-foreground/70">
                 {language === "id" ? "Ukuran Tampilan" : "Viewport Presets"}
               </div>
               {RESPONSIVE_PRESETS.map((preset) => (
@@ -410,8 +410,8 @@ export function BrowserTab({ tab, onUpdateTab }: BrowserTabProps) {
                   }}
                   className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition-colors cursor-pointer text-left ${
                     selectedPreset === preset.id
-                      ? "bg-[#0066ff] text-white font-medium"
-                      : "text-[#c2c2c2] hover:bg-white/10 hover:text-white"
+                      ? "bg-primary text-primary-foreground font-medium"
+                      : "text-popover-foreground hover:bg-muted"
                   }`}
                 >
                   <span>{preset.label}</span>
@@ -427,23 +427,23 @@ export function BrowserTab({ tab, onUpdateTab }: BrowserTabProps) {
           <button
             type="button"
             onClick={() => setIsMoreMenuOpen(!isMoreMenuOpen)}
-            className="w-7 h-7 rounded-md flex items-center justify-center text-[#a0a0a0] hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
+            className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
             title="More actions"
           >
             <MoreHorizontal className="w-4 h-4" />
           </button>
 
           {isMoreMenuOpen && (
-            <div className="absolute right-0 top-full mt-1.5 w-52 bg-[#1e1e22] border border-[#333338] rounded-xl shadow-2xl p-1 z-50 flex flex-col gap-0.5">
+            <div className="absolute right-0 top-full mt-1.5 w-52 bg-popover border border-border rounded-xl shadow-2xl p-1 z-50 flex flex-col gap-0.5">
               <button
                 type="button"
                 onClick={handleCopyUrl}
                 disabled={!currentUrl}
                 className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition-colors text-left ${
-                  currentUrl ? "text-[#c2c2c2] hover:bg-white/10 hover:text-white cursor-pointer" : "text-[#555] cursor-not-allowed"
+                  currentUrl ? "text-popover-foreground hover:bg-muted cursor-pointer" : "text-muted-foreground/40 cursor-not-allowed"
                 }`}
               >
-                {isCopied ? <Check className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+                {isCopied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
                 <span>{isCopied ? (language === "id" ? "URL Disalin" : "URL Copied!") : (language === "id" ? "Salin URL" : "Copy URL")}</span>
               </button>
 
@@ -452,7 +452,7 @@ export function BrowserTab({ tab, onUpdateTab }: BrowserTabProps) {
                 onClick={handleOpenExternal}
                 disabled={!currentUrl}
                 className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition-colors text-left ${
-                  currentUrl ? "text-[#c2c2c2] hover:bg-white/10 hover:text-white cursor-pointer" : "text-[#555] cursor-not-allowed"
+                  currentUrl ? "text-popover-foreground hover:bg-muted cursor-pointer" : "text-muted-foreground/40 cursor-not-allowed"
                 }`}
               >
                 <ExternalLink className="w-3.5 h-3.5" />
@@ -464,7 +464,7 @@ export function BrowserTab({ tab, onUpdateTab }: BrowserTabProps) {
                 onClick={handleHardReload}
                 disabled={!currentUrl}
                 className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition-colors text-left ${
-                  currentUrl ? "text-[#c2c2c2] hover:bg-white/10 hover:text-white cursor-pointer" : "text-[#555] cursor-not-allowed"
+                  currentUrl ? "text-popover-foreground hover:bg-muted cursor-pointer" : "text-muted-foreground/40 cursor-not-allowed"
                 }`}
               >
                 <RotateCcw className="w-3.5 h-3.5" />
@@ -476,18 +476,18 @@ export function BrowserTab({ tab, onUpdateTab }: BrowserTabProps) {
       </div>
 
       {/* 2. Main Body Viewport */}
-      <div className="flex-1 w-full h-[calc(100%-40px)] min-h-0 relative overflow-hidden flex flex-col items-center justify-center bg-[#0c0c0d]">
+      <div className="flex-1 w-full h-[calc(100%-40px)] min-h-0 relative overflow-hidden flex flex-col items-center justify-center bg-background">
         {!currentUrl ? (
           /* Blank / New Tab Landing State ("namun dengan tidak buka apa apa") */
           <div className="flex-1 w-full h-full flex flex-col items-center justify-center p-6 text-center select-none overflow-y-auto">
-            <div className="w-14 h-14 rounded-2xl bg-[#1f1f23] border border-[#333338] flex items-center justify-center text-[#38bdf8] mb-4 shadow-sm">
+            <div className="w-14 h-14 rounded-2xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-500 mb-4 shadow-xs">
               <Globe className="w-7 h-7 stroke-[1.6]" />
             </div>
 
-            <h3 className="text-base font-semibold text-white mb-1.5 tracking-tight font-sans">
+            <h3 className="text-base font-semibold text-foreground mb-1.5 tracking-tight font-sans">
               {language === "id" ? "Peramban Riset Web" : "Web Research Browser"}
             </h3>
-            <p className="text-xs text-[#8e8e93] max-w-sm leading-relaxed mb-6">
+            <p className="text-xs text-muted-foreground max-w-sm leading-relaxed mb-6">
               {language === "id"
                 ? "Jelajahi referensi, baca jurnal, atau buka sumber web langsung di samping ruang belajar Anda."
                 : "Explore references, read documentation, or view web sources alongside your learning workspace."}
@@ -501,19 +501,19 @@ export function BrowserTab({ tab, onUpdateTab }: BrowserTabProps) {
               }}
               className="w-full max-w-md mb-6"
             >
-              <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[#18181b] border border-[#38383e] focus-within:border-[#0066ff] shadow-sm transition-all">
-                <Search className="w-4 h-4 text-[#707075] shrink-0" />
+              <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-card border border-border focus-within:border-primary shadow-xs transition-all">
+                <Search className="w-4 h-4 text-muted-foreground shrink-0" />
                 <input
                   type="text"
                   value={addressBarInput}
                   onChange={(e) => setAddressBarInput(e.target.value)}
                   placeholder={language === "id" ? "Masukkan kata kunci atau alamat web..." : "Search web or enter address..."}
-                  className="flex-1 bg-transparent text-white outline-none text-xs font-sans placeholder-[#606065]"
+                  className="flex-1 bg-transparent text-foreground outline-none text-xs font-sans placeholder:text-muted-foreground/50"
                   autoFocus
                 />
                 <button
                   type="submit"
-                  className="px-2.5 py-1 rounded-lg bg-[#2b2b30] hover:bg-[#35353c] text-white text-xs font-medium transition-colors cursor-pointer"
+                  className="px-2.5 py-1 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-medium transition-colors cursor-pointer"
                 >
                   {language === "id" ? "Buka" : "Go"}
                 </button>
@@ -522,7 +522,7 @@ export function BrowserTab({ tab, onUpdateTab }: BrowserTabProps) {
 
             {/* Quick Links Chips */}
             <div className="flex flex-col items-center gap-2">
-              <span className="text-[11px] text-[#6b6b72] uppercase tracking-wider font-semibold">
+              <span className="text-[11px] text-muted-foreground/80 uppercase tracking-wider font-semibold">
                 {language === "id" ? "Tautan Cepat" : "Quick Links"}
               </span>
               <div className="flex flex-wrap items-center justify-center gap-2">
@@ -533,9 +533,9 @@ export function BrowserTab({ tab, onUpdateTab }: BrowserTabProps) {
                       key={link.label}
                       type="button"
                       onClick={() => handleNavigate(link.url)}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#18181b] hover:bg-[#232328] border border-[#2e2e33] hover:border-[#3e3e46] text-xs text-[#d4d4d8] hover:text-white transition-all cursor-pointer shadow-2xs"
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-card hover:bg-secondary/70 border border-border hover:border-border/80 text-xs text-foreground transition-all cursor-pointer shadow-2xs"
                     >
-                      <Icon className="w-3.5 h-3.5 text-[#38bdf8]" />
+                      <Icon className="w-3.5 h-3.5 text-sky-500" />
                       <span>{link.label}</span>
                     </button>
                   );
@@ -546,20 +546,20 @@ export function BrowserTab({ tab, onUpdateTab }: BrowserTabProps) {
         ) : loadError ? (
           /* Error State */
           <div className="flex-1 w-full h-full flex flex-col items-center justify-center p-6 text-center">
-            <div className="w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-400 mb-3">
+            <div className="w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-500 dark:text-red-400 mb-3">
               <AlertCircle className="w-6 h-6" />
             </div>
-            <h3 className="text-sm font-semibold text-white mb-1">
+            <h3 className="text-sm font-semibold text-foreground mb-1">
               {language === "id" ? "Tidak Dapat Memuat Halaman" : "Unable to load page"}
             </h3>
-            <p className="text-xs text-[#8e8e8e] mb-4 leading-relaxed max-w-sm">
+            <p className="text-xs text-muted-foreground mb-4 leading-relaxed max-w-sm">
               {loadError.desc}
             </p>
             <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={handleReloadOrStop}
-                className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-white text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5"
+                className="px-3 py-1.5 rounded-lg bg-secondary hover:bg-secondary/80 text-foreground text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5"
               >
                 <RotateCw className="w-3.5 h-3.5" />
                 <span>{language === "id" ? "Coba Lagi" : "Retry"}</span>
@@ -567,7 +567,7 @@ export function BrowserTab({ tab, onUpdateTab }: BrowserTabProps) {
               <button
                 type="button"
                 onClick={() => handleNavigate("")}
-                className="px-3 py-1.5 rounded-lg bg-[#242424] hover:bg-[#2e2e2e] text-[#a0a0a0] hover:text-white text-xs transition-colors cursor-pointer"
+                className="px-3 py-1.5 rounded-lg bg-secondary hover:bg-secondary/80 text-muted-foreground hover:text-foreground text-xs transition-colors cursor-pointer"
               >
                 {language === "id" ? "Ke Beranda" : "Go to Home"}
               </button>
@@ -578,7 +578,7 @@ export function BrowserTab({ tab, onUpdateTab }: BrowserTabProps) {
           <div
             className={`w-full h-full flex-1 min-h-0 relative flex flex-col ${
               isCustomWidth
-                ? "shadow-2xl border-x border-[#333338] bg-black mx-auto"
+                ? "shadow-2xl border-x border-border bg-background mx-auto"
                 : ""
             }`}
             style={{
@@ -606,4 +606,3 @@ export function BrowserTab({ tab, onUpdateTab }: BrowserTabProps) {
     </div>
   );
 }
-

@@ -99,8 +99,8 @@ export function SourcesSheet({
       {/* Slide-over Panel from Left: Matches workspace sidebar geometry & position */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 w-[85vw] max-w-[340px] h-full bg-[#1c1c1e] text-[#d4d4d4]",
-          "border-r border-[#333336] rounded-tr-[24px] rounded-br-[24px] flex flex-col will-change-transform font-sans overflow-hidden select-none",
+          "fixed inset-y-0 left-0 z-50 w-[85vw] max-w-[340px] h-full bg-card text-card-foreground",
+          "border-r border-border rounded-tr-[24px] rounded-br-[24px] flex flex-col will-change-transform font-sans overflow-hidden select-none",
           "transition-[transform,visibility] duration-300 [transition-timing-function:cubic-bezier(0.16,1,0.3,1)]",
           open
             ? "translate-x-0 visible pointer-events-auto shadow-2xl"
@@ -111,25 +111,25 @@ export function SourcesSheet({
         aria-label="Panel Sumber Belajar"
       >
         {/* Header - Seamless matching sidebar top bar */}
-        <div className="h-14 px-3.5 border-b border-[#2d2d30] flex items-center justify-between shrink-0 bg-[#202022] rounded-tr-[24px]">
+        <div className="h-14 px-3.5 border-b border-border flex items-center justify-between shrink-0 bg-secondary/40 rounded-tr-[24px]">
           <div className="flex items-center gap-2 min-w-0 pr-2">
             {onBack ? (
               <button
                 type="button"
                 onClick={onBack}
-                className="h-8 w-8 rounded-full hover:bg-white/10 text-[#969696] hover:text-white flex items-center justify-center transition-colors cursor-pointer active:scale-95 shrink-0 -ml-1"
+                className="h-8 w-8 rounded-full hover:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer active:scale-95 shrink-0 -ml-1"
                 aria-label="Kembali ke Sidebar"
                 title="Kembali ke Sidebar"
               >
                 <ArrowLeft className="h-4 w-4" />
               </button>
             ) : (
-              <FolderOpen className="h-4 w-4 text-white shrink-0" />
+              <FolderOpen className="h-4 w-4 text-foreground shrink-0" />
             )}
-            <span className="text-sm font-semibold text-white tracking-tight truncate">
+            <span className="text-sm font-semibold text-foreground tracking-tight truncate">
               {t("learningSources") || "Learning Sources"}
             </span>
-            <span className="text-[10.5px] font-sans px-2 py-0.5 rounded-full bg-[#252528] text-[#969696] border border-[#383838] shrink-0">
+            <span className="text-[10.5px] font-sans px-2 py-0.5 rounded-full bg-secondary text-muted-foreground border border-border/70 shrink-0">
               {displayCount === 1
                 ? t("sourcesCountSingle")
                 : t("sourcesCount", { count: displayCount })}
@@ -139,7 +139,7 @@ export function SourcesSheet({
           <button
             type="button"
             onClick={onClose}
-            className="h-8 w-8 rounded-full hover:bg-white/10 text-[#969696] hover:text-white flex items-center justify-center transition-colors cursor-pointer active:scale-95 shrink-0"
+            className="h-8 w-8 rounded-full hover:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer active:scale-95 shrink-0"
             aria-label="Tutup"
           >
             <X className="h-4 w-4" />
@@ -156,22 +156,22 @@ export function SourcesSheet({
                 onClose();
                 onOpenAddSource();
               }}
-              className="w-full h-10 px-3 rounded-xl border border-[#383838] hover:border-[#525256] bg-[#262629] hover:bg-[#323236] text-xs font-semibold text-white flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs active:scale-[0.99] shrink-0"
+              className="w-full h-10 px-3 rounded-xl border border-border hover:border-border/80 bg-foreground text-background hover:opacity-90 text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs active:scale-[0.99] shrink-0"
             >
-              <Plus className="h-4 w-4 text-white" />
+              <Plus className="h-4 w-4" />
               <span>{t("addSource") || "Add source"}</span>
             </button>
 
             {/* Web Research Search Box */}
-            <div className="w-full bg-[#232326] rounded-2xl p-2.5 border border-[#333336] focus-within:border-[#4d4d52] transition-all text-left flex flex-col gap-2 shrink-0">
+            <div className="w-full bg-secondary/50 rounded-2xl p-2.5 border border-border focus-within:border-foreground/30 transition-all text-left flex flex-col gap-2 shrink-0">
               <div className="flex items-center gap-1.5 px-0.5">
-                <Search className="h-3.5 w-3.5 text-[#777777] shrink-0" />
+                <Search className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                 <input
                   type="text"
                   value={searchQuery}
                   onChange={(e) => onSearchQueryChange(e.target.value)}
                   placeholder={t("searchWebSources") || "Cari sumber web baru..."}
-                  className="w-full bg-transparent text-xs text-white placeholder:text-[#666666] outline-none font-sans"
+                  className="w-full bg-transparent text-xs text-foreground placeholder:text-muted-foreground outline-none font-sans"
                   onKeyDown={(e) => {
                     if (e.key === "Enter" && onSearchWeb) {
                       onSearchWeb();
@@ -182,7 +182,7 @@ export function SourcesSheet({
                   <button
                     type="button"
                     onClick={() => onSearchQueryChange("")}
-                    className="text-[#888888] hover:text-white p-0.5 rounded-full hover:bg-white/10 transition-colors cursor-pointer shrink-0"
+                    className="text-muted-foreground hover:text-foreground p-0.5 rounded-full hover:bg-secondary transition-colors cursor-pointer shrink-0"
                     title="Clear"
                   >
                     <X className="h-3 w-3" />
@@ -195,7 +195,7 @@ export function SourcesSheet({
                   <button
                     type="button"
                     onClick={onToggleWebScope}
-                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-[#2b2b2e] hover:bg-[#38383c] text-[10px] font-sans text-[#a0a0a0] hover:text-white transition-colors cursor-pointer border border-[#38383c]"
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-secondary hover:bg-secondary/80 text-[10px] font-sans text-muted-foreground hover:text-foreground transition-colors cursor-pointer border border-border/70"
                   >
                     <Globe className="h-2.5 w-2.5" />
                     <span>{webScope === "Web" ? t("webScopeWeb") : t("webScopeJournal")}</span>
@@ -205,7 +205,7 @@ export function SourcesSheet({
                   <button
                     type="button"
                     onClick={onToggleResearchSpeed}
-                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-[#2b2b2e] hover:bg-[#38383c] text-[10px] font-sans text-[#a0a0a0] hover:text-white transition-colors cursor-pointer border border-[#38383c]"
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-secondary hover:bg-secondary/80 text-[10px] font-sans text-muted-foreground hover:text-foreground transition-colors cursor-pointer border border-border/70"
                   >
                     <Search className="h-2.5 w-2.5" />
                     <span>
@@ -219,7 +219,7 @@ export function SourcesSheet({
                   <button
                     type="button"
                     onClick={onSearchWeb}
-                    className="h-6 w-6 rounded-lg bg-white/95 hover:bg-white text-black flex items-center justify-center transition-all cursor-pointer active:scale-95 shrink-0 shadow-2xs"
+                    className="h-6 w-6 rounded-lg bg-foreground text-background hover:opacity-90 flex items-center justify-center transition-all cursor-pointer active:scale-95 shrink-0 shadow-2xs"
                     aria-label={t("search")}
                   >
                     <Search className="h-3 w-3" />
@@ -232,7 +232,7 @@ export function SourcesSheet({
             {sources.length > 0 ? (
               <div className="flex flex-col gap-2 pt-0.5">
                 {/* Header selection info & bulk toggle */}
-                <div className="flex items-center justify-between px-1 text-[11px] text-[#969696]">
+                <div className="flex items-center justify-between px-1 text-[11px] text-muted-foreground">
                   <span>
                     {t("carriedSourcesHeader", {
                       carried: carriedCount,
@@ -246,7 +246,7 @@ export function SourcesSheet({
                         const allSelected = carriedCount === sources.length;
                         localDb.setAllSourcesInChat(learnId, !allSelected);
                       }}
-                      className="text-[10.5px] text-white hover:underline cursor-pointer font-medium"
+                      className="text-[10.5px] text-foreground hover:underline cursor-pointer font-medium"
                     >
                       {carriedCount === sources.length
                         ? t("deselectAll") || "Deselect all"
@@ -265,8 +265,8 @@ export function SourcesSheet({
                         className={cn(
                           "group relative flex items-center gap-2.5 p-2 rounded-xl border transition-all cursor-pointer",
                           isCarried
-                            ? "bg-[#252528] hover:bg-[#2c2c30] border-[#38383a] text-white"
-                            : "bg-[#1f1f21]/60 hover:bg-[#252528] border-[#2c2c2f] text-[#888888] opacity-75"
+                            ? "bg-card hover:bg-secondary/60 border-border text-foreground shadow-2xs"
+                            : "bg-secondary/30 hover:bg-secondary/60 border-border/60 text-muted-foreground opacity-75"
                         )}
                         onClick={() => {
                           localDb.toggleSourceInChat(source.id, !isCarried);
@@ -276,7 +276,7 @@ export function SourcesSheet({
                           type="checkbox"
                           checked={isCarried}
                           onChange={() => {}}
-                          className="rounded border-[#444446] bg-[#1a1a1c] h-3.5 w-3.5 text-white focus:ring-0 cursor-pointer pointer-events-none shrink-0 accent-white"
+                          className="rounded border-border bg-background h-3.5 w-3.5 text-foreground focus:ring-0 cursor-pointer pointer-events-none shrink-0"
                         />
 
                         <SourceIcon source={source} size="sm" />
@@ -289,13 +289,13 @@ export function SourcesSheet({
                           }}
                         >
                           <p
-                            className="text-xs font-medium text-white truncate leading-tight hover:underline"
+                            className="text-xs font-medium text-foreground truncate leading-tight hover:underline"
                             title={source.title}
                           >
                             {source.title}
                           </p>
-                          <p className="text-[10px] text-[#888888] font-mono mt-0.5 truncate flex items-center gap-1">
-                            <span className="capitalize font-medium text-[#a1a1aa]">
+                          <p className="text-[10px] text-muted-foreground font-mono mt-0.5 truncate flex items-center gap-1">
+                            <span className="capitalize font-medium text-foreground/80">
                               {getSourceCategoryLabel(source)}
                             </span>
                             {source.size ? `• ${formatFileSize(source.size)}` : null}
@@ -312,7 +312,7 @@ export function SourcesSheet({
                             e.stopPropagation();
                             localDb.deleteSource(source.id);
                           }}
-                          className="absolute right-2 text-[#777777] hover:text-red-400 p-1 rounded-md hover:bg-white/5 transition-colors cursor-pointer"
+                          className="absolute right-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 p-1 rounded-md transition-colors cursor-pointer"
                           title={t("removeSource") || "Hapus sumber"}
                           aria-label={t("removeSource") || "Hapus sumber"}
                         >
@@ -330,19 +330,19 @@ export function SourcesSheet({
                   onClose();
                   onOpenAddSource();
                 }}
-                className="flex-1 min-h-[190px] flex flex-col items-center justify-center text-center p-6 rounded-2xl border border-dashed border-[#333336] bg-[#222225]/40 hover:bg-[#222225]/65 transition-all cursor-pointer group"
+                className="flex-1 min-h-[190px] flex flex-col items-center justify-center text-center p-6 rounded-2xl border border-dashed border-border/80 bg-card/40 hover:bg-secondary/40 transition-all cursor-pointer group"
               >
-                <div className="h-11 w-11 rounded-2xl bg-[#28282b] border border-[#383838] flex items-center justify-center text-[#969696] mb-3 group-hover:scale-105 group-hover:text-white transition-all shadow-2xs">
-                  <FileText className="h-5 w-5 stroke-[1.5] text-[#d4d4d4] group-hover:text-white transition-colors" />
+                <div className="h-11 w-11 rounded-2xl bg-secondary border border-border/70 flex items-center justify-center text-muted-foreground mb-3 group-hover:scale-105 group-hover:text-foreground transition-all shadow-2xs">
+                  <FileText className="h-5 w-5 stroke-[1.5] text-foreground group-hover:text-foreground transition-colors" />
                 </div>
-                <h3 className="text-xs font-semibold text-white mb-1.5 tracking-tight">
+                <h3 className="text-xs font-semibold text-foreground mb-1.5 tracking-tight">
                   {t("emptySourcesTitle") || "Belum ada sumber"}
                 </h3>
-                <p className="text-[10.5px] text-[#969696] leading-relaxed max-w-[210px] mb-3.5">
+                <p className="text-[10.5px] text-muted-foreground leading-relaxed max-w-[210px] mb-3.5">
                   {t("emptySourcesDescription") ||
                     "Tambahkan dokumen, link web, atau teks untuk memperkaya pemahaman AI."}
                 </p>
-                <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-[#2b2b2e] group-hover:bg-[#343438] border border-[#3c3c40] text-[11px] font-medium text-white transition-all active:scale-95 shadow-2xs">
+                <span className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-secondary group-hover:bg-secondary/80 border border-border text-[11px] font-medium text-foreground transition-all active:scale-95 shadow-2xs">
                   <Plus className="h-3 w-3" />
                   <span>{t("addFirstSource") || "Tambah sumber pertama"}</span>
                 </span>
@@ -359,14 +359,14 @@ export function SourcesSheet({
           onClick={() => setSelectedSourceForPreview(null)}
         >
           <div
-            className="w-full max-w-lg max-h-[85vh] bg-[#1c1c1e] border border-[#333336] rounded-2xl p-4 shadow-2xl flex flex-col text-left font-sans"
+            className="w-full max-w-lg max-h-[85vh] bg-card border border-border rounded-2xl p-4 shadow-2xl flex flex-col text-left font-sans text-card-foreground"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex items-start justify-between gap-3 pb-3 border-b border-[#2d2d30]">
+            <div className="flex items-start justify-between gap-3 pb-3 border-b border-border">
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2 mb-1">
                   <SourceIcon source={selectedSourceForPreview} size="md" />
-                  <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded-full bg-[#252528] text-[#969696] border border-[#383838]">
+                  <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded-full bg-secondary text-muted-foreground border border-border/70">
                     {getSourceCategoryLabel(selectedSourceForPreview)}
                   </span>
                   {selectedSourceForPreview.subpagesCount &&
@@ -376,7 +376,7 @@ export function SourcesSheet({
                     </span>
                   ) : null}
                 </div>
-                <h3 className="text-sm font-semibold text-white truncate">
+                <h3 className="text-sm font-semibold text-foreground truncate">
                   {selectedSourceForPreview.title}
                 </h3>
                 {selectedSourceForPreview.url && (
@@ -384,7 +384,7 @@ export function SourcesSheet({
                     href={selectedSourceForPreview.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-xs text-blue-400 hover:underline truncate block mt-0.5"
+                    className="text-xs text-blue-500 hover:underline truncate block mt-0.5"
                   >
                     {selectedSourceForPreview.url}
                   </a>
@@ -394,7 +394,7 @@ export function SourcesSheet({
               <button
                 type="button"
                 onClick={() => setSelectedSourceForPreview(null)}
-                className="h-7 w-7 rounded-full bg-[#252528] hover:bg-[#333336] text-[#969696] hover:text-white flex items-center justify-center cursor-pointer shrink-0"
+                className="h-7 w-7 rounded-full bg-secondary hover:bg-secondary/80 text-muted-foreground hover:text-foreground flex items-center justify-center cursor-pointer shrink-0"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -402,7 +402,7 @@ export function SourcesSheet({
 
             {/* Extracted Text Content */}
             <div className="flex-1 overflow-y-auto mt-3 pr-1">
-              <div className="flex items-center justify-between text-[11px] text-[#888888] mb-2">
+              <div className="flex items-center justify-between text-[11px] text-muted-foreground mb-2">
                 <span>Extracted Content & Ground Truth:</span>
                 <span>
                   {selectedSourceForPreview.content
@@ -410,7 +410,7 @@ export function SourcesSheet({
                     : "No text cached"}
                 </span>
               </div>
-              <div className="p-3 rounded-xl bg-[#141416] border border-[#28282b] text-[11px] font-mono text-[#d4d4d4] whitespace-pre-wrap leading-relaxed select-text max-h-[50vh] overflow-y-auto">
+              <div className="p-3 rounded-xl bg-secondary/30 border border-border text-[11px] font-mono text-foreground whitespace-pre-wrap leading-relaxed select-text max-h-[50vh] overflow-y-auto">
                 {selectedSourceForPreview.content ||
                   "[Content is not cached locally. This source was added via link.]"}
               </div>

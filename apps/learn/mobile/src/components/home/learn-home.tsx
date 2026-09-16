@@ -292,11 +292,11 @@ export function LearnHome({
         <nav
           ref={navRef}
           aria-label="Navigation Tabs"
-          className="relative inline-flex items-center p-1 rounded-full bg-[#222222] border border-[#383838] overflow-x-auto no-scrollbar max-w-full"
+          className="relative inline-flex items-center p-1 rounded-full bg-secondary/80 border border-border/80 overflow-x-auto no-scrollbar max-w-full"
         >
           {/* Animated Sliding Pill Indicator */}
           <div
-            className="absolute top-1 bottom-1 rounded-full bg-[#2b2b2b] border border-[#383838] transition-all duration-300 pointer-events-none"
+            className="absolute top-1 bottom-1 rounded-full bg-background border border-border/60 shadow-2xs transition-all duration-300 pointer-events-none"
             style={{
               left: `${indicatorStyle.left}px`,
               width: `${indicatorStyle.width}px`,
@@ -320,8 +320,8 @@ export function LearnHome({
                 }}
                 className={`relative z-10 px-3.5 py-1.5 rounded-full text-xs font-medium tracking-tight whitespace-nowrap transition-colors duration-200 cursor-pointer select-none ${
                   isActive
-                    ? "text-[#ffffff]"
-                    : "text-[#969696] hover:text-[#d4d4d4] active:scale-95"
+                    ? "text-foreground font-semibold"
+                    : "text-muted-foreground hover:text-foreground active:scale-95"
                 }`}
               >
                 {tab.label}
@@ -333,18 +333,18 @@ export function LearnHome({
 
       {/* Collection Drilldown Header Banner */}
       {activeCollection && (
-        <div className="mx-4 my-2 px-3.5 py-2 flex items-center gap-2.5 bg-[#222222] border border-[#383838] rounded-xl">
+        <div className="mx-4 my-2 px-3.5 py-2 flex items-center gap-2.5 bg-card border border-border/80 rounded-xl shadow-2xs">
           <button
             type="button"
             onClick={() => setActiveCollectionId(null)}
-            className="h-7 w-7 rounded-full border border-[#383838] flex items-center justify-center text-[#969696] hover:text-[#d4d4d4] shrink-0 cursor-pointer active:scale-95 transition-all"
+            className="h-7 w-7 rounded-full border border-border/60 flex items-center justify-center text-muted-foreground hover:text-foreground shrink-0 cursor-pointer active:scale-95 transition-all hover:bg-secondary"
             aria-label={t("backToAllCollections")}
           >
             <ArrowLeft className="h-3.5 w-3.5" />
           </button>
           <div className="flex items-center gap-1.5 min-w-0 flex-1">
             <span className="text-base">{activeCollection.emoji || "📁"}</span>
-            <span className="font-sans text-sm font-semibold truncate text-[#d4d4d4]">
+            <span className="font-sans text-sm font-semibold truncate text-foreground">
               {activeCollection.name}
             </span>
           </div>
@@ -356,7 +356,7 @@ export function LearnHome({
                 setEditingCollection(activeCollection);
                 setIsCreateCollectionOpen(true);
               }}
-              className="rounded-full h-7 text-[11px] px-2.5 cursor-pointer border-[#383838] text-[#d4d4d4] hover:bg-[#2b2b2b]"
+              className="rounded-full h-7 text-[11px] px-2.5 cursor-pointer border-border/80 text-foreground hover:bg-secondary"
             >
               {t("edit")}
             </Button>
@@ -387,7 +387,7 @@ export function LearnHome({
         <div className="flex items-center gap-2 w-full">
           {/* Search Input */}
           <div className="relative flex-1 flex items-center">
-            <Search className="absolute left-3.5 h-4 w-4 text-[#969696] pointer-events-none" />
+            <Search className="absolute left-3.5 h-4 w-4 text-muted-foreground pointer-events-none" />
             <Input
               type="text"
               value={searchQuery}
@@ -403,13 +403,13 @@ export function LearnHome({
                   ? t("searchArtifacts")
                   : t("searchNotebooksAndCollections")
               }
-              className="h-10 w-full pl-10 pr-9 text-xs sm:text-sm rounded-xl bg-[#222222] border-[#383838] text-[#d4d4d4] placeholder:text-[#5d5d5d] focus-visible:ring-1 focus-visible:ring-[#5d5d5d]"
+              className="h-10 w-full pl-10 pr-9 text-xs sm:text-sm rounded-xl bg-card border border-border/80 text-foreground placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring shadow-2xs"
             />
             {searchQuery ? (
               <button
                 type="button"
                 onClick={() => setSearchQuery("")}
-                className="absolute right-3 p-1 text-[#969696] hover:text-[#d4d4d4] cursor-pointer"
+                className="absolute right-3 p-1 text-muted-foreground hover:text-foreground cursor-pointer"
                 aria-label={t("clearSearch")}
               >
                 <X className="h-3.5 w-3.5" />
@@ -422,19 +422,19 @@ export function LearnHome({
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
-                className="h-10 px-3 rounded-xl flex items-center gap-1.5 text-xs text-[#969696] hover:text-[#d4d4d4] hover:bg-[#222222] bg-[#222222] border border-[#383838] active:scale-95 transition-all duration-200 cursor-pointer shrink-0"
+                className="h-10 px-3 rounded-xl flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary bg-card border border-border/80 active:scale-95 transition-all duration-200 cursor-pointer shrink-0 shadow-2xs"
                 title={t("sort")}
               >
                 <ArrowUpDown className="h-3.5 w-3.5" />
                 <span>{sortLabels[sortOption]}</span>
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-36 p-1 shadow-none border-[#383838] bg-[#222222]">
+            <DropdownMenuContent align="end" className="w-36 p-1 border-border bg-popover text-popover-foreground shadow-md">
               {(Object.keys(sortLabels) as SortOption[]).map((key) => (
                 <DropdownMenuItem
                   key={key}
                   onClick={() => setSortOption(key)}
-                  className="cursor-pointer text-xs py-1.5 px-2 text-[#d4d4d4] hover:bg-[#2b2b2b]"
+                  className="cursor-pointer text-xs py-1.5 px-2 text-foreground hover:bg-secondary rounded-lg"
                 >
                   {sortLabels[key]}
                 </DropdownMenuItem>
@@ -458,7 +458,7 @@ export function LearnHome({
                   <h2 className="font-sans text-sm font-semibold tracking-tight text-foreground">
                     {t("learns")}
                   </h2>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#222222] border border-[#383838] text-[#969696] font-mono">
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary border border-border/60 text-muted-foreground font-mono">
                     {learns.length}
                   </span>
                 </div>
@@ -467,7 +467,7 @@ export function LearnHome({
                   <button
                     type="button"
                     onClick={() => setActiveTab("learns")}
-                    className="text-xs text-[#969696] hover:text-[#d4d4d4] flex items-center gap-0.5 transition-colors cursor-pointer"
+                    className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-0.5 transition-colors cursor-pointer"
                   >
                     <span>{t("viewAll")}</span>
                     <ChevronRight className="h-3 w-3" />
@@ -499,8 +499,8 @@ export function LearnHome({
                     />
                   ))
                 ) : (
-                  <div className="text-center py-6 px-4 bg-[#1b1b1b] rounded-2xl border border-dashed border-[#2e2e2e]">
-                    <p className="text-xs text-[#969696]">{t("noLearnsFound")}</p>
+                  <div className="text-center py-6 px-4 bg-card rounded-2xl border border-dashed border-border/80 shadow-2xs">
+                    <p className="text-xs text-muted-foreground">{t("noLearnsFound")}</p>
                   </div>
                 )}
               </div>
@@ -513,7 +513,7 @@ export function LearnHome({
                   <h2 className="font-sans text-sm font-semibold tracking-tight text-foreground">
                     {t("collections")}
                   </h2>
-                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#222222] border border-[#383838] text-[#969696] font-mono">
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary border border-border/60 text-muted-foreground font-mono">
                     {collections.length}
                   </span>
                 </div>
@@ -522,7 +522,7 @@ export function LearnHome({
                   <button
                     type="button"
                     onClick={() => setActiveTab("collections")}
-                    className="text-xs text-[#969696] hover:text-[#d4d4d4] flex items-center gap-0.5 transition-colors cursor-pointer"
+                    className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-0.5 transition-colors cursor-pointer"
                   >
                     <span>{t("viewAll")}</span>
                     <ChevronRight className="h-3 w-3" />
@@ -556,8 +556,8 @@ export function LearnHome({
                     />
                   ))
                 ) : (
-                  <div className="text-center py-6 px-4 bg-[#1b1b1b] rounded-2xl border border-dashed border-[#2e2e2e]">
-                    <p className="text-xs text-[#969696]">{t("noCollectionsYet")}</p>
+                  <div className="text-center py-6 px-4 bg-card rounded-2xl border border-dashed border-border/80 shadow-2xs">
+                    <p className="text-xs text-muted-foreground">{t("noCollectionsYet")}</p>
                   </div>
                 )}
               </div>
@@ -575,7 +575,7 @@ export function LearnHome({
                 <h2 className="font-sans text-sm font-semibold tracking-tight text-foreground">
                   {t("allLearns")}
                 </h2>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#222222] border border-[#383838] text-[#969696] font-mono">
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary border border-border/60 text-muted-foreground font-mono">
                   {learns.length}
                 </span>
               </div>
@@ -605,14 +605,14 @@ export function LearnHome({
                   />
                 ))
               ) : (
-                <div className="text-center py-12 px-4 bg-[#1b1b1b] rounded-2xl border border-dashed border-[#2e2e2e]">
-                  <div className="h-10 w-10 rounded-xl bg-[#222222] border border-[#383838] flex items-center justify-center text-lg mx-auto mb-2 text-[#969696]">
+                <div className="text-center py-12 px-4 bg-card rounded-2xl border border-dashed border-border/80 shadow-2xs">
+                  <div className="h-10 w-10 rounded-xl bg-secondary border border-border flex items-center justify-center text-lg mx-auto mb-2 text-muted-foreground">
                     📘
                   </div>
                   <h3 className="text-sm font-medium text-foreground mb-1">
                     {t("noLearnsFound")}
                   </h3>
-                  <p className="text-xs text-[#969696]">
+                  <p className="text-xs text-muted-foreground">
                     {searchQuery ? t("noLearnsMatchSearch", { query: searchQuery }) : t("noLearnsDescription")}
                   </p>
                 </div>
@@ -668,8 +668,8 @@ export function LearnHome({
                       />
                     ))
                   ) : (
-                    <div className="text-center py-12 px-4 bg-[#1b1b1b] rounded-2xl border border-dashed border-[#2e2e2e]">
-                      <p className="text-xs text-[#969696]">
+                    <div className="text-center py-12 px-4 bg-card rounded-2xl border border-dashed border-border/80 shadow-2xs">
+                      <p className="text-xs text-muted-foreground">
                         {t("noLearnsInCollection")}
                       </p>
                     </div>
@@ -684,7 +684,7 @@ export function LearnHome({
                     <h2 className="font-sans text-sm font-semibold tracking-tight text-foreground">
                       {t("collections")}
                     </h2>
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#222222] border border-[#383838] text-[#969696] font-mono">
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary border border-border/60 text-muted-foreground font-mono">
                       {collections.length}
                     </span>
                   </div>
@@ -694,7 +694,7 @@ export function LearnHome({
                       setEditingCollection(null);
                       setIsCreateCollectionOpen(true);
                     }}
-                    className="h-7 px-2.5 rounded-full bg-[#222222] hover:bg-[#2b2b2b] text-foreground text-xs font-medium border border-[#383838] flex items-center gap-1.5 transition-colors cursor-pointer"
+                    className="h-7 px-2.5 rounded-full bg-secondary hover:bg-secondary/80 text-foreground text-xs font-medium border border-border/80 flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
                   >
                     <Plus className="h-3 w-3" />
                     <span>{t("newCollection")}</span>
@@ -724,15 +724,15 @@ export function LearnHome({
                       />
                     ))
                   ) : (
-                    <div className="text-center py-12 px-4 bg-[#1b1b1b] rounded-2xl border border-dashed border-[#2e2e2e]">
-                      <p className="text-xs text-[#969696]">{t("noCollectionsYet")}</p>
+                    <div className="text-center py-12 px-4 bg-card rounded-2xl border border-dashed border-border/80 shadow-2xs">
+                      <p className="text-xs text-muted-foreground">{t("noCollectionsYet")}</p>
                       <button
                         type="button"
                         onClick={() => {
                           setEditingCollection(null);
                           setIsCreateCollectionOpen(true);
                         }}
-                        className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#222222] hover:bg-[#2b2b2b] text-foreground text-xs font-medium border border-[#383838] transition-colors cursor-pointer"
+                        className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-secondary hover:bg-secondary/80 text-foreground text-xs font-medium border border-border/80 transition-colors cursor-pointer shadow-2xs"
                       >
                         <Plus className="h-3.5 w-3.5" />
                         <span>{t("createCardCollection")}</span>
@@ -754,7 +754,7 @@ export function LearnHome({
               <h2 className="font-sans text-sm font-semibold tracking-tight text-foreground">
                 {t("artifacts")}
               </h2>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#222222] border border-[#383838] text-[#969696] font-mono">
+              <span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary border border-border/60 text-muted-foreground font-mono">
                 {artifacts.length}
               </span>
             </div>
@@ -764,16 +764,16 @@ export function LearnHome({
                 {artifacts.map((art) => (
                   <div
                     key={art.id}
-                    className="p-3.5 rounded-2xl border border-[#383838] bg-[#1e1e24] hover:bg-[#25252b] active:scale-[0.99] transition-all duration-200 flex flex-col justify-between select-none"
+                    className="p-3.5 rounded-2xl border border-border/80 bg-card hover:bg-secondary/60 active:scale-[0.99] transition-all duration-200 flex flex-col justify-between select-none shadow-2xs"
                   >
                     <div className="flex items-start justify-between">
-                      <div className="h-8 w-8 rounded-xl bg-[#2b2b2b] border border-[#383838] flex items-center justify-center text-base shrink-0">
+                      <div className="h-8 w-8 rounded-xl bg-secondary border border-border/60 flex items-center justify-center text-base shrink-0">
                         {art.type === "slide" ? "📊" : art.type === "diagram" ? "📐" : "⚡"}
                       </div>
                       <button
                         type="button"
                         onClick={() => localDb.deleteArtifact(art.id)}
-                        className="h-7 w-7 rounded-lg flex items-center justify-center text-[#969696] hover:text-destructive active:text-destructive cursor-pointer transition-colors"
+                        className="h-7 w-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-destructive active:text-destructive cursor-pointer transition-colors"
                         title={t("deleteArtifact")}
                       >
                         <Trash2 className="h-3.5 w-3.5" />
@@ -784,12 +784,12 @@ export function LearnHome({
                       <h4 className="text-xs font-medium text-foreground line-clamp-2">
                         {art.title}
                       </h4>
-                      <span className="inline-block mt-1 text-[9px] uppercase font-mono px-1.5 py-0.5 rounded-full bg-[#2b2b2b] border border-[#383838] text-[#969696]">
+                      <span className="inline-block mt-1 text-[9px] uppercase font-mono px-1.5 py-0.5 rounded-full bg-secondary border border-border/60 text-muted-foreground">
                         {art.type}
                       </span>
                     </div>
 
-                    <div className="text-[10px] text-[#969696] pt-1.5">
+                    <div className="text-[10px] text-muted-foreground pt-1.5">
                       {new Intl.DateTimeFormat(language === "id" ? "id-ID" : "en-US", {
                         day: "numeric",
                         month: "short",
@@ -800,14 +800,14 @@ export function LearnHome({
                 ))}
               </div>
             ) : (
-              <div className="text-center py-14 px-4 border border-[#2e2e2e] rounded-2xl bg-[#1b1b1b]">
-                <div className="h-10 w-10 rounded-xl bg-[#222222] border border-[#383838] flex items-center justify-center text-xl mx-auto mb-2">
+              <div className="text-center py-14 px-4 border border-dashed border-border/80 rounded-2xl bg-card">
+                <div className="h-10 w-10 rounded-xl bg-secondary border border-border/60 flex items-center justify-center text-xl mx-auto mb-2">
                   🎨
                 </div>
                 <h3 className="font-sans text-sm text-foreground font-semibold">
                   {t("noArtifactsTitle")}
                 </h3>
-                <p className="text-xs text-[#969696] mt-1 leading-relaxed max-w-xs mx-auto">
+                <p className="text-xs text-muted-foreground mt-1 leading-relaxed max-w-xs mx-auto">
                   {t("noArtifactsDesc")}
                 </p>
               </div>

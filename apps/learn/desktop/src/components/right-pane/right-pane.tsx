@@ -272,7 +272,7 @@ export function RightPane({
             className={cn(
               "h-7 w-7 rounded-lg flex items-center justify-center transition-colors cursor-pointer",
               mode === "studio"
-                ? "bg-[#0066ff] text-white"
+                ? "bg-primary text-primary-foreground"
                 : "hover:bg-muted text-muted-foreground hover:text-foreground"
             )}
             title="Studio"
@@ -289,14 +289,14 @@ export function RightPane({
             className={cn(
               "relative h-7 w-7 rounded-lg flex items-center justify-center transition-colors cursor-pointer",
               mode === "preview"
-                ? "bg-[#0066ff] text-white"
+                ? "bg-primary text-primary-foreground"
                 : "hover:bg-muted text-muted-foreground hover:text-foreground"
             )}
             title={`Preview (${mutations.length} changes)`}
           >
             <Layers className="h-3.5 w-3.5" />
             {mutations.length > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-[#10b981]" />
+              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-emerald-500" />
             )}
           </button>
         </div>
@@ -351,10 +351,10 @@ export function RightPane({
         <div
           onMouseDown={handleMouseDown}
           onDoubleClick={() => onWidthChange?.(400)}
-          className="absolute top-0 left-0 w-1 h-full cursor-col-resize hover:bg-white/20 transition-colors z-30 group"
+          className="absolute top-0 left-0 w-1 h-full cursor-col-resize hover:bg-muted-foreground/20 transition-colors z-30 group"
           title="Drag to resize, double-click to reset"
         >
-          <div className="w-0.5 h-full bg-transparent group-hover:bg-[#0066ff]/50" />
+          <div className="w-0.5 h-full bg-transparent group-hover:bg-primary/50" />
         </div>
 
         {/* Conditional View: When Note is Active in Studio (Image 3) vs Studio/Review Overview */}
@@ -370,70 +370,70 @@ export function RightPane({
           <>
             {/* Top Header with 2 Menus: Studio & Review */}
             <div
-              className={`h-12 px-3 bg-[#1e1e20] flex items-center justify-between shrink-0 select-none ${
-                mode === "studio" ? "border-b-0" : "border-b border-[#282828]"
+              className={`h-12 px-3 bg-card flex items-center justify-between shrink-0 select-none ${
+                mode === "studio" ? "border-b-0" : "border-b border-border"
               }`}
             >
               {/* Segmented Control: [ Studio ] [ Review (N) ] */}
-              <div className="relative flex items-center bg-[#141416] p-0.5 rounded-xl border border-[#2d2d30]">
+              <div className="relative flex items-center bg-muted/70 p-0.5 rounded-xl border border-border">
                 {/* Animated Sliding Background Pill */}
                 <div
-                  className="absolute top-0.5 bottom-0.5 rounded-lg bg-[#28282b] shadow-2xs transition-all duration-200 ease-[cubic-bezier(0.2,0,0,1)] pointer-events-none"
+                  className="absolute top-0.5 bottom-0.5 rounded-lg bg-background shadow-xs transition-all duration-200 ease-[cubic-bezier(0.2,0,0,1)] pointer-events-none"
                   style={{
                     left: `${indicatorStyle.left}px`,
-                width: indicatorStyle.width ? `${indicatorStyle.width}px` : undefined,
-                opacity: indicatorStyle.width ? 1 : 0,
-              }}
-            />
+                    width: indicatorStyle.width ? `${indicatorStyle.width}px` : undefined,
+                    opacity: indicatorStyle.width ? 1 : 0,
+                  }}
+                />
 
-            <button
-              ref={studioBtnRef}
-              type="button"
-              onClick={() => onModeChange("studio")}
-              className={cn(
-                "relative z-10 flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium transition-colors duration-150 cursor-pointer select-none",
-                mode === "studio"
-                  ? "text-white"
-                  : "text-[#888888] hover:text-[#d4d4d4]"
-              )}
-            >
-              <PenTool className="w-3.5 h-3.5" />
-              <span>{t("studio") || "Studio"}</span>
-            </button>
+                <button
+                  ref={studioBtnRef}
+                  type="button"
+                  onClick={() => onModeChange("studio")}
+                  className={cn(
+                    "relative z-10 flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium transition-colors duration-150 cursor-pointer select-none",
+                    mode === "studio"
+                      ? "text-foreground font-semibold"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <PenTool className="w-3.5 h-3.5" />
+                  <span>{t("studio") || "Studio"}</span>
+                </button>
 
-            <button
-              ref={reviewBtnRef}
-              type="button"
-              onClick={() => onModeChange("preview")}
-              className={cn(
-                "relative z-10 flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium transition-colors duration-150 cursor-pointer select-none",
-                mode === "preview"
-                  ? "text-white"
-                  : "text-[#888888] hover:text-[#d4d4d4]"
-              )}
-            >
-              <Layers className="w-3.5 h-3.5" />
-              <span>{t("review") || "Review"}</span>
-              {mutations.length > 0 && (
-                <span className="px-1.5 py-0.5 rounded-full bg-[#10b981]/20 text-[#10b981] font-mono text-[10px] font-semibold ml-0.5">
-                  {mutations.length}
-                </span>
-              )}
-            </button>
-          </div>
+                <button
+                  ref={reviewBtnRef}
+                  type="button"
+                  onClick={() => onModeChange("preview")}
+                  className={cn(
+                    "relative z-10 flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-medium transition-colors duration-150 cursor-pointer select-none",
+                    mode === "preview"
+                      ? "text-foreground font-semibold"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  <Layers className="w-3.5 h-3.5" />
+                  <span>{t("review") || "Review"}</span>
+                  {mutations.length > 0 && (
+                    <span className="px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-mono text-[10px] font-semibold ml-0.5">
+                      {mutations.length}
+                    </span>
+                  )}
+                </button>
+              </div>
 
-          {/* Collapse Button */}
-          {onToggleCollapse && (
-            <button
-              type="button"
-              onClick={onToggleCollapse}
-              className="h-7 w-7 rounded-lg hover:bg-[#2c2c30] text-[#969696] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
-              title={t("hidePanel") || "Collapse panel"}
-            >
-              <PanelRight className="h-4 w-4" />
-            </button>
-          )}
-        </div>
+              {/* Collapse Button */}
+              {onToggleCollapse && (
+                <button
+                  type="button"
+                  onClick={onToggleCollapse}
+                  className="h-7 w-7 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
+                  title={t("hidePanel") || "Collapse panel"}
+                >
+                  <PanelRight className="h-4 w-4" />
+                </button>
+              )}
+            </div>
 
         {/* Main Body based on Active Menu with smooth fade */}
         <div className="flex-1 flex flex-col min-h-0 relative overflow-hidden">
@@ -457,12 +457,12 @@ export function RightPane({
                         <div className="flex items-center gap-1.5">
                           <Icon className={`h-4 w-4 ${tool.iconColor} shrink-0`} />
                           {tool.hasBadge && (
-                            <span className="bg-[#ededed] text-[#141414] text-[9.5px] font-bold px-1.5 py-0.5 rounded-full leading-none shadow-2xs">
+                            <span className="bg-foreground text-background text-[9.5px] font-bold px-1.5 py-0.5 rounded-full leading-none shadow-2xs">
                               {t("badgeNew")}
                             </span>
                           )}
                         </div>
-                        <ChevronRight className="h-3.5 w-3.5 text-[#888888]/60 group-hover:text-[#d4d4d4] group-hover:translate-x-0.5 transition-all shrink-0" />
+                        <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/60 group-hover:text-foreground group-hover:translate-x-0.5 transition-all shrink-0" />
                       </div>
                       <span
                         className={`text-[11px] sm:text-xs font-medium ${
@@ -500,7 +500,7 @@ export function RightPane({
                           <div
                             key={art.id}
                             className={cn(
-                              "p-3 rounded-2xl bg-[#1c1c1f] flex items-center gap-3 select-none animate-pulse shadow-xs border",
+                              "p-3 rounded-2xl bg-card flex items-center gap-3 select-none animate-pulse shadow-xs border",
                               isMindMap
                                 ? "border-purple-500/30"
                                 : isQuiz
@@ -536,10 +536,10 @@ export function RightPane({
                               />
                             </div>
                             <div className="min-w-0 flex-1">
-                              <div className="text-xs font-semibold text-white tracking-tight truncate">
+                              <div className="text-xs font-semibold text-foreground tracking-tight truncate">
                                 {art.title || defaultGeneratingTitle}
                               </div>
-                              <div className="text-[11px] text-neutral-400 truncate mt-0.5">
+                              <div className="text-[11px] text-muted-foreground truncate mt-0.5">
                                 {language === "id"
                                   ? `berdasarkan ${art.sourcesCount ?? 1} sumber`
                                   : `based on ${art.sourcesCount ?? 1} source${
@@ -561,8 +561,6 @@ export function RightPane({
                         : null;
                       const countText = itemCount !== null && itemCount !== undefined
                         ? isQuiz
-                          ? (language === "id" ? `${itemCount} pertanyaan` : `${itemCount} questions`)
-                          : (language === "id" ? `${itemCount} kartu` : `${itemCount} cards`)
                         : isMindMap
                         ? (language === "id" ? "Peta Konsep" : "Concept Map")
                         : null;
@@ -576,17 +574,17 @@ export function RightPane({
                         <div
                           key={art.id}
                           onClick={handleOpenThis}
-                          className="p-3 rounded-2xl bg-[#1e1e21] hover:bg-[#25252a] border border-[#2d2d32] hover:border-[#3d3d44] transition-all flex items-center justify-between gap-2.5 cursor-pointer group shadow-xs active:scale-[0.99]"
+                          className="p-3 rounded-2xl bg-card hover:bg-secondary/70 border border-border hover:border-border/80 transition-all flex items-center justify-between gap-2.5 cursor-pointer group shadow-xs active:scale-[0.99]"
                         >
                           <div className="flex items-center gap-3 min-w-0 flex-1">
-                            <div className="h-9 w-9 rounded-xl bg-[#28282e] border border-[#383842] flex items-center justify-center text-[#d4d4d4] group-hover:text-white shrink-0 transition-colors">
+                            <div className="h-9 w-9 rounded-xl bg-secondary border border-border flex items-center justify-center text-muted-foreground group-hover:text-foreground shrink-0 transition-colors">
                               <ItemIcon className="h-4 w-4" />
                             </div>
                             <div className="min-w-0 flex-1">
-                              <div className="text-xs font-semibold text-white tracking-tight truncate group-hover:text-blue-400 transition-colors">
+                              <div className="text-xs font-semibold text-foreground tracking-tight truncate group-hover:text-primary transition-colors">
                                 {art.title}
                               </div>
-                              <div className="text-[11px] text-neutral-400 truncate mt-0.5">
+                              <div className="text-[11px] text-muted-foreground truncate mt-0.5">
                                 {countText ? `${countText} · ` : art.sourcesCount
                                   ? `${art.sourcesCount} ${
                                       language === "id" ? "sumber" : "source"
@@ -605,7 +603,7 @@ export function RightPane({
                             >
                               <button
                                 type="button"
-                                className="h-8 w-8 rounded-lg hover:bg-white/10 text-neutral-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                                className="h-8 w-8 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer shrink-0"
                                 title="Opsi"
                               >
                                 <MoreVertical className="h-4 w-4" />
@@ -613,10 +611,10 @@ export function RightPane({
                             </DropdownMenuTrigger>
                             <DropdownMenuContent
                               align="end"
-                              className="w-44 p-1 shadow-xl bg-[#1e1e22] border-[#333338]"
+                              className="w-44 p-1 shadow-xl bg-popover border-border"
                             >
                               <DropdownMenuItem
-                                className="cursor-pointer flex items-center gap-2 text-xs py-2 px-2.5 text-neutral-300 hover:text-white"
+                                className="cursor-pointer flex items-center gap-2 text-xs py-2 px-2.5 text-popover-foreground hover:text-popover-foreground"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   onOpenArtifact?.(art);
@@ -630,7 +628,7 @@ export function RightPane({
                                 </span>
                               </DropdownMenuItem>
                               <DropdownMenuItem
-                                className="cursor-pointer flex items-center gap-2 text-xs py-2 px-2.5 text-neutral-300 hover:text-white"
+                                className="cursor-pointer flex items-center gap-2 text-xs py-2 px-2.5 text-popover-foreground hover:text-popover-foreground"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   if (art.content) {
@@ -651,7 +649,7 @@ export function RightPane({
                                 </span>
                               </DropdownMenuItem>
                               <DropdownMenuItem
-                                className="cursor-pointer flex items-center gap-2 text-xs py-2 px-2.5 text-neutral-300 hover:text-white"
+                                className="cursor-pointer flex items-center gap-2 text-xs py-2 px-2.5 text-popover-foreground hover:text-popover-foreground"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   onDownloadArtifact?.(art);
@@ -664,7 +662,7 @@ export function RightPane({
                                     : "Download .md"}
                                 </span>
                               </DropdownMenuItem>
-                              <DropdownMenuSeparator className="bg-[#2e2e34]" />
+                              <DropdownMenuSeparator className="bg-border" />
                               <DropdownMenuItem
                                 className="cursor-pointer flex items-center gap-2 text-xs py-2 px-2.5 text-destructive focus:text-destructive"
                                 onClick={(e) => {
@@ -686,7 +684,7 @@ export function RightPane({
                 ) : (
                   /* Empty State Studio Output */
                   <div className="flex-1 flex flex-col items-center justify-center text-center p-4 min-h-[160px]">
-                    <div className="h-12 w-12 rounded-2xl bg-[#252528] border border-[#383838] flex items-center justify-center text-[#969696] mb-3 shadow-2xs">
+                    <div className="h-12 w-12 rounded-2xl bg-muted border border-border flex items-center justify-center text-muted-foreground mb-3 shadow-2xs">
                       <Layers className="h-6 w-6 stroke-[1.5]" />
                     </div>
                     <h3 className="text-xs font-semibold text-foreground mb-1.5 tracking-tight">
@@ -701,11 +699,11 @@ export function RightPane({
             </ScrollArea>
 
             {/* "+ Tambahkan catatan" Clean Fixed Footer (Never buggy on scroll) */}
-            <div className="p-3 pt-2 flex justify-center shrink-0 border-t border-transparent bg-gradient-to-t from-[#1b1b1d] via-[#1b1b1d]/90 to-transparent">
+            <div className="p-3 pt-2 flex justify-center shrink-0 border-t border-transparent bg-gradient-to-t from-card via-card/90 to-transparent">
               <button
                 type="button"
                 onClick={onAddNote}
-                className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-white text-neutral-900 hover:bg-neutral-100 text-xs font-semibold transition-all shadow-md active:scale-98 cursor-pointer border border-white/20"
+                className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 text-xs font-semibold transition-all shadow-md active:scale-98 cursor-pointer border border-border"
               >
                 <SquarePen className="h-4 w-4 stroke-[2]" />
                 <span>{t("addNote")}</span>
@@ -714,7 +712,7 @@ export function RightPane({
           </div>
         ) : (
             /* Review Sidepanel matching apps/harness/desktop */
-            <div className="flex-1 w-full h-full min-h-0 flex flex-col overflow-hidden bg-[#141414] animate-in fade-in duration-200">
+            <div className="flex-1 w-full h-full min-h-0 flex flex-col overflow-hidden bg-background animate-in fade-in duration-200">
               {/* Harness Tab Header with +, Search Dropdown, Drag & Drop */}
               <TabHeader
                 tabs={tabs}
@@ -727,7 +725,7 @@ export function RightPane({
               />
 
               {/* Active Tab Body matching apps/harness/desktop */}
-              <div className="flex-1 w-full h-[calc(100%-40px)] min-h-0 relative overflow-hidden flex flex-col bg-[#141414]">
+              <div className="flex-1 w-full h-[calc(100%-40px)] min-h-0 relative overflow-hidden flex flex-col bg-background">
                 {isOpeningNewTab || tabs.length === 0 || !activeTab ? (
                   <OpenTabView onSelectTabType={onOpenTabType || (() => {})} />
                 ) : activeTab.type === "file_diff" ? (

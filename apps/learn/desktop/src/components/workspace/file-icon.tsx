@@ -1,4 +1,5 @@
 import React from "react";
+import { FileText } from "lucide-react";
 
 /**
  * VS Code Seti Icon Theme:
@@ -284,10 +285,10 @@ export function FileIcon({
   // Default File
   return (
     <span
-      className={`${className} inline-flex items-center justify-center text-[10px] leading-none select-none text-[#777777] shrink-0`}
-      title={filename}
+      className={`${className} inline-flex items-center justify-center text-[10px] leading-none select-none text-muted-foreground shrink-0`}
+      title="File"
     >
-      •
+      <FileText className="w-full h-full text-muted-foreground" />
     </span>
   );
 }

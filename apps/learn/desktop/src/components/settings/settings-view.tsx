@@ -136,17 +136,17 @@ export function SettingsView({
   ];
 
   return (
-    <div className="h-screen w-full flex bg-[#ececee] dark:bg-[#2b2b2b] text-[#262626] dark:text-[#d4d4d4] overflow-hidden select-none">
+    <div className="h-screen w-full flex bg-secondary/50 text-foreground overflow-hidden select-none">
       {/* Settings Left Sidebar */}
       <aside className="w-56 h-full flex flex-col justify-between p-3 shrink-0">
         <div className="flex flex-col gap-3">
           {/* Top Brand & Back to workspace */}
           <div className="flex items-center gap-2 px-1 py-1">
-            <ConstLogoIcon size="sm" className="w-5 h-5 text-[#262626] dark:text-white" />
-            <span className="font-serif text-base font-normal tracking-tight text-[#262626] dark:text-white">
+            <ConstLogoIcon size="sm" className="w-5 h-5 text-foreground" />
+            <span className="font-serif text-base font-normal tracking-tight text-foreground">
               Const
             </span>
-            <span className="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-[#dedee2] dark:bg-[#383838] text-[#5d5d5d] dark:text-[#969696]">
+            <span className="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
               Settings
             </span>
           </div>
@@ -154,15 +154,15 @@ export function SettingsView({
           <button
             type="button"
             onClick={onBackToWorkspace}
-            className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-xl text-xs font-medium text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-[#dedee2] dark:hover:bg-[#383838] transition-colors cursor-pointer"
+            className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-xl text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
           >
-            <ArrowLeft className="w-4 h-4 text-[#8a8a8a] dark:text-[#969696]" />
+            <ArrowLeft className="w-4 h-4 text-muted-foreground" />
             <span>{t("backToLearns")}</span>
           </button>
 
           {/* Navigation Categories */}
           <div className="flex flex-col gap-0.5 pt-2">
-            <span className="text-[11px] font-medium text-[#8a8a8a] dark:text-[#737373] px-2.5 mb-1 tracking-tight">
+            <span className="text-[11px] font-medium text-muted-foreground px-2.5 mb-1 tracking-tight">
               {t("preferences")}
             </span>
             {navItems.map((item) => {
@@ -176,14 +176,14 @@ export function SettingsView({
                   className={cn(
                     "w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer",
                     isActive
-                      ? "bg-[#dedee2] dark:bg-[#383838] text-[#262626] dark:text-white font-medium"
-                      : "text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-[#dedee2]/60 dark:hover:bg-[#383838]/60"
+                      ? "bg-background text-foreground font-medium shadow-xs"
+                      : "text-muted-foreground hover:text-foreground hover:bg-muted/60"
                   )}
                 >
                   <Icon
                     className={cn(
                       "w-4 h-4 shrink-0",
-                      isActive ? "text-[#262626] dark:text-white" : "text-[#8a8a8a] dark:text-[#969696]"
+                      isActive ? "text-foreground" : "text-muted-foreground"
                     )}
                   />
                   <span>{item.label}</span>
@@ -194,21 +194,21 @@ export function SettingsView({
         </div>
 
         {/* User Account Info at bottom */}
-        <div className="pt-2 border-t border-[#dedee2] dark:border-[#383838]/40 flex flex-col gap-1">
+        <div className="pt-2 border-t border-border flex flex-col gap-1">
           <div className="flex items-center gap-2 px-2 py-1.5 rounded-xl">
-            <Avatar className="h-7 w-7 rounded-full bg-white dark:bg-[#1e1e1e] border border-[#dedee2] dark:border-[#383838] shrink-0">
+            <Avatar className="h-7 w-7 rounded-full bg-card border border-border shrink-0">
               {user?.image ? (
                 <AvatarImage src={user.image} alt={user.name || "User"} />
               ) : null}
-              <AvatarFallback className="text-[11px] font-medium text-[#262626] dark:text-white bg-[#dedee2] dark:bg-[#383838]">
+              <AvatarFallback className="text-[11px] font-medium text-foreground bg-muted">
                 {initials}
               </AvatarFallback>
             </Avatar>
             <div className="min-w-0 flex-1">
-              <p className="text-xs font-medium text-[#262626] dark:text-white truncate">
+              <p className="text-xs font-medium text-foreground truncate">
                 {user?.name || "Const User"}
               </p>
-              <p className="text-[10px] text-[#8a8a8a] dark:text-[#888888] truncate">
+              <p className="text-[10px] text-muted-foreground truncate">
                 {user?.email || "Workspace"}
               </p>
             </div>
@@ -218,7 +218,7 @@ export function SettingsView({
             <button
               type="button"
               onClick={onSwitchAccount}
-              className="w-full flex items-center gap-2 px-2.5 py-1 rounded-lg text-xs text-[#8a8a8a] hover:text-[#262626] dark:hover:text-white hover:bg-[#dedee2]/50 dark:hover:bg-[#383838]/50 transition-colors cursor-pointer"
+              className="w-full flex items-center gap-2 px-2.5 py-1 rounded-lg text-xs text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors cursor-pointer"
             >
               <ArrowLeftRight className="w-3.5 h-3.5" />
               <span>{t("switchAccount")}</span>
@@ -239,40 +239,40 @@ export function SettingsView({
       </aside>
 
       {/* Settings Main Content Area */}
-      <main className="flex-1 h-full flex flex-col bg-[#f8f8f8] dark:bg-[#161616] rounded-l-2xl sm:rounded-l-3xl border-l border-[#dedee2] dark:border-[#333333]/40 overflow-y-auto">
+      <main className="flex-1 h-full flex flex-col bg-background text-foreground rounded-l-2xl sm:rounded-l-3xl border-l border-border overflow-y-auto">
         <div className="max-w-3xl w-full mx-auto px-6 sm:px-8 py-8 space-y-8">
           {/* TAB 1: GENERAL */}
           {activeTab === "general" && (
             <div className="space-y-6">
               <div>
-                <h1 className="text-xl font-medium tracking-tight text-[#262626] dark:text-white">
+                <h1 className="text-xl font-medium tracking-tight text-foreground">
                   {t("generalSettings")}
                 </h1>
-                <p className="mt-1 text-xs text-[#8a8a8a] dark:text-[#888888]">
+                <p className="mt-1 text-xs text-muted-foreground">
                   {t("generalSettingsSubtitle")}
                 </p>
               </div>
 
               {/* Account details card */}
-              <div className="p-4 rounded-2xl bg-white dark:bg-[#222222] border border-[#dedee2] dark:border-[#383838] space-y-4">
-                <span className="text-[11px] font-medium uppercase tracking-wider text-[#8a8a8a] dark:text-[#777777]">
+              <div className="p-4 rounded-2xl bg-card border border-border space-y-4">
+                <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
                   {t("connectedAccount")}
                 </span>
 
                 <div className="flex items-center gap-4">
-                  <Avatar className="h-12 w-12 rounded-full border border-[#dedee2] dark:border-[#383838]">
+                  <Avatar className="h-12 w-12 rounded-full border border-border">
                     {user?.image ? (
                       <AvatarImage src={user.image} alt={user?.name || "User"} />
                     ) : null}
-                    <AvatarFallback className="text-sm font-medium bg-[#dedee2] dark:bg-[#383838] text-[#262626] dark:text-white">
+                    <AvatarFallback className="text-sm font-medium bg-muted text-foreground">
                       {initials}
                     </AvatarFallback>
                   </Avatar>
                   <div className="min-w-0 flex-1">
-                    <h3 className="text-sm font-medium text-[#262626] dark:text-white">
+                    <h3 className="text-sm font-medium text-foreground">
                       {user?.name || "Const User"}
                     </h3>
-                    <p className="text-xs text-[#8a8a8a] dark:text-[#888888]">
+                    <p className="text-xs text-muted-foreground">
                       {user?.email || "Workspace User"}
                     </p>
                     <div className="flex items-center gap-2 mt-1.5">
@@ -286,8 +286,8 @@ export function SettingsView({
               </div>
 
               {/* Language selection card */}
-              <div className="p-4 rounded-2xl bg-white dark:bg-[#222222] border border-[#dedee2] dark:border-[#383838] space-y-3">
-                <span className="text-[11px] font-medium uppercase tracking-wider text-[#8a8a8a] dark:text-[#777777]">
+              <div className="p-4 rounded-2xl bg-card border border-border space-y-3">
+                <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
                   {t("language")}
                 </span>
                 <div className="grid grid-cols-2 gap-3">
@@ -301,17 +301,17 @@ export function SettingsView({
                         className={cn(
                           "flex items-center justify-between p-3.5 rounded-xl border text-left transition-all cursor-pointer",
                           isSelected
-                            ? "border-[#262626] dark:border-white bg-[#f4f4f6] dark:bg-[#2b2b2b]"
-                            : "border-[#dedee2] dark:border-[#383838] hover:border-[#8a8a8a] dark:hover:border-[#555555] bg-transparent"
+                            ? "border-primary bg-secondary"
+                            : "border-border hover:border-foreground/20 bg-card hover:bg-secondary/50"
                         )}
                       >
                         <div className="flex items-center gap-2.5">
-                          <Globe className="w-4 h-4 text-[#8a8a8a] dark:text-[#888888]" />
-                          <span className="text-xs font-medium text-[#262626] dark:text-white">
+                          <Globe className="w-4 h-4 text-muted-foreground" />
+                          <span className="text-xs font-medium text-foreground">
                             {opt.label}
                           </span>
                         </div>
-                        {isSelected && <Check className="w-3.5 h-3.5 text-[#262626] dark:text-white" />}
+                        {isSelected && <Check className="w-3.5 h-3.5 text-primary" />}
                       </button>
                     );
                   })}
@@ -319,18 +319,18 @@ export function SettingsView({
               </div>
 
               {/* System environment card */}
-              <div className="p-4 rounded-2xl bg-white dark:bg-[#222222] border border-[#dedee2] dark:border-[#383838] space-y-3">
-                <span className="text-[11px] font-medium uppercase tracking-wider text-[#8a8a8a] dark:text-[#777777]">
+              <div className="p-4 rounded-2xl bg-card border border-border space-y-3">
+                <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
                   {t("systemRuntime")}
                 </span>
                 <div className="grid grid-cols-2 gap-3 text-xs">
-                  <div className="p-3 rounded-xl bg-[#f4f4f6] dark:bg-[#2b2b2b] border border-[#dedee2] dark:border-[#383838]">
-                    <span className="text-[#8a8a8a] dark:text-[#888888] block text-[11px]">{t("application")}</span>
-                    <span className="font-medium text-[#262626] dark:text-white">Const Learn Desktop</span>
+                  <div className="p-3 rounded-xl bg-secondary border border-border">
+                    <span className="text-muted-foreground block text-[11px]">{t("application")}</span>
+                    <span className="font-medium text-foreground">Const Learn Desktop</span>
                   </div>
-                  <div className="p-3 rounded-xl bg-[#f4f4f6] dark:bg-[#2b2b2b] border border-[#dedee2] dark:border-[#383838]">
-                    <span className="text-[#8a8a8a] dark:text-[#888888] block text-[11px]">{t("localDatabase")}</span>
-                    <span className="font-medium text-[#262626] dark:text-white">Dexie.js (ACID-compliant)</span>
+                  <div className="p-3 rounded-xl bg-secondary border border-border">
+                    <span className="text-muted-foreground block text-[11px]">{t("localDatabase")}</span>
+                    <span className="font-medium text-foreground">Dexie.js (ACID-compliant)</span>
                   </div>
                 </div>
               </div>
@@ -341,16 +341,16 @@ export function SettingsView({
           {activeTab === "appearance" && (
             <div className="space-y-6">
               <div>
-                <h1 className="text-xl font-medium tracking-tight text-[#262626] dark:text-white">
+                <h1 className="text-xl font-medium tracking-tight text-foreground">
                   {t("theme")}
                 </h1>
-                <p className="mt-1 text-xs text-[#8a8a8a] dark:text-[#888888]">
+                <p className="mt-1 text-xs text-muted-foreground">
                   {t("appearanceSubtitle")}
                 </p>
               </div>
 
-              <div className="p-4 rounded-2xl bg-white dark:bg-[#222222] border border-[#dedee2] dark:border-[#383838] space-y-4">
-                <span className="text-[11px] font-medium uppercase tracking-wider text-[#8a8a8a] dark:text-[#777777]">
+              <div className="p-4 rounded-2xl bg-card border border-border space-y-4">
+                <span className="text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
                   {t("interfaceTheme")}
                 </span>
 
@@ -370,18 +370,18 @@ export function SettingsView({
                         className={cn(
                           "flex flex-col items-start p-3.5 rounded-xl border text-left transition-all cursor-pointer",
                           isSelected
-                            ? "border-[#262626] dark:border-white bg-[#f4f4f6] dark:bg-[#2b2b2b]"
-                            : "border-[#dedee2] dark:border-[#383838] hover:border-[#8a8a8a] dark:hover:border-[#555555] bg-transparent"
+                            ? "border-primary bg-secondary"
+                            : "border-border hover:border-foreground/20 bg-card hover:bg-secondary/50"
                         )}
                       >
                         <div className="flex items-center justify-between w-full mb-2">
-                          <Icon className={cn("w-4 h-4", isSelected ? "text-[#262626] dark:text-white" : "text-[#8a8a8a] dark:text-[#888888]")} />
-                          {isSelected && <Check className="w-3.5 h-3.5 text-[#262626] dark:text-white" />}
+                          <Icon className={cn("w-4 h-4", isSelected ? "text-primary" : "text-muted-foreground")} />
+                          {isSelected && <Check className="w-3.5 h-3.5 text-primary" />}
                         </div>
-                        <span className="text-xs font-medium text-[#262626] dark:text-white">
+                        <span className="text-xs font-medium text-foreground">
                           {tTheme.label}
                         </span>
-                        <span className="text-[10px] text-[#8a8a8a] dark:text-[#888888] mt-0.5">
+                        <span className="text-[10px] text-muted-foreground mt-0.5">
                           {tTheme.desc}
                         </span>
                       </button>
@@ -396,10 +396,10 @@ export function SettingsView({
           {activeTab === "models" && (
             <div className="space-y-6">
               <div>
-                <h1 className="text-xl font-medium tracking-tight text-[#262626] dark:text-white">
+                <h1 className="text-xl font-medium tracking-tight text-foreground">
                   AI Models
                 </h1>
-                <p className="mt-1 text-xs text-[#8a8a8a] dark:text-[#888888]">
+                <p className="mt-1 text-xs text-muted-foreground">
                   {t("aiModelsSubtitle")}
                 </p>
               </div>
@@ -414,17 +414,17 @@ export function SettingsView({
                       className={cn(
                         "p-4 rounded-2xl border transition-all cursor-pointer flex items-start justify-between gap-4",
                         isSelected
-                          ? "border-[#262626] dark:border-white bg-white dark:bg-[#222222]"
-                          : "border-[#dedee2] dark:border-[#383838] hover:border-[#8a8a8a] dark:hover:border-[#555555] bg-white/50 dark:bg-[#1e1e1e]"
+                          ? "border-primary bg-secondary/30"
+                          : "border-border hover:border-foreground/20 bg-card hover:bg-secondary/40"
                       )}
                     >
                       <div className="min-w-0 flex-1 space-y-1">
                         <div className="flex items-center gap-2">
-                          <h4 className="text-sm font-medium text-[#262626] dark:text-white">
+                          <h4 className="text-sm font-medium text-foreground">
                             {model.name}
                           </h4>
                           {model.isDefault && (
-                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#dedee2] dark:bg-[#383838] text-[#262626] dark:text-[#d4d4d4] font-medium">
+                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary text-foreground font-medium">
                               Default
                             </span>
                           )}
@@ -435,10 +435,10 @@ export function SettingsView({
                             </span>
                           )}
                         </div>
-                        <p className="text-xs text-[#8a8a8a] dark:text-[#888888] leading-relaxed">
+                        <p className="text-xs text-muted-foreground leading-relaxed">
                           {language === "id" ? model.descId : model.descEn}
                         </p>
-                        <div className="flex items-center gap-3 pt-1 text-[11px] font-mono text-[#8a8a8a] dark:text-[#777777]">
+                        <div className="flex items-center gap-3 pt-1 text-[11px] font-mono text-muted-foreground">
                           <span>{model.contextWindow}</span>
                           <span>•</span>
                           <span>{model.maxOutput}</span>
@@ -450,12 +450,12 @@ export function SettingsView({
                           className={cn(
                             "w-4 h-4 rounded-full border flex items-center justify-center transition-colors",
                             isSelected
-                              ? "border-[#262626] dark:border-white bg-[#262626] dark:bg-white"
-                              : "border-[#8a8a8a] dark:border-[#555555]"
+                              ? "border-primary bg-primary"
+                              : "border-muted-foreground/40"
                           )}
                         >
                           {isSelected && (
-                            <div className="w-1.5 h-1.5 rounded-full bg-white dark:bg-[#161616]" />
+                            <div className="w-1.5 h-1.5 rounded-full bg-background" />
                           )}
                         </div>
                       </div>

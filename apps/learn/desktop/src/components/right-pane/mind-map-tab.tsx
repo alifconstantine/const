@@ -81,7 +81,7 @@ export function MindMapTab({
 
   if (!data || !data.root) {
     return (
-      <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground p-6 bg-[#161618]">
+      <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground p-6 bg-background">
         <span>Data Peta Pikiran tidak ditemukan atau rusak.</span>
       </div>
     );
@@ -91,19 +91,19 @@ export function MindMapTab({
   const sourceNames = data.sourceNames || [];
 
   return (
-    <div className="w-full h-full flex flex-col bg-[#161618] text-[#d4d4d4] font-sans relative overflow-hidden select-none">
+    <div className="w-full h-full flex flex-col bg-background text-foreground font-sans relative overflow-hidden select-none">
       {/* Top Header matching video reference */}
-      <div className="px-5 py-3 border-b border-[#28282b] bg-[#1a1a1d] flex items-center justify-between shrink-0">
+      <div className="px-5 py-3 border-b border-border bg-card flex items-center justify-between shrink-0">
         {/* Left: Breadcrumbs & Title & Source Chip */}
         <div className="flex flex-col min-w-0 pr-4">
-          <div className="text-[11px] font-medium text-[#888890] flex items-center gap-1.5 mb-0.5">
+          <div className="text-[11px] font-medium text-muted-foreground flex items-center gap-1.5 mb-0.5">
             <span>Studio</span>
-            <span className="text-[#55555c]">&gt;</span>
-            <span className="text-white/80">Aplikasi</span>
+            <span className="text-muted-foreground/60">&gt;</span>
+            <span className="text-foreground/80">Aplikasi</span>
           </div>
 
           <div className="flex items-center gap-3 min-w-0">
-            <h2 className="text-sm sm:text-base font-semibold text-white tracking-tight truncate">
+            <h2 className="text-sm sm:text-base font-semibold text-foreground tracking-tight truncate">
               {data.title || tab.title}
             </h2>
 
@@ -112,25 +112,25 @@ export function MindMapTab({
               <PopoverTrigger asChild>
                 <button
                   type="button"
-                  className="px-2.5 py-0.5 rounded-full bg-[#26262a] hover:bg-[#323236] text-[11px] font-medium text-[#b0b4be] border border-[#38383e] transition-colors cursor-pointer shrink-0"
+                  className="px-2.5 py-0.5 rounded-full bg-secondary hover:bg-secondary/80 text-[11px] font-medium text-foreground border border-border transition-colors cursor-pointer shrink-0"
                 >
                   {sourceCount === 1
                     ? t("viewSourcesSingle") || "Lihat 1 sumber"
                     : t("viewSources", { count: sourceCount }) || `Lihat ${sourceCount} sumber`}
                 </button>
               </PopoverTrigger>
-              <PopoverContent align="start" className="w-64 bg-[#222225] border-[#36363a] text-white p-3 space-y-2">
-                <div className="text-xs font-semibold text-white">Sumber yang Digunakan:</div>
+              <PopoverContent align="start" className="w-64 bg-popover border-border text-popover-foreground p-3 space-y-2">
+                <div className="text-xs font-semibold text-foreground">Sumber yang Digunakan:</div>
                 <div className="space-y-1.5 max-h-48 overflow-y-auto">
                   {sourceNames.length > 0 ? (
                     sourceNames.map((name, i) => (
-                      <div key={i} className="flex items-center gap-2 text-xs text-[#a5a5ad]">
-                        <FileText className="w-3.5 h-3.5 text-[#888888] shrink-0" />
+                      <div key={i} className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <FileText className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
                         <span className="truncate">{name}</span>
                       </div>
                     ))
                   ) : (
-                    <div className="text-xs text-[#888888]">1 sumber dari notebook</div>
+                    <div className="text-xs text-muted-foreground">1 sumber dari notebook</div>
                   )}
                 </div>
               </PopoverContent>
@@ -143,7 +143,7 @@ export function MindMapTab({
           <button
             type="button"
             onClick={handleShare}
-            className="h-8 w-8 rounded-lg hover:bg-white/10 text-[#a0a0a8] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+            className="h-8 w-8 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
             title="Bagikan"
           >
             <Share2 className="w-4 h-4" />
@@ -153,7 +153,7 @@ export function MindMapTab({
             <button
               type="button"
               onClick={onToggleFullscreen}
-              className="h-8 w-8 rounded-lg hover:bg-white/10 text-[#a0a0a8] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+              className="h-8 w-8 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
               title={isFullscreen ? "Keluar Layar Penuh" : "Layar Penuh"}
             >
               {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
@@ -162,7 +162,7 @@ export function MindMapTab({
 
           <button
             type="button"
-            className="h-8 w-8 rounded-lg hover:bg-white/10 text-[#a0a0a8] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+            className="h-8 w-8 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
             title="Menu Lainnya"
           >
             <MoreVertical className="w-4 h-4" />
@@ -176,7 +176,7 @@ export function MindMapTab({
       </div>
 
       {/* Footer with Thumbs Up / Down feedback matching video reference */}
-      <div className="px-5 py-2.5 border-t border-[#252528] bg-[#18181b] flex items-center justify-between shrink-0">
+      <div className="px-5 py-2.5 border-t border-border bg-card flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2">
           <button
             type="button"
@@ -184,8 +184,8 @@ export function MindMapTab({
             className={cn(
               "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer border",
               feedback === "good"
-                ? "bg-[#0066ff]/20 border-[#0066ff]/60 text-white"
-                : "bg-transparent border-transparent text-[#888890] hover:text-white hover:bg-white/5"
+                ? "bg-primary/20 border-primary/60 text-primary"
+                : "bg-transparent border-transparent text-muted-foreground hover:text-foreground hover:bg-muted"
             )}
           >
             <ThumbsUp className="w-3.5 h-3.5" />
@@ -198,8 +198,8 @@ export function MindMapTab({
             className={cn(
               "inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-colors cursor-pointer border",
               feedback === "bad"
-                ? "bg-rose-500/20 border-rose-500/60 text-rose-300"
-                : "bg-transparent border-transparent text-[#888890] hover:text-white hover:bg-white/5"
+                ? "bg-rose-500/20 border-rose-500/60 text-rose-500 dark:text-rose-400"
+                : "bg-transparent border-transparent text-muted-foreground hover:text-foreground hover:bg-muted"
             )}
           >
             <ThumbsDown className="w-3.5 h-3.5" />
@@ -207,7 +207,7 @@ export function MindMapTab({
           </button>
         </div>
 
-        <div className="text-[11px] text-[#6e6e76] font-mono">
+        <div className="text-[11px] text-muted-foreground/60 font-mono">
           Interactive Canvas • Const Studio
         </div>
       </div>

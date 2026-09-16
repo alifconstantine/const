@@ -958,8 +958,8 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
                   </>
                 ) : (
                   <>
-                    <ShieldAlert className="h-3.5 w-3.5 text-[#e79737] shrink-0" />
-                    <span className="hidden sm:inline text-[#e79737]">{t("fullAccess")}</span>
+                    <ShieldAlert className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                    <span className="hidden sm:inline text-amber-500">{t("fullAccess")}</span>
                   </>
                 )}
                 <ChevronDown className="h-3 w-3 text-muted-foreground ml-0.5 opacity-70 shrink-0" />
@@ -999,7 +999,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
                   }
                 }}
               >
-                <ShieldAlert className="h-4 w-4 text-[#e79737] shrink-0 mt-0.5" />
+                <ShieldAlert className="h-4 w-4 text-amber-500 shrink-0 mt-0.5" />
                 <div className="flex-1">
                   <div className="text-xs font-medium text-foreground">
                     {t("fullAccess")}
@@ -1009,7 +1009,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
                   </div>
                 </div>
                 {(learn?.permissionMode || "ask_before_changes") === "full_access" && (
-                  <Check className="h-3.5 w-3.5 text-[#e79737] shrink-0 ml-1 mt-0.5" />
+                  <Check className="h-3.5 w-3.5 text-amber-500 shrink-0 ml-1 mt-0.5" />
                 )}
               </DropdownMenuItem>
             </DropdownMenuContent>
