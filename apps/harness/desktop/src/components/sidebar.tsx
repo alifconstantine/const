@@ -449,7 +449,7 @@ export function Sidebar({
     /Mac|iPod|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
 
   return (
-    <aside className="w-56 h-full flex flex-col justify-between shrink-0 select-none bg-transparent text-[#262626] dark:text-[#d4d4d4] p-3">
+    <aside className="w-64 h-full flex flex-col justify-between shrink-0 select-none bg-transparent text-[#262626] dark:text-[#d4d4d4] p-3">
       {/* Top Header & Navigation Actions (No dividing lines, following DESIGN.md) */}
       <div className="flex flex-col gap-1">
         {/* Logo and Collapse Button */}

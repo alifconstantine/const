@@ -91,7 +91,7 @@ export function Sidebar({
     /Mac|iPod|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
 
   return (
-    <aside className="w-56 h-full flex flex-col justify-between shrink-0 select-none bg-transparent text-foreground p-3">
+    <aside className="w-64 h-full flex flex-col justify-between shrink-0 select-none bg-transparent text-foreground p-3">
       {/* Top Section */}
       <div className="flex flex-col gap-3">
         {/* Brand Header & Sidebar Close Icon */}

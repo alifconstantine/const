@@ -2184,10 +2184,10 @@ function AuthenticatedContent({
       {/* 1. Left Sidebar (Collapsible with smooth slide, NO bouncing) */}
       <div
         className={`shrink-0 overflow-hidden transition-[width,opacity] duration-200 ease-out ${
-          isSidebarOpen ? "w-56 opacity-100" : "w-0 opacity-0 pointer-events-none"
+          isSidebarOpen ? "w-64 opacity-100" : "w-0 opacity-0 pointer-events-none"
         }`}
       >
-        <div className="w-56 h-full">
+        <div className="w-64 h-full">
           <Sidebar
             user={user}
             onSignOut={onSignOut}
