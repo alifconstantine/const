@@ -1,11 +1,12 @@
-import type { LocalSource, QuizData, FlashcardData, MindMapData, MindMapNode } from "../db";
+import type { LocalSource, QuizData, FlashcardData, MindMapData, MindMapNode, SlideDeckData, SlideItem } from "../db";
 
 export interface GenerateStudioArtifactOptions {
-  type: "quiz" | "flashcard" | "mind_map";
+  type: "quiz" | "flashcard" | "mind_map" | "slides";
   learnId: string;
   topic?: string;
   difficulty?: "easy" | "medium" | "hard";
   count?: number;
+  lengthMode?: "short" | "medium" | "long" | "auto";
   sources: LocalSource[];
   language?: "id" | "en";
 }
@@ -123,11 +124,12 @@ export async function generateStudioArtifact({
   topic,
   difficulty = "medium",
   count = 10,
+  lengthMode = "auto",
   sources,
   language = "id",
 }: GenerateStudioArtifactOptions): Promise<{
   title: string;
-  data: QuizData | FlashcardData | MindMapData;
+  data: QuizData | FlashcardData | MindMapData | SlideDeckData;
 }> {
   // Aggregate source texts for grounding context
   const sourceSnippets = sources
@@ -281,7 +283,7 @@ Rules:
         null,
         2
       );
-  } else {
+  } else if (type === "mind_map") {
     // Mind Map
     systemPrompt = isIndo
       ? `Anda adalah pembuat peta pikiran (mind map) terstruktur ahli untuk Const Learn.
@@ -359,6 +361,96 @@ Rules:
     userPrompt = `Materi Sumber Belajar:\n${sourceSnippets || "Topik: " + (topic || "Pengetahuan Umum")}\n\n` +
       (topic ? `Fokus Topik Spesifik / Instruksi: ${topic}\n\n` : "") +
       `Silakan buatkan Peta Pikiran hierarkis dalam format JSON yang valid.`;
+  } else if (type === "slides") {
+    const targetSlideCount =
+      lengthMode === "short"
+        ? 5
+        : lengthMode === "long"
+        ? 14
+        : lengthMode === "medium"
+        ? 8
+        : Math.max(5, Math.min(20, count || 8));
+
+    systemPrompt = isIndo
+      ? `Anda adalah arsitek dek presentasi slide (PPT) profesional untuk Const Learn.
+Tugas Anda adalah merangkum materi rujukan ke dalam dek presentasi slide berkualitas tinggi yang terstruktur, fokus, dan siap disajikan.
+Aturan Penting:
+1. Buat tepat ${targetSlideCount} slide dalam format JSON.
+2. Setiap slide memiliki salah satu layout berikut:
+   - "hero": Slide judul/cover awal (title, subtitle, accentTag).
+   - "bullets": Poin-poin kunci (3-4 bullet jelas dan padat).
+   - "split": Tata letak 2 kolom (leftColumn dan rightColumn).
+   - "numbers": Kartu metrik/angka kunci (2-3 kartu dengan value dan label).
+   - "comparison": Perbandingan 2 hal/metode (leftColumn vs rightColumn).
+   - "quote": Kutipan penting / prinsip sentral.
+   - "takeaway": Kesimpulan dan langkah tindakan nyata.
+3. Rancang alur presentasi:
+   - Slide 1: Cover ("hero")
+   - Slide 2: Latar belakang & konteks ("bullets")
+   - Slide 3: Tantangan / metrik data ("numbers" atau "split")
+   - Slide 4: Solusi & konsep inti ("bullets")
+   - Slide 5: Rincian / perbandingan ("comparison" atau "split")
+   - Slide 6+: Metrik dampak dan kesimpulan ("takeaway")
+4. Setiap slide WAJIB memiliki "speakerNotes" (catatan narasi pembicara 1-2 kalimat) yang memandu apa yang harus dijelaskan.
+5. Format HANYA JSON valid tanpa teks pengantar atau markdown.`
+      : `You are a professional slide presentation (PPT) deck designer for Const Learn.
+Your task is to synthesize the provided study materials into a structured, elegant, high-impact presentation deck.
+Critical Rules:
+1. Create exactly ${targetSlideCount} slides in valid JSON format.
+2. Each slide must use an appropriate layout:
+   - "hero": Title / cover slide (title, subtitle, accentTag).
+   - "bullets": Key bullet points (3-4 concise bullets).
+   - "split": Two-column layout (leftColumn & rightColumn).
+   - "numbers": Key stats & numbers (2-3 cards with value & label).
+   - "comparison": Comparing 2 approaches.
+   - "quote": Central quote or key principle.
+   - "takeaway": Actionable summary & conclusion.
+3. Every slide MUST include "speakerNotes" (1-2 sentences of talking points for the presenter).
+4. Output STRICTLY valid JSON without intro or markdown wrappers.`;
+
+    userPrompt = isIndo
+      ? `Materi Sumber Belajar:\n${sourceSnippets || "Topik: " + (topic || "Pengetahuan Umum")}\n\n` +
+        (topic ? `Fokus Topik Spesifik / Instruksi: ${topic}\n\n` : "") +
+        `Silakan hasilkan dek slide presentasi dalam format JSON persis seperti contoh skema berikut:\n` +
+        JSON.stringify(
+          {
+            title: `Presentasi: ${topic || sources[0]?.title || "Materi Belajar"}`,
+            slides: [
+              {
+                id: "slide_1",
+                slideNumber: 1,
+                layout: "hero",
+                title: "Judul Presentasi",
+                subtitle: "Subjudul penjelasan materi",
+                accentTag: "Ringkasan Eksekutif",
+                speakerNotes: "Catatan narasi pembicara untuk slide pertama."
+              }
+            ]
+          },
+          null,
+          2
+        )
+      : `Source Study Materials:\n${sourceSnippets || "Topic: " + (topic || "General Knowledge")}\n\n` +
+        (topic ? `Specific Topic Focus / Instructions: ${topic}\n\n` : "") +
+        `Please generate the presentation slide deck in JSON matching this schema:\n` +
+        JSON.stringify(
+          {
+            title: `Presentation: ${topic || sources[0]?.title || "Study Material"}`,
+            slides: [
+              {
+                id: "slide_1",
+                slideNumber: 1,
+                layout: "hero",
+                title: "Presentation Title",
+                subtitle: "Presentation subtitle or overview",
+                accentTag: "Executive Summary",
+                speakerNotes: "Presenter talking points for the first slide."
+              }
+            ]
+          },
+          null,
+          2
+        );
   }
 
   // 1. Attempt generation via Electron agent isolated completion (Stateless, never leaks into Chat AI / Ask AI)
@@ -430,6 +522,34 @@ Rules:
               updatedAt: Date.now(),
             };
             return { title: mindMapData.title, data: mindMapData };
+          } else if (type === "slides" && Array.isArray(parsed.slides) && parsed.slides.length > 0) {
+            const slidesData: SlideDeckData = {
+              id: `slides_${Date.now()}`,
+              title: parsed.title || (topic ? (isIndo ? `Presentasi: ${topic}` : `Presentation: ${topic}`) : (isIndo ? `Presentasi: ${sources[0]?.title || "Materi Belajar"}` : `Presentation: ${sources[0]?.title || "Study Material"}`)),
+              topic,
+              lengthMode,
+              language,
+              sourceCount: sources.length,
+              sourceTitles: sources.map((s) => s.title),
+              sourceIds: sources.map((s) => s.id),
+              slides: parsed.slides.map((s: any, sIdx: number) => ({
+                id: String(s.id || `slide_${sIdx + 1}`),
+                slideNumber: sIdx + 1,
+                layout: s.layout || (sIdx === 0 ? "hero" : "bullets"),
+                title: s.title || `Slide ${sIdx + 1}`,
+                subtitle: s.subtitle || undefined,
+                bullets: Array.isArray(s.bullets) ? s.bullets : undefined,
+                leftColumn: s.leftColumn || undefined,
+                rightColumn: s.rightColumn || undefined,
+                quote: s.quote || undefined,
+                numbers: Array.isArray(s.numbers) ? s.numbers : undefined,
+                speakerNotes: s.speakerNotes || undefined,
+                accentTag: s.accentTag || undefined,
+              })),
+              createdAt: Date.now(),
+              updatedAt: Date.now(),
+            };
+            return { title: slidesData.title, data: slidesData };
           }
         }
       }
@@ -531,6 +651,34 @@ Rules:
               updatedAt: Date.now(),
             };
             return { title: mindMapData.title, data: mindMapData };
+          } else if (type === "slides" && Array.isArray(parsed.slides) && parsed.slides.length > 0) {
+            const slidesData: SlideDeckData = {
+              id: `slides_${Date.now()}`,
+              title: parsed.title || (topic ? (isIndo ? `Presentasi: ${topic}` : `Presentation: ${topic}`) : (isIndo ? `Presentasi: ${sources[0]?.title || "Materi Belajar"}` : `Presentation: ${sources[0]?.title || "Study Material"}`)),
+              topic,
+              lengthMode,
+              language,
+              sourceCount: sources.length,
+              sourceTitles: sources.map((s) => s.title),
+              sourceIds: sources.map((s) => s.id),
+              slides: parsed.slides.map((s: any, sIdx: number) => ({
+                id: String(s.id || `slide_${sIdx + 1}`),
+                slideNumber: sIdx + 1,
+                layout: s.layout || (sIdx === 0 ? "hero" : "bullets"),
+                title: s.title || `Slide ${sIdx + 1}`,
+                subtitle: s.subtitle || undefined,
+                bullets: Array.isArray(s.bullets) ? s.bullets : undefined,
+                leftColumn: s.leftColumn || undefined,
+                rightColumn: s.rightColumn || undefined,
+                quote: s.quote || undefined,
+                numbers: Array.isArray(s.numbers) ? s.numbers : undefined,
+                speakerNotes: s.speakerNotes || undefined,
+                accentTag: s.accentTag || undefined,
+              })),
+              createdAt: Date.now(),
+              updatedAt: Date.now(),
+            };
+            return { title: slidesData.title, data: slidesData };
           }
         }
       }
@@ -541,10 +689,10 @@ Rules:
 
   // Graceful offline/fallback generator so user flow NEVER breaks
   const fallbackTitle = topic
-    ? (type === "quiz" ? `AI Kuis: ${topic}` : type === "flashcard" ? `Flashcard: ${topic}` : `Peta Pikiran: ${topic}`)
+    ? (type === "quiz" ? `AI Kuis: ${topic}` : type === "flashcard" ? `Flashcard: ${topic}` : type === "slides" ? (isIndo ? `Presentasi: ${topic}` : `Presentation: ${topic}`) : `Peta Pikiran: ${topic}`)
     : sources.length > 0
-    ? (type === "quiz" ? `AI Kuis: ${sources[0]!.title}` : type === "flashcard" ? `Flashcard: ${sources[0]!.title}` : `Peta Pikiran: ${sources[0]!.title}`)
-    : type === "quiz" ? "AI Kuis Mandiri" : type === "flashcard" ? "Flashcard Mandiri" : "Peta Pikiran Mandiri";
+    ? (type === "quiz" ? `AI Kuis: ${sources[0]!.title}` : type === "flashcard" ? `Flashcard: ${sources[0]!.title}` : type === "slides" ? (isIndo ? `Presentasi: ${sources[0]!.title}` : `Presentation: ${sources[0]!.title}`) : `Peta Pikiran: ${sources[0]!.title}`)
+    : type === "quiz" ? "AI Kuis Mandiri" : type === "flashcard" ? "Flashcard Mandiri" : type === "slides" ? (isIndo ? "Presentasi Mandiri" : "Self-guided Presentation") : "Peta Pikiran Mandiri";
 
   if (type === "quiz") {
     const rawSampleQuestions = [
@@ -697,7 +845,7 @@ Rules:
       questions: shuffleAndFormatQuizQuestions(dynamicQuestions),
     };
     return { title: fallbackTitle, data: fallbackQuiz };
-  } else {
+  } else if (type === "flashcard") {
     const sampleCards = [
       {
         id: "1",
@@ -707,20 +855,19 @@ Rules:
       },
       {
         id: "2",
-        front: "Metode Pembelajaran Socratic",
-        back: "Pendekatan dialogis di mana AI membimbing pengguna memahami konsep melalui pertanyaan mendalam dan analogi terstruktur, bukan sekadar memberikan jawaban langsung.",
-        hint: "Tanya-jawab terbimbing",
+        front: "Model Penalaran Adaptif",
+        back: "Pendekatan komputasi yang menimbang probabilitas logika langkah-demi-langkah sebelum merumuskan kesimpulan akhir.",
+        hint: "Chain of Thought",
       },
       {
         id: "3",
-        front: "Penalaran Adaptif (Reasoning Effort)",
-        back: "Kemampuan model AI mengalokasikan waktu berpikir ekstra untuk memecah masalah rumit menjadi langkah-langkah logis sebelum memformulasikan respons akhir.",
-        hint: "Thinking process",
+        front: "Dual-Tier Architecture",
+        back: "Pemisahan lapisan eksekusi antara komputasi lokal desktop (performa penuh) dengan sandbox awan mobile (portabilitas tinggi).",
+        hint: "Desktop vs Mobile",
       },
     ];
 
-    // Generate flashcards dynamically up to numItems
-    const dynamicCards = [];
+    const dynamicCards: typeof sampleCards = [];
     for (let i = 0; i < numItems; i++) {
       const baseCard = sampleCards[i % sampleCards.length]!;
       dynamicCards.push({
@@ -743,6 +890,97 @@ Rules:
       cards: dynamicCards,
     };
     return { title: fallbackTitle, data: fallbackFlashcard };
+  } else if (type === "slides") {
+    const mainTitle = topic?.trim() || sources[0]?.title || (isIndo ? "Presentasi Materi Belajar" : "Presentation Slides");
+    const fallbackSlides: SlideItem[] = [
+      {
+        id: "slide_1",
+        slideNumber: 1,
+        layout: "hero",
+        title: mainTitle,
+        subtitle: isIndo ? "Rangkuman komprehensif konsep & intisari materi" : "Comprehensive concept & insights overview",
+        accentTag: isIndo ? "Ringkasan Eksekutif" : "Key Overview",
+        speakerNotes: isIndo ? `Selamat datang di presentasi ${mainTitle}. Slide ini mengantar materi utama.` : `Welcome to the presentation on ${mainTitle}.`,
+      },
+      {
+        id: "slide_2",
+        slideNumber: 2,
+        layout: "bullets",
+        title: isIndo ? "Latar Belakang & Konteks" : "Context & Background",
+        subtitle: isIndo ? "Fondasi pemikiran utama" : "Core theoretical foundations",
+        bullets: sources.length > 0
+          ? sources.slice(0, 3).map((s) => `${s.title}: ${s.content?.slice(0, 90) || "Intisari konsep rujukan."}...`)
+          : [
+              isIndo ? "Pemahaman mendasar terhadap pokok bahasan." : "Fundamental understanding of key concepts.",
+              isIndo ? "Keterkaitan antar variabel dan metodologi." : "Interconnections between variables and methodology.",
+              isIndo ? "Penerapan sistematis dalam skenario nyata." : "Systematic application in real scenarios."
+            ],
+        speakerNotes: isIndo ? "Jelaskan latar belakang dan relevansi topik ini bagi pemahaman audiens." : "Explain background and significance.",
+      },
+      {
+        id: "slide_3",
+        slideNumber: 3,
+        layout: "split",
+        title: isIndo ? "Struktur & Karakteristik Utama" : "Key Structure & Characteristics",
+        subtitle: isIndo ? "Dua pilar pemahaman kunci" : "Two core pillars of understanding",
+        leftColumn: {
+          title: isIndo ? "Prinsip Inti" : "Core Principles",
+          items: [
+            isIndo ? "Konseptualisasi berbasis fakta" : "Fact-based conceptualization",
+            isIndo ? "Konsistensi alur penalaran" : "Consistent reasoning flow"
+          ]
+        },
+        rightColumn: {
+          title: isIndo ? "Implementasi Praktis" : "Practical Implementation",
+          items: [
+            isIndo ? "Aplikasi bertahap dan teruji" : "Step-by-step tested execution",
+            isIndo ? "Optimasi hasil yang terukur" : "Measurable result optimization"
+          ]
+        },
+        speakerNotes: isIndo ? "Bandingkan kedua sisi pilar untuk memberikan pemahaman holistik." : "Contrast the two pillars.",
+      },
+      {
+        id: "slide_4",
+        slideNumber: 4,
+        layout: "numbers",
+        title: isIndo ? "Poin Kunci & Parameter Evaluasi" : "Key Metrics & Evaluation",
+        subtitle: isIndo ? "Indikator keberhasilan pemahaman" : "Measurable indicators",
+        numbers: [
+          { value: "100%", label: isIndo ? "Akurasi Sumber" : "Source Grounding", note: isIndo ? "Terverifikasi" : "Verified" },
+          { value: "10x", label: isIndo ? "Retensi Pemahaman" : "Retention Boost", note: isIndo ? "Metode aktif" : "Active recall" },
+          { value: "3x", label: isIndo ? "Efisiensi Belajar" : "Study Efficiency", note: isIndo ? "Fokus intisari" : "Targeted focus" }
+        ],
+        speakerNotes: isIndo ? "Tekankan indikator kuantitatif dan dampak nyata dari materi." : "Emphasize key quantitative outcomes.",
+      },
+      {
+        id: "slide_5",
+        slideNumber: 5,
+        layout: "takeaway",
+        title: isIndo ? "Kesimpulan & Langkah Selanjutnya" : "Conclusion & Next Steps",
+        subtitle: isIndo ? "Intisari akhir untuk tindakan" : "Key actionable takeaways",
+        bullets: [
+          isIndo ? "Kuasai konsep fondasi sebelum melangkah ke analisis lanjutan." : "Master fundamentals before proceeding to advanced analysis.",
+          isIndo ? "Lakukan evaluasi berkala menggunakan ringkasan dan kuis mandiri." : "Evaluate regularly with study summaries and quizzes.",
+          isIndo ? "Terapkan wawasan ini secara kontekstual dalam studi Anda." : "Apply insights contextually in your study workflow."
+        ],
+        speakerNotes: isIndo ? "Tutup presentasi dengan kesimpulan tajam dan ajakan bertindak." : "Conclude presentation with clear action items.",
+      }
+    ];
+
+    const fallbackSlideDeck: SlideDeckData = {
+      id: `slides_${Date.now()}`,
+      title: fallbackTitle,
+      topic,
+      lengthMode,
+      language,
+      sourceCount: sources.length,
+      sourceTitles: sources.map((s) => s.title),
+      sourceIds: sources.map((s) => s.id),
+      slides: fallbackSlides,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+    return { title: fallbackTitle, data: fallbackSlideDeck };
   }
 
   // Mind Map fallback

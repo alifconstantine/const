@@ -275,6 +275,7 @@ export function StudioSheet({
 
                 if (isGenerating) {
                   const isMindMap = art.type === "mind_map";
+                  const isSlides = art.type === "slides";
                   const defaultGenTitle =
                     art.type === "quiz"
                       ? (language === "id" ? "Membuat Kuis..." : "Creating Quiz...")
@@ -282,6 +283,8 @@ export function StudioSheet({
                       ? (language === "id" ? "Membuat Kartu Tanya-Jawab..." : "Creating Flashcards...")
                       : isMindMap
                       ? (language === "id" ? "Membuat Peta Pikiran..." : "Creating Mind Map...")
+                      : isSlides
+                      ? (language === "id" ? "Membuat Presentasi..." : "Creating Presentation...")
                       : (language === "id" ? "Membuat Catatan..." : "Creating Note...");
 
                   return (
@@ -289,7 +292,11 @@ export function StudioSheet({
                       key={art.id}
                       className={cn(
                         "p-2.5 rounded-2xl bg-secondary/50 flex items-center gap-2.5 select-none animate-pulse shadow-xs border",
-                        isMindMap ? "border-purple-500/30" : "border-blue-500/30"
+                        isMindMap
+                          ? "border-purple-500/30"
+                          : isSlides
+                          ? "border-amber-400/40"
+                          : "border-blue-500/30"
                       )}
                     >
                       <div
@@ -297,13 +304,19 @@ export function StudioSheet({
                           "h-8 w-8 rounded-xl flex items-center justify-center shrink-0 border",
                           isMindMap
                             ? "bg-purple-500/10 border-purple-500/20 text-purple-400"
+                            : isSlides
+                            ? "bg-amber-500/10 border-amber-500/20 text-amber-400"
                             : "bg-blue-500/10 border-blue-500/20 text-blue-400"
                         )}
                       >
                         <RotateCw
                           className={cn(
                             "h-4 w-4 animate-spin",
-                            isMindMap ? "text-purple-400" : "text-blue-400"
+                            isMindMap
+                              ? "text-purple-400"
+                              : isSlides
+                              ? "text-amber-400"
+                              : "text-blue-400"
                           )}
                         />
                       </div>
@@ -326,15 +339,22 @@ export function StudioSheet({
                 const isQuiz = art.type === "quiz";
                 const isFlashcard = art.type === "flashcard" || art.type === "flashcards";
                 const isMindMap = art.type === "mind_map";
+                const isSlides = art.type === "slides";
                 const itemCount = isQuiz && art.data?.questions
                   ? art.data.questions.length
                   : isFlashcard && art.data?.cards
                   ? art.data.cards.length
+                  : isSlides && art.data?.slides
+                  ? art.data.slides.length
                   : null;
                 const countText = itemCount !== null && itemCount !== undefined
                   ? isQuiz
                     ? (language === "id" ? `${itemCount} soal` : `${itemCount} questions`)
-                    : (language === "id" ? `${itemCount} kartu` : `${itemCount} cards`)
+                    : isFlashcard
+                    ? (language === "id" ? `${itemCount} kartu` : `${itemCount} cards`)
+                    : isSlides
+                    ? (language === "id" ? `${itemCount} slide` : `${itemCount} slide${itemCount > 1 ? "s" : ""}`)
+                    : null
                   : isMindMap
                   ? (language === "id" ? "Peta Konsep" : "Concept Map")
                   : null;

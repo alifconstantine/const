@@ -87,13 +87,49 @@ export interface MindMapData {
   updatedAt?: number;
 }
 
+export interface SlideNumberItem {
+  value: string;
+  label: string;
+  note?: string;
+}
+
+export interface SlideItem {
+  id: string;
+  slideNumber: number;
+  title: string;
+  layout: "hero" | "bullets" | "split" | "quote" | "numbers" | "comparison" | "takeaway";
+  subtitle?: string;
+  bullets?: string[];
+  leftColumn?: { title?: string; items: string[] };
+  rightColumn?: { title?: string; items: string[] };
+  quote?: { text: string; author?: string };
+  numbers?: SlideNumberItem[];
+  speakerNotes?: string;
+  accentTag?: string;
+}
+
+export interface SlideDeckData {
+  id?: string;
+  learnId?: string;
+  title: string;
+  topic?: string;
+  lengthMode: "short" | "medium" | "long" | "auto";
+  language: "id" | "en";
+  sourceCount?: number;
+  sourceTitles?: string[];
+  sourceIds?: string[];
+  slides: SlideItem[];
+  createdAt?: number;
+  updatedAt?: number;
+}
+
 export interface LocalArtifact {
   id: string;
   learnId?: string;
   title: string;
   type: string;
   content?: string;
-  data?: QuizData | FlashcardData | MindMapData | any;
+  data?: QuizData | FlashcardData | MindMapData | SlideDeckData | any;
   fileUrl?: string;
   isZip?: boolean;
   status?: "generating" | "completed" | "error";

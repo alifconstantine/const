@@ -44,6 +44,7 @@ import { RightPane, type RightPaneTab, type RightPaneTabType, type GeneratingArt
 import { AddSourceDialog } from "./add-source-dialog";
 import { CreateStudioArtifactDialog } from "./create-studio-artifact-dialog";
 import { CreateMindMapDialog } from "./create-mind-map-dialog";
+import { CreatePresentationDialog } from "./create-presentation-dialog";
 import { WorkspaceTitle } from "./workspace-title";
 import { SettingsView } from "../settings/settings-view";
 import { ErrorBoundary } from "../ui/error-boundary";
@@ -106,6 +107,7 @@ export function LearnWorkspace({
   const [isCreateStudioOpen, setIsCreateStudioOpen] = useState(false);
   const [createStudioType, setCreateStudioType] = useState<"quiz" | "flashcard">("quiz");
   const [isCreateMindMapOpen, setIsCreateMindMapOpen] = useState(false);
+  const [isCreatePresentationOpen, setIsCreatePresentationOpen] = useState(false);
   const [generatingArtifacts, setGeneratingArtifacts] = useState<GeneratingArtifactStatus[]>([]);
 
   // Right Pane: Dual Studio & Preview/Review state
@@ -475,35 +477,46 @@ export function LearnWorkspace({
   };
 
   const handleGenerateStudioArtifact = async (params: {
-    type: "quiz" | "flashcard" | "mind_map";
+    type: "quiz" | "flashcard" | "mind_map" | "slides";
     topic: string;
     selectedSourceIds: string[];
-    count: number;
-    difficulty: "easy" | "medium" | "hard";
+    count?: number;
+    difficulty?: "easy" | "medium" | "hard";
+    lengthMode?: "short" | "medium" | "long" | "auto";
+    language?: "id" | "en";
   }) => {
     // 1. Ensure studio panel is open and in Studio mode so user immediately sees the progress card!
     setIsStudioCollapsed(false);
     setRightPaneMode("studio");
 
     const selectedSources = (sources || []).filter((s) => params.selectedSourceIds.includes(s.id));
+    const targetLang = params.language || (language === "id" ? "id" : "en");
+    const isIndo = targetLang === "id";
+
     const title = params.topic.trim()
       ? (params.type === "quiz"
-          ? `Kuis: ${params.topic}`
+          ? (isIndo ? `Kuis: ${params.topic}` : `Quiz: ${params.topic}`)
           : params.type === "flashcard"
-          ? `Kartu: ${params.topic}`
-          : `Peta Pikiran: ${params.topic}`)
+          ? (isIndo ? `Kartu: ${params.topic}` : `Flashcard: ${params.topic}`)
+          : params.type === "mind_map"
+          ? (isIndo ? `Peta Pikiran: ${params.topic}` : `Mind Map: ${params.topic}`)
+          : (isIndo ? `Presentasi: ${params.topic}` : `Presentation: ${params.topic}`))
       : (params.type === "quiz"
-          ? (language === "id" ? `Kuis (${params.count} Soal)` : `Quiz (${params.count} Questions)`)
+          ? (isIndo ? `Kuis (${params.count || 5} Soal)` : `Quiz (${params.count || 5} Questions)`)
           : params.type === "flashcard"
-          ? (language === "id" ? `Kartu Hafalan (${params.count} Kartu)` : `Flashcards (${params.count} Cards)`)
-          : (language === "id" ? "Peta Pikiran" : "Mind Map"));
+          ? (isIndo ? `Kartu Hafalan (${params.count || 10} Kartu)` : `Flashcards (${params.count || 10} Cards)`)
+          : params.type === "mind_map"
+          ? (isIndo ? "Peta Pikiran" : "Mind Map")
+          : (isIndo ? "Slide Presentasi" : "Presentation Slides"));
 
     const initialLoadingTitle =
       params.type === "quiz"
-        ? (language === "id" ? "Membuat Kuis..." : "Creating Quiz...")
+        ? (isIndo ? "Membuat Kuis..." : "Creating Quiz...")
         : params.type === "flashcard"
-        ? (language === "id" ? "Membuat Kartu Tanya-Jawab..." : "Creating Flashcards...")
-        : (language === "id" ? "Membuat Peta Pikiran..." : "Creating Mind Map...");
+        ? (isIndo ? "Membuat Kartu Tanya-Jawab..." : "Creating Flashcards...")
+        : params.type === "mind_map"
+        ? (isIndo ? "Membuat Peta Pikiran..." : "Creating Mind Map...")
+        : (isIndo ? "Menyusun Presentasi..." : "Creating Presentation...");
 
     // 2. Immediately create in Dexie with status: "generating" (appears instantly in Artifacts list)
     const artId = await localDb.createArtifact({
@@ -524,7 +537,8 @@ export function LearnWorkspace({
         sources: selectedSources,
         count: params.count,
         difficulty: params.difficulty,
-        language: language === "id" ? "id" : "en",
+        lengthMode: params.lengthMode,
+        language: targetLang,
       });
 
       // Update Dexie artifact to completed
@@ -536,17 +550,21 @@ export function LearnWorkspace({
       });
 
       toast.success(
-        language === "id"
+        isIndo
           ? (params.type === "quiz"
               ? "Kuis berhasil dibuat!"
               : params.type === "flashcard"
               ? "Kartu tanya-jawab berhasil dibuat!"
-              : "Peta pikiran berhasil dibuat!")
+              : params.type === "mind_map"
+              ? "Peta pikiran berhasil dibuat!"
+              : "Presentasi berhasil disusun!")
           : (params.type === "quiz"
               ? "Quiz created successfully!"
               : params.type === "flashcard"
               ? "Flashcards created successfully!"
-              : "Mind map created successfully!")
+              : params.type === "mind_map"
+              ? "Mind map created successfully!"
+              : "Presentation slides created successfully!")
       );
 
       // Auto-open in preview & auto-widen
@@ -562,7 +580,7 @@ export function LearnWorkspace({
         error: err?.message || "Generation failed",
       });
       toast.error(
-        language === "id"
+        isIndo
           ? `Gagal membuat materi: ${err?.message || "Terjadi kesalahan"}`
           : `Failed to create material: ${err?.message || "An error occurred"}`
       );
@@ -585,8 +603,10 @@ export function LearnWorkspace({
       setIsCreateStudioOpen(true);
     } else if (toolId === "mind_map") {
       setIsCreateMindMapOpen(true);
+    } else if (toolId === "slides" || toolId === "presentation") {
+      setIsCreatePresentationOpen(true);
     } else {
-      // Menu lain selain Quiz & Flashcard, MindMap tidak melakukan apa-apa (no-op)
+      // Menu lain tidak melakukan apa-apa (no-op)
       return;
     }
   };
@@ -596,9 +616,11 @@ export function LearnWorkspace({
       art.type === "quiz" ||
       art.type === "flashcard" ||
       art.type === "mind_map" ||
+      art.type === "slides" ||
       art.data?.questions ||
       art.data?.cards ||
-      art.data?.root
+      art.data?.root ||
+      art.data?.slides
     ) {
       handleOpenStudioArtifact(art);
       return;
@@ -1325,6 +1347,14 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
       <CreateMindMapDialog
         open={isCreateMindMapOpen}
         onOpenChange={setIsCreateMindMapOpen}
+        sources={sources || []}
+        onGenerate={handleGenerateStudioArtifact}
+      />
+
+      {/* Dedicated Create Presentation Dialog */}
+      <CreatePresentationDialog
+        open={isCreatePresentationOpen}
+        onOpenChange={setIsCreatePresentationOpen}
         sources={sources || []}
         onGenerate={handleGenerateStudioArtifact}
       />

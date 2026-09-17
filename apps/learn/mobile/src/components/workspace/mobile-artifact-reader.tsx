@@ -14,8 +14,9 @@ import {
 } from "lucide-react";
 import { cn } from "@const/ui";
 import { useI18n } from "../../lib/i18n";
-import type { LocalArtifact, QuizData, QuizQuestion, FlashcardData, FlashcardItem } from "../../lib/db";
+import type { LocalArtifact, QuizData, QuizQuestion, FlashcardData, FlashcardItem, SlideDeckData } from "../../lib/db";
 import { MobileMindMapViewer } from "./mobile-mind-map-viewer";
+import { MobileSlideViewer } from "./mobile-slide-viewer";
 
 export interface MobileArtifactReaderProps {
   open: boolean;
@@ -38,6 +39,7 @@ export function MobileArtifactReader({
   const isQuiz = artifact.type === "quiz";
   const isFlashcard = artifact.type === "flashcard" || artifact.type === "flashcards";
   const isMindMap = artifact.type === "mind_map" || Boolean(artifact.data?.root);
+  const isSlides = artifact.type === "slides" || Boolean(artifact.data?.slides);
 
   const quizData = isQuiz ? (artifact.data as QuizData) : null;
   const flashcardData = isFlashcard ? (artifact.data as FlashcardData) : null;
@@ -54,9 +56,32 @@ export function MobileArtifactReader({
           }
         })()
     : null;
+  const slideDeckData = isSlides
+    ? artifact.data?.slides
+      ? (artifact.data as SlideDeckData)
+      : (() => {
+          try {
+            return typeof artifact.content === "string"
+              ? JSON.parse(artifact.content)
+              : artifact.content;
+          } catch {
+            return null;
+          }
+        })()
+    : null;
 
   if (isMindMap && mindMapData) {
     return <MobileMindMapViewer data={mindMapData} onClose={onClose} />;
+  }
+
+  if (isSlides && slideDeckData) {
+    return (
+      <MobileSlideViewer
+        deck={slideDeckData}
+        onClose={onClose}
+        onExplainInChat={onExplainInChat}
+      />
+    );
   }
 
   return (
