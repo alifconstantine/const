@@ -17,6 +17,9 @@ import {
   SelectContent,
   SelectItem,
   ScrollArea,
+  Sheet,
+  SheetContent,
+  SheetTitle,
   cn,
   toast,
 } from "@const/ui";
@@ -257,6 +260,7 @@ export default function GenerationPage() {
 
   // UI Panels & Modals State
   const [isRunSettingsCollapsed, setIsRunSettingsCollapsed] = useState(false);
+  const [mobileSettingsOpen, setMobileSettingsOpen] = useState(false);
   const [isModelSelectorOpen, setIsModelSelectorOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [isSystemInstructionOpen, setIsSystemInstructionOpen] = useState(false);
@@ -723,13 +727,276 @@ export default function GenerationPage() {
     }
   };
 
+  const renderRunSettingsContent = (onClose: () => void, isMobileView: boolean = false) => (
+    <div className="flex flex-col h-full overflow-hidden bg-card/40">
+      {/* Header Bar */}
+      <div className="p-4 flex items-center justify-between shrink-0 border-b border-border/40">
+        <h2 className="font-sans text-base font-semibold text-foreground">
+          Run settings
+        </h2>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setIsViewCodeOpen(true)}
+            className="h-7 px-2.5 rounded-full text-xs font-normal gap-1.5 text-muted-foreground hover:text-foreground cursor-pointer"
+          >
+            <Code2 className="h-3.5 w-3.5" />
+            <span>Get code</span>
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onClose}
+            className="h-7 w-7 rounded-full text-muted-foreground hover:text-foreground cursor-pointer"
+            title="Collapse settings"
+          >
+            <PanelRightClose className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </div>
+
+      <div className="p-4 space-y-6 flex-1 overflow-y-auto">
+        {/* New Chat & History Row in Right Sidebar */}
+        <div className="flex items-center gap-2">
+          <Button
+            onClick={() => {
+              handleNewChat();
+              if (isMobileView) setMobileSettingsOpen(false);
+            }}
+            size="sm"
+            className="flex-1 rounded-full text-xs sm:text-sm font-medium h-9 gap-1.5 cursor-pointer shadow-sm bg-foreground text-background hover:bg-foreground/90"
+          >
+            <Plus className="h-4 w-4" />
+            <span>New chat</span>
+          </Button>
+
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => setIsHistoryOpen(true)}
+            className="h-9 w-9 rounded-full text-muted-foreground hover:text-foreground border-border/70 cursor-pointer shrink-0 hover:bg-secondary"
+            title="Chat history"
+          >
+            <History className="h-4 w-4" />
+          </Button>
+        </div>
+
+        {/* 1. Model Selector Row (Clean, No Icon) */}
+        <div className="space-y-1.5">
+          <div
+            onClick={() => setIsModelSelectorOpen(true)}
+            className="p-3.5 rounded-2xl border border-border/70 bg-card hover:bg-secondary/40 hover:border-border transition-all cursor-pointer group"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 min-w-0 pr-2">
+                <span className="font-sans text-sm font-medium text-foreground group-hover:text-foreground truncate">
+                  {selectedModel.name}
+                </span>
+                {selectedModel.isCombo && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-secondary text-muted-foreground font-mono shrink-0">
+                    Combo
+                  </span>
+                )}
+              </div>
+              <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors shrink-0" />
+            </div>
+          </div>
+        </div>
+
+        {/* 2. System Instructions Row (No Icon, Clean Typography) */}
+        <div className="space-y-1.5">
+          <div
+            onClick={() => setIsSystemInstructionOpen(true)}
+            className="p-3.5 rounded-2xl border border-border/70 bg-card hover:bg-secondary/40 transition-all cursor-pointer space-y-1.5 group"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-foreground">System instructions</span>
+              <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
+            </div>
+            <p className="text-xs text-muted-foreground font-normal line-clamp-2 leading-relaxed">
+              {systemInstruction.trim() || "Optional tone and style instructions for the model"}
+            </p>
+          </div>
+        </div>
+
+        {/* 3. Paste API Key */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-medium text-foreground flex items-center gap-1.5">
+              <Key className="h-3.5 w-3.5 text-muted-foreground" />
+              <span>API Key</span>
+            </label>
+            {customApiKey && (
+              <button
+                onClick={() => setShowApiKey(!showApiKey)}
+                className="text-xs text-muted-foreground hover:text-foreground cursor-pointer flex items-center gap-1"
+              >
+                {showApiKey ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                <span>{showApiKey ? "Hide" : "Show"}</span>
+              </button>
+            )}
+          </div>
+
+          {/* Selector or custom paste */}
+          {userKeys && userKeys.length > 0 ? (
+            <div className="space-y-2">
+              <Select value={selectedKeyId} onValueChange={setSelectedKeyId}>
+                <SelectTrigger className="h-9 rounded-full text-xs font-sans bg-secondary/50 border-border/70 text-foreground">
+                  <SelectValue placeholder="Choose Key" />
+                </SelectTrigger>
+                <SelectContent className="bg-card border-border/70 text-xs font-sans">
+                  <SelectItem value="account-session" className="cursor-pointer font-sans text-foreground">
+                    Const Account Session (Default)
+                  </SelectItem>
+                  <SelectItem value="custom" className="cursor-pointer font-sans text-foreground">
+                    Use Custom Pasted Key
+                  </SelectItem>
+                  {userKeys.map((k) => (
+                    <SelectItem key={k._id} value={k._id} className="cursor-pointer text-foreground">
+                      {k.name} ({k.keyPrefix})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              {selectedKeyId === "custom" && (
+                <Input
+                  type={showApiKey ? "text" : "password"}
+                  value={customApiKey}
+                  onChange={(e) => handleCustomKeyChange(e.target.value)}
+                  placeholder="Paste Gemini, OpenAI, or Const Key..."
+                  className="h-9 rounded-full text-xs font-mono border-border/70 bg-background text-foreground"
+                />
+              )}
+            </div>
+          ) : (
+            <Input
+              type={showApiKey ? "text" : "password"}
+              value={customApiKey}
+              onChange={(e) => handleCustomKeyChange(e.target.value)}
+              placeholder="Paste Gemini, OpenAI, or Const Key..."
+              className="h-9 rounded-full text-xs font-mono border-border/70 bg-background text-foreground"
+            />
+          )}
+          <p className="text-xs text-muted-foreground font-normal leading-relaxed">
+            Key is used for direct streaming execution and saved in your local browser session.
+          </p>
+        </div>
+
+        {/* 4. Temperature Slider */}
+        <div className="space-y-2.5">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-foreground">Temperature</span>
+            <span className="text-xs font-mono font-medium text-foreground">{temperature.toFixed(1)}</span>
+          </div>
+          <Slider
+            value={[temperature]}
+            onValueChange={(vals) => setTemperature(vals[0] ?? 1.0)}
+            min={0.0}
+            max={2.0}
+            step={0.1}
+            className="w-full cursor-pointer"
+          />
+          <div className="flex justify-between text-xs text-muted-foreground font-sans">
+            <span>0.0 (Precise)</span>
+            <span>2.0 (Creative)</span>
+          </div>
+        </div>
+
+        {/* 5. Thinking Level (Conditional: Only visible if model supports thinking) */}
+        {supportsThinking && (
+          <div className="space-y-2.5 pt-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-foreground">Thinking level</span>
+              <Badge variant="secondary" className="text-xs px-2 py-0.5 font-sans text-foreground font-medium">
+                Reasoning
+              </Badge>
+            </div>
+
+            <Select
+              value={thinkingLevel}
+              onValueChange={(val: "low" | "medium" | "high") => setThinkingLevel(val)}
+            >
+              <SelectTrigger className="w-full h-9 rounded-full text-xs font-sans border-border/70 bg-secondary/50 text-foreground">
+                <SelectValue placeholder="Thinking Level" />
+              </SelectTrigger>
+              <SelectContent className="bg-card border-border/70 text-xs font-sans">
+                <SelectItem value="low" className="cursor-pointer text-foreground">
+                  Low (Fast Verification)
+                </SelectItem>
+                <SelectItem value="medium" className="cursor-pointer text-foreground">
+                  Medium (Balanced Reasoning)
+                </SelectItem>
+                <SelectItem value="high" className="cursor-pointer text-foreground">
+                  High (Deep Step-by-Step Logic)
+                </SelectItem>
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground font-normal leading-relaxed">
+              Configures reasoning effort and token allocation before producing output.
+            </p>
+          </div>
+        )}
+
+        {/* 6. Web Search: Off | Research | DeepResearch */}
+        <div className="space-y-2.5 pt-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <Globe className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="text-xs font-medium text-foreground">Web search</span>
+            </div>
+            <Badge
+              variant={webSearch !== "off" ? "default" : "secondary"}
+              className={cn(
+                "text-xs px-2 py-0.5 font-sans font-medium",
+                webSearch !== "off"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground"
+              )}
+            >
+              {webSearch === "deep-research"
+                ? "DeepResearch"
+                : webSearch !== "off"
+                  ? "Research"
+                  : "Off"}
+            </Badge>
+          </div>
+
+          <Select
+            value={webSearch}
+            onValueChange={(val: "off" | "auto" | "research" | "deep-research") => setWebSearch(val)}
+          >
+            <SelectTrigger className="w-full h-9 rounded-full text-xs font-sans border-border/70 bg-secondary/50 text-foreground">
+              <SelectValue placeholder="Web Search" />
+            </SelectTrigger>
+            <SelectContent className="bg-card border-border/70 text-xs font-sans">
+              <SelectItem value="off" className="cursor-pointer text-foreground">
+                Off (Standard inference)
+              </SelectItem>
+              <SelectItem value="research" className="cursor-pointer text-foreground">
+                Research (Fast live search)
+              </SelectItem>
+              <SelectItem value="deep-research" className="cursor-pointer text-foreground">
+                DeepResearch (In-depth multi-source)
+              </SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground font-normal leading-relaxed">
+            Grounds answers with live web research or deep multi-source synthesis via Const Search.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+
   return (
     <div className="flex h-[calc(100vh-3.5rem)] -m-6 md:-m-8 bg-background text-foreground overflow-hidden">
       {/* Main Center Canvas: Full Width */}
       <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden bg-background">
         {/* Top Chat Title Bar (Editable, Default "Untitled Chat") */}
-        <div className="h-14 px-6 flex items-center justify-between shrink-0 bg-background/95 backdrop-blur">
-          <div className="flex items-center gap-2 max-w-lg">
+        <div className="h-14 px-4 sm:px-6 flex items-center justify-between shrink-0 bg-background/95 backdrop-blur">
+          <div className="flex items-center gap-2 min-w-0 max-w-lg">
             {isEditingTitle ? (
               <input
                 value={titleDraft}
@@ -742,7 +1009,7 @@ export default function GenerationPage() {
                     setIsEditingTitle(false);
                   }
                 }}
-                className="h-8 px-2.5 text-base sm:text-lg font-sans font-medium rounded-lg bg-secondary/50 text-foreground outline-none ring-1 ring-foreground/30 w-72 transition-all"
+                className="h-8 px-2.5 text-base sm:text-lg font-sans font-medium rounded-lg bg-secondary/50 text-foreground outline-none ring-1 ring-foreground/30 w-56 sm:w-72 transition-all"
                 autoFocus
                 onFocus={(e) => e.target.select()}
               />
@@ -752,13 +1019,13 @@ export default function GenerationPage() {
                   setTitleDraft(chatTitle);
                   setIsEditingTitle(true);
                 }}
-                className="group flex items-center gap-2 cursor-pointer select-none py-1 px-2 -ml-2 rounded-lg hover:bg-secondary/50 transition-colors"
+                className="group flex items-center gap-2 cursor-pointer select-none py-1 px-2 -ml-2 rounded-lg hover:bg-secondary/50 transition-colors min-w-0"
                 title="Click to rename chat"
               >
-                <span className="font-sans text-base sm:text-lg font-medium text-foreground truncate max-w-md">
+                <span className="font-sans text-base sm:text-lg font-medium text-foreground truncate max-w-[200px] sm:max-w-md">
                   {chatTitle}
                 </span>
-                <Pencil className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                <Pencil className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
               </div>
             )}
           </div>
@@ -960,278 +1227,75 @@ export default function GenerationPage() {
         </div>
       </div>
 
-      {/* Right Inspector Panel: "Run settings" */}
-      {isRunSettingsCollapsed ? (
-        <div className="shrink-0 flex flex-col items-center py-3 px-2 border-l border-border/70 bg-card/40">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setIsRunSettingsCollapsed(false)}
-            className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground cursor-pointer"
-            title="Expand Run Settings"
+      {/* Desktop Right Inspector Panel (Collapsible) */}
+      <div className="hidden md:flex shrink-0 h-full">
+        {isRunSettingsCollapsed ? (
+          <div className="shrink-0 flex flex-col items-center py-3 px-2 border-l border-border/70 bg-card/40">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setIsRunSettingsCollapsed(false)}
+              className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground cursor-pointer"
+              title="Expand Run Settings"
+            >
+              <PanelRight className="h-4 w-4" />
+            </Button>
+          </div>
+        ) : (
+          <div className="w-80 shrink-0 border-l border-border/70 bg-card/40 flex flex-col h-full overflow-hidden transition-all">
+            {renderRunSettingsContent(() => setIsRunSettingsCollapsed(true), false)}
+          </div>
+        )}
+      </div>
+
+      {/* Mobile Collapsed Right Rail (Icon Only when closed) */}
+      <div className="md:hidden shrink-0 flex flex-col items-center py-3 px-1.5 border-l border-border/70 bg-card/40 gap-2">
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setMobileSettingsOpen(true)}
+          className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground cursor-pointer"
+          title="Open Run Settings"
+          aria-label="Open Run Settings"
+        >
+          <PanelRight className="h-4 w-4" />
+        </Button>
+        <div className="w-4 h-[1px] bg-border/50 my-0.5" />
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={handleNewChat}
+          className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground cursor-pointer"
+          title="New chat"
+          aria-label="New chat"
+        >
+          <Plus className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={() => setIsHistoryOpen(true)}
+          className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground cursor-pointer"
+          title="Chat history"
+          aria-label="Chat history"
+        >
+          <History className="h-4 w-4" />
+        </Button>
+      </div>
+
+      {/* Mobile Slide-out Drawer (Like the Left Sidebar Drawer) */}
+      <div className="md:hidden">
+        <Sheet open={mobileSettingsOpen} onOpenChange={setMobileSettingsOpen}>
+          <SheetContent
+            side="right"
+            showCloseButton={false}
+            className="p-0 w-[85vw] max-w-sm border-l border-border bg-card flex flex-col h-full z-50"
           >
-            <PanelRight className="h-4 w-4" />
-          </Button>
-        </div>
-      ) : (
-        <div className="w-80 shrink-0 border-l border-border/70 bg-card/40 flex flex-col h-full overflow-y-auto transition-all">
-          {/* Header Bar */}
-          <div className="p-4 flex items-center justify-between">
-            <h2 className="font-sans text-base font-semibold text-foreground">
-              Run settings
-            </h2>
-            <div className="flex items-center gap-1">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => setIsViewCodeOpen(true)}
-                className="h-7 px-2.5 rounded-full text-xs font-normal gap-1.5 text-muted-foreground hover:text-foreground cursor-pointer"
-              >
-                <Code2 className="h-3.5 w-3.5" />
-                <span>Get code</span>
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setIsRunSettingsCollapsed(true)}
-                className="h-7 w-7 rounded-full text-muted-foreground hover:text-foreground cursor-pointer"
-                title="Collapse settings"
-              >
-                <PanelRightClose className="h-3.5 w-3.5" />
-              </Button>
-            </div>
-          </div>
-
-          <div className="p-4 space-y-6 flex-1">
-            {/* New Chat & History Row in Right Sidebar */}
-            <div className="flex items-center gap-2">
-              <Button
-                onClick={handleNewChat}
-                size="sm"
-                className="flex-1 rounded-full text-xs sm:text-sm font-medium h-9 gap-1.5 cursor-pointer shadow-sm bg-foreground text-background hover:bg-foreground/90"
-              >
-                <Plus className="h-4 w-4" />
-                <span>New chat</span>
-              </Button>
-
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => setIsHistoryOpen(true)}
-                className="h-9 w-9 rounded-full text-muted-foreground hover:text-foreground border-border/70 cursor-pointer shrink-0 hover:bg-secondary"
-                title="Chat history"
-              >
-                <History className="h-4 w-4" />
-              </Button>
-            </div>
-
-            {/* 1. Model Selector Row (Clean, No Icon) */}
-            <div className="space-y-1.5">
-              <div
-                onClick={() => setIsModelSelectorOpen(true)}
-                className="p-3.5 rounded-2xl border border-border/70 bg-card hover:bg-secondary/40 hover:border-border transition-all cursor-pointer group"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2 min-w-0 pr-2">
-                    <span className="font-sans text-sm font-medium text-foreground group-hover:text-foreground truncate">
-                      {selectedModel.name}
-                    </span>
-                    {selectedModel.isCombo && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-secondary text-muted-foreground font-mono shrink-0">
-                        Combo
-                      </span>
-                    )}
-                  </div>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors shrink-0" />
-                </div>
-              </div>
-            </div>
-
-            {/* 2. System Instructions Row (No Icon, Clean Typography) */}
-            <div className="space-y-1.5">
-              <div
-                onClick={() => setIsSystemInstructionOpen(true)}
-                className="p-3.5 rounded-2xl border border-border/70 bg-card hover:bg-secondary/40 transition-all cursor-pointer space-y-1.5 group"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-foreground">System instructions</span>
-                  <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-foreground transition-colors" />
-                </div>
-                <p className="text-xs text-muted-foreground font-normal line-clamp-2 leading-relaxed">
-                  {systemInstruction.trim() || "Optional tone and style instructions for the model"}
-                </p>
-              </div>
-            </div>
-
-            {/* 3. Paste API Key */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-xs font-medium text-foreground flex items-center gap-1.5">
-                  <Key className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span>API Key</span>
-                </label>
-                {customApiKey && (
-                  <button
-                    onClick={() => setShowApiKey(!showApiKey)}
-                    className="text-xs text-muted-foreground hover:text-foreground cursor-pointer flex items-center gap-1"
-                  >
-                    {showApiKey ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-                    <span>{showApiKey ? "Hide" : "Show"}</span>
-                  </button>
-                )}
-              </div>
-
-              {/* Selector or custom paste */}
-              {userKeys && userKeys.length > 0 ? (
-                <div className="space-y-2">
-                  <Select value={selectedKeyId} onValueChange={setSelectedKeyId}>
-                    <SelectTrigger className="h-9 rounded-full text-xs font-sans bg-secondary/50 border-border/70 text-foreground">
-                      <SelectValue placeholder="Choose Key" />
-                    </SelectTrigger>
-                    <SelectContent className="bg-card border-border/70 text-xs font-sans">
-                      <SelectItem value="account-session" className="cursor-pointer font-sans text-foreground">
-                        Const Account Session (Default)
-                      </SelectItem>
-                      <SelectItem value="custom" className="cursor-pointer font-sans text-foreground">
-                        Use Custom Pasted Key
-                      </SelectItem>
-                      {userKeys.map((k) => (
-                        <SelectItem key={k._id} value={k._id} className="cursor-pointer text-foreground">
-                          {k.name} ({k.keyPrefix})
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-
-                  {selectedKeyId === "custom" && (
-                    <Input
-                      type={showApiKey ? "text" : "password"}
-                      value={customApiKey}
-                      onChange={(e) => handleCustomKeyChange(e.target.value)}
-                      placeholder="Paste Gemini, OpenAI, or Const Key..."
-                      className="h-9 rounded-full text-xs font-mono border-border/70 bg-background text-foreground"
-                    />
-                  )}
-                </div>
-              ) : (
-                <Input
-                  type={showApiKey ? "text" : "password"}
-                  value={customApiKey}
-                  onChange={(e) => handleCustomKeyChange(e.target.value)}
-                  placeholder="Paste Gemini, OpenAI, or Const Key..."
-                  className="h-9 rounded-full text-xs font-mono border-border/70 bg-background text-foreground"
-                />
-              )}
-              <p className="text-xs text-muted-foreground font-normal leading-relaxed">
-                Key is used for direct streaming execution and saved in your local browser session.
-              </p>
-            </div>
-
-            {/* 4. Temperature Slider */}
-            <div className="space-y-2.5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-foreground">Temperature</span>
-                <span className="text-xs font-mono font-medium text-foreground">{temperature.toFixed(1)}</span>
-              </div>
-              <Slider
-                value={[temperature]}
-                onValueChange={(vals) => setTemperature(vals[0] ?? 1.0)}
-                min={0.0}
-                max={2.0}
-                step={0.1}
-                className="w-full cursor-pointer"
-              />
-              <div className="flex justify-between text-xs text-muted-foreground font-sans">
-                <span>0.0 (Precise)</span>
-                <span>2.0 (Creative)</span>
-              </div>
-            </div>
-
-            {/* 5. Thinking Level (Conditional: Only visible if model supports thinking) */}
-            {supportsThinking && (
-              <div className="space-y-2.5 pt-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-foreground">Thinking level</span>
-                  <Badge variant="secondary" className="text-xs px-2 py-0.5 font-sans text-foreground font-medium">
-                    Reasoning
-                  </Badge>
-                </div>
-
-                <Select
-                  value={thinkingLevel}
-                  onValueChange={(val: "low" | "medium" | "high") => setThinkingLevel(val)}
-                >
-                  <SelectTrigger className="w-full h-9 rounded-full text-xs font-sans border-border/70 bg-secondary/50 text-foreground">
-                    <SelectValue placeholder="Thinking Level" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-card border-border/70 text-xs font-sans">
-                    <SelectItem value="low" className="cursor-pointer text-foreground">
-                      Low (Fast Verification)
-                    </SelectItem>
-                    <SelectItem value="medium" className="cursor-pointer text-foreground">
-                      Medium (Balanced Reasoning)
-                    </SelectItem>
-                    <SelectItem value="high" className="cursor-pointer text-foreground">
-                      High (Deep Step-by-Step Logic)
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground font-normal leading-relaxed">
-                  Configures reasoning effort and token allocation before producing output.
-                </p>
-              </div>
-            )}
-
-            {/* 6. Web Search: Off | Research | DeepResearch */}
-            <div className="space-y-2.5 pt-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5">
-                  <Globe className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span className="text-xs font-medium text-foreground">Web search</span>
-                </div>
-                <Badge
-                  variant={webSearch !== "off" ? "default" : "secondary"}
-                  className={cn(
-                    "text-xs px-2 py-0.5 font-sans font-medium",
-                    webSearch !== "off"
-                      ? "bg-primary text-primary-foreground"
-                      : "text-muted-foreground"
-                  )}
-                >
-                  {webSearch === "deep-research"
-                    ? "DeepResearch"
-                    : webSearch !== "off"
-                      ? "Research"
-                      : "Off"}
-                </Badge>
-              </div>
-
-              <Select
-                value={webSearch}
-                onValueChange={(val: "off" | "auto" | "research" | "deep-research") => setWebSearch(val)}
-              >
-                <SelectTrigger className="w-full h-9 rounded-full text-xs font-sans border-border/70 bg-secondary/50 text-foreground">
-                  <SelectValue placeholder="Web Search" />
-                </SelectTrigger>
-                <SelectContent className="bg-card border-border/70 text-xs font-sans">
-                  <SelectItem value="off" className="cursor-pointer text-foreground">
-                    Off (Standard inference)
-                  </SelectItem>
-                  <SelectItem value="research" className="cursor-pointer text-foreground">
-                    Research (Fast live search)
-                  </SelectItem>
-                  <SelectItem value="deep-research" className="cursor-pointer text-foreground">
-                    DeepResearch (In-depth multi-source)
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground font-normal leading-relaxed">
-                Grounds answers with live web research or deep multi-source synthesis via Const Search.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
+            <SheetTitle className="sr-only">Run settings</SheetTitle>
+            {renderRunSettingsContent(() => setMobileSettingsOpen(false), true)}
+          </SheetContent>
+        </Sheet>
+      </div>
 
       {/* Model Selector Slide-Over Panel (Virtual Combos & Standard Models) */}
       <ModelSelectorPanel
