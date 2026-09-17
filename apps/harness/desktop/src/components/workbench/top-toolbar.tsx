@@ -199,12 +199,11 @@ export function TopToolbar({
             <button
               type="button"
               onClick={onToggleSidebar}
-              className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-[#222222] text-[#262626] dark:text-[#d4d4d4] transition-colors cursor-pointer group flex items-center justify-center"
+              className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-[#222222] text-[#262626] dark:text-[#d4d4d4] transition-colors cursor-pointer flex items-center justify-center"
               title="Open sidebar"
               aria-label="Open sidebar"
             >
-              <ConstLogoIcon size="sm" className="w-5 h-5 group-hover:hidden" />
-              <PanelLeft className="w-5 h-5 hidden group-hover:block text-[#262626] dark:text-[#d4d4d4]" />
+              <PanelLeft className="w-4 h-4 text-[#262626] dark:text-[#d4d4d4]" />
             </button>
 
             <div className="flex items-center gap-0.5 text-[#262626] dark:text-[#d4d4d4]">

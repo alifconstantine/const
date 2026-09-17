@@ -27,7 +27,8 @@ import {
   TooltipProvider,
 } from "@const/ui";
 import {
-  PanelLeftClose,
+  PanelLeft,
+  PlusCircle,
   ArrowLeft,
   ArrowRight,
   MessageCirclePlus,
@@ -443,63 +444,72 @@ export function Sidebar({
     setDragOverProjectIndex(null);
   };
 
+  const isMac =
+    typeof window !== "undefined" &&
+    /Mac|iPod|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+
   return (
-    <aside className="w-56 h-full flex flex-col justify-between shrink-0 select-none bg-[#ececee] dark:bg-[#2b2b2b] text-[#262626] dark:text-[#d4d4d4] p-3">
+    <aside className="w-56 h-full flex flex-col justify-between shrink-0 select-none bg-transparent text-[#262626] dark:text-[#d4d4d4] p-3">
       {/* Top Header & Navigation Actions (No dividing lines, following DESIGN.md) */}
       <div className="flex flex-col gap-1">
-        {/* Logo and Back/Forward Navigation */}
+        {/* Logo and Collapse Button */}
         <div
-          className="flex items-center justify-between h-9 mb-2"
+          className="flex items-center justify-between h-9 mb-1"
           style={{ WebkitAppRegion: "drag" } as React.CSSProperties}
         >
-          {/* Logo with hover-to-collapse effect */}
-          <button
-            type="button"
-            onClick={onCollapse}
+          <div
+            className="flex items-center gap-2"
             style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
-            className="p-1.5 rounded-lg hover:bg-[#dedee2] dark:hover:bg-[#383838] text-[#262626] dark:text-[#d4d4d4] transition-colors cursor-pointer group flex items-center justify-center"
-            title="Collapse sidebar"
-            aria-label="Collapse sidebar"
           >
-            <ConstLogoIcon size="sm" className="w-5 h-5 group-hover:hidden transition-transform" />
-            <PanelLeftClose className="w-5 h-5 hidden group-hover:block text-[#262626] dark:text-[#d4d4d4]" />
-          </button>
+            <ConstLogoIcon size="sm" className="w-5 h-5 text-foreground shrink-0" />
+            <div className="flex items-center gap-1.5">
+              <span className="font-serif text-base font-normal tracking-tight text-foreground">
+                Const
+              </span>
+              <span className="text-[10px] font-mono tracking-wider uppercase px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                Harness
+              </span>
+            </div>
+          </div>
 
-          {/* Go Back & Go Forward */}
           <div
             className="flex items-center gap-0.5 text-[#262626] dark:text-[#d4d4d4]"
             style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
           >
             <button
               type="button"
-              className="p-1.5 rounded-md hover:bg-[#dedee2] dark:hover:bg-[#383838] hover:text-black dark:hover:text-white transition-colors disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
-              title="Go back"
-              aria-label="Go back"
+              onClick={onCollapse}
+              className="p-1.5 rounded-lg hover:bg-[#dedee2] dark:hover:bg-[#383838] text-[#262626] dark:text-[#d4d4d4] transition-colors cursor-pointer"
+              title="Collapse sidebar (Ctrl+B)"
+              aria-label="Collapse sidebar"
             >
-              <ArrowLeft className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              className="p-1.5 rounded-md hover:bg-[#dedee2] dark:hover:bg-[#383838] hover:text-black dark:hover:text-white transition-colors disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
-              title="Go forward"
-              aria-label="Go forward"
-            >
-              <ArrowRight className="w-4 h-4" />
+              <PanelLeft className="w-4 h-4" />
             </button>
           </div>
         </div>
 
-        {/* Navigation Items */}
-        <div className="space-y-0.5 text-xs font-medium">
-          {/* New Task / Chat */}
+        {/* Action: Create New Task Button (Kimi Reference Style) */}
+        <div className="pt-1 pb-1.5">
           <button
             type="button"
             onClick={() => onNewChat?.()}
-            className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[#262626] dark:text-[#d4d4d4] hover:bg-[#dedee2] dark:hover:bg-[#383838] hover:text-black dark:hover:text-white transition-colors cursor-pointer"
+            className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-secondary/80 hover:bg-secondary border border-border/60 hover:border-border text-foreground font-medium text-xs transition-all cursor-pointer shadow-2xs group active:scale-[0.99]"
+            title={`New task (${isMac ? "⌘K" : "Ctrl K"})`}
           >
-            <MessageCirclePlus className="w-4 h-4 text-[#8a8a8a] dark:text-[#d4d4d4]" />
-            <span>New task</span>
+            <div className="flex items-center gap-2">
+              <PlusCircle className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors stroke-[1.8]" />
+              <span className="font-medium text-foreground/90 group-hover:text-foreground">
+                New task
+              </span>
+            </div>
+            <kbd className="px-1.5 py-0.5 rounded-md bg-background/90 border border-border/60 text-[10px] font-mono text-muted-foreground group-hover:text-foreground shadow-2xs">
+              {isMac ? "⌘K" : "Ctrl K"}
+            </kbd>
           </button>
+        </div>
+
+        {/* Navigation Items */}
+        <div className="space-y-0.5 text-xs font-medium">
 
           {/* Search */}
           <button

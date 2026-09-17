@@ -131,23 +131,6 @@ function AuthenticatedContent({
     setIsSettingsOpen(true);
   };
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        setIsSearchOpen((prev) => !prev);
-      }
-    };
-    const handleOpenCommandPalette = () => setIsSearchOpen(true);
-
-    window.addEventListener("keydown", handleKeyDown);
-    window.addEventListener("const:open-command-palette", handleOpenCommandPalette);
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-      window.removeEventListener("const:open-command-palette", handleOpenCommandPalette);
-    };
-  }, []);
-
   // Conversation history & state
   const [conversations, setConversations] = useState<ConversationItem[]>(() => {
     return loadConversations();
@@ -2140,6 +2123,50 @@ function AuthenticatedContent({
     }
   };
 
+  // Keyboard shortcuts: Toggle sidebar (Ctrl+B), New task (Ctrl+K), Search (Ctrl+P / Ctrl+Shift+K)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const isInput =
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable);
+
+      // Toggle sidebar: Ctrl+B or Cmd+B
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "b") {
+        e.preventDefault();
+        setIsSidebarOpen((prev) => !prev);
+      }
+
+      // New task: Ctrl+K or Cmd+K
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k" && !e.shiftKey) {
+        if (!isInput) {
+          e.preventDefault();
+          handleNewChat();
+        }
+      }
+
+      // Search / Command Palette: Ctrl+P, Cmd+P or Ctrl+Shift+K
+      if (
+        ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "p") ||
+        ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "k")
+      ) {
+        e.preventDefault();
+        setIsSearchOpen((prev) => !prev);
+      }
+    };
+
+    const handleOpenCommandPalette = () => setIsSearchOpen(true);
+
+    window.addEventListener("keydown", handleKeyDown);
+    window.addEventListener("const:open-command-palette", handleOpenCommandPalette);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      window.removeEventListener("const:open-command-palette", handleOpenCommandPalette);
+    };
+  }, []);
+
   if (isSettingsOpen) {
     return (
       <SettingsView
@@ -2153,37 +2180,39 @@ function AuthenticatedContent({
   }
 
   return (
-    <div className="h-full w-full max-w-full flex bg-[#ececee] dark:bg-[#2b2b2b] text-[#262626] dark:text-[#d4d4d4] overflow-hidden select-none">
-      {/* Left Sidebar (Only visible when isSidebarOpen = true) */}
-      {isSidebarOpen && (
-        <Sidebar
-          user={user}
-          onSignOut={onSignOut}
-          onSwitchAccount={onSwitchAccount}
-          onCollapse={() => setIsSidebarOpen(false)}
-          onNewChat={handleNewChat}
-          onNewChatOutside={() => handleNewChat("Outside Project")}
-          conversations={conversations}
-          activeConversationId={conversationId}
-          runningConvoIds={runningConvoIds}
-          onSelectConversation={handleSelectConversation}
-          onDeleteConversation={handleDeleteConversation}
-          onRenameConversation={handleRenameConversation}
-          onArchiveConversation={handleArchiveConversation}
-          onUnarchiveConversation={handleUnarchiveConversation}
-          onOpenSettings={(tab) => handleOpenSettings(tab || "general")}
-          onOpenScheduledTasks={() => setIsScheduledTasksOpen(true)}
-          isScheduledTasksActive={isScheduledTasksOpen}
-          onOpenSearch={() => setIsSearchOpen(true)}
-        />
-      )}
-
-      {/* Main Content Area: Background #f8f8f8 (light) / #161616 (dark), text #262626 / #d4d4d4 */}
-      <main
-        className={`flex-1 min-w-0 h-full bg-[#f8f8f8] dark:bg-[#161616] text-[#262626] dark:text-[#d4d4d4] overflow-hidden flex flex-col relative transition-[border-radius] duration-200 ${
-          isSidebarOpen ? "rounded-l-2xl sm:rounded-l-3xl border-l border-[#dedee2] dark:border-[#333333]/40" : ""
+    <div className="h-full w-full max-w-full flex bg-[#ececee] dark:bg-[#121212] text-[#262626] dark:text-[#d4d4d4] overflow-hidden select-none">
+      {/* 1. Left Sidebar (Collapsible with smooth slide, NO bouncing) */}
+      <div
+        className={`shrink-0 overflow-hidden transition-[width,opacity] duration-200 ease-out ${
+          isSidebarOpen ? "w-56 opacity-100" : "w-0 opacity-0 pointer-events-none"
         }`}
       >
+        <div className="w-56 h-full">
+          <Sidebar
+            user={user}
+            onSignOut={onSignOut}
+            onSwitchAccount={onSwitchAccount}
+            onCollapse={() => setIsSidebarOpen(false)}
+            onNewChat={handleNewChat}
+            onNewChatOutside={() => handleNewChat("Outside Project")}
+            conversations={conversations}
+            activeConversationId={conversationId}
+            runningConvoIds={runningConvoIds}
+            onSelectConversation={handleSelectConversation}
+            onDeleteConversation={handleDeleteConversation}
+            onRenameConversation={handleRenameConversation}
+            onArchiveConversation={handleArchiveConversation}
+            onUnarchiveConversation={handleUnarchiveConversation}
+            onOpenSettings={(tab) => handleOpenSettings(tab || "general")}
+            onOpenScheduledTasks={() => setIsScheduledTasksOpen(true)}
+            isScheduledTasksActive={isScheduledTasksOpen}
+            onOpenSearch={() => setIsSearchOpen(true)}
+          />
+        </div>
+      </div>
+
+      {/* 2. Main Content Area (Floating card with rounded corners on all sides: top, right, bottom, left) */}
+      <main className="flex-1 min-w-0 bg-[#f8f8f8] dark:bg-[#161616] text-[#262626] dark:text-[#d4d4d4] overflow-hidden flex flex-col relative rounded-2xl sm:rounded-3xl border border-[#dedee2] dark:border-[#333333]/60 shadow-sm m-2 sm:m-2.5">
         {isScheduledTasksOpen ? (
           <ScheduledTasksView
             onBackToWorkspace={() => setIsScheduledTasksOpen(false)}
