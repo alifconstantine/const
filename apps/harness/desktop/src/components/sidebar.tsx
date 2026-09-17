@@ -494,17 +494,17 @@ export function Sidebar({
             type="button"
             onClick={() => onNewChat?.()}
             className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-secondary/80 hover:bg-secondary border border-border/60 hover:border-border text-foreground font-medium text-xs transition-all cursor-pointer shadow-2xs group active:scale-[0.99]"
-            title={`New task (${isMac ? "⌘K" : "Ctrl K"})`}
+            title={`New task (${isMac ? "⌘K" : "Ctrl+K"})`}
           >
             <div className="flex items-center gap-2">
-              <PlusCircle className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors stroke-[1.8]" />
+              <MessageCirclePlus className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors stroke-[1.8]" />
               <span className="font-medium text-foreground/90 group-hover:text-foreground">
                 New task
               </span>
             </div>
-            <kbd className="px-1.5 py-0.5 rounded-md bg-background/90 border border-border/60 text-[10px] font-mono text-muted-foreground group-hover:text-foreground shadow-2xs">
-              {isMac ? "⌘K" : "Ctrl K"}
-            </kbd>
+            <span className="text-xs text-muted-foreground/60 group-hover:text-muted-foreground font-sans transition-colors select-none tracking-tight">
+              {isMac ? "⌘K" : "Ctrl+K"}
+            </span>
           </button>
         </div>
 
