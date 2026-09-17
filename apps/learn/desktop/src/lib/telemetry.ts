@@ -131,8 +131,9 @@ export function calculateContextUsage(params: {
   if (params.sources && params.sources.length > 0) {
     for (const s of params.sources) {
       if (s.includedInChat !== false) {
-        if (s.content) {
-          sourcesTokens += Math.round(s.content.length / 3.8);
+        const contentStr = typeof s.content === "string" ? s.content : s.content ? JSON.stringify(s.content) : "";
+        if (contentStr) {
+          sourcesTokens += Math.round(contentStr.length / 3.8);
         } else if (s.size) {
           sourcesTokens += Math.round(Math.min(s.size, 100000) / 4);
         } else {

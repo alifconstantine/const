@@ -55,7 +55,14 @@ contextBridge.exposeInMainWorld("electron", {
       model?: string;
       authToken?: string;
       temperature?: number;
+      timeoutMs?: number;
+      requestId?: string;
     }) => ipcRenderer.invoke("agent:generate-completion", payload),
+    onStudioToken: (callback: (data: { requestId: string; token: string }) => void) => {
+      const handler = (_event: any, data: any) => callback(data);
+      ipcRenderer.on("studio:stream-token", handler);
+      return () => ipcRenderer.removeListener("studio:stream-token", handler);
+    },
     rollbackFile: (record: any) =>
       ipcRenderer.invoke("agent:rollback-file", { record }),
     onStreamEvent: (callback: (event: any) => void) => {

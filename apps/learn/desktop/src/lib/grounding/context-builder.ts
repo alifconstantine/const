@@ -52,7 +52,19 @@ export function buildGroundedContext(
     const rawId = src.id;
     sourceIds.push(rawId);
 
-    const contentText = (src.content || "").trim();
+    let contentText = "";
+    if (typeof src.content === "string") {
+      contentText = src.content.trim();
+    } else if (typeof src.content === "object" && src.content !== null) {
+      try {
+        contentText = JSON.stringify(src.content, null, 2).trim();
+      } catch {
+        contentText = String(src.content).trim();
+      }
+    } else if (src.content !== undefined && src.content !== null) {
+      contentText = String(src.content).trim();
+    }
+
     const snippetOrNotice = contentText
       ? contentText
       : `[Content is not locally cached. URL reference: ${src.url || "N/A"}]`;

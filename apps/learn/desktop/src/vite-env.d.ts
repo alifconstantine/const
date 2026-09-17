@@ -92,7 +92,10 @@ declare global {
           model?: string;
           authToken?: string;
           temperature?: number;
+          timeoutMs?: number;
+          requestId?: string;
         }) => Promise<{ success: boolean; content?: string; error?: string }>;
+        onStudioToken?: (callback: (data: { requestId: string; token: string }) => void) => () => void;
         rollbackFile?: (record: FileMutationRecord) => Promise<{ success: boolean; message: string }>;
         onStreamEvent: (callback: (event: any) => void) => () => void;
       };

@@ -693,40 +693,53 @@ export function LearnWorkspace({
   const handleAddNote = async () => {
     if (!learnId) return;
 
+    const defaultTitle = language === "id" ? "Catatan Baru" : "New Note";
+    const artId = await localDb.createArtifact({
+      learnId,
+      title: defaultTitle,
+      type: "note",
+      status: "completed",
+      content: "",
+      sourcesCount: 0,
+    });
+
+    setActiveNoteArtifactId(artId);
+    setIsStudioCollapsed(false);
+    setRightPaneMode("studio");
+    const windowWidth = typeof window !== "undefined" ? window.innerWidth : 1280;
+    const targetPreviewWidth = Math.max(
+      studioWidth,
+      Math.min(Math.round(windowWidth * 0.45), 720),
+      620
+    );
+    if (studioWidth < targetPreviewWidth) {
+      setStudioWidth(targetPreviewWidth);
+      setIsManualWidth(true);
+    }
+  };
+
+  const handleGenerateNote = async (art: LocalArtifact) => {
+    if (!learnId || !art) return;
+
     const allSources = await db.sources.where("learnId").equals(learnId).toArray();
     const activeSources = allSources.filter((s) => s.includedInChat !== false);
     const sourcesCount = activeSources.length;
 
-    // 1. Create generating artifact in Dexie (instantly shows loading state with spinner in Image 1)
-    const defaultTitle = language === "id" ? "Catatan Baru" : "New Note";
-    const artId = await localDb.createArtifact({
-      learnId,
-      title: sourcesCount > 0 ? (language === "id" ? "Membuat Catatan..." : "Creating Note...") : defaultTitle,
-      type: "note",
-      status: sourcesCount > 0 ? "generating" : "completed",
-      content: "",
-      sourcesCount,
-    });
-
     if (sourcesCount === 0) {
-      // If no sources to synthesize, open blank note immediately
-      setActiveNoteArtifactId(artId);
-      setIsStudioCollapsed(false);
-      setRightPaneMode("studio");
-      const windowWidth = typeof window !== "undefined" ? window.innerWidth : 1280;
-      const targetPreviewWidth = Math.max(
-        studioWidth,
-        Math.min(Math.round(windowWidth * 0.45), 720),
-        620
+      toast.error(
+        language === "id"
+          ? "Tambahkan sumber materi terlebih dahulu untuk menghasilkan catatan AI."
+          : "Add sources to the notebook first to generate an AI note."
       );
-      if (studioWidth < targetPreviewWidth) {
-        setStudioWidth(targetPreviewWidth);
-        setIsManualWidth(true);
-      }
       return;
     }
 
-    // 2. Synthesize note using AI in background
+    const defaultTitle = language === "id" ? "Catatan Baru" : "New Note";
+    await localDb.updateArtifact(art.id, {
+      status: "generating",
+      sourcesCount,
+    });
+
     try {
       const grounded = buildGroundedContext(activeSources);
       const activeModelId =
@@ -742,15 +755,18 @@ Format the note in clear, beautiful Markdown:
 - Rujukan Sumber / Source References
 Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
 
-      const userPrompt = `Mohon buatkan catatan sintesis komprehensif berdasarkan materi sumber berikut:\n\n${grounded.formattedContext}\n\nBuat catatan yang rapi, padat wawasan, terstruktur, dan mudah dipahami.`;
+      const userPrompt = `Mohon buatkan catatan sintesis komprehensif berdasarkan materi sumber berikut:\n\n${grounded.formattedContext}\n\nBuat catatan yang rapi, padat wawasan, terstruktur, dan mudah dipahami. Gunakan tabel Markdown jika terdapat data perbandingan atau ringkasan matriks.`;
 
       let noteContent = "";
       await streamChatCompletion({
         model: activeModelId,
         systemPrompt,
         messages: [{ role: "user", content: userPrompt }],
-        onToken: (token) => {
+        onToken: async (token) => {
           noteContent += token;
+          await localDb.updateArtifact(art.id, {
+            content: noteContent,
+          });
         },
         onDone: async (finalContent) => {
           const contentToSave = finalContent || noteContent;
@@ -762,7 +778,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
             noteTitle = `${language === "id" ? "Catatan: " : "Note: "}${learn.title}`;
           }
 
-          await localDb.updateArtifact(artId, {
+          await localDb.updateArtifact(art.id, {
             title: noteTitle,
             content: contentToSave,
             status: "completed",
@@ -776,22 +792,20 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
         },
         onError: async (err) => {
           console.error("Failed to generate note:", err);
-          await localDb.updateArtifact(artId, {
-            title: defaultTitle,
+          await localDb.updateArtifact(art.id, {
             status: "completed",
             error: err.message,
           });
           toast.error(
             language === "id"
-              ? "Gagal menghasilkan ringkasan AI, catatan kosong tetap dibuat."
-              : "Failed to generate AI note, blank note created."
+              ? "Gagal menghasilkan ringkasan AI: " + err.message
+              : "Failed to generate AI note: " + err.message
           );
         },
       });
     } catch (err: any) {
       console.error("Error initiating note generation:", err);
-      await localDb.updateArtifact(artId, {
-        title: defaultTitle,
+      await localDb.updateArtifact(art.id, {
         status: "completed",
         error: err.message,
       });
@@ -1317,6 +1331,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
             activeNoteArtifact={activeNoteArtifact}
             onCloseNote={handleCloseNote}
             onConvertToSource={handleConvertToSource}
+            onGenerateNote={handleGenerateNote}
             artifacts={artifacts || []}
             onDownloadArtifact={handleDownloadArtifact}
             generatingArtifacts={generatingArtifacts}

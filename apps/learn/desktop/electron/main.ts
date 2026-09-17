@@ -867,6 +867,8 @@ app.on("second-instance", (_event, commandLine) => {
         model?: string;
         authToken?: string;
         temperature?: number;
+        timeoutMs?: number;
+        requestId?: string;
       }
     ) => {
       try {
@@ -903,7 +905,23 @@ app.on("second-instance", (_event, commandLine) => {
           : `${baseUrl.replace(/\/+$/, "")}/chat/completions`;
 
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 35000);
+        const maxTimeoutMs = payload.timeoutMs || 180000; // 3 minutes total ceiling
+        const inactivityMs = 60000; // 60 seconds without any chunk/reasoning
+
+        let inactivityTimer: NodeJS.Timeout | null = setTimeout(() => {
+          controller.abort();
+        }, inactivityMs);
+
+        const resetInactivityTimer = () => {
+          if (inactivityTimer) clearTimeout(inactivityTimer);
+          inactivityTimer = setTimeout(() => {
+            controller.abort();
+          }, inactivityMs);
+        };
+
+        const hardTimeoutId = setTimeout(() => {
+          controller.abort();
+        }, maxTimeoutMs);
 
         const res = await fetch(endpoint, {
           method: "POST",
@@ -915,20 +933,74 @@ app.on("second-instance", (_event, commandLine) => {
             model,
             messages: payload.messages,
             temperature: payload.temperature ?? 0.3,
-            stream: false,
+            stream: true,
           }),
           signal: controller.signal,
         });
-        clearTimeout(timeoutId);
 
         if (!res.ok) {
+          if (inactivityTimer) clearTimeout(inactivityTimer);
+          clearTimeout(hardTimeoutId);
           const errText = await res.text().catch(() => "");
           return { success: false, error: `HTTP ${res.status}: ${errText}` };
         }
 
-        const json: any = await res.json();
-        const content = json.choices?.[0]?.message?.content;
-        return { success: true, content };
+        if (!res.body) {
+          if (inactivityTimer) clearTimeout(inactivityTimer);
+          clearTimeout(hardTimeoutId);
+          throw new Error("Response body is null");
+        }
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+        let buffer = "";
+        let accumulatedContent = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          resetInactivityTimer();
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed.startsWith("data:")) continue;
+            const dataStr = trimmed.slice(5).trim();
+            if (dataStr === "[DONE]") continue;
+
+            try {
+              const json = JSON.parse(dataStr);
+              const delta = json.choices?.[0]?.delta;
+              if (!delta) continue;
+
+              // If thinking reasoning tokens arrive, keep connection alive
+              if (delta.reasoning_content) {
+                resetInactivityTimer();
+              }
+
+              if (delta.content) {
+                resetInactivityTimer();
+                accumulatedContent += delta.content;
+                if (payload.requestId && win && !win.isDestroyed()) {
+                  win.webContents.send("studio:stream-token", {
+                    requestId: payload.requestId,
+                    token: delta.content,
+                  });
+                }
+              }
+            } catch {
+              // Ignore partial JSON
+            }
+          }
+        }
+
+        if (inactivityTimer) clearTimeout(inactivityTimer);
+        clearTimeout(hardTimeoutId);
+
+        return { success: true, content: accumulatedContent };
       } catch (err: any) {
         return { success: false, error: err.message || "Failed to generate completion" };
       }

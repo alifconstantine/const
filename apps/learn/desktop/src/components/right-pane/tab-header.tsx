@@ -7,7 +7,6 @@ import {
   Globe,
   Search,
   Layers,
-  Sparkles,
   GitFork,
   SquarePen,
   Volume2,
@@ -37,7 +36,7 @@ function getTabIcon(type: RightPaneTabType) {
     case "browser":
       return Globe;
     case "studio_preview":
-      return Sparkles;
+      return Layers;
     case "mind_map":
       return GitFork;
     case "note_preview":

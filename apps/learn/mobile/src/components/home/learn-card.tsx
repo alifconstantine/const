@@ -7,7 +7,7 @@ import {
   DropdownMenuSeparator,
   Checkbox,
 } from "@const/ui";
-import { MoreVertical, FolderPlus, Edit3, Trash2, ExternalLink, Sparkles } from "lucide-react";
+import { MoreVertical, FolderPlus, Edit3, Trash2, ExternalLink } from "lucide-react";
 import { LocalLearn } from "../../lib/db";
 import { useI18n } from "../../lib/i18n";
 
@@ -110,7 +110,7 @@ export function LearnCard({
               className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground active:text-foreground cursor-pointer shrink-0 transition-colors"
               aria-label={t("moreOptions")}
             >
-              <Sparkles className="h-4 w-4" />
+              <MoreVertical className="h-4 w-4" />
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48 p-1.5 shadow-md mr-2">

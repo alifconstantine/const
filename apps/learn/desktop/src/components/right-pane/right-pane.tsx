@@ -104,6 +104,7 @@ export interface RightPaneProps {
   activeNoteArtifact?: any | null;
   onCloseNote?: () => void;
   onConvertToSource?: (art: any) => void;
+  onGenerateNote?: (art: LocalArtifact) => void;
   onExplainInChat?: (prompt: string) => void;
 }
 
@@ -130,7 +131,7 @@ export function RightPane({
   onOpenFileDiff,
   onSelectStudioTool,
   onAddNote,
-  artifacts,
+  artifacts = [],
   onDownloadArtifact,
   generatingArtifacts = [],
   onOpenArtifact,
@@ -139,6 +140,7 @@ export function RightPane({
   activeNoteArtifact,
   onCloseNote,
   onConvertToSource,
+  onGenerateNote,
   onExplainInChat,
 }: RightPaneProps) {
   const { t, language } = useI18n();
@@ -443,6 +445,7 @@ export function RightPane({
             onClose={onCloseNote}
             onDeleteArtifact={onDeleteArtifact}
             onConvertToSource={onConvertToSource}
+            onGenerateNote={onGenerateNote}
             onToggleCollapse={onToggleCollapse}
           />
         ) : (

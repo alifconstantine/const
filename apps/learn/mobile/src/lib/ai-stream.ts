@@ -311,7 +311,10 @@ export async function streamChatCompletion({
       onDone?.(accumulatedContent, accumulatedThinking);
       return;
     }
-    onError?.(err);
+    if (onError) {
+      onError(err);
+      return;
+    }
     throw err;
   }
 }

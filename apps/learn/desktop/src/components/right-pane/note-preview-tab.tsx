@@ -15,7 +15,8 @@ import {
   PanelRight,
   ChevronRight,
   ChevronDown,
-  FilePlus,
+  Wand2,
+  Loader2,
 } from "lucide-react";
 import {
   cn,
@@ -37,6 +38,7 @@ export interface NotePreviewTabProps {
   onClose?: () => void;
   onDeleteArtifact?: (artId: string) => void;
   onConvertToSource?: (art: LocalArtifact) => void;
+  onGenerateNote?: (art: LocalArtifact) => void;
   onToggleCollapse?: () => void;
   onUpdateTab?: (tabId: string, updates: Partial<RightPaneTab>) => void;
   onDownloadArtifact?: (art: any) => void;
@@ -55,6 +57,71 @@ function markdownToHtml(md: string): string {
   }
 }
 
+function serializeTableCell(cell: HTMLElement): string {
+  function serializeInline(node: Node): string {
+    if (node.nodeType === Node.TEXT_NODE) {
+      return (node.textContent || "").replace(/\|/g, "\\|");
+    }
+    if (node.nodeType !== Node.ELEMENT_NODE) return "";
+    const el = node as HTMLElement;
+    const tag = el.tagName.toLowerCase();
+    const children = Array.from(el.childNodes).map(serializeInline).join("");
+    switch (tag) {
+      case "strong":
+      case "b":
+        return `**${children}**`;
+      case "em":
+      case "i":
+        return `*${children}*`;
+      case "code":
+        return `\`${children}\``;
+      case "a":
+        return `[${children}](${el.getAttribute("href") || "#"})`;
+      case "br":
+        return " ";
+      default:
+        return children;
+    }
+  }
+  return Array.from(cell.childNodes).map(serializeInline).join("").replace(/\n+/g, " ").trim();
+}
+
+function serializeTable(tableEl: HTMLElement): string {
+  const rows = Array.from(tableEl.querySelectorAll("tr"));
+  if (rows.length === 0) return "";
+
+  const tableData: string[][] = [];
+  let maxCols = 0;
+
+  rows.forEach((row) => {
+    const cells = Array.from(row.querySelectorAll("th, td"));
+    const rowData = cells.map((cell) => serializeTableCell(cell as HTMLElement));
+    if (rowData.length > maxCols) maxCols = rowData.length;
+    tableData.push(rowData);
+  });
+
+  if (maxCols === 0 || tableData.length === 0 || !tableData[0]) return "";
+
+  tableData.forEach((row) => {
+    while (row.length < maxCols) row.push("");
+  });
+
+  const lines: string[] = [];
+  const headerRow = tableData[0];
+  if (!headerRow) return "";
+  lines.push(`| ${headerRow.join(" | ")} |`);
+  lines.push(`| ${headerRow.map(() => "---").join(" | ")} |`);
+
+  for (let i = 1; i < tableData.length; i++) {
+    const row = tableData[i];
+    if (row) {
+      lines.push(`| ${row.join(" | ")} |`);
+    }
+  }
+
+  return `\n\n${lines.join("\n")}\n\n`;
+}
+
 /**
  * Converts rich contentEditable DOM nodes into clean standard Markdown
  */
@@ -62,7 +129,7 @@ function htmlToMarkdown(element: HTMLElement | null): string {
   if (!element) return "";
 
   const text = element.innerText || element.textContent || "";
-  if (!text.trim() && !element.querySelector("img, hr, br")) {
+  if (!text.trim() && !element.querySelector("img, hr, br, table")) {
     return "";
   }
 
@@ -109,8 +176,24 @@ function htmlToMarkdown(element: HTMLElement | null): string {
         }
         return children.trim() ? `\`${children}\`` : "";
       }
-      case "pre":
-        return `\n\n\`\`\`\n${children.trim()}\n\`\`\`\n\n`;
+      case "pre": {
+        const codeChild = el.querySelector("code");
+        let lang = "";
+        if (codeChild) {
+          const match = codeChild.className.match(/(?:language-|lang-)(\w+)/);
+          if (match && match[1]) lang = match[1];
+        }
+        return `\n\n\`\`\`${lang}\n${children.trim()}\n\`\`\`\n\n`;
+      }
+      case "table":
+        return serializeTable(el);
+      case "thead":
+      case "tbody":
+      case "tfoot":
+      case "tr":
+      case "th":
+      case "td":
+        return el.closest("table") ? "" : children;
       case "ul": {
         const items = Array.from(el.children)
           .map((child) => `- ${serialize(child).trim()}`)
@@ -154,6 +237,7 @@ export function NotePreviewTab({
   onClose,
   onDeleteArtifact,
   onConvertToSource,
+  onGenerateNote,
   onToggleCollapse,
   onUpdateTab,
 }: NotePreviewTabProps) {
@@ -173,16 +257,34 @@ export function NotePreviewTab({
   // Initialize and synchronize HTML content into contentEditable without cursor jumps
   useEffect(() => {
     const artId = artifact?.id || tab?.artifactId || "temp";
-    if (editorRef.current && (!isInitializedRef.current || currentArtifactIdRef.current !== artId)) {
-      isInitializedRef.current = true;
-      currentArtifactIdRef.current = artId;
-      const initialMd = artifact?.content || tab?.newContent || "";
-      editorRef.current.innerHTML = markdownToHtml(initialMd);
+    if (editorRef.current) {
+      if (!isInitializedRef.current || currentArtifactIdRef.current !== artId) {
+        isInitializedRef.current = true;
+        currentArtifactIdRef.current = artId;
+        const initialMd = artifact?.content || tab?.newContent || "";
+        editorRef.current.innerHTML = markdownToHtml(initialMd);
+      } else if (
+        artifact?.content !== undefined &&
+        (artifact?.status === "generating" || artifact?.status === "completed")
+      ) {
+        if (document.activeElement !== editorRef.current) {
+          editorRef.current.innerHTML = markdownToHtml(artifact.content);
+        }
+      }
     }
     if (artifact?.title) {
       setTitle(artifact.title);
     }
-  }, [artifact?.id, artifact?.title, tab?.artifactId]);
+  }, [artifact?.id, artifact?.title, artifact?.content, artifact?.status, tab?.artifactId]);
+
+  const isGenerating = artifact?.status === "generating";
+
+  const handleGenerate = () => {
+    if (!artifact) return;
+    if (onGenerateNote) {
+      onGenerateNote(artifact);
+    }
+  };
 
   const handleInput = () => {
     if (!editorRef.current) return;
@@ -589,23 +691,38 @@ export function NotePreviewTab({
             "[&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:my-2 [&_ol]:space-y-1",
             "[&_li]:leading-relaxed",
             "[&_blockquote]:border-l-2 [&_blockquote]:border-primary [&_blockquote]:pl-3 [&_blockquote]:py-0.5 [&_blockquote]:my-2.5 [&_blockquote]:italic [&_blockquote]:text-muted-foreground",
-            "[&_hr]:border-border [&_hr]:my-4"
+            "[&_hr]:border-border [&_hr]:my-4",
+            "[&_table]:w-full [&_table]:my-3.5 [&_table]:border-collapse [&_table]:border [&_table]:border-border [&_table]:rounded-xl [&_table]:overflow-hidden",
+            "[&_thead]:bg-muted/60 [&_thead]:border-b [&_thead]:border-border",
+            "[&_th]:px-3.5 [&_th]:py-2.5 [&_th]:text-left [&_th]:text-xs [&_th]:font-semibold [&_th]:text-foreground [&_th]:border-r [&_th]:border-border last:[&_th]:border-r-0",
+            "[&_tbody_tr]:border-b [&_tbody_tr]:border-border/60 hover:[&_tbody_tr]:bg-muted/30",
+            "[&_td]:px-3.5 [&_td]:py-2 [&_td]:text-xs [&_td]:text-foreground/90 [&_td]:border-r [&_td]:border-border/60 last:[&_td]:border-r-0"
           )}
         />
       </ScrollArea>
 
-      {/* Bottom Bar: Konversikan menjadi sumber (Image 3) */}
+      {/* Bottom Bar: Generate Note Action */}
       <div className="h-12 px-5 border-t border-border bg-card flex items-center justify-between shrink-0">
         <button
           type="button"
-          onClick={handleConvertToSource}
-          className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-medium text-foreground bg-secondary hover:bg-secondary/80 border border-border transition-all cursor-pointer shadow-xs active:scale-95"
+          onClick={handleGenerate}
+          disabled={isGenerating}
+          className={cn(
+            "inline-flex items-center gap-2 px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all shadow-xs cursor-pointer active:scale-95",
+            isGenerating
+              ? "bg-secondary text-muted-foreground cursor-not-allowed opacity-75"
+              : "bg-foreground text-background hover:bg-foreground/90"
+          )}
         >
-          <FilePlus className="h-3.5 w-3.5 text-primary" />
+          {isGenerating ? (
+            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          ) : (
+            <Wand2 className="h-3.5 w-3.5" />
+          )}
           <span>
-            {language === "id"
-              ? "Konversikan menjadi sumber"
-              : "Convert to source"}
+            {isGenerating
+              ? (language === "id" ? "Menghasilkan..." : "Generating...")
+              : "Generate"}
           </span>
         </button>
 

@@ -70,13 +70,38 @@ export function getRouterBaseUrl(): string {
     return envBaseUrl.replace(/\/+$/, "");
   }
 
+  // When running in development (localhost) or in Electron renderer,
+  // use Vite's dev proxy at relative "/v1" to avoid browser CORS restrictions
+  if (typeof window !== "undefined") {
+    const isDev = Boolean((import.meta as any).env?.DEV);
+    const host = window.location.hostname;
+    const isLocalhost = host === "localhost" || host === "127.0.0.1";
+    const isDevPort = window.location.port === "3004" || window.location.port === "5173";
+
+    if (isDev && (isLocalhost || isDevPort)) {
+      return "/v1";
+    }
+  }
+
   return "https://router.const.web.id/v1";
 }
 
 /**
- * Fetch available models dynamically from Const Router.
+ * Fetch available models dynamically from Const Router or Electron agent.
  */
 export async function fetchRouterModels(): Promise<DesktopModel[]> {
+  const electron = typeof window !== "undefined" ? (window as any).electron : null;
+  if (electron?.agent?.getModels) {
+    try {
+      const models = await electron.agent.getModels();
+      if (Array.isArray(models) && models.length > 0) {
+        return mapRouterModels(models);
+      }
+    } catch (err) {
+      console.warn("Failed to fetch models from Electron IPC, trying router HTTP:", err);
+    }
+  }
+
   try {
     const baseUrl = getRouterBaseUrl();
     const endpoint = baseUrl.endsWith("/models") ? baseUrl : `${baseUrl}/models`;
@@ -167,10 +192,89 @@ export async function streamChatCompletion({
   onError,
 }: StreamChatParams): Promise<void> {
   const authToken =
-    localStorage.getItem("const_learn_auth_token") ||
-    localStorage.getItem("const_sso_token") ||
+    (typeof localStorage !== "undefined" &&
+      (localStorage.getItem("const_learn_auth_token") ||
+        localStorage.getItem("const_sso_token"))) ||
     "";
 
+  // 1. In Electron Desktop environment, route through Electron IPC isolated agent completion
+  // This completely bypasses browser CORS/CSP restrictions, has access to ~/.const/learn/config.json,
+  // and uses Node.js native fetch in the main process.
+  const electron = typeof window !== "undefined" ? (window as any).electron : null;
+  if (electron?.agent?.generateCompletion) {
+    try {
+      const activeModel =
+        model ||
+        (typeof localStorage !== "undefined" &&
+          localStorage.getItem("const_learn_active_model")) ||
+        "gemini-3.8-flash";
+
+      const requestId = `gen_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+      let unsubscribe: (() => void) | undefined;
+      let streamedTokensCount = 0;
+
+      if (electron.agent.onStudioToken) {
+        unsubscribe = electron.agent.onStudioToken((data: { requestId: string; token: string }) => {
+          if (data.requestId === requestId && data.token) {
+            streamedTokensCount++;
+            onToken?.(data.token);
+          }
+        });
+      }
+
+      const res = await electron.agent.generateCompletion({
+        messages: [
+          {
+            role: "system",
+            content: systemPrompt || SOCRATIC_LEARNING_SYSTEM_PROMPT,
+          },
+          ...messages.map((m) => ({
+            role: m.role,
+            content: typeof m.content === "string" ? m.content : JSON.stringify(m.content),
+          })),
+        ],
+        model: activeModel,
+        authToken: authToken || undefined,
+        temperature: temperature ?? 0.3,
+        timeoutMs: 180000,
+        requestId,
+      });
+
+      unsubscribe?.();
+
+      if (res?.success && res.content) {
+        const fullContent = res.content;
+        // If tokens were not streamed in real-time (e.g. older runtime), emit progressive chunks
+        if (streamedTokensCount === 0) {
+          const chunkSize = 24;
+          for (let i = 0; i < fullContent.length; i += chunkSize) {
+            if (signal?.aborted) break;
+            const chunk = fullContent.slice(i, i + chunkSize);
+            onToken?.(chunk);
+            await new Promise((resolve) => setTimeout(resolve, 8));
+          }
+        }
+        onDone?.(fullContent, "");
+        return;
+      } else {
+        throw new Error(res?.error || "Gagal menghasilkan respon AI.");
+      }
+    } catch (ipcErr: any) {
+      if (signal?.aborted || ipcErr.name === "AbortError") {
+        onDone?.("", "");
+        return;
+      }
+      console.warn("[ai-stream] Electron IPC completion failed, trying HTTP fallback:", ipcErr);
+      // If we are in Electron and IPC failed, report error via onError without double-throw
+      if (onError) {
+        onError(ipcErr);
+        return;
+      }
+      throw ipcErr;
+    }
+  }
+
+  // 2. HTTP Gateway fallback (Web browser environment or external network)
   const apiKey =
     authToken ||
     (import.meta as any).env?.VITE_CONST_ROUTER_API_KEY ||
@@ -273,7 +377,10 @@ export async function streamChatCompletion({
       onDone?.(accumulatedContent, accumulatedThinking);
       return;
     }
-    onError?.(err);
+    if (onError) {
+      onError(err);
+      return;
+    }
     throw err;
   }
 }

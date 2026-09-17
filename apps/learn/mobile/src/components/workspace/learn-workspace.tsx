@@ -74,11 +74,76 @@ function markdownToHtml(md: string): string {
   }
 }
 
+function serializeTableCell(cell: HTMLElement): string {
+  function serializeInline(node: Node): string {
+    if (node.nodeType === Node.TEXT_NODE) {
+      return (node.textContent || "").replace(/\|/g, "\\|");
+    }
+    if (node.nodeType !== Node.ELEMENT_NODE) return "";
+    const el = node as HTMLElement;
+    const tag = el.tagName.toLowerCase();
+    const children = Array.from(el.childNodes).map(serializeInline).join("");
+    switch (tag) {
+      case "strong":
+      case "b":
+        return `**${children}**`;
+      case "em":
+      case "i":
+        return `*${children}*`;
+      case "code":
+        return `\`${children}\``;
+      case "a":
+        return `[${children}](${el.getAttribute("href") || "#"})`;
+      case "br":
+        return " ";
+      default:
+        return children;
+    }
+  }
+  return Array.from(cell.childNodes).map(serializeInline).join("").replace(/\n+/g, " ").trim();
+}
+
+function serializeTable(tableEl: HTMLElement): string {
+  const rows = Array.from(tableEl.querySelectorAll("tr"));
+  if (rows.length === 0) return "";
+
+  const tableData: string[][] = [];
+  let maxCols = 0;
+
+  rows.forEach((row) => {
+    const cells = Array.from(row.querySelectorAll("th, td"));
+    const rowData = cells.map((cell) => serializeTableCell(cell as HTMLElement));
+    if (rowData.length > maxCols) maxCols = rowData.length;
+    tableData.push(rowData);
+  });
+
+  if (maxCols === 0 || tableData.length === 0 || !tableData[0]) return "";
+
+  tableData.forEach((row) => {
+    while (row.length < maxCols) row.push("");
+  });
+
+  const lines: string[] = [];
+  const headerRow = tableData[0];
+  if (!headerRow) return "";
+  lines.push(`| ${headerRow.join(" | ")} |`);
+  lines.push(`| ${headerRow.map(() => "---").join(" | ")} |`);
+
+  for (let i = 1; i < tableData.length; i++) {
+    const row = tableData[i];
+    if (row) {
+      lines.push(`| ${row.join(" | ")} |`);
+    }
+  }
+
+  return `\n\n${lines.join("\n")}\n\n`;
+}
+
 function htmlToMarkdown(element: HTMLElement | null): string {
   if (!element) return "";
 
   const text = element.innerText || element.textContent || "";
-  if (!text.trim() && !element.querySelector("img, hr, br")) {
+  if (!text.trim() && !element.querySelector("img, hr, br, table")) {
     return "";
   }
 
@@ -125,8 +190,24 @@ function htmlToMarkdown(element: HTMLElement | null): string {
         }
         return children.trim() ? `\`${children}\`` : "";
       }
-      case "pre":
-        return `\n\n\`\`\`\n${children.trim()}\n\`\`\`\n\n`;
+      case "pre": {
+        const codeChild = el.querySelector("code");
+        let lang = "";
+        if (codeChild) {
+          const match = codeChild.className.match(/(?:language-|lang-)(\w+)/);
+          if (match && match[1]) lang = match[1];
+        }
+        return `\n\n\`\`\`${lang}\n${children.trim()}\n\`\`\`\n\n`;
+      }
+      case "table":
+        return serializeTable(el);
+      case "thead":
+      case "tbody":
+      case "tfoot":
+      case "tr":
+      case "th":
+      case "td":
+        return el.closest("table") ? "" : children;
       case "ul": {
         const items = Array.from(el.children)
           .map((child) => `- ${serialize(child).trim()}`)
@@ -213,7 +294,7 @@ import {
   Quote,
   Minus,
   RemoveFormatting,
-  FilePlus,
+  Wand2,
   Layers,
 } from "lucide-react";
 
@@ -483,6 +564,12 @@ export function MobileLearnWorkspace({
         isNoteInitializedRef.current = true;
         currentNoteArtifactIdRef.current = selectedNoteArtifact.id;
         noteEditorRef.current.innerHTML = markdownToHtml(selectedNoteArtifact.content || "");
+      } else if (
+        noteEditorRef.current &&
+        selectedNoteArtifact.status === "generating" &&
+        selectedNoteArtifact.content !== undefined
+      ) {
+        noteEditorRef.current.innerHTML = markdownToHtml(selectedNoteArtifact.content);
       }
       if (selectedNoteArtifact.title) {
         setNoteTitleInput(selectedNoteArtifact.title);
@@ -491,7 +578,7 @@ export function MobileLearnWorkspace({
       isNoteInitializedRef.current = false;
       currentNoteArtifactIdRef.current = null;
     }
-  }, [artifacts, selectedNoteArtifact?.id, selectedNoteArtifact?.title]);
+  }, [artifacts, selectedNoteArtifact?.id, selectedNoteArtifact?.title, selectedNoteArtifact?.content, selectedNoteArtifact?.status]);
 
   // Dynamic visualViewport tracking to adjust cleanly when software keyboard opens/closes
   const [viewportHeight, setViewportHeight] = useState<number | null>(null);
@@ -1373,30 +1460,44 @@ export function MobileLearnWorkspace({
   const handleAddNote = async () => {
     if (!learnId) return;
 
+    const defaultTitle = language === "id" ? "Catatan Baru" : "New Note";
+    const artId = await localDb.createArtifact({
+      learnId,
+      title: defaultTitle,
+      type: "note",
+      status: "completed",
+      content: "",
+      sourcesCount: 0,
+    });
+
+    const created = await db.artifacts.get(artId);
+    if (created) {
+      handleOpenArtifact(created);
+    }
+  };
+
+  const handleGenerateNote = async (art: LocalArtifact | null) => {
+    if (!learnId || !art) return;
+
     const allSources = await db.sources.where("learnId").equals(learnId).toArray();
     const activeSources = allSources.filter((s) => s.includedInChat !== false);
     const sourcesCount = activeSources.length;
 
-    // 1. Create generating artifact in Dexie (instantly shows loading state with spinner in Image 1)
-    const defaultTitle = language === "id" ? "Catatan Baru" : "New Note";
-    const artId = await localDb.createArtifact({
-      learnId,
-      title: sourcesCount > 0 ? (language === "id" ? "Membuat Catatan..." : "Creating Note...") : defaultTitle,
-      type: "note",
-      status: sourcesCount > 0 ? "generating" : "completed",
-      content: "",
-      sourcesCount,
-    });
-
     if (sourcesCount === 0) {
-      const created = await db.artifacts.get(artId);
-      if (created) {
-        handleOpenArtifact(created);
-      }
+      toast.error(
+        language === "id"
+          ? "Tambahkan sumber materi terlebih dahulu untuk menghasilkan catatan AI."
+          : "Add sources to the notebook first to generate an AI note."
+      );
       return;
     }
 
-    // 2. Synthesize note using AI in background
+    const defaultTitle = language === "id" ? "Catatan Baru" : "New Note";
+    await localDb.updateArtifact(art.id, {
+      status: "generating",
+      sourcesCount,
+    });
+
     try {
       const grounded = buildGroundedContext(activeSources);
       const activeModelId =
@@ -1412,15 +1513,22 @@ Format the note in clear, beautiful Markdown:
 - Rujukan Sumber / Source References
 Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
 
-      const userPrompt = `Mohon buatkan catatan sintesis komprehensif berdasarkan materi sumber berikut:\n\n${grounded.formattedContext}\n\nBuat catatan yang rapi, padat wawasan, terstruktur, dan mudah dipahami.`;
+      const userPrompt = `Mohon buatkan catatan sintesis komprehensif berdasarkan materi sumber berikut:\n\n${grounded.formattedContext}\n\nBuat catatan yang rapi, padat wawasan, terstruktur, dan mudah dipahami. Gunakan tabel Markdown jika terdapat data perbandingan atau ringkasan matriks.`;
 
       let noteContent = "";
       await streamChatCompletion({
         model: activeModelId,
         systemPrompt,
         messages: [{ role: "user", content: userPrompt }],
-        onToken: (token) => {
+        onToken: async (token) => {
           noteContent += token;
+          await localDb.updateArtifact(art.id, {
+            content: noteContent,
+          });
+          if (noteEditorRef.current) {
+            noteEditorRef.current.innerHTML = markdownToHtml(noteContent);
+          }
+          setNoteContentInput(noteContent);
         },
         onDone: async (finalContent) => {
           const contentToSave = finalContent || noteContent;
@@ -1432,11 +1540,17 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
             noteTitle = `${language === "id" ? "Catatan: " : "Note: "}${learn.title}`;
           }
 
-          await localDb.updateArtifact(artId, {
+          await localDb.updateArtifact(art.id, {
             title: noteTitle,
             content: contentToSave,
             status: "completed",
           });
+
+          setNoteTitleInput(noteTitle);
+          setNoteContentInput(contentToSave);
+          if (noteEditorRef.current) {
+            noteEditorRef.current.innerHTML = markdownToHtml(contentToSave);
+          }
 
           toast.success(
             language === "id"
@@ -1446,22 +1560,20 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
         },
         onError: async (err) => {
           console.error("Failed to generate note:", err);
-          await localDb.updateArtifact(artId, {
-            title: defaultTitle,
+          await localDb.updateArtifact(art.id, {
             status: "completed",
             error: err.message,
           });
           toast.error(
             language === "id"
-              ? "Gagal menghasilkan ringkasan AI, catatan kosong tetap dibuat."
-              : "Failed to generate AI note, blank note created."
+              ? "Gagal menghasilkan ringkasan AI: " + err.message
+              : "Failed to generate AI note: " + err.message
           );
         },
       });
     } catch (err: any) {
       console.error("Error initiating note generation:", err);
-      await localDb.updateArtifact(artId, {
-        title: defaultTitle,
+      await localDb.updateArtifact(art.id, {
         status: "completed",
         error: err.message,
       });
@@ -2749,21 +2861,38 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
                   "[&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:my-2 [&_ol]:space-y-1",
                   "[&_li]:leading-relaxed",
                   "[&_blockquote]:border-l-2 [&_blockquote]:border-blue-500 [&_blockquote]:pl-3 [&_blockquote]:py-0.5 [&_blockquote]:my-2.5 [&_blockquote]:italic [&_blockquote]:text-muted-foreground",
-                  "[&_hr]:border-border [&_hr]:my-4"
+                  "[&_hr]:border-border [&_hr]:my-4",
+                  "[&_table]:w-full [&_table]:my-3.5 [&_table]:border-collapse [&_table]:border [&_table]:border-border [&_table]:rounded-xl [&_table]:overflow-hidden",
+                  "[&_thead]:bg-secondary/60 [&_thead]:border-b [&_thead]:border-border",
+                  "[&_th]:px-3 [&_th]:py-2 [&_th]:text-left [&_th]:text-xs [&_th]:font-semibold [&_th]:text-foreground [&_th]:border-r [&_th]:border-border last:[&_th]:border-r-0",
+                  "[&_tbody_tr]:border-b [&_tbody_tr]:border-border/60 hover:[&_tbody_tr]:bg-secondary/30",
+                  "[&_td]:px-3 [&_td]:py-1.5 [&_td]:text-xs [&_td]:text-foreground/90 [&_td]:border-r [&_td]:border-border/60 last:[&_td]:border-r-0"
                 )}
               />
             </div>
 
-            {/* Footer / Convert to Source Button (Image 3) */}
+            {/* Footer / Generate Note Button */}
             <div className="px-4 py-2.5 border-t border-border flex items-center justify-between bg-secondary/30 shrink-0">
               <button
                 type="button"
-                onClick={() => handleConvertToSource(selectedNoteArtifact)}
-                className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold transition-all shadow-xs cursor-pointer active:scale-98"
+                onClick={() => handleGenerateNote(selectedNoteArtifact)}
+                disabled={selectedNoteArtifact?.status === "generating"}
+                className={cn(
+                  "inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all shadow-xs cursor-pointer active:scale-98",
+                  selectedNoteArtifact?.status === "generating"
+                    ? "bg-secondary text-muted-foreground cursor-not-allowed opacity-75"
+                    : "bg-foreground text-background hover:bg-foreground/90"
+                )}
               >
-                <FilePlus className="h-4 w-4 stroke-[2]" />
+                {selectedNoteArtifact?.status === "generating" ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Wand2 className="h-4 w-4 stroke-[2]" />
+                )}
                 <span>
-                  {language === "id" ? "Konversikan menjadi sumber" : "Convert to source"}
+                  {selectedNoteArtifact?.status === "generating"
+                    ? (language === "id" ? "Menghasilkan..." : "Generating...")
+                    : "Generate"}
                 </span>
               </button>
 
