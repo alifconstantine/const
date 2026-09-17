@@ -38,7 +38,8 @@ export function CreateStudioArtifactDialog({
   const isIndo = language === "id";
 
   const [artifactType, setArtifactType] = useState<"quiz" | "flashcard">(initialType);
-  const [countLevel, setCountLevel] = useState<"less" | "standard" | "more">("standard");
+  const [countMode, setCountMode] = useState<"5" | "10" | "custom">("10");
+  const [customCount, setCustomCount] = useState<number>(15);
   const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard">("medium");
   const [topic, setTopic] = useState("");
   const [selectedSourceIds, setSelectedSourceIds] = useState<string[]>([]);
@@ -55,7 +56,12 @@ export function CreateStudioArtifactDialog({
     }
   }, [sources]);
 
-  const countValue = countLevel === "less" ? 5 : countLevel === "more" ? 15 : 10;
+  const countValue =
+    countMode === "5"
+      ? 5
+      : countMode === "10"
+      ? 10
+      : Math.max(1, Math.min(50, Number(customCount) || 10));
 
   // Smart suggestions based on source titles
   const topicChips = React.useMemo(() => {
@@ -181,53 +187,93 @@ export function CreateStudioArtifactDialog({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {/* Jumlah Pertanyaan */}
               <div className="space-y-1.5">
-                <label className="text-[11.5px] font-medium text-muted-foreground">
-                  {artifactType === "quiz"
-                    ? isIndo
-                      ? "Jumlah Pertanyaan"
-                      : "Number of Questions"
-                    : isIndo
-                    ? "Jumlah Kartu"
-                    : "Number of Cards"}
-                </label>
+                <div className="flex items-center justify-between">
+                  <label className="text-[11.5px] font-medium text-muted-foreground">
+                    {artifactType === "quiz"
+                      ? isIndo
+                        ? "Jumlah Pertanyaan"
+                        : "Number of Questions"
+                      : isIndo
+                      ? "Jumlah Kartu"
+                      : "Number of Cards"}
+                  </label>
+                  {countMode === "custom" && (
+                    <span className="text-[10px] text-muted-foreground">
+                      1 - 50
+                    </span>
+                  )}
+                </div>
                 <div className="inline-flex w-full rounded-xl bg-secondary/60 border border-border p-0.5">
                   <button
                     type="button"
-                    onClick={() => setCountLevel("less")}
+                    onClick={() => setCountMode("5")}
                     className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-                      countLevel === "less"
-                        ? "bg-card text-foreground shadow-xs"
+                      countMode === "5"
+                        ? "bg-card text-foreground shadow-xs border border-border/50 font-semibold"
                         : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
-                    {isIndo ? "Sedikit (5)" : "Few (5)"}
+                    5
                   </button>
                   <button
                     type="button"
-                    onClick={() => setCountLevel("standard")}
+                    onClick={() => setCountMode("10")}
                     className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer flex items-center justify-center gap-1 ${
-                      countLevel === "standard"
-                        ? "bg-card text-foreground shadow-xs"
+                      countMode === "10"
+                        ? "bg-card text-foreground shadow-xs border border-border/50 font-semibold"
                         : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
-                    {countLevel === "standard" && (
+                    {countMode === "10" && (
                       <Check className="h-3 w-3 text-teal-500" />
                     )}
-                    <span>{isIndo ? "Standar (10)" : "Standard (10)"}</span>
+                    <span>10</span>
                   </button>
                   <button
                     type="button"
-                    onClick={() => setCountLevel("more")}
-                    className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer ${
-                      countLevel === "more"
-                        ? "bg-card text-foreground shadow-xs"
+                    onClick={() => setCountMode("custom")}
+                    className={`flex-1 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer flex items-center justify-center gap-1 ${
+                      countMode === "custom"
+                        ? "bg-card text-foreground shadow-xs border border-border/50 font-semibold"
                         : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
-                    {isIndo ? "Banyak (15)" : "Many (15)"}
+                    {countMode === "custom" && (
+                      <Check className="h-3 w-3 text-teal-500" />
+                    )}
+                    <span>{isIndo ? "Kustom" : "Custom"}</span>
                   </button>
                 </div>
+
+                {countMode === "custom" && (
+                  <div className="flex items-center gap-2 pt-1 animate-in fade-in duration-150">
+                    <input
+                      type="number"
+                      min={1}
+                      max={50}
+                      value={customCount}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value, 10);
+                        setCustomCount(isNaN(val) ? ("" as any) : Math.max(1, Math.min(50, val)));
+                      }}
+                      onBlur={() => {
+                        if (!customCount || Number(customCount) < 1) setCustomCount(5);
+                        else if (Number(customCount) > 50) setCustomCount(50);
+                      }}
+                      placeholder="1-50"
+                      className="w-20 h-8 px-2.5 rounded-lg bg-card border border-border text-foreground font-mono text-xs focus:outline-none focus:border-primary transition-colors text-center"
+                    />
+                    <span className="text-[11px] text-muted-foreground">
+                      {artifactType === "quiz"
+                        ? isIndo
+                          ? "soal (maks. 50)"
+                          : "questions (max 50)"
+                        : isIndo
+                        ? "kartu (maks. 50)"
+                        : "cards (max 50)"}
+                    </span>
+                  </div>
+                )}
               </div>
 
               {/* Tingkat Kesulitan */}

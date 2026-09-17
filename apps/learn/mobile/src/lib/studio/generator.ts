@@ -123,7 +123,7 @@ export async function generateStudioArtifact({
     .join("\n\n");
 
   const isIndo = language === "id";
-  const numItems = Math.max(3, Math.min(20, count));
+  const numItems = Math.max(1, Math.min(50, count));
 
   let systemPrompt = "";
   let userPrompt = "";
@@ -227,17 +227,19 @@ Critical Rules:
       ? `Anda adalah pembuat flashcard edukatif ahli. Tugas Anda adalah mengekstrak konsep kunci, definisi, atau tanya-jawab penting dari materi sumber yang diberikan.
 Aturan:
 1. Buat tepat ${numItems} kartu flashcard.
-2. Sisi depan ("front") berisi istilah, konsep, atau pertanyaan ringkas.
-3. Sisi belakang ("back") berisi definisi, intisari penjelasan, atau fakta kunci yang terverifikasi.
-4. Sertakan petunjuk pengingat ("hint") jika relevan.
-5. Format output HANYA JSON valid tanpa teks pengantar atau penutup.`
+2. Tingkat kesulitan materi: ${difficulty}.
+3. Sisi depan ("front") berisi istilah, konsep, atau pertanyaan ringkas.
+4. Sisi belakang ("back") berisi definisi, intisari penjelasan, atau fakta kunci yang terverifikasi.
+5. Sertakan petunjuk pengingat ("hint") jika relevan.
+6. Format output HANYA JSON valid tanpa teks pengantar atau penutup.`
       : `You are an expert flashcard creator. Your task is to extract key concepts, definitions, or Q&A from the provided source material.
 Rules:
 1. Create exactly ${numItems} flashcard items.
-2. "front" contains the term, concept, or concise question.
-3. "back" contains the clear explanation, definition, or key verified takeaway.
-4. Include a hint where relevant.
-5. Output ONLY valid JSON with no introductory text.`;
+2. Difficulty level: ${difficulty}.
+3. "front" contains the term, concept, or concise question.
+4. "back" contains the clear explanation, definition, or key verified takeaway.
+5. Include a hint where relevant.
+6. Output ONLY valid JSON with no introductory text.`;
 
     userPrompt = `Materi Sumber Belajar:\n${sourceSnippets || "Topik: " + (topic || "Pengetahuan Umum")}\n\n` +
       (topic ? `Fokus Topik Spesifik: ${topic}\n\n` : "") +
@@ -385,7 +387,7 @@ Rules:
         const parsed = extractJson(content);
         if (parsed) {
           if (type === "quiz" && Array.isArray(parsed.questions) && parsed.questions.length > 0) {
-            const formattedQuestions = shuffleAndFormatQuizQuestions(parsed.questions);
+            const formattedQuestions = shuffleAndFormatQuizQuestions(parsed.questions).slice(0, numItems);
             const quizData: QuizData = {
               title: parsed.title || `AI Kuis: ${topic || sources[0]?.title || "Materi Belajar"}`,
               topic,
@@ -402,7 +404,7 @@ Rules:
               difficulty,
               sourceCount: sources.length,
               sourceTitles: sources.map((s) => s.title),
-              cards: parsed.cards.map((c: any, cIdx: number) => ({
+              cards: parsed.cards.slice(0, numItems).map((c: any, cIdx: number) => ({
                 id: String(c.id || cIdx + 1),
                 front: c.front || `Konsep ${cIdx + 1}`,
                 back: c.back || "Penjelasan materi.",
@@ -568,13 +570,27 @@ Rules:
       },
     ];
 
+    // Generate questions dynamically up to numItems
+    const dynamicQuestions = [];
+    for (let i = 0; i < numItems; i++) {
+      const baseQ = rawSampleQuestions[i % rawSampleQuestions.length]!;
+      dynamicQuestions.push({
+        ...baseQ,
+        id: String(i + 1),
+        question:
+          i < rawSampleQuestions.length
+            ? baseQ.question
+            : `${baseQ.question} (Bagian ${Math.floor(i / rawSampleQuestions.length) + 1})`,
+      });
+    }
+
     const fallbackQuiz: QuizData = {
       title: fallbackTitle,
       topic,
       difficulty,
       sourceCount: sources.length,
       sourceTitles: sources.map((s) => s.title),
-      questions: shuffleAndFormatQuizQuestions(rawSampleQuestions),
+      questions: shuffleAndFormatQuizQuestions(dynamicQuestions),
     };
     return { title: fallbackTitle, data: fallbackQuiz };
   } else {
@@ -599,13 +615,28 @@ Rules:
       },
     ];
 
+    // Generate flashcards dynamically up to numItems
+    const dynamicCards = [];
+    for (let i = 0; i < numItems; i++) {
+      const baseCard = sampleCards[i % sampleCards.length]!;
+      dynamicCards.push({
+        id: String(i + 1),
+        front:
+          i < sampleCards.length
+            ? baseCard.front
+            : `${baseCard.front} (Bagian ${Math.floor(i / sampleCards.length) + 1})`,
+        back: baseCard.back,
+        hint: baseCard.hint,
+      });
+    }
+
     const fallbackFlashcard: FlashcardData = {
       title: fallbackTitle,
       topic,
       difficulty,
       sourceCount: sources.length,
       sourceTitles: sources.map((s) => s.title),
-      cards: sampleCards,
+      cards: dynamicCards,
     };
     return { title: fallbackTitle, data: fallbackFlashcard };
   }

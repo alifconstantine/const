@@ -38,7 +38,8 @@ export function CreateArtifactSheet({
   const [artifactType, setArtifactType] = useState<"quiz" | "flashcard">(initialType);
   const [topic, setTopic] = useState("");
   const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard">("medium");
-  const [count, setCount] = useState<number>(10);
+  const [countMode, setCountMode] = useState<"5" | "10" | "custom">("10");
+  const [customCount, setCustomCount] = useState<number>(15);
   const [selectedSourceIds, setSelectedSourceIds] = useState<string[]>(() =>
     sources.map((s) => s.id)
   );
@@ -67,11 +68,18 @@ export function CreateArtifactSheet({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const finalCount =
+      countMode === "5"
+        ? 5
+        : countMode === "10"
+        ? 10
+        : Math.max(1, Math.min(50, Number(customCount) || 10));
+
     onGenerate({
       type: artifactType,
       topic: topic.trim(),
       difficulty,
-      count,
+      count: finalCount,
       selectedSourceIds,
     });
     onClose();
@@ -194,32 +202,79 @@ export function CreateArtifactSheet({
           <div className="grid grid-cols-2 gap-3">
             {/* Question / Card Count */}
             <div>
-              <label className="block text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
-                {artifactType === "quiz"
-                  ? isIndo
-                    ? "Jumlah Soal"
-                    : "Question Count"
-                  : isIndo
-                  ? "Jumlah Kartu"
-                  : "Card Count"}
-              </label>
-              <div className="flex items-center gap-1.5">
-                {[5, 10, 15].map((cnt) => (
-                  <button
-                    key={cnt}
-                    type="button"
-                    onClick={() => setCount(cnt)}
-                    className={cn(
-                      "flex-1 py-1.5 rounded-lg border text-center font-mono font-medium transition-all text-xs cursor-pointer",
-                      count === cnt
-                        ? "bg-card border-border text-foreground shadow-xs font-semibold"
-                        : "bg-secondary/60 border-border text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    {cnt}
-                  </button>
-                ))}
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="block text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                  {artifactType === "quiz"
+                    ? isIndo
+                      ? "Jumlah Soal"
+                      : "Question Count"
+                    : isIndo
+                    ? "Jumlah Kartu"
+                    : "Card Count"}
+                </label>
+                {countMode === "custom" && (
+                  <span className="text-[10px] text-muted-foreground">1-50</span>
+                )}
               </div>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setCountMode("5")}
+                  className={cn(
+                    "flex-1 py-1.5 rounded-lg border text-center font-mono font-medium transition-all text-xs cursor-pointer",
+                    countMode === "5"
+                      ? "bg-card border-border text-foreground shadow-xs font-semibold"
+                      : "bg-secondary/60 border-border text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  5
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCountMode("10")}
+                  className={cn(
+                    "flex-1 py-1.5 rounded-lg border text-center font-mono font-medium transition-all text-xs cursor-pointer",
+                    countMode === "10"
+                      ? "bg-card border-border text-foreground shadow-xs font-semibold"
+                      : "bg-secondary/60 border-border text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  10
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCountMode("custom")}
+                  className={cn(
+                    "flex-1 py-1.5 rounded-lg border text-center font-medium transition-all text-[11px] cursor-pointer",
+                    countMode === "custom"
+                      ? "bg-card border-border text-foreground shadow-xs font-semibold"
+                      : "bg-secondary/60 border-border text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {isIndo ? "Kustom" : "Custom"}
+                </button>
+              </div>
+
+              {countMode === "custom" && (
+                <div className="flex items-center gap-2 mt-1.5 animate-in fade-in duration-150">
+                  <input
+                    type="number"
+                    min={1}
+                    max={50}
+                    value={customCount}
+                    onChange={(e) => {
+                      const val = parseInt(e.target.value, 10);
+                      setCustomCount(isNaN(val) ? ("" as any) : Math.max(1, Math.min(50, val)));
+                    }}
+                    onBlur={() => {
+                      if (!customCount || Number(customCount) < 1) setCustomCount(5);
+                      else if (Number(customCount) > 50) setCustomCount(50);
+                    }}
+                    placeholder="1-50"
+                    className="w-full px-2.5 py-1.5 rounded-lg bg-secondary/60 border border-border text-foreground font-mono text-xs focus:outline-none focus:border-foreground/30 text-center"
+                  />
+                </div>
+              )}
             </div>
 
             {/* Difficulty */}
