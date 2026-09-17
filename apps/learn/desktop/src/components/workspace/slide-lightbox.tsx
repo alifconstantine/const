@@ -20,6 +20,8 @@ import {
 } from "@const/ui";
 import type { SlideDeckData, SlideItem } from "../../lib/db";
 import { exportToPptx, exportToPdf, exportToHtml } from "../../lib/studio/pptx-exporter";
+import { getTheme } from "../../lib/studio/presentation/themes";
+import { SlideContentView } from "../right-pane/slide-content-view";
 
 export interface SlideLightboxProps {
   deck: SlideDeckData;
@@ -41,6 +43,7 @@ export function SlideLightbox({
   const slides: SlideItem[] = deck.slides || [];
   const currentSlide: SlideItem | undefined = slides[currentIndex];
   const totalSlides = slides.length;
+  const theme = getTheme(deck.themeId);
 
   const handleNext = useCallback(() => {
     if (currentIndex < totalSlides - 1) {
@@ -146,6 +149,11 @@ export function SlideLightbox({
               <span className="capitalize">{currentSlide.layout}</span>
               <span>•</span>
               <span>Slide {currentIndex + 1} of {totalSlides}</span>
+              <span>•</span>
+              <span className="flex items-center gap-1 font-medium" style={{ color: theme.colors.accent }}>
+                <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: theme.colors.accent }} />
+                {theme.name}
+              </span>
             </div>
           </div>
         </div>
@@ -163,11 +171,11 @@ export function SlideLightbox({
                 title="Download Presentation"
               >
                 <Download className="h-3.5 w-3.5 text-[#38bdf8]" />
-                <span className="hidden sm:inline">Download</span>
+                <span>Export</span>
                 <ChevronDown className="h-3 w-3 opacity-60 ml-0.5" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56 p-1.5 bg-[#1e1e24] border-[#38383e] text-white shadow-xl z-[120]">
+            <DropdownMenuContent align="end" className="w-56 p-1.5 bg-[#1e1e24] border-[#38383e] text-white shadow-xl z-50">
               <DropdownMenuItem
                 onClick={handleDownloadPptx}
                 className="cursor-pointer flex items-center gap-2.5 text-xs py-2 px-2.5 rounded-md hover:bg-white/10 text-white focus:bg-white/10 focus:text-white"
@@ -175,7 +183,7 @@ export function SlideLightbox({
                 <Presentation className="h-4 w-4 text-[#38bdf8] shrink-0" />
                 <div className="flex flex-col min-w-0">
                   <span className="font-medium text-[12px] leading-tight">PowerPoint (.pptx)</span>
-                  <span className="text-[10px] text-[#969696] leading-tight mt-0.5">Standard slide deck</span>
+                  <span className="text-[10px] text-[#969696] leading-tight mt-0.5">Standard editable slide deck</span>
                 </div>
               </DropdownMenuItem>
               <DropdownMenuItem
@@ -195,7 +203,7 @@ export function SlideLightbox({
                 <FileCode className="h-4 w-4 text-[#f472b6] shrink-0" />
                 <div className="flex flex-col min-w-0">
                   <span className="font-medium text-[12px] leading-tight">HTML Mandiri (.html)</span>
-                  <span className="text-[10px] text-[#969696] leading-tight mt-0.5">Standalone offline player</span>
+                  <span className="text-[10px] text-[#969696] leading-tight mt-0.5">Standalone offline presentation</span>
                 </div>
               </DropdownMenuItem>
             </DropdownMenuContent>
@@ -243,157 +251,46 @@ export function SlideLightbox({
         </button>
 
         {/* 16:9 Slide Surface */}
-        <div className="w-full aspect-[16/9] max-h-[75vh] rounded-2xl bg-[#161616] border border-[#383838] p-6 sm:p-10 md:p-12 flex flex-col justify-between shadow-2xl relative overflow-hidden select-text">
+        <div
+          className="w-full aspect-[16/9] max-h-[75vh] rounded-2xl p-6 sm:p-10 md:p-12 flex flex-col justify-between shadow-2xl relative overflow-hidden select-text border transition-all"
+          style={{
+            backgroundColor: theme.colors.bg,
+            borderColor: theme.colors.border,
+            color: theme.colors.fg,
+            fontFamily: theme.fontBody,
+          }}
+        >
           {/* Top metadata strip */}
-          <div className="flex items-center justify-between text-xs text-[#969696] font-medium tracking-wider uppercase shrink-0 pb-3 border-b border-white/10">
-            <span className="truncate max-w-[70%]">{deck.title}</span>
-            <span className="font-mono">№ {currentSlide.slideNumber || currentIndex + 1} / {totalSlides}</span>
+          <div
+            className="flex items-center justify-between text-xs font-medium tracking-wider uppercase shrink-0 pb-3 border-b"
+            style={{
+              color: theme.colors.fgMuted,
+              borderColor: `${theme.colors.border}80`,
+            }}
+          >
+            <span className="truncate max-w-[70%]" style={{ color: theme.colors.fg }}>{deck.title}</span>
+            <span className="font-mono" style={{ fontFamily: theme.fontMono, color: theme.colors.fgMuted }}>
+              № {currentSlide.slideNumber || currentIndex + 1} / {totalSlides}
+            </span>
           </div>
 
           {/* Slide Content Body */}
           <div className="flex-1 flex flex-col justify-center py-4 sm:py-6 overflow-y-auto">
-            {/* HERO LAYOUT */}
-            {currentSlide.layout === "hero" && (
-              <div className="text-center space-y-4 max-w-3xl mx-auto">
-                {currentSlide.accentTag && (
-                  <span className="inline-block px-3 py-1 rounded-full bg-blue-500/15 border border-blue-500/30 text-blue-400 text-xs font-semibold uppercase tracking-wider">
-                    {currentSlide.accentTag}
-                  </span>
-                )}
-                <h1 className="text-2xl sm:text-4xl md:text-5xl font-extrabold text-white tracking-tight leading-tight">
-                  {currentSlide.title}
-                </h1>
-                {currentSlide.subtitle && (
-                  <p className="text-sm sm:text-base md:text-lg text-[#969696] max-w-2xl mx-auto leading-relaxed">
-                    {currentSlide.subtitle}
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* NUMBERS LAYOUT */}
-            {currentSlide.layout === "numbers" && (
-              <div className="space-y-5">
-                <div>
-                  <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-white tracking-tight">
-                    {currentSlide.title}
-                  </h2>
-                  {currentSlide.subtitle && (
-                    <p className="text-xs sm:text-sm text-[#969696] mt-1">{currentSlide.subtitle}</p>
-                  )}
-                </div>
-                <div
-                  className="grid gap-3 sm:gap-4"
-                  style={{
-                    gridTemplateColumns: `repeat(${Math.min(currentSlide.numbers?.length || 3, 3)}, minmax(0, 1fr))`,
-                  }}
-                >
-                  {(currentSlide.numbers || []).map((num, nIdx) => (
-                    <div
-                      key={nIdx}
-                      className="p-4 sm:p-5 rounded-2xl bg-[#222222] border border-[#383838] flex flex-col justify-between"
-                    >
-                      <div className="text-2xl sm:text-4xl font-black text-[#38bdf8] font-mono tracking-tight">
-                        {num.value}
-                      </div>
-                      <div className="text-xs sm:text-sm font-semibold text-white mt-2">
-                        {num.label}
-                      </div>
-                      {num.note && (
-                        <div className="text-[11px] text-[#969696] mt-1 leading-snug">
-                          {num.note}
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* SPLIT / COMPARISON LAYOUT */}
-            {(currentSlide.layout === "split" || currentSlide.layout === "comparison") && (
-              <div className="space-y-4">
-                <div>
-                  <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-white tracking-tight">
-                    {currentSlide.title}
-                  </h2>
-                  {currentSlide.subtitle && (
-                    <p className="text-xs sm:text-sm text-[#969696] mt-1">{currentSlide.subtitle}</p>
-                  )}
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                  {/* Left Column */}
-                  <div className="p-4 sm:p-5 rounded-2xl bg-[#222222] border border-[#383838]">
-                    <h3 className="text-xs sm:text-sm font-semibold text-[#38bdf8] mb-2.5">
-                      {currentSlide.leftColumn?.title || "Poin A"}
-                    </h3>
-                    <ul className="space-y-1.5 text-xs sm:text-sm text-[#d4d4d4]">
-                      {(currentSlide.leftColumn?.items || currentSlide.bullets?.slice(0, 3) || []).map(
-                        (it, idx) => (
-                          <li key={idx} className="flex items-start gap-2">
-                            <span className="text-[#38bdf8] font-bold shrink-0">•</span>
-                            <span>{it}</span>
-                          </li>
-                        )
-                      )}
-                    </ul>
-                  </div>
-
-                  {/* Right Column */}
-                  <div className="p-4 sm:p-5 rounded-2xl bg-[#222222] border border-[#383838]">
-                    <h3 className="text-xs sm:text-sm font-semibold text-[#fde047] mb-2.5">
-                      {currentSlide.rightColumn?.title || "Poin B"}
-                    </h3>
-                    <ul className="space-y-1.5 text-xs sm:text-sm text-[#d4d4d4]">
-                      {(currentSlide.rightColumn?.items || currentSlide.bullets?.slice(3) || []).map(
-                        (it, idx) => (
-                          <li key={idx} className="flex items-start gap-2">
-                            <span className="text-[#fde047] font-bold shrink-0">•</span>
-                            <span>{it}</span>
-                          </li>
-                        )
-                      )}
-                    </ul>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* DEFAULT / BULLETS / TAKEAWAY LAYOUT */}
-            {currentSlide.layout !== "hero" &&
-              currentSlide.layout !== "numbers" &&
-              currentSlide.layout !== "split" &&
-              currentSlide.layout !== "comparison" && (
-                <div className="space-y-4">
-                  <div>
-                    <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-white tracking-tight">
-                      {currentSlide.title}
-                    </h2>
-                    {currentSlide.subtitle && (
-                      <p className="text-xs sm:text-sm text-[#969696] mt-1">{currentSlide.subtitle}</p>
-                    )}
-                  </div>
-                  <div className="space-y-2 sm:space-y-2.5">
-                    {(currentSlide.bullets || []).map((b, bIdx) => (
-                      <div
-                        key={bIdx}
-                        className="p-3 sm:p-3.5 rounded-xl bg-[#222222] border border-[#383838] text-xs sm:text-sm text-white font-medium flex items-center gap-3 transition-colors hover:border-[#484848]"
-                      >
-                        <div className="h-2 w-2 rounded-full bg-[#38bdf8] shrink-0" />
-                        <span className="leading-snug">{b}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+            <SlideContentView slide={currentSlide} theme={theme} mode="large" />
           </div>
 
           {/* Bottom notes / footer strip */}
-          <div className="flex items-center justify-between text-[11px] text-[#808080] pt-3 border-t border-white/10 shrink-0">
+          <div
+            className="flex items-center justify-between text-[11px] pt-3 border-t shrink-0"
+            style={{
+              color: theme.colors.fgMuted,
+              borderColor: `${theme.colors.border}80`,
+            }}
+          >
             <span className="truncate max-w-[80%]">
               {currentSlide.speakerNotes ? `Catatan: ${currentSlide.speakerNotes}` : "Const Learn Presentation Engine"}
             </span>
-            <span className="font-mono">16 : 9</span>
+            <span className="font-mono" style={{ fontFamily: theme.fontMono }}>16 : 9</span>
           </div>
         </div>
 
@@ -422,9 +319,10 @@ export function SlideLightbox({
             onClick={() => setCurrentIndex(idx)}
             className={`h-2 transition-all rounded-full cursor-pointer ${
               idx === currentIndex
-                ? "w-8 bg-[#38bdf8]"
+                ? "w-8"
                 : "w-2 bg-white/20 hover:bg-white/40"
             }`}
+            style={idx === currentIndex ? { backgroundColor: theme.colors.accent } : undefined}
             title={`Slide ${idx + 1}: ${s.title}`}
           />
         ))}

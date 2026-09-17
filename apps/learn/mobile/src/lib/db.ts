@@ -95,13 +95,35 @@ export interface SlideItem {
   id: string;
   slideNumber: number;
   title: string;
-  layout: "hero" | "bullets" | "split" | "quote" | "numbers" | "comparison" | "takeaway";
+  layout:
+    | "hero"
+    | "agenda"
+    | "bullets"
+    | "split"
+    | "quote"
+    | "numbers"
+    | "big-stat"
+    | "bento-grid"
+    | "comparison"
+    | "timeline"
+    | "takeaway";
   subtitle?: string;
+  kicker?: string;
   bullets?: string[];
   leftColumn?: { title?: string; items: string[] };
   rightColumn?: { title?: string; items: string[] };
-  quote?: { text: string; author?: string };
+  quote?: { text: string; author?: string; context?: string };
   numbers?: SlideNumberItem[];
+  statHighlight?: { value: string; label: string; context?: string };
+  bentoCards?: Array<{ badge?: string; title: string; desc: string }>;
+  comparisonDetails?: {
+    leftTitle: string;
+    leftItems: string[];
+    rightTitle: string;
+    rightItems: string[];
+    winner?: "left" | "right";
+  };
+  timelineSteps?: Array<{ step: string; title: string; desc: string }>;
   speakerNotes?: string;
   accentTag?: string;
 }
@@ -113,6 +135,7 @@ export interface SlideDeckData {
   topic?: string;
   lengthMode: "short" | "medium" | "long" | "auto";
   language: "id" | "en";
+  themeId?: string;
   sourceCount?: number;
   sourceTitles?: string[];
   sourceIds?: string[];

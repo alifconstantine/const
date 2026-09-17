@@ -1,5 +1,6 @@
 import type { LocalSource, QuizData, FlashcardData, MindMapData, MindMapNode, SlideDeckData, SlideItem } from "../db";
 import { getRouterBaseUrl } from "../ai-stream";
+import { buildPresentationPrompt } from "./presentation/prompt";
 
 export interface GenerateStudioArtifactOptions {
   type: "quiz" | "flashcard" | "mind_map" | "slides";
@@ -10,6 +11,7 @@ export interface GenerateStudioArtifactOptions {
   lengthMode?: "short" | "medium" | "long" | "auto";
   sources: LocalSource[];
   language?: "id" | "en";
+  themeId?: string;
 }
 
 function extractJson(text: string): any {
@@ -106,6 +108,7 @@ export async function generateStudioArtifact({
   lengthMode = "auto",
   sources,
   language = "id",
+  themeId = "auto",
 }: GenerateStudioArtifactOptions): Promise<{
   title: string;
   data: QuizData | FlashcardData | MindMapData | SlideDeckData;
@@ -340,95 +343,16 @@ Rules:
       (topic ? `Fokus Topik Spesifik / Instruksi: ${topic}\n\n` : "") +
       `Silakan buatkan Peta Pikiran hierarkis dalam format JSON yang valid.`;
   } else if (type === "slides") {
-    const targetSlideCount =
-      lengthMode === "short"
-        ? 5
-        : lengthMode === "long"
-        ? 14
-        : lengthMode === "medium"
-        ? 8
-        : Math.max(5, Math.min(20, count || 8));
-
-    systemPrompt = isIndo
-      ? `Anda adalah arsitek dek presentasi slide (PPT) profesional untuk Const Learn.
-Tugas Anda adalah merangkum materi rujukan ke dalam dek presentasi slide berkualitas tinggi yang terstruktur, fokus, dan siap disajikan.
-Aturan Penting:
-1. Buat tepat ${targetSlideCount} slide dalam format JSON.
-2. Setiap slide memiliki salah satu layout berikut:
-   - "hero": Slide judul/cover awal (title, subtitle, accentTag).
-   - "bullets": Poin-poin kunci (3-4 bullet jelas dan padat).
-   - "split": Tata letak 2 kolom (leftColumn dan rightColumn).
-   - "numbers": Kartu metrik/angka kunci (2-3 kartu dengan value dan label).
-   - "comparison": Perbandingan 2 hal/metode (leftColumn vs rightColumn).
-   - "quote": Kutipan penting / prinsip sentral.
-   - "takeaway": Kesimpulan dan langkah tindakan nyata.
-3. Rancang alur presentasi:
-   - Slide 1: Cover ("hero")
-   - Slide 2: Latar belakang & konteks ("bullets")
-   - Slide 3: Tantangan / metrik data ("numbers" atau "split")
-   - Slide 4: Solusi & konsep inti ("bullets")
-   - Slide 5: Rincian / perbandingan ("comparison" atau "split")
-   - Slide 6+: Metrik dampak dan kesimpulan ("takeaway")
-4. Setiap slide WAJIB memiliki "speakerNotes" (catatan narasi pembicara 1-2 kalimat) yang memandu apa yang harus dijelaskan.
-5. Format HANYA JSON valid tanpa teks pengantar atau markdown.`
-      : `You are a professional slide presentation (PPT) deck designer for Const Learn.
-Your task is to synthesize the provided study materials into a structured, elegant, high-impact presentation deck.
-Critical Rules:
-1. Create exactly ${targetSlideCount} slides in valid JSON format.
-2. Each slide must use an appropriate layout:
-   - "hero": Title / cover slide (title, subtitle, accentTag).
-   - "bullets": Key bullet points (3-4 concise bullets).
-   - "split": Two-column layout (leftColumn & rightColumn).
-   - "numbers": Key stats & numbers (2-3 cards with value & label).
-   - "comparison": Comparing 2 approaches.
-   - "quote": Central quote or key principle.
-   - "takeaway": Actionable summary & conclusion.
-3. Every slide MUST include "speakerNotes" (1-2 sentences of talking points for the presenter).
-4. Output STRICTLY valid JSON without intro or markdown wrappers.`;
-
-    userPrompt = isIndo
-      ? `Materi Sumber Belajar:\n${sourceSnippets || "Topik: " + (topic || "Pengetahuan Umum")}\n\n` +
-        (topic ? `Fokus Topik Spesifik / Instruksi: ${topic}\n\n` : "") +
-        `Silakan hasilkan dek slide presentasi dalam format JSON persis seperti contoh skema berikut:\n` +
-        JSON.stringify(
-          {
-            title: `Presentasi: ${topic || sources[0]?.title || "Materi Belajar"}`,
-            slides: [
-              {
-                id: "slide_1",
-                slideNumber: 1,
-                layout: "hero",
-                title: "Judul Presentasi",
-                subtitle: "Subjudul penjelasan materi",
-                accentTag: "Ringkasan Eksekutif",
-                speakerNotes: "Catatan narasi pembicara untuk slide pertama."
-              }
-            ]
-          },
-          null,
-          2
-        )
-      : `Source Study Materials:\n${sourceSnippets || "Topic: " + (topic || "General Knowledge")}\n\n` +
-        (topic ? `Specific Topic Focus / Instructions: ${topic}\n\n` : "") +
-        `Please generate the presentation slide deck in JSON matching this schema:\n` +
-        JSON.stringify(
-          {
-            title: `Presentation: ${topic || sources[0]?.title || "Study Material"}`,
-            slides: [
-              {
-                id: "slide_1",
-                slideNumber: 1,
-                layout: "hero",
-                title: "Presentation Title",
-                subtitle: "Presentation subtitle or overview",
-                accentTag: "Executive Summary",
-                speakerNotes: "Presenter talking points for the first slide."
-              }
-            ]
-          },
-          null,
-          2
-        );
+    const promptConfig = buildPresentationPrompt({
+      topic,
+      lengthMode,
+      count,
+      sources,
+      language,
+      themeId,
+    });
+    systemPrompt = promptConfig.systemPrompt;
+    userPrompt = promptConfig.userPrompt;
   }
 
   // Attempt API call to Router AI Gateway
@@ -525,12 +449,14 @@ Critical Rules:
             };
             return { title: mindMapData.title, data: mindMapData };
           } else if (type === "slides" && Array.isArray(parsed.slides) && parsed.slides.length > 0) {
+            const resolvedDeckTheme = parsed.themeId || (themeId !== "auto" && themeId ? themeId : "const-dark");
             const slidesData: SlideDeckData = {
               id: `slides_${Date.now()}`,
               title: parsed.title || (topic ? (isIndo ? `Presentasi: ${topic}` : `Presentation: ${topic}`) : (isIndo ? `Presentasi: ${sources[0]?.title || "Materi Belajar"}` : `Presentation: ${sources[0]?.title || "Study Material"}`)),
               topic,
               lengthMode,
               language,
+              themeId: resolvedDeckTheme,
               sourceCount: sources.length,
               sourceTitles: sources.map((s) => s.title),
               sourceIds: sources.map((s) => s.id),
@@ -540,11 +466,16 @@ Critical Rules:
                 layout: s.layout || (sIdx === 0 ? "hero" : "bullets"),
                 title: s.title || `Slide ${sIdx + 1}`,
                 subtitle: s.subtitle || undefined,
+                kicker: s.kicker || undefined,
                 bullets: Array.isArray(s.bullets) ? s.bullets : undefined,
                 leftColumn: s.leftColumn || undefined,
                 rightColumn: s.rightColumn || undefined,
                 quote: s.quote || undefined,
                 numbers: Array.isArray(s.numbers) ? s.numbers : undefined,
+                statHighlight: s.statHighlight || undefined,
+                bentoCards: Array.isArray(s.bentoCards) ? s.bentoCards : undefined,
+                comparisonDetails: s.comparisonDetails || undefined,
+                timelineSteps: Array.isArray(s.timelineSteps) ? s.timelineSteps : undefined,
                 speakerNotes: s.speakerNotes || undefined,
                 accentTag: s.accentTag || undefined,
               })),
@@ -765,77 +696,97 @@ Critical Rules:
     };
     return { title: fallbackTitle, data: fallbackFlashcard };
   } else if (type === "slides") {
-    const mainTitle = topic?.trim() || sources[0]?.title || (isIndo ? "Presentasi Materi Belajar" : "Presentation Slides");
+    const mainTitle = fallbackTitle;
+    const resolvedFallbackTheme = themeId !== "auto" && themeId ? themeId : "const-dark";
     const fallbackSlides: SlideItem[] = [
       {
         id: "slide_1",
         slideNumber: 1,
         layout: "hero",
+        kicker: isIndo ? "RINGKASAN EKSEKUTIF" : "EXECUTIVE SUMMARY",
         title: mainTitle,
-        subtitle: isIndo ? "Rangkuman komprehensif konsep & intisari materi" : "Comprehensive concept & insights overview",
-        accentTag: isIndo ? "Ringkasan Eksekutif" : "Key Overview",
+        subtitle: isIndo ? "Rangkuman komprehensif konsep, metodologi & intisari materi" : "Comprehensive concept, methodology & insights overview",
+        accentTag: isIndo ? "Esensial" : "Essential",
         speakerNotes: isIndo ? `Selamat datang di presentasi ${mainTitle}. Slide ini mengantar materi utama.` : `Welcome to the presentation on ${mainTitle}.`,
       },
       {
         id: "slide_2",
         slideNumber: 2,
-        layout: "bullets",
-        title: isIndo ? "Latar Belakang & Konteks" : "Context & Background",
-        subtitle: isIndo ? "Fondasi pemikiran utama" : "Core theoretical foundations",
-        bullets: sources.length > 0
-          ? sources.slice(0, 3).map((s) => `${s.title}: ${s.content?.slice(0, 90) || "Intisari konsep rujukan."}...`)
-          : [
-              isIndo ? "Pemahaman mendasar terhadap pokok bahasan." : "Fundamental understanding of key concepts.",
-              isIndo ? "Keterkaitan antar variabel dan metodologi." : "Interconnections between variables and methodology.",
-              isIndo ? "Penerapan sistematis dalam skenario nyata." : "Systematic application in real scenarios."
-            ],
-        speakerNotes: isIndo ? "Jelaskan latar belakang dan relevansi topik ini bagi pemahaman audiens." : "Explain background and significance.",
+        layout: "agenda",
+        kicker: isIndo ? "PETA BAHASAN" : "AGENDA OVERVIEW",
+        title: isIndo ? "Struktur & Alur Materi" : "Structure & Agenda",
+        subtitle: isIndo ? "Tiga babak utama pembahasan" : "Three primary chapters of discussion",
+        bullets: [
+          isIndo ? "01. Landasan Konseptual & Tantangan Utama" : "01. Conceptual Foundation & Core Challenges",
+          isIndo ? "02. Arsitektur Kerangka Kerja & Solusi Modern" : "02. Framework Architecture & Modern Solutions",
+          isIndo ? "03. Evaluasi Metrik Dampak & Rencana Tindakan" : "03. Impact Metrics & Actionable Roadmaps",
+        ],
+        speakerNotes: isIndo ? "Uraikan tiga babak utama yang akan dipelajari dalam sesi ini." : "Outline the three main chapters of the study session.",
       },
       {
         id: "slide_3",
         slideNumber: 3,
-        layout: "split",
-        title: isIndo ? "Struktur & Karakteristik Utama" : "Key Structure & Characteristics",
-        subtitle: isIndo ? "Dua pilar pemahaman kunci" : "Two core pillars of understanding",
-        leftColumn: {
-          title: isIndo ? "Prinsip Inti" : "Core Principles",
-          items: [
-            isIndo ? "Konseptualisasi berbasis fakta" : "Fact-based conceptualization",
-            isIndo ? "Konsistensi alur penalaran" : "Consistent reasoning flow"
-          ]
+        layout: "big-stat",
+        kicker: isIndo ? "TANTANGAN UTAMA" : "CORE CHALLENGE",
+        title: isIndo ? "Urgensi Pemahaman Komprehensif" : "The Imperative for Deep Grounding",
+        subtitle: isIndo ? "Data membuktikan pentingnya penguasaan konsep secara terstruktur" : "Empirical data highlights the need for structured comprehension",
+        statHighlight: {
+          value: "10x",
+          label: isIndo ? "Efektivitas Pemahaman Berbasis Intisari" : "Comprehension Boost via Grounded Synthesis",
+          context: isIndo ? "Pembelajaran aktif berbasis sumber rujukan terbukti melipatgandakan retensi ingatan jangka panjang." : "Active synthesis grounded in source documents multiplies long-term conceptual retention.",
         },
-        rightColumn: {
-          title: isIndo ? "Implementasi Praktis" : "Practical Implementation",
-          items: [
-            isIndo ? "Aplikasi bertahap dan teruji" : "Step-by-step tested execution",
-            isIndo ? "Optimasi hasil yang terukur" : "Measurable result optimization"
-          ]
-        },
-        speakerNotes: isIndo ? "Bandingkan kedua sisi pilar untuk memberikan pemahaman holistik." : "Contrast the two pillars.",
+        speakerNotes: isIndo ? "Soroti rasio 10x sebagai pembeda utama metodologi terstruktur dibanding membaca pasif." : "Highlight the 10x factor as key differentiator.",
       },
       {
         id: "slide_4",
         slideNumber: 4,
-        layout: "numbers",
-        title: isIndo ? "Poin Kunci & Parameter Evaluasi" : "Key Metrics & Evaluation",
-        subtitle: isIndo ? "Indikator keberhasilan pemahaman" : "Measurable indicators",
-        numbers: [
-          { value: "100%", label: isIndo ? "Akurasi Sumber" : "Source Grounding", note: isIndo ? "Terverifikasi" : "Verified" },
-          { value: "10x", label: isIndo ? "Retensi Pemahaman" : "Retention Boost", note: isIndo ? "Metode aktif" : "Active recall" },
-          { value: "3x", label: isIndo ? "Efisiensi Belajar" : "Study Efficiency", note: isIndo ? "Fokus intisari" : "Targeted focus" }
-        ],
-        speakerNotes: isIndo ? "Tekankan indikator kuantitatif dan dampak nyata dari materi." : "Emphasize key quantitative outcomes.",
+        layout: "comparison",
+        kicker: isIndo ? "KOMPARASI METODE" : "METHOD COMPARISON",
+        title: isIndo ? "Transformasi Pendekatan" : "Approach Transformation",
+        subtitle: isIndo ? "Membandingkan pola konvensional dengan kerangka kerja modern" : "Contrasting conventional patterns with modern frameworks",
+        comparisonDetails: {
+          leftTitle: isIndo ? "Pola Konvensional" : "Conventional Pattern",
+          leftItems: [
+            isIndo ? "Hafalan pasif tanpa keterkaitan" : "Passive memorization without context",
+            isIndo ? "Fragmentasi sumber belajar" : "Fragmented source materials",
+            isIndo ? "Evaluasi lambat dan parsial" : "Slow, isolated evaluation cycles",
+          ],
+          rightTitle: isIndo ? "Kerangka Kerja Modern" : "Modern Framework",
+          rightItems: [
+            isIndo ? "Penalaran aktif berbasis intisari" : "Active reasoning grounded in synthesis",
+            isIndo ? "Konsolidasi sumber multi-perspektif" : "Multi-perspective source consolidation",
+            isIndo ? "Validasi langsung dan iteratif" : "Immediate, iterative validation feedback",
+          ],
+          winner: "right",
+        },
+        speakerNotes: isIndo ? "Tekankan keuntungan pendekatan kanan dalam membangun pemahaman mendalam." : "Emphasize the right column advantages.",
       },
       {
         id: "slide_5",
         slideNumber: 5,
+        layout: "bento-grid",
+        kicker: isIndo ? "PILAR UTAMA" : "KEY PILLARS",
+        title: isIndo ? "Empat Dimensi Penguasaan Materi" : "Four Dimensions of Mastery",
+        subtitle: isIndo ? "Komponen esensial untuk mempraktikkan konsep ini" : "Essential components for practical execution",
+        bentoCards: [
+          { badge: "01", title: isIndo ? "Fondasi Teori" : "Foundations", desc: isIndo ? "Memahami prinsip dasar tanpa asumsi prematur." : "Grasping core tenets without premature assumptions." },
+          { badge: "02", title: isIndo ? "Verifikasi Fakta" : "Fact Checking", desc: isIndo ? "Menyaring informasi berbasis bukti terverifikasi." : "Filtering evidence-grounded facts." },
+          { badge: "03", title: isIndo ? "Sintesis Dinamis" : "Synthesis", desc: isIndo ? "Menghubungkan pola lintas sumber rujukan." : "Cross-referencing insights across domains." },
+          { badge: "04", title: isIndo ? "Aplikasi Nyata" : "Application", desc: isIndo ? "Mengimplementasikan solusi pada kasus nyata." : "Executing solutions in real-world scenarios." },
+        ],
+        speakerNotes: isIndo ? "Jelaskan kesatuan keempat dimensi sebagai sistem yang utuh." : "Explain how these four dimensions function as one integrated system.",
+      },
+      {
+        id: "slide_6",
+        slideNumber: 6,
         layout: "takeaway",
+        kicker: isIndo ? "KESIMPULAN AKSI" : "ACTIONABLE SUMMARY",
         title: isIndo ? "Kesimpulan & Langkah Selanjutnya" : "Conclusion & Next Steps",
-        subtitle: isIndo ? "Intisari akhir untuk tindakan" : "Key actionable takeaways",
+        subtitle: isIndo ? "Tiga komitmen nyata untuk hasil optimal" : "Three commitments for optimal outcome",
         bullets: [
           isIndo ? "Kuasai konsep fondasi sebelum melangkah ke analisis lanjutan." : "Master fundamentals before proceeding to advanced analysis.",
           isIndo ? "Lakukan evaluasi berkala menggunakan ringkasan dan kuis mandiri." : "Evaluate regularly with study summaries and quizzes.",
-          isIndo ? "Terapkan wawasan ini secara kontekstual dalam studi Anda." : "Apply insights contextually in your study workflow."
+          isIndo ? "Terapkan wawasan ini secara kontekstual dalam alur kerja nyata." : "Apply insights contextually in your study workflow."
         ],
         speakerNotes: isIndo ? "Tutup presentasi dengan kesimpulan tajam dan ajakan bertindak." : "Conclude presentation with clear action items.",
       }
@@ -847,6 +798,7 @@ Critical Rules:
       topic,
       lengthMode,
       language,
+      themeId: resolvedFallbackTheme,
       sourceCount: sources.length,
       sourceTitles: sources.map((s) => s.title),
       sourceIds: sources.map((s) => s.id),

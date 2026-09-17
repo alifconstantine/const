@@ -484,6 +484,7 @@ export function LearnWorkspace({
     difficulty?: "easy" | "medium" | "hard";
     lengthMode?: "short" | "medium" | "long" | "auto";
     language?: "id" | "en";
+    themeId?: string;
   }) => {
     // 1. Ensure studio panel is open and in Studio mode so user immediately sees the progress card!
     setIsStudioCollapsed(false);
@@ -539,6 +540,7 @@ export function LearnWorkspace({
         difficulty: params.difficulty,
         lengthMode: params.lengthMode,
         language: targetLang,
+        themeId: params.themeId,
       });
 
       // Update Dexie artifact to completed

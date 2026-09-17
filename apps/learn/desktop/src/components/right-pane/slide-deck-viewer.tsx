@@ -24,7 +24,9 @@ import {
 import type { SlideDeckData, SlideItem } from "../../lib/db";
 import { useI18n } from "../../lib/i18n";
 import { exportToPptx, exportToPdf, exportToHtml } from "../../lib/studio/pptx-exporter";
+import { getTheme } from "../../lib/studio/presentation/themes";
 import { SlideLightbox } from "../workspace/slide-lightbox";
+import { SlideContentView } from "./slide-content-view";
 
 export interface SlideDeckViewerProps {
   deck: SlideDeckData;
@@ -58,6 +60,7 @@ export function SlideDeckViewer({
   const slides = deck.slides || [];
   const currentSlide = slides[currentSlideIndex];
   const totalSlides = slides.length;
+  const theme = getTheme(deck.themeId);
 
   const handleNext = () => {
     if (currentSlideIndex < totalSlides - 1) {
@@ -194,6 +197,11 @@ What are the detailed nuances and practical examples?`;
               <span>{totalSlides} {isIndo ? "slide" : "slides"}</span>
               <span>•</span>
               <span className="capitalize">{currentSlide.layout}</span>
+              <span>•</span>
+              <span className="flex items-center gap-1 text-[10px] font-medium" style={{ color: theme.colors.accent }}>
+                <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: theme.colors.accent }} />
+                {theme.name}
+              </span>
             </div>
           </div>
         </div>
@@ -278,147 +286,61 @@ What are the detailed nuances and practical examples?`;
         {/* 16:9 Canvas Area */}
         <div
           onClick={() => setIsLightboxOpen(true)}
-          className="w-full aspect-[16/9] rounded-2xl bg-[#222222] border border-[#383838] p-5 sm:p-7 flex flex-col justify-between shadow-xl relative cursor-pointer group hover:border-[#4d4d4d] transition-colors"
+          className="w-full aspect-[16/9] rounded-2xl p-5 sm:p-7 flex flex-col justify-between shadow-xl relative cursor-pointer group transition-all"
+          style={{
+            backgroundColor: theme.colors.bg,
+            borderColor: theme.colors.border,
+            borderWidth: "1px",
+            borderStyle: "solid",
+            color: theme.colors.fg,
+            fontFamily: theme.fontBody,
+          }}
           title={isIndo ? "Klik untuk memperbesar ke depan layar" : "Click to maximize"}
         >
           {/* Subtle expand indicator icon on top right */}
-          <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity bg-black/60 px-2 py-1 rounded-md text-[10px] text-white flex items-center gap-1 border border-white/15">
+          <div
+            className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity px-2 py-1 rounded-md text-[10px] flex items-center gap-1 border shadow-sm"
+            style={{
+              backgroundColor: `${theme.colors.bg}d9`,
+              borderColor: theme.colors.border,
+              color: theme.colors.fg,
+            }}
+          >
             <Maximize2 className="h-3 w-3" />
             <span>{isIndo ? "Klik Perbesar" : "Maximize"}</span>
           </div>
 
           {/* Slide Header */}
-          <div className="flex items-center justify-between text-[11px] text-[#969696] font-medium uppercase tracking-wider shrink-0 border-b border-white/5 pb-2">
+          <div
+            className="flex items-center justify-between text-[11px] font-medium uppercase tracking-wider shrink-0 pb-2 border-b"
+            style={{
+              color: theme.colors.fgMuted,
+              borderColor: `${theme.colors.border}80`,
+            }}
+          >
             <span className="truncate max-w-[70%]">{deck.title}</span>
-            <span className="font-mono">№ {currentSlideIndex + 1} / {totalSlides}</span>
+            <span className="font-mono" style={{ fontFamily: theme.fontMono }}>
+              № {currentSlideIndex + 1} / {totalSlides}
+            </span>
           </div>
 
           {/* Slide Layout Content */}
-          <div className="flex-1 flex flex-col justify-center py-3 overflow-hidden">
-            {/* HERO */}
-            {currentSlide.layout === "hero" && (
-              <div className="text-center space-y-2.5">
-                {currentSlide.accentTag && (
-                  <span className="inline-block px-2.5 py-0.5 rounded-full bg-blue-500/15 border border-blue-500/30 text-blue-400 text-[10px] font-semibold uppercase tracking-wider">
-                    {currentSlide.accentTag}
-                  </span>
-                )}
-                <h1 className="text-lg sm:text-2xl font-bold text-white tracking-tight leading-tight line-clamp-3">
-                  {currentSlide.title}
-                </h1>
-                {currentSlide.subtitle && (
-                  <p className="text-xs sm:text-sm text-[#969696] max-w-xl mx-auto line-clamp-2">
-                    {currentSlide.subtitle}
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* NUMBERS */}
-            {currentSlide.layout === "numbers" && (
-              <div className="space-y-3">
-                <div>
-                  <h2 className="text-sm sm:text-base font-bold text-white tracking-tight line-clamp-1">
-                    {currentSlide.title}
-                  </h2>
-                  {currentSlide.subtitle && (
-                    <p className="text-[11px] text-[#969696] line-clamp-1">{currentSlide.subtitle}</p>
-                  )}
-                </div>
-                <div
-                  className="grid gap-2"
-                  style={{
-                    gridTemplateColumns: `repeat(${Math.min(currentSlide.numbers?.length || 3, 3)}, minmax(0, 1fr))`,
-                  }}
-                >
-                  {(currentSlide.numbers || []).slice(0, 3).map((num, nIdx) => (
-                    <div
-                      key={nIdx}
-                      className="p-2.5 sm:p-3 rounded-xl bg-[#2b2b2b] border border-[#383838] flex flex-col justify-between"
-                    >
-                      <div className="text-xl sm:text-2xl font-black text-[#38bdf8] font-mono">
-                        {num.value}
-                      </div>
-                      <div className="text-[11px] font-semibold text-white truncate mt-1">
-                        {num.label}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* SPLIT / COMPARISON */}
-            {(currentSlide.layout === "split" || currentSlide.layout === "comparison") && (
-              <div className="space-y-3">
-                <div>
-                  <h2 className="text-sm sm:text-base font-bold text-white tracking-tight line-clamp-1">
-                    {currentSlide.title}
-                  </h2>
-                  {currentSlide.subtitle && (
-                    <p className="text-[11px] text-[#969696] line-clamp-1">{currentSlide.subtitle}</p>
-                  )}
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="p-2.5 rounded-xl bg-[#2b2b2b] border border-[#383838]">
-                    <span className="text-[11px] font-semibold text-[#38bdf8] block truncate mb-1">
-                      {currentSlide.leftColumn?.title || "Poin A"}
-                    </span>
-                    <ul className="space-y-1 text-[11px] text-[#d4d4d4]">
-                      {(currentSlide.leftColumn?.items || currentSlide.bullets?.slice(0, 2) || []).map((it, idx) => (
-                        <li key={idx} className="truncate">• {it}</li>
-                      ))}
-                    </ul>
-                  </div>
-                  <div className="p-2.5 rounded-xl bg-[#2b2b2b] border border-[#383838]">
-                    <span className="text-[11px] font-semibold text-[#fde047] block truncate mb-1">
-                      {currentSlide.rightColumn?.title || "Poin B"}
-                    </span>
-                    <ul className="space-y-1 text-[11px] text-[#d4d4d4]">
-                      {(currentSlide.rightColumn?.items || currentSlide.bullets?.slice(2, 4) || []).map((it, idx) => (
-                        <li key={idx} className="truncate">• {it}</li>
-                      ))}
-                    </ul>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* DEFAULT BULLETS */}
-            {currentSlide.layout !== "hero" &&
-              currentSlide.layout !== "numbers" &&
-              currentSlide.layout !== "split" &&
-              currentSlide.layout !== "comparison" && (
-                <div className="space-y-2">
-                  <div>
-                    <h2 className="text-sm sm:text-base font-bold text-white tracking-tight line-clamp-1">
-                      {currentSlide.title}
-                    </h2>
-                    {currentSlide.subtitle && (
-                      <p className="text-[11px] text-[#969696] line-clamp-1">{currentSlide.subtitle}</p>
-                    )}
-                  </div>
-                  <div className="space-y-1.5">
-                    {(currentSlide.bullets || []).slice(0, 4).map((b, bIdx) => (
-                      <div
-                        key={bIdx}
-                        className="p-2 rounded-lg bg-[#2b2b2b] border border-[#383838] text-[11px] text-white flex items-center gap-2"
-                      >
-                        <div className="h-1.5 w-1.5 rounded-full bg-[#38bdf8] shrink-0" />
-                        <span className="truncate">{b}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+          <div className="flex-1 flex flex-col justify-center py-2 overflow-hidden">
+            <SlideContentView slide={currentSlide} theme={theme} mode="compact" />
           </div>
 
           {/* Slide Footer */}
-          <div className="flex items-center justify-between text-[10px] text-[#808080] border-t border-white/5 pt-1.5 shrink-0">
+          <div
+            className="flex items-center justify-between text-[10px] border-t pt-1.5 shrink-0"
+            style={{
+              color: theme.colors.fgMuted,
+              borderColor: `${theme.colors.border}80`,
+            }}
+          >
             <span className="truncate max-w-[80%]">
               {currentSlide.speakerNotes ? `Catatan: ${currentSlide.speakerNotes}` : "Const Learn Presentation"}
             </span>
-            <span className="font-mono">16 : 9</span>
+            <span className="font-mono" style={{ fontFamily: theme.fontMono }}>16 : 9</span>
           </div>
         </div>
 

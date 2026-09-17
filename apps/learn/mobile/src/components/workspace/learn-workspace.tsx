@@ -1622,6 +1622,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
     lengthMode?: "short" | "medium" | "long" | "auto";
     language?: "id" | "en";
     selectedSourceIds: string[];
+    themeId?: string;
   }) => {
     const selectedSources = (sources || []).filter((s) => options.selectedSourceIds.includes(s.id));
     const targetLang = options.language || (language === "id" ? "id" : "en");
@@ -1675,6 +1676,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
         difficulty: options.difficulty,
         lengthMode: options.lengthMode,
         language: targetLang,
+        themeId: options.themeId,
       });
 
       await localDb.updateArtifact(artId, {

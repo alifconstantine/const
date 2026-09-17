@@ -25,6 +25,8 @@ import {
 import type { SlideDeckData, SlideItem } from "../../lib/db";
 import { useI18n } from "../../lib/i18n";
 import { exportToPptx, exportToPdf, exportToHtml } from "../../lib/studio/pptx-exporter";
+import { getTheme } from "../../lib/studio/presentation/themes";
+import { SlideContentView } from "./slide-content-view";
 
 export interface MobileSlideViewerProps {
   deck: SlideDeckData;
@@ -50,6 +52,7 @@ export function MobileSlideViewer({
   const slides = deck.slides || [];
   const currentSlide = slides[currentIndex];
   const totalSlides = slides.length;
+  const theme = getTheme(deck.themeId);
 
   // Touch swipe support
   const touchStartXRef = useRef<number | null>(null);
@@ -210,6 +213,11 @@ ${(currentSlide.bullets || []).map((b) => `- ${b}`).join("\n")}`;
               <span>{currentIndex + 1} / {totalSlides}</span>
               <span>•</span>
               <span className="capitalize">{currentSlide.layout}</span>
+              <span>•</span>
+              <span className="flex items-center gap-1 font-medium" style={{ color: theme.colors.accent }}>
+                <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: theme.colors.accent }} />
+                {theme.name}
+              </span>
             </div>
           </div>
         </div>
@@ -292,70 +300,43 @@ ${(currentSlide.bullets || []).map((b) => `- ${b}`).join("\n")}`;
         {/* 16:9 Slide Surface */}
         <div
           onClick={() => setIsLightboxOpen(true)}
-          className="w-full aspect-[16/9] rounded-2xl bg-[#222222] border border-[#383838] p-4 sm:p-6 flex flex-col justify-between shadow-xl relative cursor-pointer active:scale-[0.99] transition-transform"
+          className="w-full aspect-[16/9] rounded-2xl p-4 sm:p-6 flex flex-col justify-between shadow-xl relative cursor-pointer active:scale-[0.99] transition-all border"
+          style={{
+            backgroundColor: theme.colors.bg,
+            borderColor: theme.colors.border,
+            color: theme.colors.fg,
+            fontFamily: theme.fontBody,
+          }}
         >
           {/* Top metadata */}
-          <div className="flex items-center justify-between text-[10px] text-[#969696] font-medium tracking-wide uppercase shrink-0 border-b border-white/5 pb-1.5">
+          <div
+            className="flex items-center justify-between text-[10px] font-medium tracking-wide uppercase shrink-0 border-b pb-1.5"
+            style={{
+              color: theme.colors.fgMuted,
+              borderColor: `${theme.colors.border}80`,
+            }}
+          >
             <span className="truncate max-w-[70%]">{deck.title}</span>
-            <span className="font-mono">№ {currentIndex + 1} / {totalSlides}</span>
+            <span className="font-mono" style={{ fontFamily: theme.fontMono }}>
+              № {currentIndex + 1} / {totalSlides}
+            </span>
           </div>
 
           {/* Slide Layout Body */}
           <div className="flex-1 flex flex-col justify-center py-2 overflow-hidden">
-            {currentSlide.layout === "hero" ? (
-              <div className="text-center space-y-1.5">
-                {currentSlide.accentTag && (
-                  <span className="inline-block px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 text-[9px] font-bold uppercase tracking-wider">
-                    {currentSlide.accentTag}
-                  </span>
-                )}
-                <h2 className="text-base sm:text-lg font-bold text-white tracking-tight leading-tight line-clamp-3">
-                  {currentSlide.title}
-                </h2>
-                {currentSlide.subtitle && (
-                  <p className="text-[11px] text-[#969696] line-clamp-2">
-                    {currentSlide.subtitle}
-                  </p>
-                )}
-              </div>
-            ) : currentSlide.layout === "numbers" ? (
-              <div className="space-y-2">
-                <h2 className="text-xs sm:text-sm font-bold text-white truncate">
-                  {currentSlide.title}
-                </h2>
-                <div className="grid grid-cols-2 gap-1.5">
-                  {(currentSlide.numbers || []).slice(0, 2).map((num, nIdx) => (
-                    <div key={nIdx} className="p-2 rounded-xl bg-[#2b2b2b] border border-[#383838]">
-                      <div className="text-lg font-black text-[#38bdf8] font-mono">{num.value}</div>
-                      <div className="text-[10px] font-medium text-white truncate">{num.label}</div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div className="space-y-1.5">
-                <h2 className="text-xs sm:text-sm font-bold text-white truncate">
-                  {currentSlide.title}
-                </h2>
-                <div className="space-y-1">
-                  {(currentSlide.bullets || []).slice(0, 3).map((b, bIdx) => (
-                    <div
-                      key={bIdx}
-                      className="p-1.5 rounded-lg bg-[#2b2b2b] border border-[#383838] text-[10px] text-white flex items-center gap-1.5"
-                    >
-                      <div className="h-1.5 w-1.5 rounded-full bg-[#38bdf8] shrink-0" />
-                      <span className="truncate">{b}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
+            <SlideContentView slide={currentSlide} theme={theme} mode="mobile" />
           </div>
 
           {/* Footer note */}
-          <div className="text-[9px] text-[#707070] border-t border-white/5 pt-1 flex items-center justify-between shrink-0">
+          <div
+            className="text-[9px] border-t pt-1 flex items-center justify-between shrink-0"
+            style={{
+              color: theme.colors.fgMuted,
+              borderColor: `${theme.colors.border}80`,
+            }}
+          >
             <span className="truncate max-w-[75%]">{currentSlide.speakerNotes || "Const Learn"}</span>
-            <span className="font-mono text-[#38bdf8] flex items-center gap-1">
+            <span className="font-mono flex items-center gap-1" style={{ color: theme.colors.accent }}>
               <Maximize2 className="h-2.5 w-2.5" />
               <span>{isIndo ? "Ketuk Perbesar" : "Tap Maximize"}</span>
             </span>
@@ -555,57 +536,41 @@ ${(currentSlide.bullets || []).map((b) => `- ${b}`).join("\n")}`;
           </div>
 
           {/* Large Centered 16:9 Canvas */}
-          <div className="w-full aspect-[16/9] my-auto rounded-2xl bg-[#161616] border border-[#383838] p-5 sm:p-7 flex flex-col justify-between shadow-2xl relative">
-            <div className="flex items-center justify-between text-[11px] text-[#969696] uppercase border-b border-white/10 pb-2">
-              <span>{deck.title}</span>
-              <span>№ {currentIndex + 1} / {totalSlides}</span>
+          <div
+            className="w-full aspect-[16/9] my-auto rounded-2xl p-5 sm:p-7 flex flex-col justify-between shadow-2xl relative border"
+            style={{
+              backgroundColor: theme.colors.bg,
+              borderColor: theme.colors.border,
+              color: theme.colors.fg,
+              fontFamily: theme.fontBody,
+            }}
+          >
+            <div
+              className="flex items-center justify-between text-[11px] uppercase border-b pb-2"
+              style={{
+                color: theme.colors.fgMuted,
+                borderColor: `${theme.colors.border}80`,
+              }}
+            >
+              <span className="truncate max-w-[70%]">{deck.title}</span>
+              <span className="font-mono" style={{ fontFamily: theme.fontMono }}>
+                № {currentIndex + 1} / {totalSlides}
+              </span>
             </div>
 
-            <div className="flex-1 flex flex-col justify-center py-3">
-              {currentSlide.layout === "hero" ? (
-                <div className="text-center space-y-2">
-                  {currentSlide.accentTag && (
-                    <span className="inline-block px-2.5 py-0.5 rounded-full bg-blue-500/20 text-blue-400 text-[10px] font-bold uppercase">
-                      {currentSlide.accentTag}
-                    </span>
-                  )}
-                  <h1 className="text-xl sm:text-2xl font-black text-white leading-snug">
-                    {currentSlide.title}
-                  </h1>
-                  {currentSlide.subtitle && (
-                    <p className="text-xs text-[#969696]">{currentSlide.subtitle}</p>
-                  )}
-                </div>
-              ) : currentSlide.layout === "numbers" ? (
-                <div className="space-y-3">
-                  <h2 className="text-sm sm:text-base font-bold text-white">{currentSlide.title}</h2>
-                  <div className="grid grid-cols-2 gap-2">
-                    {(currentSlide.numbers || []).slice(0, 2).map((n, idx) => (
-                      <div key={idx} className="p-3 rounded-xl bg-[#222222] border border-[#383838]">
-                        <div className="text-2xl font-black text-[#38bdf8] font-mono">{n.value}</div>
-                        <div className="text-xs font-semibold text-white mt-1">{n.label}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  <h2 className="text-sm sm:text-base font-bold text-white">{currentSlide.title}</h2>
-                  <div className="space-y-1.5">
-                    {(currentSlide.bullets || []).map((b, idx) => (
-                      <div key={idx} className="p-2 rounded-xl bg-[#222222] border border-[#383838] text-xs text-white flex items-center gap-2">
-                        <div className="h-1.5 w-1.5 rounded-full bg-[#38bdf8] shrink-0" />
-                        <span>{b}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
+            <div className="flex-1 flex flex-col justify-center py-3 overflow-hidden">
+              <SlideContentView slide={currentSlide} theme={theme} mode="fullscreen" />
             </div>
 
-            <div className="text-[10px] text-[#808080] border-t border-white/10 pt-2 flex items-center justify-between">
+            <div
+              className="text-[10px] border-t pt-2 flex items-center justify-between"
+              style={{
+                color: theme.colors.fgMuted,
+                borderColor: `${theme.colors.border}80`,
+              }}
+            >
               <span>{currentSlide.speakerNotes || "Const Learn"}</span>
-              <span className="font-mono">16 : 9</span>
+              <span className="font-mono" style={{ fontFamily: theme.fontMono }}>16 : 9</span>
             </div>
           </div>
 

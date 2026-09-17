@@ -7,10 +7,12 @@ import {
   FileText,
   Sliders,
   Languages,
+  Palette,
 } from "lucide-react";
 import { cn } from "@const/ui";
 import { useI18n } from "../../lib/i18n";
 import type { LocalSource } from "../../lib/db";
+import { PRESENTATION_THEMES } from "../../lib/studio/presentation/themes";
 
 export interface CreatePresentationSheetProps {
   open: boolean;
@@ -22,6 +24,7 @@ export interface CreatePresentationSheetProps {
     lengthMode: "short" | "medium" | "long" | "auto";
     language: "id" | "en";
     selectedSourceIds: string[];
+    themeId?: string;
   }) => void;
 }
 
@@ -37,6 +40,7 @@ export function CreatePresentationSheet({
   const [topic, setTopic] = useState("");
   const [lengthMode, setLengthMode] = useState<"short" | "medium" | "long" | "auto">("auto");
   const [selectedLanguage, setSelectedLanguage] = useState<"id" | "en">(isIndo ? "id" : "en");
+  const [selectedTheme, setSelectedTheme] = useState<string>("auto");
   const [selectedSourceIds, setSelectedSourceIds] = useState<string[]>(() =>
     sources.map((s) => s.id)
   );
@@ -95,6 +99,7 @@ export function CreatePresentationSheet({
       topic: topic.trim(),
       lengthMode,
       language: selectedLanguage,
+      themeId: selectedTheme,
       selectedSourceIds:
         selectedSourceIds.length > 0 ? selectedSourceIds : sources.map((s) => s.id),
     });
@@ -283,6 +288,70 @@ export function CreatePresentationSheet({
               >
                 English
               </button>
+            </div>
+          </div>
+
+          {/* Visual Aesthetic Theme Selector */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-semibold text-[#cccccc] flex items-center gap-1.5">
+                <Palette className="h-3.5 w-3.5 text-[#fde047]" />
+                {isIndo ? "Gaya & Estetika Visual" : "Theme & Aesthetic"}
+              </label>
+              <span className="text-[10.5px] text-[#888888]">
+                {selectedTheme === "auto"
+                  ? isIndo
+                    ? "AI pilih otomatis"
+                    : "AI picks best match"
+                  : isIndo
+                  ? PRESENTATION_THEMES.find((t) => t.id === selectedTheme)?.nameId
+                  : PRESENTATION_THEMES.find((t) => t.id === selectedTheme)?.name}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-1.5 p-1 bg-[#141416] border border-[#2b2b2f] rounded-2xl">
+              <button
+                type="button"
+                onClick={() => setSelectedTheme("auto")}
+                className={cn(
+                  "py-2.5 px-3 rounded-xl text-xs font-medium flex items-center justify-between transition-all cursor-pointer",
+                  selectedTheme === "auto"
+                    ? "bg-[#28282e] text-white border border-[#38383e] shadow-xs"
+                    : "text-[#888888] hover:text-[#cccccc]"
+                )}
+              >
+                <div className="flex items-center gap-2 truncate">
+                  <Sparkles className="h-3.5 w-3.5 text-[#fde047] shrink-0" />
+                  <span className="truncate">Auto (AI)</span>
+                </div>
+                {selectedTheme === "auto" && <Check className="h-3.5 w-3.5 text-[#fde047] shrink-0 ml-1" />}
+              </button>
+
+              {PRESENTATION_THEMES.map((theme) => {
+                const isSelected = selectedTheme === theme.id;
+                return (
+                  <button
+                    key={theme.id}
+                    type="button"
+                    onClick={() => setSelectedTheme(theme.id)}
+                    className={cn(
+                      "py-2.5 px-3 rounded-xl text-xs font-medium flex items-center justify-between transition-all cursor-pointer",
+                      isSelected
+                        ? "bg-[#28282e] text-white border border-[#38383e] shadow-xs"
+                        : "text-[#888888] hover:text-[#cccccc]"
+                    )}
+                  >
+                    <div className="flex items-center gap-2 truncate">
+                      <span
+                        className="h-2.5 w-2.5 rounded-full shrink-0 border border-white/20"
+                        style={{ backgroundColor: theme.colors.accent }}
+                      />
+                      <span className="truncate">{isIndo ? theme.nameId : theme.name}</span>
+                    </div>
+                    {isSelected && <Check className="h-3.5 w-3.5 text-[#fde047] shrink-0 ml-1" />}
+                  </button>
+                );
+              })}
             </div>
           </div>
 

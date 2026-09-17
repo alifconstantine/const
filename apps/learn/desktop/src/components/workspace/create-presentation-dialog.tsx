@@ -8,10 +8,12 @@ import {
   Sparkles,
   Sliders,
   Languages,
+  Palette,
 } from "lucide-react";
 import { Dialog, DialogContent, ScrollArea } from "@const/ui";
 import { useI18n } from "../../lib/i18n";
 import type { LocalSource } from "../../lib/db";
+import { PRESENTATION_THEMES } from "../../lib/studio/presentation/themes";
 
 export interface CreatePresentationDialogProps {
   open: boolean;
@@ -23,6 +25,7 @@ export interface CreatePresentationDialogProps {
     lengthMode: "short" | "medium" | "long" | "auto";
     language: "id" | "en";
     selectedSourceIds: string[];
+    themeId?: string;
   }) => void;
 }
 
@@ -38,6 +41,7 @@ export function CreatePresentationDialog({
   const [topic, setTopic] = useState("");
   const [lengthMode, setLengthMode] = useState<"short" | "medium" | "long" | "auto">("auto");
   const [selectedLanguage, setSelectedLanguage] = useState<"id" | "en">(isIndo ? "id" : "en");
+  const [selectedTheme, setSelectedTheme] = useState<string>("auto");
   const [selectedSourceIds, setSelectedSourceIds] = useState<string[]>([]);
   const [isSourceDropdownOpen, setIsSourceDropdownOpen] = useState(false);
 
@@ -97,6 +101,7 @@ export function CreatePresentationDialog({
       topic: topic.trim(),
       lengthMode,
       language: selectedLanguage,
+      themeId: selectedTheme,
       selectedSourceIds:
         selectedSourceIds.length > 0 ? selectedSourceIds : sources.map((s) => s.id),
     });
@@ -275,6 +280,68 @@ export function CreatePresentationDialog({
                   English
                 </button>
               </div>
+            </div>
+          </div>
+
+          {/* Visual Aesthetic Theme Selector */}
+          <div className="space-y-1.5">
+            <label className="text-[11.5px] font-medium text-[#999999] flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <Palette className="h-3.5 w-3.5 text-[#fde047]" />
+                {isIndo ? "Gaya & Estetika Visual Slide" : "Visual Theme & Aesthetic"}
+              </span>
+              <span className="text-[10.5px] text-[#777777]">
+                {selectedTheme === "auto"
+                  ? isIndo
+                    ? "AI otomatis memilih tema terbaik"
+                    : "AI picks best matched palette"
+                  : isIndo
+                  ? PRESENTATION_THEMES.find((t) => t.id === selectedTheme)?.nameId
+                  : PRESENTATION_THEMES.find((t) => t.id === selectedTheme)?.name}
+              </span>
+            </label>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 p-1 bg-[#141416] border border-[#28282d] rounded-xl">
+              <button
+                type="button"
+                onClick={() => setSelectedTheme("auto")}
+                className={`py-2 px-2.5 rounded-lg text-xs font-medium flex items-center justify-between transition-all cursor-pointer ${
+                  selectedTheme === "auto"
+                    ? "bg-[#28282e] text-white border border-[#38383e] shadow-xs"
+                    : "text-[#888888] hover:text-[#d4d4d4]"
+                }`}
+              >
+                <div className="flex items-center gap-2 truncate">
+                  <Sparkles className="h-3.5 w-3.5 text-[#fde047] shrink-0" />
+                  <span className="truncate">{isIndo ? "Auto (AI)" : "Auto (AI)"}</span>
+                </div>
+                {selectedTheme === "auto" && <Check className="h-3.5 w-3.5 text-[#fde047] shrink-0 ml-1" />}
+              </button>
+
+              {PRESENTATION_THEMES.map((theme) => {
+                const isSelected = selectedTheme === theme.id;
+                return (
+                  <button
+                    key={theme.id}
+                    type="button"
+                    onClick={() => setSelectedTheme(theme.id)}
+                    className={`py-2 px-2.5 rounded-lg text-xs font-medium flex items-center justify-between transition-all cursor-pointer ${
+                      isSelected
+                        ? "bg-[#28282e] text-white border border-[#38383e] shadow-xs"
+                        : "text-[#888888] hover:text-[#d4d4d4]"
+                    }`}
+                    title={isIndo ? theme.descriptionId : theme.description}
+                  >
+                    <div className="flex items-center gap-2 truncate">
+                      <span
+                        className="h-2.5 w-2.5 rounded-full shrink-0 border border-white/20"
+                        style={{ backgroundColor: theme.colors.accent }}
+                      />
+                      <span className="truncate">{isIndo ? theme.nameId : theme.name}</span>
+                    </div>
+                    {isSelected && <Check className="h-3.5 w-3.5 text-[#fde047] shrink-0 ml-1" />}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
