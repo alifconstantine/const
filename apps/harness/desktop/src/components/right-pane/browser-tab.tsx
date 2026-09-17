@@ -850,7 +850,7 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
             <webview
               ref={webviewRef}
               src={initialUrlRef.current || currentUrl}
-              partition="persist:harness_browser"
+              partition="persist:const_browser"
               allowpopups={true}
               webpreferences="contextIsolation=yes, backgroundThrottling=no, autoplayPolicy=no-user-gesture-required"
               className="w-full h-full border-none block flex-1"
