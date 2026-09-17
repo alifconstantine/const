@@ -361,6 +361,33 @@ export function LearnWorkspace({
   const isLayoutModified =
     sourcesWidth !== responsiveDefaults.sources || studioWidth !== responsiveDefaults.studio;
 
+  useEffect(() => {
+    const onOpenSettings = () => {
+      setSettingsInitialTab("general");
+      setIsSettingsOpen(true);
+    };
+    const onToggleSidebar = () => {
+      setIsSourcesCollapsed((prev) => !prev);
+    };
+    const onNewLearn = () => {
+      if (onCreateNew) {
+        onCreateNew();
+      } else {
+        onBack();
+      }
+    };
+
+    window.addEventListener("const:open-settings", onOpenSettings);
+    window.addEventListener("const:toggle-sidebar", onToggleSidebar);
+    window.addEventListener("const:new-learn", onNewLearn);
+
+    return () => {
+      window.removeEventListener("const:open-settings", onOpenSettings);
+      window.removeEventListener("const:toggle-sidebar", onToggleSidebar);
+      window.removeEventListener("const:new-learn", onNewLearn);
+    };
+  }, [onCreateNew, onBack]);
+
   const handleResetLayout = () => {
     setIsManualWidth(false);
     const defaults = getResponsiveWidths();
@@ -881,7 +908,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
   };
 
   return (
-    <div className="h-screen w-screen flex flex-col bg-background text-foreground overflow-hidden select-none">
+    <div className="h-full w-full flex flex-col bg-background text-foreground overflow-hidden select-none">
       {/* Top Workspace Header Bar */}
       <header className="h-14 px-4 bg-card/60 backdrop-blur-md border-b border-border/50 flex items-center justify-between shrink-0 z-10">
         {/* Left: Back button + Notebook Title (No Logo, Clean Sans-Serif) */}

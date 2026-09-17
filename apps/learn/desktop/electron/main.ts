@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell, ipcMain, dialog } from "electron";
+import { app, BrowserWindow, shell, ipcMain, dialog, Menu, nativeTheme } from "electron";
 import path from "node:path";
 import fs from "node:fs";
 import os from "node:os";
@@ -246,13 +246,27 @@ app.on("second-instance", (_event, commandLine) => {
   });
 
   function createWindow() {
+    const isMac = process.platform === "darwin";
+    const isDark = nativeTheme.shouldUseDarkColors;
+
+    // Disable default native menu bar so it does not clutter the UI
+    Menu.setApplicationMenu(null);
+
     win = new BrowserWindow({
       title: "Const Learn",
       width: 1280,
       height: 800,
       minWidth: 960,
       minHeight: 640,
-      backgroundColor: "#09090b",
+      backgroundColor: isDark ? "#161616" : "#ffffff",
+      titleBarStyle: isMac ? "hiddenInset" : "hidden",
+      titleBarOverlay: isMac
+        ? false
+        : {
+            color: isDark ? "#161616" : "#f3f3f3",
+            symbolColor: isDark ? "#d4d4d4" : "#374151",
+            height: 30,
+          },
       show: true,
       webPreferences: {
         preload: path.join(__dirname, "preload.js"),
@@ -260,6 +274,29 @@ app.on("second-instance", (_event, commandLine) => {
         nodeIntegration: false,
         webviewTag: true,
       },
+    });
+
+    win.on("maximize", () => {
+      win?.webContents.send("window:maximized-change", true);
+    });
+    win.on("unmaximize", () => {
+      win?.webContents.send("window:maximized-change", false);
+    });
+
+    nativeTheme.on("updated", () => {
+      if (win && !win.isDestroyed()) {
+        const dark = nativeTheme.shouldUseDarkColors;
+        win.setBackgroundColor(dark ? "#161616" : "#ffffff");
+        if (process.platform === "win32") {
+          try {
+            win.setTitleBarOverlay?.({
+              color: dark ? "#161616" : "#f3f3f3",
+              symbolColor: dark ? "#d4d4d4" : "#374151",
+              height: 30,
+            });
+          } catch {}
+        }
+      }
     });
 
     win.webContents.on("console-message", (event) => {
@@ -299,6 +336,64 @@ app.on("second-instance", (_event, commandLine) => {
   }
 
   // IPC Handlers
+  // Window control IPC handlers
+  ipcMain.on("window:minimize", () => {
+    win?.minimize();
+  });
+
+  ipcMain.on("window:maximize", () => {
+    if (win?.isMaximized()) {
+      win.unmaximize();
+    } else {
+      win?.maximize();
+    }
+  });
+
+  ipcMain.on("window:close", () => {
+    win?.close();
+  });
+
+  ipcMain.handle("window:is-maximized", () => {
+    return win?.isMaximized() || false;
+  });
+
+  ipcMain.on("window:toggle-fullscreen", () => {
+    if (win) {
+      win.setFullScreen(!win.isFullScreen());
+    }
+  });
+
+  ipcMain.on("window:toggle-devtools", () => {
+    win?.webContents.toggleDevTools();
+  });
+
+  ipcMain.on("window:reload", () => {
+    win?.webContents.reload();
+  });
+
+  ipcMain.handle("window:set-zoom-level", (_event, level: number) => {
+    if (win) {
+      win.webContents.setZoomLevel(level);
+    }
+  });
+
+  ipcMain.handle("window:get-zoom-level", () => {
+    return win?.webContents.getZoomLevel() ?? 0;
+  });
+
+  ipcMain.handle(
+    "window:set-title-bar-overlay",
+    (_event, options: { color?: string; symbolColor?: string; height?: number }) => {
+      try {
+        if (win && !win.isDestroyed() && process.platform === "win32") {
+          win.setTitleBarOverlay?.(options);
+        }
+      } catch (err) {
+        console.error("[Electron Main] Failed to setTitleBarOverlay:", err);
+      }
+    }
+  );
+
   ipcMain.handle("dialog:open-directory", async () => {
     if (!win) return null;
     const result = await dialog.showOpenDialog(win, {

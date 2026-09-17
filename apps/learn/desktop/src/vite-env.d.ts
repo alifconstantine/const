@@ -101,6 +101,22 @@ declare global {
         get: () => Promise<any>;
         save: (newConfig: any) => Promise<any>;
       };
+      minimize?: () => void;
+      maximize?: () => void;
+      close?: () => void;
+      window?: {
+        minimize: () => void;
+        maximize: () => void;
+        close: () => void;
+        isMaximized: () => Promise<boolean>;
+        toggleFullScreen?: () => void;
+        toggleDevTools?: () => void;
+        reload?: () => void;
+        setZoomLevel?: (level: number) => Promise<void>;
+        getZoomLevel?: () => Promise<number>;
+        setTitleBarOverlay?: (options: { color?: string; symbolColor?: string; height?: number }) => Promise<void>;
+        onMaximizedChange?: (callback: (max: boolean) => void) => () => void;
+      };
     };
   }
 }

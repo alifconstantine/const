@@ -44,7 +44,7 @@ interface SidebarProps {
   onSelectTab: (tab: HomeNavTab) => void;
   onCollapse: () => void;
   onCreateNewLearn: () => void;
-  onCreateNewCollection: () => void;
+  onCreateNewCollection?: () => void;
   onOpenSettings: () => void;
   user?: UserProfile | null;
   onSignOut?: () => void;
@@ -95,15 +95,9 @@ export function Sidebar({
       {/* Top Section */}
       <div className="flex flex-col gap-3">
         {/* Brand Header & Sidebar Close Icon */}
-        <div
-          className="flex items-center justify-between h-9 px-1"
-          style={{ WebkitAppRegion: "drag" } as React.CSSProperties}
-        >
+        <div className="flex items-center justify-between h-9 px-1">
           {/* Logo & Const Learn text */}
-          <div
-            className="flex items-center gap-2"
-            style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
-          >
+          <div className="flex items-center gap-2">
             <ConstLogoIcon size="sm" className="w-5 h-5 text-foreground shrink-0" />
             <div className="flex items-center gap-1.5">
               <span className="font-serif text-base font-normal tracking-tight text-foreground">
@@ -119,7 +113,6 @@ export function Sidebar({
           <button
             type="button"
             onClick={onCollapse}
-            style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}
             className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
             title={t("closeSidebarKeyboard")}
             aria-label={t("closeSidebar")}
@@ -192,18 +185,6 @@ export function Sidebar({
             );
           })}
         </nav>
-
-        {/* Collections Quick Action (like Kimi's Projects section) */}
-        <div className="pt-2">
-          <button
-            type="button"
-            onClick={onCreateNewCollection}
-            className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-xl text-xs text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer group"
-          >
-            <FolderPlus className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground transition-colors" />
-            <span>{t("newCollection")}</span>
-          </button>
-        </div>
       </div>
 
       {/* Bottom Section: User Profile Menu (Zero dividing lines per DESIGN.md) */}

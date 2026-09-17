@@ -8,6 +8,7 @@ import { LearnHome } from "./components/home/learn-home";
 import { LearnWorkspace } from "./components/workspace/learn-workspace";
 import { localDb } from "./lib/db";
 import { useI18n } from "./lib/i18n";
+import { TitleBar } from "./components/title-bar";
 import authArt from "./assets/auth-art.jpg";
 
 function AuthenticatedContent({
@@ -213,93 +214,96 @@ export default function App() {
   };
 
   // -------------------------------------------------------------
-  // 1. Authenticated View: Navbar at Top + Empty Main Area (Zero Dummy Data)
-  // -------------------------------------------------------------
-  if (token) {
-    return (
-      <ConvexClientProvider token={token} signOut={handleSignOut}>
-        <AuthenticatedContent
-          onSignOut={handleSignOut}
-          onSwitchAccount={handleSwitchAccount}
-        />
-      </ConvexClientProvider>
-    );
-  }
-
-  // -------------------------------------------------------------
-  // 2. Unauthenticated View: Redesigned Split Login Page with @const/ui
+  // Render Application: Antigravity-style TitleBar at Top
   // -------------------------------------------------------------
   return (
-    <div className="h-screen max-h-screen w-full overflow-hidden flex bg-background text-foreground selection:bg-primary selection:text-primary-foreground">
-      {/* Left Column: Sign-in Card */}
-      <div className="flex h-full w-full flex-col justify-between p-6 sm:p-8 lg:p-10 lg:w-1/2 overflow-hidden">
-        {/* Brand Mark */}
-        <div className="flex items-center gap-2.5 shrink-0">
-          <ConstLogoIcon size="sm" className="w-6 h-6 text-foreground shrink-0" />
-          <div className="flex items-center gap-2">
-            <span className="font-serif text-lg font-normal tracking-tight text-foreground">
-              Const
-            </span>
-            <span className="text-[10px] font-mono tracking-wider uppercase px-2 py-0.5 rounded-full bg-secondary text-muted-foreground border border-border/50">
-              Learn
-            </span>
+    <div className="h-screen max-h-screen w-screen overflow-hidden flex flex-col bg-background text-foreground selection:bg-primary selection:text-primary-foreground">
+      {/* 1. Antigravity-style Window TitleBar */}
+      <TitleBar />
+
+      {/* 2. Main View Content */}
+      <div className="flex-1 min-h-0 w-full overflow-hidden">
+        {token ? (
+          <ConvexClientProvider token={token} signOut={handleSignOut}>
+            <AuthenticatedContent
+              onSignOut={handleSignOut}
+              onSwitchAccount={handleSwitchAccount}
+            />
+          </ConvexClientProvider>
+        ) : (
+          <div className="h-full w-full overflow-hidden flex bg-background text-foreground">
+            {/* Left Column: Sign-in Card */}
+            <div className="flex h-full w-full flex-col justify-between p-6 sm:p-8 lg:p-10 lg:w-1/2 overflow-hidden">
+              {/* Brand Mark */}
+              <div className="flex items-center gap-2.5 shrink-0">
+                <ConstLogoIcon size="sm" className="w-6 h-6 text-foreground shrink-0" />
+                <div className="flex items-center gap-2">
+                  <span className="font-serif text-lg font-normal tracking-tight text-foreground">
+                    Const
+                  </span>
+                  <span className="text-[10px] font-mono tracking-wider uppercase px-2 py-0.5 rounded-full bg-secondary text-muted-foreground border border-border/50">
+                    Learn
+                  </span>
+                </div>
+              </div>
+
+              {/* Center: Sign in content */}
+              <div className="my-auto mx-auto w-full max-w-sm shrink-0 py-2">
+                <h1 className="font-serif text-3xl font-normal tracking-tight text-foreground sm:text-4xl">
+                  {t("signInConstLearn")}.
+                </h1>
+                <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+                  {t("signInSubtitle")}
+                </p>
+
+                <div className="mt-8 space-y-4">
+                  <Button
+                    onClick={handleSignIn}
+                    size="lg"
+                    className="w-full h-12 rounded-xl text-sm font-medium gap-2 cursor-pointer transition-all active:scale-[0.99]"
+                  >
+                    <LogIn className="h-4 w-4" />
+                    {isWaitingAuth ? t("reopenLoginTab") : t("signInConstLearn")}
+                  </Button>
+                  {isWaitingAuth && (
+                    <Button
+                      variant="outline"
+                      onClick={handleCancelSignIn}
+                      size="sm"
+                      className="w-full rounded-xl text-xs text-muted-foreground"
+                    >
+                      {t("cancel")}
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              {/* Bottom Footer */}
+              <div className="flex items-center justify-between pt-4 text-xs text-muted-foreground shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setLanguage(language === "en" ? "id" : "en")}
+                  className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
+                >
+                  <Globe className="h-3.5 w-3.5" />
+                  <span>{language === "id" ? "Bahasa Indonesia" : "English"}</span>
+                </button>
+                <span>© 2026 Const · All rights reserved.</span>
+              </div>
+            </div>
+
+            {/* Right Column: Artwork image (Desktop only) */}
+            <div className="hidden lg:flex lg:w-1/2 h-full p-4 overflow-hidden items-center justify-center">
+              <div className="relative h-full w-full max-h-full overflow-hidden rounded-3xl border border-border shadow-inner">
+                <img
+                  src={authArt}
+                  alt="Const Learn Art"
+                  className="h-full w-full object-cover select-none"
+                />
+              </div>
+            </div>
           </div>
-        </div>
-
-        {/* Center: Sign in content */}
-        <div className="my-auto mx-auto w-full max-w-sm shrink-0 py-2">
-          <h1 className="font-serif text-3xl font-normal tracking-tight text-foreground sm:text-4xl">
-            {t("signInConstLearn")}.
-          </h1>
-          <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-            {t("signInSubtitle")}
-          </p>
-
-          <div className="mt-8 space-y-4">
-            <Button
-              onClick={handleSignIn}
-              size="lg"
-              className="w-full h-12 rounded-xl text-sm font-medium gap-2 cursor-pointer transition-all active:scale-[0.99]"
-            >
-              <LogIn className="h-4 w-4" />
-              {isWaitingAuth ? t("reopenLoginTab") : t("signInConstLearn")}
-            </Button>
-            {isWaitingAuth && (
-              <Button
-                variant="outline"
-                onClick={handleCancelSignIn}
-                size="sm"
-                className="w-full rounded-xl text-xs text-muted-foreground"
-              >
-                {t("cancel")}
-              </Button>
-            )}
-          </div>
-        </div>
-
-        {/* Bottom Footer */}
-        <div className="flex items-center justify-between pt-4 text-xs text-muted-foreground shrink-0">
-          <button
-            type="button"
-            onClick={() => setLanguage(language === "en" ? "id" : "en")}
-            className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
-          >
-            <Globe className="h-3.5 w-3.5" />
-            <span>{language === "id" ? "Bahasa Indonesia" : "English"}</span>
-          </button>
-          <span>© 2026 Const · All rights reserved.</span>
-        </div>
-      </div>
-
-      {/* Right Column: Artwork image (Desktop only) */}
-      <div className="hidden lg:flex lg:w-1/2 h-full p-4 overflow-hidden items-center justify-center">
-        <div className="relative h-full w-full max-h-full overflow-hidden rounded-3xl border border-border shadow-inner">
-          <img
-            src={authArt}
-            alt="Const Learn Art"
-            className="h-full w-full object-cover select-none"
-          />
-        </div>
+        )}
       </div>
     </div>
   );

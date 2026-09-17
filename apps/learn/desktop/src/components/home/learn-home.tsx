@@ -241,6 +241,51 @@ export function LearnHome({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
+  // Listen to menu actions dispatched from TitleBar
+  useEffect(() => {
+    const onToggleSidebar = () => setIsSidebarOpen((prev) => !prev);
+    const onNewLearn = () => handleCreateNewLearn();
+    const onNewCollection = () => {
+      setEditingCollection(null);
+      setIsCreateCollectionOpen(true);
+    };
+    const onOpenSettings = () => setIsSettingsOpen(true);
+    const onOpenWorkspaceFolder = async (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail?.folderPath) {
+        const folderName =
+          detail.folderPath.split(/[\\/]/).filter(Boolean).pop() || t("untitledNotebook");
+        const newId = await localDb.createLearn({
+          title: folderName,
+          emoji: "📁",
+          projectPath: detail.folderPath,
+          permissionMode: "ask_before_changes",
+        });
+        const initialSessionId = await localDb.createSession(newId, t("initialSessionTitle"));
+        try {
+          localStorage.setItem(`const_learn_active_session_${newId}`, initialSessionId);
+        } catch {}
+        if (onOpenLearn) {
+          onOpenLearn(newId, false);
+        }
+      }
+    };
+
+    window.addEventListener("const:toggle-sidebar", onToggleSidebar);
+    window.addEventListener("const:new-learn", onNewLearn);
+    window.addEventListener("const:new-collection", onNewCollection);
+    window.addEventListener("const:open-settings", onOpenSettings);
+    window.addEventListener("const:open-workspace-folder", onOpenWorkspaceFolder);
+
+    return () => {
+      window.removeEventListener("const:toggle-sidebar", onToggleSidebar);
+      window.removeEventListener("const:new-learn", onNewLearn);
+      window.removeEventListener("const:new-collection", onNewCollection);
+      window.removeEventListener("const:open-settings", onOpenSettings);
+      window.removeEventListener("const:open-workspace-folder", onOpenWorkspaceFolder);
+    };
+  }, [onOpenLearn, t]);
+
   const renderSidebarToggle = () => null;
 
   // If Settings view is triggered
@@ -256,7 +301,7 @@ export function LearnHome({
   }
 
   return (
-    <div className="h-screen w-full flex bg-secondary/60 dark:bg-[#121212] text-foreground overflow-hidden select-none">
+    <div className="h-full w-full flex bg-secondary/60 dark:bg-[#121212] text-foreground overflow-hidden select-none">
       {/* 1. Left Sidebar (Collapsible with smooth slide, NO bouncing) */}
       <div
         className={`shrink-0 overflow-hidden transition-[width,opacity] duration-200 ease-out ${

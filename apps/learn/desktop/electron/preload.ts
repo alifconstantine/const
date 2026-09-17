@@ -70,4 +70,25 @@ contextBridge.exposeInMainWorld("electron", {
     get: () => ipcRenderer.invoke("config:get"),
     save: (newConfig: any) => ipcRenderer.invoke("config:save", newConfig),
   },
+  minimize: () => ipcRenderer.send("window:minimize"),
+  maximize: () => ipcRenderer.send("window:maximize"),
+  close: () => ipcRenderer.send("window:close"),
+  window: {
+    minimize: () => ipcRenderer.send("window:minimize"),
+    maximize: () => ipcRenderer.send("window:maximize"),
+    close: () => ipcRenderer.send("window:close"),
+    isMaximized: () => ipcRenderer.invoke("window:is-maximized"),
+    toggleFullScreen: () => ipcRenderer.send("window:toggle-fullscreen"),
+    toggleDevTools: () => ipcRenderer.send("window:toggle-devtools"),
+    reload: () => ipcRenderer.send("window:reload"),
+    setZoomLevel: (level: number) => ipcRenderer.invoke("window:set-zoom-level", level),
+    getZoomLevel: () => ipcRenderer.invoke("window:get-zoom-level"),
+    setTitleBarOverlay: (options: { color?: string; symbolColor?: string; height?: number }) =>
+      ipcRenderer.invoke("window:set-title-bar-overlay", options),
+    onMaximizedChange: (callback: (max: boolean) => void) => {
+      const handler = (_event: any, max: boolean) => callback(max);
+      ipcRenderer.on("window:maximized-change", handler);
+      return () => ipcRenderer.removeListener("window:maximized-change", handler);
+    },
+  },
 });
