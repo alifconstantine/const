@@ -9,6 +9,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  cn,
 } from "@const/ui";
 import {
   Search,
@@ -21,6 +22,10 @@ import {
   X,
   BookOpen,
   FileText,
+  Menu as MenuIcon,
+  Bot,
+  Server,
+  Settings,
 } from "lucide-react";
 
 import { LearnCard, LearnItem } from "./learn-card";
@@ -30,6 +35,10 @@ import { CreateLearnDialog } from "./dialogs/create-learn-dialog";
 import { CreateCollectionDialog } from "./dialogs/create-collection-dialog";
 import { ManageCollectionDialog } from "./dialogs/manage-collection-dialog";
 import { DeleteConfirmDialog } from "./dialogs/delete-confirm-dialog";
+import { MenuContainer, MenuItem } from "../ui/fluid-menu";
+import { ModelSelectionSheet } from "./sheets/model-selection-sheet";
+import { McpToolsSheet } from "./sheets/mcp-tools-sheet";
+import { MobileSettingsSheet } from "./sheets/mobile-settings-sheet";
 import { useI18n } from "../../lib/i18n";
 
 type TabKey = "all" | "learns" | "sources" | "collections" | "artifact";
@@ -101,6 +110,10 @@ export function LearnHome({
   const [editingCollection, setEditingCollection] = useState<CollectionItem | null>(null);
   const [managingLearn, setManagingLearn] = useState<LearnItem | null>(null);
   const [isAddSourceModalOpen, setIsAddSourceModalOpen] = useState(false);
+  const [isFluidMenuExpanded, setIsFluidMenuExpanded] = useState(false);
+  const [isModelSheetOpen, setIsModelSheetOpen] = useState(false);
+  const [isMcpSheetOpen, setIsMcpSheetOpen] = useState(false);
+  const [isSettingsSheetOpen, setIsSettingsSheetOpen] = useState(false);
 
   const handleCreateNewLearn = async (collectionId?: string) => {
     if (onOpenLearn) {
@@ -818,9 +831,9 @@ export function LearnHome({
       </main>
 
       {/* -------------------------------------------------------------
-          FLOATING ACTION BUTTON (+ New Learn / + New Sources) AT BOTTOM
+          FLOATING ACTION CONTAINER: (+ New Learn / + New Sources) + FLUID MENU
           ------------------------------------------------------------- */}
-      <div className="fixed bottom-6 right-5 z-40 safe-area-bottom">
+      <div className="fixed bottom-6 right-5 z-40 safe-area-bottom flex items-center gap-2.5">
         {activeTab === "sources" ? (
           <button
             type="button"
@@ -842,6 +855,70 @@ export function LearnHome({
             <span>{t("newLearn")}</span>
           </button>
         )}
+
+        {/* Fluid circular menu for Models, MCP Tools, and Settings */}
+        <MenuContainer
+          direction="up"
+          size={48}
+          spacing={56}
+          isExpanded={isFluidMenuExpanded}
+          onExpandedChange={setIsFluidMenuExpanded}
+        >
+          {/* Trigger item (morphs MenuIcon <-> X) */}
+          <MenuItem
+            label="Menu Cepat"
+            icon={
+              <div className="relative w-5 h-5 flex items-center justify-center">
+                <div
+                  className={cn(
+                    "absolute inset-0 flex items-center justify-center transition-all duration-300 ease-in-out origin-center",
+                    isFluidMenuExpanded ? "opacity-0 scale-0 rotate-180" : "opacity-100 scale-100 rotate-0"
+                  )}
+                >
+                  <MenuIcon size={20} strokeWidth={2} />
+                </div>
+                <div
+                  className={cn(
+                    "absolute inset-0 flex items-center justify-center transition-all duration-300 ease-in-out origin-center",
+                    isFluidMenuExpanded ? "opacity-100 scale-100 rotate-0" : "opacity-0 scale-0 -rotate-180"
+                  )}
+                >
+                  <X size={20} strokeWidth={2} />
+                </div>
+              </div>
+            }
+          />
+
+          {/* Child 1: Model AI */}
+          <MenuItem
+            label="Model AI"
+            icon={<Bot size={20} strokeWidth={1.8} className="text-indigo-500 dark:text-indigo-400" />}
+            onClick={() => {
+              setIsFluidMenuExpanded(false);
+              setIsModelSheetOpen(true);
+            }}
+          />
+
+          {/* Child 2: MCP Tools */}
+          <MenuItem
+            label="MCP Tools"
+            icon={<Server size={20} strokeWidth={1.8} className="text-emerald-500 dark:text-emerald-400" />}
+            onClick={() => {
+              setIsFluidMenuExpanded(false);
+              setIsMcpSheetOpen(true);
+            }}
+          />
+
+          {/* Child 3: Pengaturan */}
+          <MenuItem
+            label={t("settings")}
+            icon={<Settings size={20} strokeWidth={1.8} className="text-amber-500 dark:text-amber-400" />}
+            onClick={() => {
+              setIsFluidMenuExpanded(false);
+              setIsSettingsSheetOpen(true);
+            }}
+          />
+        </MenuContainer>
       </div>
 
       {/* Dialogs */}
@@ -910,6 +987,22 @@ export function LearnHome({
           onConfirm={handleExecuteDelete}
         />
       )}
+
+      {/* Fluid Menu Bottom Sheets */}
+      <ModelSelectionSheet
+        open={isModelSheetOpen}
+        onClose={() => setIsModelSheetOpen(false)}
+      />
+
+      <McpToolsSheet
+        open={isMcpSheetOpen}
+        onClose={() => setIsMcpSheetOpen(false)}
+      />
+
+      <MobileSettingsSheet
+        open={isSettingsSheetOpen}
+        onClose={() => setIsSettingsSheetOpen(false)}
+      />
     </div>
   );
 }

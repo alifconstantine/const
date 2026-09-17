@@ -26,6 +26,8 @@ import { CreateCard } from "./create-card";
 import { RecentlyViewedCard } from "./recently-viewed-card";
 import { Sidebar, HomeNavTab } from "./sidebar";
 import { SourcesView } from "./sources-view";
+import { ModelsView } from "./views/models-view";
+import { McpToolsView } from "./views/mcp-tools-view";
 import { SettingsView } from "../settings/settings-view";
 import { CreateLearnDialog } from "./dialogs/create-learn-dialog";
 import { CreateCollectionDialog } from "./dialogs/create-collection-dialog";
@@ -783,6 +785,18 @@ export function LearnHome({
                 )}
               </section>
             )}
+
+            {/* ============================================================ */}
+            {/* TAB: MODELS                                                  */}
+            {/* ============================================================ */}
+            {activeTab === "models" && (
+              <ModelsView onOpenSettings={() => setIsSettingsOpen(true)} />
+            )}
+
+            {/* ============================================================ */}
+            {/* TAB: MCP TOOLS                                               */}
+            {/* ============================================================ */}
+            {activeTab === "mcp" && <McpToolsView />}
           </div>
         </ScrollArea>
       </main>
