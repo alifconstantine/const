@@ -19,10 +19,88 @@ export interface MindMapData {
   updatedAt: number;
 }
 
+export interface BranchTheme {
+  name: string;
+  borderHex: string;
+  bgHex: string;
+  curveHex: string;
+  badgeBgHex: string;
+  badgeTextHex: string;
+  textHex: string;
+}
+
+export const BRANCH_THEMES: BranchTheme[] = [
+  {
+    name: "Sky",
+    borderHex: "#0284c7",
+    bgHex: "rgba(2, 132, 199, 0.08)",
+    curveHex: "#38bdf8",
+    badgeBgHex: "rgba(2, 132, 199, 0.15)",
+    badgeTextHex: "#0284c7",
+    textHex: "#0369a1",
+  },
+  {
+    name: "Emerald",
+    borderHex: "#059669",
+    bgHex: "rgba(5, 150, 105, 0.08)",
+    curveHex: "#34d399",
+    badgeBgHex: "rgba(5, 150, 105, 0.15)",
+    badgeTextHex: "#059669",
+    textHex: "#047857",
+  },
+  {
+    name: "Amber",
+    borderHex: "#d97706",
+    bgHex: "rgba(217, 119, 6, 0.08)",
+    curveHex: "#fbbf24",
+    badgeBgHex: "rgba(217, 119, 6, 0.15)",
+    badgeTextHex: "#d97706",
+    textHex: "#b45309",
+  },
+  {
+    name: "Rose",
+    borderHex: "#e11d48",
+    bgHex: "rgba(225, 29, 72, 0.08)",
+    curveHex: "#fb7185",
+    badgeBgHex: "rgba(225, 29, 72, 0.15)",
+    badgeTextHex: "#e11d48",
+    textHex: "#be123c",
+  },
+  {
+    name: "Violet",
+    borderHex: "#7c3aed",
+    bgHex: "rgba(124, 58, 237, 0.08)",
+    curveHex: "#a78bfa",
+    badgeBgHex: "rgba(124, 58, 237, 0.15)",
+    badgeTextHex: "#7c3aed",
+    textHex: "#6d28d9",
+  },
+  {
+    name: "Cyan",
+    borderHex: "#0891b2",
+    bgHex: "rgba(8, 145, 178, 0.08)",
+    curveHex: "#22d3ee",
+    badgeBgHex: "rgba(8, 145, 178, 0.15)",
+    badgeTextHex: "#0891b2",
+    textHex: "#0e7490",
+  },
+];
+
+export const ROOT_THEME: BranchTheme = {
+  name: "Primary",
+  borderHex: "#3b82f6",
+  bgHex: "rgba(59, 130, 246, 0.12)",
+  curveHex: "#60a5fa",
+  badgeBgHex: "rgba(59, 130, 246, 0.2)",
+  badgeTextHex: "#2563eb",
+  textHex: "#1d4ed8",
+};
+
 export interface PositionedNode {
   node: MindMapNode;
   id: string;
   label: string;
+  lines: string[];
   x: number;
   y: number;
   width: number;
@@ -31,6 +109,8 @@ export interface PositionedNode {
   isRoot: boolean;
   hasChildren: boolean;
   isCollapsed: boolean;
+  branchIndex: number;
+  branchTheme: BranchTheme;
   parent?: PositionedNode;
   children: PositionedNode[];
 }
@@ -40,6 +120,7 @@ export interface ConnectorCurve {
   fromId: string;
   toId: string;
   path: string;
+  colorHex: string;
 }
 
 export interface TreeLayoutResult {
@@ -55,16 +136,66 @@ export interface TreeLayoutResult {
   };
 }
 
-const HORIZONTAL_GAP = 85;
-const VERTICAL_GAP = 20;
-const NODE_HEIGHT = 42;
+const HORIZONTAL_GAP = 90;
+const VERTICAL_GAP = 22;
+const SINGLE_LINE_HEIGHT = 42;
+const MULTI_LINE_HEIGHT = 56;
 
-export function estimateNodeWidth(label: string, isRoot: boolean): number {
-  const charLength = label.length;
-  const basePadding = isRoot ? 50 : 40;
-  const charWidth = 7.2;
-  const calculated = basePadding + charLength * charWidth;
-  return Math.min(Math.max(calculated, isRoot ? 160 : 120), 260);
+/**
+ * Wraps node label into 1 or 2 lines cleanly by word boundary.
+ */
+export function wrapNodeLabel(label: string, isRoot: boolean): { lines: string[]; height: number; width: number } {
+  const trimmed = label.trim();
+  const maxCharsSingle = isRoot ? 30 : 24;
+
+  if (trimmed.length <= maxCharsSingle) {
+    const basePad = isRoot ? 54 : 44;
+    const calcWidth = basePad + trimmed.length * 7.4;
+    const width = Math.min(Math.max(calcWidth, isRoot ? 170 : 120), 270);
+    return {
+      lines: [trimmed],
+      height: SINGLE_LINE_HEIGHT,
+      width,
+    };
+  }
+
+  const words = trimmed.split(/\s+/);
+  const line1Words: string[] = [];
+  const line2Words: string[] = [];
+  let currentLen = 0;
+  const targetPerLine = Math.ceil(trimmed.length / 2);
+
+  for (const word of words) {
+    if (line1Words.length === 0 || (currentLen + word.length + 1 <= targetPerLine && line1Words.length < 5)) {
+      line1Words.push(word);
+      currentLen += word.length + 1;
+    } else {
+      line2Words.push(word);
+    }
+  }
+
+  let line1 = line1Words.join(" ");
+  let line2 = line2Words.join(" ");
+
+  if (!line2) {
+    line1 = trimmed.slice(0, 22);
+    line2 = trimmed.slice(22, 44);
+  }
+
+  if (line2.length > 26) {
+    line2 = `${line2.slice(0, 24)}...`;
+  }
+
+  const maxLineLen = Math.max(line1.length, line2.length);
+  const basePad = isRoot ? 60 : 48;
+  const calcWidth = basePad + maxLineLen * 7.2;
+  const width = Math.min(Math.max(calcWidth, isRoot ? 190 : 150), 300);
+
+  return {
+    lines: [line1, line2],
+    height: MULTI_LINE_HEIGHT,
+    width,
+  };
 }
 
 export function computeTreeLayout(
@@ -74,25 +205,26 @@ export function computeTreeLayout(
   const allNodes: PositionedNode[] = [];
   const curves: ConnectorCurve[] = [];
 
-  function measureSubtreeHeight(node: MindMapNode): number {
+  function measureSubtreeHeight(node: MindMapNode, isRoot: boolean): number {
     const isCollapsed = collapsedIds.has(node.id);
     const children = (!isCollapsed && node.children) ? node.children : [];
+    const { height: nodeHeight } = wrapNodeLabel(node.label, isRoot);
 
     if (children.length === 0) {
-      return NODE_HEIGHT;
+      return nodeHeight;
     }
 
-    let totalHeight = 0;
+    let totalChildrenHeight = 0;
     for (let i = 0; i < children.length; i++) {
       const child = children[i];
       if (child) {
-        totalHeight += measureSubtreeHeight(child);
+        totalChildrenHeight += measureSubtreeHeight(child, false);
       }
       if (i > 0) {
-        totalHeight += VERTICAL_GAP;
+        totalChildrenHeight += VERTICAL_GAP;
       }
     }
-    return Math.max(NODE_HEIGHT, totalHeight);
+    return Math.max(nodeHeight, totalChildrenHeight);
   }
 
   function layoutNode(
@@ -100,6 +232,7 @@ export function computeTreeLayout(
     x: number,
     yStart: number,
     depth: number,
+    branchIdx: number,
     parent?: PositionedNode
   ): PositionedNode {
     const isRoot = depth === 0;
@@ -107,16 +240,19 @@ export function computeTreeLayout(
     const children = (!isCollapsed && node.children) ? node.children : [];
     const hasChildren = Boolean(node.children && node.children.length > 0);
 
-    const width = estimateNodeWidth(node.label, isRoot);
-    const height = NODE_HEIGHT;
-
-    const subtreeHeight = measureSubtreeHeight(node);
+    const { lines, width, height } = wrapNodeLabel(node.label, isRoot);
+    const subtreeHeight = measureSubtreeHeight(node, isRoot);
     const nodeY = yStart + (subtreeHeight - height) / 2;
+
+    const branchTheme = isRoot
+      ? ROOT_THEME
+      : BRANCH_THEMES[Math.abs(branchIdx) % BRANCH_THEMES.length]!;
 
     const positionedNode: PositionedNode = {
       node,
       id: node.id,
       label: node.label,
+      lines,
       x,
       y: nodeY,
       width,
@@ -125,6 +261,8 @@ export function computeTreeLayout(
       isRoot,
       hasChildren,
       isCollapsed,
+      branchIndex: branchIdx,
+      branchTheme,
       parent,
       children: [],
     };
@@ -135,13 +273,17 @@ export function computeTreeLayout(
       let childYCurrent = yStart;
       const childX = x + width + HORIZONTAL_GAP;
 
-      for (const child of children) {
-        const childSubtreeHeight = measureSubtreeHeight(child);
+      for (let idx = 0; idx < children.length; idx++) {
+        const child = children[idx]!;
+        const childBranchIdx = isRoot ? idx : branchIdx;
+        const childSubtreeHeight = measureSubtreeHeight(child, false);
+
         const childPositioned = layoutNode(
           child,
           childX,
           childYCurrent,
           depth + 1,
+          childBranchIdx,
           positionedNode
         );
         positionedNode.children.push(childPositioned);
@@ -159,6 +301,7 @@ export function computeTreeLayout(
           fromId: node.id,
           toId: child.id,
           path,
+          colorHex: childPositioned.branchTheme.curveHex,
         });
 
         childYCurrent += childSubtreeHeight + VERTICAL_GAP;
@@ -168,7 +311,7 @@ export function computeTreeLayout(
     return positionedNode;
   }
 
-  layoutNode(root, 50, 50, 0);
+  layoutNode(root, 50, 50, 0, 0);
 
   let minX = Infinity;
   let minY = Infinity;

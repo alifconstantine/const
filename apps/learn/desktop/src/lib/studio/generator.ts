@@ -313,7 +313,8 @@ Aturan Penting:
 2. Panduan Hirarki:
    - Root memiliki 4 sampai 6 cabang utama (Level 1).
    - Setiap cabang Level 1 memiliki 2 sampai 4 sub-cabang (Level 2).
-   - Label simpul ringkas dan padat (2 sampai 6 kata).
+   - Label simpul ringkas dan jelas (2 sampai 6 kata).
+   - Setiap simpul dapat memiliki properti "description" (penjelasan intisari konsep dalam 1-2 kalimat ringkas).
    - Gunakan ID alfanumerik unik untuk setiap simpul (misal: "c1", "c1_1").
 3. Bahasa: Gunakan Bahasa Indonesia.
 4. Output HANYA JSON valid tanpa teks pengantar atau markdown.`
@@ -326,16 +327,19 @@ Rules:
   "root": {
     "id": "root",
     "label": string,
+    "description"?: string,
     "children": [
       {
         "id": string,
         "label": string,
+        "description"?: string,
         "children": [
           {
             "id": string,
             "label": string,
+            "description"?: string,
             "children": [
-              { "id": string, "label": string }
+              { "id": string, "label": string, "description"?: string }
             ]
           }
         ]
@@ -347,6 +351,7 @@ Rules:
    - Root has 4 to 6 main Level 1 branches.
    - Each Level 1 branch has 2 to 4 Level 2 children.
    - Concise node labels (2 to 6 words max).
+   - Each node can optionally include a concise 1-2 sentence "description" summarizing the key concept.
    - Unique alphanumeric IDs for each node.
 3. Language: English.
 4. STRICT: Pure JSON only without markdown or introductory text.`;
