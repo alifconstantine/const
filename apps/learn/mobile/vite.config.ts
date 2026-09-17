@@ -18,6 +18,12 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       },
+      "/composio-api": {
+        target: "https://backend.composio.dev",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/composio-api/, "/api/v3.1"),
+        secure: false,
+      },
     },
   },
   define: {

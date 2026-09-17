@@ -1140,6 +1140,35 @@ export function MobileLearnWorkspace({
             )
           );
         },
+        onToolCallStart: (toolCall) => {
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === assistantMsgId
+                ? {
+                    ...msg,
+                    toolCalls: [
+                      ...(msg.toolCalls || []).filter((tc: any) => tc.id !== toolCall.id),
+                      toolCall,
+                    ],
+                  }
+                : msg
+            )
+          );
+        },
+        onToolCallResult: (toolCall) => {
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === assistantMsgId
+                ? {
+                    ...msg,
+                    toolCalls: (msg.toolCalls || []).map((tc: any) =>
+                      tc.id === toolCall.id ? toolCall : tc
+                    ),
+                  }
+                : msg
+            )
+          );
+        },
         onToken: (chunk) => {
           setMessages((prev) =>
             prev.map((msg) => {
@@ -1155,7 +1184,7 @@ export function MobileLearnWorkspace({
             })
           );
         },
-        onDone: async (finalContent, finalThinking) => {
+        onDone: async (finalContent, finalThinking, finalToolCalls) => {
           const resolvedContent = finalContent || t("noResponseReceived");
           const finalDuration = Date.now() - now;
           setMessages((prev) =>
@@ -1165,6 +1194,7 @@ export function MobileLearnWorkspace({
                     ...msg,
                     content: resolvedContent,
                     thinking: finalThinking,
+                    toolCalls: finalToolCalls && finalToolCalls.length > 0 ? finalToolCalls : msg.toolCalls,
                     thinkingDurationMs:
                       msg.thinkingDurationMs ??
                       (finalThinking && finalThinking.trim().length > 0
@@ -1187,6 +1217,7 @@ export function MobileLearnWorkspace({
               role: "assistant",
               content: resolvedContent,
               thinking: finalThinking,
+              toolCalls: finalToolCalls && finalToolCalls.length > 0 ? finalToolCalls : undefined,
               durationMs: finalDuration,
               createdAt: Date.now(),
             });
@@ -2346,10 +2377,15 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
                   </div>
                 ) : (
                   <div className="w-full flex flex-col gap-2 group select-text">
-                    {/* Thinking Process (Minimalist, auto-collapses once content begins) */}
+                    {/* Thinking & Tool Execution Process */}
                     <ThinkingProcess
                       thinking={msg.thinking}
-                      isExecuting={Boolean(msg.isStreaming && !msg.content)}
+                      toolCalls={msg.toolCalls}
+                      isExecuting={Boolean(
+                        msg.isStreaming &&
+                          (!msg.content ||
+                            (msg.toolCalls && msg.toolCalls.some((tc: any) => !tc.result)))
+                      )}
                       durationMs={
                         msg.thinkingDurationMs ||
                         (msg.isStreaming && !msg.content ? liveDurationMs : undefined)

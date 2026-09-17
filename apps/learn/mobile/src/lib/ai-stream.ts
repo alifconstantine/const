@@ -5,12 +5,43 @@
  * dynamic model fetching, and cancellation via AbortController.
  */
 
+import { executeCodeInterpreter, getComposioApiKey } from "./composio";
+
 export interface MobileModel {
   id: string;
   name: string;
   description: string;
   supportsThinking?: boolean;
 }
+
+export interface AiToolCall {
+  id: string;
+  name: string;
+  args?: any;
+  result?: any;
+  isError?: boolean;
+  durationMs?: number;
+}
+
+export const COMPOSIO_CODE_INTERPRETER_TOOL = {
+  type: "function",
+  function: {
+    name: "code_interpreter",
+    description:
+      "Executes Python 3 code in an isolated Composio cloud sandbox. Use this tool whenever you need to compute mathematical formulas, solve algebra/calculus, simulate algorithms, process data, or verify logic.",
+    parameters: {
+      type: "object",
+      properties: {
+        code: {
+          type: "string",
+          description: "The exact Python 3 script to execute.",
+        },
+      },
+      required: ["code"],
+    },
+  },
+};
+
 
 export const DEFAULT_MOBILE_MODELS: MobileModel[] = [
   {
@@ -164,13 +195,21 @@ function mapRouterModels(rawModels: any[]): MobileModel[] {
 
 export interface StreamChatParams {
   model: string;
-  messages: Array<{ role: "system" | "user" | "assistant"; content: string | any[] }>;
+  messages: Array<{
+    role: "system" | "user" | "assistant" | "tool";
+    content: string | any[];
+    tool_call_id?: string;
+    tool_calls?: any[];
+  }>;
   signal?: AbortSignal;
   systemPrompt?: string;
   temperature?: number;
+  enableTools?: boolean;
   onToken?: (token: string) => void;
   onThinking?: (thinking: string) => void;
-  onDone?: (finalContent: string, finalThinking: string) => void;
+  onToolCallStart?: (toolCall: AiToolCall) => void;
+  onToolCallResult?: (toolCall: AiToolCall) => void;
+  onDone?: (finalContent: string, finalThinking: string, toolCalls?: AiToolCall[]) => void;
   onError?: (error: Error) => void;
 }
 
@@ -180,8 +219,11 @@ export async function streamChatCompletion({
   signal,
   systemPrompt,
   temperature,
+  enableTools,
   onToken,
   onThinking,
+  onToolCallStart,
+  onToolCallResult,
   onDone,
   onError,
 }: StreamChatParams): Promise<void> {
@@ -196,18 +238,31 @@ export async function streamChatCompletion({
     (import.meta as any).env?.VITE_CONST_ENGINE_API_KEY ||
     "";
 
-  const payload = {
+  const composioKey = getComposioApiKey();
+  const toolsAvailable = Boolean(enableTools !== false && composioKey);
+
+  let effectiveSystemPrompt = systemPrompt || SOCRATIC_LEARNING_SYSTEM_PROMPT;
+  if (toolsAvailable) {
+    effectiveSystemPrompt +=
+      "\n\nYou have access to the 'code_interpreter' tool (powered by Composio Cloud Sandbox). When the user asks you to perform calculations, verify math, solve equations, analyze datasets, plot, or execute code, ALWAYS invoke the 'code_interpreter' tool to obtain verified output before explaining your answer.";
+  }
+
+  const payload: any = {
     model,
     messages: [
       {
         role: "system",
-        content: systemPrompt || SOCRATIC_LEARNING_SYSTEM_PROMPT,
+        content: effectiveSystemPrompt,
       },
       ...messages,
     ],
     temperature: temperature ?? 0.7,
     stream: true,
   };
+
+  if (toolsAvailable) {
+    payload.tools = [COMPOSIO_CODE_INTERPRETER_TOOL];
+  }
 
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
@@ -220,12 +275,13 @@ export async function streamChatCompletion({
 
   let accumulatedContent = "";
   let accumulatedThinking = "";
+  const accumulatedToolCalls: Map<number, { id: string; name: string; argsStr: string }> = new Map();
 
-  const executeFetch = async (targetEndpoint: string) => {
+  const executeFetch = async (targetEndpoint: string, customBody?: any) => {
     return await fetch(targetEndpoint, {
       method: "POST",
       headers,
-      body: JSON.stringify(payload),
+      body: JSON.stringify(customBody || payload),
       signal,
     });
   };
@@ -294,6 +350,22 @@ export async function streamChatCompletion({
             onThinking?.(delta.reasoning_content);
           }
 
+          // Process tool calls if emitted by model
+          if (delta.tool_calls && Array.isArray(delta.tool_calls)) {
+            for (const tc of delta.tool_calls) {
+              const idx = tc.index ?? 0;
+              const existing = accumulatedToolCalls.get(idx) || {
+                id: tc.id || `call_${Date.now()}_${idx}`,
+                name: tc.function?.name || "",
+                argsStr: "",
+              };
+              if (tc.id) existing.id = tc.id;
+              if (tc.function?.name) existing.name = tc.function.name;
+              if (tc.function?.arguments) existing.argsStr += tc.function.arguments;
+              accumulatedToolCalls.set(idx, existing);
+            }
+          }
+
           // Process final content tokens
           if (delta.content) {
             accumulatedContent += delta.content;
@@ -305,10 +377,141 @@ export async function streamChatCompletion({
       }
     }
 
-    onDone?.(accumulatedContent, accumulatedThinking);
+    // Handle tool call execution loop if model requested tool execution
+    if (accumulatedToolCalls.size > 0) {
+      if (signal?.aborted) {
+        onDone?.(accumulatedContent, accumulatedThinking, []);
+        return;
+      }
+
+      const executedTools: AiToolCall[] = [];
+
+      for (const tc of accumulatedToolCalls.values()) {
+        if (signal?.aborted) break;
+
+        let parsedArgs: any = {};
+        try {
+          parsedArgs = JSON.parse(tc.argsStr);
+        } catch {
+          parsedArgs = { code: tc.argsStr };
+        }
+
+        const toolItem: AiToolCall = {
+          id: tc.id,
+          name: tc.name || "code_interpreter",
+          args: parsedArgs,
+        };
+        executedTools.push(toolItem);
+        onToolCallStart?.(toolItem);
+
+        if (toolItem.name === "code_interpreter" && parsedArgs.code) {
+          const execRes = await executeCodeInterpreter(parsedArgs.code);
+          const rawOutput =
+            execRes.stdout ||
+            execRes.stderr ||
+            (execRes.success ? "Execution completed successfully." : execRes.error || "Execution failed.");
+          toolItem.result = rawOutput;
+          toolItem.isError = !execRes.success;
+          toolItem.durationMs = execRes.durationMs;
+        } else {
+          toolItem.result = "Tool execution unsupported.";
+          toolItem.isError = true;
+        }
+
+        onToolCallResult?.(toolItem);
+      }
+
+      if (signal?.aborted) {
+        onDone?.(accumulatedContent, accumulatedThinking, executedTools);
+        return;
+      }
+
+      // Second turn: send tool result back to model to get final conversational explanation
+      const followUpMessages: any[] = [
+        ...payload.messages,
+        {
+          role: "assistant",
+          content: accumulatedContent || null,
+          tool_calls: Array.from(accumulatedToolCalls.values()).map((tc) => ({
+            id: tc.id,
+            type: "function",
+            function: {
+              name: tc.name,
+              arguments: tc.argsStr,
+            },
+          })),
+        },
+        ...executedTools.map((t) => ({
+          role: "tool",
+          tool_call_id: t.id,
+          content: typeof t.result === "string" ? t.result : JSON.stringify(t.result),
+        })),
+      ];
+
+      const followUpPayload = {
+        model,
+        messages: followUpMessages,
+        temperature: temperature ?? 0.7,
+        stream: true,
+      };
+
+      try {
+        let followUpRes: Response;
+        try {
+          followUpRes = await executeFetch(endpoint, followUpPayload);
+        } catch {
+          const altEndpoint = endpoint.startsWith("/v1")
+            ? "https://router.const.web.id/v1/chat/completions"
+            : "/v1/chat/completions";
+          followUpRes = await executeFetch(altEndpoint, followUpPayload);
+        }
+
+        if (followUpRes.ok && followUpRes.body) {
+          const followUpReader = followUpRes.body.getReader();
+          let followUpBuffer = "";
+          let followUpContent = "";
+
+          while (true) {
+            if (signal?.aborted) break;
+            const { done, value } = await followUpReader.read();
+            if (done) break;
+
+            followUpBuffer += decoder.decode(value, { stream: true });
+            const fLines = followUpBuffer.split("\n");
+            followUpBuffer = fLines.pop() || "";
+
+            for (const fLine of fLines) {
+              const fTrimmed = fLine.trim();
+              if (!fTrimmed.startsWith("data:")) continue;
+              const fDataStr = fTrimmed.slice(5).trim();
+              if (fDataStr === "[DONE]") continue;
+
+              try {
+                const fJson = JSON.parse(fDataStr);
+                const fDelta = fJson.choices?.[0]?.delta;
+                if (fDelta?.content) {
+                  followUpContent += fDelta.content;
+                  onToken?.(fDelta.content);
+                }
+              } catch {}
+            }
+          }
+
+          onDone?.(followUpContent || accumulatedContent, accumulatedThinking, executedTools);
+          return;
+        }
+      } catch (fErr) {
+        console.warn("Follow-up streaming failed, returning direct output:", fErr);
+      }
+
+      onDone?.(accumulatedContent, accumulatedThinking, executedTools);
+      return;
+    }
+
+    onDone?.(accumulatedContent, accumulatedThinking, []);
   } catch (err: any) {
     if (err.name === "AbortError") {
-      onDone?.(accumulatedContent, accumulatedThinking);
+      onDone?.(accumulatedContent, accumulatedThinking, []);
       return;
     }
     if (onError) {
@@ -318,6 +521,7 @@ export async function streamChatCompletion({
     throw err;
   }
 }
+
 
 /**
  * Generates a clean fallback title from the user prompt

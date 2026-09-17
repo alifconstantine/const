@@ -1,75 +1,19 @@
-import React from "react";
-import { X, Cable, ShieldCheck, Terminal, Code2, FolderTree, Globe, FileCode2, CheckCircle2 } from "lucide-react";
+import React, { useState } from "react";
+import {
+  X,
+  Cable,
+  Terminal,
+  CheckCircle2,
+  AlertCircle,
+  Play,
+  Loader2,
+  Sparkles,
+  ShieldCheck,
+  Cpu,
+} from "lucide-react";
 import { cn } from "@const/ui";
 import { useI18n } from "../../../lib/i18n";
-
-export interface McpToolItem {
-  id: string;
-  name: string;
-  category: "Code Execution" | "Filesystem" | "Web & Knowledge";
-  descEn: string;
-  descId: string;
-  icon: React.ElementType;
-}
-
-export const MCP_TOOLS_LIST: McpToolItem[] = [
-  {
-    id: "execute_code",
-    name: "execute_code",
-    category: "Code Execution",
-    descEn: "Secure sandbox for executing Python and JavaScript computations.",
-    descId: "Sandbox terisolasi untuk eksekusi komputasi Python dan JavaScript.",
-    icon: Code2,
-  },
-  {
-    id: "execute_terminal_command",
-    name: "execute_terminal_command",
-    category: "Code Execution",
-    descEn: "Runs non-destructive terminal utilities and data analysis scripts.",
-    descId: "Menjalankan perintah terminal utilitas dan skrip analisis data.",
-    icon: Terminal,
-  },
-  {
-    id: "get_file_content",
-    name: "get_file_content",
-    category: "Filesystem",
-    descEn: "Inspects source files, notes, and local workspace artifacts.",
-    descId: "Membaca berkas sumber, catatan, dan artefak workspace.",
-    icon: FileCode2,
-  },
-  {
-    id: "set_file_content",
-    name: "set_file_content",
-    category: "Filesystem",
-    descEn: "Creates or modifies note drafts and generated study summaries.",
-    descId: "Membuat atau memperbarui draf catatan dan rangkuman belajar.",
-    icon: FileCode2,
-  },
-  {
-    id: "list_directory",
-    name: "list_directory",
-    category: "Filesystem",
-    descEn: "Explores files and directories in the current learning workspace.",
-    descId: "Menjelajahi struktur direktori dan berkas pada workspace belajar.",
-    icon: FolderTree,
-  },
-  {
-    id: "web_search",
-    name: "web_search",
-    category: "Web & Knowledge",
-    descEn: "Real-time web search for fresh learning citations and groundings.",
-    descId: "Pencarian web real-time untuk referensi dan sitasi belajar terkini.",
-    icon: Globe,
-  },
-  {
-    id: "web_fetch",
-    name: "web_fetch",
-    category: "Web & Knowledge",
-    descEn: "Fetches and parses public web documents and research articles.",
-    descId: "Mengambil dan mengekstrak dokumen web publik dan artikel riset.",
-    icon: Globe,
-  },
-];
+import { testSandboxConnection } from "../../../lib/composio";
 
 interface McpToolsSheetProps {
   open: boolean;
@@ -79,6 +23,31 @@ interface McpToolsSheetProps {
 export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
   const { language } = useI18n();
   const isIndo = language === "id";
+
+  const [isTesting, setIsTesting] = useState(false);
+  const [testResult, setTestResult] = useState<{
+    success: boolean;
+    message: string;
+    durationMs: number;
+    stdout?: string;
+  } | null>(null);
+
+  const handleRunTest = async () => {
+    setIsTesting(true);
+    setTestResult(null);
+    try {
+      const res = await testSandboxConnection();
+      setTestResult(res);
+    } catch (err: any) {
+      setTestResult({
+        success: false,
+        message: err?.message || String(err),
+        durationMs: 0,
+      });
+    } finally {
+      setIsTesting(false);
+    }
+  };
 
   return (
     <>
@@ -95,7 +64,7 @@ export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
       {/* Bottom Sheet */}
       <div
         className={cn(
-          "fixed inset-x-0 bottom-0 z-50 max-h-[85vh] bg-card text-card-foreground border-t border-border rounded-t-[24px] flex flex-col will-change-transform font-sans overflow-hidden select-none transition-transform duration-300 ease-out safe-area-bottom",
+          "fixed inset-x-0 bottom-0 z-50 max-h-[88vh] bg-card text-card-foreground border-t border-border rounded-t-[24px] flex flex-col will-change-transform font-sans overflow-hidden select-none transition-transform duration-300 ease-out safe-area-bottom",
           open ? "translate-y-0" : "translate-y-full pointer-events-none"
         )}
         role="dialog"
@@ -122,7 +91,7 @@ export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
                 </span>
               </div>
               <p className="text-[11px] text-muted-foreground">
-                Composio Remote MCP Sandbox & Web Tools
+                Composio Remote Cloud Sandbox & Execution
               </p>
             </div>
           </div>
@@ -137,65 +106,181 @@ export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
           </button>
         </div>
 
-        {/* Tools Content */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
-          {/* Server Info Card */}
-          <div className="p-3.5 rounded-2xl bg-secondary/40 border border-border space-y-2">
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-4 select-text">
+          {/* Runtime Info Card */}
+          <div className="p-3.5 rounded-2xl bg-secondary/40 border border-border space-y-2 select-none">
             <div className="flex items-center justify-between text-xs">
-              <span className="text-muted-foreground">{isIndo ? "Protokol Server" : "Server Protocol"}</span>
-              <span className="font-mono font-medium text-foreground">Model Context Protocol (MCP)</span>
+              <span className="text-muted-foreground">{isIndo ? "Protokol Alat" : "Tool Protocol"}</span>
+              <span className="font-mono font-medium text-foreground">Composio MCP REST v3.1</span>
             </div>
             <div className="flex items-center justify-between text-xs">
-              <span className="text-muted-foreground">{isIndo ? "Transport" : "Transport Layer"}</span>
-              <span className="font-mono text-muted-foreground">Composio Cloud SSE</span>
+              <span className="text-muted-foreground">{isIndo ? "Lingkungan Sandbox" : "Sandbox Engine"}</span>
+              <span className="font-mono text-muted-foreground flex items-center gap-1">
+                <Cpu className="w-3 h-3 text-muted-foreground" />
+                E2B Linux Cloud (x86_64)
+              </span>
             </div>
             <div className="flex items-center justify-between text-xs">
-              <span className="text-muted-foreground">{isIndo ? "Alat Tersedia" : "Registered Tools"}</span>
-              <span className="font-mono font-semibold text-foreground">{MCP_TOOLS_LIST.length} Tools</span>
+              <span className="text-muted-foreground">{isIndo ? "Status Otorisasi" : "Auth Status"}</span>
+              <span className="text-emerald-500 font-medium flex items-center gap-1">
+                <ShieldCheck className="w-3.5 h-3.5" />
+                {isIndo ? "Zero Auth (Siap Pakai)" : "Zero Auth (Ready)"}
+              </span>
             </div>
           </div>
 
-          {/* List of Tools */}
+          {/* Active Tool: Code Interpreter */}
           <div className="space-y-2">
-            <h3 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider px-1">
-              {isIndo ? "Daftar Alat Agen" : "Agent Tools List"}
-            </h3>
+            <div className="flex items-center justify-between px-1">
+              <h3 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                {isIndo ? "Alat Aktif" : "Active Tool"}
+              </h3>
+              <span className="text-[10px] text-emerald-500 font-medium">1 Toolkit Active</span>
+            </div>
 
-            {MCP_TOOLS_LIST.map((tool) => {
-              const Icon = tool.icon;
-              return (
-                <div
-                  key={tool.id}
-                  className="p-3 rounded-2xl bg-secondary/20 border border-border/70 flex items-start gap-3"
-                >
-                  <div className="h-7 w-7 rounded-lg bg-secondary border border-border flex items-center justify-center shrink-0 mt-0.5 text-muted-foreground">
-                    <Icon className="h-3.5 w-3.5" />
-                  </div>
+            <div className="p-3.5 rounded-2xl bg-secondary/20 border border-border flex flex-col gap-3">
+              <div className="flex items-start gap-3">
+                <div className="h-9 w-9 rounded-xl bg-foreground text-background flex items-center justify-center shrink-0 shadow-xs">
+                  <Terminal className="h-4 w-4" />
+                </div>
 
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-1.5">
-                      <span className="text-xs font-mono font-semibold text-foreground truncate">
-                        {tool.name}
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between gap-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-semibold text-foreground">
+                        Code Interpreter
                       </span>
-                      <span className="text-[9.5px] px-1.5 py-0.5 rounded bg-secondary text-muted-foreground border border-border/50 shrink-0">
-                        {tool.category}
+                      <span className="px-1.5 py-0.2 rounded text-[9.5px] font-mono bg-secondary text-muted-foreground border border-border/60">
+                        Python 3.11
                       </span>
                     </div>
-                    <p className="text-[11px] text-muted-foreground mt-0.5 leading-relaxed">
-                      {isIndo ? tool.descId : tool.descEn}
-                    </p>
+                    <span className="px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 text-[9px] font-medium border border-emerald-500/20">
+                      Active
+                    </span>
                   </div>
+                  <p className="text-[11.5px] text-muted-foreground mt-1 leading-relaxed">
+                    {isIndo
+                      ? "Eksekusi kode Python, perhitungan matematis kalkulus/aljabar, analisis data, dan manipulasi komputasi secara aman di sandbox cloud terisolasi."
+                      : "Executes Python code, mathematical computations, data analysis, and scripts safely in an isolated cloud sandbox."}
+                  </p>
                 </div>
-              );
-            })}
+              </div>
+
+              {/* Badges */}
+              <div className="flex flex-wrap gap-1.5 pt-1 border-t border-border/40 text-[10px] text-muted-foreground">
+                <span className="px-2 py-0.5 rounded-md bg-secondary/60 border border-border/50">
+                  ⚡ Auto-Invoked by Ask AI
+                </span>
+                <span className="px-2 py-0.5 rounded-md bg-secondary/60 border border-border/50">
+                  🔒 Isolated Container
+                </span>
+                <span className="px-2 py-0.5 rounded-md bg-secondary/60 border border-border/50">
+                  📊 NumPy / SymPy / Math
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Interactive Sandbox Test Runner */}
+          <div className="p-3.5 rounded-2xl bg-secondary/15 border border-border/80 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                <span>{isIndo ? "Uji Koneksi Sandbox" : "Test Sandbox Live"}</span>
+              </div>
+              <button
+                type="button"
+                onClick={handleRunTest}
+                disabled={isTesting}
+                className="px-2.5 py-1 rounded-lg bg-foreground text-background text-xs font-medium flex items-center gap-1 hover:opacity-90 active:scale-95 transition-all disabled:opacity-50 cursor-pointer"
+              >
+                {isTesting ? (
+                  <>
+                    <Loader2 className="w-3 h-3 animate-spin" />
+                    <span>{isIndo ? "Mengeksekusi..." : "Running..."}</span>
+                  </>
+                ) : (
+                  <>
+                    <Play className="w-3 h-3 fill-current" />
+                    <span>{isIndo ? "Jalankan Tes" : "Run Test"}</span>
+                  </>
+                )}
+              </button>
+            </div>
+
+            <p className="text-[11px] text-muted-foreground leading-relaxed">
+              {isIndo
+                ? "Jalankan pengujian langsung ke Composio Sandbox untuk memverifikasi kesiapan container Python sebelum digunakan di chat."
+                : "Run a direct test against Composio Sandbox to verify Python container readiness."}
+            </p>
+
+            {testResult && (
+              <div
+                className={cn(
+                  "p-2.5 rounded-xl border text-xs font-mono space-y-1 select-text transition-all",
+                  testResult.success
+                    ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
+                    : "bg-destructive/10 border-destructive/30 text-destructive"
+                )}
+              >
+                <div className="flex items-center justify-between text-[11px] font-sans font-medium">
+                  <span className="flex items-center gap-1">
+                    {testResult.success ? (
+                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                    ) : (
+                      <AlertCircle className="w-3.5 h-3.5 text-destructive" />
+                    )}
+                    {testResult.success
+                      ? isIndo
+                        ? "Sandbox Berhasil Terhubung!"
+                        : "Sandbox Connected Successfully!"
+                      : isIndo
+                        ? "Gagal Terhubung ke Sandbox"
+                        : "Sandbox Connection Failed"}
+                  </span>
+                  {testResult.durationMs > 0 && (
+                    <span className="text-[10px] text-muted-foreground">
+                      {testResult.durationMs}ms
+                    </span>
+                  )}
+                </div>
+
+                <div className="p-2 rounded-lg bg-black/40 text-[11px] text-foreground whitespace-pre-wrap break-all leading-tight">
+                  {testResult.stdout || testResult.message}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Upcoming Integrations */}
+          <div className="space-y-2 pt-1">
+            <h3 className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider px-1">
+              {isIndo ? "Integrasi Lainnya" : "More Integrations"}
+            </h3>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div className="p-2.5 rounded-xl bg-secondary/10 border border-border/60 flex flex-col justify-between">
+                <span className="text-xs font-medium text-foreground">GitHub</span>
+                <span className="text-[10px] text-muted-foreground mt-1">
+                  {isIndo ? "Repo & Issues (Segera)" : "Repo & Issues (Soon)"}
+                </span>
+              </div>
+              <div className="p-2.5 rounded-xl bg-secondary/10 border border-border/60 flex flex-col justify-between">
+                <span className="text-xs font-medium text-foreground">Notion</span>
+                <span className="text-[10px] text-muted-foreground mt-1">
+                  {isIndo ? "Workspace Notes (Segera)" : "Workspace Notes (Soon)"}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-border bg-secondary/20 flex items-center justify-between text-[11px] text-muted-foreground">
-          <span className="flex items-center gap-1">
+        <div className="p-4 border-t border-border bg-secondary/20 flex items-center justify-between text-[11px] text-muted-foreground shrink-0">
+          <span className="flex items-center gap-1.5 font-medium">
             <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500" />
-            {isIndo ? "Semua alat siap digunakan" : "All tools ready"}
+            {isIndo ? "Code Interpreter siap digunakan" : "Code Interpreter ready"}
           </span>
           <button
             type="button"
