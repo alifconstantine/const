@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import {
-  Server,
+  Cable,
   Code2,
   Terminal,
   FileCode2,
@@ -148,7 +148,7 @@ export function McpToolsView() {
               {isIndo ? "Protokol & Server" : "Protocol & Server"}
             </span>
             <div className="flex items-center gap-2">
-              <Server className="h-4 w-4 text-foreground" />
+              <Cable className="h-4 w-4 text-foreground" />
               <span className="text-xs font-semibold font-mono text-foreground">
                 Const MCP Hub
               </span>

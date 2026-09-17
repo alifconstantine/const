@@ -172,7 +172,7 @@ export function MenuContainer({
       <div className="relative">
         {/* First item - trigger, always visible */}
         <div
-          className="relative bg-card text-foreground border border-border/80 hover:border-border cursor-pointer rounded-full group will-change-transform z-50 shadow-lg flex items-center justify-center transition-all duration-200 active:scale-95"
+          className="relative bg-neutral-900 dark:bg-neutral-900 text-white border border-neutral-800/80 hover:border-neutral-700 cursor-pointer rounded-full group will-change-transform z-50 shadow-xl flex items-center justify-center transition-all duration-200 active:scale-95"
           style={sizeStyle}
           onClick={handleToggle}
           role="button"
@@ -201,7 +201,7 @@ export function MenuContainer({
           return (
             <div
               key={index}
-              className="absolute top-0 left-0 bg-card text-foreground border border-border/80 rounded-full will-change-transform shadow-lg overflow-hidden flex items-center justify-center"
+              className="absolute top-0 left-0 bg-neutral-900 dark:bg-neutral-900 text-white border border-neutral-800/80 rounded-full will-change-transform shadow-xl overflow-hidden flex items-center justify-center"
               style={{
                 ...sizeStyle,
                 transform: `translateY(${isExpanded ? translateY : 0}px) scale(${isExpanded ? 1 : 0.7})`,

@@ -33,8 +33,8 @@ import {
   FolderPlus,
   PlusCircle,
   Globe,
-  Bot,
-  Server,
+  Box,
+  Cable,
 } from "lucide-react";
 import { getUserInitials, type UserProfile } from "../navbar";
 import { useI18n, LANGUAGE_OPTIONS } from "../../lib/i18n";
@@ -86,8 +86,8 @@ export function Sidebar({
     { id: "sources", label: t("sources"), icon: FileText, count: sourcesCount },
     { id: "collections", label: t("collections"), icon: Folder, count: collectionsCount },
     { id: "artifacts", label: t("artifacts"), icon: Layers, count: artifactsCount },
-    { id: "models", label: t("models") || "Models", icon: Bot },
-    { id: "mcp", label: t("mcpTools") || "MCP Tools", icon: Server },
+    { id: "models", label: t("models") || "Models", icon: Box },
+    { id: "mcp", label: t("mcpTools") || "MCP Tools", icon: Cable },
   ];
 
   const isMac =

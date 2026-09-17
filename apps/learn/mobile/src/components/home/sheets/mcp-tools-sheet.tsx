@@ -1,5 +1,5 @@
 import React from "react";
-import { X, Server, ShieldCheck, Terminal, Code2, FolderTree, Globe, FileCode2, CheckCircle2 } from "lucide-react";
+import { X, Cable, ShieldCheck, Terminal, Code2, FolderTree, Globe, FileCode2, CheckCircle2 } from "lucide-react";
 import { cn } from "@const/ui";
 import { useI18n } from "../../../lib/i18n";
 
@@ -109,7 +109,7 @@ export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
         <div className="px-5 py-3 border-b border-border flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="h-8 w-8 rounded-xl bg-secondary border border-border flex items-center justify-center">
-              <Server className="h-4 w-4 text-foreground" />
+              <Cable className="h-4 w-4 text-foreground" />
             </div>
             <div>
               <div className="flex items-center gap-1.5">

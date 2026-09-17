@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Bot, Sparkles, Cpu, Zap, Code2, Check, ExternalLink, ShieldCheck, ArrowRight } from "lucide-react";
+import { Box, Sparkles, Cpu, Zap, Code2, Check, ExternalLink, ShieldCheck, ArrowRight } from "lucide-react";
 import { toast, cn } from "@const/ui";
 import { useI18n } from "../../../lib/i18n";
 import { BUILTIN_MODELS } from "../../settings/settings-view";
@@ -53,7 +53,7 @@ export function ModelsView({ onOpenSettings }: ModelsViewProps) {
     if (id.includes("3.7")) return Cpu;
     if (id.includes("coding")) return Code2;
     if (id.includes("fast")) return Zap;
-    return Bot;
+    return Box;
   };
 
   return (
@@ -93,7 +93,7 @@ export function ModelsView({ onOpenSettings }: ModelsViewProps) {
         <div className="mt-6 p-4 rounded-2xl bg-secondary/50 border border-border/80 flex items-center justify-between shadow-2xs">
           <div className="flex items-center gap-3">
             <div className="h-9 w-9 rounded-xl bg-foreground text-background flex items-center justify-center font-bold">
-              <Bot className="h-5 w-5" />
+              <Box className="h-5 w-5" />
             </div>
             <div>
               <div className="flex items-center gap-2">

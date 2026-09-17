@@ -23,8 +23,8 @@ import {
   BookOpen,
   FileText,
   Menu as MenuIcon,
-  Bot,
-  Server,
+  Box,
+  Cable,
   Settings,
 } from "lucide-react";
 
@@ -868,22 +868,22 @@ export function LearnHome({
           <MenuItem
             label="Menu Cepat"
             icon={
-              <div className="relative w-5 h-5 flex items-center justify-center">
+              <div className="relative w-5 h-5 flex items-center justify-center text-white">
                 <div
                   className={cn(
-                    "absolute inset-0 flex items-center justify-center transition-all duration-300 ease-in-out origin-center",
+                    "absolute inset-0 flex items-center justify-center transition-all duration-300 ease-in-out origin-center text-white",
                     isFluidMenuExpanded ? "opacity-0 scale-0 rotate-180" : "opacity-100 scale-100 rotate-0"
                   )}
                 >
-                  <MenuIcon size={20} strokeWidth={2} />
+                  <MenuIcon size={20} strokeWidth={2} className="text-white" />
                 </div>
                 <div
                   className={cn(
-                    "absolute inset-0 flex items-center justify-center transition-all duration-300 ease-in-out origin-center",
+                    "absolute inset-0 flex items-center justify-center transition-all duration-300 ease-in-out origin-center text-white",
                     isFluidMenuExpanded ? "opacity-100 scale-100 rotate-0" : "opacity-0 scale-0 -rotate-180"
                   )}
                 >
-                  <X size={20} strokeWidth={2} />
+                  <X size={20} strokeWidth={2} className="text-white" />
                 </div>
               </div>
             }
@@ -892,7 +892,7 @@ export function LearnHome({
           {/* Child 1: Model AI */}
           <MenuItem
             label="Model AI"
-            icon={<Bot size={20} strokeWidth={1.8} className="text-indigo-500 dark:text-indigo-400" />}
+            icon={<Box size={20} strokeWidth={1.8} className="text-white" />}
             onClick={() => {
               setIsFluidMenuExpanded(false);
               setIsModelSheetOpen(true);
@@ -902,7 +902,7 @@ export function LearnHome({
           {/* Child 2: MCP Tools */}
           <MenuItem
             label="MCP Tools"
-            icon={<Server size={20} strokeWidth={1.8} className="text-emerald-500 dark:text-emerald-400" />}
+            icon={<Cable size={20} strokeWidth={1.8} className="text-white" />}
             onClick={() => {
               setIsFluidMenuExpanded(false);
               setIsMcpSheetOpen(true);
@@ -912,7 +912,7 @@ export function LearnHome({
           {/* Child 3: Pengaturan */}
           <MenuItem
             label={t("settings")}
-            icon={<Settings size={20} strokeWidth={1.8} className="text-amber-500 dark:text-amber-400" />}
+            icon={<Settings size={20} strokeWidth={1.8} className="text-white" />}
             onClick={() => {
               setIsFluidMenuExpanded(false);
               setIsSettingsSheetOpen(true);

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { X, Bot, Check, Sparkles, Cpu, Zap, Code2 } from "lucide-react";
+import { X, Box, Check, Sparkles, Cpu, Zap, Code2 } from "lucide-react";
 import { cn } from "@const/ui";
 import { useI18n } from "../../../lib/i18n";
 
@@ -53,7 +53,7 @@ export const LEARN_MODELS: ModelOption[] = [
     supportsThinking: true,
     descEn: "Intelligent dynamic router balancing latency and accuracy.",
     descId: "Dynamic router cerdas yang menyeimbangkan latensi dan keakuratan jawaban.",
-    icon: Bot,
+    icon: Box,
   },
   {
     id: "combo/fast",
@@ -143,7 +143,7 @@ export function ModelSelectionSheet({
         <div className="px-5 py-3 border-b border-border flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="h-8 w-8 rounded-xl bg-secondary border border-border flex items-center justify-center">
-              <Bot className="h-4 w-4 text-foreground" />
+              <Box className="h-4 w-4 text-foreground" />
             </div>
             <div>
               <h2 className="text-sm font-semibold text-foreground tracking-tight">
@@ -169,7 +169,7 @@ export function ModelSelectionSheet({
         <div className="flex-1 overflow-y-auto p-4 space-y-2.5">
           {LEARN_MODELS.map((model) => {
             const isSelected = activeModel === model.id;
-            const Icon = model.icon || Bot;
+            const Icon = model.icon || Box;
 
             return (
               <button
