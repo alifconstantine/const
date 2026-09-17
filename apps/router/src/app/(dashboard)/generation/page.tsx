@@ -991,11 +991,11 @@ export default function GenerationPage() {
   );
 
   return (
-    <div className="flex h-[calc(100vh-3.5rem)] -m-6 md:-m-8 bg-background text-foreground overflow-hidden">
+    <div className="flex-1 flex h-full w-full bg-background text-foreground overflow-hidden">
       {/* Main Center Canvas: Full Width */}
       <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden bg-background">
         {/* Top Chat Title Bar (Editable, Default "Untitled Chat") */}
-        <div className="h-14 px-4 sm:px-6 flex items-center justify-between shrink-0 bg-background/95 backdrop-blur">
+        <div className="h-14 px-4 sm:px-6 flex items-center justify-between shrink-0 bg-background/95 backdrop-blur border-b border-border/40">
           <div className="flex items-center gap-2 min-w-0 max-w-lg">
             {isEditingTitle ? (
               <input
@@ -1029,10 +1029,24 @@ export default function GenerationPage() {
               </div>
             )}
           </div>
+
+          {/* Right Mobile Actions: Sidebar/Settings Icon */}
+          <div className="flex items-center gap-1.5 md:hidden">
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setMobileSettingsOpen(true)}
+              className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary cursor-pointer"
+              title="Open Run settings"
+              aria-label="Open Run settings"
+            >
+              <PanelRight className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
 
         {/* Chat Thread Messages Viewport with ScrollArea */}
-        <ScrollArea className="flex-1 h-full">
+        <ScrollArea className="flex-1 min-h-0 h-full">
           <div className="px-4 sm:px-12 py-6 space-y-6">
             {messages.length === 0 ? null : (
               /* Active Messages Thread matching Image 1 layout */
@@ -1053,7 +1067,7 @@ export default function GenerationPage() {
         </ScrollArea>
 
         {/* Bottom AI Input Bar */}
-        <div className="p-4 sm:p-6 pt-2 bg-gradient-to-t from-background via-background/90 to-transparent">
+        <div className="p-3 sm:p-6 pt-2 pb-3 sm:pb-6 shrink-0 bg-gradient-to-t from-background via-background/90 to-transparent">
           <div
             onDragOver={(e) => {
               e.preventDefault();
@@ -1246,41 +1260,6 @@ export default function GenerationPage() {
             {renderRunSettingsContent(() => setIsRunSettingsCollapsed(true), false)}
           </div>
         )}
-      </div>
-
-      {/* Mobile Collapsed Right Rail (Icon Only when closed) */}
-      <div className="md:hidden shrink-0 flex flex-col items-center py-3 px-1.5 border-l border-border/70 bg-card/40 gap-2">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setMobileSettingsOpen(true)}
-          className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground cursor-pointer"
-          title="Open Run Settings"
-          aria-label="Open Run Settings"
-        >
-          <PanelRight className="h-4 w-4" />
-        </Button>
-        <div className="w-4 h-[1px] bg-border/50 my-0.5" />
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={handleNewChat}
-          className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground cursor-pointer"
-          title="New chat"
-          aria-label="New chat"
-        >
-          <Plus className="h-4 w-4" />
-        </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setIsHistoryOpen(true)}
-          className="h-8 w-8 rounded-full text-muted-foreground hover:text-foreground cursor-pointer"
-          title="Chat history"
-          aria-label="Chat history"
-        >
-          <History className="h-4 w-4" />
-        </Button>
       </div>
 
       {/* Mobile Slide-out Drawer (Like the Left Sidebar Drawer) */}

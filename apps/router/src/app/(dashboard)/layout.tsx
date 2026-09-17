@@ -61,6 +61,10 @@ export default function DashboardLayout({
     return "Dashboard";
   }, [pathname]);
 
+  const isGeneration = useMemo(() => {
+    return pathname === "/generation" || Boolean(pathname?.startsWith("/generation/"));
+  }, [pathname]);
+
   useEffect(() => {
     document.title = `${currentTitle} - Const Router`;
   }, [currentTitle]);
@@ -116,7 +120,12 @@ export default function DashboardLayout({
   return (
     <>
       <title>{`${currentTitle} - Const Router`}</title>
-      <div className="min-h-screen flex flex-col bg-sidebar text-foreground antialiased selection:bg-primary selection:text-primary-foreground">
+      <div
+        className={cn(
+          "flex flex-col bg-sidebar text-foreground antialiased selection:bg-primary selection:text-primary-foreground",
+          isGeneration ? "h-[100dvh] overflow-hidden" : "min-h-screen"
+        )}
+      >
       {/* Top Header Bar matching Const Harness studio header */}
       <header className="h-14 w-full border-b border-border bg-card sticky top-0 z-40 px-4 sm:px-6 flex items-center justify-between shrink-0 select-none transition-colors">
         {/* Left: Const Logo & Product Badge */}
@@ -174,7 +183,12 @@ export default function DashboardLayout({
       </header>
 
       {/* Main Layout: Left Sidebar + Content Area */}
-      <div className="flex-1 flex min-w-0 bg-sidebar">
+      <div
+        className={cn(
+          "flex-1 flex min-w-0 bg-sidebar",
+          isGeneration && "overflow-hidden h-[calc(100dvh-3.5rem)] md:h-[calc(100vh-3.5rem)]"
+        )}
+      >
         {/* Desktop Left Sidebar (Collapsible with smooth transition) */}
         <div
           className={cn(
@@ -204,7 +218,14 @@ export default function DashboardLayout({
         </div>
 
         {/* Page Content Viewport - Studio Canvas */}
-        <main className="flex-1 min-w-0 p-6 md:p-8 w-full bg-background text-foreground border-t border-l border-border/40 overflow-y-auto">
+        <main
+          className={cn(
+            "flex-1 min-w-0 w-full bg-background text-foreground border-t border-l border-border/40",
+            isGeneration
+              ? "p-0 overflow-hidden flex flex-col h-full"
+              : "p-6 md:p-8 overflow-y-auto"
+          )}
+        >
           {children}
         </main>
       </div>
