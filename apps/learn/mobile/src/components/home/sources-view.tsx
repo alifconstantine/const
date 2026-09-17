@@ -12,6 +12,7 @@ import {
   Video,
   ArrowUpRight,
   FolderPlus,
+  Eye,
 } from "lucide-react";
 import {
   Button,
@@ -25,6 +26,7 @@ import {
 import { db, localDb, type LocalSource, type LocalLearn } from "../../lib/db";
 import { useI18n } from "../../lib/i18n";
 import { DeleteConfirmDialog } from "./dialogs/delete-confirm-dialog";
+import { SourcePreviewDialog } from "../workspace/source-preview-dialog";
 
 export interface SourcesViewProps {
   onAddSource?: () => void;
@@ -129,6 +131,7 @@ export function SourcesView({
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string>("all");
   const [deleteTarget, setDeleteTarget] = useState<LocalSource | null>(null);
   const [localAddSourceModalOpen, setLocalAddSourceModalOpen] = useState(false);
+  const [previewSource, setPreviewSource] = useState<LocalSource | null>(null);
 
   const isAddSourceModalOpen =
     propIsAddSourceModalOpen !== undefined ? propIsAddSourceModalOpen : localAddSourceModalOpen;
@@ -295,7 +298,7 @@ export function SourcesView({
     return (
       <div
         key={source.id}
-        onClick={() => onOpenLearn?.(source.learnId)}
+        onClick={() => setPreviewSource(source)}
         className="w-full p-3 rounded-2xl border border-border/80 bg-card hover:bg-secondary/60 active:bg-secondary/80 transition-all flex flex-col gap-2.5 cursor-pointer select-none shadow-2xs"
       >
         {/* Top Row: Icon, Title, & Actions */}
@@ -327,6 +330,16 @@ export function SourcesView({
             className="flex items-center gap-1 shrink-0 pt-0.5"
             onClick={(e) => e.stopPropagation()}
           >
+            <button
+              type="button"
+              onClick={() => setPreviewSource(source)}
+              className="h-7 w-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary cursor-pointer transition-colors active:scale-95"
+              title={t("previewSource")}
+              aria-label={t("previewSource")}
+            >
+              <Eye className="h-3.5 w-3.5" />
+            </button>
+
             {source.url && (
               <button
                 type="button"
@@ -659,6 +672,16 @@ export function SourcesView({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Source Preview Dialog */}
+      <SourcePreviewDialog
+        source={previewSource}
+        open={!!previewSource}
+        onOpenChange={(open) => {
+          if (!open) setPreviewSource(null);
+        }}
+        onOpenLearn={onOpenLearn}
+      />
     </div>
   );
 }

@@ -15,6 +15,7 @@ import { ChatInputCard, type AttachedMedia } from "./chat-input-card";
 import { AddSourceDialog } from "./add-source-dialog";
 import { WorkspaceSidebar } from "./workspace-sidebar";
 import { SourcesSheet } from "./sources-sheet";
+import { SourcePreviewDialog } from "./source-preview-dialog";
 import { StudioSheet, type GeneratingArtifactStatus } from "./studio-sheet";
 import { CreateArtifactSheet } from "./create-artifact-sheet";
 import { CreateMindMapSheet } from "./create-mind-map-sheet";
@@ -2453,70 +2454,13 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
       )}
 
       {/* Source Reference Inspection Modal */}
-      {selectedSourceForPreview && (
-        <div
-          className="fixed inset-0 z-[60] bg-black/75 backdrop-blur-xs flex items-center justify-center p-3"
-          onClick={() => setSelectedSourceForPreview(null)}
-        >
-          <div
-            className="w-full max-w-lg max-h-[85vh] bg-card border border-border rounded-2xl p-4 shadow-2xl flex flex-col text-left font-sans"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-start justify-between gap-3 pb-3 border-b border-border">
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded-full bg-secondary text-muted-foreground border border-border">
-                    {selectedSourceForPreview.type}
-                  </span>
-                  {selectedSourceForPreview.subpagesCount &&
-                  selectedSourceForPreview.subpagesCount > 1 ? (
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
-                      {selectedSourceForPreview.subpagesCount} pages
-                    </span>
-                  ) : null}
-                </div>
-                <h3 className="text-sm font-semibold text-foreground truncate">
-                  {selectedSourceForPreview.title}
-                </h3>
-                {selectedSourceForPreview.url && (
-                  <a
-                    href={selectedSourceForPreview.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-blue-400 hover:underline truncate block mt-0.5"
-                  >
-                    {selectedSourceForPreview.url}
-                  </a>
-                )}
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setSelectedSourceForPreview(null)}
-                className="h-7 w-7 rounded-full bg-secondary hover:bg-secondary/80 text-muted-foreground hover:text-foreground flex items-center justify-center cursor-pointer shrink-0"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            {/* Extracted Text Content */}
-            <div className="flex-1 overflow-y-auto mt-3 pr-1">
-              <div className="flex items-center justify-between text-[11px] text-muted-foreground mb-2">
-                <span>Verified Source Content (Ground Truth):</span>
-                <span>
-                  {selectedSourceForPreview.content
-                    ? `${selectedSourceForPreview.content.length.toLocaleString()} characters`
-                    : "No text cached"}
-                </span>
-              </div>
-              <div className="p-3 rounded-xl bg-secondary/40 border border-border text-[11px] font-mono text-foreground whitespace-pre-wrap leading-relaxed select-text max-h-[50vh] overflow-y-auto">
-                {selectedSourceForPreview.content ||
-                  "[Content is not cached locally. This source was added via link.]"}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      <SourcePreviewDialog
+        source={selectedSourceForPreview}
+        open={!!selectedSourceForPreview}
+        onOpenChange={(open) => {
+          if (!open) setSelectedSourceForPreview(null);
+        }}
+      />
 
       {/* Full-Screen Note Direct Editor Modal (Matching Image 3) */}
       {selectedNoteArtifact && selectedNoteArtifact.type === "note" && (

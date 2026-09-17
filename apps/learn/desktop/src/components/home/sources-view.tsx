@@ -14,6 +14,7 @@ import {
   Video,
   X,
   ArrowUpRight,
+  Eye,
 } from "lucide-react";
 import {
   Button,
@@ -28,6 +29,7 @@ import {
 import { db, localDb, type LocalSource, type LocalLearn } from "../../lib/db";
 import { useI18n } from "../../lib/i18n";
 import { DeleteConfirmDialog } from "./dialogs/delete-confirm-dialog";
+import { SourcePreviewDialog } from "../workspace/source-preview-dialog";
 
 interface SourcesViewProps {
   onAddSource?: () => void;
@@ -127,6 +129,7 @@ export function SourcesView({
   const [searchQuery, setSearchQuery] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<LocalSource | null>(null);
   const [isAddSourceModalOpen, setIsAddSourceModalOpen] = useState(false);
+  const [previewSource, setPreviewSource] = useState<LocalSource | null>(null);
 
   // Tab indicator smooth animation refs & state
   const allTabRef = useRef<HTMLButtonElement>(null);
@@ -272,7 +275,7 @@ export function SourcesView({
     return (
       <div
         key={source.id}
-        onClick={() => onOpenLearn?.(source.learnId)}
+        onClick={() => setPreviewSource(source)}
         className="w-full px-3.5 py-2.5 rounded-xl border border-border hover:border-foreground/20 bg-card hover:bg-secondary/70 transition-colors flex items-center justify-between gap-3 group select-none cursor-pointer shadow-none"
       >
         {/* Left: Icon, Title & Optional Link */}
@@ -336,6 +339,15 @@ export function SourcesView({
             className="flex items-center gap-1 shrink-0"
             onClick={(e) => e.stopPropagation()}
           >
+            <button
+              type="button"
+              onClick={() => setPreviewSource(source)}
+              className="h-7 w-7 rounded-lg flex items-center justify-center hover:bg-secondary text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
+              title={t("previewSource")}
+            >
+              <Eye className="h-3.5 w-3.5" />
+            </button>
+
             {source.url && (
               <button
                 type="button"
@@ -672,6 +684,16 @@ export function SourcesView({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Source Preview Dialog */}
+      <SourcePreviewDialog
+        source={previewSource}
+        open={!!previewSource}
+        onOpenChange={(open) => {
+          if (!open) setPreviewSource(null);
+        }}
+        onOpenLearn={onOpenLearn}
+      />
     </div>
   );
 }

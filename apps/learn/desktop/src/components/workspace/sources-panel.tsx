@@ -25,6 +25,7 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { db, localDb, type LocalSource } from "@/lib/db";
 import { useI18n } from "../../lib/i18n";
 import { SourceIcon, getSourceCategoryLabel } from "./source-icon";
+import { SourcePreviewDialog } from "./source-preview-dialog";
 
 interface SourcesPanelProps {
   learnId?: string;
@@ -431,69 +432,13 @@ export function SourcesPanel({
       </aside>
 
       {/* Source Detail Modal */}
-      {selectedSourceForPreview && (
-        <div
-          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4"
-          onClick={() => setSelectedSourceForPreview(null)}
-        >
-          <div
-            className="w-full max-w-2xl max-h-[85vh] bg-card border border-border rounded-3xl p-6 shadow-2xl flex flex-col text-left"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-start justify-between gap-4 pb-3 border-b border-border/60">
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2 mb-1">
-                  <SourceIcon source={selectedSourceForPreview} size="md" />
-                  <span className="text-[11px] font-mono uppercase px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
-                    {getSourceCategoryLabel(selectedSourceForPreview)}
-                  </span>
-                  {selectedSourceForPreview.subpagesCount && selectedSourceForPreview.subpagesCount > 1 ? (
-                    <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-primary/10 text-primary">
-                      {selectedSourceForPreview.subpagesCount} pages
-                    </span>
-                  ) : null}
-                </div>
-                <h3 className="text-base font-semibold text-foreground truncate">
-                  {selectedSourceForPreview.title}
-                </h3>
-                {selectedSourceForPreview.url && (
-                  <a
-                    href={selectedSourceForPreview.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-primary hover:underline truncate block mt-0.5"
-                  >
-                    {selectedSourceForPreview.url}
-                  </a>
-                )}
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setSelectedSourceForPreview(null)}
-                className="h-8 w-8 rounded-full bg-secondary hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center cursor-pointer"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-
-            {/* Extracted Text Content */}
-            <ScrollArea className="flex-1 mt-4 pr-1 w-full min-h-0">
-              <div className="flex items-center justify-between text-[11px] text-muted-foreground mb-2">
-                <span>Extracted Content & Ground Truth:</span>
-                <span>
-                  {selectedSourceForPreview.content
-                    ? `${selectedSourceForPreview.content.length.toLocaleString()} characters`
-                    : "No text cached"}
-                </span>
-              </div>
-              <div className="p-4 rounded-2xl bg-muted/40 border border-border/50 text-xs font-mono text-foreground whitespace-pre-wrap leading-relaxed select-text">
-                {selectedSourceForPreview.content || "[Content is not cached locally. This source was added via link.]"}
-              </div>
-            </ScrollArea>
-          </div>
-        </div>
-      )}
+      <SourcePreviewDialog
+        source={selectedSourceForPreview}
+        open={!!selectedSourceForPreview}
+        onOpenChange={(open) => {
+          if (!open) setSelectedSourceForPreview(null);
+        }}
+      />
     </>
   );
 }
