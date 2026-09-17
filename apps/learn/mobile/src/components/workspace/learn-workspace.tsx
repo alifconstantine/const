@@ -19,7 +19,6 @@ import { SourcePreviewDialog } from "./source-preview-dialog";
 import { StudioSheet, type GeneratingArtifactStatus } from "./studio-sheet";
 import { CreateArtifactSheet } from "./create-artifact-sheet";
 import { CreateMindMapSheet } from "./create-mind-map-sheet";
-import { CreatePresentationSheet } from "./create-presentation-sheet";
 import { MobileArtifactReader } from "./mobile-artifact-reader";
 import { generateStudioArtifact } from "../../lib/studio/generator";
 import { ThinkingProcess } from "./working-process";
@@ -519,7 +518,6 @@ export function MobileLearnWorkspace({
   const [isCreateArtifactSheetOpen, setIsCreateArtifactSheetOpen] = useState(false);
   const [createArtifactType, setCreateArtifactType] = useState<"quiz" | "flashcard">("quiz");
   const [isCreateMindMapSheetOpen, setIsCreateMindMapSheetOpen] = useState(false);
-  const [isCreatePresentationSheetOpen, setIsCreatePresentationSheetOpen] = useState(false);
   const [generatingArtifacts, setGeneratingArtifacts] = useState<GeneratingArtifactStatus[]>([]);
   const [selectedReaderArtifact, setSelectedReaderArtifact] = useState<LocalArtifact | null>(null);
   const [isReaderOpen, setIsReaderOpen] = useState(false);
@@ -1269,11 +1267,9 @@ export function MobileLearnWorkspace({
       art.type === "quiz" ||
       art.type === "flashcard" ||
       art.type === "mind_map" ||
-      art.type === "slides" ||
       art.data?.questions ||
       art.data?.cards ||
-      art.data?.root ||
-      art.data?.slides
+      art.data?.root
     ) {
       handleOpenArtifactReader(art);
       return;
@@ -1606,16 +1602,12 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
       setIsCreateMindMapSheetOpen(true);
       return;
     }
-    if (toolId === "slides" || toolId === "presentation") {
-      setIsCreatePresentationSheetOpen(true);
-      return;
-    }
     // Other tools: strictly no-op as requested
     return;
   };
 
   const handleGenerateStudioArtifact = async (options: {
-    type: "quiz" | "flashcard" | "mind_map" | "slides";
+    type: "quiz" | "flashcard" | "mind_map";
     topic: string;
     difficulty?: "easy" | "medium" | "hard";
     count?: number;
@@ -1633,25 +1625,19 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
           ? (isIndo ? `Kuis: ${options.topic}` : `Quiz: ${options.topic}`)
           : options.type === "flashcard"
           ? (isIndo ? `Kartu: ${options.topic}` : `Flashcard: ${options.topic}`)
-          : options.type === "mind_map"
-          ? (isIndo ? `Peta Pikiran: ${options.topic}` : `Mind Map: ${options.topic}`)
-          : (isIndo ? `Presentasi: ${options.topic}` : `Presentation: ${options.topic}`))
+          : (isIndo ? `Peta Pikiran: ${options.topic}` : `Mind Map: ${options.topic}`))
       : (options.type === "quiz"
           ? (isIndo ? `Kuis (${options.count || 5} Soal)` : `Quiz (${options.count || 5} Questions)`)
           : options.type === "flashcard"
           ? (isIndo ? `Kartu Hafalan (${options.count || 10} Kartu)` : `Flashcards (${options.count || 10} Cards)`)
-          : options.type === "mind_map"
-          ? (isIndo ? "Peta Pikiran" : "Mind Map")
-          : (isIndo ? "Slide Presentasi" : "Presentation Slides"));
+          : (isIndo ? "Peta Pikiran" : "Mind Map"));
 
     const initialLoadingTitle =
       options.type === "quiz"
         ? (isIndo ? "Membuat Kuis..." : "Creating Quiz...")
         : options.type === "flashcard"
         ? (isIndo ? "Membuat Kartu Tanya-Jawab..." : "Creating Flashcards...")
-        : options.type === "mind_map"
-        ? (isIndo ? "Membuat Peta Pikiran..." : "Creating Mind Map...")
-        : (isIndo ? "Menyusun Presentasi..." : "Creating Presentation...");
+        : (isIndo ? "Membuat Peta Pikiran..." : "Creating Mind Map...");
 
     // 1. Immediately create in Dexie with status: "generating"
     const artId = await localDb.createArtifact({
@@ -1692,16 +1678,12 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
               ? "Kuis berhasil dibuat!"
               : options.type === "flashcard"
               ? "Kartu tanya-jawab berhasil dibuat!"
-              : options.type === "mind_map"
-              ? "Peta pikiran berhasil dibuat!"
-              : "Presentasi berhasil disusun!")
+              : "Peta pikiran berhasil dibuat!")
           : (options.type === "quiz"
               ? "Quiz created successfully!"
               : options.type === "flashcard"
               ? "Flashcards created successfully!"
-              : options.type === "mind_map"
-              ? "Mind map created successfully!"
-              : "Presentation slides created successfully!")
+              : "Mind map created successfully!")
       );
 
       const fullArt = await localDb.getArtifact(artId);
@@ -2556,14 +2538,6 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
       <CreateMindMapSheet
         open={isCreateMindMapSheetOpen}
         onClose={() => setIsCreateMindMapSheetOpen(false)}
-        sources={sources || []}
-        onGenerate={handleGenerateStudioArtifact}
-      />
-
-      {/* Create Presentation Bottom Sheet */}
-      <CreatePresentationSheet
-        open={isCreatePresentationSheetOpen}
-        onClose={() => setIsCreatePresentationSheetOpen(false)}
         sources={sources || []}
         onGenerate={handleGenerateStudioArtifact}
       />

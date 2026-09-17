@@ -1,8 +1,7 @@
-import type { LocalSource, QuizData, FlashcardData, MindMapData, MindMapNode, SlideDeckData, SlideItem } from "../db";
-import { buildPresentationPrompt } from "./presentation/prompt";
+import type { LocalSource, QuizData, FlashcardData, MindMapData, MindMapNode } from "../db";
 
 export interface GenerateStudioArtifactOptions {
-  type: "quiz" | "flashcard" | "mind_map" | "slides";
+  type: "quiz" | "flashcard" | "mind_map";
   learnId: string;
   topic?: string;
   difficulty?: "easy" | "medium" | "hard";
@@ -32,8 +31,11 @@ function getRouterBaseUrl(): string {
 
 function extractJson(text: string): any {
   if (!text) return null;
+  // Strip reasoning / thinking tags from thinking models (e.g. DeepSeek R1)
+  let cleaned = text.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+
   // Strip markdown fences
-  const cleaned = text
+  cleaned = cleaned
     .replace(/^```(?:json)?\s*/i, "")
     .replace(/\s*```$/i, "")
     .trim();
@@ -48,7 +50,13 @@ function extractJson(text: string): any {
       const candidate = cleaned.slice(startIdx, endIdx + 1);
       try {
         return JSON.parse(candidate);
-      } catch {}
+      } catch {
+        // Fix trailing commas if present
+        try {
+          const sanitized = candidate.replace(/,\s*([}\]])/g, "$1");
+          return JSON.parse(sanitized);
+        } catch {}
+      }
     }
   }
   return null;
@@ -132,7 +140,7 @@ export async function generateStudioArtifact({
   themeId = "auto",
 }: GenerateStudioArtifactOptions): Promise<{
   title: string;
-  data: QuizData | FlashcardData | MindMapData | SlideDeckData;
+  data: QuizData | FlashcardData | MindMapData;
 }> {
   // Aggregate source texts for grounding context
   const sourceSnippets = sources
@@ -364,17 +372,6 @@ Rules:
     userPrompt = `Materi Sumber Belajar:\n${sourceSnippets || "Topik: " + (topic || "Pengetahuan Umum")}\n\n` +
       (topic ? `Fokus Topik Spesifik / Instruksi: ${topic}\n\n` : "") +
       `Silakan buatkan Peta Pikiran hierarkis dalam format JSON yang valid.`;
-  } else if (type === "slides") {
-    const promptConfig = buildPresentationPrompt({
-      topic,
-      lengthMode,
-      count,
-      sources,
-      language,
-      themeId,
-    });
-    systemPrompt = promptConfig.systemPrompt;
-    userPrompt = promptConfig.userPrompt;
   }
 
   // 1. Attempt generation via Electron agent isolated completion (Stateless, never leaks into Chat AI / Ask AI)
@@ -446,36 +443,12 @@ Rules:
               updatedAt: Date.now(),
             };
             return { title: mindMapData.title, data: mindMapData };
-          } else if (type === "slides" && Array.isArray(parsed.slides) && parsed.slides.length > 0) {
-            const slidesData: SlideDeckData = {
-              id: `slides_${Date.now()}`,
-              title: parsed.title || (topic ? (isIndo ? `Presentasi: ${topic}` : `Presentation: ${topic}`) : (isIndo ? `Presentasi: ${sources[0]?.title || "Materi Belajar"}` : `Presentation: ${sources[0]?.title || "Study Material"}`)),
-              topic,
-              lengthMode,
-              language,
-              sourceCount: sources.length,
-              sourceTitles: sources.map((s) => s.title),
-              sourceIds: sources.map((s) => s.id),
-              slides: parsed.slides.map((s: any, sIdx: number) => ({
-                id: String(s.id || `slide_${sIdx + 1}`),
-                slideNumber: sIdx + 1,
-                layout: s.layout || (sIdx === 0 ? "hero" : "bullets"),
-                title: s.title || `Slide ${sIdx + 1}`,
-                subtitle: s.subtitle || undefined,
-                bullets: Array.isArray(s.bullets) ? s.bullets : undefined,
-                leftColumn: s.leftColumn || undefined,
-                rightColumn: s.rightColumn || undefined,
-                quote: s.quote || undefined,
-                numbers: Array.isArray(s.numbers) ? s.numbers : undefined,
-                speakerNotes: s.speakerNotes || undefined,
-                accentTag: s.accentTag || undefined,
-              })),
-              createdAt: Date.now(),
-              updatedAt: Date.now(),
-            };
-            return { title: slidesData.title, data: slidesData };
           }
+        } else {
+          console.warn("[Studio Generator] Electron agent.generateCompletion produced unparseable JSON content:", res.content);
         }
+      } else {
+        console.warn("[Studio Generator] Electron agent.generateCompletion returned failure:", res?.error);
       }
     } catch (ipcErr) {
       console.warn("Electron isolated completion failed, falling back to HTTP router:", ipcErr);
@@ -575,44 +548,14 @@ Rules:
               updatedAt: Date.now(),
             };
             return { title: mindMapData.title, data: mindMapData };
-          } else if (type === "slides" && Array.isArray(parsed.slides) && parsed.slides.length > 0) {
-            const resolvedDeckTheme = parsed.themeId || (themeId !== "auto" && themeId ? themeId : "const-dark");
-            const slidesData: SlideDeckData = {
-              id: `slides_${Date.now()}`,
-              title: parsed.title || (topic ? (isIndo ? `Presentasi: ${topic}` : `Presentation: ${topic}`) : (isIndo ? `Presentasi: ${sources[0]?.title || "Materi Belajar"}` : `Presentation: ${sources[0]?.title || "Study Material"}`)),
-              topic,
-              lengthMode,
-              language,
-              themeId: resolvedDeckTheme,
-              sourceCount: sources.length,
-              sourceTitles: sources.map((s) => s.title),
-              sourceIds: sources.map((s) => s.id),
-              slides: parsed.slides.map((s: any, sIdx: number) => ({
-                id: String(s.id || `slide_${sIdx + 1}`),
-                slideNumber: sIdx + 1,
-                layout: s.layout || (sIdx === 0 ? "hero" : "bullets"),
-                title: s.title || `Slide ${sIdx + 1}`,
-                subtitle: s.subtitle || undefined,
-                kicker: s.kicker || undefined,
-                bullets: Array.isArray(s.bullets) ? s.bullets : undefined,
-                leftColumn: s.leftColumn || undefined,
-                rightColumn: s.rightColumn || undefined,
-                quote: s.quote || undefined,
-                numbers: Array.isArray(s.numbers) ? s.numbers : undefined,
-                statHighlight: s.statHighlight || undefined,
-                bentoCards: Array.isArray(s.bentoCards) ? s.bentoCards : undefined,
-                comparisonDetails: s.comparisonDetails || undefined,
-                timelineSteps: Array.isArray(s.timelineSteps) ? s.timelineSteps : undefined,
-                speakerNotes: s.speakerNotes || undefined,
-                accentTag: s.accentTag || undefined,
-              })),
-              createdAt: Date.now(),
-              updatedAt: Date.now(),
-            };
-            return { title: slidesData.title, data: slidesData };
           }
+        } else {
+          console.warn("[Studio Generator] Router fetch returned unparseable content:", content);
         }
       }
+    } else {
+      const errText = await response.text().catch(() => "");
+      console.warn("[Studio Generator] Direct HTTP fetch failed with status:", response.status, errText);
     }
   } catch (err) {
     console.warn("API call to Const Router failed, generating offline verified fallback:", err);
@@ -620,10 +563,10 @@ Rules:
 
   // Graceful offline/fallback generator so user flow NEVER breaks
   const fallbackTitle = topic
-    ? (type === "quiz" ? `AI Kuis: ${topic}` : type === "flashcard" ? `Flashcard: ${topic}` : type === "slides" ? (isIndo ? `Presentasi: ${topic}` : `Presentation: ${topic}`) : `Peta Pikiran: ${topic}`)
+    ? (type === "quiz" ? `AI Kuis: ${topic}` : type === "flashcard" ? `Flashcard: ${topic}` : `Peta Pikiran: ${topic}`)
     : sources.length > 0
-    ? (type === "quiz" ? `AI Kuis: ${sources[0]!.title}` : type === "flashcard" ? `Flashcard: ${sources[0]!.title}` : type === "slides" ? (isIndo ? `Presentasi: ${sources[0]!.title}` : `Presentation: ${sources[0]!.title}`) : `Peta Pikiran: ${sources[0]!.title}`)
-    : type === "quiz" ? "AI Kuis Mandiri" : type === "flashcard" ? "Flashcard Mandiri" : type === "slides" ? (isIndo ? "Presentasi Mandiri" : "Self-guided Presentation") : "Peta Pikiran Mandiri";
+    ? (type === "quiz" ? `AI Kuis: ${sources[0]!.title}` : type === "flashcard" ? `Flashcard: ${sources[0]!.title}` : `Peta Pikiran: ${sources[0]!.title}`)
+    : type === "quiz" ? "AI Kuis Mandiri" : type === "flashcard" ? "Flashcard Mandiri" : "Peta Pikiran Mandiri";
 
   if (type === "quiz") {
     const rawSampleQuestions = [
@@ -821,118 +764,6 @@ Rules:
       cards: dynamicCards,
     };
     return { title: fallbackTitle, data: fallbackFlashcard };
-  } else if (type === "slides") {
-    const mainTitle = fallbackTitle;
-    const resolvedFallbackTheme = themeId !== "auto" && themeId ? themeId : "const-dark";
-    const fallbackSlides: SlideItem[] = [
-      {
-        id: "slide_1",
-        slideNumber: 1,
-        layout: "hero",
-        kicker: isIndo ? "RINGKASAN EKSEKUTIF" : "EXECUTIVE SUMMARY",
-        title: mainTitle,
-        subtitle: isIndo ? "Rangkuman komprehensif konsep, metodologi & intisari materi" : "Comprehensive concept, methodology & insights overview",
-        accentTag: isIndo ? "Esensial" : "Essential",
-        speakerNotes: isIndo ? `Selamat datang di presentasi ${mainTitle}. Slide ini mengantar materi utama.` : `Welcome to the presentation on ${mainTitle}.`,
-      },
-      {
-        id: "slide_2",
-        slideNumber: 2,
-        layout: "agenda",
-        kicker: isIndo ? "PETA BAHASAN" : "AGENDA OVERVIEW",
-        title: isIndo ? "Struktur & Alur Materi" : "Structure & Agenda",
-        subtitle: isIndo ? "Tiga babak utama pembahasan" : "Three primary chapters of discussion",
-        bullets: [
-          isIndo ? "01. Landasan Konseptual & Tantangan Utama" : "01. Conceptual Foundation & Core Challenges",
-          isIndo ? "02. Arsitektur Kerangka Kerja & Solusi Modern" : "02. Framework Architecture & Modern Solutions",
-          isIndo ? "03. Evaluasi Metrik Dampak & Rencana Tindakan" : "03. Impact Metrics & Actionable Roadmaps",
-        ],
-        speakerNotes: isIndo ? "Uraikan tiga babak utama yang akan dipelajari dalam sesi ini." : "Outline the three main chapters of the study session.",
-      },
-      {
-        id: "slide_3",
-        slideNumber: 3,
-        layout: "big-stat",
-        kicker: isIndo ? "TANTANGAN UTAMA" : "CORE CHALLENGE",
-        title: isIndo ? "Urgensi Pemahaman Komprehensif" : "The Imperative for Deep Grounding",
-        subtitle: isIndo ? "Data membuktikan pentingnya penguasaan konsep secara terstruktur" : "Empirical data highlights the need for structured comprehension",
-        statHighlight: {
-          value: "10x",
-          label: isIndo ? "Efektivitas Pemahaman Berbasis Intisari" : "Comprehension Boost via Grounded Synthesis",
-          context: isIndo ? "Pembelajaran aktif berbasis sumber rujukan terbukti melipatgandakan retensi ingatan jangka panjang." : "Active synthesis grounded in source documents multiplies long-term conceptual retention.",
-        },
-        speakerNotes: isIndo ? "Soroti rasio 10x sebagai pembeda utama metodologi terstruktur dibanding membaca pasif." : "Highlight the 10x factor as key differentiator.",
-      },
-      {
-        id: "slide_4",
-        slideNumber: 4,
-        layout: "comparison",
-        kicker: isIndo ? "KOMPARASI METODE" : "METHOD COMPARISON",
-        title: isIndo ? "Transformasi Pendekatan" : "Approach Transformation",
-        subtitle: isIndo ? "Membandingkan pola konvensional dengan kerangka kerja modern" : "Contrasting conventional patterns with modern frameworks",
-        comparisonDetails: {
-          leftTitle: isIndo ? "Pola Konvensional" : "Conventional Pattern",
-          leftItems: [
-            isIndo ? "Hafalan pasif tanpa keterkaitan" : "Passive memorization without context",
-            isIndo ? "Fragmentasi sumber belajar" : "Fragmented source materials",
-            isIndo ? "Evaluasi lambat dan parsial" : "Slow, isolated evaluation cycles",
-          ],
-          rightTitle: isIndo ? "Kerangka Kerja Modern" : "Modern Framework",
-          rightItems: [
-            isIndo ? "Penalaran aktif berbasis intisari" : "Active reasoning grounded in synthesis",
-            isIndo ? "Konsolidasi sumber multi-perspektif" : "Multi-perspective source consolidation",
-            isIndo ? "Validasi langsung dan iteratif" : "Immediate, iterative validation feedback",
-          ],
-          winner: "right",
-        },
-        speakerNotes: isIndo ? "Tekankan keuntungan pendekatan kanan dalam membangun pemahaman mendalam." : "Emphasize the right column advantages.",
-      },
-      {
-        id: "slide_5",
-        slideNumber: 5,
-        layout: "bento-grid",
-        kicker: isIndo ? "PILAR UTAMA" : "KEY PILLARS",
-        title: isIndo ? "Empat Dimensi Penguasaan Materi" : "Four Dimensions of Mastery",
-        subtitle: isIndo ? "Komponen esensial untuk mempraktikkan konsep ini" : "Essential components for practical execution",
-        bentoCards: [
-          { badge: "01", title: isIndo ? "Fondasi Teori" : "Foundations", desc: isIndo ? "Memahami prinsip dasar tanpa asumsi prematur." : "Grasping core tenets without premature assumptions." },
-          { badge: "02", title: isIndo ? "Verifikasi Fakta" : "Fact Checking", desc: isIndo ? "Menyaring informasi berbasis bukti terverifikasi." : "Filtering evidence-grounded facts." },
-          { badge: "03", title: isIndo ? "Sintesis Dinamis" : "Synthesis", desc: isIndo ? "Menghubungkan pola lintas sumber rujukan." : "Cross-referencing insights across domains." },
-          { badge: "04", title: isIndo ? "Aplikasi Nyata" : "Application", desc: isIndo ? "Mengimplementasikan solusi pada kasus nyata." : "Executing solutions in real-world scenarios." },
-        ],
-        speakerNotes: isIndo ? "Jelaskan kesatuan keempat dimensi sebagai sistem yang utuh." : "Explain how these four dimensions function as one integrated system.",
-      },
-      {
-        id: "slide_6",
-        slideNumber: 6,
-        layout: "takeaway",
-        kicker: isIndo ? "KESIMPULAN AKSI" : "ACTIONABLE SUMMARY",
-        title: isIndo ? "Kesimpulan & Langkah Selanjutnya" : "Conclusion & Next Steps",
-        subtitle: isIndo ? "Tiga komitmen nyata untuk hasil optimal" : "Three commitments for optimal outcome",
-        bullets: [
-          isIndo ? "Kuasai konsep fondasi sebelum melangkah ke analisis lanjutan." : "Master fundamentals before proceeding to advanced analysis.",
-          isIndo ? "Lakukan evaluasi berkala menggunakan ringkasan dan kuis mandiri." : "Evaluate regularly with study summaries and quizzes.",
-          isIndo ? "Terapkan wawasan ini secara kontekstual dalam alur kerja nyata." : "Apply insights contextually in your study workflow."
-        ],
-        speakerNotes: isIndo ? "Tutup presentasi dengan kesimpulan tajam dan ajakan bertindak." : "Conclude presentation with clear action items.",
-      }
-    ];
-
-    const fallbackSlideDeck: SlideDeckData = {
-      id: `slides_${Date.now()}`,
-      title: fallbackTitle,
-      topic,
-      lengthMode,
-      language,
-      themeId: resolvedFallbackTheme,
-      sourceCount: sources.length,
-      sourceTitles: sources.map((s) => s.title),
-      sourceIds: sources.map((s) => s.id),
-      slides: fallbackSlides,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    };
-    return { title: fallbackTitle, data: fallbackSlideDeck };
   }
 
   // Mind Map fallback

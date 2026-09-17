@@ -8,5 +8,4 @@ export * from "./open-tab-view";
 export * from "./browser-tab";
 export * from "./note-preview-tab";
 export * from "./mind-map-tab";
-export * from "./slide-deck-viewer";
 export * from "./right-pane";

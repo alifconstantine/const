@@ -47,11 +47,14 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
           <h3 className="text-sm font-semibold text-foreground mb-1">
             {this.props.title || "Terjadi kendala pada tampilan"}
           </h3>
-          <p className="text-xs text-muted-foreground max-w-sm mb-4 leading-relaxed">
-            {this.props.description ||
-              this.state.error?.message ||
-              "Komponen ini mengalami error saat proses rendering."}
+          <p className="text-xs text-muted-foreground max-w-sm mb-2 leading-relaxed">
+            {this.props.description || "Komponen ini mengalami error saat proses rendering."}
           </p>
+          {this.state.error?.message && (
+            <p className="text-[11px] text-destructive/90 font-mono max-w-sm mb-4 break-words bg-destructive/10 px-2.5 py-1.5 rounded-lg border border-destructive/20 text-left">
+              {this.state.error.message}
+            </p>
+          )}
           <button
             type="button"
             onClick={this.handleReset}

@@ -46,7 +46,6 @@ import { NotePreviewTab } from "./note-preview-tab";
 import { QuizViewer } from "./quiz-viewer";
 import { FlashcardViewer } from "./flashcard-viewer";
 import { MindMapTab } from "./mind-map-tab";
-import { SlideDeckViewer } from "./slide-deck-viewer";
 import { STUDIO_TOOLS } from "../workspace/studio-panel";
 import { useI18n } from "../../lib/i18n";
 import type { RightPaneTab, RightPaneTabType, BrowserSelectedElement } from "./types";
@@ -291,14 +290,6 @@ export function RightPane({
       }
       if (tab.artifact?.type === "mind_map") {
         return <MindMapTab tab={tab} />;
-      }
-      if (tab.artifact?.type === "slides" && tab.artifact.data) {
-        return (
-          <SlideDeckViewer
-            deck={tab.artifact.data}
-            onExplainInChat={onExplainInChat}
-          />
-        );
       }
       return null;
     }
@@ -575,15 +566,12 @@ export function RightPane({
                         const isMindMap = art.type === "mind_map";
                         const isQuiz = art.type === "quiz";
                         const isFlashcard = art.type === "flashcard" || art.type === "flashcards";
-                        const isSlides = art.type === "slides";
                         const defaultGeneratingTitle = isMindMap
                           ? (language === "id" ? "Membuat Peta Pikiran..." : "Creating Mind Map...")
                           : isQuiz
                           ? (language === "id" ? "Membuat Kuis..." : "Creating Quiz...")
                           : isFlashcard
                           ? (language === "id" ? "Membuat Kartu Tanya-Jawab..." : "Creating Flashcards...")
-                          : isSlides
-                          ? (language === "id" ? "Membuat Presentasi..." : "Creating Presentation...")
                           : (language === "id" ? "Membuat Catatan..." : "Creating Note...");
 
                         return (
@@ -597,8 +585,6 @@ export function RightPane({
                                 ? "border-amber-500/30"
                                 : isFlashcard
                                 ? "border-emerald-500/30"
-                                : isSlides
-                                ? "border-amber-400/40"
                                 : "border-blue-500/30"
                             )}
                           >
@@ -611,8 +597,6 @@ export function RightPane({
                                   ? "bg-amber-500/10 border-amber-500/20 text-amber-400"
                                   : isFlashcard
                                   ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
-                                  : isSlides
-                                  ? "bg-amber-500/10 border-amber-500/20 text-amber-400"
                                   : "bg-blue-500/10 border-blue-500/20 text-blue-400"
                               )}
                             >
@@ -625,8 +609,6 @@ export function RightPane({
                                     ? "text-amber-400"
                                     : isFlashcard
                                     ? "text-emerald-400"
-                                    : isSlides
-                                    ? "text-amber-400"
                                     : "text-blue-400"
                                 )}
                               />

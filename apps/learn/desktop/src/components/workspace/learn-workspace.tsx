@@ -44,7 +44,6 @@ import { RightPane, type RightPaneTab, type RightPaneTabType, type GeneratingArt
 import { AddSourceDialog } from "./add-source-dialog";
 import { CreateStudioArtifactDialog } from "./create-studio-artifact-dialog";
 import { CreateMindMapDialog } from "./create-mind-map-dialog";
-import { CreatePresentationDialog } from "./create-presentation-dialog";
 import { WorkspaceTitle } from "./workspace-title";
 import { SettingsView } from "../settings/settings-view";
 import { ErrorBoundary } from "../ui/error-boundary";
@@ -107,7 +106,6 @@ export function LearnWorkspace({
   const [isCreateStudioOpen, setIsCreateStudioOpen] = useState(false);
   const [createStudioType, setCreateStudioType] = useState<"quiz" | "flashcard">("quiz");
   const [isCreateMindMapOpen, setIsCreateMindMapOpen] = useState(false);
-  const [isCreatePresentationOpen, setIsCreatePresentationOpen] = useState(false);
   const [generatingArtifacts, setGeneratingArtifacts] = useState<GeneratingArtifactStatus[]>([]);
 
   // Right Pane: Dual Studio & Preview/Review state
@@ -509,7 +507,7 @@ export function LearnWorkspace({
   };
 
   const handleGenerateStudioArtifact = async (params: {
-    type: "quiz" | "flashcard" | "mind_map" | "slides";
+    type: "quiz" | "flashcard" | "mind_map";
     topic: string;
     selectedSourceIds: string[];
     count?: number;
@@ -531,25 +529,19 @@ export function LearnWorkspace({
           ? (isIndo ? `Kuis: ${params.topic}` : `Quiz: ${params.topic}`)
           : params.type === "flashcard"
           ? (isIndo ? `Kartu: ${params.topic}` : `Flashcard: ${params.topic}`)
-          : params.type === "mind_map"
-          ? (isIndo ? `Peta Pikiran: ${params.topic}` : `Mind Map: ${params.topic}`)
-          : (isIndo ? `Presentasi: ${params.topic}` : `Presentation: ${params.topic}`))
+          : (isIndo ? `Peta Pikiran: ${params.topic}` : `Mind Map: ${params.topic}`))
       : (params.type === "quiz"
           ? (isIndo ? `Kuis (${params.count || 5} Soal)` : `Quiz (${params.count || 5} Questions)`)
           : params.type === "flashcard"
           ? (isIndo ? `Kartu Hafalan (${params.count || 10} Kartu)` : `Flashcards (${params.count || 10} Cards)`)
-          : params.type === "mind_map"
-          ? (isIndo ? "Peta Pikiran" : "Mind Map")
-          : (isIndo ? "Slide Presentasi" : "Presentation Slides"));
+          : (isIndo ? "Peta Pikiran" : "Mind Map"));
 
     const initialLoadingTitle =
       params.type === "quiz"
         ? (isIndo ? "Membuat Kuis..." : "Creating Quiz...")
         : params.type === "flashcard"
         ? (isIndo ? "Membuat Kartu Tanya-Jawab..." : "Creating Flashcards...")
-        : params.type === "mind_map"
-        ? (isIndo ? "Membuat Peta Pikiran..." : "Creating Mind Map...")
-        : (isIndo ? "Menyusun Presentasi..." : "Creating Presentation...");
+        : (isIndo ? "Membuat Peta Pikiran..." : "Creating Mind Map...");
 
     // 2. Immediately create in Dexie with status: "generating" (appears instantly in Artifacts list)
     const artId = await localDb.createArtifact({
@@ -637,10 +629,8 @@ export function LearnWorkspace({
       setIsCreateStudioOpen(true);
     } else if (toolId === "mind_map") {
       setIsCreateMindMapOpen(true);
-    } else if (toolId === "slides" || toolId === "presentation") {
-      setIsCreatePresentationOpen(true);
     } else {
-      // Menu lain tidak melakukan apa-apa (no-op)
+      // Menu lain (slides, audio, video) tidak melakukan apa-apa (no-op)
       return;
     }
   };
@@ -650,11 +640,9 @@ export function LearnWorkspace({
       art.type === "quiz" ||
       art.type === "flashcard" ||
       art.type === "mind_map" ||
-      art.type === "slides" ||
       art.data?.questions ||
       art.data?.cards ||
-      art.data?.root ||
-      art.data?.slides
+      art.data?.root
     ) {
       handleOpenStudioArtifact(art);
       return;
@@ -1334,49 +1322,57 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
         </div>
 
         {/* Right Column: Dual Studio & Preview RightPane */}
-        <ErrorBoundary
-          title="Panel samping mengalami kendala"
-          description="Terjadi kesalahan pada panel Studio/Preview."
+        <div
+          style={{ width: isStudioCollapsed ? 48 : (studioWidth || 400) }}
+          className={cn(
+            "h-full flex flex-col shrink-0 overflow-hidden",
+            isStudioCollapsed && "w-12"
+          )}
         >
-          <RightPane
-            width={studioWidth}
-            onWidthChange={(w) => {
-              setIsManualWidth(true);
-              setStudioWidth(clampStudioWidth(w));
-            }}
-            isCollapsed={isStudioCollapsed}
-            isResizing={isDraggingStudio}
-            onToggleCollapse={() => setIsStudioCollapsed(!isStudioCollapsed)}
-            mode={rightPaneMode}
-            onModeChange={setRightPaneMode}
-            tabs={rightPaneTabs}
-            activeTabId={activeRightPaneTabId}
-            isOpeningNewTab={isOpeningNewTab}
-            onSelectTab={handleSelectTab}
-            onCloseTab={handleCloseTab}
-            onNewTab={handleNewTab}
-            onOpenTabType={handleOpenTabType}
-            onReorderTabs={handleReorderTabs}
-            onUpdateTab={handleUpdateTab}
-            mutations={sessionMutations}
-            onRollbackFile={handleRollbackFile}
-            onRollbackAll={handleRollbackAll}
-            onOpenFileDiff={handleOpenFileDiff}
-            onSelectStudioTool={handleSelectStudioTool}
-            onAddNote={handleAddNote}
-            onOpenArtifact={handleOpenArtifact}
-            onDeleteArtifact={handleDeleteArtifact}
-            activeNoteArtifact={activeNoteArtifact}
-            onCloseNote={handleCloseNote}
-            onConvertToSource={handleConvertToSource}
-            onGenerateNote={handleGenerateNote}
-            artifacts={artifacts || []}
-            onDownloadArtifact={handleDownloadArtifact}
-            generatingArtifacts={generatingArtifacts}
-            onSelectArtifact={handleOpenStudioArtifact}
-            onExplainInChat={(prompt) => setPendingStudioPrompt(prompt)}
-          />
-        </ErrorBoundary>
+          <ErrorBoundary
+            title="Panel samping mengalami kendala"
+            description="Terjadi kesalahan pada panel Studio/Preview."
+          >
+            <RightPane
+              width={studioWidth}
+              onWidthChange={(w) => {
+                setIsManualWidth(true);
+                setStudioWidth(clampStudioWidth(w));
+              }}
+              isCollapsed={isStudioCollapsed}
+              isResizing={isDraggingStudio}
+              onToggleCollapse={() => setIsStudioCollapsed(!isStudioCollapsed)}
+              mode={rightPaneMode}
+              onModeChange={setRightPaneMode}
+              tabs={rightPaneTabs}
+              activeTabId={activeRightPaneTabId}
+              isOpeningNewTab={isOpeningNewTab}
+              onSelectTab={handleSelectTab}
+              onCloseTab={handleCloseTab}
+              onNewTab={handleNewTab}
+              onOpenTabType={handleOpenTabType}
+              onReorderTabs={handleReorderTabs}
+              onUpdateTab={handleUpdateTab}
+              mutations={sessionMutations}
+              onRollbackFile={handleRollbackFile}
+              onRollbackAll={handleRollbackAll}
+              onOpenFileDiff={handleOpenFileDiff}
+              onSelectStudioTool={handleSelectStudioTool}
+              onAddNote={handleAddNote}
+              onOpenArtifact={handleOpenArtifact}
+              onDeleteArtifact={handleDeleteArtifact}
+              activeNoteArtifact={activeNoteArtifact}
+              onCloseNote={handleCloseNote}
+              onConvertToSource={handleConvertToSource}
+              onGenerateNote={handleGenerateNote}
+              artifacts={artifacts || []}
+              onDownloadArtifact={handleDownloadArtifact}
+              generatingArtifacts={generatingArtifacts}
+              onSelectArtifact={handleOpenStudioArtifact}
+              onExplainInChat={(prompt) => setPendingStudioPrompt(prompt)}
+            />
+          </ErrorBoundary>
+        </div>
       </div>
 
       {/* Add Source Pop-up Modal */}
@@ -1400,14 +1396,6 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
       <CreateMindMapDialog
         open={isCreateMindMapOpen}
         onOpenChange={setIsCreateMindMapOpen}
-        sources={sources || []}
-        onGenerate={handleGenerateStudioArtifact}
-      />
-
-      {/* Dedicated Create Presentation Dialog */}
-      <CreatePresentationDialog
-        open={isCreatePresentationOpen}
-        onOpenChange={setIsCreatePresentationOpen}
         sources={sources || []}
         onGenerate={handleGenerateStudioArtifact}
       />

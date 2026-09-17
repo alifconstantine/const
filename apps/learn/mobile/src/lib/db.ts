@@ -95,7 +95,9 @@ export interface SlideItem {
   id: string;
   slideNumber: number;
   title: string;
-  layout:
+  html?: string;
+  rawHtml?: string;
+  layout?:
     | "hero"
     | "agenda"
     | "bullets"
@@ -106,7 +108,8 @@ export interface SlideItem {
     | "bento-grid"
     | "comparison"
     | "timeline"
-    | "takeaway";
+    | "takeaway"
+    | string;
   subtitle?: string;
   kicker?: string;
   bullets?: string[];
@@ -136,6 +139,7 @@ export interface SlideDeckData {
   lengthMode: "short" | "medium" | "long" | "auto";
   language: "id" | "en";
   themeId?: string;
+  customCss?: string;
   sourceCount?: number;
   sourceTitles?: string[];
   sourceIds?: string[];
