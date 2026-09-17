@@ -1,6 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { SonnerToaster } from "@const/ui";
+import { Toaster } from "@const/ui";
 import App from "./App";
 import { initThemeListener } from "./lib/theme";
 import "./index.css";
@@ -13,7 +13,7 @@ if (rootElement) {
   ReactDOM.createRoot(rootElement).render(
     <React.StrictMode>
       <App />
-      <SonnerToaster position="top-center" richColors closeButton />
+      <Toaster position="bottom-right" />
     </React.StrictMode>
   );
 }

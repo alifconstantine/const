@@ -1,6 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { SonnerToaster, initThemeListener } from "@const/ui";
+import { Toaster, initThemeListener } from "@const/ui";
 import { I18nProvider } from "./lib/i18n";
 import App from "./App";
 import "./index.css";
@@ -15,7 +15,7 @@ if (rootElement) {
     <React.StrictMode>
       <I18nProvider>
         <App />
-        <SonnerToaster position="top-center" richColors closeButton />
+        <Toaster position="bottom-right" />
       </I18nProvider>
     </React.StrictMode>
   );

@@ -1,6 +1,6 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { SonnerToaster, initThemeListener } from "@const/ui";
+import { Toaster, initThemeListener } from "@const/ui";
 import { I18nProvider } from "./lib/i18n";
 import { ErrorBoundary } from "./components/ui/error-boundary";
 import App from "./App";
@@ -17,7 +17,7 @@ if (rootElement) {
       <ErrorBoundary title="Aplikasi mengalami kendala" description="Terjadi kesalahan tak terduga pada antarmuka. Silakan muat ulang atau coba lagi.">
         <I18nProvider>
           <App />
-          <SonnerToaster position="top-center" richColors closeButton />
+          <Toaster position="bottom-right" />
         </I18nProvider>
       </ErrorBoundary>
     </React.StrictMode>

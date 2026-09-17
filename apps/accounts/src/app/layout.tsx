@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Inter, Lora } from "next/font/google";
 import { ConvexAuthNextjsServerProvider } from "@convex-dev/auth/nextjs/server";
 import { ConvexClientProvider } from "@/components/providers/convex-client-provider";
-import { ThemeProvider, SonnerToaster } from "@const/ui";
+import { ThemeProvider, Toaster } from "@const/ui";
 import "./globals.css";
 
 const inter = Inter({
@@ -47,7 +47,7 @@ export default function RootLayout({
             disableTransitionOnChange
           >
             <ConvexClientProvider>{children}</ConvexClientProvider>
-            <SonnerToaster position="top-center" richColors closeButton />
+            <Toaster position="bottom-right" />
           </ThemeProvider>
         </body>
       </html>

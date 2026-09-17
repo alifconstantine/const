@@ -3,19 +3,30 @@
 // Inspired by react-hot-toast library
 import * as React from "react";
 
+import { CheckCircle2, AlertCircle, Info, AlertTriangle } from "lucide-react";
+
 import type {
   ToastActionElement,
   ToastProps,
 } from "@const/ui/components/ui/toast";
 
-const TOAST_LIMIT = 1;
+const TOAST_LIMIT = 3;
 const TOAST_REMOVE_DELAY = 1000000;
 
-type ToasterToast = ToastProps & {
+export type ToastActionType =
+  | ToastActionElement
+  | {
+      label: React.ReactNode;
+      onClick: (event: React.MouseEvent<HTMLElement>) => void;
+      altText?: string;
+    };
+
+export type ToasterToast = Omit<ToastProps, "title"> & {
   id: string;
   title?: React.ReactNode;
   description?: React.ReactNode;
-  action?: ToastActionElement;
+  action?: ToastActionType;
+  icon?: React.ReactNode;
 };
 
 const actionTypes = {
@@ -142,8 +153,36 @@ function dispatch(action: Action) {
 
 type Toast = Omit<ToasterToast, "id">;
 
-function toast({ ...props }: Toast) {
+function isToastObject(input: any): input is Toast {
+  return (
+    input !== null &&
+    typeof input === "object" &&
+    !React.isValidElement(input)
+  );
+}
+
+function createToast(
+  input: Toast | React.ReactNode,
+  options?: Partial<Toast>,
+): {
+  id: string;
+  dismiss: () => void;
+  update: (props: ToasterToast) => void;
+} {
   const id = genId();
+
+  let props: Toast;
+  if (isToastObject(input)) {
+    props = {
+      ...input,
+      ...options,
+    };
+  } else {
+    props = {
+      title: input,
+      ...options,
+    };
+  }
 
   const update = (props: ToasterToast) =>
     dispatch({
@@ -170,6 +209,103 @@ function toast({ ...props }: Toast) {
     update,
   };
 }
+
+export interface ToastFn {
+  (input: Toast | React.ReactNode, options?: Partial<Toast>): {
+    id: string;
+    dismiss: () => void;
+    update: (props: ToasterToast) => void;
+  };
+  success: (
+    message: React.ReactNode,
+    options?: Partial<Toast>,
+  ) => {
+    id: string;
+    dismiss: () => void;
+    update: (props: ToasterToast) => void;
+  };
+  error: (
+    message: React.ReactNode,
+    options?: Partial<Toast>,
+  ) => {
+    id: string;
+    dismiss: () => void;
+    update: (props: ToasterToast) => void;
+  };
+  info: (
+    message: React.ReactNode,
+    options?: Partial<Toast>,
+  ) => {
+    id: string;
+    dismiss: () => void;
+    update: (props: ToasterToast) => void;
+  };
+  warning: (
+    message: React.ReactNode,
+    options?: Partial<Toast>,
+  ) => {
+    id: string;
+    dismiss: () => void;
+    update: (props: ToasterToast) => void;
+  };
+  dismiss: (toastId?: string) => void;
+}
+
+const toast: ToastFn = Object.assign(
+  (input: Toast | React.ReactNode, options?: Partial<Toast>) =>
+    createToast(input, options),
+  {
+    success: (message: React.ReactNode, options?: Partial<Toast>) => {
+      const baseProps: Toast = isToastObject(message) ? message : { title: message };
+      return createToast(
+        { ...baseProps, variant: "success" },
+        {
+          icon: React.createElement(CheckCircle2, {
+            className: "h-4 w-4 text-emerald-500 shrink-0",
+          }),
+          ...options,
+        },
+      );
+    },
+    error: (message: React.ReactNode, options?: Partial<Toast>) => {
+      const baseProps: Toast = isToastObject(message) ? message : { title: message };
+      return createToast(
+        { ...baseProps, variant: "destructive" },
+        {
+          icon: React.createElement(AlertCircle, {
+            className: "h-4 w-4 text-destructive shrink-0",
+          }),
+          ...options,
+        },
+      );
+    },
+    info: (message: React.ReactNode, options?: Partial<Toast>) => {
+      const baseProps: Toast = isToastObject(message) ? message : { title: message };
+      return createToast(
+        { ...baseProps, variant: "info" },
+        {
+          icon: React.createElement(Info, {
+            className: "h-4 w-4 text-sky-500 shrink-0",
+          }),
+          ...options,
+        },
+      );
+    },
+    warning: (message: React.ReactNode, options?: Partial<Toast>) => {
+      const baseProps: Toast = isToastObject(message) ? message : { title: message };
+      return createToast(
+        { ...baseProps, variant: "warning" },
+        {
+          icon: React.createElement(AlertTriangle, {
+            className: "h-4 w-4 text-amber-500 shrink-0",
+          }),
+          ...options,
+        },
+      );
+    },
+    dismiss: (toastId?: string) => dispatch({ type: "DISMISS_TOAST", toastId }),
+  },
+);
 
 function useToast() {
   const [state, setState] = React.useState<State>(memoryState);
