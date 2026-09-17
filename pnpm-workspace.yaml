@@ -7,5 +7,6 @@ packages:
 allowBuilds:
   '@google/genai': true
   canvas: true
+  core-js: false
   esbuild: true
   protobufjs: true
