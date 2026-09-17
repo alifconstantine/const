@@ -37,6 +37,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   Tooltip,
   TooltipTrigger,
   TooltipContent,
@@ -229,6 +230,25 @@ export function ChatPanel({
 }: ChatPanelProps) {
   const { t, language } = useI18n();
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
+
+  // Observe container width for adaptive responsive UI (heading & chat input)
+  const panelRef = useRef<HTMLElement>(null);
+  const [panelWidth, setPanelWidth] = useState<number>(600);
+
+  useEffect(() => {
+    if (!panelRef.current) return;
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.contentRect.width > 0) {
+          setPanelWidth(entry.contentRect.width);
+        }
+      }
+    });
+    observer.observe(panelRef.current);
+    return () => observer.disconnect();
+  }, []);
+
+  const isCompact = panelWidth < 480;
 
   // Sync mutations to parent workspace (for Preview/Review tab)
   const prevMutationsRef = useRef<FileMutationRecord[]>([]);
@@ -1959,38 +1979,43 @@ export function ChatPanel({
     }
   };
 
-  const renderSourcesDropdown = () => (
-    <div className="relative" ref={sourcesDropdownRef}>
-      <button
-        type="button"
-        onClick={(e) => {
-          e.stopPropagation();
-          setIsSourcesDropdownOpen(!isSourcesDropdownOpen);
-        }}
-        className={cn(
-          "h-8 px-2.5 rounded-xl text-xs font-medium transition-all cursor-pointer select-none flex items-center gap-1.5 border shrink-0 shadow-xs active:scale-98 font-sans",
-          carriedSourcesCount > 0
-            ? "bg-muted/60 hover:bg-muted border-border/70 text-foreground dark:text-white"
-            : "bg-muted/40 hover:bg-muted text-foreground/80 dark:text-white/90 hover:dark:text-white border-border/50"
-        )}
-        aria-label={t("manageCarriedSources")}
-        title={t("manageCarriedSources")}
-      >
-        <FileText className="h-3.5 w-3.5 text-foreground/70 dark:text-white/80 shrink-0" />
-        <span className="font-sans text-xs text-foreground dark:text-white font-medium">
-          {carriedSourcesCount > 1
-            ? t("carriedSourcesPill", { count: carriedSourcesCount })
-            : carriedSourcesCount === 1
-            ? t("carriedSourcesPillSingle")
-            : t("sourcesCountNone")}
-        </span>
-        <ChevronDown
+  const renderSourcesDropdown = () => {
+    const fullSourcesLabel =
+      carriedSourcesCount > 1
+        ? t("carriedSourcesPill", { count: carriedSourcesCount })
+        : carriedSourcesCount === 1
+        ? t("carriedSourcesPillSingle")
+        : t("sourcesCountNone");
+
+    return (
+      <div className="relative" ref={sourcesDropdownRef}>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setIsSourcesDropdownOpen(!isSourcesDropdownOpen);
+          }}
           className={cn(
-            "h-3 w-3 text-foreground/60 dark:text-white/70 transition-transform duration-150 ml-0.5",
-            isSourcesDropdownOpen && "rotate-180"
+            "h-8 rounded-xl text-xs font-medium transition-all cursor-pointer select-none flex items-center gap-1.5 border shrink-0 shadow-xs active:scale-98 font-sans",
+            isCompact ? "px-2" : "px-2.5",
+            carriedSourcesCount > 0
+              ? "bg-muted/60 hover:bg-muted border-border/70 text-foreground dark:text-white"
+              : "bg-muted/40 hover:bg-muted text-foreground/80 dark:text-white/90 hover:dark:text-white border-border/50"
           )}
-        />
-      </button>
+          aria-label={t("manageCarriedSources")}
+          title={fullSourcesLabel}
+        >
+          <FileText className="h-3.5 w-3.5 text-foreground/70 dark:text-white/80 shrink-0" />
+          <span className="font-sans text-xs text-foreground dark:text-white font-medium">
+            {isCompact ? carriedSourcesCount : fullSourcesLabel}
+          </span>
+          <ChevronDown
+            className={cn(
+              "h-3 w-3 text-foreground/60 dark:text-white/70 transition-transform duration-150 ml-0.5",
+              isSourcesDropdownOpen && "rotate-180"
+            )}
+          />
+        </button>
 
       {isSourcesDropdownOpen && (
         <div
@@ -2087,6 +2112,7 @@ export function ChatPanel({
       )}
     </div>
   );
+};
 
   const renderContextIndicator = () => {
     // Only show Context Window indicator once user has sent their first message
@@ -2269,6 +2295,25 @@ export function ChatPanel({
       ? `${currentModelName} (${activeThinkingLabel})`
       : currentModelName;
 
+    const shortModelName = currentModelName
+      .replace(/^(Google|Anthropic|OpenAI|Meta)\s+/i, "")
+      .replace(/^Gemini\s+/i, "");
+
+    const compactThinkingLabel =
+      activeThinkingLabel === "Low"
+        ? "Low"
+        : activeThinkingLabel === "Medium"
+        ? "Med"
+        : activeThinkingLabel === "High"
+        ? "High"
+        : activeThinkingLabel;
+
+    const compactDisplayText = isCurrentThinkingSupported
+      ? `${shortModelName} (${compactThinkingLabel})`
+      : shortModelName;
+
+    const displayText = isCompact ? compactDisplayText : triggerDisplayText;
+
     return (
       <div className="relative" ref={dropdownRef}>
         <button
@@ -2282,12 +2327,15 @@ export function ChatPanel({
             }
             setIsModelDropdownOpen(next);
           }}
-          className="flex items-center gap-1 px-2.5 py-1 rounded-full hover:bg-muted/70 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer select-none shrink-0 max-w-[200px] sm:max-w-[280px]"
+          className={cn(
+            "flex items-center gap-1 px-2.5 py-1 rounded-full hover:bg-muted/70 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer select-none shrink-0",
+            isCompact ? "max-w-[135px]" : "max-w-[200px] sm:max-w-[280px]"
+          )}
           aria-label={t("selectAiModel")}
           title={triggerDisplayText}
         >
           <span className="text-[12px] font-medium text-foreground/80 truncate">
-            {triggerDisplayText}
+            {displayText}
           </span>
           <ChevronDown
             className={cn(
@@ -2803,11 +2851,11 @@ export function ChatPanel({
   };
 
   return (
-    <main className="flex-1 h-full flex flex-col bg-card rounded-2xl border border-border/50 text-foreground min-w-0 relative select-text overflow-hidden shadow-xs">
+    <main ref={panelRef} className="flex-1 h-full flex flex-col bg-card rounded-2xl border border-border/50 text-foreground min-w-0 relative select-text overflow-hidden shadow-xs">
       {/* Top Header Bar */}
-      <div className="h-12 px-4 sm:px-5 flex items-center justify-between shrink-0 select-none">
+      <div className="h-12 px-3 sm:px-5 flex items-center justify-between shrink-0 select-none gap-2 overflow-hidden">
         {/* Left: Project / Workspace Folder Indicator */}
-        <div className="flex items-center gap-2.5 min-w-0">
+        <div className="flex items-center min-w-0 shrink">
           <button
             type="button"
             onClick={() => {
@@ -2815,19 +2863,25 @@ export function ChatPanel({
                 (window as any).electron.openPath(workspacePath);
               }
             }}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-muted/60 hover:bg-muted text-xs font-medium text-foreground dark:text-white transition-all cursor-pointer border border-border/60 max-w-[200px] sm:max-w-[280px] truncate group select-none shadow-xs active:scale-98 shrink-0 font-sans"
+            className={cn(
+              "flex items-center gap-1.5 rounded-xl bg-muted/60 hover:bg-muted text-xs font-medium text-foreground dark:text-white transition-all cursor-pointer border border-border/60 select-none shadow-xs active:scale-98 shrink-0 font-sans",
+              isCompact ? "h-8 w-8 justify-center px-0" : "px-2.5 py-1 max-w-[200px] sm:max-w-[280px] truncate group"
+            )}
             title={
               workspacePath
-                ? t("openInExplorer", { path: workspacePath })
+                ? t("openInExplorer", { path: workspacePath || "" })
                 : `${t("defaultWorkspace")} (~/.const/learn/workspaces/)`
             }
+            aria-label={t("defaultWorkspace")}
           >
             <Folder className="h-3.5 w-3.5 text-primary dark:text-white shrink-0 group-hover:scale-110 transition-transform" />
-            <span className="truncate font-sans text-xs font-medium">
-              {workspacePath
-                ? workspacePath.split(/[\\/]/).filter(Boolean).pop() || workspacePath
-                : t("defaultWorkspace")}
-            </span>
+            {!isCompact && (
+              <span className="truncate font-sans text-xs font-medium">
+                {workspacePath
+                  ? (workspacePath.split(/[\\/]/).filter(Boolean).pop() || workspacePath)
+                  : t("defaultWorkspace")}
+              </span>
+            )}
           </button>
         </div>
 
@@ -2836,19 +2890,21 @@ export function ChatPanel({
           {/* Sources Dropdown Indicator */}
           {renderSourcesDropdown()}
 
-          {/* New Chat Button */}
-          <button
-            type="button"
-            onClick={handleNewChat}
-            className="h-8 w-8 rounded-xl hover:bg-muted text-foreground/80 hover:text-foreground dark:text-white/80 dark:hover:text-white flex items-center justify-center transition-all cursor-pointer border border-border/60 bg-muted/40 shadow-xs active:scale-98 shrink-0"
-            title={t("startConversationNew")}
-            aria-label={t("newChat")}
-          >
-            <MessageCirclePlus className="h-4 w-4 stroke-[1.8]" />
-          </button>
+          {/* New Chat Button (visible when !isCompact) */}
+          {!isCompact && (
+            <button
+              type="button"
+              onClick={handleNewChat}
+              className="h-8 w-8 rounded-xl hover:bg-muted text-foreground/80 hover:text-foreground dark:text-white/80 dark:hover:text-white flex items-center justify-center transition-all cursor-pointer border border-border/60 bg-muted/40 shadow-xs active:scale-98 shrink-0"
+              title={t("startConversationNew")}
+              aria-label={t("newChat")}
+            >
+              <MessageCirclePlus className="h-4 w-4 stroke-[1.8]" />
+            </button>
+          )}
 
-          {/* Context Window Indicator */}
-          {renderContextIndicator()}
+          {/* Context Window Indicator (visible when !isCompact) */}
+          {!isCompact && renderContextIndicator()}
 
           {/* History Button */}
           <button
@@ -2878,7 +2934,30 @@ export function ChatPanel({
                 <MoreVertical className="h-4 w-4 stroke-[1.8]" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-52 rounded-2xl p-1.5 shadow-xl bg-card border border-border z-50">
+            <DropdownMenuContent align="end" className="w-56 rounded-2xl p-1.5 shadow-xl bg-card border border-border z-50 font-sans">
+              {isCompact && (
+                <>
+                  <DropdownMenuItem
+                    onClick={handleNewChat}
+                    className="flex items-center gap-2 px-2.5 py-2 rounded-xl text-xs cursor-pointer hover:bg-muted"
+                  >
+                    <MessageCirclePlus className="h-3.5 w-3.5 text-muted-foreground" />
+                    <span>{t("startConversationNew")}</span>
+                  </DropdownMenuItem>
+                  {hasStartedChat && (
+                    <div className="px-2.5 py-1.5 text-xs text-muted-foreground flex items-center justify-between">
+                      <span className="flex items-center gap-1.5">
+                        <Cpu className="h-3.5 w-3.5 text-muted-foreground" />
+                        <span>{t("contextUsed") || "Context"}</span>
+                      </span>
+                      <span className="font-mono text-[11px] font-medium text-foreground">
+                        {contextUsage.percentUsed} (~{formatTokenDisplay(contextUsage.usedTokens)})
+                      </span>
+                    </div>
+                  )}
+                  <DropdownMenuSeparator />
+                </>
+              )}
               <DropdownMenuItem
                 onClick={handleNewChat}
                 className="flex items-center gap-2 px-2.5 py-2 rounded-xl text-xs cursor-pointer hover:bg-muted"
@@ -2905,7 +2984,7 @@ export function ChatPanel({
       </div>
 
       {/* Main Conversation Stream using Radix ScrollArea */}
-      <ScrollArea className="flex-1 w-full" viewportClassName="px-4 sm:px-8 py-6 max-w-3xl mx-auto w-full">
+      <ScrollArea className="flex-1 w-full" viewportClassName={cn("py-6 max-w-3xl mx-auto w-full", isCompact ? "px-3 sm:px-4" : "px-4 sm:px-8")}>
         {messages.length === 0 ? (
           carriedSources.length > 0 ? (
             /* NotebookLM Source Guide View (Panduan Sumber) */
@@ -3260,7 +3339,7 @@ export function ChatPanel({
       </ScrollArea>
 
       {/* Sticky Bottom Chat Input Container */}
-      <div className="p-4 sm:p-5 shrink-0 max-w-3xl mx-auto w-full font-sans">
+      <div className={cn("shrink-0 max-w-3xl mx-auto w-full font-sans", isCompact ? "p-2.5 sm:p-3" : "p-4 sm:p-5")}>
         {activeApproval ? (
           <ApprovalCard
             request={activeApproval}
@@ -3279,19 +3358,21 @@ export function ChatPanel({
               "w-full bg-card border border-border focus-within:border-primary/50 transition-[border-color,padding] duration-150 shadow-md rounded-[24px]",
               isMultiline || attachments.length > 0
                 ? "p-3 sm:p-3.5"
+                : isCompact
+                ? "px-3 py-2 sm:py-2.5"
                 : "px-3 py-1.5 sm:py-2"
             )}
             style={{
               display: "grid",
               gridTemplateAreas: attachments.length > 0
                 ? '"shelf shelf shelf" "input input input" "plus . actions"'
-                : isMultiline
+                : isMultiline || isCompact
                 ? '"input input input" "plus . actions"'
                 : '"plus input actions"',
               gridTemplateColumns: "auto 1fr auto",
-              alignItems: isMultiline || attachments.length > 0 ? "stretch" : "center",
-              rowGap: isMultiline || attachments.length > 0 ? "0.625rem" : "0",
-              columnGap: "0.625rem",
+              alignItems: isMultiline || attachments.length > 0 || isCompact ? "stretch" : "center",
+              rowGap: isMultiline || attachments.length > 0 || isCompact ? "0.5rem" : "0",
+              columnGap: "0.5rem",
             }}
           >
             {/* Attachments Shelf */}
@@ -3308,6 +3389,8 @@ export function ChatPanel({
                   "w-full",
                   isMultiline || attachments.length > 0
                     ? "max-h-48 sm:max-h-60 [&>div>div[style]]:!block pr-1.5"
+                    : isCompact
+                    ? "min-h-[28px] max-h-32 overflow-hidden pr-1"
                     : "h-[28px] overflow-hidden"
                 )}
               >
@@ -3344,10 +3427,12 @@ export function ChatPanel({
                     "w-full resize-none bg-transparent text-[14px] text-foreground placeholder:text-muted-foreground/60 outline-none font-sans block disabled:opacity-50 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden overflow-hidden transition-[height] duration-200 ease-out",
                     isMultiline || attachments.length > 0
                       ? "leading-[1.65] py-0.5 min-h-[48px]"
+                      : isCompact
+                      ? "leading-5 py-0.5 min-h-[26px] max-h-[80px]"
                       : "leading-5 py-1 h-[28px] max-h-[28px] overflow-hidden"
                   )}
                   style={{
-                    height: isMultiline || attachments.length > 0 ? undefined : `${SINGLE_LINE_HEIGHT}px`,
+                    height: isMultiline || attachments.length > 0 || isCompact ? undefined : `${SINGLE_LINE_HEIGHT}px`,
                   }}
                 />
               </ScrollArea>
@@ -3369,28 +3454,41 @@ export function ChatPanel({
         {/* Active Conversation Footer Telemetry Bar (Matching apps/harness/desktop) */}
         {conversationMetrics && (
           <div
-            className="w-full flex flex-wrap items-center justify-center gap-x-2 gap-y-0.5 text-[11px] font-mono text-muted-foreground pt-2 pb-0.5 select-none overflow-hidden"
-            title="Session telemetry metrics"
+            className="w-full flex items-center justify-center gap-x-2 text-[11px] font-mono text-muted-foreground pt-2 pb-0.5 select-none overflow-hidden truncate"
+            title={`Session telemetry metrics:
+${conversationMetrics.turns} turns · ${conversationMetrics.steps} steps
+LLM: ${formatDurationDisplay(conversationMetrics.llmDurationMs)} · Tools: ${formatDurationDisplay(conversationMetrics.toolDurationMs)}
+Speed: ${conversationMetrics.tokPerSec} tok/s · TTFT: ${conversationMetrics.ttftSeconds.toFixed(1)}s
+Cache: ${conversationMetrics.cacheHitRate}%
+Tokens: ↑${formatTokenDisplay(conversationMetrics.inputTokens)} · ↓${formatTokenDisplay(conversationMetrics.outputTokens)} tok`}
           >
-            <span title={`${conversationMetrics.turns} conversation turns, ${conversationMetrics.steps} tool execution steps`}>
-              {conversationMetrics.turns} turns · {conversationMetrics.steps} steps
-            </span>
-            <span className="text-border">|</span>
-            <span title={`LLM duration: ${formatDurationDisplay(conversationMetrics.llmDurationMs)} · Tools duration: ${formatDurationDisplay(conversationMetrics.toolDurationMs)}`}>
-              LLM {formatDurationDisplay(conversationMetrics.llmDurationMs)} · Tools {formatDurationDisplay(conversationMetrics.toolDurationMs)}
-            </span>
-            <span className="text-border">|</span>
-            <span title={`Average TTFT: ${conversationMetrics.ttftSeconds.toFixed(1)}s · Generation speed: ${conversationMetrics.tokPerSec} tok/s`}>
-              {conversationMetrics.tokPerSec} tok/s
-            </span>
-            <span className="text-border">|</span>
-            <span title={`Prompt cache hit rate: ${conversationMetrics.cacheHitRate}%`}>
-              {conversationMetrics.cacheHitRate}% cache
-            </span>
-            <span className="text-border">|</span>
-            <span title={`Input: ${conversationMetrics.inputTokens.toLocaleString()} tokens · Output: ${conversationMetrics.outputTokens.toLocaleString()} tokens`}>
-              ↑{formatTokenDisplay(conversationMetrics.inputTokens)} · ↓{formatTokenDisplay(conversationMetrics.outputTokens)} tok
-            </span>
+            {isCompact ? (
+              <span className="truncate">
+                {conversationMetrics.turns} turns · {conversationMetrics.tokPerSec} tok/s · {conversationMetrics.cacheHitRate}% cache
+              </span>
+            ) : (
+              <div className="w-full flex flex-wrap items-center justify-center gap-x-2 gap-y-0.5">
+                <span title={`${conversationMetrics.turns} conversation turns, ${conversationMetrics.steps} tool execution steps`}>
+                  {conversationMetrics.turns} turns · {conversationMetrics.steps} steps
+                </span>
+                <span className="text-border">|</span>
+                <span title={`LLM duration: ${formatDurationDisplay(conversationMetrics.llmDurationMs)} · Tools duration: ${formatDurationDisplay(conversationMetrics.toolDurationMs)}`}>
+                  LLM {formatDurationDisplay(conversationMetrics.llmDurationMs)} · Tools {formatDurationDisplay(conversationMetrics.toolDurationMs)}
+                </span>
+                <span className="text-border">|</span>
+                <span title={`Average TTFT: ${conversationMetrics.ttftSeconds.toFixed(1)}s · Generation speed: ${conversationMetrics.tokPerSec} tok/s`}>
+                  {conversationMetrics.tokPerSec} tok/s
+                </span>
+                <span className="text-border">|</span>
+                <span title={`Prompt cache hit rate: ${conversationMetrics.cacheHitRate}%`}>
+                  {conversationMetrics.cacheHitRate}% cache
+                </span>
+                <span className="text-border">|</span>
+                <span title={`Input: ${conversationMetrics.inputTokens.toLocaleString()} tokens · Output: ${conversationMetrics.outputTokens.toLocaleString()} tokens`}>
+                  ↑{formatTokenDisplay(conversationMetrics.inputTokens)} · ↓{formatTokenDisplay(conversationMetrics.outputTokens)} tok
+                </span>
+              </div>
+            )}
           </div>
         )}
       </div>

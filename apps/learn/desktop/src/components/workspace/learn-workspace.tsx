@@ -352,6 +352,34 @@ export function LearnWorkspace({
     return { sources: 250, studio: 285 };
   };
 
+  // Minimum width protection for Ask AI central column
+  const MIN_CHAT_WIDTH = 360;
+
+  const clampStudioWidth = (
+    desiredWidth: number,
+    currentSourcesWidth = sourcesWidth,
+    sourcesCollapsed = isSourcesCollapsed
+  ) => {
+    const windowWidth = typeof window !== "undefined" ? window.innerWidth : 1280;
+    const effectiveSourcesWidth = sourcesCollapsed ? 48 : currentSourcesWidth;
+    // Account for padding (p-2 sm:p-2.5 = 16-20px), gaps (gap-1.5 sm:gap-2 = 12-16px), resize handles ~ 44px
+    const maxAllowedByChat = Math.max(260, windowWidth - effectiveSourcesWidth - MIN_CHAT_WIDTH - 44);
+    const maxStudioWidth = Math.min(Math.max(Math.round(windowWidth * 0.65), 750), 960, maxAllowedByChat);
+    return Math.min(Math.max(desiredWidth, 260), maxStudioWidth);
+  };
+
+  const clampSourcesWidth = (
+    desiredWidth: number,
+    currentStudioWidth = studioWidth,
+    studioCollapsed = isStudioCollapsed
+  ) => {
+    const windowWidth = typeof window !== "undefined" ? window.innerWidth : 1280;
+    const effectiveStudioWidth = studioCollapsed ? 48 : currentStudioWidth;
+    const maxAllowedSources = Math.max(230, windowWidth - effectiveStudioWidth - MIN_CHAT_WIDTH - 44);
+    const maxSourcesWidth = Math.min(520, maxAllowedSources);
+    return Math.min(Math.max(desiredWidth, 230), maxSourcesWidth);
+  };
+
   const [sourcesWidth, setSourcesWidth] = useState<number>(() => getResponsiveWidths().sources);
   const [studioWidth, setStudioWidth] = useState<number>(() => getResponsiveWidths().studio);
   const [isManualWidth, setIsManualWidth] = useState(false);
@@ -422,10 +450,12 @@ export function LearnWorkspace({
     // Sesuaikan lebar studio/preview agar browser lebih luas dan nyaman (memicu isLayoutModified & tombol refresh di heading)
     const responsiveDefaults = getResponsiveWidths();
     const windowWidth = typeof window !== "undefined" ? window.innerWidth : 1280;
-    const targetBrowserWidth = Math.max(
-      studioWidth,
-      Math.min(Math.round(windowWidth * 0.45), 720),
-      600
+    const targetBrowserWidth = clampStudioWidth(
+      Math.max(
+        studioWidth,
+        Math.min(Math.round(windowWidth * 0.45), 720),
+        600
+      )
     );
 
     if (studioWidth < targetBrowserWidth) {
@@ -462,10 +492,12 @@ export function LearnWorkspace({
     // Auto-widen studio/preview pane width like handleOpenBrowser
     const responsiveDefaults = getResponsiveWidths();
     const windowWidth = typeof window !== "undefined" ? window.innerWidth : 1280;
-    const targetStudioWidth = Math.max(
-      studioWidth,
-      Math.min(Math.round(windowWidth * 0.45), 720),
-      600
+    const targetStudioWidth = clampStudioWidth(
+      Math.max(
+        studioWidth,
+        Math.min(Math.round(windowWidth * 0.45), 720),
+        600
+      )
     );
 
     if (studioWidth < targetStudioWidth) {
@@ -635,10 +667,12 @@ export function LearnWorkspace({
 
       // Auto-widen studio/preview width comfortably (matching Image 3)
       const windowWidth = typeof window !== "undefined" ? window.innerWidth : 1280;
-      const targetPreviewWidth = Math.max(
-        studioWidth,
-        Math.min(Math.round(windowWidth * 0.45), 720),
-        620
+      const targetPreviewWidth = clampStudioWidth(
+        Math.max(
+          studioWidth,
+          Math.min(Math.round(windowWidth * 0.45), 720),
+          620
+        )
       );
       if (studioWidth < targetPreviewWidth) {
         setStudioWidth(targetPreviewWidth);
@@ -709,10 +743,12 @@ export function LearnWorkspace({
     setIsStudioCollapsed(false);
     setRightPaneMode("studio");
     const windowWidth = typeof window !== "undefined" ? window.innerWidth : 1280;
-    const targetPreviewWidth = Math.max(
-      studioWidth,
-      Math.min(Math.round(windowWidth * 0.45), 720),
-      620
+    const targetPreviewWidth = clampStudioWidth(
+      Math.max(
+        studioWidth,
+        Math.min(Math.round(windowWidth * 0.45), 720),
+        620
+      )
     );
     if (studioWidth < targetPreviewWidth) {
       setStudioWidth(targetPreviewWidth);
@@ -818,13 +854,16 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
     const handleResize = () => {
       if (!isManualWidth) {
         const { sources, studio } = getResponsiveWidths();
-        setSourcesWidth(sources);
-        setStudioWidth(studio);
+        setSourcesWidth(clampSourcesWidth(sources));
+        setStudioWidth(clampStudioWidth(studio));
+      } else {
+        setSourcesWidth((prev) => clampSourcesWidth(prev));
+        setStudioWidth((prev) => clampStudioWidth(prev));
       }
     };
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
-  }, [isManualWidth]);
+  }, [isManualWidth, sourcesWidth, studioWidth, isSourcesCollapsed, isStudioCollapsed]);
 
   const [isDraggingSources, setIsDraggingSources] = useState(false);
   const [isDraggingStudio, setIsDraggingStudio] = useState(false);
@@ -839,8 +878,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
 
     const onMouseMove = (moveEvent: MouseEvent) => {
       const delta = moveEvent.clientX - startX;
-      const newWidth = Math.min(Math.max(startWidth + delta, 230), 520);
-      setSourcesWidth(newWidth);
+      setSourcesWidth(clampSourcesWidth(startWidth + delta));
     };
 
     const onMouseUp = () => {
@@ -863,9 +901,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
 
     const onMouseMove = (moveEvent: MouseEvent) => {
       const delta = startX - moveEvent.clientX;
-      const maxStudioWidth = Math.min(Math.max(Math.round(window.innerWidth * 0.65), 750), 960);
-      const newWidth = Math.min(Math.max(startWidth + delta, 260), maxStudioWidth);
-      setStudioWidth(newWidth);
+      setStudioWidth(clampStudioWidth(startWidth + delta));
     };
 
     const onMouseUp = () => {
@@ -1306,7 +1342,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
             width={studioWidth}
             onWidthChange={(w) => {
               setIsManualWidth(true);
-              setStudioWidth(w);
+              setStudioWidth(clampStudioWidth(w));
             }}
             isCollapsed={isStudioCollapsed}
             isResizing={isDraggingStudio}
