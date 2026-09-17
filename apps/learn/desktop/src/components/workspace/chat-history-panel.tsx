@@ -7,6 +7,7 @@ import {
   SheetContent,
   SheetClose,
   SheetTitle,
+  ScrollArea,
 } from "@const/ui";
 import {
   X,
@@ -158,7 +159,7 @@ export function ChatHistoryPanel({
         </div>
 
         {/* Sessions List */}
-        <div className="flex-1 overflow-y-auto px-3 py-1 pb-6 space-y-4">
+        <ScrollArea className="flex-1 w-full" viewportClassName="px-3 py-1 pb-6 space-y-4">
           {filteredSessions.length === 0 ? (
             <div className="py-16 text-center text-xs text-muted-foreground">
               <MessageSquare className="h-8 w-8 mx-auto mb-2 text-muted-foreground/40 stroke-[1.5]" />
@@ -255,7 +256,7 @@ export function ChatHistoryPanel({
               );
             })
           )}
-        </div>
+        </ScrollArea>
       </SheetContent>
     </Sheet>
   );

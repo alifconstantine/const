@@ -327,17 +327,31 @@ export function ChatPanel({
     const textarea = textareaRef.current;
     if (!textarea) return;
 
+    // Viewport element from Radix ScrollArea
+    const viewport = textarea.closest(
+      "[data-radix-scroll-area-viewport]"
+    ) as HTMLElement | null;
+    const prevScrollTop = viewport ? viewport.scrollTop : 0;
+
     if (!isMultiline && attachments.length === 0) {
       textarea.style.height = `${SINGLE_LINE_HEIGHT}px`;
       return;
     }
 
     textarea.style.height = "auto";
-    const nextHeight = Math.min(
-      Math.max(MIN_MULTILINE_HEIGHT, textarea.scrollHeight),
-      MAX_MULTILINE_HEIGHT
-    );
+    const nextHeight = Math.max(MIN_MULTILINE_HEIGHT, textarea.scrollHeight);
     textarea.style.height = `${nextHeight}px`;
+
+    // Handle scroll position in viewport
+    if (viewport) {
+      const isNearBottom =
+        viewport.scrollHeight - viewport.clientHeight - prevScrollTop < 40;
+      if (isNearBottom) {
+        viewport.scrollTop = viewport.scrollHeight;
+      } else if (prevScrollTop > 0) {
+        viewport.scrollTop = prevScrollTop;
+      }
+    }
   };
 
   // Input change handler ensuring reliable return to single-line pill when empty
@@ -3261,10 +3275,10 @@ export function ChatPanel({
               }
             }}
             className={cn(
-              "w-full bg-card border border-border focus-within:border-primary/50 transition-[border-color,border-radius,padding] duration-150 shadow-md",
+              "w-full bg-card border border-border focus-within:border-primary/50 transition-[border-color,padding] duration-150 shadow-md rounded-[24px]",
               isMultiline || attachments.length > 0
-                ? "rounded-3xl p-3 sm:p-3.5"
-                : "rounded-full px-3 py-1.5 sm:py-2"
+                ? "p-3 sm:p-3.5"
+                : "px-3 py-1.5 sm:py-2"
             )}
             style={{
               display: "grid",
@@ -3286,47 +3300,56 @@ export function ChatPanel({
               </div>
             )}
 
-            {/* Textarea - Persistent across single-line & multi-line modes (NEVER UNMOUNTED) */}
-            <div style={{ gridArea: "input" }} className="min-w-0 w-full">
-              <textarea
-                ref={textareaRef}
-                value={inputMessage}
-                onChange={(e) => {
-                  handleInputChange(e.target.value);
-                }}
-                onPaste={(e) => {
-                  const text = e.clipboardData.getData("text");
-                  if (text.includes("\n") || text.length > 60) {
-                    setIsMultiline(true);
-                  }
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    if (!isStreaming && (inputMessage.trim() || attachments.length > 0)) {
-                      handleSend(inputMessage);
-                    }
-                  } else if (e.key === "Enter" && e.shiftKey) {
-                    setIsMultiline(true);
-                  }
-                }}
-                rows={isMultiline || attachments.length > 0 ? 2 : 1}
-                disabled={isStreaming}
-                placeholder={
-                  isStreaming
-                    ? t("inputStreamingPlaceholder")
-                    : t("inputPlaceholder")
-                }
+            {/* Textarea with ScrollArea - Persistent across single-line & multi-line modes (NEVER UNMOUNTED) */}
+            <div style={{ gridArea: "input" }} className="min-w-0 w-full flex items-center">
+              <ScrollArea
                 className={cn(
-                  "w-full resize-none bg-transparent text-[14px] text-foreground placeholder:text-muted-foreground/60 outline-none font-sans block disabled:opacity-50",
+                  "w-full",
                   isMultiline || attachments.length > 0
-                    ? "leading-[1.65] py-0.5 min-h-[48px] max-h-48 sm:max-h-60 overflow-y-auto"
-                    : "leading-5 py-1 h-[28px] max-h-[28px] overflow-hidden"
+                    ? "max-h-48 sm:max-h-60 [&>div>div[style]]:!block pr-1.5"
+                    : "h-[28px] overflow-hidden"
                 )}
-                style={{
-                  height: isMultiline || attachments.length > 0 ? undefined : `${SINGLE_LINE_HEIGHT}px`,
-                }}
-              />
+              >
+                <textarea
+                  ref={textareaRef}
+                  value={inputMessage}
+                  onChange={(e) => {
+                    handleInputChange(e.target.value);
+                  }}
+                  onPaste={(e) => {
+                    const text = e.clipboardData.getData("text");
+                    if (text.includes("\n") || text.length > 60) {
+                      setIsMultiline(true);
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      if (!isStreaming && (inputMessage.trim() || attachments.length > 0)) {
+                        handleSend(inputMessage);
+                      }
+                    } else if (e.key === "Enter" && e.shiftKey) {
+                      setIsMultiline(true);
+                    }
+                  }}
+                  rows={isMultiline || attachments.length > 0 ? 2 : 1}
+                  disabled={isStreaming}
+                  placeholder={
+                    isStreaming
+                      ? t("inputStreamingPlaceholder")
+                      : t("inputPlaceholder")
+                  }
+                  className={cn(
+                    "w-full resize-none bg-transparent text-[14px] text-foreground placeholder:text-muted-foreground/60 outline-none font-sans block disabled:opacity-50 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden overflow-hidden transition-[height] duration-200 ease-out",
+                    isMultiline || attachments.length > 0
+                      ? "leading-[1.65] py-0.5 min-h-[48px]"
+                      : "leading-5 py-1 h-[28px] max-h-[28px] overflow-hidden"
+                  )}
+                  style={{
+                    height: isMultiline || attachments.length > 0 ? undefined : `${SINGLE_LINE_HEIGHT}px`,
+                  }}
+                />
+              </ScrollArea>
             </div>
 
             {/* Plus Button */}
@@ -3442,7 +3465,7 @@ export function ChatPanel({
             </div>
 
             {/* Extracted Text Content */}
-            <div className="flex-1 overflow-y-auto mt-4 pr-1">
+            <ScrollArea className="flex-1 mt-4 pr-1 w-full min-h-0">
               <div className="flex items-center justify-between text-[11px] text-muted-foreground mb-2">
                 <span>Verified Source Content (Ground Truth):</span>
                 <span>
@@ -3455,7 +3478,7 @@ export function ChatPanel({
                 {selectedSourceForPreview.content ||
                   "[Content is not cached locally. This source was added via link.]"}
               </div>
-            </div>
+            </ScrollArea>
           </div>
         </div>
       )}

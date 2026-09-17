@@ -19,6 +19,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   cn,
+  ScrollArea,
 } from "@const/ui";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db, localDb, type LocalSource } from "@/lib/db";
@@ -321,7 +322,7 @@ export function SourcesPanel({
               </button>
             </div>
           ) : (
-            <div className="flex-1 overflow-y-auto space-y-1.5 pr-0.5">
+            <ScrollArea className="flex-1 w-full" viewportClassName="space-y-1.5 pr-1">
               {filteredSources.map((source) => {
                 const isCarried = source.includedInChat !== false;
                 return (
@@ -385,7 +386,7 @@ export function SourcesPanel({
                     </div>
                   );
                 })}
-              </div>
+              </ScrollArea>
             )}
           </div>
         ) : (
@@ -477,7 +478,7 @@ export function SourcesPanel({
             </div>
 
             {/* Extracted Text Content */}
-            <div className="flex-1 overflow-y-auto mt-4 pr-1">
+            <ScrollArea className="flex-1 mt-4 pr-1 w-full min-h-0">
               <div className="flex items-center justify-between text-[11px] text-muted-foreground mb-2">
                 <span>Extracted Content & Ground Truth:</span>
                 <span>
@@ -489,7 +490,7 @@ export function SourcesPanel({
               <div className="p-4 rounded-2xl bg-muted/40 border border-border/50 text-xs font-mono text-foreground whitespace-pre-wrap leading-relaxed select-text">
                 {selectedSourceForPreview.content || "[Content is not cached locally. This source was added via link.]"}
               </div>
-            </div>
+            </ScrollArea>
           </div>
         </div>
       )}

@@ -2100,7 +2100,8 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
                           return (
                             <div
                               key={att.id || attIdx}
-                              onClick={() => {
+                              onClick={(e) => {
+                                e.stopPropagation();
                                 if (att.url || att.base64) {
                                   setLightboxItem({
                                     src: att.url || att.base64 || "",
@@ -2112,21 +2113,22 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
                                 }
                               }}
                               className={cn(
-                                "relative rounded-xl border border-border bg-secondary/50 overflow-hidden shadow-xs select-none",
+                                "relative shrink-0 rounded-xl border border-border bg-secondary/50 overflow-hidden shadow-xs select-none",
                                 isMedia
                                   ? "w-16 h-16 sm:w-20 sm:h-20 cursor-pointer active:scale-95 transition-transform"
                                   : "w-28 sm:w-32 h-16 sm:h-20"
                               )}
-                              title={`${att.name} (${formatFileSize(att.size)})`}
                             >
                               {isImage && (att.url || att.base64) ? (
-                                <img
-                                  src={att.url || att.base64}
-                                  alt={att.name}
-                                  className="w-full h-full object-cover block"
-                                />
+                                <div className="w-full h-full rounded-xl overflow-hidden relative">
+                                  <img
+                                    src={att.url || att.base64}
+                                    alt={att.name}
+                                    className="w-full h-full object-cover block"
+                                  />
+                                </div>
                               ) : isVideo && att.url ? (
-                                <div className="w-full h-full relative flex items-center justify-center bg-black">
+                                <div className="w-full h-full rounded-xl overflow-hidden bg-black relative flex items-center justify-center">
                                   <Video className="w-5 h-5 text-muted-foreground" />
                                   <span className="absolute bottom-1 right-1 text-[7px] font-mono bg-black/70 text-white px-1 rounded uppercase font-bold">
                                     VID
@@ -2196,13 +2198,13 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
                       );
                     })()}
 
-                    {/* User Message Action Bar: Timestamp, Copy, Edit */}
+                    {/* User Message Action Bar: Timestamp, Copy, Edit - Always visible */}
                     <div className="flex items-center gap-2 pt-1 pr-1 text-[10.5px] font-mono text-muted-foreground select-none">
                       {msg.createdAt && <span>{formatTimestamp(msg.createdAt)}</span>}
                       <button
                         type="button"
                         onClick={() => handleCopy(msg.id, cleanUserMessageContent(msg.content) || msg.content)}
-                        className="p-1 rounded hover:bg-secondary hover:text-foreground transition-colors cursor-pointer"
+                        className="p-1 rounded hover:bg-secondary hover:text-foreground transition-colors cursor-pointer active:scale-95"
                         title={t("copyMessage")}
                       >
                         {copiedId === msg.id ? (
@@ -2214,7 +2216,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
                       <button
                         type="button"
                         onClick={() => handleEditAndUndoTurn(msg)}
-                        className="p-1 rounded hover:bg-secondary hover:text-foreground transition-colors cursor-pointer"
+                        className="p-1 rounded hover:bg-secondary hover:text-foreground transition-colors cursor-pointer active:scale-95"
                         title={t("editMessage")}
                       >
                         <Pencil className="w-3 h-3" />
@@ -2247,14 +2249,14 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
                       </div>
                     ) : null}
 
-                    {/* Assistant Action Bar: Timestamp & Copy */}
+                    {/* Assistant Action Bar: Timestamp & Copy - Always visible */}
                     {!msg.isStreaming && msg.content && (
                       <div className="flex items-center gap-2 pt-0.5 pl-0.5 text-[10.5px] font-mono text-muted-foreground select-none">
                         {msg.createdAt && <span>{formatTimestamp(msg.createdAt)}</span>}
                         <button
                           type="button"
                           onClick={() => handleCopy(msg.id, msg.content)}
-                          className="p-1 rounded hover:bg-secondary hover:text-foreground transition-colors cursor-pointer"
+                          className="p-1 rounded hover:bg-secondary hover:text-foreground transition-colors cursor-pointer active:scale-95"
                           title={t("copyMessage")}
                         >
                           {copiedId === msg.id ? (
