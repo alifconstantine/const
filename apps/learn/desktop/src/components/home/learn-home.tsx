@@ -11,7 +11,7 @@ import {
   LayoutGrid,
   List as ListIcon,
   Plus,
-  PanelLeftOpen,
+  PanelLeft,
   ArrowLeft,
   Trash2,
   X,
@@ -56,6 +56,10 @@ export function LearnHome({
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [searchQuery, setSearchQuery] = useState("");
   const [activeCollectionId, setActiveCollectionId] = useState<string | null>(null);
+
+  const isMac =
+    typeof window !== "undefined" &&
+    /Mac|iPod|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
 
   // Dialog States
   const [isCreateLearnOpen, setIsCreateLearnOpen] = useState(false);
@@ -211,32 +215,33 @@ export function LearnHome({
     }
   };
 
-  // Keyboard shortcut: Toggle sidebar with Ctrl+B or Cmd+B
+  // Keyboard shortcut: Toggle sidebar with Ctrl+B / Cmd+B, Create new learn with Ctrl+K / Cmd+K
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      const isInput =
+        target &&
+        (target.tagName === "INPUT" ||
+          target.tagName === "TEXTAREA" ||
+          target.isContentEditable);
+
       if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "b") {
         e.preventDefault();
         setIsSidebarOpen((prev) => !prev);
+      }
+
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        if (!isInput) {
+          e.preventDefault();
+          handleCreateNewLearn();
+        }
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  const renderSidebarToggle = () => {
-    if (isSidebarOpen) return null;
-    return (
-      <button
-        type="button"
-        onClick={() => setIsSidebarOpen(true)}
-        className="p-1.5 -ml-1 rounded-xl bg-muted hover:bg-secondary text-muted-foreground hover:text-foreground transition-all cursor-pointer flex items-center justify-center shrink-0 shadow-none"
-        title={t("openSidebarKeyboard")}
-        aria-label={t("openSidebar")}
-      >
-        <PanelLeftOpen className="w-4 h-4" />
-      </button>
-    );
-  };
+  const renderSidebarToggle = () => null;
 
   // If Settings view is triggered
   if (isSettingsOpen) {
@@ -251,38 +256,55 @@ export function LearnHome({
   }
 
   return (
-    <div className="h-screen w-full flex bg-secondary/50 text-foreground overflow-hidden select-none">
-      {/* 1. Left Sidebar (Collapsible) */}
-      {isSidebarOpen && (
-        <Sidebar
-          activeTab={activeTab}
-          onSelectTab={(tab) => {
-            setActiveTab(tab);
-            if (tab !== "collections") setActiveCollectionId(null);
-          }}
-          onCollapse={() => setIsSidebarOpen(false)}
-          onCreateNewLearn={() => handleCreateNewLearn()}
-          onCreateNewCollection={() => {
-            setEditingCollection(null);
-            setIsCreateCollectionOpen(true);
-          }}
-          onOpenSettings={() => setIsSettingsOpen(true)}
-          user={user}
-          onSignOut={onSignOut}
-          onSwitchAccount={onSwitchAccount}
-          learnsCount={allLearns.length}
-          sourcesCount={totalSourcesCount}
-          collectionsCount={collections.length}
-          artifactsCount={artifacts.length}
-        />
-      )}
-
-      {/* 2. Main Canvas (Left rounded against sidebar, bg-background per DESIGN.md - no dividing lines) */}
-      <main
-        className={`flex-1 min-w-0 h-full bg-background text-foreground overflow-hidden flex flex-col relative transition-[border-radius] duration-200 ${
-          isSidebarOpen ? "rounded-l-2xl sm:rounded-l-3xl" : ""
+    <div className="h-screen w-full flex bg-secondary/60 dark:bg-[#121212] text-foreground overflow-hidden select-none">
+      {/* 1. Left Sidebar (Collapsible with smooth slide, NO bouncing) */}
+      <div
+        className={`shrink-0 overflow-hidden transition-[width,opacity] duration-200 ease-out ${
+          isSidebarOpen ? "w-56 opacity-100" : "w-0 opacity-0 pointer-events-none"
         }`}
       >
+        <div className="w-56 h-full">
+          <Sidebar
+            activeTab={activeTab}
+            onSelectTab={(tab) => {
+              setActiveTab(tab);
+              if (tab !== "collections") setActiveCollectionId(null);
+            }}
+            onCollapse={() => setIsSidebarOpen(false)}
+            onCreateNewLearn={() => handleCreateNewLearn()}
+            onCreateNewCollection={() => {
+              setEditingCollection(null);
+              setIsCreateCollectionOpen(true);
+            }}
+            onOpenSettings={() => setIsSettingsOpen(true)}
+            user={user}
+            onSignOut={onSignOut}
+            onSwitchAccount={onSwitchAccount}
+            learnsCount={allLearns.length}
+            sourcesCount={totalSourcesCount}
+            collectionsCount={collections.length}
+            artifactsCount={artifacts.length}
+          />
+        </div>
+      </div>
+
+      {/* 2. Main Canvas (Floating card with rounded corners on all sides: top, right, bottom, left) */}
+      <main className="flex-1 min-w-0 bg-background text-foreground overflow-hidden flex flex-col relative rounded-2xl sm:rounded-3xl border border-border/50 shadow-sm m-2 sm:m-2.5">
+        {/* Top Header Bar when sidebar is collapsed (Kimi Reference Style) */}
+        {!isSidebarOpen && (
+          <div className="h-10 px-4 pt-3 flex items-center justify-between shrink-0 select-none">
+            <button
+              type="button"
+              onClick={() => setIsSidebarOpen(true)}
+              className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors cursor-pointer flex items-center justify-center"
+              title={t("openSidebarKeyboard")}
+              aria-label={t("openSidebar")}
+            >
+              <PanelLeft className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
         {/* Scrollable Main Area */}
         <ScrollArea className="flex-1 w-full h-full min-h-0">
           <div className="max-w-7xl mx-auto px-6 sm:px-10 py-7 space-y-9">
@@ -473,7 +495,6 @@ export function LearnHome({
               <SourcesView
                 onOpenLearn={(learnId) => onOpenLearn?.(learnId, false)}
                 isSidebarOpen={isSidebarOpen}
-                onToggleSidebar={() => setIsSidebarOpen(true)}
               />
             )}
 

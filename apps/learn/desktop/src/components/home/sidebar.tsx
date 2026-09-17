@@ -16,7 +16,7 @@ import {
   cn,
 } from "@const/ui";
 import {
-  PanelLeftClose,
+  PanelLeft,
   BookOpen,
   FileText,
   Folder,
@@ -31,7 +31,7 @@ import {
   LogOut,
   ArrowLeftRight,
   FolderPlus,
-  ChevronDown,
+  PlusCircle,
   Globe,
 } from "lucide-react";
 import { getUserInitials, type UserProfile } from "../navbar";
@@ -86,8 +86,12 @@ export function Sidebar({
     { id: "artifacts", label: t("artifacts"), icon: Layers, count: artifactsCount },
   ];
 
+  const isMac =
+    typeof window !== "undefined" &&
+    /Mac|iPod|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
+
   return (
-    <aside className="w-56 h-full flex flex-col justify-between shrink-0 select-none bg-secondary/70 text-foreground p-3">
+    <aside className="w-56 h-full flex flex-col justify-between shrink-0 select-none bg-transparent text-foreground p-3">
       {/* Top Section */}
       <div className="flex flex-col gap-3">
         {/* Brand Header & Sidebar Close Icon */}
@@ -120,46 +124,28 @@ export function Sidebar({
             title={t("closeSidebarKeyboard")}
             aria-label={t("closeSidebar")}
           >
-            <PanelLeftClose className="w-4 h-4" />
+            <PanelLeft className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Action: Create New Dropdown */}
+        {/* Action: Create New Notebook Button (Kimi Reference Style) */}
         <div className="pt-1">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-primary text-primary-foreground font-medium text-xs hover:bg-primary/90 transition-all cursor-pointer shadow-none"
-              >
-                <div className="flex items-center gap-2">
-                  <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-                  <span>{t("createNew")}</span>
-                </div>
-                <ChevronDown className="w-3.5 h-3.5 opacity-70" />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent
-              align="start"
-              sideOffset={6}
-              className="w-48 p-1.5 bg-popover border border-border text-popover-foreground rounded-xl shadow-xl z-50 text-xs"
-            >
-              <DropdownMenuItem
-                onClick={onCreateNewLearn}
-                className="cursor-pointer flex items-center gap-2.5 py-2 px-2.5 rounded-lg hover:bg-secondary focus:bg-secondary"
-              >
-                <BookOpen className="w-4 h-4 text-primary" />
-                <span>{t("newLearn")}</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={onCreateNewCollection}
-                className="cursor-pointer flex items-center gap-2.5 py-2 px-2.5 rounded-lg hover:bg-secondary focus:bg-secondary"
-              >
-                <FolderPlus className="w-4 h-4 text-primary" />
-                <span>{t("newCollection")}</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <button
+            type="button"
+            onClick={onCreateNewLearn}
+            className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-secondary/80 hover:bg-secondary border border-border/60 hover:border-border text-foreground font-medium text-xs transition-all cursor-pointer shadow-2xs group active:scale-[0.99]"
+            title={`${t("newLearn")} (${isMac ? "⌘K" : "Ctrl K"})`}
+          >
+            <div className="flex items-center gap-2">
+              <PlusCircle className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors stroke-[1.8]" />
+              <span className="font-medium text-foreground/90 group-hover:text-foreground">
+                {t("newLearn")}
+              </span>
+            </div>
+            <kbd className="px-1.5 py-0.5 rounded-md bg-background/90 border border-border/60 text-[10px] font-mono text-muted-foreground group-hover:text-foreground shadow-2xs">
+              {isMac ? "⌘K" : "Ctrl K"}
+            </kbd>
+          </button>
         </div>
 
         {/* Navigation Items (Learns, Sources, Collections, Artifact) */}
@@ -206,6 +192,18 @@ export function Sidebar({
             );
           })}
         </nav>
+
+        {/* Collections Quick Action (like Kimi's Projects section) */}
+        <div className="pt-2">
+          <button
+            type="button"
+            onClick={onCreateNewCollection}
+            className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-xl text-xs text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-colors cursor-pointer group"
+          >
+            <FolderPlus className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground transition-colors" />
+            <span>{t("newCollection")}</span>
+          </button>
+        </div>
       </div>
 
       {/* Bottom Section: User Profile Menu (Zero dividing lines per DESIGN.md) */}
