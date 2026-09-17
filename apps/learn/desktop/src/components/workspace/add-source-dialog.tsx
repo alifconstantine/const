@@ -112,13 +112,19 @@ export function AddSourceDialog({
   const handleAddSearchResult = async (item: SearchSourceResult) => {
     if (!learnId) return;
     try {
+      const content =
+        typeof item.content === "string"
+          ? item.content
+          : typeof item.snippet === "string"
+          ? item.snippet
+          : "";
       const sourceId = await localDb.createSource({
         learnId,
         title: item.title,
         type: "url",
         url: item.url,
-        content: item.content || item.snippet,
-        size: new Blob([item.content || item.snippet]).size,
+        content,
+        size: new Blob([content]).size,
         includedInChat: true,
       });
       setAddedUrls((prev) => new Set(prev).add(item.url));

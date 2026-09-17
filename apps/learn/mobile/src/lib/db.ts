@@ -271,6 +271,45 @@ db.version(4).stores({
   sources: "id, learnId, type, includedInChat, createdAt",
 });
 
+// Hook on reading sources from DB to ensure content is always a clean string even for legacy/malformed records
+db.sources.hook("reading", (obj: any) => {
+  if (obj && obj.content && typeof obj.content !== "string") {
+    const raw = obj.content;
+    obj.content =
+      typeof raw.text === "string"
+        ? raw.text
+        : typeof raw.content === "string"
+        ? raw.content
+        : typeof raw.snippet === "string"
+        ? raw.snippet
+        : JSON.stringify(raw);
+  }
+  return obj;
+});
+
+// Self-healing migration for existing records on DB ready
+db.on("ready", async () => {
+  try {
+    const corruptSources = await db.sources
+      .filter((s: any) => s && typeof s.content !== "string" && s.content !== undefined)
+      .toArray();
+    for (const s of corruptSources) {
+      const raw = (s as any).content;
+      const clean =
+        typeof raw?.text === "string"
+          ? raw.text
+          : typeof raw?.content === "string"
+          ? raw.content
+          : typeof raw?.snippet === "string"
+          ? raw.snippet
+          : JSON.stringify(raw);
+      await db.sources.update(s.id, { content: clean });
+    }
+  } catch (err) {
+    console.warn("Source migration notice:", err);
+  }
+});
+
 // Helper functions for CRUD operations
 export const localDb = {
   // Learns
@@ -587,13 +626,33 @@ export const localDb = {
     type?: LocalSource["type"];
     url?: string;
     path?: string;
-    content?: string;
+    content?: any;
     size?: number;
     subpagesCount?: number;
     includedInChat?: boolean;
   }): Promise<string> {
     const id = "source_" + Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
     const now = Date.now();
+
+    let safeContent: string | undefined = undefined;
+    if (typeof data.content === "string") {
+      safeContent = data.content;
+    } else if (data.content && typeof data.content === "object") {
+      const c = data.content as any;
+      safeContent =
+        typeof c.text === "string"
+          ? c.text
+          : typeof c.content === "string"
+          ? c.content
+          : typeof c.snippet === "string"
+          ? c.snippet
+          : JSON.stringify(c);
+    } else if (data.content !== undefined && data.content !== null) {
+      safeContent = String(data.content);
+    }
+
+    const safeSize = data.size ?? (safeContent ? new Blob([safeContent]).size : undefined);
+
     await db.sources.add({
       id,
       learnId: data.learnId,
@@ -601,8 +660,8 @@ export const localDb = {
       type: data.type || "file",
       url: data.url,
       path: data.path,
-      content: data.content,
-      size: data.size,
+      content: safeContent,
+      size: safeSize,
       subpagesCount: data.subpagesCount,
       includedInChat: data.includedInChat ?? true,
       createdAt: now,
@@ -619,7 +678,13 @@ export const localDb = {
   },
 
   async getSources(learnId: string): Promise<LocalSource[]> {
-    return await db.sources.where("learnId").equals(learnId).reverse().sortBy("createdAt");
+    const sources = await db.sources.where("learnId").equals(learnId).reverse().sortBy("createdAt");
+    return sources.map((s: any) => {
+      if (s.content && typeof s.content !== "string") {
+        s.content = typeof s.content.text === "string" ? s.content.text : JSON.stringify(s.content);
+      }
+      return s;
+    });
   },
 
   async toggleSourceInChat(sourceId: string, includedInChat: boolean): Promise<void> {

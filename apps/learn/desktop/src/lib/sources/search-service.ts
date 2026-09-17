@@ -111,15 +111,41 @@ export async function searchWebSources(
       return [];
     }
 
-    return data.results.map((r: any) => ({
-      title: r.title || r.url || "Untitled Source",
-      url: r.url,
-      snippet: r.snippet || r.content?.slice(0, 280) || "",
-      content: r.content || r.snippet || "",
-      author: r.author,
-      publishedDate: r.published_date,
-      score: r.score,
-    }));
+    return data.results.map((r: any) => {
+      let content = "";
+      if (typeof r.content === "string") {
+        content = r.content;
+      } else if (r.content && typeof r.content === "object") {
+        content =
+          (typeof r.content.text === "string" && r.content.text) ||
+          (typeof r.content.snippet === "string" && r.content.snippet) ||
+          (typeof r.content.content === "string" && r.content.content) ||
+          "";
+      }
+
+      let snippet = "";
+      if (typeof r.snippet === "string") {
+        snippet = r.snippet;
+      } else if (typeof r.snippet === "object" && r.snippet) {
+        snippet = r.snippet.text || "";
+      } else if (content) {
+        snippet = content.slice(0, 280);
+      }
+
+      if (!content && snippet) {
+        content = snippet;
+      }
+
+      return {
+        title: r.title || r.url || "Untitled Source",
+        url: r.url,
+        snippet,
+        content,
+        author: r.author,
+        publishedDate: r.published_date,
+        score: r.score,
+      };
+    });
   } catch (err: any) {
     if (err.name === "AbortError") throw err;
     console.error("searchWebSources error:", err);

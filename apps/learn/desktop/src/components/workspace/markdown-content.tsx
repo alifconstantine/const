@@ -41,7 +41,7 @@ export function MarkdownContent({
   sourcesMap,
   onSourceClick,
 }: MarkdownContentProps) {
-  if (!content) return null;
+  if (!content || typeof content !== "string") return null;
 
   // Normalize single-space indented list items so they parse cleanly into nested lists
   let normalizedContent = content.replace(/\n( +)([*+-]) /g, (match, spaces, bullet) => {
@@ -364,7 +364,7 @@ function TableBlock({
   };
 
   const getAlignClass = (index: number) => {
-    const a = align[index];
+    const a = align?.[index];
     if (a === "center") return "text-center";
     if (a === "right") return "text-right";
     return "text-left";
@@ -675,10 +675,12 @@ function InlineRenderer({
   text,
   sourcesMap,
 }: {
-  text: string;
+  text?: string;
   sourcesMap?: Map<string, { title: string }>;
 }) {
-  const normalized = convertReferencesToMarkdownLinks(text, sourcesMap);
+  const safeText = typeof text === "string" ? text : (text ? String(text) : "");
+  if (!safeText) return null;
+  const normalized = convertReferencesToMarkdownLinks(safeText, sourcesMap);
   const html = marked.parseInline(normalized);
   if (typeof html === "string") {
     return (
@@ -688,5 +690,5 @@ function InlineRenderer({
       />
     );
   }
-  return <span>{text}</span>;
+  return <span>{safeText}</span>;
 }

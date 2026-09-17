@@ -38,6 +38,23 @@ function formatFileSize(bytes?: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function getContentString(content: unknown): string {
+  if (!content) return "";
+  if (typeof content === "string") return content;
+  if (typeof content === "object") {
+    const obj = content as Record<string, unknown>;
+    if (typeof obj.text === "string") return obj.text;
+    if (typeof obj.content === "string") return obj.content;
+    if (typeof obj.snippet === "string") return obj.snippet;
+    try {
+      return JSON.stringify(content, null, 2);
+    } catch {
+      return String(content);
+    }
+  }
+  return String(content);
+}
+
 export function SourcePreviewDialog({
   source,
   open,
@@ -48,24 +65,26 @@ export function SourcePreviewDialog({
   const [viewMode, setViewMode] = useState<"formatted" | "raw">("formatted");
   const [hasCopied, setHasCopied] = useState(false);
 
+  const contentString = useMemo(() => getContentString(source?.content), [source?.content]);
+
   // Content statistics
   const stats = useMemo(() => {
-    if (!source?.content) {
+    if (!contentString) {
       return { characters: 0, words: 0, readingMinutes: 0 };
     }
-    const text = source.content.trim();
+    const text = contentString.trim();
     const characters = text.length;
     const words = text ? text.split(/\s+/).filter(Boolean).length : 0;
     const readingMinutes = Math.max(1, Math.ceil(words / 200));
     return { characters, words, readingMinutes };
-  }, [source?.content]);
+  }, [contentString]);
 
   if (!source) return null;
 
   const handleCopyContent = async () => {
-    if (!source.content) return;
+    if (!contentString) return;
     try {
-      await navigator.clipboard.writeText(source.content);
+      await navigator.clipboard.writeText(contentString);
       setHasCopied(true);
       toast.success(t("contentCopied"));
       setTimeout(() => setHasCopied(false), 2000);
@@ -77,6 +96,7 @@ export function SourcePreviewDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
+        hideClose
         className="w-[92vw] max-w-3xl max-h-[88vh] p-0 rounded-3xl border border-border bg-card text-card-foreground shadow-2xl flex flex-col overflow-hidden outline-none"
         aria-describedby={undefined}
       >
@@ -136,7 +156,7 @@ export function SourcePreviewDialog({
             {/* Right: Actions */}
             <div className="flex items-center gap-1.5 shrink-0 pt-0.5">
               {/* Copy content button */}
-              {source.content && (
+              {contentString && (
                 <button
                   type="button"
                   onClick={handleCopyContent}
@@ -224,7 +244,7 @@ export function SourcePreviewDialog({
             </div>
 
             {/* Reading stats */}
-            {source.content ? (
+            {contentString ? (
               <div className="flex items-center gap-3 text-muted-foreground text-[11px] font-mono">
                 <span className="inline-flex items-center gap-1">
                   <Clock className="w-3 h-3 opacity-70" />
@@ -247,17 +267,17 @@ export function SourcePreviewDialog({
 
         {/* 2. Scrollable Body: Rendered Content */}
         <ScrollArea className="flex-1 w-full min-h-0" viewportClassName="p-6">
-          {source.content ? (
+          {contentString ? (
             viewMode === "formatted" ? (
               <div className="max-w-none">
                 <MarkdownContent
-                  content={source.content}
+                  content={contentString}
                   className="space-y-4 text-sm sm:text-[14.5px] leading-relaxed select-text"
                 />
               </div>
             ) : (
               <div className="p-4 rounded-2xl bg-muted/30 border border-border/60 text-xs font-mono text-foreground whitespace-pre-wrap leading-relaxed select-text font-normal">
-                {source.content}
+                {contentString}
               </div>
             )
           ) : (
