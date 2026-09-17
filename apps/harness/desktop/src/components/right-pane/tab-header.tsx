@@ -10,6 +10,8 @@ import {
   Search,
   Activity,
   Layers,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 import { FileIcon } from "../workbench/file-icon";
 import type { RightPaneTab, RightPaneTabType } from "./types";
@@ -22,6 +24,7 @@ interface TabHeaderProps {
   onCloseTab: (tabId: string, e: React.MouseEvent) => void;
   onNewTab: () => void;
   onReorderTabs?: (fromIndex: number, toIndex: number) => void;
+  onToggleMuteTab?: (tabId: string) => void;
 }
 
 function getTabIcon(type: RightPaneTabType) {
@@ -87,6 +90,7 @@ export function TabHeader({
   onCloseTab,
   onNewTab,
   onReorderTabs,
+  onToggleMuteTab,
 }: TabHeaderProps) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -353,6 +357,32 @@ export function TabHeader({
                 />
               )}
               <span className="truncate max-w-[120px] pointer-events-none">{tab.title}</span>
+
+              {tab.isAudible && (
+                <button
+                  type="button"
+                  draggable={false}
+                  onDragStart={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onToggleMuteTab?.(tab.id);
+                  }}
+                  className={`p-0.5 rounded cursor-pointer transition-colors shrink-0 ml-0.5 ${
+                    tab.isMuted
+                      ? "text-amber-400 hover:text-amber-300"
+                      : "text-blue-400 hover:text-blue-300 animate-pulse"
+                  }`}
+                  title={tab.isMuted ? "Unmute tab" : "Mute tab"}
+                  aria-label={tab.isMuted ? "Unmute tab" : "Mute tab"}
+                >
+                  {tab.isMuted ? (
+                    <VolumeX className="w-3 h-3 pointer-events-none" />
+                  ) : (
+                    <Volume2 className="w-3 h-3 pointer-events-none" />
+                  )}
+                </button>
+              )}
+
               <button
                 type="button"
                 draggable={false}

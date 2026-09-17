@@ -10,6 +10,8 @@ import {
   Sparkles,
   GitFork,
   SquarePen,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 import { FileIcon } from "../workspace/file-icon";
 import type { RightPaneTab, RightPaneTabType } from "./types";
@@ -22,6 +24,7 @@ interface TabHeaderProps {
   onCloseTab: (tabId: string, e: React.MouseEvent) => void;
   onNewTab: () => void;
   onReorderTabs?: (fromIndex: number, toIndex: number) => void;
+  onToggleMuteTab?: (tabId: string) => void;
 }
 
 function getTabIcon(type: RightPaneTabType) {
@@ -44,6 +47,41 @@ function getTabIcon(type: RightPaneTabType) {
   }
 }
 
+function TabFavicon({
+  favicon,
+  fallbackIcon: FallbackIcon,
+  isActive,
+}: {
+  favicon?: string;
+  fallbackIcon: React.ComponentType<{ className?: string }>;
+  isActive: boolean;
+}) {
+  const [hasError, setHasError] = useState(false);
+
+  useEffect(() => {
+    setHasError(false);
+  }, [favicon]);
+
+  if (favicon && !hasError) {
+    return (
+      <img
+        src={favicon}
+        alt=""
+        className="w-3.5 h-3.5 shrink-0 object-contain rounded-xs pointer-events-none"
+        onError={() => setHasError(true)}
+      />
+    );
+  }
+
+  return (
+    <FallbackIcon
+      className={`w-3.5 h-3.5 shrink-0 pointer-events-none ${
+        isActive ? "text-foreground" : "text-muted-foreground group-hover:text-foreground"
+      }`}
+    />
+  );
+}
+
 export function TabHeader({
   tabs,
   activeTabId,
@@ -52,6 +90,7 @@ export function TabHeader({
   onCloseTab,
   onNewTab,
   onReorderTabs,
+  onToggleMuteTab,
 }: TabHeaderProps) {
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -211,6 +250,12 @@ export function TabHeader({
                       <div className="flex items-center gap-2 min-w-0">
                         {t.type === "file_diff" || t.type === "file_preview" ? (
                           <FileIcon filename={t.filePath || t.title} className="w-3.5 h-3.5 shrink-0" />
+                        ) : t.type === "browser" ? (
+                          <TabFavicon
+                            favicon={t.favicon}
+                            fallbackIcon={Icon}
+                            isActive={isActive}
+                          />
                         ) : (
                           <Icon className="w-3.5 h-3.5 shrink-0" />
                         )}
@@ -306,6 +351,12 @@ export function TabHeader({
 
               {tab.type === "file_diff" || tab.type === "file_preview" ? (
                 <FileIcon filename={tab.filePath || tab.title} className="w-3.5 h-3.5 shrink-0 pointer-events-none" />
+              ) : tab.type === "browser" ? (
+                <TabFavicon
+                  favicon={tab.favicon}
+                  fallbackIcon={Icon}
+                  isActive={isActive}
+                />
               ) : (
                 <Icon
                   className={`w-3.5 h-3.5 shrink-0 pointer-events-none ${
@@ -314,6 +365,28 @@ export function TabHeader({
                 />
               )}
               <span className="truncate max-w-[130px] pointer-events-none">{tab.title}</span>
+
+              {tab.isAudible && (
+                <button
+                  type="button"
+                  draggable={false}
+                  onDragStart={(e) => e.stopPropagation()}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onToggleMuteTab?.(tab.id);
+                  }}
+                  className={`p-0.5 rounded cursor-pointer transition-colors shrink-0 ml-0.5 ${
+                    tab.isMuted
+                      ? "text-amber-500 hover:text-amber-400"
+                      : "text-sky-500 hover:text-sky-400 animate-pulse"
+                  }`}
+                  title={tab.isMuted ? "Tab dibisukan (klik untuk bunyikan)" : "Tab memutar audio (klik untuk bisukan)"}
+                  aria-label={tab.isMuted ? "Unmute tab" : "Mute tab"}
+                >
+                  {tab.isMuted ? <VolumeX className="w-3 h-3 pointer-events-none" /> : <Volume2 className="w-3 h-3 pointer-events-none" />}
+                </button>
+              )}
+
               <button
                 type="button"
                 draggable={false}

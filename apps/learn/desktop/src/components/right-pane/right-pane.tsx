@@ -48,7 +48,7 @@ import { FlashcardViewer } from "./flashcard-viewer";
 import { MindMapTab } from "./mind-map-tab";
 import { STUDIO_TOOLS } from "../workspace/studio-panel";
 import { useI18n } from "../../lib/i18n";
-import type { RightPaneTab, RightPaneTabType } from "./types";
+import type { RightPaneTab, RightPaneTabType, BrowserSelectedElement } from "./types";
 import type { FileMutationRecord } from "@const/agent";
 import type { LocalArtifact } from "../../lib/db";
 
@@ -233,6 +233,76 @@ export function RightPane({
   };
 
   const activeTab = tabs.find((t) => t.id === activeTabId) || tabs[0];
+
+  const renderTabContent = (tab: RightPaneTab) => {
+    if (tab.type === "file_diff") {
+      return (
+        <FileDiffTab
+          tab={tab}
+          onRollbackFile={onRollbackFile}
+        />
+      );
+    }
+    if (tab.type === "file_preview") {
+      return <FilePreviewTab tab={tab} />;
+    }
+    if (tab.type === "browser") {
+      return (
+        <BrowserTab
+          tab={tab}
+          onUpdateTab={onUpdateTab}
+          onSelectElementForChat={(element) => {
+            if (onExplainInChat) {
+              const prompt = `Tolong jelaskan atau analisa elemen <${element.tag}> dari ${element.url}:\nSelector: ${element.selector}\nKonten: "${element.textSnippet}"\n\`\`\`html\n${element.htmlSnippet}\n\`\`\``;
+              onExplainInChat(prompt);
+            }
+          }}
+        />
+      );
+    }
+    if (tab.type === "note_preview") {
+      return (
+        <NotePreviewTab
+          tab={tab}
+          onUpdateTab={onUpdateTab}
+          onDownloadArtifact={onDownloadArtifact}
+        />
+      );
+    }
+    if (tab.type === "studio_preview") {
+      if (tab.artifact?.type === "quiz" && tab.artifact.data) {
+        return (
+          <QuizViewer
+            quiz={tab.artifact.data}
+            onExplainInChat={onExplainInChat}
+          />
+        );
+      }
+      if ((tab.artifact?.type === "flashcard" || tab.artifact?.type === "flashcards") && tab.artifact.data) {
+        return (
+          <FlashcardViewer
+            flashcard={tab.artifact.data}
+            onExplainInChat={onExplainInChat}
+          />
+        );
+      }
+      if (tab.artifact?.type === "mind_map") {
+        return <MindMapTab tab={tab} />;
+      }
+      return null;
+    }
+    if (tab.type === "mind_map") {
+      return <MindMapTab tab={tab} />;
+    }
+    return (
+      <ReviewTab
+        mutations={mutations}
+        onRollbackFile={onRollbackFile}
+        onRollbackAll={onRollbackAll}
+        onOpenFileDiff={onOpenFileDiff}
+      />
+    );
+  };
 
   // Unified Sidebar View with smooth width and tab animation
   return (
@@ -437,9 +507,14 @@ export function RightPane({
 
         {/* Main Body based on Active Menu with smooth fade */}
         <div className="flex-1 flex flex-col min-h-0 relative overflow-hidden">
-          {mode === "studio" ? (
-            /* Studio Content */
-            <div className="flex-1 flex flex-col min-h-0 select-none animate-in fade-in duration-200">
+          {/* Studio Content */}
+          <div
+            className={cn(
+              "flex-1 flex flex-col min-h-0 select-none",
+              mode === "studio" ? "flex" : "hidden"
+            )}
+            style={{ display: mode === "studio" ? "flex" : "none" }}
+          >
               <ScrollArea className="flex-1 w-full min-h-0" viewportClassName="p-3 sm:p-3.5">
                 {/* Grid of Studio Tools */}
               <div className="grid grid-cols-3 gap-2 mb-4 shrink-0">
@@ -710,81 +785,55 @@ export function RightPane({
               </button>
             </div>
           </div>
-        ) : (
-            /* Review Sidepanel matching apps/harness/desktop */
-            <div className="flex-1 w-full h-full min-h-0 flex flex-col overflow-hidden bg-background animate-in fade-in duration-200">
-              {/* Harness Tab Header with +, Search Dropdown, Drag & Drop */}
-              <TabHeader
-                tabs={tabs}
-                activeTabId={activeTabId}
-                isOpeningNewTab={Boolean(isOpeningNewTab)}
-                onSelectTab={onSelectTab}
-                onCloseTab={onCloseTab}
-                onNewTab={onNewTab || (() => {})}
-                onReorderTabs={onReorderTabs}
-              />
 
-              {/* Active Tab Body matching apps/harness/desktop */}
-              <div className="flex-1 w-full h-[calc(100%-40px)] min-h-0 relative overflow-hidden flex flex-col bg-background">
-                {isOpeningNewTab || tabs.length === 0 || !activeTab ? (
-                  <OpenTabView onSelectTabType={onOpenTabType || (() => {})} />
-                ) : activeTab.type === "file_diff" ? (
-                  <FileDiffTab
-                    key={activeTab.id}
-                    tab={activeTab}
-                    onRollbackFile={onRollbackFile}
-                  />
-                ) : activeTab.type === "file_preview" ? (
-                  <FilePreviewTab key={activeTab.id} tab={activeTab} />
-                ) : activeTab.type === "browser" ? (
-                  <BrowserTab
-                    key={activeTab.id}
-                    tab={activeTab}
-                    onUpdateTab={onUpdateTab}
-                  />
-                ) : activeTab.type === "note_preview" ? (
-                  <NotePreviewTab
-                    key={activeTab.id}
-                    tab={activeTab}
-                    onUpdateTab={onUpdateTab}
-                    onDownloadArtifact={onDownloadArtifact}
-                  />
-                ) : activeTab.type === "studio_preview" ? (
-                  activeTab.artifact?.type === "quiz" && activeTab.artifact.data ? (
-                    <QuizViewer
-                      key={activeTab.id}
-                      quiz={activeTab.artifact.data}
-                      onExplainInChat={onExplainInChat}
-                    />
-                  ) : (activeTab.artifact?.type === "flashcard" || activeTab.artifact?.type === "flashcards") && activeTab.artifact.data ? (
-                    <FlashcardViewer
-                      key={activeTab.id}
-                      flashcard={activeTab.artifact.data}
-                      onExplainInChat={onExplainInChat}
-                    />
-                  ) : activeTab.artifact?.type === "mind_map" ? (
-                    <MindMapTab
-                      key={activeTab.id}
-                      tab={activeTab}
-                    />
-                  ) : null
-                ) : activeTab.type === "mind_map" ? (
-                  <MindMapTab
-                    key={activeTab.id}
-                    tab={activeTab}
-                  />
-                ) : (
-                  <ReviewTab
-                    key={activeTab.id || "review_tab"}
-                    mutations={mutations}
-                    onRollbackFile={onRollbackFile}
-                    onRollbackAll={onRollbackAll}
-                    onOpenFileDiff={onOpenFileDiff}
-                  />
-                )}
-              </div>
+          {/* Review Sidepanel (Persistent Stack keeping tabs mounted) */}
+          <div
+            className={cn(
+              "flex-1 w-full h-full min-h-0 flex flex-col overflow-hidden bg-background animate-in fade-in duration-200",
+              mode === "preview" ? "flex" : "hidden"
+            )}
+            style={{ display: mode === "preview" ? "flex" : "none" }}
+          >
+            {/* Harness Tab Header with +, Search Dropdown, Drag & Drop */}
+            <TabHeader
+              tabs={tabs}
+              activeTabId={activeTabId}
+              isOpeningNewTab={Boolean(isOpeningNewTab)}
+              onSelectTab={onSelectTab}
+              onCloseTab={onCloseTab}
+              onNewTab={onNewTab || (() => {})}
+              onReorderTabs={onReorderTabs}
+              onToggleMuteTab={(tabId) => {
+                const target = tabs.find((t) => t.id === tabId);
+                if (target) {
+                  onUpdateTab?.(tabId, { isMuted: !target.isMuted });
+                }
+              }}
+            />
+
+            {/* Persistent Tab Stack Viewport */}
+            <div className="flex-1 w-full h-[calc(100%-40px)] min-h-0 relative overflow-hidden flex flex-col bg-background">
+              {isOpeningNewTab || tabs.length === 0 ? (
+                <OpenTabView onSelectTabType={onOpenTabType || (() => {})} />
+              ) : null}
+
+              {tabs.map((tab) => {
+                const isTabActive = !isOpeningNewTab && tab.id === activeTabId;
+                return (
+                  <div
+                    key={tab.id}
+                    className={cn(
+                      "w-full h-full min-h-0",
+                      isTabActive ? "flex flex-col flex-1" : "hidden"
+                    )}
+                    style={{ display: isTabActive ? "flex" : "none" }}
+                  >
+                    {renderTabContent(tab)}
+                  </div>
+                );
+              })}
             </div>
-          )}
+          </div>
         </div>
       </>
     )}

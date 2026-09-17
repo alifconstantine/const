@@ -27,6 +27,8 @@ export interface RightPaneTab {
   createdAt?: number;
   url?: string;
   favicon?: string;
+  isAudible?: boolean;
+  isMuted?: boolean;
 }
 
 export interface BrowserSelectedElement {

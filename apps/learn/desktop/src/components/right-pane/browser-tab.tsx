@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -16,13 +16,20 @@ import {
   BookOpen,
   GraduationCap,
   FileText,
+  Sparkles,
+  Code2,
+  ZoomIn,
+  ZoomOut,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
-import type { RightPaneTab } from "./types";
+import type { RightPaneTab, BrowserSelectedElement } from "./types";
 import { useI18n } from "../../lib/i18n";
 
 interface BrowserTabProps {
   tab: RightPaneTab;
   onUpdateTab?: (tabId: string, updates: Partial<RightPaneTab>) => void;
+  onSelectElementForChat?: (element: BrowserSelectedElement) => void;
 }
 
 type ResponsivePreset = "responsive" | "mobile" | "mobile-lg" | "tablet" | "desktop";
@@ -68,9 +75,10 @@ function normalizeUrl(input: any): string {
   return `https://www.google.com/search?q=${encodeURIComponent(trimmed)}`;
 }
 
-export function BrowserTab({ tab, onUpdateTab }: BrowserTabProps) {
+export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: BrowserTabProps) {
   const { language } = useI18n();
   const rawInitial = typeof tab.url === "string" && tab.url && tab.url !== "[object Object]" ? tab.url.trim() : "";
+  const initialUrlRef = useRef<string>(rawInitial);
   const [currentUrl, setCurrentUrl] = useState<string>(rawInitial);
   const [addressBarInput, setAddressBarInput] = useState<string>(rawInitial);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -88,7 +96,22 @@ export function BrowserTab({ tab, onUpdateTab }: BrowserTabProps) {
   const [isCopied, setIsCopied] = useState<boolean>(false);
   const moreMenuRef = useRef<HTMLDivElement>(null);
 
+  // Zoom controls
+  const [zoomLevel, setZoomLevel] = useState<number>(100);
+
+  // Element Picker Mode
+  const [isElementPickerActive, setIsElementPickerActive] = useState<boolean>(false);
+
   const webviewRef = useRef<any>(null);
+
+  // Sync mute with tab.isMuted
+  useEffect(() => {
+    if (webviewRef.current && typeof tab.isMuted === "boolean") {
+      try {
+        webviewRef.current.setAudioMuted(tab.isMuted);
+      } catch {}
+    }
+  }, [tab.isMuted]);
 
   // Keep address bar in sync if tab.url changes from outside
   useEffect(() => {
@@ -97,6 +120,9 @@ export function BrowserTab({ tab, onUpdateTab }: BrowserTabProps) {
       if (trimmed !== currentUrl) {
         setCurrentUrl(trimmed);
         setAddressBarInput(trimmed);
+        if (!initialUrlRef.current) {
+          initialUrlRef.current = trimmed;
+        }
       }
     }
   }, [tab.url, currentUrl]);
@@ -122,7 +148,7 @@ export function BrowserTab({ tab, onUpdateTab }: BrowserTabProps) {
       setAddressBarInput("");
       setCurrentUrl("");
       setLoadError(null);
-      onUpdateTab?.(tab.id, { url: "", title: language === "id" ? "Peramban Web" : "Web Browser" });
+      onUpdateTab?.(tab.id, { url: "", title: language === "id" ? "Peramban Web" : "Web Browser", favicon: undefined });
       return;
     }
     setAddressBarInput(resolved);
@@ -189,6 +215,225 @@ export function BrowserTab({ tab, onUpdateTab }: BrowserTabProps) {
       webviewRef.current.reloadIgnoringCache();
     }
   };
+
+  const handleOpenDevTools = () => {
+    setIsMoreMenuOpen(false);
+    if (webviewRef.current) {
+      webviewRef.current.openDevTools();
+    }
+  };
+
+  const handleZoomIn = () => {
+    if (!webviewRef.current) return;
+    const next = Math.min(200, zoomLevel + 10);
+    setZoomLevel(next);
+    try {
+      webviewRef.current.setZoomFactor(next / 100);
+    } catch {}
+  };
+
+  const handleZoomOut = () => {
+    if (!webviewRef.current) return;
+    const next = Math.max(50, zoomLevel - 10);
+    setZoomLevel(next);
+    try {
+      webviewRef.current.setZoomFactor(next / 100);
+    } catch {}
+  };
+
+  const handleZoomReset = () => {
+    if (!webviewRef.current) return;
+    setZoomLevel(100);
+    try {
+      webviewRef.current.setZoomFactor(1.0);
+    } catch {}
+  };
+
+  // Toggle interactive DOM element inspector
+  const toggleElementPicker = useCallback(() => {
+    if (!webviewRef.current) return;
+
+    if (isElementPickerActive) {
+      // Deactivate
+      setIsElementPickerActive(false);
+      webviewRef.current.executeJavaScript(`
+        if (window.__harnessPickerCleanup) {
+          window.__harnessPickerCleanup();
+        }
+      `);
+    } else {
+      // Activate
+      setIsElementPickerActive(true);
+      const inspectorScript = `
+        (function() {
+          if (window.__harnessPickerActive) return;
+          window.__harnessPickerActive = true;
+
+          const oldOverlay = document.getElementById('__harness_inspector_overlay');
+          if (oldOverlay) oldOverlay.remove();
+          const oldTooltip = document.getElementById('__harness_inspector_tooltip');
+          if (oldTooltip) oldTooltip.remove();
+
+          const overlay = document.createElement('div');
+          overlay.id = '__harness_inspector_overlay';
+          overlay.style.position = 'fixed';
+          overlay.style.pointerEvents = 'none';
+          overlay.style.border = '2px solid #3b82f6';
+          overlay.style.backgroundColor = 'rgba(59, 130, 246, 0.12)';
+          overlay.style.zIndex = '2147483646';
+          overlay.style.boxSizing = 'border-box';
+          overlay.style.borderRadius = '3px';
+          overlay.style.display = 'none';
+          overlay.style.transition = 'all 0.05s ease-out';
+
+          const tooltip = document.createElement('div');
+          tooltip.id = '__harness_inspector_tooltip';
+          tooltip.style.position = 'fixed';
+          tooltip.style.pointerEvents = 'none';
+          tooltip.style.backgroundColor = '#10141d';
+          tooltip.style.border = '1px solid #2d3748';
+          tooltip.style.borderRadius = '10px';
+          tooltip.style.padding = '8px 12px';
+          tooltip.style.color = '#ffffff';
+          tooltip.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
+          tooltip.style.fontSize = '12px';
+          tooltip.style.lineHeight = '1.4';
+          tooltip.style.zIndex = '2147483647';
+          tooltip.style.boxShadow = '0 10px 25px -5px rgba(0, 0, 0, 0.6), 0 8px 10px -6px rgba(0, 0, 0, 0.4)';
+          tooltip.style.display = 'none';
+          tooltip.style.maxWidth = '300px';
+
+          document.body.appendChild(overlay);
+          document.body.appendChild(tooltip);
+
+          let currentTarget = null;
+
+          function rgbToHex(rgb) {
+            if (!rgb) return '#000000';
+            if (rgb.startsWith('#')) return rgb;
+            const match = rgb.match(/^rgba?\\((\\d+),\\s*(\\d+),\\s*(\\d+)/i);
+            if (!match) return rgb;
+            return '#' + [match[1], match[2], match[3]].map(x => {
+              const hex = parseInt(x).toString(16);
+              return hex.length === 1 ? '0' + hex : hex;
+            }).join('');
+          }
+
+          function getSelector(el) {
+            if (!el || el === document.body) return 'body';
+            if (el.id) return '#' + el.id;
+            let path = el.tagName.toLowerCase();
+            if (el.className && typeof el.className === 'string') {
+              const classes = el.className.trim().split(/\\s+/).filter(Boolean);
+              if (classes.length > 0) {
+                path += '.' + classes.slice(0, 2).join('.');
+              }
+            }
+            if (el.parentElement && el.parentElement !== document.body) {
+              const parentPath = getSelector(el.parentElement);
+              if (parentPath && !parentPath.includes('>')) {
+                path = parentPath + ' > ' + path;
+              }
+            }
+            return path;
+          }
+
+          function onMouseMove(e) {
+            const el = document.elementFromPoint(e.clientX, e.clientY);
+            if (!el || el === overlay || el === tooltip) return;
+            currentTarget = el;
+
+            const rect = el.getBoundingClientRect();
+            overlay.style.display = 'block';
+            overlay.style.top = rect.top + 'px';
+            overlay.style.left = rect.left + 'px';
+            overlay.style.width = rect.width + 'px';
+            overlay.style.height = rect.height + 'px';
+
+            const style = window.getComputedStyle(el);
+            const colorHex = rgbToHex(style.color);
+            const fontInfo = Math.round(parseFloat(style.fontSize) || 12) + 'px ' + (style.fontFamily.split(',')[0].replace(/['"]/g, '') || 'sans-serif');
+            const dimensions = Math.round(rect.width) + 'x' + Math.round(rect.height);
+
+            tooltip.innerHTML = \`
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; gap: 16px;">
+                <span style="font-weight: 700; color: #ffffff; font-size: 13px;">\${el.tagName.toLowerCase()}</span>
+                <span style="font-weight: 700; color: #ffffff; font-size: 12px; font-family: monospace;">\${dimensions}</span>
+              </div>
+              <div style="display: flex; gap: 10px; font-size: 11px; margin-bottom: 3px; align-items: center;">
+                <span style="color: #8892b0; min-width: 32px;">Color</span>
+                <span style="display: inline-flex; align-items: center; gap: 4px; font-weight: 700; color: #ffffff; font-family: monospace;">
+                  <span style="display: inline-block; width: 8px; height: 8px; border-radius: 2px; background: \${colorHex}; border: 1px solid #4a5568;"></span>
+                  \${colorHex}
+                </span>
+              </div>
+              <div style="display: flex; gap: 10px; font-size: 11px; overflow: hidden; align-items: center;">
+                <span style="color: #8892b0; min-width: 32px;">Font</span>
+                <span style="color: #ffffff; font-weight: 600; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">\${fontInfo}</span>
+              </div>
+            \`;
+
+            tooltip.style.display = 'block';
+            let tipTop = rect.bottom + 8;
+            if (tipTop + 90 > window.innerHeight) {
+              tipTop = Math.max(8, rect.top - 85);
+            }
+            let tipLeft = Math.max(8, Math.min(rect.left, window.innerWidth - 280));
+            tooltip.style.top = tipTop + 'px';
+            tooltip.style.left = tipLeft + 'px';
+          }
+
+          function onClick(e) {
+            if (!currentTarget) return;
+            e.preventDefault();
+            e.stopPropagation();
+
+            const el = currentTarget;
+            const rect = el.getBoundingClientRect();
+            const style = window.getComputedStyle(el);
+            const payload = {
+              tag: el.tagName.toLowerCase(),
+              id: el.id || '',
+              className: typeof el.className === 'string' ? el.className : '',
+              selector: getSelector(el),
+              rect: { width: Math.round(rect.width), height: Math.round(rect.height) },
+              color: rgbToHex(style.color),
+              font: Math.round(parseFloat(style.fontSize) || 12) + 'px ' + style.fontFamily,
+              textSnippet: (el.innerText || '').slice(0, 120).trim(),
+              htmlSnippet: el.outerHTML ? el.outerHTML.slice(0, 300) : '',
+              url: window.location.href,
+            };
+
+            cleanup();
+            console.log('__HARNESS_ELEMENT_PICK__:' + JSON.stringify(payload));
+          }
+
+          function onKeyDown(e) {
+            if (e.key === 'Escape') {
+              cleanup();
+              console.log('__HARNESS_ELEMENT_CANCEL__');
+            }
+          }
+
+          function cleanup() {
+            window.__harnessPickerActive = false;
+            document.removeEventListener('mousemove', onMouseMove, true);
+            document.removeEventListener('click', onClick, true);
+            document.removeEventListener('keydown', onKeyDown, true);
+            if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+            if (tooltip.parentNode) tooltip.parentNode.removeChild(tooltip);
+            window.__harnessPickerCleanup = null;
+          }
+
+          window.__harnessPickerCleanup = cleanup;
+          document.addEventListener('mousemove', onMouseMove, true);
+          document.addEventListener('click', onClick, true);
+          document.addEventListener('keydown', onKeyDown, true);
+        })();
+      `;
+      webviewRef.current.executeJavaScript(inspectorScript);
+    }
+  }, [isElementPickerActive]);
 
   // Wire up webview native events
   useEffect(() => {
@@ -263,6 +508,31 @@ export function BrowserTab({ tab, onUpdateTab }: BrowserTabProps) {
       }
     };
 
+    const handleMediaStartedPlaying = () => {
+      onUpdateTab?.(tab.id, { isAudible: true });
+    };
+
+    const handleMediaPaused = () => {
+      const isAudible = webview.isCurrentlyAudible ? webview.isCurrentlyAudible() : false;
+      onUpdateTab?.(tab.id, { isAudible });
+    };
+
+    const handleConsoleMessage = (e: any) => {
+      const msg = e.message || "";
+      if (msg.startsWith("__HARNESS_ELEMENT_PICK__:")) {
+        try {
+          const raw = msg.replace("__HARNESS_ELEMENT_PICK__:", "");
+          const data: BrowserSelectedElement = JSON.parse(raw);
+          setIsElementPickerActive(false);
+          onSelectElementForChat?.(data);
+        } catch (err) {
+          console.error("Failed to parse picked element:", err);
+        }
+      } else if (msg.startsWith("__HARNESS_ELEMENT_CANCEL__")) {
+        setIsElementPickerActive(false);
+      }
+    };
+
     webview.addEventListener("did-start-loading", handleDidStartLoading);
     webview.addEventListener("did-stop-loading", handleDidStopLoading);
     webview.addEventListener("did-navigate", handleDidNavigate);
@@ -271,6 +541,9 @@ export function BrowserTab({ tab, onUpdateTab }: BrowserTabProps) {
     webview.addEventListener("page-favicon-updated", handlePageFaviconUpdated);
     webview.addEventListener("did-fail-load", handleDidFailLoad);
     webview.addEventListener("new-window", handleNewWindow);
+    webview.addEventListener("media-started-playing", handleMediaStartedPlaying);
+    webview.addEventListener("media-paused", handleMediaPaused);
+    webview.addEventListener("console-message", handleConsoleMessage);
 
     return () => {
       webview.removeEventListener("did-start-loading", handleDidStartLoading);
@@ -281,8 +554,11 @@ export function BrowserTab({ tab, onUpdateTab }: BrowserTabProps) {
       webview.removeEventListener("page-favicon-updated", handlePageFaviconUpdated);
       webview.removeEventListener("did-fail-load", handleDidFailLoad);
       webview.removeEventListener("new-window", handleNewWindow);
+      webview.removeEventListener("media-started-playing", handleMediaStartedPlaying);
+      webview.removeEventListener("media-paused", handleMediaPaused);
+      webview.removeEventListener("console-message", handleConsoleMessage);
     };
-  }, [tab.id, onUpdateTab, currentUrl]);
+  }, [tab.id, onUpdateTab, onSelectElementForChat, currentUrl]);
 
   // Viewport preset style
   const activePresetConfig = RESPONSIVE_PRESETS.find((p) => p.id === selectedPreset);
@@ -422,6 +698,49 @@ export function BrowserTab({ tab, onUpdateTab }: BrowserTabProps) {
           )}
         </div>
 
+        {/* Select Page Element for Chat Button */}
+        <button
+          type="button"
+          onClick={toggleElementPicker}
+          disabled={!currentUrl}
+          className={`w-7 h-7 rounded-md flex items-center justify-center transition-colors cursor-pointer ${
+            isElementPickerActive
+              ? "bg-primary text-primary-foreground shadow-[0_0_12px_rgba(59,130,246,0.6)]"
+              : currentUrl
+              ? "text-muted-foreground hover:text-foreground hover:bg-muted"
+              : "text-muted-foreground/40 cursor-not-allowed"
+          }`}
+          title={
+            isElementPickerActive
+              ? language === "id"
+                ? "Pemilih elemen aktif (Klik elemen atau Esc untuk batal)"
+                : "Element picker active (Click element or Esc to cancel)"
+              : language === "id"
+              ? "Pilih elemen halaman untuk tanya ke AI"
+              : "Select page element for chat"
+          }
+          aria-label="Select element for chat"
+        >
+          <Sparkles className="w-3.5 h-3.5" />
+        </button>
+
+        {/* Audio Mute Quick Toggle */}
+        {tab.isAudible && (
+          <button
+            type="button"
+            onClick={() => onUpdateTab?.(tab.id, { isMuted: !tab.isMuted })}
+            className={`w-7 h-7 rounded-md flex items-center justify-center transition-colors cursor-pointer ${
+              tab.isMuted
+                ? "text-amber-500 hover:bg-amber-500/10"
+                : "text-sky-500 hover:bg-sky-500/10 animate-pulse"
+            }`}
+            title={tab.isMuted ? (language === "id" ? "Bunyikan tab" : "Unmute tab") : (language === "id" ? "Bisukan tab" : "Mute tab")}
+            aria-label={tab.isMuted ? "Unmute tab" : "Mute tab"}
+          >
+            {tab.isMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
+          </button>
+        )}
+
         {/* More Actions Dropdown */}
         <div className="relative" ref={moreMenuRef}>
           <button
@@ -434,7 +753,7 @@ export function BrowserTab({ tab, onUpdateTab }: BrowserTabProps) {
           </button>
 
           {isMoreMenuOpen && (
-            <div className="absolute right-0 top-full mt-1.5 w-52 bg-popover border border-border rounded-xl shadow-2xl p-1 z-50 flex flex-col gap-0.5">
+            <div className="absolute right-0 top-full mt-1.5 w-56 bg-popover border border-border rounded-xl shadow-2xl p-1 z-50 flex flex-col gap-0.5">
               <button
                 type="button"
                 onClick={handleCopyUrl}
@@ -458,6 +777,54 @@ export function BrowserTab({ tab, onUpdateTab }: BrowserTabProps) {
                 <ExternalLink className="w-3.5 h-3.5" />
                 <span>{language === "id" ? "Buka di browser luar" : "Open in default browser"}</span>
               </button>
+
+              <button
+                type="button"
+                onClick={handleOpenDevTools}
+                disabled={!currentUrl}
+                className={`w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs transition-colors text-left ${
+                  currentUrl ? "text-popover-foreground hover:bg-muted cursor-pointer" : "text-muted-foreground/40 cursor-not-allowed"
+                }`}
+              >
+                <Code2 className="w-3.5 h-3.5" />
+                <span>{language === "id" ? "Buka DevTools" : "Open DevTools"}</span>
+              </button>
+
+              {/* Zoom Controls */}
+              <div className="flex items-center justify-between px-2.5 py-1.5 border-t border-border mt-0.5 pt-1">
+                <span className="text-[11px] text-muted-foreground">{language === "id" ? "Zoom" : "Zoom"} ({zoomLevel}%)</span>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={handleZoomOut}
+                    disabled={!currentUrl || zoomLevel <= 50}
+                    className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground cursor-pointer disabled:opacity-40"
+                    title="Zoom out"
+                  >
+                    <ZoomOut className="w-3 h-3" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleZoomReset}
+                    disabled={!currentUrl || zoomLevel === 100}
+                    className="text-[10px] px-1.5 py-0.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground cursor-pointer disabled:opacity-40 font-mono"
+                    title="Reset zoom"
+                  >
+                    100%
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleZoomIn}
+                    disabled={!currentUrl || zoomLevel >= 200}
+                    className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground cursor-pointer disabled:opacity-40"
+                    title="Zoom in"
+                  >
+                    <ZoomIn className="w-3 h-3" />
+                  </button>
+                </div>
+              </div>
+
+              <div className="border-t border-border my-0.5" />
 
               <button
                 type="button"
@@ -589,9 +956,10 @@ export function BrowserTab({ tab, onUpdateTab }: BrowserTabProps) {
           >
             <webview
               ref={webviewRef}
-              src={currentUrl}
+              src={initialUrlRef.current || currentUrl}
               partition="persist:learn_browser"
               allowpopups={true}
+              webpreferences="contextIsolation=yes, backgroundThrottling=no, autoplayPolicy=no-user-gesture-required"
               className="w-full h-full border-none block flex-1"
               style={{
                 display: "inline-flex",

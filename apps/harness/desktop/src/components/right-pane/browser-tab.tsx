@@ -13,6 +13,10 @@ import {
   Check,
   RotateCcw,
   AlertCircle,
+  Volume2,
+  VolumeX,
+  ZoomIn,
+  ZoomOut,
 } from "lucide-react";
 import type { RightPaneTab, BrowserSelectedElement } from "./types";
 
@@ -70,6 +74,7 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
     typeof tab.url === "string" && tab.url && tab.url !== "[object Object]"
       ? tab.url
       : "https://www.google.com";
+  const initialUrlRef = useRef<string>(initialUrl);
   const [currentUrl, setCurrentUrl] = useState<string>(initialUrl);
   const [addressBarInput, setAddressBarInput] = useState<string>(initialUrl);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -87,10 +92,22 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
   const [isCopied, setIsCopied] = useState<boolean>(false);
   const moreMenuRef = useRef<HTMLDivElement>(null);
 
+  // Zoom controls
+  const [zoomLevel, setZoomLevel] = useState<number>(100);
+
   // Element Picker Mode
   const [isElementPickerActive, setIsElementPickerActive] = useState<boolean>(false);
 
   const webviewRef = useRef<any>(null);
+
+  // Sync audio muting with tab.isMuted
+  useEffect(() => {
+    if (webviewRef.current && typeof tab.isMuted === "boolean") {
+      try {
+        webviewRef.current.setAudioMuted(tab.isMuted);
+      } catch {}
+    }
+  }, [tab.isMuted]);
 
   // Keep address bar in sync if tab.url changes from outside
   useEffect(() => {
@@ -187,6 +204,32 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
       setLoadError(null);
       webviewRef.current.reloadIgnoringCache();
     }
+  };
+
+  const handleZoomIn = () => {
+    if (!webviewRef.current) return;
+    const next = Math.min(200, zoomLevel + 10);
+    setZoomLevel(next);
+    try {
+      webviewRef.current.setZoomFactor(next / 100);
+    } catch {}
+  };
+
+  const handleZoomOut = () => {
+    if (!webviewRef.current) return;
+    const next = Math.max(50, zoomLevel - 10);
+    setZoomLevel(next);
+    try {
+      webviewRef.current.setZoomFactor(next / 100);
+    } catch {}
+  };
+
+  const handleZoomReset = () => {
+    if (!webviewRef.current) return;
+    setZoomLevel(100);
+    try {
+      webviewRef.current.setZoomFactor(1.0);
+    } catch {}
   };
 
   // Toggle interactive DOM element inspector
@@ -465,6 +508,15 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
       }
     };
 
+    const handleMediaStartedPlaying = () => {
+      onUpdateTab?.(tab.id, { isAudible: true });
+    };
+
+    const handleMediaPaused = () => {
+      const isAudible = webview.isCurrentlyAudible ? webview.isCurrentlyAudible() : false;
+      onUpdateTab?.(tab.id, { isAudible });
+    };
+
     webview.addEventListener("did-start-loading", handleDidStartLoading);
     webview.addEventListener("did-stop-loading", handleDidStopLoading);
     webview.addEventListener("did-navigate", handleDidNavigate);
@@ -474,6 +526,8 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
     webview.addEventListener("did-fail-load", handleDidFailLoad);
     webview.addEventListener("console-message", handleConsoleMessage);
     webview.addEventListener("new-window", handleNewWindow);
+    webview.addEventListener("media-started-playing", handleMediaStartedPlaying);
+    webview.addEventListener("media-paused", handleMediaPaused);
 
     return () => {
       webview.removeEventListener("did-start-loading", handleDidStartLoading);
@@ -485,6 +539,8 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
       webview.removeEventListener("did-fail-load", handleDidFailLoad);
       webview.removeEventListener("console-message", handleConsoleMessage);
       webview.removeEventListener("new-window", handleNewWindow);
+      webview.removeEventListener("media-started-playing", handleMediaStartedPlaying);
+      webview.removeEventListener("media-paused", handleMediaPaused);
     };
   }, [tab.id, onUpdateTab, onSelectElementForChat, currentUrl]);
 
@@ -622,6 +678,23 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
           <Sparkles className="w-3.5 h-3.5" />
         </button>
 
+        {/* Audio Mute Quick Toggle */}
+        {tab.isAudible && (
+          <button
+            type="button"
+            onClick={() => onUpdateTab?.(tab.id, { isMuted: !tab.isMuted })}
+            className={`w-7 h-7 rounded-md flex items-center justify-center transition-colors cursor-pointer ${
+              tab.isMuted
+                ? "text-amber-400 hover:bg-amber-400/15"
+                : "text-blue-400 hover:bg-blue-400/15 animate-pulse"
+            }`}
+            title={tab.isMuted ? "Unmute tab" : "Mute tab"}
+            aria-label={tab.isMuted ? "Unmute tab" : "Mute tab"}
+          >
+            {tab.isMuted ? <VolumeX className="w-3.5 h-3.5" /> : <Volume2 className="w-3.5 h-3.5" />}
+          </button>
+        )}
+
         {/* More Options (...) Menu */}
         <div className="relative" ref={moreMenuRef}>
           <button
@@ -674,6 +747,40 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
                 )}
                 <span>{isCopied ? "Copied to clipboard" : "Copy URL"}</span>
               </button>
+
+              {/* Zoom Controls */}
+              <div className="flex items-center justify-between px-2.5 py-1.5 border-t border-[#333333] mt-0.5 pt-1">
+                <span className="text-[11px] text-[#8e8e8e]">Zoom ({zoomLevel}%)</span>
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={handleZoomOut}
+                    disabled={zoomLevel <= 50}
+                    className="p-1 rounded hover:bg-white/10 text-[#a0a0a0] hover:text-white cursor-pointer disabled:opacity-40"
+                    title="Zoom out"
+                  >
+                    <ZoomOut className="w-3 h-3" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleZoomReset}
+                    disabled={zoomLevel === 100}
+                    className="text-[10px] px-1.5 py-0.5 rounded hover:bg-white/10 text-[#a0a0a0] hover:text-white cursor-pointer disabled:opacity-40 font-mono"
+                    title="Reset zoom"
+                  >
+                    100%
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleZoomIn}
+                    disabled={zoomLevel >= 200}
+                    className="p-1 rounded hover:bg-white/10 text-[#a0a0a0] hover:text-white cursor-pointer disabled:opacity-40"
+                    title="Zoom in"
+                  >
+                    <ZoomIn className="w-3 h-3" />
+                  </button>
+                </div>
+              </div>
 
               <div className="border-t border-[#333333] my-1" />
 
@@ -742,9 +849,10 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
           >
             <webview
               ref={webviewRef}
-              src={currentUrl}
+              src={initialUrlRef.current || currentUrl}
               partition="persist:harness_browser"
               allowpopups={true}
+              webpreferences="contextIsolation=yes, backgroundThrottling=no, autoplayPolicy=no-user-gesture-required"
               className="w-full h-full border-none block flex-1"
               style={{
                 display: "inline-flex",

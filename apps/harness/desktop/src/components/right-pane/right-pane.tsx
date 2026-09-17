@@ -85,6 +85,48 @@ export function RightPane({
 
   const activeTab = tabs.find((t) => t.id === activeTabId);
 
+  const renderTabContent = (tab: RightPaneTab) => {
+    switch (tab.type) {
+      case "terminal":
+        return <TerminalTab tab={tab} />;
+      case "task_output":
+        return <TaskOutputTab tab={tab} onStopTask={onStopTask} />;
+      case "review":
+        return (
+          <ReviewTab
+            mutations={mutations}
+            onRollbackFile={onRollbackFile}
+            onRollbackAll={onRollbackAll}
+            onOpenFileDiff={onOpenFileDiff}
+          />
+        );
+      case "file_diff":
+        return <FileDiffTab tab={tab} onRollbackFile={onRollbackFile} />;
+      case "file_preview":
+        return <FilePreviewTab tab={tab} />;
+      case "side_conversation":
+        return (
+          <div className="flex-1 w-full h-full p-4 text-white flex flex-col items-center justify-center text-center">
+            <MessageSquare className="w-8 h-8 mb-2 text-neutral-500 opacity-60" />
+            <h4 className="text-sm font-medium text-neutral-300 mb-1">Side Conversation</h4>
+            <p className="text-xs text-neutral-500 max-w-xs">
+              Open a separate scratchpad conversation alongside your main thread.
+            </p>
+          </div>
+        );
+      case "browser":
+        return (
+          <BrowserTab
+            tab={tab}
+            onUpdateTab={onUpdateTab}
+            onSelectElementForChat={onSelectElementForChat}
+          />
+        );
+      default:
+        return null;
+    }
+  };
+
   return (
     <aside
       className="h-full flex flex-col relative bg-[#141414] border-l border-[#262626] shrink-0 overflow-hidden z-20"
@@ -109,59 +151,35 @@ export function RightPane({
         onCloseTab={onCloseTab}
         onNewTab={onNewTab}
         onReorderTabs={onReorderTabs}
+        onToggleMuteTab={(tabId) => {
+          const target = tabs.find((t) => t.id === tabId);
+          if (target && onUpdateTab) {
+            onUpdateTab(tabId, { isMuted: !target.isMuted });
+          }
+        }}
       />
 
-      {/* Main Tab Body */}
+      {/* Main Tab Body (Persistent Stack keeping tabs alive in DOM) */}
       <div className="flex-1 w-full h-[calc(100%-40px)] min-h-0 relative overflow-hidden flex flex-col bg-[#141414]">
         {isOpeningNewTab || tabs.length === 0 || !activeTab ? (
           /* Empty / New Tab Picker matching Image 2 1:1 */
           <OpenTabView onSelectTabType={onOpenTabType} />
-        ) : activeTab.type === "terminal" ? (
-          /* Interactive Terminal matching Image 1 1:1 */
-          <TerminalTab key={activeTab.id} tab={activeTab} />
-        ) : activeTab.type === "task_output" ? (
-          /* Background Task Output Tab */
-          <TaskOutputTab key={activeTab.id} tab={activeTab} onStopTask={onStopTask} />
-        ) : activeTab.type === "review" ? (
-          /* Review Changes Tab matching Image 3 */
-          <ReviewTab
-            key={activeTab.id}
-            mutations={mutations}
-            onRollbackFile={onRollbackFile}
-            onRollbackAll={onRollbackAll}
-            onOpenFileDiff={onOpenFileDiff}
-          />
-        ) : activeTab.type === "file_diff" ? (
-          /* Single File Diff Tab matching Image 1 & Image 4 */
-          <FileDiffTab
-            key={activeTab.id}
-            tab={activeTab}
-            onRollbackFile={onRollbackFile}
-          />
-        ) : activeTab.type === "file_preview" ? (
-          /* File Preview Tab (Markdown rendered / Code viewer) matching Image 2 */
-          <FilePreviewTab
-            key={activeTab.id}
-            tab={activeTab}
-          />
-        ) : activeTab.type === "side_conversation" ? (
-          /* Side Conversation Tab */
-          <div className="flex-1 w-full h-full p-4 text-white flex flex-col items-center justify-center text-center">
-            <MessageSquare className="w-8 h-8 mb-2 text-neutral-500 opacity-60" />
-            <h4 className="text-sm font-medium text-neutral-300 mb-1">Side Conversation</h4>
-            <p className="text-xs text-neutral-500 max-w-xs">
-              Open a separate scratchpad conversation alongside your main thread.
-            </p>
-          </div>
-        ) : activeTab.type === "browser" ? (
-          /* Browser Tab */
-          <BrowserTab
-            key={activeTab.id}
-            tab={activeTab}
-            onUpdateTab={onUpdateTab}
-            onSelectElementForChat={onSelectElementForChat}
-          />
         ) : null}
+
+        {tabs.map((tab) => {
+          const isTabActive = !isOpeningNewTab && tab.id === activeTabId;
+          return (
+            <div
+              key={tab.id}
+              className={`w-full h-full min-h-0 ${
+                isTabActive ? "flex flex-col flex-1" : "hidden"
+              }`}
+              style={{ display: isTabActive ? "flex" : "none" }}
+            >
+              {renderTabContent(tab)}
+            </div>
+          );
+        })}
       </div>
     </aside>
   );

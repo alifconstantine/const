@@ -26,4 +26,19 @@ export interface RightPaneTab {
   artifactId?: string;
   artifact?: LocalArtifact;
   mindMapData?: any;
+  isAudible?: boolean;
+  isMuted?: boolean;
+}
+
+export interface BrowserSelectedElement {
+  tag: string;
+  id?: string;
+  className?: string;
+  selector: string;
+  rect: { width: number; height: number };
+  color?: string;
+  font?: string;
+  textSnippet?: string;
+  htmlSnippet?: string;
+  url: string;
 }
