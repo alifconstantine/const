@@ -5,6 +5,7 @@ import {
   Button,
   Input,
   ScrollArea,
+  cn,
 } from "@const/ui";
 import {
   Search,
@@ -18,6 +19,17 @@ import {
   Folder,
   Clock,
   Layers,
+  Presentation,
+  SquarePen,
+  HelpCircle,
+  BookOpen,
+  GitFork,
+  AudioLines,
+  Video,
+  FileText,
+  BarChart3,
+  Table2,
+  Package,
 } from "lucide-react";
 
 import { LearnCard, LearnItem } from "./learn-card";
@@ -41,6 +53,101 @@ interface LearnHomeProps {
   user?: UserProfile | null;
   onSignOut?: () => void;
   onSwitchAccount?: () => void;
+}
+
+interface ArtifactConfig {
+  icon: React.ElementType;
+  iconColor: string;
+  bgClass: string;
+}
+
+function getArtifactConfig(type: string, isZip?: boolean): ArtifactConfig {
+  if (isZip) {
+    return {
+      icon: Package,
+      iconColor: "text-orange-600 dark:text-[#fb923c]",
+      bgClass: "bg-orange-500/10 border-orange-500/20",
+    };
+  }
+
+  const normalized = (type || "").toLowerCase().trim();
+
+  switch (normalized) {
+    case "slide":
+    case "slides":
+      return {
+        icon: Presentation,
+        iconColor: "text-amber-600 dark:text-[#fde047]",
+        bgClass: "bg-amber-500/10 border-amber-500/20",
+      };
+    case "note":
+    case "notes":
+      return {
+        icon: SquarePen,
+        iconColor: "text-blue-600 dark:text-[#60a5fa]",
+        bgClass: "bg-blue-500/10 border-blue-500/20",
+      };
+    case "quiz":
+      return {
+        icon: HelpCircle,
+        iconColor: "text-teal-600 dark:text-[#5eead4]",
+        bgClass: "bg-teal-500/10 border-teal-500/20",
+      };
+    case "flashcard":
+    case "flashcards":
+      return {
+        icon: BookOpen,
+        iconColor: "text-emerald-600 dark:text-[#86efac]",
+        bgClass: "bg-emerald-500/10 border-emerald-500/20",
+      };
+    case "mind_map":
+    case "mindmap":
+    case "diagram":
+      return {
+        icon: GitFork,
+        iconColor: "text-pink-600 dark:text-[#f472b6]",
+        bgClass: "bg-pink-500/10 border-pink-500/20",
+      };
+    case "audio_summary":
+    case "audio":
+      return {
+        icon: AudioLines,
+        iconColor: "text-indigo-600 dark:text-[#a5b4fc]",
+        bgClass: "bg-indigo-500/10 border-indigo-500/20",
+      };
+    case "video_summary":
+    case "video":
+      return {
+        icon: Video,
+        iconColor: "text-emerald-600 dark:text-[#86efac]",
+        bgClass: "bg-emerald-500/10 border-emerald-500/20",
+      };
+    case "report":
+      return {
+        icon: FileText,
+        iconColor: "text-stone-600 dark:text-[#dedac2]",
+        bgClass: "bg-stone-500/10 border-stone-500/20",
+      };
+    case "infographic":
+      return {
+        icon: BarChart3,
+        iconColor: "text-purple-600 dark:text-[#c084fc]",
+        bgClass: "bg-purple-500/10 border-purple-500/20",
+      };
+    case "data_table":
+    case "table":
+      return {
+        icon: Table2,
+        iconColor: "text-sky-600 dark:text-[#38bdf8]",
+        bgClass: "bg-sky-500/10 border-sky-500/20",
+      };
+    default:
+      return {
+        icon: Layers,
+        iconColor: "text-muted-foreground",
+        bgClass: "bg-secondary border-border",
+      };
+  }
 }
 
 export function LearnHome({
@@ -732,43 +839,64 @@ export function LearnHome({
 
                 {artifacts.length > 0 ? (
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                    {artifacts.map((art) => (
-                      <div
-                        key={art.id}
-                        className="p-4 rounded-2xl border border-border bg-card hover:border-foreground/20 hover:bg-secondary/40 transition-all flex flex-col justify-between shadow-none"
-                      >
-                        <div className="flex items-start justify-between">
-                          <div className="h-9 w-9 rounded-xl bg-secondary border border-border flex items-center justify-center text-lg shrink-0">
-                            {art.type === "slide" ? "📊" : art.type === "diagram" ? "📐" : "⚡"}
+                    {artifacts.map((art) => {
+                      const config = getArtifactConfig(art.type, art.isZip);
+                      const Icon = config.icon;
+
+                      return (
+                        <div
+                          key={art.id}
+                          onClick={() => {
+                            if (art.learnId && onOpenLearn) {
+                              onOpenLearn(art.learnId);
+                            }
+                          }}
+                          className={cn(
+                            "p-4 rounded-2xl border border-border bg-card hover:border-foreground/20 hover:bg-secondary/40 transition-all flex flex-col justify-between shadow-none",
+                            art.learnId && onOpenLearn && "cursor-pointer group"
+                          )}
+                        >
+                          <div className="flex items-start justify-between">
+                            <div
+                              className={cn(
+                                "h-9 w-9 rounded-xl border flex items-center justify-center shrink-0",
+                                config.bgClass
+                              )}
+                            >
+                              <Icon className={cn("h-4 w-4", config.iconColor)} />
+                            </div>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                localDb.deleteArtifact(art.id);
+                              }}
+                              className="h-7 w-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                              title={t("delete")}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
                           </div>
-                          <button
-                            type="button"
-                            onClick={() => localDb.deleteArtifact(art.id)}
-                            className="h-7 w-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
-                            title={t("delete")}
-                          >
-                            <Trash2 className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
 
-                        <div className="my-3">
-                          <h4 className="text-sm font-medium text-card-foreground line-clamp-2">
-                            {art.title}
-                          </h4>
-                          <span className="inline-block mt-1 text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-secondary text-muted-foreground border border-border">
-                            {art.type}
-                          </span>
-                        </div>
+                          <div className="my-3">
+                            <h4 className="text-sm font-medium text-card-foreground line-clamp-2 group-hover:text-foreground">
+                              {art.title}
+                            </h4>
+                            <span className="inline-block mt-1 text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-secondary text-muted-foreground border border-border">
+                              {art.type.replace(/_/g, " ")}
+                            </span>
+                          </div>
 
-                        <div className="text-[11px] text-muted-foreground pt-1">
-                          {new Intl.DateTimeFormat(language === "id" ? "id-ID" : "en-US", {
-                            day: "numeric",
-                            month: "short",
-                            year: "numeric",
-                          }).format(new Date(art.updatedAt))}
+                          <div className="text-[11px] text-muted-foreground pt-1">
+                            {new Intl.DateTimeFormat(language === "id" ? "id-ID" : "en-US", {
+                              day: "numeric",
+                              month: "short",
+                              year: "numeric",
+                            }).format(new Date(art.updatedAt))}
+                          </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ) : (
                   <div className="text-center py-16 px-4 rounded-2xl border border-dashed border-border bg-card/40">
