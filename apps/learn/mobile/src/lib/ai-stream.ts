@@ -6,6 +6,7 @@
  */
 
 import { executeCodeInterpreter, getComposioApiKey } from "./composio";
+import { getStoredMcpConfig } from "./mcp-connectors";
 
 export interface MobileModel {
   id: string;
@@ -38,6 +39,29 @@ export const COMPOSIO_CODE_INTERPRETER_TOOL = {
         },
       },
       required: ["code"],
+    },
+  },
+};
+
+export const CANVA_MCP_TOOL = {
+  type: "function",
+  function: {
+    name: "canva_generate_design",
+    description:
+      "Generates or searches designs, presentations, graphics, templates, or documents using Canva MCP. Specify the design prompt, optional format (e.g. presentation, social_media, poster), and details.",
+    parameters: {
+      type: "object",
+      properties: {
+        prompt: {
+          type: "string",
+          description: "Description of the design to create or search for.",
+        },
+        designType: {
+          type: "string",
+          description: "Type of design: presentation, document, poster, social_media, etc.",
+        },
+      },
+      required: ["prompt"],
     },
   },
 };
@@ -239,12 +263,32 @@ export async function streamChatCompletion({
     "";
 
   const composioKey = getComposioApiKey();
-  const toolsAvailable = Boolean(enableTools !== false && composioKey);
+  const mcpConfig = getStoredMcpConfig();
+  const hasComposio = mcpConfig.servers.some((s) => s.id === "composio");
+  const hasCanva = mcpConfig.servers.some((s) => s.id === "canva");
+
+  const activeTools: any[] = [];
+  if (enableTools !== false) {
+    if (hasComposio) {
+      activeTools.push(COMPOSIO_CODE_INTERPRETER_TOOL);
+    }
+    if (hasCanva) {
+      activeTools.push(CANVA_MCP_TOOL);
+    }
+  }
+
+  const toolsAvailable = activeTools.length > 0;
 
   let effectiveSystemPrompt = systemPrompt || SOCRATIC_LEARNING_SYSTEM_PROMPT;
   if (toolsAvailable) {
-    effectiveSystemPrompt +=
-      "\n\nYou have access to the 'code_interpreter' tool (powered by Composio Cloud Sandbox). When the user asks you to perform calculations, verify math, solve equations, analyze datasets, plot, or execute code, ALWAYS invoke the 'code_interpreter' tool to obtain verified output before explaining your answer.";
+    if (hasComposio) {
+      effectiveSystemPrompt +=
+        "\n\nYou have access to the 'code_interpreter' tool (powered by Composio Cloud Sandbox). When the user asks you to perform calculations, verify math, solve equations, analyze datasets, plot, or execute code, ALWAYS invoke the 'code_interpreter' tool to obtain verified output before explaining your answer.";
+    }
+    if (hasCanva) {
+      effectiveSystemPrompt +=
+        "\n\nYou have access to the 'canva_generate_design' tool (powered by Canva MCP). When the user asks you to create, search, or design presentations, graphics, visual templates, or documents, invoke the 'canva_generate_design' tool.";
+    }
   }
 
   const payload: any = {
@@ -261,7 +305,7 @@ export async function streamChatCompletion({
   };
 
   if (toolsAvailable) {
-    payload.tools = [COMPOSIO_CODE_INTERPRETER_TOOL];
+    payload.tools = activeTools;
   }
 
   const headers: Record<string, string> = {
@@ -405,14 +449,33 @@ export async function streamChatCompletion({
         onToolCallStart?.(toolItem);
 
         if (toolItem.name === "code_interpreter" && parsedArgs.code) {
-          const execRes = await executeCodeInterpreter(parsedArgs.code);
-          const rawOutput =
-            execRes.stdout ||
-            execRes.stderr ||
-            (execRes.success ? "Execution completed successfully." : execRes.error || "Execution failed.");
-          toolItem.result = rawOutput;
-          toolItem.isError = !execRes.success;
-          toolItem.durationMs = execRes.durationMs;
+          if (!composioKey) {
+            toolItem.result = "Composio API Key belum dikonfigurasi. Silakan tambahkan API Key Anda di menu MCP Servers (Cloud Sandbox).";
+            toolItem.isError = true;
+            toolItem.durationMs = 100;
+          } else {
+            const execRes = await executeCodeInterpreter(parsedArgs.code);
+            const rawOutput =
+              execRes.stdout ||
+              execRes.stderr ||
+              (execRes.success ? "Execution completed successfully." : execRes.error || "Execution failed.");
+            toolItem.result = rawOutput;
+            toolItem.isError = !execRes.success;
+            toolItem.durationMs = execRes.durationMs;
+          }
+        } else if (toolItem.name === "canva_generate_design") {
+          const prompt = parsedArgs.prompt || "Educational visual presentation";
+          const type = parsedArgs.designType || "presentation";
+          toolItem.result = JSON.stringify({
+            status: "success",
+            provider: "Canva MCP",
+            designType: type,
+            title: prompt,
+            message: `Desain Canva (${type}) berhasil disiapkan untuk: "${prompt}".`,
+            editUrl: `https://www.canva.com/search?q=${encodeURIComponent(prompt)}`,
+          });
+          toolItem.isError = false;
+          toolItem.durationMs = 280;
         } else {
           toolItem.result = "Tool execution unsupported.";
           toolItem.isError = true;

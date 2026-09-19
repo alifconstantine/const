@@ -765,6 +765,7 @@ app.on("second-instance", (_event, commandLine) => {
         maxOutputTokens?: number;
         systemPrompt?: string;
         temperature?: number;
+        mcpServers?: any[];
       }
     ) => {
       const config = loadUserConfig();
@@ -810,13 +811,22 @@ app.on("second-instance", (_event, commandLine) => {
         }
       }
 
+      let effectiveSystemPrompt = payload.systemPrompt;
+      if (payload.mcpServers && Array.isArray(payload.mcpServers) && payload.mcpServers.length > 0) {
+        const mcpSummary = payload.mcpServers
+          .map((s: any) => `- ${s.name} (${s.transport}): ${s.command ? `${s.command} ${s.args?.join(" ")}` : s.url}`)
+          .join("\n");
+        effectiveSystemPrompt = (effectiveSystemPrompt || "") +
+          `\n\n[CONNECTED MCP SERVERS]:\nYou have the following Model Context Protocol (MCP) servers configured in your workspace:\n${mcpSummary}\nYou can interact with and invoke these MCP servers using your terminal tools ('run_command' or 'bash') whenever relevant to user instructions.`;
+      }
+
       activeAgent = createConstAgent({
         baseUrl,
         apiKey,
         model,
         workspacePath: targetWorkspace,
         preset: "learn",
-        systemPrompt: payload.systemPrompt,
+        systemPrompt: effectiveSystemPrompt,
         mode: payload.mode || "ask_before_changes",
         thinkingLevel: payload.thinkingLevel as any,
         maxOutputTokens: payload.maxOutputTokens ?? (modelDef as any)?.maxOutputTokens,

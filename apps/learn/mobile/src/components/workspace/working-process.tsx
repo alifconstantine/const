@@ -51,7 +51,7 @@ export function SmoothCollapse({
 
 /**
  * ThinkingProcess / WorkingProcess (Mobile):
- * Clean minimalist accordion rendering reasoning traces and tool executions (Code Interpreter).
+ * Clean minimalist accordion rendering reasoning traces and tool executions (Cloud Sandbox).
  */
 export function ThinkingProcess({
   thinking = "",
@@ -95,8 +95,8 @@ export function ThinkingProcess({
       const liveSeconds = Math.round(liveStepDuration / 1000);
       if (isRunningTool) {
         return liveSeconds >= 1
-          ? `Running Code Interpreter (${liveSeconds}s)...`
-          : "Running Code Interpreter...";
+          ? `Running Cloud Sandbox (${liveSeconds}s)...`
+          : "Running Cloud Sandbox...";
       }
       if (liveSeconds >= 1) {
         return `Thinking (${liveSeconds}s)...`;
@@ -158,7 +158,7 @@ export function ThinkingProcess({
                       <div className="flex items-center justify-between text-[11.5px]">
                         <div className="flex items-center gap-1.5 font-medium text-foreground">
                           <Terminal className="w-3.5 h-3.5 text-foreground shrink-0" />
-                          <span>Code Interpreter</span>
+                          <span>Cloud Sandbox</span>
                           {isPython && (
                             <span className="text-[9.5px] px-1.5 py-0.2 rounded bg-secondary text-muted-foreground border border-border/50 font-mono">
                               python

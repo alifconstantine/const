@@ -53,6 +53,18 @@ export function getComposioApiKey(): string {
   if (typeof window !== "undefined") {
     const localKey = localStorage.getItem("composio_api_key");
     if (localKey) return localKey;
+
+    // Check MCP configuration stored under const_mcp_configuration_mobile_v3
+    try {
+      const rawMcp = localStorage.getItem("const_mcp_configuration_mobile_v3");
+      if (rawMcp) {
+        const parsed = JSON.parse(rawMcp);
+        const composioServer = parsed?.servers?.find((s: any) => s.id === "composio");
+        if (composioServer?.env?.COMPOSIO_API_KEY) {
+          return composioServer.env.COMPOSIO_API_KEY;
+        }
+      }
+    } catch {}
   }
 
   return "";

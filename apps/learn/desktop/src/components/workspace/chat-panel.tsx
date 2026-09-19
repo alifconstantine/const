@@ -1503,6 +1503,17 @@ export function ChatPanel({
           localStorage.getItem("const_sso_token") ||
           "";
 
+        const storedMcp = localStorage.getItem("const_mcp_configuration_v3");
+        let parsedMcpServers: any = undefined;
+        try {
+          if (storedMcp) {
+            const parsed = JSON.parse(storedMcp);
+            if (Array.isArray(parsed?.servers) && parsed.servers.length > 0) {
+              parsedMcpServers = parsed.servers;
+            }
+          }
+        } catch {}
+
         const res = await electron.agent.sendMessage({
           messages: formattedMessages,
           systemPrompt: systemPrompt,
@@ -1513,6 +1524,7 @@ export function ChatPanel({
           mode: permissionMode || "ask_before_changes",
           temperature: carriedSources.length > 0 ? 0.2 : 0.7,
           thinkingLevel: currentModel.supportsThinking ? thinkingLevel : undefined,
+          mcpServers: parsedMcpServers,
         });
 
         const finalDuration = streamStartTimeRef.current
