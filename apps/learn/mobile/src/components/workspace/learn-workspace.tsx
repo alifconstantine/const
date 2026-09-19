@@ -392,7 +392,7 @@ const STUDIO_TOOLS: StudioTool[] = [
   },
   {
     id: "data_table",
-    name: "Data Table",
+    name: "Cheat Sheet",
     icon: Table2,
     iconColor: "text-sky-600 dark:text-[#38bdf8]",
     textColor: "text-sky-950 dark:text-[#e0f2fe]",
