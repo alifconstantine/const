@@ -167,13 +167,83 @@ export interface AudioSummaryData {
   audioError?: string;
 }
 
+export interface VideoSummaryScene {
+  id: string;
+  sceneNumber: number;
+  title: string;
+  narrationText: string;
+  audioUrl?: string;
+  audioBase64?: string;
+  audioFilename?: string;
+  durationSeconds: number;
+  archetype?: "hero" | "flow_diagram" | "comparison" | "metrics" | "cards" | "takeaway" | string;
+  layout?: "hero" | "split" | "bullets" | "stat" | "comparison" | "quote" | "takeaway" | "concept" | string;
+  subtitle?: string;
+  bullets?: string[];
+  keypoints?: string[];
+  visualNote?: string;
+  visualData?: {
+    steps?: Array<{ label: string; desc: string; tag?: string }>;
+    cards?: Array<{ title: string; desc: string; metric?: string; highlight?: boolean }>;
+    metrics?: Array<{ value: string; label: string; desc?: string; badge?: string }>;
+    comparison?: { leftTitle: string; leftItems: string[]; rightTitle: string; rightItems: string[] };
+    takeaways?: string[];
+  };
+  statHighlight?: { value: string; label: string; context?: string };
+  comparison?: { leftTitle: string; leftItems: string[]; rightTitle: string; rightItems: string[] };
+  quote?: { text: string; author?: string };
+}
+
+export interface VideoSummaryTheme {
+  archetype?: "minimal_editorial" | "bold_tech" | "warm_academic" | "dark_luminous" | "vibrant_creative" | string;
+  primaryColor: string;
+  secondaryColor?: string;
+  backgroundColor: string;
+  accentColor: string;
+  textColor: string;
+  fontHeading?: string;
+  fontBody?: string;
+}
+
+export interface VideoSummaryData {
+  id?: string;
+  learnId?: string;
+  title: string;
+  topic?: string;
+  coverageMode: "short" | "long" | "auto";
+  language: "id" | "en" | string;
+  voiceProviderId?: string;
+  voiceModel?: string;
+  voiceId?: string;
+  voiceName?: string;
+  totalDurationSeconds: number;
+  combinedAudioUrl?: string;
+  combinedAudioBase64?: string;
+  masterAudioRelative?: string;
+  projectPath?: string;
+  mp4Path?: string;
+  mp4Url?: string;
+  renderingStatus?: "idle" | "rendering" | "completed" | "error";
+  renderingError?: string;
+  theme?: VideoSummaryTheme;
+  audioError?: string;
+  hyperframesHtml?: string;
+  scenes: VideoSummaryScene[];
+  sourceCount?: number;
+  sourceTitles?: string[];
+  sourceIds?: string[];
+  customInstructions?: string;
+  createdAt?: number;
+  updatedAt?: number;
+}
+
 export interface LocalArtifact {
   id: string;
   learnId?: string;
   title: string;
   type: string;
   content?: string;
-  data?: QuizData | FlashcardData | MindMapData | SlideDeckData | AudioSummaryData | any;
+  data?: QuizData | FlashcardData | MindMapData | SlideDeckData | AudioSummaryData | VideoSummaryData | any;
   fileUrl?: string;
   isZip?: boolean;
   status?: "generating" | "completed" | "error";

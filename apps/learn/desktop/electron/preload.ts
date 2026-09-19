@@ -90,6 +90,51 @@ contextBridge.exposeInMainWorld("electron", {
       speakingRate?: number;
     }) => ipcRenderer.invoke("inworld:test-voice", payload),
   },
+  video: {
+    getProjectPath: (payload: { learnId: string; artifactId: string }) =>
+      ipcRenderer.invoke("video:get-project-path", payload),
+    synthesizeScenes: (payload: {
+      learnId: string;
+      artifactId: string;
+      apiKey: string;
+      model?: string;
+      voiceId?: string;
+      language?: string;
+      scenes: Array<{ sceneNumber: number; id: string; narrationText: string }>;
+    }) => ipcRenderer.invoke("video:synthesize-scenes", payload),
+    stitchAudio: (payload: {
+      learnId: string;
+      artifactId: string;
+      sceneAudios: Array<{
+        sceneNumber: number;
+        filename: string;
+        startMs: number;
+      }>;
+      totalDurationSeconds: number;
+    }) => ipcRenderer.invoke("video:stitch-audio", payload),
+    saveComposition: (payload: {
+      learnId: string;
+      artifactId: string;
+      htmlContent: string;
+      hyperframesJson?: string;
+    }) => ipcRenderer.invoke("video:save-composition", payload),
+    renderMp4: (payload: {
+      learnId: string;
+      artifactId: string;
+    }) => ipcRenderer.invoke("video:render-mp4", payload),
+    checkStatus: (payload: {
+      learnId: string;
+      artifactId: string;
+      projectPath?: string;
+    }) => ipcRenderer.invoke("video:check-status", payload),
+    onRenderProgress: (callback: (data: { artifactId: string; chunk: string }) => void) => {
+      const handler = (_event: any, data: any) => callback(data);
+      ipcRenderer.on("video:render-progress", handler);
+      return () => {
+        ipcRenderer.removeListener("video:render-progress", handler);
+      };
+    },
+  },
   minimize: () => ipcRenderer.send("window:minimize"),
   maximize: () => ipcRenderer.send("window:maximize"),
   close: () => ipcRenderer.send("window:close"),

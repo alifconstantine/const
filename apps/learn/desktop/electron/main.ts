@@ -1,7 +1,8 @@
-import { app, BrowserWindow, shell, ipcMain, dialog, Menu, nativeTheme } from "electron";
+import { app, BrowserWindow, shell, ipcMain, dialog, Menu, nativeTheme, protocol, net } from "electron";
 import path from "node:path";
 import fs from "node:fs";
 import os from "node:os";
+import { Readable } from "node:stream";
 import {
   createConstAgent,
   DEFAULT_MODELS,
@@ -14,6 +15,30 @@ import {
   stopLoopbackAuthServer,
   registerLinuxProtocolHandler,
 } from "./auth-server.js";
+
+// Top-level crash guards to prevent unexpected termination or silent app exits
+process.on("uncaughtException", (err) => {
+  console.error("[Electron Main uncaughtException]", err);
+});
+
+process.on("unhandledRejection", (reason) => {
+  console.error("[Electron Main unhandledRejection]", reason);
+});
+
+// Register privileged custom protocol for streaming local video artifacts
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: "const-media",
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      stream: true,
+      bypassCSP: true,
+      corsEnabled: true,
+    },
+  },
+]);
 
 // Initialize ~/.const/learn directory hierarchy
 const constHomeDir = path.join(os.homedir(), ".const");
@@ -363,6 +388,18 @@ app.on("second-instance", (_event, commandLine) => {
 
     win.webContents.on("did-fail-load", (_event, errorCode, errorDescription, validatedURL) => {
       console.error(`[Electron did-fail-load] Code ${errorCode}: ${errorDescription} (${validatedURL})`);
+    });
+
+    win.webContents.on("render-process-gone", (_event, details) => {
+      console.error(`[Electron] Renderer process gone! Reason: ${details.reason}, exitCode: ${details.exitCode}`);
+    });
+
+    win.on("unresponsive", () => {
+      console.warn("[Electron] Window message pump became unresponsive!");
+    });
+
+    win.on("responsive", () => {
+      console.log("[Electron] Window message pump is responsive again.");
     });
 
     win.webContents.on("did-finish-load", () => {
@@ -1285,7 +1322,578 @@ app.on("second-instance", (_event, commandLine) => {
     }
   );
 
+  // ==================== VIDEO SUMMARY IPC HANDLERS ====================
+  ipcMain.handle(
+    "video:get-project-path",
+    async (_event, payload: { learnId: string; artifactId: string }) => {
+      const projDir = path.join(
+        learnWorkspacesDir,
+        payload.learnId || "default",
+        "video_summaries",
+        payload.artifactId || `art_${Date.now()}`
+      );
+      const audioDir = path.join(projDir, "audio");
+      if (!fs.existsSync(audioDir)) {
+        fs.mkdirSync(audioDir, { recursive: true });
+      }
+      return { success: true, projectPath: projDir, audioPath: audioDir };
+    }
+  );
+
+  ipcMain.handle(
+    "video:synthesize-scenes",
+    async (
+      _event,
+      payload: {
+        learnId: string;
+        artifactId: string;
+        apiKey: string;
+        model?: string;
+        voiceId?: string;
+        language?: string;
+        scenes: Array<{ sceneNumber: number; id: string; narrationText: string }>;
+      }
+    ) => {
+      try {
+        const cleanKey = (payload.apiKey || "").trim();
+        let authHeader = cleanKey;
+        if (authHeader) {
+          if (authHeader.toLowerCase().startsWith("bearer ")) {
+            authHeader = `Basic ${authHeader.slice(7).trim()}`;
+          } else if (!authHeader.toLowerCase().startsWith("basic ")) {
+            if (authHeader.includes(":") && !authHeader.includes(" ")) {
+              authHeader = `Basic ${Buffer.from(authHeader).toString("base64")}`;
+            } else {
+              authHeader = `Basic ${authHeader}`;
+            }
+          }
+        }
+
+        const projDir = path.join(
+          learnWorkspacesDir,
+          payload.learnId || "default",
+          "video_summaries",
+          payload.artifactId || `art_${Date.now()}`
+        );
+        const audioDir = path.join(projDir, "audio");
+        if (!fs.existsSync(audioDir)) {
+          fs.mkdirSync(audioDir, { recursive: true });
+        }
+
+        const modelId = payload.model || "inworld-tts-2";
+        const voiceId = payload.voiceId || "Ashley";
+        const sceneAudios: Array<{
+          sceneNumber: number;
+          id: string;
+          filename: string;
+          filePath: string;
+          audioBase64?: string;
+          durationSeconds: number;
+        }> = [];
+
+        for (const scene of payload.scenes) {
+          const text = (scene.narrationText || "").trim();
+          if (!text) continue;
+
+          const filename = `scene_${scene.sceneNumber}.mp3`;
+          const outPath = path.join(audioDir, filename);
+
+          let audioBuffer: Buffer | null = null;
+          if (authHeader) {
+            try {
+              const synthRes = await fetch("https://api.inworld.ai/tts/v1/voice", {
+                method: "POST",
+                headers: {
+                  Authorization: authHeader,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  text,
+                  voiceId,
+                  modelId,
+                  audioConfig: { audioEncoding: "MP3" },
+                }),
+              });
+
+              if (synthRes.ok) {
+                const contentType = synthRes.headers.get("content-type") || "";
+                if (contentType.includes("application/json")) {
+                  const json: any = await synthRes.json();
+                  const b64 = json.audioContent || json.audio_content || json.audio;
+                  if (b64) audioBuffer = Buffer.from(b64, "base64");
+                } else {
+                  audioBuffer = Buffer.from(await synthRes.arrayBuffer());
+                }
+              } else {
+                const errText = await synthRes.text().catch(() => "");
+                console.error(`[Electron Video] Scene ${scene.sceneNumber} TTS HTTP ${synthRes.status}:`, errText);
+              }
+            } catch (err) {
+              console.warn(`[Electron Video] Scene ${scene.sceneNumber} TTS error:`, err);
+            }
+          }
+
+          let measuredDur = 4.0;
+          let sceneBase64: string | undefined = undefined;
+          if (audioBuffer && audioBuffer.length > 0) {
+            fs.writeFileSync(outPath, audioBuffer);
+            sceneBase64 = `data:audio/mp3;base64,${audioBuffer.toString("base64")}`;
+            // Probe audio duration via ffprobe or estimate from MP3 byte size (~128kbps = 16000 bytes/sec)
+            try {
+              const { exec } = await import("node:child_process");
+              await new Promise<void>((resolveProbe) => {
+                exec(
+                  `ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "${outPath}"`,
+                  { encoding: "utf-8", timeout: 3000 },
+                  (err, stdout) => {
+                    if (!err && stdout) {
+                      const durParsed = parseFloat(stdout.trim());
+                      if (!isNaN(durParsed) && durParsed > 0.5) {
+                        measuredDur = durParsed;
+                      }
+                    }
+                    resolveProbe();
+                  }
+                );
+              });
+            } catch {
+              measuredDur = Math.max(3.0, Math.round((audioBuffer.length / 16000) * 10) / 10);
+            }
+          } else {
+            // Fallback word count if TTS failed
+            const words = text.split(/\s+/).filter(Boolean).length;
+            measuredDur = Math.max(3.5, Math.round((words / 2.3) * 10) / 10 + 0.8);
+          }
+
+          sceneAudios.push({
+            sceneNumber: scene.sceneNumber,
+            id: scene.id,
+            filename,
+            filePath: outPath,
+            audioBase64: sceneBase64,
+            durationSeconds: measuredDur,
+          });
+        }
+
+        return { success: true, sceneAudios, projectPath: projDir, audioPath: audioDir };
+      } catch (err: any) {
+        console.error("[Electron Video] synthesize-scenes error:", err);
+        return { success: false, error: err.message || "Failed to synthesize scenes" };
+      }
+    }
+  );
+
+  ipcMain.handle(
+    "video:stitch-audio",
+    async (
+      _event,
+      payload: {
+        learnId: string;
+        artifactId: string;
+        sceneAudios: Array<{
+          sceneNumber: number;
+          filename: string;
+          startMs: number;
+        }>;
+        totalDurationSeconds: number;
+      }
+    ) => {
+      try {
+        const projDir = path.join(
+          learnWorkspacesDir,
+          payload.learnId || "default",
+          "video_summaries",
+          payload.artifactId || `art_${Date.now()}`
+        );
+        const audioDir = path.join(projDir, "audio");
+        const outMasterPath = path.join(audioDir, "full_narration.mp3");
+
+        const validAudios = (payload.sceneAudios || []).filter((s) =>
+          fs.existsSync(path.join(audioDir, s.filename))
+        );
+
+        if (validAudios.length === 0) {
+          return { success: false, error: "No scene audio files found to stitch." };
+        }
+
+        if (validAudios.length === 1) {
+          const singleSrc = path.join(audioDir, validAudios[0]!.filename);
+          fs.copyFileSync(singleSrc, outMasterPath);
+          const masterB64 = fs.readFileSync(outMasterPath).toString("base64");
+          return {
+            success: true,
+            masterAudioPath: outMasterPath,
+            masterAudioRelative: "audio/full_narration.mp3",
+            masterAudioBase64: `data:audio/mp3;base64,${masterB64}`,
+          };
+        }
+
+        // Build ffmpeg adelay + amix filter complex
+        let inputsStr = "";
+        let filterStr = "";
+        let amixInputs = "";
+
+        validAudios.forEach((scene, idx) => {
+          const src = path.join(audioDir, scene.filename);
+          inputsStr += `-i "${src}" `;
+          const delay = Math.max(0, Math.round(scene.startMs));
+          filterStr += `[${idx}:a]adelay=${delay}|${delay}[a${idx}]; `;
+          amixInputs += `[a${idx}]`;
+        });
+
+        filterStr += `${amixInputs}amix=inputs=${validAudios.length}:duration=longest:dropout_transition=0:normalize=0[out]`;
+
+        const totalSec = Math.max(1, payload.totalDurationSeconds).toFixed(2);
+        const cmd = `ffmpeg -y ${inputsStr}-filter_complex "${filterStr}" -map "[out]" -t ${totalSec} "${outMasterPath}"`;
+
+        const { exec } = await import("node:child_process");
+        await new Promise<void>((resolveFfmpeg) => {
+          exec(cmd, { timeout: 45000 }, (ffmpegErr) => {
+            if (ffmpegErr) {
+              console.warn("[Electron Video] ffmpeg stitch failed or unavailable, falling back to buffer concatenation:", ffmpegErr.message);
+              try {
+                const buffers: Buffer[] = validAudios.map((s) => fs.readFileSync(path.join(audioDir, s.filename)));
+                fs.writeFileSync(outMasterPath, Buffer.concat(buffers));
+              } catch (concatErr) {
+                console.error("[Electron Video] Fallback concat error:", concatErr);
+              }
+            }
+            resolveFfmpeg();
+          });
+        });
+
+        const masterB64 = fs.readFileSync(outMasterPath).toString("base64");
+        return {
+          success: true,
+          masterAudioPath: outMasterPath,
+          masterAudioRelative: "audio/full_narration.mp3",
+          masterAudioBase64: `data:audio/mp3;base64,${masterB64}`,
+        };
+      } catch (err: any) {
+        console.error("[Electron Video] stitch-audio error:", err);
+        return { success: false, error: err.message || "Failed to stitch audio" };
+      }
+    }
+  );
+
+  ipcMain.handle(
+    "video:save-composition",
+    async (
+      _event,
+      payload: {
+        learnId: string;
+        artifactId: string;
+        htmlContent: string;
+        hyperframesJson?: string;
+      }
+    ) => {
+      try {
+        const projDir = path.join(
+          learnWorkspacesDir,
+          payload.learnId || "default",
+          "video_summaries",
+          payload.artifactId || `art_${Date.now()}`
+        );
+        if (!fs.existsSync(projDir)) {
+          fs.mkdirSync(projDir, { recursive: true });
+        }
+
+        const indexPath = path.join(projDir, "index.html");
+        fs.writeFileSync(indexPath, payload.htmlContent, "utf-8");
+
+        const hfConfigPath = path.join(projDir, "hyperframes.json");
+        const defaultHfConfig = JSON.stringify(
+          {
+            $schema: "https://hyperframes.heygen.com/schema/hyperframes.json",
+            media: { autoProxy: true },
+            paths: {
+              assets: "assets",
+              blocks: "compositions",
+              components: "compositions/components",
+            },
+            registry: "https://raw.githubusercontent.com/heygen-com/hyperframes/main/registry",
+          },
+          null,
+          2
+        );
+        fs.writeFileSync(hfConfigPath, payload.hyperframesJson || defaultHfConfig, "utf-8");
+
+        const packageJsonPath = path.join(projDir, "package.json");
+        if (!fs.existsSync(packageJsonPath)) {
+          fs.writeFileSync(
+            packageJsonPath,
+            JSON.stringify(
+              {
+                name: `video-summary-${payload.artifactId}`,
+                private: true,
+                type: "module",
+                scripts: {
+                  check: "npx --yes hyperframes check",
+                  preview: "npx --yes hyperframes preview",
+                  render: "npx --yes hyperframes render",
+                },
+              },
+              null,
+              2
+            ),
+            "utf-8"
+          );
+        }
+
+        return {
+          success: true,
+          projectPath: projDir,
+          indexPath,
+          hyperframesJsonPath: hfConfigPath,
+        };
+      } catch (err: any) {
+        console.error("[Electron Video] save-composition error:", err);
+        return { success: false, error: err.message || "Failed to save composition" };
+      }
+    }
+  );
+
+  ipcMain.handle(
+    "video:render-mp4",
+    async (
+      _event,
+      payload: {
+        learnId: string;
+        artifactId: string;
+      }
+    ) => {
+      try {
+        const projDir = path.join(
+          learnWorkspacesDir,
+          payload.learnId || "default",
+          "video_summaries",
+          payload.artifactId || `art_${Date.now()}`
+        );
+        const outMp4Path = path.join(projDir, "video.mp4");
+
+        if (!fs.existsSync(projDir)) {
+          return { success: false, error: `Project directory does not exist: ${projDir}` };
+        }
+
+        const indexPath = path.join(projDir, "index.html");
+        if (!fs.existsSync(indexPath)) {
+          return { success: false, error: `Composition index.html not found in: ${projDir}` };
+        }
+
+        console.log("[Electron Video] Starting non-blocking async HyperFrames render in:", projDir);
+
+        const { spawn } = await import("node:child_process");
+
+        return await new Promise<{ success: boolean; mp4Path?: string; mp4Url?: string; error?: string }>((resolve) => {
+          const isWin = process.platform === "win32";
+          const cmd = isWin ? "npx.cmd" : "npx";
+          const args = ["--yes", "hyperframes", "render", ".", "-o", outMp4Path];
+
+          let stdoutData = "";
+          let stderrData = "";
+
+          const child = spawn(cmd, args, {
+            cwd: projDir,
+            shell: true,
+            windowsHide: true,
+            env: {
+              ...process.env,
+              PUPPETEER_DISABLE_HEADLESS_WARNING: "true",
+            },
+          });
+
+          child.stdout?.on("data", (chunk: Buffer) => {
+            const text = chunk.toString();
+            stdoutData += text;
+            console.log("[HyperFrames Render]", text.trim());
+            if (win && !win.isDestroyed()) {
+              win.webContents.send("video:render-progress", {
+                artifactId: payload.artifactId,
+                chunk: text,
+              });
+            }
+          });
+
+          child.stderr?.on("data", (chunk: Buffer) => {
+            const text = chunk.toString();
+            stderrData += text;
+            console.warn("[HyperFrames Render stderr]", text.trim());
+          });
+
+          child.on("error", (err: any) => {
+            console.error("[Electron Video] Spawn error:", err);
+            resolve({ success: false, error: err?.message || "Failed to start render process" });
+          });
+
+          child.on("close", (code: number) => {
+            console.log("[Electron Video] HyperFrames render process exited with code:", code);
+            if (code === 0 && fs.existsSync(outMp4Path)) {
+              resolve({
+                success: true,
+                mp4Path: outMp4Path,
+                mp4Url: `const-media://file/${outMp4Path.replace(/\\/g, "/")}`,
+              });
+            } else {
+              const errMsg = stderrData.trim() || stdoutData.trim() || `Render exited with code ${code}`;
+              resolve({
+                success: false,
+                error: errMsg.slice(-400),
+              });
+            }
+          });
+
+          // 5 minute safeguard timeout
+          const timer = setTimeout(() => {
+            try {
+              child.kill();
+            } catch {}
+            resolve({
+              success: false,
+              error: "Render timed out after 5 minutes",
+            });
+          }, 300000);
+
+          child.on("exit", () => clearTimeout(timer));
+        });
+      } catch (err: any) {
+        console.error("[Electron Video] render-mp4 error:", err);
+        return { success: false, error: err.message || "Failed to render video" };
+      }
+    }
+  );
+
+  ipcMain.handle(
+    "video:check-status",
+    async (
+      _event,
+      payload: {
+        learnId: string;
+        artifactId: string;
+        projectPath?: string;
+      }
+    ) => {
+      try {
+        let mp4Path = "";
+        if (payload.projectPath && fs.existsSync(path.join(payload.projectPath, "video.mp4"))) {
+          mp4Path = path.join(payload.projectPath, "video.mp4");
+        } else if (payload.artifactId) {
+          const projDir = path.join(
+            learnWorkspacesDir,
+            payload.learnId || "default",
+            "video_summaries",
+            payload.artifactId
+          );
+          if (fs.existsSync(path.join(projDir, "video.mp4"))) {
+            mp4Path = path.join(projDir, "video.mp4");
+          }
+        }
+
+        if (mp4Path && fs.existsSync(mp4Path)) {
+          const stats = fs.statSync(mp4Path);
+          if (stats.size > 1000) {
+            return {
+              success: true,
+              exists: true,
+              mp4Path,
+              mp4Url: `const-media://file/${mp4Path.replace(/\\/g, "/")}`,
+            };
+          }
+        }
+        return { success: true, exists: false };
+      } catch (err: any) {
+        return { success: false, exists: false, error: err.message };
+      }
+    }
+  );
+
   app.whenReady().then(() => {
+    // Register protocol handler for streaming local video and audio artifacts
+    protocol.handle("const-media", (request) => {
+      try {
+        const urlObj = new URL(request.url);
+        let filePath = decodeURIComponent(urlObj.pathname);
+        if (process.platform === "win32" && filePath.startsWith("/")) {
+          filePath = filePath.slice(1);
+        }
+        if (urlObj.host && urlObj.host !== "file") {
+          filePath = `${urlObj.host}:${filePath}`;
+        }
+        filePath = path.normalize(filePath);
+
+        if (!fs.existsSync(filePath)) {
+          return new Response("Media not found", { status: 404 });
+        }
+
+        const stat = fs.statSync(filePath);
+        const fileSize = stat.size;
+
+        const ext = path.extname(filePath).toLowerCase();
+        const mimeTypes: Record<string, string> = {
+          ".mp4": "video/mp4",
+          ".webm": "video/webm",
+          ".ogg": "video/ogg",
+          ".mp3": "audio/mpeg",
+          ".wav": "audio/wav",
+          ".m4a": "audio/mp4",
+          ".png": "image/png",
+          ".jpg": "image/jpeg",
+          ".jpeg": "image/jpeg",
+          ".gif": "image/gif",
+          ".svg": "image/svg+xml",
+        };
+        const contentType = mimeTypes[ext] || "application/octet-stream";
+
+        const rangeHeader = request.headers.get("Range") || request.headers.get("range");
+        if (rangeHeader) {
+          const match = rangeHeader.match(/bytes=(\d+)-(\d*)/);
+          if (match && match[1]) {
+            const start = parseInt(match[1], 10);
+            const end = match[2] ? parseInt(match[2], 10) : fileSize - 1;
+
+            if (start >= fileSize || end >= fileSize || start > end) {
+              return new Response(null, {
+                status: 416,
+                statusText: "Range Not Satisfiable",
+                headers: {
+                  "Content-Range": `bytes */${fileSize}`,
+                  "Accept-Ranges": "bytes",
+                },
+              });
+            }
+
+            const chunkSize = end - start + 1;
+            const nodeStream = fs.createReadStream(filePath, { start, end });
+            const webStream = Readable.toWeb(nodeStream) as any;
+
+            return new Response(webStream, {
+              status: 206,
+              statusText: "Partial Content",
+              headers: {
+                "Content-Range": `bytes ${start}-${end}/${fileSize}`,
+                "Accept-Ranges": "bytes",
+                "Content-Length": String(chunkSize),
+                "Content-Type": contentType,
+              },
+            });
+          }
+        }
+
+        const nodeStream = fs.createReadStream(filePath);
+        const webStream = Readable.toWeb(nodeStream) as any;
+        return new Response(webStream, {
+          status: 200,
+          headers: {
+            "Accept-Ranges": "bytes",
+            "Content-Length": String(fileSize),
+            "Content-Type": contentType,
+          },
+        });
+      } catch (err) {
+        console.error("[const-media] Protocol fetch error:", err);
+        return new Response("Internal Server Error", { status: 500 });
+      }
+    });
+
     // Check if launched directly with a deep link on cold start
     const initialArg = process.argv.find((arg) =>
       arg.includes(`${PROTOCOL_NAME}://`)

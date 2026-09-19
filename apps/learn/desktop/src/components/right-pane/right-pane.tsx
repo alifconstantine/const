@@ -47,11 +47,12 @@ import { QuizViewer } from "./quiz-viewer";
 import { FlashcardViewer } from "./flashcard-viewer";
 import { MindMapTab } from "./mind-map-tab";
 import { AudioSummaryViewer } from "./audio-summary-viewer";
+import { VideoSummaryViewer } from "./video-summary-viewer";
 import { STUDIO_TOOLS } from "../workspace/studio-panel";
 import { useI18n } from "../../lib/i18n";
 import type { RightPaneTab, RightPaneTabType, BrowserSelectedElement } from "./types";
 import type { FileMutationRecord } from "@const/agent";
-import type { LocalArtifact, AudioSummaryData } from "../../lib/db";
+import type { LocalArtifact, AudioSummaryData, VideoSummaryData } from "../../lib/db";
 
 export interface GeneratingArtifactStatus {
   id: string;
@@ -310,6 +311,33 @@ export function RightPane({
               artifact={tab.artifact}
               data={audioData}
               onExplainInChat={onExplainInChat}
+            />
+          );
+        }
+      }
+      if (tab.artifact?.type === "video_summary") {
+        const videoData =
+          (tab.artifact.data as VideoSummaryData) ||
+          (() => {
+            try {
+              return typeof tab.artifact.content === "string"
+                ? JSON.parse(tab.artifact.content)
+                : null;
+            } catch {
+              return null;
+            }
+          })();
+        if (videoData) {
+          return (
+            <VideoSummaryViewer
+              data={{
+                ...videoData,
+                id: tab.artifact.id || videoData.id,
+                learnId: tab.artifact.learnId || videoData.learnId,
+              }}
+              onExplainInChat={onExplainInChat}
+              onToggleExpand={onToggleCollapse}
+              isExpanded={!isCollapsed}
             />
           );
         }
@@ -589,7 +617,10 @@ export function RightPane({
                         const isMindMap = art.type === "mind_map";
                         const isQuiz = art.type === "quiz";
                         const isFlashcard = art.type === "flashcard" || art.type === "flashcards";
-                        const defaultGeneratingTitle = isMindMap
+                        const isVideo = art.type === "video_summary";
+                        const defaultGeneratingTitle = isVideo
+                          ? (language === "id" ? "Membuat Ringkasan Video..." : "Creating Video Summary...")
+                          : isMindMap
                           ? (language === "id" ? "Membuat Peta Pikiran..." : "Creating Mind Map...")
                           : isQuiz
                           ? (language === "id" ? "Membuat Kuis..." : "Creating Quiz...")
@@ -602,7 +633,9 @@ export function RightPane({
                             key={art.id}
                             className={cn(
                               "p-3 rounded-2xl bg-card flex items-center gap-3 select-none animate-pulse shadow-xs border",
-                              isMindMap
+                              isVideo
+                                ? "border-emerald-500/30"
+                                : isMindMap
                                 ? "border-purple-500/30"
                                 : isQuiz
                                 ? "border-amber-500/30"
@@ -614,7 +647,9 @@ export function RightPane({
                             <div
                               className={cn(
                                 "h-9 w-9 rounded-xl flex items-center justify-center shrink-0 border",
-                                isMindMap
+                                isVideo
+                                  ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
+                                  : isMindMap
                                   ? "bg-purple-500/10 border-purple-500/20 text-purple-400"
                                   : isQuiz
                                   ? "bg-amber-500/10 border-amber-500/20 text-amber-400"
@@ -626,7 +661,9 @@ export function RightPane({
                               <RotateCw
                                 className={cn(
                                   "h-4 w-4 animate-spin",
-                                  isMindMap
+                                  isVideo
+                                    ? "text-emerald-400"
+                                    : isMindMap
                                     ? "text-purple-400"
                                     : isQuiz
                                     ? "text-amber-400"
@@ -648,6 +685,19 @@ export function RightPane({
                                     }`}
                               </div>
                             </div>
+                            {onDeleteArtifact && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onDeleteArtifact(art.id);
+                                }}
+                                className="h-7 w-7 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive flex items-center justify-center transition-colors cursor-pointer shrink-0"
+                                title={language === "id" ? "Hapus" : "Delete"}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            )}
                           </div>
                         );
                       }
@@ -656,12 +706,15 @@ export function RightPane({
                       const isFlashcard = art.type === "flashcard" || art.type === "flashcards";
                       const isMindMap = art.type === "mind_map";
                       const isSlides = art.type === "slides";
+                      const isVideo = art.type === "video_summary";
                       const itemCount = isQuiz && art.data?.questions
                         ? art.data.questions.length
                         : isFlashcard && art.data?.cards
                         ? art.data.cards.length
                         : isSlides && art.data?.slides
                         ? art.data.slides.length
+                        : isVideo && art.data?.scenes
+                        ? art.data.scenes.length
                         : null;
                       const countText = itemCount !== null && itemCount !== undefined
                         ? isQuiz
@@ -670,6 +723,8 @@ export function RightPane({
                           ? (language === "id" ? `${itemCount} Kartu` : `${itemCount} Cards`)
                           : isSlides
                           ? (language === "id" ? `${itemCount} Slide` : `${itemCount} Slide${itemCount > 1 ? "s" : ""}`)
+                          : isVideo
+                          ? (language === "id" ? `${itemCount} Scene` : `${itemCount} Scenes`)
                           : null
                         : isMindMap
                         ? (language === "id" ? "Peta Konsep" : "Concept Map")

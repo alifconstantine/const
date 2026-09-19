@@ -24,9 +24,10 @@ import {
 } from "lucide-react";
 import { cn, toast } from "@const/ui";
 import { useI18n } from "../../lib/i18n";
-import { localDb, type LocalArtifact, type QuizData, type QuizQuestion, type FlashcardData, type FlashcardItem, type AudioSummaryData } from "../../lib/db";
+import { localDb, type LocalArtifact, type QuizData, type QuizQuestion, type FlashcardData, type FlashcardItem, type AudioSummaryData, type VideoSummaryData } from "../../lib/db";
 import { getStoredVoiceConfig, synthesizeSpeechChunked } from "../../lib/voice";
 import { MobileMindMapViewer } from "./mobile-mind-map-viewer";
+import { VideoSummarySheet } from "./video-summary-sheet";
 
 export interface MobileArtifactReaderProps {
   open: boolean;
@@ -50,11 +51,24 @@ export function MobileArtifactReader({
   const isFlashcard = artifact.type === "flashcard" || artifact.type === "flashcards";
   const isMindMap = artifact.type === "mind_map" || Boolean(artifact.data?.root);
   const isAudioSummary = artifact.type === "audio_summary";
+  const isVideoSummary = artifact.type === "video_summary";
 
   const quizData = isQuiz ? (artifact.data as QuizData) : null;
   const flashcardData = isFlashcard ? (artifact.data as FlashcardData) : null;
   const audioSummaryData = isAudioSummary
     ? (artifact.data as AudioSummaryData) ||
+      (() => {
+        try {
+          return typeof artifact.content === "string"
+            ? JSON.parse(artifact.content)
+            : null;
+        } catch {
+          return null;
+        }
+      })()
+    : null;
+  const videoSummaryData = isVideoSummary
+    ? (artifact.data as VideoSummaryData) ||
       (() => {
         try {
           return typeof artifact.content === "string"
@@ -78,6 +92,17 @@ export function MobileArtifactReader({
           }
         })()
     : null;
+
+  if (isVideoSummary && videoSummaryData) {
+    return (
+      <VideoSummarySheet
+        open={open}
+        onClose={onClose}
+        data={videoSummaryData}
+        onExplainInChat={onExplainInChat}
+      />
+    );
+  }
 
   if (isMindMap && mindMapData) {
     return <MobileMindMapViewer data={mindMapData} onClose={onClose} />;

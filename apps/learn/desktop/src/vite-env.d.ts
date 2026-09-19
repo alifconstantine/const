@@ -130,6 +130,40 @@ declare global {
           error?: string;
         }>;
       };
+      video?: {
+        getProjectPath: (payload: { learnId: string; artifactId: string }) => Promise<{ success: boolean; projectPath?: string; error?: string }>;
+        synthesizeScenes: (payload: {
+          learnId: string;
+          artifactId: string;
+          apiKey: string;
+          model?: string;
+          voiceId?: string;
+          language?: string;
+          scenes: Array<{ sceneNumber: number; id: string; narrationText: string }>;
+        }) => Promise<{ success: boolean; projectPath?: string; sceneAudios?: any[]; error?: string }>;
+        stitchAudio: (payload: {
+          learnId: string;
+          artifactId: string;
+          sceneAudios: Array<{ sceneNumber: number; filename: string; startMs: number }>;
+          totalDurationSeconds: number;
+        }) => Promise<{ success: boolean; masterAudioPath?: string; masterAudioRelative?: string; masterAudioBase64?: string; error?: string }>;
+        saveComposition: (payload: {
+          learnId: string;
+          artifactId: string;
+          htmlContent: string;
+          hyperframesJson?: string;
+        }) => Promise<{ success: boolean; indexPath?: string; error?: string }>;
+        renderMp4: (payload: {
+          learnId: string;
+          artifactId: string;
+        }) => Promise<{ success: boolean; mp4Path?: string; mp4Url?: string; error?: string }>;
+        checkStatus?: (payload: {
+          learnId: string;
+          artifactId: string;
+          projectPath?: string;
+        }) => Promise<{ success: boolean; exists?: boolean; mp4Path?: string; mp4Url?: string; error?: string }>;
+        onRenderProgress?: (callback: (data: { artifactId: string; chunk: string }) => void) => () => void;
+      };
       minimize?: () => void;
       maximize?: () => void;
       close?: () => void;

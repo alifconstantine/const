@@ -278,3 +278,73 @@ print(f"Composio Sandbox Ready! Python {sys.version.split()[0]} on Linux.")
     logId: result.logId,
   };
 }
+
+/**
+ * Renders a HyperFrames video in the Composio Cloud Sandbox.
+ * Creates the project files, installs/runs hyperframes via npx, and returns
+ * either the rendered MP4 base64 or status.
+ */
+export async function renderVideoInSandbox(payload: {
+  htmlContent: string;
+  totalDurationSeconds?: number;
+}): Promise<{
+  success: boolean;
+  mp4Base64?: string;
+  error?: string | null;
+  durationMs: number;
+}> {
+  // Python script that sets up project, runs npx hyperframes render, and extracts base64
+  const pythonScript = `
+import os
+import sys
+import subprocess
+import base64
+
+html_data = """${payload.htmlContent.replace(/\\/g, "\\\\").replace(/"""/g, '\\"\\"\\"')}"
+"""
+
+workdir = "/tmp/hf_video"
+os.makedirs(workdir, exist_ok=True)
+index_path = os.path.join(workdir, "index.html")
+with open(index_path, "w", encoding="utf-8") as f:
+    f.write(html_data)
+
+out_mp4 = os.path.join(workdir, "video.mp4")
+
+cmd = ["npx", "--yes", "hyperframes", "render", ".", "-o", out_mp4]
+proc = subprocess.run(cmd, cwd=workdir, capture_output=True, text=True, timeout=120)
+
+if os.path.exists(out_mp4):
+    with open(out_mp4, "rb") as f:
+        b64 = base64.b64encode(f.read()).decode("utf-8")
+    print(f"__MP4_DATA_START__{b64}__MP4_DATA_END__")
+else:
+    print(f"ERROR: {proc.stderr or proc.stdout}")
+`;
+
+  const result = await executeCodeInterpreter(pythonScript, { timeout: 150 });
+
+  if (!result.success) {
+    return {
+      success: false,
+      error: result.error || result.stderr || "Sandbox execution failed",
+      durationMs: result.durationMs,
+    };
+  }
+
+  const match = result.stdout.match(/__MP4_DATA_START__([A-Za-z0-9+/=]+)__MP4_DATA_END__/);
+  if (match && match[1]) {
+    return {
+      success: true,
+      mp4Base64: match[1],
+      durationMs: result.durationMs,
+    };
+  }
+
+  return {
+    success: false,
+    error: result.stdout || result.stderr || "Video rendering failed in sandbox",
+    durationMs: result.durationMs,
+  };
+}
+

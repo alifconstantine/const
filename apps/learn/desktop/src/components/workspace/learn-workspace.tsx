@@ -45,13 +45,17 @@ import { AddSourceDialog } from "./add-source-dialog";
 import { CreateStudioArtifactDialog } from "./create-studio-artifact-dialog";
 import { CreateMindMapDialog } from "./create-mind-map-dialog";
 import { CreateAudioSummaryDialog } from "./create-audio-summary-dialog";
+import { CreateVideoSummaryDialog } from "./create-video-summary-dialog";
 import { WorkspaceTitle } from "./workspace-title";
 import { SettingsView } from "../settings/settings-view";
 import { ErrorBoundary } from "../ui/error-boundary";
 import { STUDIO_TOOLS } from "./studio-panel";
 import { buildGroundedContext } from "../../lib/grounding/context-builder";
 import { streamChatCompletion } from "../../lib/ai-stream";
-import { generateStudioArtifact } from "../../lib/studio/generator";
+import {
+  generateStudioArtifact,
+  generateVideoSummaryArtifact,
+} from "../../lib/studio/generator";
 import type { FileMutationRecord } from "@const/agent";
 import type { LocalArtifact } from "../../lib/db";
 
@@ -97,6 +101,27 @@ export function LearnWorkspace({
     });
   }, [learnId]);
 
+  // Auto-clean any stale stuck "generating" artifacts (e.g. from previous app crashes or interrupted renders)
+  useEffect(() => {
+    if (!learnId) return;
+    const cleanupStale = async () => {
+      try {
+        const stuck = await db.artifacts
+          .where("learnId")
+          .equals(learnId)
+          .filter((a) => a.status === "generating" && (!a.createdAt || Date.now() - a.createdAt > 15 * 1000))
+          .toArray();
+        for (const item of stuck) {
+          console.log("[learn-workspace] Auto-cleaning stuck generating artifact:", item.id);
+          await db.artifacts.delete(item.id);
+        }
+      } catch (err) {
+        console.warn("[learn-workspace] Failed to clean up stuck artifacts:", err);
+      }
+    };
+    cleanupStale();
+  }, [learnId, artifacts]);
+
   // Dialog & Panel states
   const [isAddSourceOpen, setIsAddSourceOpen] = useState(initialSourceModalOpen);
   const [isSourcesCollapsed, setIsSourcesCollapsed] = useState(false);
@@ -108,6 +133,7 @@ export function LearnWorkspace({
   const [createStudioType, setCreateStudioType] = useState<"quiz" | "flashcard">("quiz");
   const [isCreateMindMapOpen, setIsCreateMindMapOpen] = useState(false);
   const [isCreateAudioSummaryOpen, setIsCreateAudioSummaryOpen] = useState(false);
+  const [isCreateVideoOpen, setIsCreateVideoOpen] = useState(false);
   const [generatingArtifacts, setGeneratingArtifacts] = useState<GeneratingArtifactStatus[]>([]);
 
   // Right Pane: Dual Studio & Preview/Review state
@@ -632,6 +658,90 @@ export function LearnWorkspace({
     }
   };
 
+  const handleGenerateVideoSummary = async (params: {
+    selectedSourceIds: string[];
+    coverageMode: "short" | "long" | "auto";
+    language: "id" | "en";
+    audioLanguage?: string;
+    voiceProviderId: string;
+    voiceModel: string;
+    voiceId: string;
+    voiceName: string;
+    customInstructions?: string;
+  }) => {
+    if (!learnId) return;
+
+    const selectedSources = (sources || []).filter((s) =>
+      params.selectedSourceIds.includes(s.id)
+    );
+    if (selectedSources.length === 0) return;
+
+    const isIndo = Boolean(
+      (params.audioLanguage && params.audioLanguage.startsWith("id")) ||
+      params.language === "id"
+    );
+    const title = isIndo ? "Ringkasan Video" : "Video Summary";
+
+    // 1. Create generating artifact in Dexie
+    const artId = await localDb.createArtifact({
+      learnId,
+      title: isIndo ? "Membuat Ringkasan Video..." : "Creating Video Summary...",
+      type: "video_summary",
+      status: "generating",
+      sourcesCount: selectedSources.length,
+      content: "",
+    });
+
+    try {
+      // 2. Call generator in background
+      const result = await generateVideoSummaryArtifact({
+        artifactId: artId,
+        learnId,
+        sources: selectedSources,
+        coverageMode: params.coverageMode,
+        language: params.language,
+        audioLanguage: params.audioLanguage,
+        voiceProviderId: params.voiceProviderId,
+        voiceModel: params.voiceModel,
+        voiceId: params.voiceId,
+        voiceName: params.voiceName,
+        customInstructions: params.customInstructions,
+      });
+
+      // 3. Update artifact in Dexie
+      await localDb.updateArtifact(artId, {
+        title: result.title || title,
+        data: result.data,
+        content: JSON.stringify(result.data),
+        status: "completed",
+      });
+
+      toast.success(
+        isIndo
+          ? "Ringkasan Video berhasil dibuat!"
+          : "Video Summary created successfully!"
+      );
+
+      // 4. Auto-open in preview & auto-widen
+      const fullArt = await localDb.getArtifact(artId);
+      if (fullArt) {
+        handleOpenStudioArtifact(fullArt);
+      }
+    } catch (err: any) {
+      console.error("Failed to generate video summary:", err);
+      await localDb.updateArtifact(artId, {
+        title,
+        status: "error",
+        error: err?.message || "Generation failed",
+      });
+      toast.error(
+        isIndo
+          ? `Gagal membuat ringkasan video: ${err?.message || "Terjadi kesalahan"}`
+          : `Failed to create video summary: ${err?.message || "An error occurred"}`
+      );
+    }
+  };
+
   const handleSelectStudioTool = (toolId: string) => {
     if (toolId === "browser") {
       handleOpenBrowser();
@@ -650,8 +760,10 @@ export function LearnWorkspace({
       setIsCreateMindMapOpen(true);
     } else if (toolId === "audio_summary" || toolId === "audio") {
       setIsCreateAudioSummaryOpen(true);
+    } else if (toolId === "video_summary" || toolId === "video") {
+      setIsCreateVideoOpen(true);
     } else {
-      // Menu lain (slides, video) tidak melakukan apa-apa (no-op)
+      // Menu lain (slides) tidak melakukan apa-apa (no-op)
       return;
     }
   };
@@ -662,10 +774,12 @@ export function LearnWorkspace({
       art.type === "flashcard" ||
       art.type === "mind_map" ||
       art.type === "audio_summary" ||
+      art.type === "video_summary" ||
       art.data?.questions ||
       art.data?.cards ||
       art.data?.root ||
-      art.data?.script
+      art.data?.script ||
+      art.data?.scenes
     ) {
       handleOpenStudioArtifact(art);
       return;
@@ -1430,6 +1544,18 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
         sources={sources || []}
         onGenerate={handleGenerateStudioArtifact}
         onOpenModelsSettings={() => {
+          setSettingsInitialTab("models");
+          setIsSettingsOpen(true);
+        }}
+      />
+
+      {/* Dedicated Create Video Summary Dialog */}
+      <CreateVideoSummaryDialog
+        open={isCreateVideoOpen}
+        onOpenChange={setIsCreateVideoOpen}
+        sources={sources || []}
+        onGenerate={handleGenerateVideoSummary}
+        onOpenSettings={() => {
           setSettingsInitialTab("models");
           setIsSettingsOpen(true);
         }}
