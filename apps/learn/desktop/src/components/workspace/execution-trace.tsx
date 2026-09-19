@@ -17,7 +17,7 @@ import {
   ListTodo,
   RotateCcw,
 } from "lucide-react";
-import { ScrollArea, cn } from "@const/ui";
+import { ScrollArea, cn, BrandLogo, getConnectorForTool, type ConnectorMetadata } from "@const/ui";
 import { FileIcon } from "./file-icon";
 import { MarkdownContent } from "./markdown-content";
 import { useI18n } from "../../lib/i18n";
@@ -222,6 +222,18 @@ export function ExecutionTrace({
 
             if (step.type === "tool") {
               const norm = (step.name || "").toLowerCase().replace(/[-_]/g, "");
+
+              // 0. Composio App Connectors (Canva MCP, Google Workspace, YouTube, etc.)
+              const connector = getConnectorForTool(step.name || "");
+              if (connector) {
+                return (
+                  <ConnectorToolTraceItem
+                    key={step.id || `conn_${idx}`}
+                    tool={step}
+                    connector={connector}
+                  />
+                );
+              }
 
               // A. Socratic Question (ask_question)
               if (norm === "askquestion" || norm === "question") {
@@ -1226,6 +1238,246 @@ function TodoWriteTraceItem({ tool }: { tool: TraceStep | DisplayToolCall }) {
           })}
         </div>
       </SmoothCollapse>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 8.5. Composio Connector Tool Card (Canva MCP, Google Suite, YouTube, etc.)
+// ---------------------------------------------------------------------------
+function ConnectorToolTraceItem({
+  tool,
+  connector,
+}: {
+  tool: TraceStep | DisplayToolCall;
+  connector: ConnectorMetadata;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const isRunning = tool.status === "running" || (!tool.result && !tool.isError);
+  const isError = Boolean(tool.isError || tool.status === "error");
+
+  // Determine badge tag
+  const tag =
+    tool.args?.action ||
+    tool.args?.designType ||
+    tool.args?.fileType ||
+    (tool.args?.code ? "python" : null);
+
+  // Parse result if JSON
+  let parsedResult: any = null;
+  if (tool.result) {
+    if (typeof tool.result === "object") {
+      parsedResult = tool.result;
+    } else if (typeof tool.result === "string") {
+      try {
+        parsedResult = JSON.parse(tool.result);
+      } catch {
+        parsedResult = null;
+      }
+    }
+  }
+
+  const resultUrl =
+    parsedResult?.editUrl ||
+    parsedResult?.edit_url ||
+    parsedResult?.spreadsheetUrl ||
+    parsedResult?.documentUrl ||
+    parsedResult?.presentationUrl ||
+    parsedResult?.driveUrl ||
+    parsedResult?.videoUrl ||
+    parsedResult?.formUrl;
+
+  const viewUrl = parsedResult?.viewUrl || parsedResult?.view_url;
+  const thumbnails: Array<{ url: string }> = Array.isArray(parsedResult?.thumbnails)
+    ? parsedResult.thumbnails
+    : [];
+  const pageCount = parsedResult?.page_count || parsedResult?.slideCount;
+
+  const resultMessage = parsedResult?.message || (typeof tool.result === "string" ? tool.result : null);
+
+  const handleOpenExternal = (url: string) => {
+    if ((window as any).electron?.openExternal) {
+      (window as any).electron.openExternal(url);
+    } else {
+      window.open(url, "_blank");
+    }
+  };
+
+  return (
+    <div className="w-full min-w-0 flex flex-col my-1 font-sans">
+      <div className="p-2.5 rounded-xl bg-secondary/30 border border-border/70 space-y-2 select-text">
+        {/* Tool Header */}
+        <div className="flex items-center justify-between text-[12px]">
+          <div className="flex items-center gap-2 font-medium text-foreground">
+            <BrandLogo id={connector.id} size="xs" />
+            <span>{connector.name}</span>
+            {pageCount && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20 font-medium">
+                {pageCount} Slide
+              </span>
+            )}
+            {tag && (
+              <span className="text-[10px] px-1.5 py-0.5 rounded bg-secondary text-muted-foreground border border-border/50 font-mono">
+                {tag}
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2 text-[11px]">
+            {isRunning ? (
+              <span className="flex items-center gap-1.5 text-amber-500 font-mono">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                Working...
+              </span>
+            ) : isError ? (
+              <span className="flex items-center gap-1.5 text-destructive font-mono">
+                <AlertCircle className="w-3 h-3" />
+                Error
+              </span>
+            ) : (
+              <span className="flex items-center gap-1.5 text-emerald-500 font-mono">
+                <Check className="w-3 h-3" />
+                {tool.durationMs ? `${tool.durationMs}ms` : "Done"}
+              </span>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setIsOpen((prev) => !prev)}
+              className="p-1 hover:bg-secondary rounded cursor-pointer text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <ChevronDown
+                className="w-3 h-3 transition-transform duration-200"
+                style={{ transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)" }}
+              />
+            </button>
+          </div>
+        </div>
+
+        {/* Input Parameters Preview */}
+        {tool.args && (
+          <div className="p-2 rounded-lg bg-black/30 dark:bg-black/40 border border-border/40 text-[11.5px] font-mono text-foreground/90 whitespace-pre-wrap leading-tight">
+            {tool.args.code ? (
+              <code>{tool.args.code}</code>
+            ) : tool.args.prompt ? (
+              <div>
+                <span className="text-muted-foreground">prompt: </span>
+                <span>"{tool.args.prompt}"</span>
+              </div>
+            ) : tool.args.title ? (
+              <div>
+                <span className="text-muted-foreground">{tool.args.action || "title"}: </span>
+                <span>"{tool.args.title}"</span>
+              </div>
+            ) : tool.args.query ? (
+              <div>
+                <span className="text-muted-foreground">query: </span>
+                <span>"{tool.args.query}"</span>
+              </div>
+            ) : tool.args.topic ? (
+              <div>
+                <span className="text-muted-foreground">topic: </span>
+                <span>"{tool.args.topic}"</span>
+              </div>
+            ) : (
+              <code>{JSON.stringify(tool.args, null, 2)}</code>
+            )}
+          </div>
+        )}
+
+        {/* Output Result */}
+        {tool.result && (
+          <div
+            className={cn(
+              "p-2.5 rounded-lg text-[11.5px] border leading-relaxed space-y-2",
+              isError
+                ? "bg-destructive/10 border-destructive/30 text-destructive font-mono"
+                : "bg-emerald-500/5 border-emerald-500/20 text-emerald-600 dark:text-emerald-400"
+            )}
+          >
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="text-[10px] font-sans font-semibold uppercase tracking-wider text-muted-foreground">
+                Output Result
+              </div>
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {viewUrl && viewUrl !== resultUrl && (
+                  <button
+                    type="button"
+                    onClick={() => handleOpenExternal(viewUrl)}
+                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-secondary hover:bg-secondary/80 text-foreground text-[10.5px] font-medium border border-border/70 shadow-xs cursor-pointer transition-colors"
+                  >
+                    <span>Lihat Presentasi</span>
+                    <ExternalLink className="w-2.5 h-2.5" />
+                  </button>
+                )}
+                {resultUrl && (
+                  <button
+                    type="button"
+                    onClick={() => handleOpenExternal(resultUrl)}
+                    className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-[10.5px] font-medium shadow-xs cursor-pointer transition-colors"
+                  >
+                    <span>{connector.id === "canva_mcp" ? "Edit di Canva" : `Buka di ${connector.name}`}</span>
+                    <ExternalLink className="w-2.5 h-2.5" />
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Slide Thumbnails Preview if returned by Canva MCP */}
+            {thumbnails.length > 0 && (
+              <div className="space-y-1 pt-1">
+                <div className="text-[10.5px] text-muted-foreground font-medium">Pratinjau Slide:</div>
+                <div className="flex items-center gap-2 overflow-x-auto pb-1.5 pt-0.5">
+                  {thumbnails.map((t, tIdx) => (
+                    <div
+                      key={tIdx}
+                      className="relative shrink-0 rounded-md overflow-hidden border border-border/60 hover:border-primary transition-all shadow-xs group cursor-pointer"
+                      onClick={() => resultUrl && handleOpenExternal(resultUrl)}
+                      title={`Buka slide ${tIdx + 1} di Canva`}
+                    >
+                      <img
+                        src={t.url}
+                        alt={`Slide ${tIdx + 1}`}
+                        className="h-16 w-auto object-cover group-hover:scale-105 transition-transform duration-200"
+                        loading="lazy"
+                      />
+                      <span className="absolute bottom-0.5 right-0.5 bg-black/70 text-white text-[9px] px-1 rounded font-mono">
+                        {tIdx + 1}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {resultMessage ? (
+              <div className="font-sans text-[12px]">{resultMessage}</div>
+            ) : (
+              <pre className="font-mono text-[11px] whitespace-pre-wrap break-all">
+                {typeof tool.result === "string" ? tool.result : JSON.stringify(tool.result, null, 2)}
+              </pre>
+            )}
+          </div>
+        )}
+
+        {/* Details Accordion (for full args & raw JSON inspection) */}
+        <SmoothCollapse isOpen={isOpen}>
+          <div className="pt-2 border-t border-border/50 text-[11px] font-mono space-y-1.5">
+            <div className="text-muted-foreground text-[10px]">Full Arguments:</div>
+            <pre className="p-2 rounded bg-black/40 border border-border/30 overflow-x-auto text-muted-foreground">
+              {JSON.stringify(tool.args, null, 2)}
+            </pre>
+            {tool.result && (
+              <>
+                <div className="text-muted-foreground text-[10px]">Raw Result:</div>
+                <pre className="p-2 rounded bg-black/40 border border-border/30 overflow-x-auto text-muted-foreground">
+                  {typeof tool.result === "string" ? tool.result : JSON.stringify(tool.result, null, 2)}
+                </pre>
+              </>
+            )}
+          </div>
+        </SmoothCollapse>
+      </div>
     </div>
   );
 }

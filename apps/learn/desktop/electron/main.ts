@@ -7,8 +7,12 @@ import {
   createConstAgent,
   DEFAULT_MODELS,
   rollbackFileMutation,
+  CONST_LEARN_TOOLS,
+  COMPOSIO_TOOL_MAP,
+  getComposioToolBySlugOrId,
   type AgentMessage,
   type FileMutationRecord,
+  type NativeToolDefinition,
 } from "@const/agent";
 import {
   startLoopbackAuthServer,
@@ -521,6 +525,150 @@ app.on("second-instance", (_event, commandLine) => {
     return false;
   });
 
+  ipcMain.handle(
+    "composio:get-auth-link",
+    async (
+      _event,
+      payload: { toolkit: string; userId?: string; callbackUrl?: string; apiKey?: string }
+    ) => {
+      try {
+        const apiKey =
+          payload.apiKey ||
+          process.env.COMPOSIO_API_KEY ||
+          process.env.VITE_COMPOSIO_API_KEY ||
+          "";
+
+        if (!apiKey) {
+          throw new Error("Composio API Key belum dikonfigurasi. Silakan periksa COMPOSIO_API_KEY di file .env.");
+        }
+
+        const userId = payload.userId || "learn_desktop_user";
+
+        // 1. Create or resume session in Composio REST API v3.1
+        const sessRes = await fetch("https://backend.composio.dev/api/v3.1/tool_router/session", {
+          method: "POST",
+          headers: {
+            "x-api-key": apiKey,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            user_id: userId,
+            manage_connections: { enable: true },
+          }),
+        });
+
+        if (!sessRes.ok) {
+          const errText = await sessRes.text();
+          throw new Error(`Composio session creation failed (${sessRes.status}): ${errText}`);
+        }
+
+        const sessData = await sessRes.json();
+        const sessionId = sessData.session_id;
+
+        // 2. Request connect link for the specified toolkit
+        const linkRes = await fetch(
+          `https://backend.composio.dev/api/v3.1/tool_router/session/${sessionId}/link`,
+          {
+            method: "POST",
+            headers: {
+              "x-api-key": apiKey,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              toolkit: payload.toolkit,
+              callback_url:
+                payload.callbackUrl || "https://accounts.const.web.id/auth-success",
+            }),
+          }
+        );
+
+        if (!linkRes.ok) {
+          const errText = await linkRes.text();
+          throw new Error(`Composio link failed (${linkRes.status}): ${errText}`);
+        }
+
+        const linkData = await linkRes.json();
+        const redirectUrl = linkData.redirect_url || linkData.redirectUrl;
+
+        if (redirectUrl) {
+          // Open the authorization link directly in the default system browser
+          await shell.openExternal(redirectUrl);
+          return {
+            success: true,
+            redirectUrl,
+            sessionId,
+            connectedAccountId: linkData.connected_account_id,
+            linkToken: linkData.link_token,
+          };
+        }
+
+        throw new Error("No redirect_url returned by Composio");
+      } catch (err: any) {
+        console.error("[Composio IPC get-auth-link Error]", err);
+        return { success: false, error: err?.message || String(err) };
+      }
+    }
+  );
+
+  ipcMain.handle(
+    "composio:disconnect-account",
+    async (_event, payload: { accountId: string; apiKey?: string }) => {
+      try {
+        const apiKey =
+          payload.apiKey ||
+          process.env.COMPOSIO_API_KEY ||
+          process.env.VITE_COMPOSIO_API_KEY ||
+          "";
+
+        if (!apiKey) return { success: false, error: "Missing API Key" };
+
+        const delRes = await fetch(
+          `https://backend.composio.dev/api/v3.1/connected_accounts/${payload.accountId}`,
+          {
+            method: "DELETE",
+            headers: { "x-api-key": apiKey },
+          }
+        );
+        return { success: delRes.ok };
+      } catch (err: any) {
+        return { success: false, error: err?.message || String(err) };
+      }
+    }
+  );
+
+  ipcMain.handle(
+    "composio:get-connected-accounts",
+    async (_event, payload?: { userId?: string; apiKey?: string }) => {
+      try {
+        const apiKey =
+          payload?.apiKey ||
+          process.env.COMPOSIO_API_KEY ||
+          process.env.VITE_COMPOSIO_API_KEY ||
+          "";
+
+        if (!apiKey) return { success: false, items: [] };
+
+        const userId = payload?.userId || "learn_desktop_user";
+        const res = await fetch(
+          `https://backend.composio.dev/api/v3.1/connected_accounts?user_ids=${encodeURIComponent(
+            userId
+          )}`,
+          {
+            headers: { "x-api-key": apiKey },
+          }
+        );
+
+        if (res.ok) {
+          const data = await res.json();
+          return { success: true, items: data.items || [] };
+        }
+        return { success: false, items: [] };
+      } catch {
+        return { success: false, items: [] };
+      }
+    }
+  );
+
   ipcMain.handle("shell:open-path", async (_event, targetPath: string) => {
     if (!targetPath || !fs.existsSync(targetPath)) return false;
     const res = await shell.openPath(targetPath);
@@ -848,14 +996,58 @@ app.on("second-instance", (_event, commandLine) => {
         }
       }
 
+      // Collect active Composio tools from payload.mcpServers, strictly excluding Cloud Sandbox / Code Interpreter on Desktop
+      const activeComposioTools: NativeToolDefinition[] = [];
+      if (payload.mcpServers && Array.isArray(payload.mcpServers)) {
+        for (const s of payload.mcpServers) {
+          const id = (s.id || s.name || "").toLowerCase().replace(/[-_]/g, "");
+          if (id.includes("cloudsandbox") || id.includes("codeinterpreter")) {
+            continue; // Exclude Cloud Sandbox / Code Interpreter on Desktop as instructed
+          }
+          const matchedTool =
+            COMPOSIO_TOOL_MAP[s.id] ||
+            COMPOSIO_TOOL_MAP[s.toolkitSlug] ||
+            getComposioToolBySlugOrId(s.id || s.toolkitSlug);
+          if (matchedTool && !activeComposioTools.some((t) => t.function.name === matchedTool.function.name)) {
+            activeComposioTools.push(matchedTool);
+          }
+        }
+      }
+
       let effectiveSystemPrompt = payload.systemPrompt;
       if (payload.mcpServers && Array.isArray(payload.mcpServers) && payload.mcpServers.length > 0) {
         const mcpSummary = payload.mcpServers
-          .map((s: any) => `- ${s.name} (${s.transport}): ${s.command ? `${s.command} ${s.args?.join(" ")}` : s.url}`)
+          .filter((s: any) => {
+            const id = (s.id || s.name || "").toLowerCase().replace(/[-_]/g, "");
+            return !id.includes("cloudsandbox") && !id.includes("codeinterpreter");
+          })
+          .map((s: any) => {
+            const detail = s.command
+              ? `${s.command} ${s.args?.join(" ") || ""}`
+              : s.url || s.description || (s.skills ? s.skills.join(", ") : "Active");
+            return `- ${s.name} (${s.transport || "connector"}): ${detail}`;
+          })
           .join("\n");
-        effectiveSystemPrompt = (effectiveSystemPrompt || "") +
-          `\n\n[CONNECTED MCP SERVERS]:\nYou have the following Model Context Protocol (MCP) servers configured in your workspace:\n${mcpSummary}\nYou can interact with and invoke these MCP servers using your terminal tools ('run_command' or 'bash') whenever relevant to user instructions.`;
+        if (mcpSummary) {
+          effectiveSystemPrompt =
+            (effectiveSystemPrompt || "") +
+            `\n\n[CONNECTED MCP SERVERS & APP CONNECTORS]:\nYou have the following Model Context Protocol (MCP) servers and applications connected in your workspace:\n${mcpSummary}\nYou can interact with, query, and invoke these tools whenever relevant to user instructions.`;
+        }
       }
+
+      if (activeComposioTools.length > 0) {
+        effectiveSystemPrompt =
+          (effectiveSystemPrompt || "") +
+          `\n\n[ACTIVE COMPOSIO CONNECTORS & SPECIALIZED TOOLS]:\n` +
+          `You have active integrations for the following apps. When user instructions involve any of these services, you MUST invoke the corresponding tool call directly:\n` +
+          activeComposioTools
+            .map((t) => `- '${t.function.name}': ${t.function.description}`)
+            .join("\n") +
+          `\nDo not merely talk about doing it—execute the tool call so the user sees the active connector working process card!` +
+          `\nWhen the student asks to create a presentation, slides, infographic, or visual document in Canva, invoke 'canva_mcp_generate_design' with the prompt/topic and designType='presentation'. The backend will automatically generate the slides and instantiate a real presentation in the student's Canva account, returning 'edit_url' and 'view_url'. After the tool completes, present the presentation title, number of slides, and clickable links clearly to the student!`;
+      }
+
+      const agentTools = [...CONST_LEARN_TOOLS, ...activeComposioTools];
 
       activeAgent = createConstAgent({
         baseUrl,
@@ -863,6 +1055,7 @@ app.on("second-instance", (_event, commandLine) => {
         model,
         workspacePath: targetWorkspace,
         preset: "learn",
+        tools: agentTools,
         systemPrompt: effectiveSystemPrompt,
         mode: payload.mode || "ask_before_changes",
         thinkingLevel: payload.thinkingLevel as any,

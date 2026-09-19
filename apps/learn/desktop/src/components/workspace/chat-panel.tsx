@@ -43,7 +43,9 @@ import {
   TooltipContent,
   TooltipProvider,
   toast,
+  AVAILABLE_CONNECTORS,
 } from "@const/ui";
+import { getConnectedConnectorIds } from "../../lib/connectors-service";
 import { DEFAULT_MODELS } from "@const/agent/models";
 import type { ModelConfig, AgentMessage } from "@const/agent/types";
 import type { FileMutationRecord } from "@const/agent";
@@ -1504,12 +1506,30 @@ export function ChatPanel({
           "";
 
         const storedMcp = localStorage.getItem("const_mcp_configuration_v3");
-        let parsedMcpServers: any = undefined;
+        let parsedMcpServers: any[] = [];
         try {
           if (storedMcp) {
             const parsed = JSON.parse(storedMcp);
             if (Array.isArray(parsed?.servers) && parsed.servers.length > 0) {
-              parsedMcpServers = parsed.servers;
+              parsedMcpServers = [...parsed.servers];
+            }
+          }
+        } catch {}
+
+        // Add active connected connectors (Canva MCP, Google Suite, YouTube, Cloud Sandbox)
+        try {
+          const activeConnectorIds = getConnectedConnectorIds();
+          for (const connId of activeConnectorIds) {
+            const meta = AVAILABLE_CONNECTORS.find((c) => c.id === connId);
+            if (meta && !parsedMcpServers.some((s: any) => s.id === meta.id)) {
+              parsedMcpServers.push({
+                id: meta.id,
+                name: meta.name,
+                transport: "connector",
+                status: "ready",
+                description: meta.description,
+                skills: meta.skills,
+              });
             }
           }
         } catch {}

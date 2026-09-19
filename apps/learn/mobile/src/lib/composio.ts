@@ -280,6 +280,163 @@ print(f"Composio Sandbox Ready! Python {sys.version.split()[0]} on Linux.")
 }
 
 /**
+ * Executes Canva MCP tool on Composio:
+ * Generates presentation candidates and automatically instantiates into a real Canva presentation.
+ */
+export async function executeCanvaMcp(payload: {
+  prompt: string;
+  designType?: string;
+  jobId?: string;
+  candidateId?: string;
+}): Promise<{
+  success: boolean;
+  designId?: string;
+  title?: string;
+  pageCount?: number;
+  editUrl?: string;
+  viewUrl?: string;
+  thumbnails?: Array<{ url: string }>;
+  message?: string;
+  error?: string | null;
+  durationMs: number;
+}> {
+  const apiKey = getComposioApiKey();
+  const startTime = Date.now();
+  const baseUrl = getComposioBaseUrl();
+
+  const runExec = async (sessionId: string, toolSlug: string, args: any, targetBase = baseUrl) => {
+    return await fetch(`${targetBase.replace(/\/+$/, "")}/tool_router/session/${sessionId}/execute`, {
+      method: "POST",
+      headers: {
+        "x-api-key": apiKey,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        tool_slug: toolSlug,
+        arguments: args,
+      }),
+    });
+  };
+
+  try {
+    let sessionId = await getOrCreateSessionId();
+
+    // 1. If direct materialization was requested
+    if (payload.jobId && payload.candidateId) {
+      const res = await runExec(sessionId, "CANVA_MCP_CREATE_DESIGN_FROM_CANDIDATE", {
+        job_id: payload.jobId,
+        candidate_id: payload.candidateId,
+      });
+      const json = await res.json();
+      const summary = json.data?.design_summary || json.data;
+      const editUrl = summary?.urls?.edit_url || summary?.edit_url;
+      const viewUrl = summary?.urls?.view_url || summary?.view_url;
+      return {
+        success: Boolean(editUrl),
+        designId: summary?.id,
+        title: summary?.title || payload.prompt,
+        pageCount: summary?.page_count || 1,
+        editUrl,
+        viewUrl,
+        message: `Presentasi Canva "${summary?.title || payload.prompt}" berhasil dibuat di akun Canva Anda!`,
+        durationMs: Date.now() - startTime,
+      };
+    }
+
+    // 2. Generate designs
+    let genRes: Response;
+    try {
+      genRes = await runExec(sessionId, "CANVA_MCP_GENERATE_DESIGN", {
+        query: payload.prompt,
+        design_type: payload.designType || "presentation",
+        length: "short",
+      });
+    } catch {
+      genRes = await runExec(
+        sessionId,
+        "CANVA_MCP_GENERATE_DESIGN",
+        {
+          query: payload.prompt,
+          design_type: payload.designType || "presentation",
+          length: "short",
+        },
+        baseUrl === "/composio-api" ? "https://backend.composio.dev/api/v3.1" : "/composio-api"
+      );
+    }
+
+    if (genRes.status === 404 || genRes.status === 401) {
+      sessionId = await getOrCreateSessionId(true);
+      genRes = await runExec(sessionId, "CANVA_MCP_GENERATE_DESIGN", {
+        query: payload.prompt,
+        design_type: payload.designType || "presentation",
+        length: "short",
+      });
+    }
+
+    if (!genRes.ok) {
+      throw new Error(`Canva MCP Generate failed with HTTP ${genRes.status}`);
+    }
+
+    const genJson = await genRes.json();
+    const job = genJson.data?.job || genJson.data;
+    const designs = job?.result?.generated_designs || [];
+    const firstCand = designs[0];
+
+    if (job?.id && firstCand?.candidate_id) {
+      // 3. Materialize first candidate into real presentation
+      const createRes = await runExec(sessionId, "CANVA_MCP_CREATE_DESIGN_FROM_CANDIDATE", {
+        job_id: job.id,
+        candidate_id: firstCand.candidate_id,
+      });
+
+      if (createRes.ok) {
+        const createJson = await createRes.json();
+        const summary = createJson.data?.design_summary || createJson.data;
+        const editUrl = summary?.urls?.edit_url || firstCand.url;
+        const viewUrl = summary?.urls?.view_url || firstCand.url;
+        const pageCount = summary?.page_count || 4;
+        const title = summary?.title || payload.prompt;
+
+        return {
+          success: true,
+          designId: summary?.id,
+          title,
+          pageCount,
+          editUrl,
+          viewUrl,
+          thumbnails: firstCand.thumbnails || [],
+          message: `Presentasi Canva "${title}" berhasil dibuat dengan ${pageCount} slide di akun Canva Anda!`,
+          durationMs: Date.now() - startTime,
+        };
+      }
+    }
+
+    if (firstCand?.url) {
+      return {
+        success: true,
+        title: payload.prompt,
+        editUrl: firstCand.url,
+        viewUrl: firstCand.url,
+        thumbnails: firstCand.thumbnails || [],
+        message: `Draft presentasi Canva "${payload.prompt}" berhasil dibuat!`,
+        durationMs: Date.now() - startTime,
+      };
+    }
+
+    throw new Error("No design candidates returned by Canva MCP");
+  } catch (err: any) {
+    const fallbackUrl = `https://www.canva.com/search?q=${encodeURIComponent(payload.prompt)}`;
+    return {
+      success: false,
+      editUrl: fallbackUrl,
+      message: `Desain Canva disiapkan untuk: "${payload.prompt}". Silakan hubungkan akun Canva di menu MCP.`,
+      error: err?.message || String(err),
+      durationMs: Date.now() - startTime,
+    };
+  }
+}
+
+/**
  * Renders a HyperFrames video in the Composio Cloud Sandbox.
  * Creates the project files, installs/runs hyperframes via npx, and returns
  * either the rendered MP4 base64 or status.

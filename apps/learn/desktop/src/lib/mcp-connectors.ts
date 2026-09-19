@@ -157,3 +157,33 @@ export function saveStoredMcpConfig(config: McpConfigurationState): void {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
   }
 }
+
+/**
+ * Resolves Composio API Key from env, localStorage, or stored MCP config.
+ */
+export function getComposioApiKey(): string {
+  const envKey =
+    (import.meta as any).env?.VITE_COMPOSIO_API_KEY ||
+    (import.meta as any).env?.COMPOSIO_API_KEY ||
+    "";
+  if (envKey) return envKey;
+
+  if (typeof window !== "undefined") {
+    const localKey = localStorage.getItem("composio_api_key");
+    if (localKey) return localKey;
+
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        const composioServer = parsed?.servers?.find((s: any) => s.id === "composio");
+        if (composioServer?.env?.COMPOSIO_API_KEY) {
+          return composioServer.env.COMPOSIO_API_KEY;
+        }
+      }
+    } catch {}
+  }
+
+  return "";
+}
+

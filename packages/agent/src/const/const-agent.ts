@@ -145,6 +145,21 @@ const VALID_FALLBACK_TOOLS = new Set([
   "apply_patch",
   "run_command",
   "manage_task",
+  "run_python",
+  "python",
+  "canva_mcp_generate_design",
+  "canva_generate_design",
+  "canva_mcp_create_design_from_candidate",
+  "canva_create_design_from_candidate",
+  "google_sheets_manage",
+  "google_docs_manage",
+  "google_slides_manage",
+  "google_drive_search",
+  "google_tasks_manage",
+  "google_classroom_manage",
+  "google_forms_manage",
+  "youtube_search_and_transcribe",
+  "code_interpreter",
 ]);
 
 export function extractFallbackToolCalls(content: string): ToolCall[] {

@@ -1,46 +1,45 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   X,
-  Server,
   Code2,
-  Plus,
-  ChevronDown,
-  ChevronUp,
   Check,
   Copy,
   CheckCheck,
   RotateCcw,
-  Trash2,
   Layers,
-  Monitor,
+  ArrowLeft,
+  Link2,
+  Unlink2,
+  ExternalLink,
+  ShieldCheck,
+  Sparkles,
+  Search,
 } from "lucide-react";
 import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  Select,
-  SelectTrigger,
-  SelectValue,
-  SelectContent,
-  SelectItem,
+  AVAILABLE_CONNECTORS,
+  type ConnectorMetadata,
+  BrandLogo,
+  Button,
   toast,
   cn,
 } from "@const/ui";
 import { useI18n } from "../../../lib/i18n";
 import {
-  type McpServerConfig,
   type McpConfigurationState,
-  type McpTransport,
-  type McpScope,
   MOBILE_PRESET_MCP_SERVERS,
   getStoredMcpConfig,
   saveStoredMcpConfig,
   exportMcpJson,
   importMcpJson,
 } from "../../../lib/mcp-connectors";
+import {
+  getConnectedConnectorIds,
+  isConnectorActive,
+  connectConnector,
+  disconnectConnector,
+} from "../../../lib/connectors-service";
 
-type TabView = "servers" | "json";
+type TabView = "apps" | "json";
 
 interface McpToolsSheetProps {
   open: boolean;
@@ -51,686 +50,386 @@ export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
   const { language } = useI18n();
   const isIndo = language === "id";
 
-  const [activeTab, setActiveTab] = useState<TabView>("servers");
+  const [activeTab, setActiveTab] = useState<TabView>("apps");
+  const [selectedConnector, setSelectedConnector] = useState<ConnectorMetadata | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [connectedIds, setConnectedIds] = useState<string[]>(() => getConnectedConnectorIds());
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [copiedPromptIndex, setCopiedPromptIndex] = useState<number | null>(null);
 
-  // Sliding tab indicator
-  const serversTabRef = useRef<HTMLButtonElement>(null);
-  const jsonTabRef = useRef<HTMLButtonElement>(null);
-  const [indicatorStyle, setIndicatorStyle] = useState<{ left: number; width: number }>({
-    left: 0,
-    width: 0,
-  });
-
-  useEffect(() => {
-    if (!open) return;
-    const updateIndicator = () => {
-      let activeEl: HTMLButtonElement | null = null;
-      if (activeTab === "servers") activeEl = serversTabRef.current;
-      else if (activeTab === "json") activeEl = jsonTabRef.current;
-
-      if (activeEl) {
-        setIndicatorStyle({
-          left: activeEl.offsetLeft,
-          width: activeEl.offsetWidth,
-        });
-      }
-    };
-    updateIndicator();
-    const timer = setTimeout(updateIndicator, 50);
-    return () => clearTimeout(timer);
-  }, [activeTab, open, language]);
-
-  // MCP Configuration State
+  // Raw JSON state (Tab 2)
   const [mcpConfig, setMcpConfig] = useState<McpConfigurationState>(() => getStoredMcpConfig());
-  const [expandedServerId, setExpandedServerId] = useState<string | null>(null);
-  const [editFormData, setEditFormData] = useState<McpServerConfig | null>(null);
-  const [envJsonText, setEnvJsonText] = useState("");
-  const [isEnvOpen, setIsEnvOpen] = useState(true);
-
-  // Raw JSON state
   const [rawJsonText, setRawJsonText] = useState("");
   const [isCopiedJson, setIsCopiedJson] = useState(false);
-
-  // Preset Selection Modal
-  const [isPresetModalOpen, setIsPresetModalOpen] = useState(false);
 
   useEffect(() => {
     if (open) {
       const stored = getStoredMcpConfig();
       setMcpConfig(stored);
       setRawJsonText(exportMcpJson(stored));
-      setExpandedServerId(null);
-      setEditFormData(null);
-      setEnvJsonText("");
+      setConnectedIds(getConnectedConnectorIds());
+      setSelectedConnector(null);
     }
   }, [open]);
 
-  useEffect(() => {
-    setRawJsonText(exportMcpJson(mcpConfig));
-  }, [mcpConfig]);
-
-  const handleToggleExpand = (server: McpServerConfig) => {
-    if (expandedServerId === server.id) {
-      setExpandedServerId(null);
-      setEditFormData(null);
-      setEnvJsonText("");
-    } else {
-      setExpandedServerId(server.id);
-      setEditFormData(JSON.parse(JSON.stringify(server)));
-      setEnvJsonText(
-        server.env && Object.keys(server.env).length > 0
-          ? JSON.stringify(server.env, null, 2)
-          : '{\n  "MY_API_KEY": "your-key"\n}'
+  const filteredConnectors = useMemo(() => {
+    return AVAILABLE_CONNECTORS.filter((c) => {
+      const q = searchQuery.toLowerCase().trim();
+      if (!q) return true;
+      return (
+        c.name.toLowerCase().includes(q) ||
+        c.description.toLowerCase().includes(q) ||
+        c.skills.some((s) => s.toLowerCase().includes(q))
       );
-      setIsEnvOpen(Boolean(server.env && Object.keys(server.env).length > 0));
-    }
-  };
+    });
+  }, [searchQuery]);
 
-  // Save changes to current server
-  const handleApplyServerEdit = () => {
-    if (!editFormData) return;
-    if (!editFormData.name.trim()) {
-      toast.error(isIndo ? "Name wajib diisi." : "Name is required.");
+  const handleToggleConnect = async (connector: ConnectorMetadata) => {
+    if (connector.id === "cloud-sandbox") {
+      toast.info(
+        isIndo
+          ? "Cloud Sandbox adalah alat bawaan inti yang selalu aktif."
+          : "Cloud Sandbox is a core built-in tool that is always active."
+      );
       return;
     }
 
-    if (editFormData.transport === "stdio" && !editFormData.command?.trim()) {
-      toast.error(isIndo ? "Command wajib diisi untuk transport stdio." : "Command is required for stdio transport.");
-      return;
-    }
+    const isActive = isConnectorActive(connector.id);
+    setIsConnecting(true);
 
-    if ((editFormData.transport === "sse" || editFormData.transport === "http") && !editFormData.url?.trim()) {
-      toast.error(isIndo ? "URL wajib diisi untuk transport SSE/HTTP." : "URL is required for SSE/HTTP transport.");
-      return;
-    }
-
-    let parsedEnv: Record<string, string> = {};
-    if (envJsonText.trim()) {
-      try {
-        const parsed = JSON.parse(envJsonText);
-        if (typeof parsed === "object" && parsed !== null) {
-          parsedEnv = parsed;
+    try {
+      if (isActive) {
+        await disconnectConnector(connector.id);
+        setConnectedIds(getConnectedConnectorIds());
+        toast.success(
+          isIndo
+            ? `${connector.name} berhasil dinonaktifkan.`
+            : `${connector.name} disconnected successfully.`
+        );
+      } else {
+        const res = await connectConnector(connector);
+        setConnectedIds(getConnectedConnectorIds());
+        if (res.message) {
+          toast.success(res.message);
         }
-      } catch {
-        toast.error(isIndo ? "Format Environment variables JSON tidak valid." : "Invalid Environment variables JSON syntax.");
-        return;
       }
+    } catch (err: any) {
+      toast.error(err?.message || "Gagal mengubah status koneksi.");
+    } finally {
+      setIsConnecting(false);
     }
-
-    const updatedServer: McpServerConfig = {
-      ...editFormData,
-      env: parsedEnv,
-    };
-
-    const updated = mcpConfig.servers.map((s) =>
-      s.id === updatedServer.id ? updatedServer : s
-    );
-
-    const newConfig = { servers: updated };
-    setMcpConfig(newConfig);
-    saveStoredMcpConfig(newConfig);
-    setExpandedServerId(null);
-    setEditFormData(null);
-    toast.success(
-      isIndo
-        ? `Server ${updatedServer.name} berhasil disimpan.`
-        : `Server ${updatedServer.name} saved successfully.`
-    );
   };
 
-  const handleCancelServerEdit = () => {
-    setExpandedServerId(null);
-    setEditFormData(null);
+  const handleCopyPrompt = (prompt: string, idx: number) => {
+    navigator.clipboard.writeText(prompt);
+    setCopiedPromptIndex(idx);
+    toast.success(isIndo ? "Prompt disalin!" : "Prompt copied!");
+    setTimeout(() => setCopiedPromptIndex(null), 2000);
   };
 
-  const handleDeleteServer = (serverId: string, e?: React.MouseEvent) => {
-    e?.stopPropagation();
-    const updated = mcpConfig.servers.filter((s) => s.id !== serverId);
-    const newConfig = { servers: updated };
-    setMcpConfig(newConfig);
-    saveStoredMcpConfig(newConfig);
-    if (expandedServerId === serverId) {
-      setExpandedServerId(null);
-      setEditFormData(null);
-    }
-    toast.success(isIndo ? "Server MCP dihapus." : "MCP server deleted.");
-  };
-
-  // Add Custom Server
-  const handleAddCustomServer = () => {
-    const id = `custom-${Date.now()}`;
-    const newServer: McpServerConfig = {
-      id,
-      name: isIndo ? "Server Kustom" : "Custom Server",
-      transport: "stdio",
-      scope: "user",
-      timeoutMs: 30000,
-      protocolVersion: "auto",
-      command: "npx",
-      args: [],
-      env: {},
-      isCustom: true,
-      status: "ready",
-    };
-    const updated = [...mcpConfig.servers, newServer];
-    const newConfig = { servers: updated };
-    setMcpConfig(newConfig);
-    saveStoredMcpConfig(newConfig);
-    setExpandedServerId(newServer.id);
-    setEditFormData(JSON.parse(JSON.stringify(newServer)));
-    setEnvJsonText('{\n  "MY_API_KEY": "your-key"\n}');
-    setIsEnvOpen(true);
-  };
-
-  // Add Preset Server
-  const handleAddPresetServer = (preset: McpServerConfig) => {
-    if (mcpConfig.servers.some((s) => s.id === preset.id)) {
-      toast.error(isIndo ? "Server ini sudah terpasang." : "This preset server is already added.");
-      return;
-    }
-    const updated = [...mcpConfig.servers, preset];
-    const newConfig = { servers: updated };
-    setMcpConfig(newConfig);
-    saveStoredMcpConfig(newConfig);
-    setIsPresetModalOpen(false);
-    toast.success(
-      isIndo
-        ? `Server ${preset.name} berhasil ditambahkan.`
-        : `Server ${preset.name} added successfully.`
-    );
-  };
-
-  // Apply JSON Changes
+  // JSON Tab Actions
   const handleApplyJson = () => {
     try {
       const parsed = importMcpJson(rawJsonText);
       setMcpConfig(parsed);
       saveStoredMcpConfig(parsed);
-      toast.success(isIndo ? "Konfigurasi JSON berhasil diterapkan!" : "JSON configuration applied successfully!");
+      toast.success(isIndo ? "Konfigurasi JSON berhasil disimpan." : "JSON configuration saved successfully.");
     } catch (err: any) {
-      toast.error(err?.message || "Invalid JSON syntax");
+      toast.error(err?.message || "Format JSON tidak valid.");
     }
+  };
+
+  const handleResetToPresets = () => {
+    const defaultConfig: McpConfigurationState = { servers: MOBILE_PRESET_MCP_SERVERS };
+    setMcpConfig(defaultConfig);
+    setRawJsonText(exportMcpJson(defaultConfig));
+    saveStoredMcpConfig(defaultConfig);
+    toast.success(isIndo ? "Reset ke preset default berhasil." : "Reset to default presets successfully.");
   };
 
   const handleCopyJson = () => {
     navigator.clipboard.writeText(rawJsonText);
     setIsCopiedJson(true);
-    toast.success(isIndo ? "JSON disalin ke clipboard!" : "JSON copied to clipboard!");
+    toast.success(isIndo ? "JSON berhasil disalin." : "JSON copied to clipboard.");
     setTimeout(() => setIsCopiedJson(false), 2000);
   };
 
-  const handleResetToPresets = () => {
-    const resetConfig = { servers: MOBILE_PRESET_MCP_SERVERS };
-    setMcpConfig(resetConfig);
-    saveStoredMcpConfig(resetConfig);
-    setExpandedServerId(null);
-    setEditFormData(null);
-    toast.success(isIndo ? "Konfigurasi direset ke preset default." : "Configuration reset to default presets.");
-  };
+  if (!open) return null;
 
   return (
-    <>
-      {/* Backdrop */}
-      <div
-        className={cn(
-          "fixed inset-0 z-50 bg-black/60 backdrop-blur-xs transition-opacity duration-200",
-          open ? "opacity-100 visible pointer-events-auto" : "opacity-0 invisible pointer-events-none"
-        )}
-        onClick={onClose}
-        aria-hidden="true"
-      />
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-xs p-0 sm:p-4 animate-in fade-in-50 duration-200">
+      <div className="w-full sm:max-w-xl h-[88vh] sm:h-[82vh] max-h-[750px] bg-background border border-border rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-5 duration-300">
+        {/* Top Drag Indicator (Mobile) */}
+        <div className="w-full pt-3 pb-1 flex justify-center sm:hidden">
+          <div className="w-10 h-1.5 rounded-full bg-border" />
+        </div>
 
-      {/* Bottom Sheet */}
-      <div
-        className={cn(
-          "fixed inset-x-0 bottom-0 z-50 max-h-[90vh] bg-card text-card-foreground border-t border-border rounded-t-[24px] flex flex-col will-change-transform font-sans overflow-hidden select-none transition-transform duration-300 ease-out safe-area-bottom shadow-2xl",
-          open ? "translate-y-0" : "translate-y-full pointer-events-none"
-        )}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Model Context Protocol Settings"
-      >
-        {/* Drag handle */}
-        <div className="w-10 h-1 rounded-full bg-muted-foreground/30 mx-auto mt-2.5 mb-1 shrink-0" />
-
-        {/* Header */}
-        <div className="px-5 py-3 border-b border-border flex items-center justify-between shrink-0">
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-base font-semibold text-foreground tracking-tight">
-                Model Context Protocol
-              </h2>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary text-muted-foreground font-sans border border-border/70">
-                MCP Servers
-              </span>
-            </div>
-            <p className="text-[11px] text-muted-foreground mt-0.5">
-              {isIndo
-                ? "Kelola server MCP dan eksekusi alat untuk agen mobile"
-                : "Manage MCP servers and tool execution for mobile agent"}
-            </p>
+        {/* Sheet Header */}
+        <div className="px-5 py-3 border-b border-border/60 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-2">
+            <h2 className="text-base font-semibold text-foreground tracking-tight">
+              {isIndo ? "Connectors & Integrasi MCP" : "Connectors & MCP Integrations"}
+            </h2>
+            <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10.5px] font-medium border border-primary/20">
+              {connectedIds.length} {isIndo ? "Aktif" : "Active"}
+            </span>
           </div>
 
           <button
             type="button"
             onClick={onClose}
-            className="h-8 w-8 rounded-full hover:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer active:scale-95"
-            aria-label="Tutup"
+            className="p-1.5 rounded-full hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
           >
-            <X className="h-4 w-4" />
+            <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Sliding Pill Tabs & Add Action - Exact matching height h-9 */}
-        <div className="px-5 pt-3 pb-1 flex items-center justify-between gap-3 shrink-0">
-          <div className="relative flex items-center h-9 p-0.5 rounded-xl bg-muted/70 border border-border flex-1 max-w-[260px]">
-            <div
-              className="absolute top-0.5 bottom-0.5 left-0 rounded-lg bg-background shadow-2xs pointer-events-none transition-all duration-300"
-              style={{
-                transform: `translateX(${indicatorStyle.left}px)`,
-                width: `${indicatorStyle.width}px`,
-                opacity: indicatorStyle.width > 0 ? 1 : 0,
-                transitionTimingFunction: "cubic-bezier(0.16, 1, 0.3, 1)",
-              }}
-            />
-
+        {/* Tabs Bar */}
+        <div className="px-5 pt-3 shrink-0 flex items-center justify-between gap-2 border-b border-border/40 pb-2">
+          <div className="flex items-center bg-secondary/50 p-1 rounded-xl border border-border w-full">
             <button
-              ref={serversTabRef}
               type="button"
-              onClick={() => setActiveTab("servers")}
+              onClick={() => {
+                setActiveTab("apps");
+                setSelectedConnector(null);
+              }}
               className={cn(
-                "relative z-10 flex-1 h-full rounded-lg text-xs font-medium transition-colors duration-200 cursor-pointer select-none text-center flex items-center justify-center gap-1.5",
-                activeTab === "servers"
-                  ? "text-foreground font-semibold"
+                "flex-1 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1.5 cursor-pointer",
+                activeTab === "apps"
+                  ? "bg-card text-foreground shadow-xs font-semibold"
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
-              <Server className="w-3.5 h-3.5" />
-              <span>Servers</span>
+              <Layers className="w-3.5 h-3.5" />
+              <span>{isIndo ? "Aplikasi & Tools" : "Apps & Tools"}</span>
             </button>
             <button
-              ref={jsonTabRef}
               type="button"
               onClick={() => setActiveTab("json")}
               className={cn(
-                "relative z-10 flex-1 h-full rounded-lg text-xs font-medium transition-colors duration-200 cursor-pointer select-none text-center flex items-center justify-center gap-1.5",
+                "flex-1 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1.5 cursor-pointer",
                 activeTab === "json"
-                  ? "text-foreground font-semibold"
+                  ? "bg-card text-foreground shadow-xs font-semibold"
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
               <Code2 className="w-3.5 h-3.5" />
-              <span>JSON Config</span>
+              <span>{isIndo ? "MCP JSON" : "MCP JSON"}</span>
             </button>
           </div>
-
-          {/* Right Add Server Dropdown on Mobile */}
-          {activeTab === "servers" && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  className="h-9 px-3 rounded-xl border border-border hover:bg-secondary text-xs font-medium text-foreground transition-all flex items-center gap-1.5 cursor-pointer shrink-0 shadow-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-foreground/20"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>{isIndo ? "Tambah" : "Add"}</span>
-                  <ChevronDown className="w-3 h-3 text-muted-foreground" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-52 bg-card border-border text-foreground p-1 rounded-xl shadow-xl">
-                <DropdownMenuItem
-                  onClick={() => setIsPresetModalOpen(true)}
-                  className="text-xs px-3 py-2 rounded-lg cursor-pointer hover:bg-secondary/70 focus:bg-secondary/70 flex items-center gap-2"
-                >
-                  <Layers className="w-3.5 h-3.5 text-muted-foreground" />
-                  <span>{isIndo ? "Pilih dari preset" : "Add from preset"}</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={handleAddCustomServer}
-                  className="text-xs px-3 py-2 rounded-lg cursor-pointer hover:bg-secondary/70 focus:bg-secondary/70 flex items-center gap-2"
-                >
-                  <Plus className="w-3.5 h-3.5 text-muted-foreground" />
-                  <span>{isIndo ? "Tambah server kustom" : "Add custom server"}</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
         </div>
 
-        {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
-          {/* ================================================================= */}
-          {/* TAB 1: SERVERS LIST (MODELS VIEW STYLE)                            */}
-          {/* ================================================================= */}
-          {activeTab === "servers" && (
-            <div className="space-y-3">
-              {mcpConfig.servers.map((server) => {
-                const isExpanded = expandedServerId === server.id;
+        {/* Sheet Content Area (Scrollable) */}
+        <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
+          {/* ============================================================= */}
+          {/* TAB 1: APPS & CONNECTORS (LIST VIEW)                          */}
+          {/* ============================================================= */}
+          {activeTab === "apps" && !selectedConnector && (
+            <div className="space-y-4">
+              {/* Search Bar */}
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder={isIndo ? "Cari aplikasi atau tools..." : "Search apps or tools..."}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-8 pr-3 py-1.5 text-xs rounded-xl bg-secondary/40 border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/30 transition-colors"
+                />
+              </div>
 
-                return (
-                  <div
-                    key={server.id}
-                    className={cn(
-                      "rounded-2xl border border-border bg-card/60 transition-all duration-300 overflow-hidden",
-                      isExpanded ? "bg-card/90 border-border/90 shadow-xs" : "hover:border-foreground/20 hover:bg-secondary/30"
-                    )}
-                  >
-                    {/* Collapsed Header - Matches user screenshot media_1789818089728.png */}
+              {/* Connectors List */}
+              <div className="space-y-2.5">
+                {filteredConnectors.map((connector) => {
+                  const isConnected = isConnectorActive(connector.id);
+
+                  return (
                     <div
-                      onClick={() => handleToggleExpand(server)}
-                      className="p-3.5 flex items-center justify-between gap-3 cursor-pointer select-none"
+                      key={connector.id}
+                      onClick={() => setSelectedConnector(connector)}
+                      className={cn(
+                        "p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 active:scale-[0.99]",
+                        isConnected
+                          ? "bg-card border-emerald-500/30 hover:border-emerald-500/50"
+                          : "bg-card/60 border-border hover:bg-secondary/30"
+                      )}
                     >
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <span className="text-xs font-semibold text-foreground truncate">
-                          {server.name}
-                        </span>
-                        <span className="px-2 py-0.5 rounded-md bg-secondary text-muted-foreground text-[10px] font-mono border border-border/70 shrink-0">
-                          {server.transport}
-                        </span>
-                        {server.isDefault && (
-                          <span className="px-2 py-0.5 rounded-md bg-secondary text-muted-foreground text-[10px] font-sans border border-border/70 shrink-0">
-                            Default
-                          </span>
-                        )}
-                        {server.isCustom && (
-                          <span className="px-2 py-0.5 rounded-md bg-secondary text-muted-foreground text-[10px] font-sans border border-border/70 shrink-0">
-                            Custom
-                          </span>
-                        )}
-                        <span
-                          className="w-2 h-2 rounded-full bg-emerald-500 shrink-0"
-                          title="Ready"
-                        />
+                      <div className="flex items-center gap-3 min-w-0">
+                        <BrandLogo id={connector.id} name={connector.name} size="sm" />
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs font-semibold text-foreground truncate">
+                              {connector.name}
+                            </span>
+                            {connector.isBuiltin && (
+                              <span className="text-[9.5px] px-1.5 py-0.2 rounded bg-primary/10 text-primary font-medium">
+                                Core
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[11px] text-muted-foreground truncate max-w-[200px] sm:max-w-xs">
+                            {connector.tagline}
+                          </p>
+                        </div>
                       </div>
 
-                      <div className="flex items-center gap-2 shrink-0">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleToggleExpand(server);
-                          }}
-                          className={cn(
-                            "px-3 py-1 rounded-xl border text-[11px] font-medium transition-all cursor-pointer",
-                            isExpanded
-                              ? "bg-secondary text-foreground border-foreground/30 font-semibold"
-                              : "border-border hover:bg-secondary text-foreground"
-                          )}
-                        >
-                          {isExpanded ? (isIndo ? "Tutup" : "Close") : "Edit"}
-                        </button>
+                      <div className="shrink-0 flex items-center gap-2">
+                        {isConnected ? (
+                          <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10.5px] font-medium border border-emerald-500/20">
+                            <Check className="w-2.5 h-2.5" />
+                            <span>{isIndo ? "Aktif" : "Active"}</span>
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-full bg-secondary text-muted-foreground text-[10.5px] font-medium border border-border">
+                            {isIndo ? "Tersedia" : "Ready"}
+                          </span>
+                        )}
+                        <span className="text-muted-foreground text-xs">›</span>
                       </div>
                     </div>
-
-                    {/* Expanded Form - Matches user screenshot media_1789818062622.png */}
-                    {isExpanded && editFormData && (
-                      <div className="p-4 space-y-3.5 border-t border-border/40 animate-in fade-in-50 duration-200">
-                        {/* Row 1: Name and Scope */}
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="flex-1 space-y-1">
-                            <label className="text-[11px] font-medium text-foreground/80 block">
-                              Name
-                            </label>
-                            <input
-                              type="text"
-                              value={editFormData.name}
-                              onChange={(e) =>
-                                setEditFormData({ ...editFormData, name: e.target.value })
-                              }
-                              placeholder="e.g. Canva or Composio"
-                              className="w-full px-3 py-1.5 rounded-xl bg-secondary/30 border border-border text-xs text-foreground outline-none ring-0 focus:outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/40 transition-colors"
-                            />
-                          </div>
-
-                          <div className="w-32 space-y-1">
-                            <label className="text-[11px] font-medium text-muted-foreground block text-right pr-1">
-                              Scope
-                            </label>
-                            <Select
-                              value={editFormData.scope || "user"}
-                              onValueChange={(val) =>
-                                setEditFormData({
-                                  ...editFormData,
-                                  scope: val as McpScope,
-                                })
-                              }
-                            >
-                              <SelectTrigger className="w-full h-8 rounded-xl bg-secondary/30 border border-border text-xs text-foreground focus:ring-1 focus:ring-foreground/20">
-                                <div className="flex items-center gap-1.5">
-                                  <Monitor className="w-3 h-3 text-muted-foreground" />
-                                  <SelectValue placeholder="User" />
-                                </div>
-                              </SelectTrigger>
-                              <SelectContent className="bg-card border-border text-foreground rounded-xl shadow-xl">
-                                <SelectItem value="user" className="text-xs cursor-pointer">
-                                  User
-                                </SelectItem>
-                                <SelectItem value="workspace" className="text-xs cursor-pointer">
-                                  Workspace
-                                </SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-
-                        {/* Row 2: Type */}
-                        <div className="space-y-1">
-                          <label className="text-[11px] font-medium text-foreground/80 block">
-                            Type
-                          </label>
-                          <Select
-                            value={editFormData.transport}
-                            onValueChange={(val) =>
-                              setEditFormData({
-                                ...editFormData,
-                                transport: val as McpTransport,
-                              })
-                            }
-                          >
-                            <SelectTrigger className="w-full h-8 rounded-xl bg-secondary/30 border border-border text-xs text-foreground focus:ring-1 focus:ring-foreground/20">
-                              <SelectValue placeholder="stdio (local command)" />
-                            </SelectTrigger>
-                            <SelectContent className="bg-card border-border text-foreground rounded-xl shadow-xl">
-                              <SelectItem value="stdio" className="text-xs cursor-pointer">
-                                stdio (local command)
-                              </SelectItem>
-                              <SelectItem value="sse" className="text-xs cursor-pointer">
-                                sse (remote stream)
-                              </SelectItem>
-                              <SelectItem value="http" className="text-xs cursor-pointer">
-                                http (streamable)
-                              </SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        {/* Row 3: Timeout MS */}
-                        <div className="space-y-1">
-                          <label className="text-[11px] font-medium text-foreground/80 block">
-                            Timeout MS
-                          </label>
-                          <input
-                            type="number"
-                            value={editFormData.timeoutMs || 30000}
-                            onChange={(e) =>
-                              setEditFormData({
-                                ...editFormData,
-                                timeoutMs: parseInt(e.target.value) || 30000,
-                              })
-                            }
-                            placeholder="30000"
-                            className="w-full px-3 py-1.5 rounded-xl bg-secondary/30 border border-border text-xs text-foreground outline-none ring-0 focus:outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/40 transition-colors"
-                          />
-                        </div>
-
-                        {/* Row 4: Protocol version */}
-                        <div className="space-y-1">
-                          <label className="text-[11px] font-medium text-foreground/80 block">
-                            Protocol version
-                          </label>
-                          <Select
-                            value={editFormData.protocolVersion || "auto"}
-                            onValueChange={(val) =>
-                              setEditFormData({
-                                ...editFormData,
-                                protocolVersion: val,
-                              })
-                            }
-                          >
-                            <SelectTrigger className="w-full h-8 rounded-xl bg-secondary/30 border border-border text-xs text-foreground focus:ring-1 focus:ring-foreground/20">
-                              <SelectValue placeholder="Auto (recommended)" />
-                            </SelectTrigger>
-                            <SelectContent className="bg-card border-border text-foreground rounded-xl shadow-xl">
-                              <SelectItem value="auto" className="text-xs cursor-pointer">
-                                Auto (recommended)
-                              </SelectItem>
-                              <SelectItem value="2024-11-05" className="text-xs cursor-pointer">
-                                2024-11-05
-                              </SelectItem>
-                              <SelectItem value="2024-10-07" className="text-xs cursor-pointer">
-                                2024-10-07
-                              </SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-
-                        {/* Row 5 & 6: Command and Arguments (or URL) */}
-                        {editFormData.transport === "stdio" ? (
-                          <>
-                            <div className="space-y-1">
-                              <label className="text-[11px] font-medium text-foreground/80 block">
-                                Command
-                              </label>
-                              <input
-                                type="text"
-                                value={editFormData.command || ""}
-                                onChange={(e) =>
-                                  setEditFormData({ ...editFormData, command: e.target.value })
-                                }
-                                placeholder="npx"
-                                className="w-full px-3 py-1.5 rounded-xl bg-secondary/30 border border-border text-xs font-mono text-foreground outline-none ring-0 focus:outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/40 transition-colors"
-                              />
-                            </div>
-
-                            <div className="space-y-1">
-                              <label className="text-[11px] font-medium text-foreground/80 block">
-                                Arguments (space separated)
-                              </label>
-                              <input
-                                type="text"
-                                value={(editFormData.args || []).join(" ")}
-                                onChange={(e) =>
-                                  setEditFormData({
-                                    ...editFormData,
-                                    args: e.target.value.split(" ").filter(Boolean),
-                                  })
-                                }
-                                placeholder="-y mcp-remote@latest https://mcp.canva.com/mcp"
-                                className="w-full px-3 py-1.5 rounded-xl bg-secondary/30 border border-border text-xs font-mono text-foreground outline-none ring-0 focus:outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/40 transition-colors"
-                              />
-                            </div>
-                          </>
-                        ) : (
-                          <div className="space-y-1">
-                            <label className="text-[11px] font-medium text-foreground/80 block">
-                              URL
-                            </label>
-                            <input
-                              type="text"
-                              value={editFormData.url || ""}
-                              onChange={(e) =>
-                                setEditFormData({ ...editFormData, url: e.target.value })
-                              }
-                              placeholder="https://mcp.canva.com/mcp"
-                              className="w-full px-3 py-1.5 rounded-xl bg-secondary/30 border border-border text-xs font-mono text-foreground outline-none ring-0 focus:outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/40 transition-colors"
-                            />
-                          </div>
-                        )}
-
-                        {/* Row 7: Environment variables (optional) */}
-                        <div className="space-y-1.5 pt-1">
-                          <button
-                            type="button"
-                            onClick={() => setIsEnvOpen(!isEnvOpen)}
-                            className="flex items-center gap-1.5 text-[11px] text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
-                          >
-                            {isEnvOpen ? (
-                              <ChevronUp className="w-3 h-3" />
-                            ) : (
-                              <ChevronDown className="w-3 h-3" />
-                            )}
-                            <span>Environment variables (optional)</span>
-                          </button>
-
-                          {isEnvOpen && (
-                            <textarea
-                              rows={3}
-                              value={envJsonText}
-                              onChange={(e) => setEnvJsonText(e.target.value)}
-                              placeholder={'{\n  "MY_API_KEY": "your-key"\n}'}
-                              spellCheck={false}
-                              className="w-full p-2.5 rounded-xl bg-secondary/30 border border-border text-xs font-mono text-foreground outline-none ring-0 focus:outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/40 resize-none leading-relaxed transition-colors"
-                            />
-                          )}
-                        </div>
-
-                        {/* Row 8: Bottom Footer Actions */}
-                        <div className="flex items-center justify-between pt-2 border-t border-border/40">
-                          <button
-                            type="button"
-                            onClick={(e) => handleDeleteServer(editFormData.id, e)}
-                            className="text-xs text-destructive hover:text-destructive/80 transition-colors flex items-center gap-1.5 cursor-pointer font-medium"
-                          >
-                            <Trash2 className="w-3.5 h-3.5 text-destructive" />
-                            <span>Delete</span>
-                          </button>
-
-                          <div className="flex items-center gap-2">
-                            <button
-                              type="button"
-                              onClick={handleCancelServerEdit}
-                              className="px-2.5 py-1 rounded-lg text-xs font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                            >
-                              Cancel
-                            </button>
-                            <button
-                              type="button"
-                              onClick={handleApplyServerEdit}
-                              className="px-3.5 py-1 rounded-lg bg-foreground text-background text-xs font-medium hover:opacity-90 transition-opacity cursor-pointer"
-                            >
-                              Save
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           )}
 
-          {/* ================================================================= */}
-          {/* TAB 2: JSON CONFIG                                                */}
-          {/* ================================================================= */}
+          {/* ============================================================= */}
+          {/* TAB 1: CONNECTOR DETAIL VIEW (Mobile)                         */}
+          {/* ============================================================= */}
+          {activeTab === "apps" && selectedConnector && (
+            <div className="space-y-4 animate-in fade-in-50 duration-200">
+              {/* Back to List */}
+              <button
+                type="button"
+                onClick={() => setSelectedConnector(null)}
+                className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground cursor-pointer"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span>{isIndo ? "Kembali ke Daftar" : "Back to List"}</span>
+              </button>
+
+              {/* Hero Card */}
+              <div className="p-4 rounded-2xl border border-border bg-card/70 space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <BrandLogo id={selectedConnector.id} name={selectedConnector.name} size="md" />
+                    <div>
+                      <h3 className="text-sm font-semibold text-foreground">
+                        {selectedConnector.name}
+                      </h3>
+                      <div className="flex items-center gap-1.5 text-[10.5px] text-muted-foreground">
+                        <span>{selectedConnector.category}</span>
+                        <span>•</span>
+                        <span>{selectedConnector.authType}</span>
+                        <span>•</span>
+                        <span>{selectedConnector.toolCount} Tools</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Connect / Disconnect Action */}
+                  <div className="shrink-0">
+                    {isConnectorActive(selectedConnector.id) ? (
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        disabled={isConnecting || selectedConnector.isBuiltin}
+                        onClick={() => handleToggleConnect(selectedConnector)}
+                        className="rounded-xl h-8 text-[11px] px-3 cursor-pointer"
+                      >
+                        <Unlink2 className="w-3 h-3 mr-1" />
+                        <span>{isIndo ? "Putus" : "Disconnect"}</span>
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="default"
+                        size="sm"
+                        disabled={isConnecting}
+                        onClick={() => handleToggleConnect(selectedConnector)}
+                        className="rounded-xl h-8 text-[11px] px-3 cursor-pointer bg-foreground text-background"
+                      >
+                        <Link2 className="w-3 h-3 mr-1" />
+                        <span>{isIndo ? "Hubungkan" : "Connect"}</span>
+                      </Button>
+                    )}
+                  </div>
+                </div>
+
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  {selectedConnector.description}
+                </p>
+              </div>
+
+              {/* Skills */}
+              <div className="p-4 rounded-2xl border border-border bg-card/40 space-y-2.5">
+                <h4 className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
+                  <span>{isIndo ? "Kemampuan (Tools)" : "Capabilities & Tools"}</span>
+                </h4>
+                <div className="space-y-1.5">
+                  {selectedConnector.skills.map((skill, i) => (
+                    <div
+                      key={i}
+                      className="px-2.5 py-1.5 rounded-lg bg-secondary/30 border border-border/60 text-[11px] text-foreground flex items-center gap-2"
+                    >
+                      <div className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
+                      <span>{skill}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Try Prompts */}
+              {selectedConnector.tryPrompts && selectedConnector.tryPrompts.length > 0 && (
+                <div className="p-4 rounded-2xl border border-border bg-card/40 space-y-2.5">
+                  <h4 className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-primary" />
+                    <span>{isIndo ? "Contoh Prompt Belajar" : "Example Study Prompts"}</span>
+                  </h4>
+                  <div className="space-y-1.5">
+                    {selectedConnector.tryPrompts.map((p, idx) => (
+                      <div
+                        key={idx}
+                        onClick={() => handleCopyPrompt(p, idx)}
+                        className="p-2.5 rounded-lg bg-secondary/30 border border-border hover:bg-secondary/60 transition-colors cursor-pointer flex items-center justify-between gap-2"
+                      >
+                        <span className="text-[11px] font-mono text-foreground/90 line-clamp-2 select-none">
+                          {p}
+                        </span>
+                        <span className="shrink-0 text-muted-foreground text-xs">
+                          {copiedPromptIndex === idx ? (
+                            <CheckCheck className="w-3 h-3 text-emerald-500" />
+                          ) : (
+                            <Copy className="w-3 h-3" />
+                          )}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ============================================================= */}
+          {/* TAB 2: RAW MCP JSON CONFIG (Mobile)                           */}
+          {/* ============================================================= */}
           {activeTab === "json" && (
             <div className="space-y-3">
               <div className="p-3 rounded-xl bg-secondary/30 border border-border text-[11px] text-muted-foreground leading-relaxed">
                 {isIndo
-                  ? "Konfigurasi ini mengikuti format standar mcpServers yang kompatibel dengan Antigravity, Claude Desktop, dan Cursor. Anda dapat langsung mengedit atau menempelkan JSON di bawah ini."
-                  : "This configuration adheres to the standard mcpServers schema compatible with Antigravity, Claude Desktop, and Cursor. You can edit or paste JSON directly below."}
+                  ? "Format JSON ini kompatibel dengan standar mcpServers (Antigravity & Claude Desktop)."
+                  : "Adheres to standard mcpServers schema for Antigravity & Claude Desktop."}
               </div>
 
-              <div className="relative rounded-2xl border border-border bg-card/60 overflow-hidden">
-                <div className="px-3.5 py-2 border-b border-border/50 bg-secondary/20 flex items-center justify-between">
-                  <span className="text-[11px] font-mono text-muted-foreground">
-                    mcpServers.json
-                  </span>
+              <div className="rounded-xl border border-border bg-card/60 overflow-hidden">
+                <div className="px-3 py-2 border-b border-border/50 bg-secondary/20 flex items-center justify-between">
+                  <span className="text-[11px] font-mono text-muted-foreground">mcpServers.json</span>
                   <button
                     type="button"
                     onClick={handleCopyJson}
-                    className="p-1 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                    title="Copy JSON"
+                    className="p-1 rounded text-muted-foreground hover:text-foreground"
+                    title="Copy"
                   >
                     {isCopiedJson ? (
                       <CheckCheck className="w-3.5 h-3.5 text-emerald-500" />
@@ -742,92 +441,33 @@ export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
                 <textarea
                   value={rawJsonText}
                   onChange={(e) => setRawJsonText(e.target.value)}
-                  rows={14}
+                  rows={10}
                   spellCheck={false}
-                  className="w-full p-3.5 bg-transparent font-mono text-xs text-foreground outline-none resize-none leading-relaxed"
+                  className="w-full p-3 bg-transparent font-mono text-[11px] text-foreground outline-none resize-none"
                 />
               </div>
 
-              {/* JSON Action Bar */}
               <div className="flex items-center justify-between pt-1">
                 <button
                   type="button"
                   onClick={handleResetToPresets}
-                  className="px-3 py-1.5 rounded-xl border border-border hover:bg-secondary text-xs font-medium text-muted-foreground hover:text-foreground transition-all flex items-center gap-1.5 cursor-pointer"
+                  className="px-3 py-1.5 rounded-lg border border-border text-[11px] font-medium text-muted-foreground hover:text-foreground cursor-pointer"
                 >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                  <span>{isIndo ? "Reset Default" : "Reset Presets"}</span>
+                  {isIndo ? "Reset Default" : "Reset Default"}
                 </button>
-
-                <button
-                  type="button"
+                <Button
+                  size="sm"
                   onClick={handleApplyJson}
-                  className="px-3.5 py-1.5 rounded-xl bg-foreground text-background text-xs font-medium hover:opacity-90 transition-opacity flex items-center gap-1.5 cursor-pointer"
+                  className="rounded-lg h-7 text-[11px] px-3 bg-foreground text-background cursor-pointer"
                 >
-                  <Check className="w-3.5 h-3.5" />
-                  <span>{isIndo ? "Terapkan JSON" : "Apply JSON"}</span>
-                </button>
+                  <Check className="w-3 h-3 mr-1" />
+                  <span>{isIndo ? "Simpan JSON" : "Save JSON"}</span>
+                </Button>
               </div>
             </div>
           )}
         </div>
       </div>
-
-      {/* Preset Modal */}
-      {isPresetModalOpen && (
-        <div className="fixed inset-0 z-60 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="w-full max-w-sm bg-card border border-border rounded-2xl shadow-2xl p-5 space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-foreground">
-                {isIndo ? "Pilih Template Server MCP" : "Choose MCP Server Preset"}
-              </h3>
-              <button
-                type="button"
-                onClick={() => setIsPresetModalOpen(false)}
-                className="p-1 rounded-full text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <div className="space-y-2 max-h-72 overflow-y-auto">
-              {MOBILE_PRESET_MCP_SERVERS.map((preset) => {
-                const isInstalled = mcpConfig.servers.some((s) => s.id === preset.id);
-
-                return (
-                  <button
-                    key={preset.id}
-                    type="button"
-                    disabled={isInstalled}
-                    onClick={() => handleAddPresetServer(preset)}
-                    className={cn(
-                      "w-full text-left p-3 rounded-xl border transition-all flex items-center justify-between gap-3 cursor-pointer",
-                      isInstalled
-                        ? "opacity-50 bg-secondary/20 border-border cursor-not-allowed"
-                        : "bg-secondary/30 border-border hover:bg-secondary/60 hover:border-foreground/30 active:scale-[0.99]"
-                    )}
-                  >
-                    <div>
-                      <span className="text-xs font-semibold text-foreground block">
-                        {preset.name}
-                      </span>
-                      <span className="text-[10px] font-mono text-muted-foreground">
-                        {preset.transport === "stdio"
-                          ? `${preset.command} ${preset.args?.join(" ")}`
-                          : preset.url}
-                      </span>
-                    </div>
-
-                    <span className="text-[10px] px-2 py-0.5 rounded-md bg-secondary text-muted-foreground border border-border/70 shrink-0">
-                      {isInstalled ? (isIndo ? "Terpasang" : "Installed") : "+ Tambah"}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        </div>
-      )}
-    </>
+    </div>
   );
 }

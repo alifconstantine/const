@@ -25,6 +25,14 @@ contextBridge.exposeInMainWorld("electron", {
     ipcRenderer.on("auth:deep-link", handler);
     return () => ipcRenderer.removeListener("auth:deep-link", handler);
   },
+  composio: {
+    getAuthLink: (payload: { toolkit: string; userId?: string; callbackUrl?: string; apiKey?: string }) =>
+      ipcRenderer.invoke("composio:get-auth-link", payload),
+    disconnectAccount: (payload: { accountId: string; apiKey?: string }) =>
+      ipcRenderer.invoke("composio:disconnect-account", payload),
+    getConnectedAccounts: (payload?: { userId?: string; apiKey?: string }) =>
+      ipcRenderer.invoke("composio:get-connected-accounts", payload),
+  },
   agent: {
     getModels: () => ipcRenderer.invoke("agent:get-models"),
     sendMessage: (payload: {

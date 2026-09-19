@@ -5,6 +5,7 @@ export * from "./lib/theme";
 export * from "./components/theme-provider";
 export * from "./components/const-logo";
 export * from "./components/brand-logo";
+export * from "./lib/connectors-data";
 
 // Hooks
 export * from "./hooks/use-toast";
