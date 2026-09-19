@@ -1,8 +1,9 @@
-import type { LocalSource, QuizData, FlashcardData, MindMapData, MindMapNode } from "../db";
+import type { LocalSource, QuizData, FlashcardData, MindMapData, MindMapNode, AudioSummaryData } from "../db";
 import { getRouterBaseUrl } from "../ai-stream";
+import { getStoredVoiceConfig, synthesizeSpeechChunked } from "../voice";
 
 export interface GenerateStudioArtifactOptions {
-  type: "quiz" | "flashcard" | "mind_map";
+  type: "quiz" | "flashcard" | "mind_map" | "audio_summary";
   learnId: string;
   topic?: string;
   difficulty?: "easy" | "medium" | "hard";
@@ -11,6 +12,10 @@ export interface GenerateStudioArtifactOptions {
   sources: LocalSource[];
   language?: "id" | "en";
   themeId?: string;
+  customPrompt?: string;
+  voiceModel?: string;
+  voiceId?: string;
+  audioLanguage?: string;
 }
 
 function extractJson(text: string): any {
@@ -119,10 +124,15 @@ export async function generateStudioArtifact({
   sources,
   language = "id",
   themeId = "auto",
+  customPrompt,
+  voiceModel = "inworld-tts-2",
+  voiceId = "Ashley",
+  audioLanguage,
 }: GenerateStudioArtifactOptions): Promise<{
   title: string;
-  data: QuizData | FlashcardData | MindMapData;
+  data: QuizData | FlashcardData | MindMapData | AudioSummaryData;
 }> {
+  // Aggregate source texts for grounding context
   const sourceSnippets = sources
     .slice(0, 5)
     .map((s, idx) => {
@@ -352,6 +362,51 @@ Rules:
     userPrompt = `Materi Sumber Belajar:\n${sourceSnippets || "Topik: " + (topic || "Pengetahuan Umum")}\n\n` +
       (topic ? `Fokus Topik Spesifik / Instruksi: ${topic}\n\n` : "") +
       `Silakan buatkan Peta Pikiran hierarkis dalam format JSON yang valid.`;
+  } else if (type === "audio_summary") {
+    const lengthGuideline =
+      lengthMode === "short"
+        ? (isIndo ? "Ringkas: sekitar 300-500 kata, intisari pokok yang padat dan langsung ke poin utama." : "Concise: around 300-500 words, direct highlights and key takeaways.")
+        : lengthMode === "long"
+        ? (isIndo ? "Panjang & Mendalam: sekitar 1000-1600 kata, elaborasi komprehensif dengan latar belakang, analisis mendalam, dan contoh relevan." : "In-depth: around 1000-1600 words, comprehensive explanation with context, analysis, and examples.")
+        : (isIndo ? "Otomatis: sekitar 500-900 kata, pembahasan berimbang yang mencakup seluruh poin penting materi." : "Auto: around 500-900 words, balanced educational overview.");
+
+    systemPrompt = isIndo
+      ? `Anda adalah narator ahli dan produser audio edukasi untuk Const Learn.
+Tugas Anda adalah merangkum materi sumber ke dalam bentuk naskah audio (narasi suara) yang menarik, jernih, dan enak didengarkan.
+Aturan Penulisan Naskah:
+1. Kembalikan HANYA objek JSON valid:
+{
+  "title": string,
+  "script": string
+}
+2. Format Naskah:
+   - Tulis dalam gaya berbicara lisan yang natural, hangat, dan komunikatif (seperti mendengarkan podcast edukatif atau audiobook berkualitas tinggi).
+   - Hindari simbol visual seperti tabel, bullet points berlebihan, markdown tebal yang tidak dapat dibaca suara, atau URL.
+   - Gunakan tanda baca yang tepat agar intonasi suara AI mengalir dengan alami.
+   - Anda boleh menyisipkan steering tags Inworld TTS-2 dalam kurung siku secara wajar untuk variasi emosi/jeda, misalnya: [warmly], [thoughtful], [pause: 1s].
+3. Panjang Naskah: ${lengthGuideline}
+4. Bahasa: ${audioLanguage?.startsWith("en") ? "English" : "Bahasa Indonesia"}.
+5. Output HANYA JSON valid tanpa teks pengantar.`
+      : `You are an expert audio educator and narrative producer for Const Learn.
+Your task is to synthesize source materials into an engaging, natural-sounding audio overview script.
+Rules:
+1. Return ONLY a valid JSON object:
+{
+  "title": string,
+  "script": string
+}
+2. Script Format:
+   - Written for the ear: spoken-style narration, engaging and conversational yet informative.
+   - Avoid visual markdown tables, raw links, or dense bullet points that sound awkward when read aloud.
+   - You may subtly include Inworld TTS-2 steering tags like [warmly], [thoughtful], [excited], [pause: 1s] where fitting.
+3. Target Length: ${lengthGuideline}
+4. Language: ${audioLanguage?.startsWith("id") ? "Indonesian" : "English"}.
+5. STRICT: Pure JSON only without markdown or extra commentary.`;
+
+    userPrompt = `Materi Sumber Belajar:\n${sourceSnippets || "Topik: " + (topic || "Pengetahuan Umum")}\n\n` +
+      (topic ? `Fokus Topik Spesifik: ${topic}\n\n` : "") +
+      (customPrompt ? `Instruksi Khusus Tambahan: ${customPrompt}\n\n` : "") +
+      `Silakan buatkan naskah ringkasan audio dalam format JSON yang valid.`;
   }
 
   // Attempt API call to Router AI Gateway
@@ -447,6 +502,63 @@ Rules:
               updatedAt: Date.now(),
             };
             return { title: mindMapData.title, data: mindMapData };
+          } else if (type === "audio_summary" && (parsed.script || parsed.summary)) {
+            const scriptText = String(parsed.script || parsed.summary || "").trim();
+            const summaryTitle = parsed.title || (topic ? (isIndo ? `Ringkasan Audio: ${topic}` : `Audio Summary: ${topic}`) : (isIndo ? `Ringkasan Audio: ${sources[0]?.title || "Materi Belajar"}` : `Audio Summary: ${sources[0]?.title || "Study Material"}`));
+
+            let audioUrl: string | undefined;
+            let audioBase64: string | undefined;
+            let audioError: string | undefined;
+
+            const voiceConfig = getStoredVoiceConfig();
+            const provider = voiceConfig.providers.find((p) => p.protocol === "inworld") || voiceConfig.providers[0];
+
+            if (provider && provider.apiKey?.trim()) {
+              try {
+                console.log("[Studio Generator Mobile] Synthesizing audio, provider:", provider.name, "voice:", voiceId || provider.voice);
+                const synthRes = await synthesizeSpeechChunked({
+                  provider: {
+                    ...provider,
+                    model: voiceModel || provider.model || "inworld-tts-2",
+                    voice: voiceId || provider.voice || "Ashley",
+                  },
+                  text: scriptText,
+                });
+                if (synthRes.success) {
+                  audioUrl = synthRes.audioUrl;
+                  audioBase64 = synthRes.audioBase64;
+                  console.log("[Studio Generator Mobile] Audio synthesized successfully.");
+                } else {
+                  audioError = synthRes.error;
+                  console.error("[Studio Generator Mobile] Audio synthesis failed:", synthRes.error);
+                }
+              } catch (synthErr: any) {
+                audioError = synthErr?.message || "Synthesis exception";
+                console.error("[Studio Generator Mobile] Audio synthesis error:", synthErr);
+              }
+            } else {
+              audioError = isIndo
+                ? "API Key Inworld belum dikonfigurasi di menu Pengaturan Model."
+                : "Inworld API Key is not configured in Models settings.";
+              console.warn("[Studio Generator Mobile]", audioError);
+            }
+
+            const audioSummaryData: AudioSummaryData = {
+              title: summaryTitle,
+              script: scriptText,
+              audioUrl,
+              audioBase64,
+              voiceModel: voiceModel || provider?.model || "inworld-tts-2",
+              voiceId: voiceId || provider?.voice || "Ashley",
+              language: audioLanguage || language,
+              lengthMode: lengthMode as any,
+              sourceCount: sources.length,
+              sourceTitles: sources.map((s) => s.title),
+              sourceIds: sources.map((s) => s.id),
+              createdAt: Date.now(),
+              audioError,
+            };
+            return { title: audioSummaryData.title, data: audioSummaryData };
           }
         } else {
           console.warn("[Studio Generator Mobile] Router fetch returned unparseable content:", content);
@@ -462,10 +574,76 @@ Rules:
 
   // Graceful offline/fallback generator
   const fallbackTitle = topic
-    ? (type === "quiz" ? `AI Kuis: ${topic}` : type === "flashcard" ? `Flashcard: ${topic}` : `Peta Pikiran: ${topic}`)
+    ? (type === "quiz" ? `AI Kuis: ${topic}` : type === "flashcard" ? `Flashcard: ${topic}` : type === "audio_summary" ? (isIndo ? `Ringkasan Audio: ${topic}` : `Audio Summary: ${topic}`) : `Peta Pikiran: ${topic}`)
     : sources.length > 0
-    ? (type === "quiz" ? `AI Kuis: ${sources[0]!.title}` : type === "flashcard" ? `Flashcard: ${sources[0]!.title}` : `Peta Pikiran: ${sources[0]!.title}`)
-    : type === "quiz" ? "AI Kuis Mandiri" : type === "flashcard" ? "Flashcard Mandiri" : "Peta Pikiran Mandiri";
+    ? (type === "quiz" ? `AI Kuis: ${sources[0]!.title}` : type === "flashcard" ? `Flashcard: ${sources[0]!.title}` : type === "audio_summary" ? (isIndo ? `Ringkasan Audio: ${sources[0]!.title}` : `Audio Summary: ${sources[0]!.title}`) : `Peta Pikiran: ${sources[0]!.title}`)
+    : type === "quiz" ? "AI Kuis Mandiri" : type === "flashcard" ? "Flashcard Mandiri" : type === "audio_summary" ? (isIndo ? "Ringkasan Audio Mandiri" : "Audio Summary") : "Peta Pikiran Mandiri";
+
+  if (type === "audio_summary") {
+    const primarySource = sources[0];
+    const sourceTitle = primarySource?.title || "Materi Belajar";
+    const script = isIndo
+      ? `Selamat datang di Ringkasan Audio Const Learn. Pada sesi kali ini, kita akan membahas mengenai ${topic || sourceTitle}. ${
+          primarySource?.content
+            ? `Berdasarkan materi yang telah dipelajari, terdapat beberapa gagasan utama yang sangat penting untuk dipahami secara menyeluruh.`
+            : `Materi ini memberikan wawasan mendalam mengenai konsep-konsep kunci dan penerapannya.`
+        } [warmly] Mari kita telaah intisari penting dan bagaimana konsep-konsep ini saling terhubung secara terstruktur.`
+      : `Welcome to the Const Learn Audio Summary. In this session, we will explore ${topic || sourceTitle}. [warmly] Based on our study materials, there are several foundational insights and core takeaways to understand thoroughly. Let's walk through the key concepts and their practical context.`;
+
+    let audioUrl: string | undefined;
+    let audioBase64: string | undefined;
+    let audioError: string | undefined;
+
+    const voiceConfig = getStoredVoiceConfig();
+    const provider = voiceConfig.providers.find((p) => p.protocol === "inworld") || voiceConfig.providers[0];
+
+    if (provider && provider.apiKey?.trim()) {
+      try {
+        console.log("[Studio Generator Mobile] Synthesizing audio via Fallback, provider:", provider.name, "voice:", voiceId || provider.voice);
+        const synthRes = await synthesizeSpeechChunked({
+          provider: {
+            ...provider,
+            model: voiceModel || provider.model || "inworld-tts-2",
+            voice: voiceId || provider.voice || "Ashley",
+          },
+          text: script,
+        });
+        if (synthRes.success) {
+          audioUrl = synthRes.audioUrl;
+          audioBase64 = synthRes.audioBase64;
+          console.log("[Studio Generator Mobile] Fallback audio synthesized successfully.");
+        } else {
+          audioError = synthRes.error;
+          console.error("[Studio Generator Mobile] Fallback audio synthesis failed:", synthRes.error);
+        }
+      } catch (synthErr: any) {
+        audioError = synthErr?.message || "Synthesis exception";
+        console.error("[Studio Generator Mobile] Fallback audio synthesis threw:", synthErr);
+      }
+    } else {
+      audioError = isIndo
+        ? "API Key Inworld belum dikonfigurasi di menu Pengaturan Model."
+        : "Inworld API Key is not configured in Models settings.";
+      console.warn("[Studio Generator Mobile]", audioError);
+    }
+
+    const audioSummaryData: AudioSummaryData = {
+      title: isIndo ? `Ringkasan Audio: ${topic || sourceTitle}` : `Audio Summary: ${topic || sourceTitle}`,
+      script,
+      audioUrl,
+      audioBase64,
+      voiceModel: voiceModel || provider?.model || "inworld-tts-2",
+      voiceId: voiceId || provider?.voice || "Ashley",
+      language: audioLanguage || language,
+      lengthMode: lengthMode as any,
+      sourceCount: sources.length,
+      sourceTitles: sources.map((s) => s.title),
+      sourceIds: sources.map((s) => s.id),
+      createdAt: Date.now(),
+      audioError,
+    };
+    return { title: audioSummaryData.title, data: audioSummaryData };
+  }
 
   if (type === "quiz") {
     const rawSampleQuestions = [

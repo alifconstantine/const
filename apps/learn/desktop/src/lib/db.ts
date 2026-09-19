@@ -150,13 +150,30 @@ export interface SlideDeckData {
   updatedAt?: number;
 }
 
+export interface AudioSummaryData {
+  title: string;
+  script: string;
+  audioUrl?: string;
+  audioBase64?: string;
+  duration?: number;
+  voiceModel?: string;
+  voiceId?: string;
+  language?: string;
+  lengthMode?: "short" | "long" | "auto";
+  sourceCount?: number;
+  sourceTitles?: string[];
+  sourceIds?: string[];
+  createdAt?: number;
+  audioError?: string;
+}
+
 export interface LocalArtifact {
   id: string;
   learnId?: string;
   title: string;
   type: string;
   content?: string;
-  data?: QuizData | FlashcardData | MindMapData | SlideDeckData | any;
+  data?: QuizData | FlashcardData | MindMapData | SlideDeckData | AudioSummaryData | any;
   fileUrl?: string;
   isZip?: boolean;
   status?: "generating" | "completed" | "error";

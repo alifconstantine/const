@@ -46,11 +46,12 @@ import { NotePreviewTab } from "./note-preview-tab";
 import { QuizViewer } from "./quiz-viewer";
 import { FlashcardViewer } from "./flashcard-viewer";
 import { MindMapTab } from "./mind-map-tab";
+import { AudioSummaryViewer } from "./audio-summary-viewer";
 import { STUDIO_TOOLS } from "../workspace/studio-panel";
 import { useI18n } from "../../lib/i18n";
 import type { RightPaneTab, RightPaneTabType, BrowserSelectedElement } from "./types";
 import type { FileMutationRecord } from "@const/agent";
-import type { LocalArtifact } from "../../lib/db";
+import type { LocalArtifact, AudioSummaryData } from "../../lib/db";
 
 export interface GeneratingArtifactStatus {
   id: string;
@@ -290,6 +291,28 @@ export function RightPane({
       }
       if (tab.artifact?.type === "mind_map") {
         return <MindMapTab tab={tab} />;
+      }
+      if (tab.artifact?.type === "audio_summary") {
+        const audioData =
+          (tab.artifact.data as AudioSummaryData) ||
+          (() => {
+            try {
+              return typeof tab.artifact.content === "string"
+                ? JSON.parse(tab.artifact.content)
+                : null;
+            } catch {
+              return null;
+            }
+          })();
+        if (audioData) {
+          return (
+            <AudioSummaryViewer
+              artifact={tab.artifact}
+              data={audioData}
+              onExplainInChat={onExplainInChat}
+            />
+          );
+        }
       }
       return null;
     }

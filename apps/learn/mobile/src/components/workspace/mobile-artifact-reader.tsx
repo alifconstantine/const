@@ -11,10 +11,21 @@ import {
   Award,
   ChevronDown,
   GitFork,
+  AudioLines,
+  Play,
+  Pause,
+  Download,
+  Copy,
+  Clock,
+  Mic,
+  FileText,
+  AlertCircle,
+  Loader2,
 } from "lucide-react";
-import { cn } from "@const/ui";
+import { cn, toast } from "@const/ui";
 import { useI18n } from "../../lib/i18n";
-import type { LocalArtifact, QuizData, QuizQuestion, FlashcardData, FlashcardItem } from "../../lib/db";
+import { localDb, type LocalArtifact, type QuizData, type QuizQuestion, type FlashcardData, type FlashcardItem, type AudioSummaryData } from "../../lib/db";
+import { getStoredVoiceConfig, synthesizeSpeechChunked } from "../../lib/voice";
 import { MobileMindMapViewer } from "./mobile-mind-map-viewer";
 
 export interface MobileArtifactReaderProps {
@@ -38,9 +49,22 @@ export function MobileArtifactReader({
   const isQuiz = artifact.type === "quiz";
   const isFlashcard = artifact.type === "flashcard" || artifact.type === "flashcards";
   const isMindMap = artifact.type === "mind_map" || Boolean(artifact.data?.root);
+  const isAudioSummary = artifact.type === "audio_summary";
 
   const quizData = isQuiz ? (artifact.data as QuizData) : null;
   const flashcardData = isFlashcard ? (artifact.data as FlashcardData) : null;
+  const audioSummaryData = isAudioSummary
+    ? (artifact.data as AudioSummaryData) ||
+      (() => {
+        try {
+          return typeof artifact.content === "string"
+            ? JSON.parse(artifact.content)
+            : null;
+        } catch {
+          return null;
+        }
+      })()
+    : null;
   const mindMapData = isMindMap
     ? artifact.data?.root
       ? (artifact.data as any)
@@ -69,14 +93,26 @@ export function MobileArtifactReader({
       <header className="h-14 px-3 border-b border-border bg-card flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2.5 min-w-0 flex-1 mr-2">
           <div className="h-8 w-8 rounded-xl bg-secondary border border-border flex items-center justify-center text-foreground shrink-0">
-            {isQuiz ? <HelpCircle className="h-4 w-4" /> : <Layers className="h-4 w-4" />}
+            {isQuiz ? (
+              <HelpCircle className="h-4 w-4" />
+            ) : isAudioSummary ? (
+              <AudioLines className="h-4 w-4 text-indigo-400" />
+            ) : (
+              <Layers className="h-4 w-4" />
+            )}
           </div>
           <div className="min-w-0 flex-1">
             <h1 className="text-xs font-semibold text-foreground truncate">
               {artifact.title}
             </h1>
             <div className="text-[10px] text-muted-foreground flex items-center gap-1.5">
-              <span>{isQuiz ? (isIndo ? "Kuis Interaktif" : "Quiz") : (isIndo ? "Kartu Flashcard" : "Flashcards")}</span>
+              <span>
+                {isQuiz
+                  ? isIndo ? "Kuis Interaktif" : "Quiz"
+                  : isAudioSummary
+                  ? isIndo ? "Ringkasan Audio" : "Audio Summarize"
+                  : isIndo ? "Kartu Flashcard" : "Flashcards"}
+              </span>
             </div>
           </div>
         </div>
@@ -101,9 +137,18 @@ export function MobileArtifactReader({
               onExplainInChat(prompt);
             }}
           />
-        ) : flashcardData ? (
+        ) : isFlashcard && flashcardData ? (
           <MobileFlashcardBody
             flashcard={flashcardData}
+            onExplainInChat={(prompt) => {
+              onClose();
+              onExplainInChat(prompt);
+            }}
+          />
+        ) : isAudioSummary && audioSummaryData ? (
+          <MobileAudioSummaryBody
+            artifact={artifact}
+            data={audioSummaryData}
             onExplainInChat={(prompt) => {
               onClose();
               onExplainInChat(prompt);
@@ -531,3 +576,369 @@ function MobileFlashcardBody({
     </div>
   );
 }
+
+function formatAudioTime(seconds: number): string {
+  if (isNaN(seconds) || seconds < 0) return "0:00";
+  const mins = Math.floor(seconds / 60);
+  const secs = Math.floor(seconds % 60);
+  return `${mins}:${secs.toString().padStart(2, "0")}`;
+}
+
+const SPEED_OPTIONS = [0.75, 1, 1.25, 1.5, 2];
+
+function MobileAudioSummaryBody({
+  artifact,
+  data,
+  onExplainInChat,
+}: {
+  artifact?: LocalArtifact;
+  data: AudioSummaryData;
+  onExplainInChat: (prompt: string) => void;
+}) {
+  const { t, language } = useI18n();
+  const isIndo = language === "id";
+  const audioRef = React.useRef<HTMLAudioElement | null>(null);
+
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(0);
+  const [playbackRate, setPlaybackRate] = useState(1);
+  const [copied, setCopied] = useState(false);
+  const [isSynthesizing, setIsSynthesizing] = useState(false);
+  const [liveAudioSrc, setLiveAudioSrc] = useState<string>(
+    data.audioUrl || data.audioBase64 || ""
+  );
+  const [audioError, setAudioError] = useState<string | undefined>(data.audioError);
+
+  const audioSrc = liveAudioSrc;
+
+  React.useEffect(() => {
+    if (data.audioUrl || data.audioBase64) {
+      setLiveAudioSrc(data.audioUrl || data.audioBase64 || "");
+    }
+    setAudioError(data.audioError);
+  }, [data.audioUrl, data.audioBase64, data.audioError]);
+
+  React.useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    const handleTimeUpdate = () => setCurrentTime(audio.currentTime);
+    const handleLoadedMetadata = () => {
+      if (audio.duration && !isNaN(audio.duration)) {
+        setDuration(audio.duration);
+      }
+    };
+    const handleEnded = () => {
+      setIsPlaying(false);
+      setCurrentTime(0);
+    };
+
+    audio.addEventListener("timeupdate", handleTimeUpdate);
+    audio.addEventListener("loadedmetadata", handleLoadedMetadata);
+    audio.addEventListener("ended", handleEnded);
+
+    return () => {
+      audio.removeEventListener("timeupdate", handleTimeUpdate);
+      audio.removeEventListener("loadedmetadata", handleLoadedMetadata);
+      audio.removeEventListener("ended", handleEnded);
+    };
+  }, [audioSrc]);
+
+  const togglePlay = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    if (isPlaying) {
+      audio.pause();
+      setIsPlaying(false);
+    } else {
+      audio.play().then(() => setIsPlaying(true)).catch(() => {});
+    }
+  };
+
+  const handleSeek = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const newTime = parseFloat(e.target.value);
+    audio.currentTime = newTime;
+    setCurrentTime(newTime);
+  };
+
+  const handleRewind = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.currentTime = Math.max(0, audio.currentTime - 10);
+  };
+
+  const handleChangeSpeed = () => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const currentIndex = SPEED_OPTIONS.indexOf(playbackRate);
+    const nextRate = SPEED_OPTIONS[(currentIndex + 1) % SPEED_OPTIONS.length] || 1;
+    audio.playbackRate = nextRate;
+    setPlaybackRate(nextRate);
+  };
+
+  const handleCopy = () => {
+    if (!data.script) return;
+    navigator.clipboard.writeText(data.script);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleDownload = () => {
+    if (!audioSrc) return;
+    const a = document.createElement("a");
+    a.href = audioSrc;
+    a.download = `${(data.title || "audio-summary").toLowerCase().replace(/[^a-z0-9]+/g, "-")}.mp3`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+  const handleRetryAudioSynthesis = async () => {
+    if (!data.script?.trim()) {
+      toast.error(isIndo ? "Naskah tidak ditemukan." : "Script not found.");
+      return;
+    }
+
+    const voiceConfig = getStoredVoiceConfig();
+    const provider =
+      voiceConfig.providers.find((p) => p.protocol === "inworld") ||
+      voiceConfig.providers[0];
+
+    if (!provider || !provider.apiKey?.trim()) {
+      toast.error(
+        isIndo
+          ? "API Key Inworld belum dikonfigurasi di menu Pengaturan Model."
+          : "Inworld API Key is not configured in Models settings."
+      );
+      return;
+    }
+
+    setIsSynthesizing(true);
+    try {
+      toast.info(
+        isIndo
+          ? "Memulai sintesis audio dengan Inworld TTS..."
+          : "Starting audio synthesis with Inworld TTS..."
+      );
+      const synthRes = await synthesizeSpeechChunked({
+        provider: {
+          ...provider,
+          model: data.voiceModel || provider.model || "inworld-tts-2",
+          voice: data.voiceId || provider.voice || "Ashley",
+        },
+        text: data.script,
+      });
+
+      if (synthRes.success && (synthRes.audioUrl || synthRes.audioBase64)) {
+        const newSrc = synthRes.audioUrl || synthRes.audioBase64 || "";
+        setLiveAudioSrc(newSrc);
+        setAudioError(undefined);
+
+        const updatedData: AudioSummaryData = {
+          ...data,
+          audioUrl: synthRes.audioUrl,
+          audioBase64: synthRes.audioBase64,
+          audioError: undefined,
+        };
+
+        if (artifact?.id) {
+          await localDb.updateArtifact(artifact.id, {
+            data: updatedData,
+            content: JSON.stringify(updatedData),
+          });
+        }
+
+        toast.success(
+          isIndo
+            ? "Audio berhasil disintesis dan siap diputar!"
+            : "Audio synthesized successfully and ready to play!"
+        );
+      } else {
+        const errMsg = synthRes.error || "Synthesis failed";
+        setAudioError(errMsg);
+        toast.error(
+          isIndo
+            ? `Gagal mensintesis audio: ${errMsg}`
+            : `Failed to synthesize audio: ${errMsg}`
+        );
+      }
+    } catch (err: any) {
+      const errMsg = err?.message || "Synthesis error";
+      setAudioError(errMsg);
+      toast.error(
+        isIndo
+          ? `Terjadi kesalahan saat sintesis: ${errMsg}`
+          : `An error occurred during synthesis: ${errMsg}`
+      );
+    } finally {
+      setIsSynthesizing(false);
+    }
+  };
+
+  return (
+    <div className="p-4 space-y-4">
+      {audioSrc ? (
+        <audio
+          ref={audioRef}
+          src={audioSrc}
+          preload="metadata"
+          onPlay={() => setIsPlaying(true)}
+          onPause={() => setIsPlaying(false)}
+        />
+      ) : null}
+
+      {/* Audio Player Card */}
+      <div className="p-4 rounded-2xl bg-card border border-border space-y-3 shadow-xs">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+            <AudioLines className="h-4 w-4 text-indigo-400" />
+            <span>{isIndo ? "Pemutar Suara" : "Voice Player"}</span>
+          </div>
+
+          {audioSrc && (
+            <button
+              type="button"
+              onClick={handleDownload}
+              className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-400 text-xs font-medium cursor-pointer"
+            >
+              <Download className="h-3.5 w-3.5" />
+              <span>{t("audioDownload")}</span>
+            </button>
+          )}
+        </div>
+
+        {/* Missing Audio Warning & Retry */}
+        {!audioSrc && (
+          <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs text-amber-200 space-y-2">
+            <div className="flex items-start gap-2">
+              <AlertCircle className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-medium text-amber-300">
+                  {isIndo ? "File audio belum siap atau gagal disintesis" : "Audio file is not ready or failed to synthesize"}
+                </p>
+                {audioError && (
+                  <p className="text-[11px] text-amber-300/80 mt-0.5 font-mono">
+                    {audioError}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleRetryAudioSynthesis}
+              disabled={isSynthesizing}
+              className="w-full py-1.5 px-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-semibold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50 shadow-xs active:scale-95"
+            >
+              {isSynthesizing ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  <span>{isIndo ? "Memproses Audio..." : "Synthesizing Audio..."}</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-3.5 w-3.5" />
+                  <span>{isIndo ? "Sintesis Audio Sekarang" : "Synthesize Audio Now"}</span>
+                </>
+              )}
+            </button>
+          </div>
+        )}
+
+        {/* Progress bar */}
+        <div className="space-y-1">
+          <input
+            type="range"
+            min={0}
+            max={duration || 100}
+            value={currentTime}
+            onChange={handleSeek}
+            disabled={!audioSrc}
+            className="w-full h-1.5 bg-secondary rounded-lg appearance-none cursor-pointer accent-indigo-600 disabled:opacity-40"
+          />
+          <div className="flex items-center justify-between text-[10px] font-mono text-muted-foreground">
+            <span>{formatAudioTime(currentTime)}</span>
+            <span>{formatAudioTime(duration)}</span>
+          </div>
+        </div>
+
+        {/* Player controls */}
+        <div className="flex items-center justify-between pt-1">
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={togglePlay}
+              disabled={!audioSrc}
+              className="h-11 w-11 rounded-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white flex items-center justify-center shadow-md shadow-indigo-600/30 active:scale-95 cursor-pointer"
+            >
+              {isPlaying ? <Pause className="h-5 w-5 fill-white" /> : <Play className="h-5 w-5 fill-white ml-0.5" />}
+            </button>
+
+            <button
+              type="button"
+              onClick={handleRewind}
+              disabled={!audioSrc}
+              className="h-9 w-9 rounded-full bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center active:scale-95"
+              title="Rewind 10s"
+            >
+              <RotateCcw className="h-4 w-4" />
+            </button>
+
+            <button
+              type="button"
+              onClick={handleChangeSpeed}
+              disabled={!audioSrc}
+              className="px-2.5 py-1 rounded-full bg-secondary text-xs font-semibold text-foreground active:scale-95"
+            >
+              {playbackRate}x
+            </button>
+          </div>
+
+          <div className="text-[10px] text-muted-foreground flex flex-col items-end">
+            <span>{data.voiceId || "Ashley"}</span>
+            <span>{data.language || "id-ID"}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Transcript Card */}
+      <div className="p-4 rounded-2xl bg-card border border-border space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+            <FileText className="h-4 w-4 text-indigo-400" />
+            <span>{t("audioTranscript")}</span>
+          </div>
+
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={handleCopy}
+              className="flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-secondary text-[11px] text-muted-foreground hover:text-foreground"
+            >
+              {copied ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
+              <span>{copied ? (isIndo ? "Tersalin" : "Copied") : (isIndo ? "Salin" : "Copy")}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onExplainInChat(`Tolong jelaskan lebih dalam ringkasan audio berikut:\n${data.script.slice(0, 1000)}`)}
+              className="flex items-center gap-1 px-2 py-1 rounded-lg bg-indigo-500/10 text-indigo-400 text-[11px] font-medium"
+            >
+              <Sparkles className="h-3 w-3" />
+              <span>{isIndo ? "Tanya" : "Ask"}</span>
+            </button>
+          </div>
+        </div>
+
+        <div className="p-3.5 rounded-xl bg-secondary/30 text-xs text-foreground/90 leading-relaxed font-sans whitespace-pre-wrap">
+          {data.script || (isIndo ? "Tidak ada naskah transkrip." : "No transcript available.")}
+        </div>
+      </div>
+    </div>
+  );
+}
+

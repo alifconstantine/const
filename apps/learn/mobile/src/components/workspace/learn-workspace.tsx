@@ -19,6 +19,8 @@ import { SourcePreviewDialog } from "./source-preview-dialog";
 import { StudioSheet, type GeneratingArtifactStatus } from "./studio-sheet";
 import { CreateArtifactSheet } from "./create-artifact-sheet";
 import { CreateMindMapSheet } from "./create-mind-map-sheet";
+import { CreateAudioSummarySheet } from "./create-audio-summary-sheet";
+import { ModelSelectionSheet } from "../home/sheets/model-selection-sheet";
 import { MobileArtifactReader } from "./mobile-artifact-reader";
 import { generateStudioArtifact } from "../../lib/studio/generator";
 import { ThinkingProcess } from "./working-process";
@@ -518,6 +520,8 @@ export function MobileLearnWorkspace({
   const [isCreateArtifactSheetOpen, setIsCreateArtifactSheetOpen] = useState(false);
   const [createArtifactType, setCreateArtifactType] = useState<"quiz" | "flashcard">("quiz");
   const [isCreateMindMapSheetOpen, setIsCreateMindMapSheetOpen] = useState(false);
+  const [isCreateAudioSummaryOpen, setIsCreateAudioSummaryOpen] = useState(false);
+  const [isVoiceModelSheetOpen, setIsVoiceModelSheetOpen] = useState(false);
   const [generatingArtifacts, setGeneratingArtifacts] = useState<GeneratingArtifactStatus[]>([]);
   const [selectedReaderArtifact, setSelectedReaderArtifact] = useState<LocalArtifact | null>(null);
   const [isReaderOpen, setIsReaderOpen] = useState(false);
@@ -1633,22 +1637,29 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
       setIsCreateMindMapSheetOpen(true);
       return;
     }
+    if (toolId === "audio_summary" || toolId === "audio") {
+      setIsCreateAudioSummaryOpen(true);
+      return;
+    }
     // Other tools: strictly no-op as requested
     return;
   };
 
   const handleGenerateStudioArtifact = async (options: {
-    type: "quiz" | "flashcard" | "mind_map";
+    type: "quiz" | "flashcard" | "mind_map" | "audio_summary";
     topic: string;
     difficulty?: "easy" | "medium" | "hard";
     count?: number;
     lengthMode?: "short" | "medium" | "long" | "auto";
-    language?: "id" | "en";
+    language?: "id" | "en" | string;
     selectedSourceIds: string[];
     themeId?: string;
+    customPrompt?: string;
+    voiceModel?: string;
+    voiceId?: string;
   }) => {
     const selectedSources = (sources || []).filter((s) => options.selectedSourceIds.includes(s.id));
-    const targetLang = options.language || (language === "id" ? "id" : "en");
+    const targetLang = (options.language?.startsWith("id") || language === "id") ? "id" : "en";
     const isIndo = targetLang === "id";
 
     const title = options.topic.trim()
@@ -1656,11 +1667,15 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
           ? (isIndo ? `Kuis: ${options.topic}` : `Quiz: ${options.topic}`)
           : options.type === "flashcard"
           ? (isIndo ? `Kartu: ${options.topic}` : `Flashcard: ${options.topic}`)
+          : options.type === "audio_summary"
+          ? (isIndo ? `Ringkasan Audio: ${options.topic}` : `Audio Summary: ${options.topic}`)
           : (isIndo ? `Peta Pikiran: ${options.topic}` : `Mind Map: ${options.topic}`))
       : (options.type === "quiz"
           ? (isIndo ? `Kuis (${options.count || 5} Soal)` : `Quiz (${options.count || 5} Questions)`)
           : options.type === "flashcard"
           ? (isIndo ? `Kartu Hafalan (${options.count || 10} Kartu)` : `Flashcards (${options.count || 10} Cards)`)
+          : options.type === "audio_summary"
+          ? (isIndo ? "Ringkasan Audio" : "Audio Summary")
           : (isIndo ? "Peta Pikiran" : "Mind Map"));
 
     const initialLoadingTitle =
@@ -1668,6 +1683,8 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
         ? (isIndo ? "Membuat Kuis..." : "Creating Quiz...")
         : options.type === "flashcard"
         ? (isIndo ? "Membuat Kartu Tanya-Jawab..." : "Creating Flashcards...")
+        : options.type === "audio_summary"
+        ? (isIndo ? "Membuat Ringkasan Audio..." : "Creating Audio Summary...")
         : (isIndo ? "Membuat Peta Pikiran..." : "Creating Mind Map...");
 
     // 1. Immediately create in Dexie with status: "generating"
@@ -1694,6 +1711,10 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
         lengthMode: options.lengthMode,
         language: targetLang,
         themeId: options.themeId,
+        customPrompt: options.customPrompt,
+        voiceModel: options.voiceModel,
+        voiceId: options.voiceId,
+        audioLanguage: options.language,
       });
 
       await localDb.updateArtifact(artId, {
@@ -1709,12 +1730,20 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
               ? "Kuis berhasil dibuat!"
               : options.type === "flashcard"
               ? "Kartu tanya-jawab berhasil dibuat!"
-              : "Peta pikiran berhasil dibuat!")
+              : options.type === "mind_map"
+              ? "Peta pikiran berhasil dibuat!"
+              : options.type === "audio_summary"
+              ? "Ringkasan audio berhasil dibuat!"
+              : "Presentasi berhasil disusun!")
           : (options.type === "quiz"
               ? "Quiz created successfully!"
               : options.type === "flashcard"
               ? "Flashcards created successfully!"
-              : "Mind map created successfully!")
+              : options.type === "mind_map"
+              ? "Mind map created successfully!"
+              : options.type === "audio_summary"
+              ? "Audio summary created successfully!"
+              : "Presentation slides created successfully!")
       );
 
       const fullArt = await localDb.getArtifact(artId);
@@ -2576,6 +2605,22 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
         onClose={() => setIsCreateMindMapSheetOpen(false)}
         sources={sources || []}
         onGenerate={handleGenerateStudioArtifact}
+      />
+
+      {/* Create Audio Summary Bottom Sheet */}
+      <CreateAudioSummarySheet
+        open={isCreateAudioSummaryOpen}
+        onClose={() => setIsCreateAudioSummaryOpen(false)}
+        sources={sources || []}
+        onGenerate={handleGenerateStudioArtifact}
+        onOpenModelsSettings={() => setIsVoiceModelSheetOpen(true)}
+      />
+
+      {/* Model Selection Sheet for Voice */}
+      <ModelSelectionSheet
+        open={isVoiceModelSheetOpen}
+        onClose={() => setIsVoiceModelSheetOpen(false)}
+        initialCategory="voice"
       />
 
       {/* Interactive Full-Screen Reader Overlay */}

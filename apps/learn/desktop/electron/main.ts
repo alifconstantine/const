@@ -1136,7 +1136,9 @@ app.on("second-instance", (_event, commandLine) => {
           return { success: false, error: "API Key is required for testing voice." };
         }
         let authHeader = cleanKey;
-        if (!authHeader.toLowerCase().startsWith("basic ") && !authHeader.toLowerCase().startsWith("bearer ")) {
+        if (authHeader.toLowerCase().startsWith("bearer ")) {
+          authHeader = `Basic ${authHeader.slice(7).trim()}`;
+        } else if (!authHeader.toLowerCase().startsWith("basic ")) {
           if (authHeader.includes(":") && !authHeader.includes(" ")) {
             authHeader = `Basic ${Buffer.from(authHeader).toString("base64")}`;
           } else {
@@ -1265,7 +1267,7 @@ app.on("second-instance", (_event, commandLine) => {
 
         const base64Audio = audioBuffer.toString("base64");
         const dataUrl = `data:audio/mpeg;base64,${base64Audio}`;
-        return { success: true, audioUrl: dataUrl };
+        return { success: true, audioUrl: dataUrl, audioBase64: dataUrl };
       } catch (err: any) {
         console.error("[Electron Main] Inworld test-voice failed:", err);
         return { success: false, error: err.message || "Failed to generate audio sample" };

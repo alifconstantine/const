@@ -359,12 +359,31 @@ export async function fetchInworldVoices(
 }
 
 /**
+ * Helper to convert Base64 string to Blob directly in memory (no network fetch needed)
+ */
+export function base64ToBlob(base64Data: string, mimeType = "audio/mp3"): Blob {
+  const rawBase64 = base64Data.includes(",") ? base64Data.split(",")[1]! : base64Data;
+  const byteCharacters = atob(rawBase64);
+  const byteNumbers = new Array(byteCharacters.length);
+  for (let i = 0; i < byteCharacters.length; i++) {
+    byteNumbers[i] = byteCharacters.charCodeAt(i);
+  }
+  return new Blob([new Uint8Array(byteNumbers)], { type: mimeType });
+}
+
+/**
  * Synthesize speech audio using either Inworld TTS or OpenAI /v1/audio/speech
  */
 export async function synthesizeSpeech(params: {
   provider: VoiceProvider;
   text: string;
-}): Promise<{ success: boolean; audioUrl?: string; error?: string }> {
+}): Promise<{
+  success: boolean;
+  audioUrl?: string;
+  audioBase64?: string;
+  blob?: Blob;
+  error?: string;
+}> {
   const { provider, text } = params;
   if (!text.trim()) {
     return { success: false, error: "Text is required for speech synthesis." };
@@ -379,7 +398,7 @@ export async function synthesizeSpeech(params: {
       return { success: false, error: "Inworld API key is required." };
     }
 
-    // Electron IPC optimization
+    // Electron IPC optimization (bypasses browser CORS & restrictions)
     const electron = typeof window !== "undefined" ? (window as any).electron : null;
     if (electron?.inworld?.testVoice) {
       try {
@@ -391,8 +410,15 @@ export async function synthesizeSpeech(params: {
           deliveryMode: provider.deliveryMode,
           speakingRate: provider.speed,
         });
-        if (res.success && res.audioUrl) {
-          return { success: true, audioUrl: res.audioUrl };
+        if (res.success && (res.audioUrl || res.audioBase64)) {
+          const b64 = res.audioBase64 || res.audioUrl;
+          const blob = b64.startsWith("data:") ? base64ToBlob(b64) : undefined;
+          return {
+            success: true,
+            audioUrl: res.audioUrl || (blob ? URL.createObjectURL(blob) : undefined),
+            audioBase64: b64,
+            blob,
+          };
         }
         if (res.error) return { success: false, error: res.error };
       } catch (err: any) {
@@ -403,7 +429,9 @@ export async function synthesizeSpeech(params: {
     // Direct HTTP request
     try {
       let authHeader = cleanKey;
-      if (!authHeader.toLowerCase().startsWith("basic ") && !authHeader.toLowerCase().startsWith("bearer ")) {
+      if (authHeader.toLowerCase().startsWith("bearer ")) {
+        authHeader = `Basic ${authHeader.slice(7).trim()}`;
+      } else if (!authHeader.toLowerCase().startsWith("basic ")) {
         if (authHeader.includes(":") && !authHeader.includes(" ")) {
           authHeader = `Basic ${btoa(authHeader)}`;
         } else {
@@ -411,7 +439,7 @@ export async function synthesizeSpeech(params: {
         }
       }
 
-      // Try Inworld native REST endpoint
+      // Inworld native REST endpoint (/tts/v1/voice)
       const response = await fetch(`${INWORLD_BASE_URL}/tts/v1/voice`, {
         method: "POST",
         headers: {
@@ -434,48 +462,36 @@ export async function synthesizeSpeech(params: {
           const json = await response.json();
           const b64 = json.audioContent || json.audio_content || json.audio;
           if (b64) {
-            const byteCharacters = atob(b64);
-            const byteNumbers = new Array(byteCharacters.length);
-            for (let i = 0; i < byteCharacters.length; i++) {
-              byteNumbers[i] = byteCharacters.charCodeAt(i);
-            }
-            const byteArray = new Uint8Array(byteNumbers);
-            const blob = new Blob([byteArray], { type: "audio/mp3" });
-            return { success: true, audioUrl: URL.createObjectURL(blob) };
+            const cleanB64 = b64.includes(",") ? b64.split(",")[1]! : b64;
+            const blob = base64ToBlob(cleanB64);
+            const audioBase64 = `data:audio/mp3;base64,${cleanB64}`;
+            return {
+              success: true,
+              audioUrl: URL.createObjectURL(blob),
+              audioBase64,
+              blob,
+            };
           }
         } else {
           const blob = await response.blob();
-          return { success: true, audioUrl: URL.createObjectURL(blob) };
+          const audioBase64 = await blobToBase64(blob);
+          return {
+            success: true,
+            audioUrl: URL.createObjectURL(blob),
+            audioBase64,
+            blob,
+          };
         }
       }
 
-      // Fallback to Inworld's /v1/audio/speech endpoint
-      const openAiFallback = await fetch(`${INWORLD_BASE_URL}/v1/audio/speech`, {
-        method: "POST",
-        headers: {
-          Authorization: authHeader,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model: provider.model || "inworld-tts-2",
-          voice: provider.voice || "Ashley",
-          input: text,
-          response_format: "mp3",
-          speed: provider.speed || 1.0,
-        }),
-      });
-
-      if (openAiFallback.ok) {
-        const blob = await openAiFallback.blob();
-        return { success: true, audioUrl: URL.createObjectURL(blob) };
-      }
-
       const errText = await response.text().catch(() => "");
+      console.error("[VoiceService] Inworld TTS HTTP error:", response.status, errText);
       return {
         success: false,
         error: `Inworld TTS failed (${response.status}): ${errText || response.statusText}`,
       };
     } catch (err: any) {
+      console.error("[VoiceService] Direct HTTP request threw:", err);
       return { success: false, error: err.message || "Failed to synthesize audio." };
     }
   }
@@ -525,9 +541,12 @@ export async function synthesizeSpeech(params: {
       }
 
       const blob = await response.blob();
+      const audioBase64 = await blobToBase64(blob);
       return {
         success: true,
         audioUrl: URL.createObjectURL(blob),
+        audioBase64,
+        blob,
       };
     } catch (err: any) {
       return {
@@ -539,3 +558,121 @@ export async function synthesizeSpeech(params: {
 
   return { success: false, error: "Unsupported voice provider." };
 }
+
+/**
+ * Helper to convert Blob to Base64 data URL
+ */
+export async function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
+
+/**
+ * Split text into semantic chunks (< maxChars) by paragraph or sentence
+ */
+export function splitTextIntoAudioChunks(text: string, maxChars = 1500): string[] {
+  const paragraphs = text.split(/\n\n+/);
+  const chunks: string[] = [];
+  let current = "";
+
+  for (const para of paragraphs) {
+    const trimmed = para.trim();
+    if (!trimmed) continue;
+
+    if (current.length + trimmed.length + 2 <= maxChars) {
+      current = current ? `${current}\n\n${trimmed}` : trimmed;
+    } else {
+      if (current) chunks.push(current);
+      if (trimmed.length <= maxChars) {
+        current = trimmed;
+      } else {
+        const sentences = trimmed.match(/[^.!?]+[.!?]+|\S+/g) || [trimmed];
+        current = "";
+        for (const sentence of sentences) {
+          if (current.length + sentence.length + 1 <= maxChars) {
+            current = current ? `${current} ${sentence}` : sentence;
+          } else {
+            if (current) chunks.push(current);
+            current = sentence;
+          }
+        }
+      }
+    }
+  }
+  if (current) chunks.push(current);
+  return chunks.length > 0 ? chunks : [text];
+}
+
+/**
+ * Synthesize speech with automatic chunking for long texts and returns merged audio Blob/URL/base64
+ */
+export async function synthesizeSpeechChunked(params: {
+  provider: VoiceProvider;
+  text: string;
+}): Promise<{
+  success: boolean;
+  audioUrl?: string;
+  audioBase64?: string;
+  blob?: Blob;
+  error?: string;
+}> {
+  const { provider, text } = params;
+  if (!text.trim()) {
+    return { success: false, error: "Text is required for speech synthesis." };
+  }
+
+  const chunks = splitTextIntoAudioChunks(text, 1500);
+  const blobs: Blob[] = [];
+
+  for (let i = 0; i < chunks.length; i++) {
+    const chunk = chunks[i]!;
+    const res = await synthesizeSpeech({ provider, text: chunk });
+    if (!res.success) {
+      console.error(`[VoiceService] Chunk ${i + 1}/${chunks.length} failed:`, res.error);
+      return { success: false, error: res.error || `Failed to synthesize chunk ${i + 1}` };
+    }
+
+    if (res.blob) {
+      blobs.push(res.blob);
+    } else if (res.audioBase64) {
+      blobs.push(base64ToBlob(res.audioBase64));
+    } else if (res.audioUrl) {
+      if (res.audioUrl.startsWith("data:")) {
+        blobs.push(base64ToBlob(res.audioUrl));
+      } else {
+        try {
+          const response = await fetch(res.audioUrl);
+          const blob = await response.blob();
+          blobs.push(blob);
+        } catch (e: any) {
+          return { success: false, error: "Failed to read synthesized audio chunk: " + e.message };
+        }
+      }
+    }
+  }
+
+  if (blobs.length === 0) {
+    return { success: false, error: "No audio data was generated." };
+  }
+
+  const mergedBlob = new Blob(blobs, { type: "audio/mp3" });
+  const audioUrl = URL.createObjectURL(mergedBlob);
+  let audioBase64: string | undefined;
+  try {
+    audioBase64 = await blobToBase64(mergedBlob);
+  } catch (e) {
+    console.warn("Failed to convert audio blob to base64:", e);
+  }
+
+  return {
+    success: true,
+    audioUrl,
+    audioBase64,
+    blob: mergedBlob,
+  };
+}
+

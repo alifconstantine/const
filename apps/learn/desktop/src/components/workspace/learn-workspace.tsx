@@ -44,6 +44,7 @@ import { RightPane, type RightPaneTab, type RightPaneTabType, type GeneratingArt
 import { AddSourceDialog } from "./add-source-dialog";
 import { CreateStudioArtifactDialog } from "./create-studio-artifact-dialog";
 import { CreateMindMapDialog } from "./create-mind-map-dialog";
+import { CreateAudioSummaryDialog } from "./create-audio-summary-dialog";
 import { WorkspaceTitle } from "./workspace-title";
 import { SettingsView } from "../settings/settings-view";
 import { ErrorBoundary } from "../ui/error-boundary";
@@ -106,6 +107,7 @@ export function LearnWorkspace({
   const [isCreateStudioOpen, setIsCreateStudioOpen] = useState(false);
   const [createStudioType, setCreateStudioType] = useState<"quiz" | "flashcard">("quiz");
   const [isCreateMindMapOpen, setIsCreateMindMapOpen] = useState(false);
+  const [isCreateAudioSummaryOpen, setIsCreateAudioSummaryOpen] = useState(false);
   const [generatingArtifacts, setGeneratingArtifacts] = useState<GeneratingArtifactStatus[]>([]);
 
   // Right Pane: Dual Studio & Preview/Review state
@@ -507,21 +509,24 @@ export function LearnWorkspace({
   };
 
   const handleGenerateStudioArtifact = async (params: {
-    type: "quiz" | "flashcard" | "mind_map";
+    type: "quiz" | "flashcard" | "mind_map" | "audio_summary";
     topic: string;
     selectedSourceIds: string[];
     count?: number;
     difficulty?: "easy" | "medium" | "hard";
     lengthMode?: "short" | "medium" | "long" | "auto";
-    language?: "id" | "en";
+    language?: "id" | "en" | string;
     themeId?: string;
+    customPrompt?: string;
+    voiceModel?: string;
+    voiceId?: string;
   }) => {
     // 1. Ensure studio panel is open and in Studio mode so user immediately sees the progress card!
     setIsStudioCollapsed(false);
     setRightPaneMode("studio");
 
     const selectedSources = (sources || []).filter((s) => params.selectedSourceIds.includes(s.id));
-    const targetLang = params.language || (language === "id" ? "id" : "en");
+    const targetLang = (params.language?.startsWith("id") || language === "id") ? "id" : "en";
     const isIndo = targetLang === "id";
 
     const title = params.topic.trim()
@@ -529,11 +534,15 @@ export function LearnWorkspace({
           ? (isIndo ? `Kuis: ${params.topic}` : `Quiz: ${params.topic}`)
           : params.type === "flashcard"
           ? (isIndo ? `Kartu: ${params.topic}` : `Flashcard: ${params.topic}`)
+          : params.type === "audio_summary"
+          ? (isIndo ? `Ringkasan Audio: ${params.topic}` : `Audio Summary: ${params.topic}`)
           : (isIndo ? `Peta Pikiran: ${params.topic}` : `Mind Map: ${params.topic}`))
       : (params.type === "quiz"
           ? (isIndo ? `Kuis (${params.count || 5} Soal)` : `Quiz (${params.count || 5} Questions)`)
           : params.type === "flashcard"
           ? (isIndo ? `Kartu Hafalan (${params.count || 10} Kartu)` : `Flashcards (${params.count || 10} Cards)`)
+          : params.type === "audio_summary"
+          ? (isIndo ? "Ringkasan Audio" : "Audio Summary")
           : (isIndo ? "Peta Pikiran" : "Mind Map"));
 
     const initialLoadingTitle =
@@ -541,6 +550,8 @@ export function LearnWorkspace({
         ? (isIndo ? "Membuat Kuis..." : "Creating Quiz...")
         : params.type === "flashcard"
         ? (isIndo ? "Membuat Kartu Tanya-Jawab..." : "Creating Flashcards...")
+        : params.type === "audio_summary"
+        ? (isIndo ? "Membuat Ringkasan Audio..." : "Creating Audio Summary...")
         : (isIndo ? "Membuat Peta Pikiran..." : "Creating Mind Map...");
 
     // 2. Immediately create in Dexie with status: "generating" (appears instantly in Artifacts list)
@@ -565,6 +576,10 @@ export function LearnWorkspace({
         lengthMode: params.lengthMode,
         language: targetLang,
         themeId: params.themeId,
+        customPrompt: params.customPrompt,
+        voiceModel: params.voiceModel,
+        voiceId: params.voiceId,
+        audioLanguage: params.language,
       });
 
       // Update Dexie artifact to completed
@@ -583,6 +598,8 @@ export function LearnWorkspace({
               ? "Kartu tanya-jawab berhasil dibuat!"
               : params.type === "mind_map"
               ? "Peta pikiran berhasil dibuat!"
+              : params.type === "audio_summary"
+              ? "Ringkasan audio berhasil dibuat!"
               : "Presentasi berhasil disusun!")
           : (params.type === "quiz"
               ? "Quiz created successfully!"
@@ -590,6 +607,8 @@ export function LearnWorkspace({
               ? "Flashcards created successfully!"
               : params.type === "mind_map"
               ? "Mind map created successfully!"
+              : params.type === "audio_summary"
+              ? "Audio summary created successfully!"
               : "Presentation slides created successfully!")
       );
 
@@ -629,8 +648,10 @@ export function LearnWorkspace({
       setIsCreateStudioOpen(true);
     } else if (toolId === "mind_map") {
       setIsCreateMindMapOpen(true);
+    } else if (toolId === "audio_summary" || toolId === "audio") {
+      setIsCreateAudioSummaryOpen(true);
     } else {
-      // Menu lain (slides, audio, video) tidak melakukan apa-apa (no-op)
+      // Menu lain (slides, video) tidak melakukan apa-apa (no-op)
       return;
     }
   };
@@ -640,9 +661,11 @@ export function LearnWorkspace({
       art.type === "quiz" ||
       art.type === "flashcard" ||
       art.type === "mind_map" ||
+      art.type === "audio_summary" ||
       art.data?.questions ||
       art.data?.cards ||
-      art.data?.root
+      art.data?.root ||
+      art.data?.script
     ) {
       handleOpenStudioArtifact(art);
       return;
@@ -1398,6 +1421,18 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
         onOpenChange={setIsCreateMindMapOpen}
         sources={sources || []}
         onGenerate={handleGenerateStudioArtifact}
+      />
+
+      {/* Dedicated Create Audio Summary Dialog */}
+      <CreateAudioSummaryDialog
+        open={isCreateAudioSummaryOpen}
+        onOpenChange={setIsCreateAudioSummaryOpen}
+        sources={sources || []}
+        onGenerate={handleGenerateStudioArtifact}
+        onOpenModelsSettings={() => {
+          setSettingsInitialTab("models");
+          setIsSettingsOpen(true);
+        }}
       />
 
       {/* Settings Modal / Overlay */}

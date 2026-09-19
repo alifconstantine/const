@@ -120,8 +120,11 @@ export function ModelSelectionSheet({
   useEffect(() => {
     if (open) {
       setAiConfig(getStoredAiConfig());
+      if (initialCategory) {
+        setActiveCategory(initialCategory);
+      }
     }
-  }, [open]);
+  }, [open, initialCategory]);
 
   const handleToggleExpand = (provider: AiProvider) => {
     if (expandedProviderId === provider.id) {
