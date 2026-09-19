@@ -43,10 +43,33 @@ export interface ProviderConfig {
   apiKey: string;
 }
 
+export interface InworldVoiceConfig {
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+  voiceId: string;
+  voiceName?: string;
+  deliveryMode?: "BALANCED" | "STABLE" | "CREATIVE";
+  speakingRate?: number;
+  language?: string;
+}
+
+export interface VoiceConfig {
+  activeProvider: "inworld" | string;
+  inworld: InworldVoiceConfig;
+}
+
+export interface ImageConfig {
+  activeProvider: string;
+  providers: Record<string, { apiKey: string; baseUrl?: string; model?: string }>;
+}
+
 export interface UserConfig {
   activeModel: string;
   activeProvider: string;
   providers: Record<string, ProviderConfig>;
+  voice?: VoiceConfig;
+  image?: ImageConfig;
   customModels?: Array<{
     id: string;
     displayName: string;
@@ -58,8 +81,21 @@ export interface UserConfig {
 }
 
 const defaultUserConfig: UserConfig = {
-  activeModel: "gemini-3.6-flash",
+  activeModel: "gemini-3.8-flash",
   activeProvider: "const",
+  voice: {
+    activeProvider: "inworld",
+    inworld: {
+      baseUrl: "https://api.inworld.ai",
+      apiKey: process.env.INWORLD_API_KEY || "",
+      model: "inworld-tts-2",
+      voiceId: "Ashley",
+      voiceName: "Ashley",
+      deliveryMode: "BALANCED",
+      speakingRate: 1.0,
+      language: "id-ID",
+    },
+  },
   providers: {
     const: {
       name: "Const Router",
@@ -93,6 +129,14 @@ function loadUserConfig(): UserConfig {
           ...defaultUserConfig.providers,
           ...(parsed.providers || {}),
         },
+        voice: {
+          activeProvider:
+            parsed.voice?.activeProvider || defaultUserConfig.voice?.activeProvider || "inworld",
+          inworld: {
+            ...defaultUserConfig.voice?.inworld,
+            ...(parsed.voice?.inworld || {}),
+          },
+        },
       };
 
       if (!merged.activeProvider || merged.activeProvider === "const-engine") {
@@ -104,7 +148,7 @@ function loadUserConfig(): UserConfig {
         merged.activeModel.includes("(Const Router)") ||
         merged.activeModel.includes("(Native)")
       ) {
-        merged.activeModel = "gemini-3.6-flash";
+        merged.activeModel = "gemini-3.8-flash";
       }
 
       if (!merged.providers.const) {
@@ -135,8 +179,22 @@ function saveUserConfig(config: Partial<UserConfig>): UserConfig {
       ...current.providers,
       ...(config.providers || {}),
     },
+    voice: config.voice
+      ? {
+          activeProvider:
+            config.voice.activeProvider || current.voice?.activeProvider || "inworld",
+          inworld: {
+            ...(current.voice?.inworld || defaultUserConfig.voice?.inworld || {}),
+            ...(config.voice.inworld || {}),
+          },
+        }
+      : current.voice,
   };
   try {
+    const configDir = path.dirname(learnConfigFile);
+    if (!fs.existsSync(configDir)) {
+      fs.mkdirSync(configDir, { recursive: true });
+    }
     fs.writeFileSync(learnConfigFile, JSON.stringify(merged, null, 2), "utf-8");
   } catch (err) {
     console.error("[Electron Main] Failed to write config.json:", err);
@@ -1014,6 +1072,206 @@ app.on("second-instance", (_event, commandLine) => {
   ipcMain.handle("config:save", async (_event, newConfig: Partial<UserConfig>) => {
     return saveUserConfig(newConfig);
   });
+
+  ipcMain.handle("inworld:list-voices", async (_event, { apiKey }: { apiKey: string }) => {
+    try {
+      const cleanKey = (apiKey || "").trim();
+      if (!cleanKey) {
+        return { success: false, error: "API Key is required to fetch voices." };
+      }
+      let authHeader = cleanKey;
+      if (!authHeader.toLowerCase().startsWith("basic ") && !authHeader.toLowerCase().startsWith("bearer ")) {
+        if (authHeader.includes(":") && !authHeader.includes(" ")) {
+          authHeader = `Basic ${Buffer.from(authHeader).toString("base64")}`;
+        } else {
+          authHeader = `Basic ${authHeader}`;
+        }
+      }
+      const res = await fetch("https://api.inworld.ai/voices/v1/voices", {
+        method: "GET",
+        headers: {
+          Authorization: authHeader,
+        },
+      });
+      if (!res.ok) {
+        const errorText = await res.text();
+        return {
+          success: false,
+          error: `Inworld Voices Error (${res.status}): ${errorText || res.statusText}`,
+        };
+      }
+      const data = (await res.json()) as any;
+      const rawVoices = data?.voices || [];
+      const voices = rawVoices.map((v: any) => ({
+        voiceId: v.voiceId || v.voice_id || v.id,
+        displayName: v.displayName || v.display_name || v.name || v.voiceId || v.voice_id || v.id,
+        langCode: v.langCode || v.lang_code || v.language || "en-US",
+        gender: v.gender || "VOICE_GENDER_UNSPECIFIED",
+        description: v.description || "",
+        tags: v.tags || [],
+      }));
+      return { success: true, voices };
+    } catch (err: any) {
+      console.error("[Electron Main] Inworld list-voices failed:", err);
+      return { success: false, error: err.message || "Failed to connect to Inworld AI" };
+    }
+  });
+
+  ipcMain.handle(
+    "inworld:test-voice",
+    async (
+      _event,
+      payload: {
+        apiKey: string;
+        voiceId: string;
+        model?: string;
+        text?: string;
+        deliveryMode?: string;
+        speakingRate?: number;
+      }
+    ) => {
+      try {
+        const cleanKey = (payload.apiKey || "").trim();
+        if (!cleanKey) {
+          return { success: false, error: "API Key is required for testing voice." };
+        }
+        let authHeader = cleanKey;
+        if (!authHeader.toLowerCase().startsWith("basic ") && !authHeader.toLowerCase().startsWith("bearer ")) {
+          if (authHeader.includes(":") && !authHeader.includes(" ")) {
+            authHeader = `Basic ${Buffer.from(authHeader).toString("base64")}`;
+          } else {
+            authHeader = `Basic ${authHeader}`;
+          }
+        }
+        const voiceId = payload.voiceId || "Ashley";
+        const modelId = payload.model || "inworld-tts-2";
+        const customText = (payload.text || "").trim();
+
+        let audioBuffer: Buffer | null = null;
+        let lastErrorMsg = "";
+
+        // 1. If text is provided, perform real Text-to-Speech synthesis
+        if (customText) {
+          // 1a. Try Inworld native TTS endpoint (/tts/v1/voice) with MP3 encoding
+          try {
+            const synthRes = await fetch("https://api.inworld.ai/tts/v1/voice", {
+              method: "POST",
+              headers: {
+                Authorization: authHeader,
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({
+                text: customText,
+                voiceId: voiceId,
+                modelId: modelId,
+                audioConfig: {
+                  audioEncoding: "MP3",
+                },
+              }),
+            });
+
+            if (synthRes.ok) {
+              const contentType = synthRes.headers.get("content-type") || "";
+              if (contentType.includes("application/json")) {
+                const json: any = await synthRes.json();
+                const b64 = json.audioContent || json.audio_content || json.audio;
+                if (b64) {
+                  audioBuffer = Buffer.from(b64, "base64");
+                }
+              } else {
+                const arrayBuf = await synthRes.arrayBuffer();
+                audioBuffer = Buffer.from(arrayBuf);
+              }
+            } else {
+              const errBody = await synthRes.text();
+              lastErrorMsg = `Inworld TTS (${synthRes.status}): ${errBody || synthRes.statusText}`;
+              console.warn("[Electron Main] Inworld native TTS failed, trying OpenAI audio speech format...", lastErrorMsg);
+            }
+          } catch (synthErr: any) {
+            lastErrorMsg = synthErr.message || "Synthesis request error";
+            console.warn("[Electron Main] Inworld native TTS request threw:", synthErr);
+          }
+
+          // 1b. Fallback to OpenAI-compatible speech synthesis endpoint (/v1/audio/speech)
+          if (!audioBuffer) {
+            try {
+              const openAiRes = await fetch("https://api.inworld.ai/v1/audio/speech", {
+                method: "POST",
+                headers: {
+                  Authorization: authHeader,
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  model: modelId,
+                  voice: voiceId,
+                  input: customText,
+                  response_format: "mp3",
+                  speed: payload.speakingRate || 1.0,
+                }),
+              });
+
+              if (openAiRes.ok) {
+                const arrayBuf = await openAiRes.arrayBuffer();
+                audioBuffer = Buffer.from(arrayBuf);
+              } else {
+                const openAiErr = await openAiRes.text();
+                lastErrorMsg = `Inworld Speech (${openAiRes.status}): ${openAiErr || openAiRes.statusText}`;
+              }
+            } catch (openAiCatch: any) {
+              lastErrorMsg = openAiCatch.message || "OpenAI compatible speech request error";
+            }
+          }
+        }
+
+        // 2. If text was not provided or synthesis endpoints were unreachable, fallback to preview
+        if (!audioBuffer && !customText) {
+          try {
+            const previewUrl = new URL("https://api.inworld.ai/tts/v1/voice:preview");
+            previewUrl.searchParams.set("voice_id", voiceId);
+            if (modelId) {
+              previewUrl.searchParams.set("model_id", modelId);
+            }
+
+            const previewRes = await fetch(previewUrl.toString(), {
+              headers: { Authorization: authHeader },
+            });
+
+            if (previewRes.ok) {
+              const contentType = previewRes.headers.get("content-type") || "";
+              if (contentType.includes("application/json")) {
+                const json: any = await previewRes.json();
+                const b64 = json.audioContent || json.audio_content || json.audio;
+                if (b64) {
+                  audioBuffer = Buffer.from(b64, "base64");
+                }
+              } else {
+                const arrayBuf = await previewRes.arrayBuffer();
+                audioBuffer = Buffer.from(arrayBuf);
+              }
+            } else {
+              lastErrorMsg = `Voice Preview (${previewRes.status}): ${previewRes.statusText}`;
+            }
+          } catch (previewErr: any) {
+            lastErrorMsg = previewErr.message || "Preview request error";
+          }
+        }
+
+        if (!audioBuffer || audioBuffer.length === 0) {
+          return {
+            success: false,
+            error: lastErrorMsg || "Could not synthesize audio from Inworld AI.",
+          };
+        }
+
+        const base64Audio = audioBuffer.toString("base64");
+        const dataUrl = `data:audio/mpeg;base64,${base64Audio}`;
+        return { success: true, audioUrl: dataUrl };
+      } catch (err: any) {
+        console.error("[Electron Main] Inworld test-voice failed:", err);
+        return { success: false, error: err.message || "Failed to generate audio sample" };
+      }
+    }
+  );
 
   app.whenReady().then(() => {
     // Check if launched directly with a deep link on cold start

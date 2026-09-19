@@ -77,6 +77,18 @@ contextBridge.exposeInMainWorld("electron", {
     get: () => ipcRenderer.invoke("config:get"),
     save: (newConfig: any) => ipcRenderer.invoke("config:save", newConfig),
   },
+  inworld: {
+    listVoices: (options: { apiKey: string }) =>
+      ipcRenderer.invoke("inworld:list-voices", options),
+    testVoice: (payload: {
+      apiKey: string;
+      voiceId: string;
+      model?: string;
+      text?: string;
+      deliveryMode?: string;
+      speakingRate?: number;
+    }) => ipcRenderer.invoke("inworld:test-voice", payload),
+  },
   minimize: () => ipcRenderer.send("window:minimize"),
   maximize: () => ipcRenderer.send("window:maximize"),
   close: () => ipcRenderer.send("window:close"),

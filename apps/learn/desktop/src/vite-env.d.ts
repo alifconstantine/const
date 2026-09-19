@@ -104,6 +104,32 @@ declare global {
         get: () => Promise<any>;
         save: (newConfig: any) => Promise<any>;
       };
+      inworld?: {
+        listVoices: (options: { apiKey: string }) => Promise<{
+          success: boolean;
+          voices?: Array<{
+            voiceId: string;
+            displayName: string;
+            langCode: string;
+            gender: string;
+            description?: string;
+            tags?: string[];
+          }>;
+          error?: string;
+        }>;
+        testVoice: (payload: {
+          apiKey: string;
+          voiceId: string;
+          model?: string;
+          text?: string;
+          deliveryMode?: string;
+          speakingRate?: number;
+        }) => Promise<{
+          success: boolean;
+          audioUrl?: string;
+          error?: string;
+        }>;
+      };
       minimize?: () => void;
       maximize?: () => void;
       close?: () => void;
