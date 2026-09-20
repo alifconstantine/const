@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
   X,
   Code2,
@@ -108,6 +108,33 @@ export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
 
   // Two Main Tabs: Apps & Tools (First) and Custom MCP (Second)
   const [mainTab, setMainTab] = useState<MainTab>("apps");
+
+  // Sliding tab indicator (matching ModelSelectionSheet)
+  const appsTabRef = useRef<HTMLButtonElement>(null);
+  const customMcpTabRef = useRef<HTMLButtonElement>(null);
+  const [indicatorStyle, setIndicatorStyle] = useState<{ left: number; width: number }>({
+    left: 0,
+    width: 0,
+  });
+
+  useEffect(() => {
+    if (!open) return;
+    const updateIndicator = () => {
+      let activeEl: HTMLButtonElement | null = null;
+      if (mainTab === "apps") activeEl = appsTabRef.current;
+      else if (mainTab === "custom_mcp") activeEl = customMcpTabRef.current;
+
+      if (activeEl) {
+        setIndicatorStyle({
+          left: activeEl.offsetLeft,
+          width: activeEl.offsetWidth,
+        });
+      }
+    };
+    updateIndicator();
+    const timer = setTimeout(updateIndicator, 50);
+    return () => clearTimeout(timer);
+  }, [mainTab, open, language]);
 
   // Apps & Tools State
   const [selectedCategory, setSelectedCategory] = useState<CategoryFilter>("All");
@@ -561,10 +588,21 @@ export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
           </button>
         </div>
 
-        {/* Main Tab Switcher - Left-Aligned Below Header (NOT in top right) */}
-        <div className="px-4 sm:px-6 pt-2.5 shrink-0 flex items-center gap-2 border-b border-border/40 pb-2.5">
-          <div className="flex items-center p-1 rounded-xl bg-secondary/50 border border-border w-full sm:w-auto">
+        {/* Main Tab Switcher - Left-Aligned Below Header (matching ModelSelectionSheet) */}
+        <div className="px-4 sm:px-6 pt-3 pb-1 flex items-center gap-2 shrink-0">
+          <div className="relative flex items-center h-9 p-0.5 rounded-xl bg-muted/70 border border-border w-fit max-w-[280px]">
+            <div
+              className="absolute top-0.5 bottom-0.5 left-0 rounded-lg bg-background shadow-2xs pointer-events-none transition-all duration-300"
+              style={{
+                transform: `translateX(${indicatorStyle.left}px)`,
+                width: `${indicatorStyle.width}px`,
+                opacity: indicatorStyle.width > 0 ? 1 : 0,
+                transitionTimingFunction: "cubic-bezier(0.16, 1, 0.3, 1)",
+              }}
+            />
+
             <button
+              ref={appsTabRef}
               type="button"
               onClick={() => {
                 setMainTab("apps");
@@ -572,9 +610,9 @@ export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
                 setIsEditingServer(false);
               }}
               className={cn(
-                "flex-1 sm:flex-initial px-4 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1.5 cursor-pointer",
+                "relative z-10 px-4 h-full rounded-lg text-xs font-medium transition-colors duration-200 cursor-pointer select-none flex items-center justify-center gap-1.5",
                 mainTab === "apps"
-                  ? "bg-card text-foreground shadow-xs font-semibold"
+                  ? "text-foreground font-semibold"
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
@@ -583,6 +621,7 @@ export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
             </button>
 
             <button
+              ref={customMcpTabRef}
               type="button"
               onClick={() => {
                 setMainTab("custom_mcp");
@@ -590,9 +629,9 @@ export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
                 setIsEditingServer(false);
               }}
               className={cn(
-                "flex-1 sm:flex-initial px-4 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1.5 cursor-pointer",
+                "relative z-10 px-4 h-full rounded-lg text-xs font-medium transition-colors duration-200 cursor-pointer select-none flex items-center justify-center gap-1.5",
                 mainTab === "custom_mcp"
-                  ? "bg-card text-foreground shadow-xs font-semibold"
+                  ? "text-foreground font-semibold"
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
@@ -670,7 +709,7 @@ export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
                               "w-2.5 h-2.5 rounded-full ring-2 ring-card absolute -bottom-0.5 -right-0.5 transition-colors",
                               isConnected ? "bg-emerald-500" : "bg-amber-400 ring-amber-400/30"
                             )}
-                            title={isConnected ? "Connected" : "Needs Authorization"}
+                            title={isConnected ? "Connected" : "Disconnected"}
                           />
                         </div>
 
@@ -687,12 +726,12 @@ export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
                           <p className="text-[11px] text-muted-foreground leading-relaxed line-clamp-1">
                             {isConnected
                               ? (isIndo ? "Konektor plugin ini sudah terhubung dan tersedia." : "This plugin MCP server is connected and available.")
-                              : (isIndo ? "Buka otorisasi untuk menyelesaikan koneksi plugin MCP ini." : "Open authorization to finish connecting this plugin MCP server.")}
+                              : (isIndo ? "Hubungkan untuk menggunakan plugin MCP ini." : "Connect to use this plugin MCP server.")}
                           </p>
                         </div>
                       </div>
 
-                      {/* Right Action: Open Authorization (Cyan link) or Disconnect */}
+                      {/* Right Action: Connect or Disconnect */}
                       <div className="shrink-0 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                         {!isConnected ? (
                           <button
@@ -702,7 +741,7 @@ export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
                             className="text-cyan-400 hover:text-cyan-300 transition-colors text-xs font-medium flex items-center gap-1 cursor-pointer whitespace-nowrap"
                           >
                             <ExternalLink className="w-3 h-3" />
-                            <span>{isConnecting ? (isIndo ? "Menghubungkan..." : "Connecting...") : (isIndo ? "Buka otorisasi" : "Open authorization")}</span>
+                            <span>{isConnecting ? (isIndo ? "Menghubungkan..." : "Connecting...") : "Connect"}</span>
                           </button>
                         ) : (
                           <div className="flex items-center gap-2">
@@ -798,7 +837,7 @@ export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
                       className="w-full rounded-xl text-xs h-8 cursor-pointer bg-cyan-600 hover:bg-cyan-500 text-white"
                     >
                       <ExternalLink className="w-3.5 h-3.5 mr-1" />
-                      <span>{isIndo ? "Buka Otorisasi & Hubungkan" : "Open Authorization & Connect"}</span>
+                      <span>{isIndo ? "Hubungkan" : "Connect"}</span>
                     </Button>
                   )}
                 </div>
