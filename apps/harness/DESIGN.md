@@ -200,6 +200,26 @@ Drop shadows on internal cards are strictly prohibited.
 - **Floating Cards**: 16px/24px geometry (`rounded-2xl`).
 - **Multi-column Layouts**: Floating studio columns (Sources, Central Chat, and Studio/Tools) sit on the `#161616` canvas with hairline boundaries.
 
+### 4. Zero Default Browser Focus Outlines / Yellow Accent Rings on Dialogs & Cards
+- **Strict Rule**: All modal dialogs, alert dialogs, popovers, and floating sheets MUST have `outline-none focus:outline-none focus-visible:outline-none ring-0 focus-visible:ring-0` applied on their content containers (`DialogPrimitive.Content`, `AlertDialogPrimitive.Content`).
+- **Prohibited**: Default browser/OS focus outlines (e.g., Chromium's 2px yellow/gold/amber focus outline on Windows when clicking or focusing `DialogPrimitive.Content`) are strictly **prohibited**.
+- Focus indicators must never encompass an entire modal container or card. Focus states are reserved strictly for internal interactive elements (inputs, textareas, active buttons) with subtle, customized studio styling.
+
+---
+
+## Studio Tools Card Color Palette
+
+Studio tool cards (`StudioPanel`) feature distinctive, muted dark-calibrated colors for fast visual identification:
+- **Audio Summary**: Indigo (`dark:bg-[#21232d]`, `dark:border-[#303444]`, `dark:text-[#a5b4fc]`)
+- **Slides**: Amber (`dark:bg-[#2b291d]`, `dark:border-[#3e3b2a]`, `dark:text-[#fde047]`)
+- **Video Summary**: Emerald (`dark:bg-[#1d2820]`, `dark:border-[#2b3d30]`, `dark:text-[#86efac]`)
+- **Mind Map**: Pink (`dark:bg-[#2e212b]`, `dark:border-[#422f3e]`, `dark:text-[#f472b6]`)
+- **Study Report**: Warm Sand / Stone (`dark:bg-[#29281e]`, `dark:border-[#3c3a2b]`, `dark:text-[#dedac2]`)
+- **Quiz**: Teal (`dark:bg-[#1c2628]`, `dark:border-[#29383c]`, `dark:text-[#5eead4]`)
+- **Infographic**: Purple (`dark:bg-[#28202d]`, `dark:border-[#3a2d42]`, `dark:text-[#c084fc]`)
+- **Data Table**: Sky (`dark:bg-[#1a252f]`, `dark:border-[#263746]`, `dark:text-[#38bdf8]`)
+- **Browser**: Blue (`dark:bg-[#172133]`, `dark:border-[#22334f]`, `dark:text-[#60a5fa]`)
+
 ---
 
 ## Iconography & Empty States
@@ -226,6 +246,7 @@ Drop shadows on internal cards are strictly prohibited.
 - **Do** render AI response text and active header pills in crisp `#ffffff` (`dark:text-white`) for crystal-clear readability.
 - **Do** keep panel headers, dropdowns, and popovers seamless and borderless — eliminate all dividing lines (`border-b`, `border-t`, `divide-y`).
 - **Do** always use `ScrollArea` (`@const/ui` / `packages/ui/src/components/ui/scroll-area.tsx`) for all scrollable containers and popover lists instead of raw `overflow-y-auto`.
+- **Do** always ensure dialog containers, popovers, and floating card wrappers have `outline-none focus:outline-none focus-visible:outline-none ring-0` to suppress unwanted OS/browser accent rings.
 - **Do** use `Layers` for the Artifacts tab and empty states.
 - **Do** wrap empty state icons in minimalist rounded squircles (`rounded-2xl`).
 - **Do** maintain the exact palette: `#161616` for canvas, `#2b2b2b` for sidebar and input, `#222222` for top header, `#ffffff` for primary reading text.
@@ -235,6 +256,7 @@ Drop shadows on internal cards are strictly prohibited.
 - **Don't** use muddy or dim gray (`#969696` or `text-foreground/90`) for primary AI reading copy.
 - **Don't** add horizontal dividing lines (`border-b`, `border-t`) under workspace headers or inside dropdown/popover menus.
 - **Don't** use raw native `overflow-y-auto` or `overflow-x-auto` which exposes Windows' default boxy/arrow scrollbars. Always use `ScrollArea`.
+- **Don't** allow default browser/OS focus rings (such as Chromium's 2px yellow/amber outline on Windows) to appear around modal dialogs, cards, or panels when clicked or opened.
 - **Don't** use `Sparkles` for Artifacts or non-AI feature tabs.
 - **Don't** use emojis as interface icons or empty state visual representations.
 - **Don't** use heavy drop shadows (`shadow-md`, `shadow-xl`) on workspace panels.

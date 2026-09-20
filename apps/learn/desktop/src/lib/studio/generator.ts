@@ -53,6 +53,8 @@ export interface GenerateVideoSummaryOptions {
   voiceModel?: string;
   voiceId?: string;
   voiceName?: string;
+  deliveryMode?: string;
+  speed?: number;
   customInstructions?: string;
 }
 
@@ -1145,6 +1147,8 @@ export async function generateVideoSummaryArtifact(
     voiceModel,
     voiceId,
     voiceName,
+    deliveryMode,
+    speed,
     customInstructions,
   } = options;
 
@@ -1572,11 +1576,22 @@ Output pure JSON matching this exact structure:
     voiceConfig.providers[0] ||
     DEFAULT_INWORLD_PROVIDER;
 
+  const mappedDelivery: "BALANCED" | "STABLE" | "EXPRESSIVE" | undefined =
+    deliveryMode === "STABLE"
+      ? "STABLE"
+      : deliveryMode === "CREATIVE" || deliveryMode === "EXPRESSIVE"
+      ? "EXPRESSIVE"
+      : deliveryMode === "BALANCED"
+      ? "BALANCED"
+      : targetProvider.deliveryMode;
+
   const providerToUse: VoiceProvider = {
     ...targetProvider,
     model: voiceModel || targetProvider.model || "inworld-tts-2",
     voice: voiceId || targetProvider.voice || "Ashley",
     voiceName: voiceName || targetProvider.voiceName || voiceId || targetProvider.voice,
+    deliveryMode: mappedDelivery || "BALANCED",
+    speed: speed ?? targetProvider.speed ?? 1.0,
   };
 
   const artifactId = options.artifactId || `video_${Date.now()}`;
@@ -1598,6 +1613,8 @@ Output pure JSON matching this exact structure:
         model: providerToUse.model,
         voiceId: providerToUse.voice,
         language: audioLanguage || (isIndo ? "id-ID" : "en-US"),
+        deliveryMode: providerToUse.deliveryMode,
+        speakingRate: providerToUse.speed,
         scenes: rawScenes.map((s, idx) => ({
           sceneNumber: s.sceneNumber || idx + 1,
           id: `scene_${idx + 1}`,

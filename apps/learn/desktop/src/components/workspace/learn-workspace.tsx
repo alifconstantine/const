@@ -670,6 +670,8 @@ export function LearnWorkspace({
     voiceModel: string;
     voiceId: string;
     voiceName: string;
+    deliveryMode?: string;
+    speed?: number;
     customInstructions?: string;
   }) => {
     if (!learnId) return;
@@ -708,6 +710,8 @@ export function LearnWorkspace({
         voiceModel: params.voiceModel,
         voiceId: params.voiceId,
         voiceName: params.voiceName,
+        deliveryMode: params.deliveryMode,
+        speed: params.speed,
         customInstructions: params.customInstructions,
       });
 

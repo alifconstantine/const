@@ -79,6 +79,17 @@
     font-variant-numeric: normal;
     font-feature-settings: "cv05" 0;
   }
+  *:focus {
+    outline: none;
+  }
+  *:focus-visible {
+    outline: none;
+  }
+  [role="dialog"],
+  [role="alertdialog"],
+  [data-radix-portal] > * {
+    outline: none !important;
+  }
   html,
   body {
     font-family: var(--font-sans), 'Inter', sans-serif;

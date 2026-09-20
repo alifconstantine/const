@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import {
+  Video,
   X,
   Check,
   ChevronDown,
@@ -8,6 +9,7 @@ import {
   AlertCircle,
   ArrowRight,
   Settings,
+  Search,
 } from "lucide-react";
 import { Dialog, DialogContent, ScrollArea, cn } from "@const/ui";
 import { useI18n } from "../../lib/i18n";
@@ -32,20 +34,45 @@ export interface CreateVideoSummaryDialogProps {
     voiceModel: string;
     voiceId: string;
     voiceName: string;
+    deliveryMode?: string;
+    speed?: number;
     customInstructions?: string;
   }) => void;
   onOpenSettings?: () => void;
   onOpenModelsSettings?: () => void;
 }
 
-const LANGUAGE_OPTIONS = [
+export const INWORLD_SUPPORTED_LANGUAGES = [
   { id: "id-ID", label: "Bahasa Indonesia (id-ID)" },
   { id: "en-US", label: "English (US) (en-US)" },
   { id: "en-GB", label: "English (UK) (en-GB)" },
-  { id: "ja-JP", label: "Japanese (ja-JP)" },
-  { id: "ko-KR", label: "Korean (ko-KR)" },
-  { id: "zh-CN", label: "Chinese (zh-CN)" },
+  { id: "ja-JP", label: "Japanese (日本語) (ja-JP)" },
+  { id: "ko-KR", label: "Korean (한국어) (ko-KR)" },
+  { id: "zh-CN", label: "Chinese (中文 - 简体) (zh-CN)" },
+  { id: "es-ES", label: "Spanish (Español) (es-ES)" },
+  { id: "fr-FR", label: "French (Français) (fr-FR)" },
+  { id: "de-DE", label: "German (Deutsch) (de-DE)" },
+  { id: "ar-SA", label: "Arabic (العربية) (ar-SA)" },
+  { id: "pt-BR", label: "Portuguese (Português - BR) (pt-BR)" },
+  { id: "ru-RU", label: "Russian (Русский) (ru-RU)" },
+  { id: "it-IT", label: "Italian (Italiano) (it-IT)" },
+  { id: "nl-NL", label: "Dutch (Nederlands) (nl-NL)" },
+  { id: "hi-IN", label: "Hindi (हिन्दी) (hi-IN)" },
+  { id: "pl-PL", label: "Polish (Polski) (pl-PL)" },
+  { id: "tr-TR", label: "Turkish (Türkçe) (tr-TR)" },
+  { id: "vi-VN", label: "Vietnamese (Tiếng Việt) (vi-VN)" },
+  { id: "th-TH", label: "Thai (ไทย) (th-TH)" },
 ];
+
+type ActiveDropdown =
+  | "source"
+  | "coverage"
+  | "model"
+  | "voice"
+  | "language"
+  | "delivery"
+  | "speed"
+  | null;
 
 export function CreateVideoSummaryDialog({
   open,
@@ -60,18 +87,40 @@ export function CreateVideoSummaryDialog({
 
   // Sources selection
   const [selectedSourceIds, setSelectedSourceIds] = useState<string[]>([]);
-  const [isSourceDropdownOpen, setIsSourceDropdownOpen] = useState(false);
 
-  // Coverage depth
+  // Coverage depth: "auto" | "short" | "long"
   const [coverageMode, setCoverageMode] = useState<"short" | "long" | "auto">("auto");
 
-  // Optional custom guidance
-  const [customInstructions, setCustomInstructions] = useState("");
-
   // Voice state
-  const [voiceModel, setVoiceModel] = useState("inworld-tts-2");
-  const [voiceId, setVoiceId] = useState("Ashley");
-  const [audioLanguage, setAudioLanguage] = useState(isIndo ? "id-ID" : "en-US");
+  const [voiceModel, setVoiceModel] = useState<string>("inworld-tts-2");
+  const [voiceId, setVoiceId] = useState<string>("Ashley");
+  const [audioLanguage, setAudioLanguage] = useState<string>(isIndo ? "id-ID" : "en-US");
+  const [deliveryMode, setDeliveryMode] = useState<string>("BALANCED");
+  const [speed, setSpeed] = useState<number>(1.0);
+
+  // Search queries for dropdowns
+  const [voiceSearch, setVoiceSearch] = useState<string>("");
+  const [languageSearch, setLanguageSearch] = useState<string>("");
+
+  // Track which custom studio dropdown is currently open
+  const [openDropdown, setOpenDropdown] = useState<ActiveDropdown>(null);
+
+  // Optional custom instructions
+  const [customInstructions, setCustomInstructions] = useState<string>("");
+
+  // Close dropdowns on outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest("[data-studio-dropdown]")) {
+        setOpenDropdown(null);
+      }
+    };
+    if (openDropdown) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [openDropdown]);
 
   // Read stored voice config
   const voiceConfig = useMemo(() => getStoredVoiceConfig(), [open]);
@@ -94,6 +143,32 @@ export function CreateVideoSummaryDialog({
     return INWORLD_MODELS;
   }, [hasInworldKey]);
 
+  const isModelSelected = Boolean(voiceModel && voiceModel.trim().length > 0);
+  const isInworldModel = voiceModel.startsWith("inworld");
+  const isTts2Model = voiceModel === "inworld-tts-2" || voiceModel === "inworld-tts-2-flash";
+
+  // Filter voices by search query
+  const filteredVoices = useMemo(() => {
+    if (!voiceSearch.trim()) return availableVoices;
+    const q = voiceSearch.toLowerCase().trim();
+    return availableVoices.filter(
+      (v) =>
+        v.name.toLowerCase().includes(q) ||
+        v.id.toLowerCase().includes(q) ||
+        (v.gender && v.gender.toLowerCase().includes(q)) ||
+        (v.description && v.description.toLowerCase().includes(q))
+    );
+  }, [availableVoices, voiceSearch]);
+
+  // Filter languages by search query
+  const filteredLanguages = useMemo(() => {
+    if (!languageSearch.trim()) return INWORLD_SUPPORTED_LANGUAGES;
+    const q = languageSearch.toLowerCase().trim();
+    return INWORLD_SUPPORTED_LANGUAGES.filter(
+      (l) => l.label.toLowerCase().includes(q) || l.id.toLowerCase().includes(q)
+    );
+  }, [languageSearch]);
+
   // Sync initial selections
   useEffect(() => {
     if (sources.length > 0 && selectedSourceIds.length === 0) {
@@ -105,9 +180,18 @@ export function CreateVideoSummaryDialog({
     if (inworldProvider) {
       if (inworldProvider.model) setVoiceModel(inworldProvider.model);
       if (inworldProvider.voice) setVoiceId(inworldProvider.voice);
+      if (inworldProvider.deliveryMode) setDeliveryMode(inworldProvider.deliveryMode);
+      if (inworldProvider.speed) setSpeed(inworldProvider.speed);
     }
     setAudioLanguage(isIndo ? "id-ID" : "en-US");
   }, [inworldProvider, isIndo, open]);
+
+  // When model is changed, sync voice ID default if not present
+  useEffect(() => {
+    if (isModelSelected && !voiceId && availableVoices.length > 0) {
+      setVoiceId(availableVoices[0]?.id || "Ashley");
+    }
+  }, [voiceModel, availableVoices, voiceId, isModelSelected]);
 
   const handleToggleSource = (sourceId: string) => {
     setSelectedSourceIds((prev) =>
@@ -132,6 +216,24 @@ export function CreateVideoSummaryDialog({
     }
   };
 
+  const suggestionChips = useMemo(() => {
+    return [
+      t("videoSuggestEssential"),
+      t("videoSuggestCasual"),
+      t("videoSuggestAnalogies"),
+      t("videoSuggestComparative"),
+    ];
+  }, [t]);
+
+  const handleApplySuggestion = (chipText: string) => {
+    const cleanText = chipText.replace(/^\+\s*/, "");
+    if (!customInstructions.trim()) {
+      setCustomInstructions(cleanText);
+    } else {
+      setCustomInstructions((prev) => `${prev}. ${cleanText}`);
+    }
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (selectedSourceIds.length === 0) return;
@@ -142,7 +244,7 @@ export function CreateVideoSummaryDialog({
     }
 
     const chosenVoice = availableVoices.find((v) => v.id === voiceId);
-    const chosenVoiceName = chosenVoice?.name || voiceId;
+    const chosenVoiceName = chosenVoice?.name || voiceId || "Ashley";
 
     onGenerate({
       selectedSourceIds:
@@ -151,23 +253,61 @@ export function CreateVideoSummaryDialog({
       language: audioLanguage.startsWith("id") ? "id" : "en",
       audioLanguage,
       voiceProviderId: inworldProvider?.id || "inworld",
-      voiceModel,
-      voiceId,
+      voiceModel: voiceModel || "inworld-tts-2",
+      voiceId: voiceId || "Ashley",
       voiceName: chosenVoiceName,
+      deliveryMode: isTts2Model ? deliveryMode : undefined,
+      speed,
       customInstructions: customInstructions.trim() || undefined,
     });
 
     onOpenChange(false);
   };
 
+  // Helper labels
+  const selectedVoiceObj = availableVoices.find((v) => v.id === voiceId);
+  const selectedVoiceDisplay = selectedVoiceObj
+    ? `${selectedVoiceObj.name}${selectedVoiceObj.gender ? ` (${selectedVoiceObj.gender})` : ""}`
+    : voiceId || t("videoSelectVoicePrompt");
+
+  const selectedModelObj = availableModels.find((m) => m.id === voiceModel);
+  const selectedModelDisplay = selectedModelObj?.name || voiceModel || t("videoSelectModelPrompt");
+
+  const selectedLangObj = INWORLD_SUPPORTED_LANGUAGES.find((l) => l.id === audioLanguage);
+  const selectedLangDisplay = selectedLangObj?.label || audioLanguage || t("videoSelectLanguagePrompt");
+
+  const coverageDisplay =
+    coverageMode === "short"
+      ? t("videoCoverageShortShort")
+      : coverageMode === "long"
+      ? t("videoCoverageLongShort")
+      : t("videoCoverageAutoShort");
+
+  const deliveryDisplay =
+    deliveryMode === "STABLE"
+      ? t("videoDeliveryStable")
+      : deliveryMode === "CREATIVE" || deliveryMode === "EXPRESSIVE"
+      ? t("videoDeliveryCreative")
+      : t("videoDeliveryBalanced");
+
+  const speedDisplay =
+    speed === 0.75
+      ? t("videoSpeedSlow")
+      : speed === 1.25
+      ? t("videoSpeedFast")
+      : speed === 1.5
+      ? t("videoSpeedVeryFast")
+      : t("videoSpeedNormal");
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[620px] p-0 bg-[#161616] border border-[#2b2b2b] text-[#e0e0e0] rounded-2xl shadow-2xl overflow-hidden font-sans [&>button]:hidden">
-        {/* Header - No divider line */}
-        <div className="flex items-center justify-between px-5 pt-5 pb-3 bg-[#161616]">
+      <DialogContent className="max-w-[620px] p-0 bg-[#161616] border border-[#2b2b2b] text-[#e0e0e0] rounded-2xl shadow-2xl overflow-hidden font-sans [&>button]:hidden outline-none focus:outline-none focus-visible:outline-none ring-0 focus-visible:ring-0">
+        {/* Header - Icon + "Video Summarize" + X button (No dividing line) */}
+        <div className="flex items-center justify-between px-5 pt-5 pb-2 bg-[#161616]">
           <div className="flex items-center gap-2.5">
+            <Video className="h-4 w-4 text-white shrink-0" />
             <span className="text-sm font-semibold text-white tracking-tight">
-              {t("videoSummaryTitle")}
+              Video Summarize
             </span>
           </div>
 
@@ -180,49 +320,50 @@ export function CreateVideoSummaryDialog({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex flex-col max-h-[80vh]">
-          <ScrollArea className="flex-1 w-full px-5 py-1">
+        <form onSubmit={handleSubmit} className="flex flex-col max-h-[82vh]">
+          <ScrollArea className="flex-1 w-full px-5 py-2">
             <div className="space-y-4 pb-2">
-              {/* Concept Explanation Box */}
-              <div className="p-3.5 rounded-xl bg-[#222222] border border-[#2b2b2b] flex items-start gap-3">
-                <div className="text-xs text-[#d4d4d4] leading-relaxed">
-                  {t("videoSummarySubtitle")}
-                </div>
-              </div>
+              {/* 1. Pemilihan Source (Lebar) & Dropdown Durasi/Cakupan (Kanan) */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-2.5">
+                {/* Source Selection with ScrollArea & Max-Height */}
+                <div className="flex-1 space-y-1.5 relative" data-studio-dropdown>
+                  <label className="text-[11.5px] font-medium text-[#999999]">
+                    {t("videoSourceScopeLabel")}
+                  </label>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setOpenDropdown(openDropdown === "source" ? null : "source")}
+                      className="w-full h-9 px-3 rounded-xl bg-[#222222] border border-[#2b2b2b] hover:border-[#383838] flex items-center justify-between text-xs text-left cursor-pointer transition-colors"
+                    >
+                      <span className="text-white font-medium truncate">
+                        {selectedSourceIds.length === sources.length
+                          ? t("videoAllSourcesSelected", { count: sources.length })
+                          : t("videoSourcesSelectedCount", {
+                              selected: selectedSourceIds.length,
+                              total: sources.length,
+                            })}
+                      </span>
+                      <ChevronDown
+                        className={cn(
+                          "h-3.5 w-3.5 text-[#888888] shrink-0 transition-transform duration-150",
+                          openDropdown === "source" ? "rotate-180 text-white" : ""
+                        )}
+                      />
+                    </button>
 
-              {/* Sumber Dropdown */}
-              <div className="space-y-1.5 relative">
-                <label className="text-[11.5px] font-medium text-[#999999]">
-                  {isIndo ? "Sumber Rujukan Materi" : "Source Material Scope"}
-                </label>
-                <div className="relative">
-                  <button
-                    type="button"
-                    onClick={() => setIsSourceDropdownOpen(!isSourceDropdownOpen)}
-                    className="w-full h-9 px-3 rounded-xl bg-[#222222] border border-[#2b2b2b] hover:border-[#383838] flex items-center justify-between text-xs text-left cursor-pointer transition-colors"
-                  >
-                    <span className="text-white font-medium truncate">
-                      {selectedSourceIds.length === sources.length
-                        ? isIndo
-                          ? `Semua sumber (${sources.length} sumber)`
-                          : `All sources (${sources.length})`
-                        : isIndo
-                        ? `${selectedSourceIds.length} dari ${sources.length} sumber terpilih`
-                        : `${selectedSourceIds.length} of ${sources.length} sources selected`}
-                    </span>
-                    <ChevronDown className="h-3.5 w-3.5 text-[#888888] shrink-0" />
-                  </button>
-
-                  {isSourceDropdownOpen && (
-                    <div className="absolute top-full mt-1.5 left-0 right-0 z-30 bg-[#222222] border border-[#2b2b2b] rounded-xl p-2 shadow-2xl">
-                      <ScrollArea className="max-h-48 w-full" viewportClassName="space-y-1 pr-1">
+                    {openDropdown === "source" && (
+                      <div className="absolute top-full mt-1.5 left-0 right-0 z-30 bg-[#222222] border border-[#2b2b2b] rounded-xl p-2 shadow-2xl animate-in fade-in-0 zoom-in-95 duration-100">
+                        {/* Select All Toggle */}
                         <button
                           type="button"
                           onClick={handleSelectAllSources}
                           className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-[#2b2b2b] text-xs text-[#cccccc] cursor-pointer transition-colors"
                         >
                           <span className="font-medium">
-                            {isIndo ? "Pilih Semua Sumber" : "Select All Sources"}
+                            {selectedSourceIds.length === sources.length
+                              ? t("videoDeselectAllSources")
+                              : t("videoSelectAllSources")}
                           </span>
                           <div
                             className={cn(
@@ -238,115 +379,110 @@ export function CreateVideoSummaryDialog({
                           </div>
                         </button>
 
-                        {sources.map((src) => {
-                          const isSelected = selectedSourceIds.includes(src.id);
+                        <div className="h-px bg-[#2e2e2e] my-1.5" />
+
+                        {/* ScrollArea with max-height to handle many sources smoothly */}
+                        <ScrollArea className="max-h-56 w-full" viewportClassName="space-y-1 pr-1.5">
+                          {sources.map((src) => {
+                            const isSelected = selectedSourceIds.includes(src.id);
+                            return (
+                              <button
+                                key={src.id}
+                                type="button"
+                                onClick={() => handleToggleSource(src.id)}
+                                className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-[#2b2b2b] text-xs text-left cursor-pointer transition-colors"
+                              >
+                                <div className="flex items-center gap-2 truncate pr-2">
+                                  <FileText className="h-3.5 w-3.5 text-[#777777] shrink-0" />
+                                  <span className="truncate text-[#e0e0e0]">{src.title}</span>
+                                </div>
+                                <div
+                                  className={cn(
+                                    "h-4 w-4 rounded border flex items-center justify-center transition-colors shrink-0",
+                                    isSelected
+                                      ? "bg-white border-white text-black"
+                                      : "border-[#444449] bg-transparent"
+                                  )}
+                                >
+                                  {isSelected && <Check className="h-3 w-3 stroke-[3]" />}
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </ScrollArea>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Duration / Coverage Custom Studio Dropdown */}
+                <div className="w-full sm:w-[150px] shrink-0 space-y-1.5 relative" data-studio-dropdown>
+                  <label className="text-[11.5px] font-medium text-[#999999]">
+                    {t("videoCoverageDepthLabel")}
+                  </label>
+                  <div className="relative">
+                    <button
+                      type="button"
+                      onClick={() => setOpenDropdown(openDropdown === "coverage" ? null : "coverage")}
+                      className="w-full h-9 px-3 rounded-xl bg-[#222222] border border-[#2b2b2b] hover:border-[#383838] flex items-center justify-between text-xs text-left cursor-pointer transition-colors"
+                    >
+                      <span className="text-white font-medium truncate">{coverageDisplay}</span>
+                      <ChevronDown
+                        className={cn(
+                          "h-3.5 w-3.5 text-[#888888] shrink-0 transition-transform duration-150",
+                          openDropdown === "coverage" ? "rotate-180 text-white" : ""
+                        )}
+                      />
+                    </button>
+
+                    {openDropdown === "coverage" && (
+                      <div className="absolute top-full mt-1.5 right-0 w-full min-w-[140px] z-30 bg-[#222222] border border-[#2b2b2b] rounded-xl p-1.5 shadow-2xl animate-in fade-in-0 zoom-in-95 duration-100">
+                        {(
+                          [
+                            { id: "auto", label: t("videoCoverageAutoShort") },
+                            { id: "short", label: t("videoCoverageShortShort") },
+                            { id: "long", label: t("videoCoverageLongShort") },
+                          ] as const
+                        ).map((opt) => {
+                          const isSelected = coverageMode === opt.id;
                           return (
                             <button
-                              key={src.id}
+                              key={opt.id}
                               type="button"
-                              onClick={() => handleToggleSource(src.id)}
-                              className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-[#2b2b2b] text-xs text-left cursor-pointer transition-colors"
+                              onClick={() => {
+                                setCoverageMode(opt.id);
+                                setOpenDropdown(null);
+                              }}
+                              className={cn(
+                                "w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs cursor-pointer transition-colors",
+                                isSelected
+                                  ? "bg-[#2b2b2b] text-white font-medium"
+                                  : "hover:bg-[#282828] text-[#cccccc] hover:text-white"
+                              )}
                             >
-                              <div className="flex items-center gap-2 truncate pr-2">
-                                <FileText className="h-3.5 w-3.5 text-[#777777] shrink-0" />
-                                <span className="truncate text-[#e0e0e0]">{src.title}</span>
-                              </div>
-                              <div
-                                className={cn(
-                                  "h-4 w-4 rounded border flex items-center justify-center transition-colors shrink-0",
-                                  isSelected
-                                    ? "bg-white border-white text-black"
-                                    : "border-[#444449] bg-transparent"
-                                )}
-                              >
-                                {isSelected && <Check className="h-3 w-3 stroke-[3]" />}
-                              </div>
+                              <span>{opt.label}</span>
+                              {isSelected && <Check className="h-3.5 w-3.5 text-white stroke-[2.5]" />}
                             </button>
                           );
                         })}
-                      </ScrollArea>
-                    </div>
-                  )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
 
-              {/* Length / Coverage Depth Options: Ringkas, Panjang, Auto */}
-              <div className="space-y-1.5">
-                <label className="text-[11.5px] font-medium text-[#999999]">
-                  {t("videoCoverageMode")}
-                </label>
-                <div className="grid grid-cols-3 gap-2.5">
-                  {[
-                    {
-                      id: "short",
-                      label: t("videoCoverageShort"),
-                      desc: t("videoCoverageShortDesc"),
-                    },
-                    {
-                      id: "long",
-                      label: t("videoCoverageLong"),
-                      desc: t("videoCoverageLongDesc"),
-                    },
-                    {
-                      id: "auto",
-                      label: t("videoCoverageAuto"),
-                      desc: t("videoCoverageAutoDesc"),
-                    },
-                  ].map((opt) => {
-                    const isSelected = coverageMode === opt.id;
-                    return (
-                      <button
-                        key={opt.id}
-                        type="button"
-                        onClick={() => setCoverageMode(opt.id as any)}
-                        className={cn(
-                          "p-3 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between",
-                          isSelected
-                            ? "bg-[#2b2b2b] border-[#383838] text-white shadow-sm"
-                            : "bg-[#222222] border-[#2b2b2b] hover:border-[#383838] text-[#a0a0a0] hover:text-[#e0e0e0]"
-                        )}
-                      >
-                        <div>
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="text-xs font-semibold">{opt.label}</span>
-                            {isSelected && <Check className="h-3.5 w-3.5 text-white" />}
-                          </div>
-                          <p className="text-[10px] text-[#888888] leading-tight line-clamp-2">
-                            {opt.desc}
-                          </p>
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Custom Instruction Input (Optional) */}
-              <div className="space-y-1.5">
-                <label className="text-[11.5px] font-medium text-[#999999]">
-                  {t("videoAdditionalPrompt")}
-                </label>
-                <textarea
-                  value={customInstructions}
-                  onChange={(e) => setCustomInstructions(e.target.value)}
-                  placeholder={t("videoAdditionalPromptPlaceholder")}
-                  rows={2}
-                  className="w-full px-3 py-2 rounded-xl bg-[#222222] border border-[#2b2b2b] hover:border-[#383838] focus:border-[#444444] focus:outline-none text-xs text-white placeholder:text-[#666666] resize-none transition-colors font-sans"
-                />
-              </div>
-
-              {/* Voice Configuration Section */}
-              <div className="p-3.5 rounded-xl bg-[#222222] border border-[#2b2b2b] space-y-3">
+              {/* 2. Model Voice / Voice Configuration: "Select Voice" */}
+              <div className="p-3.5 rounded-xl bg-[#1c1c1c] border border-[#2b2b2b] space-y-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <Volume2 className="h-4 w-4 text-[#d4d4d4]" />
+                    <Volume2 className="h-4 w-4 text-white" />
                     <span className="text-xs font-semibold text-white">
-                      {isIndo ? "Konfigurasi Suara (Inworld TTS)" : "Voice Configuration (Inworld TTS)"}
+                      {t("videoSelectVoicePrompt")}
                     </span>
                   </div>
                   {hasInworldKey ? (
                     <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#2b2b2b] text-[#d4d4d4] border border-[#383838]">
-                      {isIndo ? "API Key Terhubung" : "API Key Connected"}
+                      {isIndo ? "Inworld Terhubung" : "Inworld Connected"}
                     </span>
                   ) : (
                     <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
@@ -356,8 +492,7 @@ export function CreateVideoSummaryDialog({
                 </div>
 
                 {!hasInworldKey ? (
-                  /* Notice when Inworld API Key is missing */
-                  <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 space-y-2.5">
+                  <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 space-y-2">
                     <div className="flex items-start gap-2 text-xs text-amber-300/90 leading-relaxed">
                       <AlertCircle className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
                       <span>{t("audioNoApiKeyNotice")}</span>
@@ -376,79 +511,411 @@ export function CreateVideoSummaryDialog({
                   </div>
                 ) : null}
 
-                {/* Dropdowns */}
-                <div className="grid grid-cols-3 gap-2.5">
-                  {/* Voice Model */}
-                  <div className="space-y-1">
+                {/* Row 1: Voice Model, Voice ID, Language (Custom Studio Dropdowns) */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  {/* Voice Model Custom Dropdown */}
+                  <div className="space-y-1 relative" data-studio-dropdown>
                     <label className="text-[10.5px] font-medium text-[#888888]">
                       {t("videoVoiceModel")}
                     </label>
-                    <select
+                    <button
+                      type="button"
                       disabled={!hasInworldKey}
-                      value={voiceModel}
-                      onChange={(e) => setVoiceModel(e.target.value)}
-                      className="w-full h-8 px-2 rounded-lg bg-[#2b2b2b] border border-[#383838] text-xs text-white disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus:border-[#555555]"
+                      onClick={() => setOpenDropdown(openDropdown === "model" ? null : "model")}
+                      className="w-full h-8 px-2.5 rounded-lg bg-[#2b2b2b] border border-[#383838] hover:border-[#444444] disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-between text-xs text-white cursor-pointer transition-colors text-left"
                     >
-                      {availableModels.length === 0 ? (
-                        <option value="">{isIndo ? "Tidak ada model" : "No models"}</option>
-                      ) : (
-                        availableModels.map((m) => (
-                          <option key={m.id} value={m.id}>
-                            {m.name}
-                          </option>
-                        ))
-                      )}
-                    </select>
+                      <span className="truncate">{selectedModelDisplay}</span>
+                      <ChevronDown
+                        className={cn(
+                          "h-3 w-3 text-[#888888] shrink-0 transition-transform duration-150",
+                          openDropdown === "model" ? "rotate-180 text-white" : ""
+                        )}
+                      />
+                    </button>
+
+                    {openDropdown === "model" && hasInworldKey && (
+                      <div className="absolute top-full mt-1.5 left-0 min-w-full sm:min-w-[240px] w-max max-w-[320px] z-30 bg-[#222222] border border-[#2b2b2b] rounded-xl p-1.5 shadow-2xl animate-in fade-in-0 zoom-in-95 duration-100">
+                        <ScrollArea className="max-h-52 w-full" viewportClassName="space-y-1 pr-1">
+                          {(availableModels.length > 0
+                            ? availableModels
+                            : [
+                                { id: "inworld-tts-2", name: "Inworld TTS-2" },
+                                { id: "inworld-tts-2-flash", name: "Inworld TTS-2 Flash" },
+                                { id: "inworld-tts-1.5-max", name: "Inworld TTS-1.5 Max" },
+                                { id: "inworld-tts-1.5-mini", name: "Inworld TTS-1.5 Mini" },
+                              ]
+                          ).map((m) => {
+                            const isSelected = voiceModel === m.id;
+                            return (
+                              <button
+                                key={m.id}
+                                type="button"
+                                onClick={() => {
+                                  setVoiceModel(m.id);
+                                  setOpenDropdown(null);
+                                }}
+                                className={cn(
+                                  "w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs cursor-pointer transition-colors text-left",
+                                  isSelected
+                                    ? "bg-[#2b2b2b] text-white font-medium"
+                                    : "hover:bg-[#282828] text-[#cccccc] hover:text-white"
+                                )}
+                              >
+                                <span className="whitespace-nowrap pr-2">{m.name}</span>
+                                {isSelected && <Check className="h-3.5 w-3.5 text-white shrink-0 ml-2" />}
+                              </button>
+                            );
+                          })}
+                        </ScrollArea>
+                      </div>
+                    )}
                   </div>
 
-                  {/* Voice ID */}
-                  <div className="space-y-1">
+                  {/* Voice ID Custom Dropdown with Search & ScrollArea */}
+                  <div className="space-y-1 relative" data-studio-dropdown>
                     <label className="text-[10.5px] font-medium text-[#888888]">
                       {t("videoVoiceCharacter")}
                     </label>
-                    <select
-                      disabled={!hasInworldKey}
-                      value={voiceId}
-                      onChange={(e) => setVoiceId(e.target.value)}
-                      className="w-full h-8 px-2 rounded-lg bg-[#2b2b2b] border border-[#383838] text-xs text-white disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus:border-[#555555]"
-                    >
-                      {availableVoices.length === 0 ? (
-                        <option value="">{isIndo ? "Tidak ada suara" : "No voices"}</option>
-                      ) : (
-                        availableVoices.map((v) => (
-                          <option key={v.id} value={v.id}>
-                            {v.name} {v.gender ? `(${v.gender})` : ""}
-                          </option>
-                        ))
+                    <button
+                      type="button"
+                      disabled={!hasInworldKey || !isModelSelected}
+                      onClick={() => {
+                        setVoiceSearch("");
+                        setOpenDropdown(openDropdown === "voice" ? null : "voice");
+                      }}
+                      className={cn(
+                        "w-full h-8 px-2.5 rounded-lg border flex items-center justify-between text-xs cursor-pointer transition-colors text-left",
+                        !isModelSelected
+                          ? "bg-[#222222] border-[#2b2b2b] text-[#666666] opacity-50 cursor-not-allowed"
+                          : "bg-[#2b2b2b] border-[#383838] hover:border-[#444444] text-white"
                       )}
-                    </select>
+                    >
+                      <span className="truncate">
+                        {!isModelSelected ? t("videoSelectModelFirst") : selectedVoiceDisplay}
+                      </span>
+                      <ChevronDown
+                        className={cn(
+                          "h-3 w-3 text-[#888888] shrink-0 transition-transform duration-150",
+                          openDropdown === "voice" ? "rotate-180 text-white" : ""
+                        )}
+                      />
+                    </button>
+
+                    {openDropdown === "voice" && isModelSelected && hasInworldKey && (
+                      <div className="absolute top-full mt-1.5 left-0 min-w-full sm:min-w-[260px] w-max max-w-[340px] z-30 bg-[#222222] border border-[#2b2b2b] rounded-xl p-2 shadow-2xl animate-in fade-in-0 zoom-in-95 duration-100">
+                        {/* Search Input */}
+                        <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-[#181818] border border-[#333333] mb-1.5">
+                          <Search className="h-3.5 w-3.5 text-[#888888] shrink-0" />
+                          <input
+                            type="text"
+                            value={voiceSearch}
+                            onChange={(e) => setVoiceSearch(e.target.value)}
+                            placeholder={t("videoSearchVoicePlaceholder")}
+                            className="w-full bg-transparent text-xs text-white placeholder:text-[#666666] focus:outline-none font-sans"
+                            autoFocus
+                          />
+                          {voiceSearch && (
+                            <button
+                              type="button"
+                              onClick={() => setVoiceSearch("")}
+                              className="text-[#888888] hover:text-white cursor-pointer"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          )}
+                        </div>
+
+                        {/* ScrollArea with max-height */}
+                        <ScrollArea className="max-h-56 w-full" viewportClassName="space-y-1 pr-1">
+                          {filteredVoices.length === 0 ? (
+                            <div className="py-4 text-center text-xs text-[#888888]">
+                              {t("videoNoVoicesFound")}
+                            </div>
+                          ) : (
+                            filteredVoices.map((v) => {
+                              const isSelected = voiceId === v.id;
+                              return (
+                                <button
+                                  key={v.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setVoiceId(v.id);
+                                    setOpenDropdown(null);
+                                  }}
+                                  className={cn(
+                                    "w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs text-left cursor-pointer transition-colors",
+                                    isSelected
+                                      ? "bg-[#2b2b2b] text-white font-medium"
+                                      : "hover:bg-[#282828] text-[#cccccc] hover:text-white"
+                                  )}
+                                >
+                                  <div className="flex flex-col min-w-0 pr-2">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="font-semibold text-white truncate">{v.name}</span>
+                                      {v.gender && (
+                                        <span className="text-[9px] px-1.5 py-0.2 rounded bg-[#333333] text-[#aaaaaa]">
+                                          {v.gender}
+                                        </span>
+                                      )}
+                                    </div>
+                                    {v.description && (
+                                      <span className="text-[10px] text-[#777777] truncate mt-0.5">
+                                        {v.description}
+                                      </span>
+                                    )}
+                                  </div>
+                                  {isSelected && <Check className="h-3.5 w-3.5 text-white shrink-0" />}
+                                </button>
+                              );
+                            })
+                          )}
+                        </ScrollArea>
+                      </div>
+                    )}
                   </div>
 
-                  {/* Audio Language */}
-                  <div className="space-y-1">
+                  {/* Select Language Custom Dropdown with Search & ScrollArea */}
+                  <div className="space-y-1 relative" data-studio-dropdown>
                     <label className="text-[10.5px] font-medium text-[#888888]">
                       {t("videoLanguage")}
                     </label>
-                    <select
-                      disabled={!hasInworldKey}
-                      value={audioLanguage}
-                      onChange={(e) => setAudioLanguage(e.target.value)}
-                      className="w-full h-8 px-2 rounded-lg bg-[#2b2b2b] border border-[#383838] text-xs text-white disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus:border-[#555555]"
+                    <button
+                      type="button"
+                      disabled={!hasInworldKey || !isModelSelected}
+                      onClick={() => {
+                        setLanguageSearch("");
+                        setOpenDropdown(openDropdown === "language" ? null : "language");
+                      }}
+                      className={cn(
+                        "w-full h-8 px-2.5 rounded-lg border flex items-center justify-between text-xs cursor-pointer transition-colors text-left",
+                        !isModelSelected
+                          ? "bg-[#222222] border-[#2b2b2b] text-[#666666] opacity-50 cursor-not-allowed"
+                          : "bg-[#2b2b2b] border-[#383838] hover:border-[#444444] text-white"
+                      )}
                     >
-                      {LANGUAGE_OPTIONS.map((lang) => (
-                        <option key={lang.id} value={lang.id}>
-                          {lang.label}
-                        </option>
-                      ))}
-                    </select>
+                      <span className="truncate">
+                        {!isModelSelected ? t("videoSelectModelFirst") : selectedLangDisplay}
+                      </span>
+                      <ChevronDown
+                        className={cn(
+                          "h-3 w-3 text-[#888888] shrink-0 transition-transform duration-150",
+                          openDropdown === "language" ? "rotate-180 text-white" : ""
+                        )}
+                      />
+                    </button>
+
+                    {openDropdown === "language" && isModelSelected && hasInworldKey && (
+                      <div className="absolute top-full mt-1.5 right-0 min-w-full sm:min-w-[240px] w-max max-w-[320px] z-30 bg-[#222222] border border-[#2b2b2b] rounded-xl p-2 shadow-2xl animate-in fade-in-0 zoom-in-95 duration-100">
+                        {/* Search Input */}
+                        <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-[#181818] border border-[#333333] mb-1.5">
+                          <Search className="h-3.5 w-3.5 text-[#888888] shrink-0" />
+                          <input
+                            type="text"
+                            value={languageSearch}
+                            onChange={(e) => setLanguageSearch(e.target.value)}
+                            placeholder={t("videoSearchLanguagePlaceholder")}
+                            className="w-full bg-transparent text-xs text-white placeholder:text-[#666666] focus:outline-none font-sans"
+                            autoFocus
+                          />
+                          {languageSearch && (
+                            <button
+                              type="button"
+                              onClick={() => setLanguageSearch("")}
+                              className="text-[#888888] hover:text-white cursor-pointer"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          )}
+                        </div>
+
+                        {/* ScrollArea with max-height */}
+                        <ScrollArea className="max-h-56 w-full" viewportClassName="space-y-1 pr-1">
+                          {filteredLanguages.length === 0 ? (
+                            <div className="py-4 text-center text-xs text-[#888888]">
+                              {t("videoNoLanguagesFound")}
+                            </div>
+                          ) : (
+                            filteredLanguages.map((lang) => {
+                              const isSelected = audioLanguage === lang.id;
+                              return (
+                                <button
+                                  key={lang.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setAudioLanguage(lang.id);
+                                    setOpenDropdown(null);
+                                  }}
+                                  className={cn(
+                                    "w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs text-left cursor-pointer transition-colors",
+                                    isSelected
+                                      ? "bg-[#2b2b2b] text-white font-medium"
+                                      : "hover:bg-[#282828] text-[#cccccc] hover:text-white"
+                                  )}
+                                >
+                                  <span className="truncate pr-2">{lang.label}</span>
+                                  {isSelected && <Check className="h-3.5 w-3.5 text-white shrink-0" />}
+                                </button>
+                              );
+                            })
+                          )}
+                        </ScrollArea>
+                      </div>
+                    )}
                   </div>
+                </div>
+
+                {/* Row 2 (Conditional): Delivery & Talking Speed Custom Dropdowns */}
+                {isModelSelected && (
+                  <div
+                    className={cn(
+                      "grid gap-2.5 pt-1",
+                      isInworldModel && isTts2Model ? "grid-cols-1 sm:grid-cols-2" : "grid-cols-1"
+                    )}
+                  >
+                    {/* Delivery Mode (Only for Inworld TTS-2 and TTS-2 Flash) */}
+                    {isInworldModel && isTts2Model && (
+                      <div className="space-y-1 relative" data-studio-dropdown>
+                        <label className="text-[10.5px] font-medium text-[#888888]">
+                          {t("videoDeliveryMode")}
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => setOpenDropdown(openDropdown === "delivery" ? null : "delivery")}
+                          className="w-full h-8 px-2.5 rounded-lg bg-[#2b2b2b] border border-[#383838] hover:border-[#444444] flex items-center justify-between text-xs text-white cursor-pointer transition-colors text-left"
+                        >
+                          <span className="truncate">{deliveryDisplay}</span>
+                          <ChevronDown
+                            className={cn(
+                              "h-3 w-3 text-[#888888] shrink-0 transition-transform duration-150",
+                              openDropdown === "delivery" ? "rotate-180 text-white" : ""
+                            )}
+                          />
+                        </button>
+
+                        {openDropdown === "delivery" && (
+                          <div className="absolute top-full mt-1.5 left-0 min-w-full sm:min-w-[200px] w-max max-w-[260px] z-30 bg-[#222222] border border-[#2b2b2b] rounded-xl p-1.5 shadow-2xl animate-in fade-in-0 zoom-in-95 duration-100">
+                            {(
+                              [
+                                { id: "BALANCED", label: t("videoDeliveryBalanced") },
+                                { id: "STABLE", label: t("videoDeliveryStable") },
+                                { id: "CREATIVE", label: t("videoDeliveryCreative") },
+                              ] as const
+                            ).map((opt) => {
+                              const isSelected = deliveryMode === opt.id;
+                              return (
+                                <button
+                                  key={opt.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setDeliveryMode(opt.id);
+                                    setOpenDropdown(null);
+                                  }}
+                                  className={cn(
+                                    "w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs cursor-pointer transition-colors text-left",
+                                    isSelected
+                                      ? "bg-[#2b2b2b] text-white font-medium"
+                                      : "hover:bg-[#282828] text-[#cccccc] hover:text-white"
+                                  )}
+                                >
+                                  <span className="whitespace-nowrap pr-2">{opt.label}</span>
+                                  {isSelected && <Check className="h-3.5 w-3.5 text-white shrink-0 ml-2" />}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Talking Speed */}
+                    <div className="space-y-1 relative" data-studio-dropdown>
+                      <label className="text-[10.5px] font-medium text-[#888888]">
+                        {t("videoTalkingSpeed")}
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => setOpenDropdown(openDropdown === "speed" ? null : "speed")}
+                        className="w-full h-8 px-2.5 rounded-lg bg-[#2b2b2b] border border-[#383838] hover:border-[#444444] flex items-center justify-between text-xs text-white cursor-pointer transition-colors text-left"
+                      >
+                        <span className="truncate">{speedDisplay}</span>
+                        <ChevronDown
+                          className={cn(
+                            "h-3 w-3 text-[#888888] shrink-0 transition-transform duration-150",
+                            openDropdown === "speed" ? "rotate-180 text-white" : ""
+                          )}
+                        />
+                      </button>
+
+                      {openDropdown === "speed" && (
+                        <div className="absolute top-full mt-1.5 right-0 min-w-full sm:min-w-[180px] w-max max-w-[240px] z-30 bg-[#222222] border border-[#2b2b2b] rounded-xl p-1.5 shadow-2xl animate-in fade-in-0 zoom-in-95 duration-100">
+                          {(
+                            [
+                              { val: 0.75, label: t("videoSpeedSlow") },
+                              { val: 1.0, label: t("videoSpeedNormal") },
+                              { val: 1.25, label: t("videoSpeedFast") },
+                              { val: 1.5, label: t("videoSpeedVeryFast") },
+                            ] as const
+                          ).map((opt) => {
+                            const isSelected = speed === opt.val;
+                            return (
+                              <button
+                                key={opt.val}
+                                type="button"
+                                onClick={() => {
+                                  setSpeed(opt.val);
+                                  setOpenDropdown(null);
+                                }}
+                                className={cn(
+                                  "w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs cursor-pointer transition-colors text-left",
+                                  isSelected
+                                    ? "bg-[#2b2b2b] text-white font-medium"
+                                    : "hover:bg-[#282828] text-[#cccccc] hover:text-white"
+                                )}
+                              >
+                                <span className="whitespace-nowrap pr-2">{opt.label}</span>
+                                {isSelected && <Check className="h-3.5 w-3.5 text-white shrink-0 ml-2" />}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* 3. Instruction (Opsional) + 4 Saran Preset */}
+              <div className="space-y-1.5">
+                <label className="text-[11.5px] font-medium text-[#999999]">
+                  {t("videoInstructionLabel")}
+                </label>
+                <textarea
+                  value={customInstructions}
+                  onChange={(e) => setCustomInstructions(e.target.value)}
+                  placeholder={t("videoInstructionPlaceholder")}
+                  rows={2}
+                  className="w-full px-3 py-2 rounded-xl bg-[#222222] border border-[#2b2b2b] hover:border-[#383838] focus:border-[#444444] focus:outline-none text-xs text-white placeholder:text-[#666666] resize-none transition-colors font-sans"
+                />
+
+                {/* 4 Saran Quick Preset Chips */}
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {suggestionChips.map((chip, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => handleApplySuggestion(chip)}
+                      className="px-2.5 py-1 rounded-lg bg-[#222222] hover:bg-[#2b2b2b] border border-[#2e2e2e] hover:border-[#383838] text-[11px] text-[#a0a0a0] hover:text-white transition-all cursor-pointer active:scale-98"
+                    >
+                      {chip}
+                    </button>
+                  ))}
                 </div>
               </div>
             </div>
           </ScrollArea>
 
           {/* Footer Actions - No divider line */}
-          <div className="flex items-center justify-end gap-2 px-5 py-4 bg-[#161616]">
+          <div className="flex items-center justify-end gap-2 px-5 py-3.5 bg-[#161616]">
             <button
               type="button"
               onClick={() => onOpenChange(false)}
@@ -459,7 +926,7 @@ export function CreateVideoSummaryDialog({
             <button
               type="submit"
               disabled={!hasInworldKey || sources.length === 0}
-              className="px-4 py-2 rounded-xl bg-white hover:bg-neutral-200 disabled:opacity-40 disabled:hover:bg-white disabled:cursor-not-allowed text-xs font-semibold text-black flex items-center gap-1.5 transition-all cursor-pointer shadow-sm"
+              className="px-4 py-2 rounded-xl bg-white hover:bg-neutral-200 disabled:opacity-40 disabled:hover:bg-white disabled:cursor-not-allowed text-xs font-semibold text-black flex items-center gap-1.5 transition-all cursor-pointer shadow-sm active:scale-98"
             >
               <span>{t("videoGenerateBtn")}</span>
             </button>
