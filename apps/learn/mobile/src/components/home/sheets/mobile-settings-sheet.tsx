@@ -25,12 +25,14 @@ import {
   Avatar,
   AvatarImage,
   AvatarFallback,
+  ScrollArea,
   toast,
 } from "@const/ui";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "../../../lib/db";
 import { useI18n, LANGUAGE_OPTIONS } from "../../../lib/i18n";
 import type { UserProfile } from "../../navbar";
+import { InteractiveBottomSheet } from "./interactive-bottom-sheet";
 
 export type SettingsTab = "general" | "appearance" | "models" | "usage";
 
@@ -221,31 +223,13 @@ export function MobileSettingsSheet({
   }, []);
 
   return (
-    <>
-      {/* Backdrop */}
-      <div
-        className={cn(
-          "fixed inset-0 z-50 bg-black/60 backdrop-blur-xs transition-opacity duration-200",
-          open ? "opacity-100 visible pointer-events-auto" : "opacity-0 invisible pointer-events-none"
-        )}
-        onClick={onClose}
-        aria-hidden="true"
-      />
-
-      {/* Bottom Sheet */}
-      <div
-        className={cn(
-          "fixed inset-x-0 bottom-0 z-50 max-h-[92vh] h-[92vh] bg-card text-card-foreground border-t border-border rounded-t-[28px] flex flex-col will-change-transform font-sans overflow-hidden select-none transition-transform duration-300 ease-out safe-area-bottom shadow-2xl",
-          open ? "translate-y-0" : "translate-y-full pointer-events-none"
-        )}
-        role="dialog"
-        aria-modal="true"
-        aria-label={t("settings") || "Settings"}
-      >
-        {/* Drag handle */}
-        <div className="w-12 h-1 rounded-full bg-muted-foreground/30 mx-auto mt-2.5 mb-1 shrink-0" />
-
-        {/* Top Header */}
+    <InteractiveBottomSheet
+      open={open}
+      onClose={onClose}
+      defaultHeightVh={85}
+      ariaLabel={t("settings") || "Settings"}
+    >
+      {/* Top Header */}
         <div className="px-4 sm:px-5 py-2.5 border-b border-border/80 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="h-8 w-8 rounded-xl bg-secondary border border-border flex items-center justify-center">
@@ -354,7 +338,7 @@ export function MobileSettingsSheet({
         </div>
 
         {/* Scrollable Content: Matching user-preferred rich card design */}
-        <div className="flex-1 overflow-y-auto px-4 py-3 space-y-4 text-xs">
+        <ScrollArea className="flex-1 min-h-0 w-full" viewportClassName="px-4 py-3 space-y-4 text-xs">
           {/* 1. GENERAL (UMUM) */}
           {activeTab === "general" && (
             <div className="space-y-3.5">
@@ -727,7 +711,7 @@ export function MobileSettingsSheet({
               </div>
             </div>
           )}
-        </div>
+        </ScrollArea>
 
         {/* Footer */}
         <div className="p-3.5 border-t border-border bg-secondary/30 flex items-center justify-between text-[11px] text-muted-foreground shrink-0">
@@ -740,7 +724,6 @@ export function MobileSettingsSheet({
             {isIndo ? "Selesai" : "Done"}
           </button>
         </div>
-      </div>
-    </>
+    </InteractiveBottomSheet>
   );
 }

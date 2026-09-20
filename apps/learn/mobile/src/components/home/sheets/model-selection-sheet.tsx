@@ -28,10 +28,12 @@ import {
   SelectValue,
   SelectContent,
   SelectItem,
+  ScrollArea,
   toast,
   cn,
 } from "@const/ui";
 import { useI18n } from "../../../lib/i18n";
+import { InteractiveBottomSheet } from "./interactive-bottom-sheet";
 import {
   type AiModel,
   type AiProvider,
@@ -837,31 +839,13 @@ export function ModelSelectionSheet({
   };
 
   return (
-    <>
-      {/* Backdrop */}
-      <div
-        className={cn(
-          "fixed inset-0 z-50 bg-black/60 backdrop-blur-xs transition-opacity duration-200",
-          open ? "opacity-100 visible pointer-events-auto" : "opacity-0 invisible pointer-events-none"
-        )}
-        onClick={onClose}
-        aria-hidden="true"
-      />
-
-      {/* Bottom Sheet */}
-      <div
-        className={cn(
-          "fixed inset-x-0 bottom-0 z-50 max-h-[90vh] bg-card text-card-foreground border-t border-border rounded-t-[24px] flex flex-col will-change-transform font-sans overflow-hidden select-none transition-transform duration-300 ease-out safe-area-bottom shadow-2xl",
-          open ? "translate-y-0" : "translate-y-full pointer-events-none"
-        )}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Models and Voice Settings"
-      >
-        {/* Drag handle */}
-        <div className="w-10 h-1 rounded-full bg-muted-foreground/30 mx-auto mt-2.5 mb-1 shrink-0" />
-
-        {/* Header */}
+    <InteractiveBottomSheet
+      open={open}
+      onClose={onClose}
+      defaultHeightVh={85}
+      ariaLabel="Models and Voice Settings"
+    >
+      {/* Header */}
         <div className="px-5 py-3 border-b border-border flex items-center justify-between shrink-0">
           <div>
             <h2 className="text-base font-semibold text-foreground tracking-tight">
@@ -994,7 +978,7 @@ export function ModelSelectionSheet({
         </div>
 
         {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        <ScrollArea className="flex-1 min-h-0 w-full" viewportClassName="p-4 space-y-3">
           {/* ================================================================= */}
           {/* TAB 1: LLM                                                        */}
           {/* ================================================================= */}
@@ -2222,7 +2206,7 @@ export function ModelSelectionSheet({
               )}
             </div>
           )}
-        </div>
+        </ScrollArea>
 
         {/* Footer */}
         <div className="p-3.5 border-t border-border bg-secondary/20 flex items-center justify-between text-[11px] text-muted-foreground shrink-0">
@@ -2235,7 +2219,6 @@ export function ModelSelectionSheet({
             {isIndo ? "Selesai" : "Done"}
           </button>
         </div>
-      </div>
-    </>
+    </InteractiveBottomSheet>
   );
 }
