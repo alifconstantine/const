@@ -58,6 +58,7 @@ import {
 import {
   type ImageModel,
   type ImageProvider,
+  type ImageProtocol,
   type ImageConfigState,
   getStoredImageConfig,
   saveStoredImageConfig,
@@ -645,7 +646,7 @@ export function ModelSelectionSheet({
       name: "",
       baseUrl: "",
       apiKey: "",
-      protocol: "openai-image",
+      protocol: "openrouter",
       models: [],
     };
     const updated = [...imageConfig.providers, newProvider];
@@ -736,7 +737,7 @@ export function ModelSelectionSheet({
       return;
     }
     setIsTestingImageConnection(true);
-    const res = await testImageProviderConnection(target.baseUrl, target.apiKey);
+    const res = await testImageProviderConnection(target.baseUrl, target.apiKey, target.protocol);
     setIsTestingImageConnection(false);
 
     if (res.success) {
@@ -1928,21 +1929,74 @@ export function ModelSelectionSheet({
 
                           {/* 2. Base URL */}
                           <div className="space-y-1">
-                            <label className="text-[11px] font-medium text-foreground block">
-                              Base URL
-                            </label>
+                            <div className="flex items-center justify-between">
+                              <label className="text-[11px] font-medium text-foreground block">
+                                Base URL
+                              </label>
+                              <span className="text-[10px] text-muted-foreground font-mono">
+                                {editImageFormData.protocol === "openrouter"
+                                  ? "/images"
+                                  : editImageFormData.protocol === "openai-generations"
+                                  ? "/images/generations"
+                                  : "direct"}
+                              </span>
+                            </div>
                             <input
                               type="text"
                               value={editImageFormData.baseUrl}
                               onChange={(e) =>
                                 setEditImageFormData({ ...editImageFormData, baseUrl: e.target.value })
                               }
-                              placeholder="https://api.openai.com/v1"
+                              placeholder={
+                                editImageFormData.protocol === "openrouter"
+                                  ? "https://openrouter.ai/api/v1"
+                                  : "https://api.openai.com/v1"
+                              }
                               className="w-full px-3 py-1.5 rounded-xl bg-secondary/30 border border-border text-xs font-mono text-foreground outline-none focus:ring-1 focus:ring-foreground/20"
                             />
                           </div>
 
-                          {/* 3. API Key */}
+                          {/* 3. API Protocol */}
+                          <div className="space-y-1">
+                            <div className="flex items-center justify-between">
+                              <label className="text-[11px] font-medium text-foreground block">
+                                {isIndo ? "Protokol API" : "API Protocol"}
+                              </label>
+                              <span className="text-[10px] text-muted-foreground font-mono">
+                                {editImageFormData.protocol === "openrouter"
+                                  ? "POST /images"
+                                  : editImageFormData.protocol === "openai-generations"
+                                  ? "POST /images/generations"
+                                  : "direct POST"}
+                              </span>
+                            </div>
+                            <Select
+                              value={editImageFormData.protocol || "openrouter"}
+                              onValueChange={(val) =>
+                                setEditImageFormData({
+                                  ...editImageFormData,
+                                  protocol: val as ImageProtocol,
+                                })
+                              }
+                            >
+                              <SelectTrigger className="w-full h-9 rounded-xl bg-secondary/30 border border-border text-xs text-foreground focus:ring-1 focus:ring-foreground/20">
+                                <SelectValue placeholder={isIndo ? "Pilih protokol" : "Select protocol"} />
+                              </SelectTrigger>
+                              <SelectContent className="bg-card border-border text-foreground rounded-xl shadow-xl">
+                                <SelectItem value="openrouter" className="text-xs cursor-pointer">
+                                  OpenRouter Images (/images)
+                                </SelectItem>
+                                <SelectItem value="openai-generations" className="text-xs cursor-pointer">
+                                  OpenAI Generations (/images/generations)
+                                </SelectItem>
+                                <SelectItem value="custom" className="text-xs cursor-pointer">
+                                  Custom Direct Endpoint
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          {/* 4. API Key */}
                           <div className="space-y-1">
                             <label className="text-[11px] font-medium text-foreground block">
                               API Key
@@ -1971,14 +2025,16 @@ export function ModelSelectionSheet({
                             </div>
                           </div>
 
-                          {/* 4. Models Catalog */}
+                          {/* 5. Models Catalog */}
                           <div className="space-y-2 pt-2 border-t border-border/40">
                             <div>
                               <label className="text-[11px] font-medium text-foreground block">
                                 {isIndo ? "Model Gambar" : "Image Models"}
                               </label>
                               <span className="text-[10px] text-muted-foreground">
-                                {isIndo ? "Tambahkan Model ID secara manual." : "Add Model IDs manually."}
+                                {isIndo
+                                  ? "Tambahkan Model ID manual dan lakukan pengujian."
+                                  : "Add Model IDs manually and test connectivity."}
                               </span>
                             </div>
 

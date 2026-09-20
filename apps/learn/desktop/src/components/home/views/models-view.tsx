@@ -58,6 +58,7 @@ import {
 import {
   type ImageModel,
   type ImageProvider,
+  type ImageProtocol,
   type ImageConfigState,
   getStoredImageConfig,
   saveStoredImageConfig,
@@ -641,7 +642,7 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
       name: "",
       baseUrl: "",
       apiKey: "",
-      protocol: "openai-image",
+      protocol: "openrouter",
       models: [],
     };
     const updated = [...imageConfig.providers, newProvider];
@@ -732,7 +733,7 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
       return;
     }
     setIsTestingImageConnection(true);
-    const res = await testImageProviderConnection(target.baseUrl, target.apiKey);
+    const res = await testImageProviderConnection(target.baseUrl, target.apiKey, target.protocol);
     setIsTestingImageConnection(false);
 
     if (res.success) {
@@ -1948,8 +1949,8 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
                         </h3>
                         <p className="text-[11px] text-muted-foreground mt-0.5">
                           {isIndo
-                            ? "Masukkan endpoint kompatibel OpenAI /v1/images/generations dan API Key penyedia Anda."
-                            : "Provide an OpenAI-compatible /v1/images/generations endpoint and your provider API key."}
+                            ? "Masukkan endpoint gambar (OpenRouter /images, OpenAI /images/generations, atau custom) dan API Key Anda."
+                            : "Provide your image generation endpoint (OpenRouter /images, OpenAI /images/generations, or custom) and API key."}
                         </p>
                       </div>
 
@@ -1976,7 +1977,11 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
                             Base URL
                           </label>
                           <span className="text-[10.5px] text-muted-foreground font-mono">
-                            /images/generations
+                            {editImageFormData.protocol === "openrouter"
+                              ? "/images"
+                              : editImageFormData.protocol === "openai-generations"
+                              ? "/images/generations"
+                              : "direct"}
                           </span>
                         </div>
                         <input
@@ -1985,12 +1990,56 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
                           onChange={(e) =>
                             setEditImageFormData({ ...editImageFormData, baseUrl: e.target.value })
                           }
-                          placeholder="https://api.openai.com/v1 or https://openrouter.ai/api/v1"
+                          placeholder={
+                            editImageFormData.protocol === "openrouter"
+                              ? "https://openrouter.ai/api/v1"
+                              : "https://api.openai.com/v1"
+                          }
                           className="w-full px-3.5 py-2 rounded-xl bg-secondary/30 border border-border text-xs text-foreground font-mono outline-none ring-0 focus:outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/40 transition-colors"
                         />
                       </div>
 
-                      {/* 3. API Key with Visibility Toggle */}
+                      {/* 3. API Protocol */}
+                      <div className="space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <label className="text-xs font-medium text-foreground block">
+                            {isIndo ? "Protokol API" : "API protocol"}
+                          </label>
+                          <span className="text-[10.5px] text-muted-foreground font-mono">
+                            {editImageFormData.protocol === "openrouter"
+                              ? "POST /images"
+                              : editImageFormData.protocol === "openai-generations"
+                              ? "POST /images/generations"
+                              : "direct POST"}
+                          </span>
+                        </div>
+                        <Select
+                          value={editImageFormData.protocol || "openrouter"}
+                          onValueChange={(val) =>
+                            setEditImageFormData({
+                              ...editImageFormData,
+                              protocol: val as ImageProtocol,
+                            })
+                          }
+                        >
+                          <SelectTrigger className="w-full h-10 rounded-xl bg-secondary/30 border border-border text-xs text-foreground focus:ring-1 focus:ring-foreground/20">
+                            <SelectValue placeholder={isIndo ? "Pilih protokol API" : "Select API protocol"} />
+                          </SelectTrigger>
+                          <SelectContent className="bg-card border-border text-foreground rounded-xl shadow-xl">
+                            <SelectItem value="openrouter" className="text-xs cursor-pointer">
+                              OpenRouter Images (/images)
+                            </SelectItem>
+                            <SelectItem value="openai-generations" className="text-xs cursor-pointer">
+                              OpenAI Image Generations (/images/generations)
+                            </SelectItem>
+                            <SelectItem value="custom" className="text-xs cursor-pointer">
+                              Custom Direct Endpoint
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* 4. API Key with Visibility Toggle */}
                       <div className="space-y-1.5">
                         <label className="text-xs font-medium text-foreground block">
                           API Key
@@ -2020,7 +2069,7 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
                         </div>
                       </div>
 
-                      {/* 4. Models Section */}
+                      {/* 5. Models Section */}
                       <div className="space-y-2.5 pt-2 border-t border-border/40">
                         <div className="pb-1">
                           <label className="text-xs font-medium text-foreground block">

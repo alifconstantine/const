@@ -9,7 +9,7 @@ export interface ImageModel {
   description?: string;
 }
 
-export type ImageProtocol = "openrouter" | "openai-generations" | "openai-image" | "custom";
+export type ImageProtocol = "openrouter" | "openai-generations" | "custom";
 
 export interface ImageProvider {
   id: string;

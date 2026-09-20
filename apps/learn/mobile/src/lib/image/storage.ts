@@ -1,8 +1,16 @@
-import type { ImageConfigState, ImageProvider } from "./types";
+import type { ImageConfigState, ImageProvider, ImageProtocol } from "./types";
 
 const STORAGE_KEY_IMAGE_PROVIDERS = "const_learn_image_providers";
 const STORAGE_KEY_ACTIVE_IMAGE_PROVIDER = "const_learn_active_image_provider";
 const STORAGE_KEY_ACTIVE_IMAGE_MODEL = "const_learn_active_image_model";
+
+function normalizeProtocol(p?: string, baseUrl?: string): ImageProtocol {
+  if (p === "openrouter") return "openrouter";
+  if (p === "custom") return "custom";
+  if (p === "openai-generations") return "openai-generations";
+  if (baseUrl && baseUrl.includes("openrouter.ai")) return "openrouter";
+  return "openai-generations";
+}
 
 export function getStoredImageConfig(): ImageConfigState {
   if (typeof localStorage === "undefined") {
@@ -19,7 +27,11 @@ export function getStoredImageConfig(): ImageConfigState {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {
-        providers = parsed;
+        providers = parsed.map((p: any) => ({
+          ...p,
+          protocol: normalizeProtocol(p.protocol, p.baseUrl),
+          models: Array.isArray(p.models) ? p.models : [],
+        }));
       }
     }
   } catch {}
