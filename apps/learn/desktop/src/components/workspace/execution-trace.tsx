@@ -1151,27 +1151,33 @@ function PythonRunnerTraceItem({ tool }: { tool: TraceStep | DisplayToolCall }) 
           {code && (
             <div>
               <div className="text-muted-foreground text-[10px] mb-1">Python script:</div>
-              <pre className="p-2 rounded-lg bg-card border border-border overflow-x-auto text-amber-500 max-h-40 overflow-y-auto whitespace-pre">
-                {code}
-              </pre>
+              <ScrollArea className="max-h-40 w-full rounded-lg bg-card border border-border">
+                <pre className="p-2 text-amber-500 whitespace-pre text-[11px] font-mono">
+                  {code}
+                </pre>
+              </ScrollArea>
             </div>
           )}
 
           {stdout && (
             <div>
               <div className="text-muted-foreground text-[10px] mb-1">stdout:</div>
-              <pre className="p-2 rounded-lg bg-card border border-border overflow-x-auto text-emerald-500 max-h-40 overflow-y-auto whitespace-pre-wrap">
-                {stdout}
-              </pre>
+              <ScrollArea className="max-h-40 w-full rounded-lg bg-card border border-border">
+                <pre className="p-2 text-emerald-500 whitespace-pre-wrap text-[11px] font-mono">
+                  {stdout}
+                </pre>
+              </ScrollArea>
             </div>
           )}
 
           {stderr && (
             <div>
               <div className="text-destructive text-[10px] mb-1">stderr:</div>
-              <pre className="p-2 rounded-lg bg-destructive/10 border border-destructive/30 overflow-x-auto text-destructive max-h-40 overflow-y-auto whitespace-pre-wrap">
-                {stderr}
-              </pre>
+              <ScrollArea className="max-h-40 w-full rounded-lg bg-destructive/10 border border-destructive/30">
+                <pre className="p-2 text-destructive whitespace-pre-wrap text-[11px] font-mono">
+                  {stderr}
+                </pre>
+              </ScrollArea>
             </div>
           )}
         </div>
@@ -1493,26 +1499,28 @@ function ConnectorToolTraceItem({
             {thumbnails.length > 0 && (
               <div className="space-y-1 pt-1">
                 <div className="text-[10.5px] text-muted-foreground font-medium">{t("slidePreview")}:</div>
-                <div className="flex items-center gap-2 overflow-x-auto pb-1.5 pt-0.5">
-                  {thumbnails.map((thumb, tIdx) => (
-                    <div
-                      key={tIdx}
-                      className="relative shrink-0 rounded-md overflow-hidden border border-border/60 hover:border-primary transition-all shadow-xs group cursor-pointer"
-                      onClick={() => resultUrl && handleOpenExternal(resultUrl)}
-                      title={t("openSlideInCanva", { index: tIdx + 1 })}
-                    >
-                      <img
-                        src={thumb.url}
-                        alt={`Slide ${tIdx + 1}`}
-                        className="h-16 w-auto object-cover group-hover:scale-105 transition-transform duration-200"
-                        loading="lazy"
-                      />
-                      <span className="absolute bottom-0.5 right-0.5 bg-black/70 text-white text-[9px] px-1 rounded font-mono">
-                        {tIdx + 1}
-                      </span>
-                    </div>
-                  ))}
-                </div>
+                <ScrollArea orientation="horizontal" className="w-full pb-1 pt-0.5" scrollBarClassName="h-1.5">
+                  <div className="flex items-center gap-2 pr-2">
+                    {thumbnails.map((thumb, tIdx) => (
+                      <div
+                        key={tIdx}
+                        className="relative shrink-0 rounded-md overflow-hidden border border-border/60 hover:border-primary transition-all shadow-xs group cursor-pointer"
+                        onClick={() => resultUrl && handleOpenExternal(resultUrl)}
+                        title={t("openSlideInCanva", { index: tIdx + 1 })}
+                      >
+                        <img
+                          src={thumb.url}
+                          alt={`Slide ${tIdx + 1}`}
+                          className="h-16 w-auto object-cover group-hover:scale-105 transition-transform duration-200"
+                          loading="lazy"
+                        />
+                        <span className="absolute bottom-0.5 right-0.5 bg-black/70 text-white text-[9px] px-1 rounded font-mono">
+                          {tIdx + 1}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
               </div>
             )}
 
@@ -1522,9 +1530,11 @@ function ConnectorToolTraceItem({
                 <div className="text-[10px] text-muted-foreground font-mono uppercase mb-1">
                   {t("inputParams")}
                 </div>
-                <pre className="p-2 rounded-lg bg-black/20 dark:bg-black/40 border border-border/30 text-[11px] font-mono text-foreground/80 overflow-x-auto whitespace-pre-wrap max-h-40">
-                  {typeof tool.args === "string" ? tool.args : JSON.stringify(tool.args, null, 2)}
-                </pre>
+                <ScrollArea className="max-h-48 w-full rounded-lg bg-black/20 dark:bg-black/40 border border-border/30">
+                  <pre className="p-2.5 text-[11px] font-mono text-foreground/80 whitespace-pre-wrap select-text leading-relaxed">
+                    {typeof tool.args === "string" ? tool.args : JSON.stringify(tool.args, null, 2)}
+                  </pre>
+                </ScrollArea>
               </div>
             )}
           </div>

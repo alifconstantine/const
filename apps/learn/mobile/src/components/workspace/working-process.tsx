@@ -459,28 +459,30 @@ function MobileToolCardItem({
             {thumbnails.length > 0 && (
               <div className="space-y-1 pt-0.5">
                 <div className="text-[10px] text-muted-foreground font-medium">{t("slidePreview")}:</div>
-                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 pt-0.5">
-                  {thumbnails.map((thumb, tIdx) => (
-                    <a
-                      key={tIdx}
-                      href={resultUrl || "#"}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="relative shrink-0 rounded overflow-hidden border border-border/60 hover:border-primary transition-all shadow-xs"
-                      title={t("openSlideInCanva", { index: tIdx + 1 })}
-                    >
-                      <img
-                        src={thumb.url}
-                        alt={`Slide ${tIdx + 1}`}
-                        className="h-14 w-auto object-cover"
-                        loading="lazy"
-                      />
-                      <span className="absolute bottom-0.5 right-0.5 bg-black/70 text-white text-[8px] px-1 rounded font-mono">
-                        {tIdx + 1}
-                      </span>
-                    </a>
-                  ))}
-                </div>
+                <ScrollArea orientation="horizontal" className="w-full pb-1 pt-0.5" scrollBarClassName="h-1">
+                  <div className="flex items-center gap-1.5 pr-2">
+                    {thumbnails.map((thumb, tIdx) => (
+                      <a
+                        key={tIdx}
+                        href={resultUrl || "#"}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="relative shrink-0 rounded overflow-hidden border border-border/60 hover:border-primary transition-all shadow-xs"
+                        title={t("openSlideInCanva", { index: tIdx + 1 })}
+                      >
+                        <img
+                          src={thumb.url}
+                          alt={`Slide ${tIdx + 1}`}
+                          className="h-14 w-auto object-cover"
+                          loading="lazy"
+                        />
+                        <span className="absolute bottom-0.5 right-0.5 bg-black/70 text-white text-[8px] px-1 rounded font-mono">
+                          {tIdx + 1}
+                        </span>
+                      </a>
+                    ))}
+                  </div>
+                </ScrollArea>
               </div>
             )}
 
@@ -490,33 +492,35 @@ function MobileToolCardItem({
                 <div className="text-[9.5px] font-semibold text-muted-foreground uppercase tracking-wider">
                   {t("inputParams")}
                 </div>
-                <div className="p-2 rounded-lg bg-black/40 border border-border/40 text-[11px] font-mono text-foreground/90 whitespace-pre-wrap overflow-x-auto leading-tight">
-                  {tc.args.code ? (
-                    <code>{tc.args.code}</code>
-                  ) : tc.args.prompt ? (
-                    <div>
-                      <span className="text-muted-foreground">prompt: </span>
-                      <span>"{tc.args.prompt}"</span>
-                    </div>
-                  ) : tc.args.title ? (
-                    <div>
-                      <span className="text-muted-foreground">{tc.args.action || "title"}: </span>
-                      <span>"{tc.args.title}"</span>
-                    </div>
-                  ) : tc.args.query ? (
-                    <div>
-                      <span className="text-muted-foreground">query: </span>
-                      <span>"{tc.args.query}"</span>
-                    </div>
-                  ) : tc.args.topic ? (
-                    <div>
-                      <span className="text-muted-foreground">topic: </span>
-                      <span>"{tc.args.topic}"</span>
-                    </div>
-                  ) : (
-                    <code>{JSON.stringify(tc.args, null, 2)}</code>
-                  )}
-                </div>
+                <ScrollArea className="max-h-48 w-full rounded-lg bg-black/40 border border-border/40">
+                  <div className="p-2 text-[11px] font-mono text-foreground/90 whitespace-pre-wrap leading-tight">
+                    {tc.args.code ? (
+                      <code>{tc.args.code}</code>
+                    ) : tc.args.prompt ? (
+                      <div>
+                        <span className="text-muted-foreground">prompt: </span>
+                        <span>"{tc.args.prompt}"</span>
+                      </div>
+                    ) : tc.args.title ? (
+                      <div>
+                        <span className="text-muted-foreground">{tc.args.action || "title"}: </span>
+                        <span>"{tc.args.title}"</span>
+                      </div>
+                    ) : tc.args.query ? (
+                      <div>
+                        <span className="text-muted-foreground">query: </span>
+                        <span>"{tc.args.query}"</span>
+                      </div>
+                    ) : tc.args.topic ? (
+                      <div>
+                        <span className="text-muted-foreground">topic: </span>
+                        <span>"{tc.args.topic}"</span>
+                      </div>
+                    ) : (
+                      <code>{JSON.stringify(tc.args, null, 2)}</code>
+                    )}
+                  </div>
+                </ScrollArea>
               </div>
             )}
           </div>
