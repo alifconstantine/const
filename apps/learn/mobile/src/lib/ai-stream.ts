@@ -487,24 +487,29 @@ export async function streamChatCompletion({
 
   const composioKey = getComposioApiKey();
   const mcpConfig = getStoredMcpConfig();
+  const hasComposio = Boolean(composioKey);
 
+  // A tool is ONLY exposed to the AI if the user has actively connected it.
+  // If not connected, the AI has no knowledge of the tool and simply responds naturally in text/markdown.
   const hasSandbox =
-    isConnectorActive("cloud-sandbox") ||
-    mcpConfig.servers.some(
-      (s) => s.id === "composio" && s.enabled !== false && s.status !== "disabled"
-    );
+    hasComposio &&
+    (isConnectorActive("cloud-sandbox") ||
+      mcpConfig.servers.some(
+        (s) => s.id === "composio" && s.enabled !== false && s.status !== "disabled"
+      ));
   const hasCanva =
-    isConnectorActive("canva_mcp") ||
-    mcpConfig.servers.some(
-      (s) => s.id === "canva" && s.enabled !== false && s.status !== "disabled"
-    );
-  const hasSheets = isConnectorActive("google-sheets");
-  const hasDocs = isConnectorActive("google-docs");
-  const hasSlides = isConnectorActive("google-slides");
-  const hasDrive = isConnectorActive("google-drive");
-  const hasTasks = isConnectorActive("google-tasks");
-  const hasClassroom = isConnectorActive("google-classroom");
-  const hasForms = isConnectorActive("google-forms");
+    hasComposio &&
+    (isConnectorActive("canva_mcp") ||
+      mcpConfig.servers.some(
+        (s) => s.id === "canva" && s.enabled !== false && s.status !== "disabled"
+      ));
+  const hasSheets = hasComposio && isConnectorActive("google-sheets");
+  const hasDocs = hasComposio && isConnectorActive("google-docs");
+  const hasSlides = hasComposio && isConnectorActive("google-slides");
+  const hasDrive = hasComposio && isConnectorActive("google-drive");
+  const hasTasks = hasComposio && isConnectorActive("google-tasks");
+  const hasClassroom = hasComposio && isConnectorActive("google-classroom");
+  const hasForms = hasComposio && isConnectorActive("google-forms");
   const hasYoutube = isConnectorActive("youtube");
 
   const activeTools: any[] = [];
@@ -569,8 +574,7 @@ export async function streamChatCompletion({
     effectiveSystemPrompt +=
       "\nWhen user instructions require any of these actions, automatically invoke the relevant tool call." +
       "\n\n[TOOL RESULT LINKING & FORMATTING RULE]:" +
-      "\nWhenever a tool execution succeeds or returns a resource URL (such as Google Slides presentationUrl, Canva editUrl/viewUrl, Google Docs documentUrl, Google Sheets spreadsheetUrl, Google Drive driveUrl, YouTube videoUrl, etc.), you MUST prominently include a direct, clickable markdown link in your conversational response text (e.g. '👉 [Buka Presentasi di Google Slides](presentationUrl)' or '👉 [Buka Desain di Canva](editUrl)'). Never omit the link from the response." +
-      "\nIf a tool returns status 'partial_success' because the user has not connected their account in Connectors, present the full structured content clearly in your answer and politely mention that the user can connect their account in the Connectors menu to automatically save it directly to Google Drive.";
+      "\nWhenever a tool execution succeeds or returns a resource URL (such as Google Slides presentationUrl, Canva editUrl/viewUrl, Google Docs documentUrl, Google Sheets spreadsheetUrl, Google Drive driveUrl, YouTube videoUrl, etc.), you MUST prominently include a direct, clickable markdown link in your conversational response text (e.g. '👉 [Buka Presentasi di Google Slides](presentationUrl)' or '👉 [Buka Desain di Canva](editUrl)'). Never omit the link from the response.";
   }
 
   const payload: any = {
@@ -1185,11 +1189,6 @@ export async function streamChatCompletion({
         followUpMessages.push({
           role: "user",
           content: `[System Instruction for Final Response]: Tool execution generated these resource links:\n${linkDirectives.map((l) => `- ${l}`).join("\n")}\nYou MUST include the exact clickable markdown link(s) prominently in your conversational response (e.g. '👉 ${linkDirectives[0]}') so the user can easily tap and open them.`,
-        });
-      } else if (hasUnconnectedTool) {
-        followUpMessages.push({
-          role: "user",
-          content: `[System Instruction for Final Response]: Layanan cloud (Google/Canva) belum terhubung di Connectors. Tolong sampaikan seluruh struktur materi/slide secara lengkap dan rapi dalam Markdown, serta tambahkan catatan singkat di akhir bahwa pengguna dapat menghubungkan akun di menu Connectors agar materi otomatis dibuat langsung di Google Drive.`,
         });
       }
 
