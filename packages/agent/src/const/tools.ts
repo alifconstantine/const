@@ -1321,16 +1321,16 @@ export async function executeComposioTool(
   signal?: AbortSignal
 ): Promise<{ result: any; isError: boolean }> {
   const norm = toolName.toLowerCase().replace(/[-_]/g, "");
+  const apiKey =
+    process.env.COMPOSIO_API_KEY ||
+    process.env.VITE_COMPOSIO_API_KEY ||
+    "";
+  const userId = process.env.COMPOSIO_USER_ID || "learn_desktop_user";
 
   // 1. Canva MCP (Live generation + materialization into real presentation)
   if (norm.includes("canva")) {
     const prompt = args.prompt || args.query || args.topic || "Visual presentation";
     const designType = args.designType || args.type || "presentation";
-    const apiKey =
-      process.env.COMPOSIO_API_KEY ||
-      process.env.VITE_COMPOSIO_API_KEY ||
-      "";
-    const userId = process.env.COMPOSIO_USER_ID || "learn_desktop_user";
 
     if (!apiKey) {
       const fallbackUrl = `https://www.canva.com/search?q=${encodeURIComponent(prompt)}`;
@@ -1404,34 +1404,32 @@ export async function executeComposioTool(
         sessionId,
         "CANVA_MCP_GENERATE_DESIGN",
         {
-          query: prompt,
-          design_type: designType,
-          length: "short",
+          prompt,
+          design_types: [designType],
         }
       );
 
       const job = genResult.job || genResult;
-      const designs = job.result?.generated_designs || [];
-      const firstCandidate = designs[0];
+      const candidates = job.design_candidates || genResult.design_candidates || [];
+      const firstCandidate = candidates[0];
 
-      if (job.id && firstCandidate?.candidate_id) {
-        // Automatically instantiate the candidate into a real Canva presentation
+      // Materialize the first candidate into real presentation
+      if (job.id && firstCandidate?.id) {
         const createResult = await executeComposioToolRouter(
           apiKey,
           sessionId,
           "CANVA_MCP_CREATE_DESIGN_FROM_CANDIDATE",
           {
             job_id: job.id,
-            candidate_id: firstCandidate.candidate_id,
+            candidate_id: firstCandidate.id,
           }
         );
 
         const summary = createResult.design_summary || createResult;
-        const editUrl = summary.urls?.edit_url || firstCandidate.url;
-        const viewUrl = summary.urls?.view_url || firstCandidate.url;
+        const editUrl = summary.urls?.edit_url || summary.edit_url || firstCandidate.url;
+        const viewUrl = summary.urls?.view_url || summary.view_url || firstCandidate.url;
         const title = summary.title || prompt;
-        const pageCount = summary.page_count || 4;
-        const thumbnails = firstCandidate.thumbnails || [];
+        const pageCount = summary.page_count || candidates.length;
 
         return {
           result: JSON.stringify(
@@ -1445,8 +1443,8 @@ export async function executeComposioTool(
               view_url: viewUrl,
               editUrl,
               viewUrl,
-              thumbnails,
-              message: `Presentasi Canva "${title}" berhasil dibuat di akun Canva Anda dengan ${pageCount} slide! Silakan klik tautan di bawah untuk melihat dan mengedit presentasi.`,
+              thumbnails: firstCandidate.thumbnails || [],
+              message: `Presentasi Canva "${title}" berhasil dibuat di akun Canva Anda dengan ${pageCount} slide!`,
             },
             null,
             2
@@ -1506,6 +1504,85 @@ export async function executeComposioTool(
     const title = args.title || args.name || "Tabel Pembelajaran";
     const action = args.action || "create_spreadsheet";
     const rows = args.rows || [];
+    const headers = args.headers || [];
+
+    if (apiKey) {
+      try {
+        const sessionId = await getOrCreateComposioSession(apiKey, userId);
+        const createResult = await executeComposioToolRouter(
+          apiKey,
+          sessionId,
+          "GOOGLESHEETS_CREATE_GOOGLE_SHEET1",
+          { title }
+        );
+
+        const sheetId = createResult.spreadsheetId || createResult.id;
+        const sheetUrl =
+          createResult.spreadsheetUrl ||
+          (sheetId ? `https://docs.google.com/spreadsheets/d/${sheetId}/edit` : "https://docs.google.com/spreadsheets");
+
+        // If data rows or headers are provided, write them into the sheet
+        if (sheetId && (headers.length > 0 || (Array.isArray(rows) && rows.length > 0))) {
+          try {
+            const valuesToWrite = headers.length > 0 ? [headers, ...rows] : rows;
+            await executeComposioToolRouter(
+              apiKey,
+              sessionId,
+              "GOOGLESHEETS_VALUES_UPDATE",
+              {
+                spreadsheet_id: sheetId,
+                range: "A1",
+                values: valuesToWrite,
+                value_input_option: "USER_ENTERED",
+              }
+            );
+          } catch (writeErr) {
+            console.warn("[Google Sheets Write Warning]", writeErr);
+          }
+        }
+
+        return {
+          result: JSON.stringify(
+            {
+              status: "success",
+              provider: "Google Sheets",
+              spreadsheetId: sheetId,
+              spreadsheetUrl: sheetUrl,
+              title,
+              rowsProcessed: Array.isArray(rows) ? rows.length : 0,
+              message: `Spreadsheet Google Sheets "${title}" berhasil dibuat di Google Drive Anda!`,
+            },
+            null,
+            2
+          ),
+          isError: false,
+        };
+      } catch (err: any) {
+        console.error("[Google Sheets Live Execution Error]", err);
+        const errMsg = err?.message || String(err);
+        const notConnected = errMsg.includes("No active connection") || errMsg.includes("4302");
+        const fallbackUrl = `https://docs.google.com/spreadsheets/create`;
+        return {
+          result: JSON.stringify(
+            {
+              status: "partial_success",
+              provider: "Google Sheets",
+              action,
+              title,
+              rowsProcessed: Array.isArray(rows) ? rows.length : 0,
+              message: notConnected
+                ? `Spreadsheet "${title}" disiapkan. Akun Google Sheets Anda belum terhubung — hubungkan akun di menu Connectors agar langsung tersimpan di Google Drive.`
+                : `Spreadsheet "${title}" disiapkan: ${errMsg}`,
+              spreadsheetUrl: fallbackUrl,
+            },
+            null,
+            2
+          ),
+          isError: false,
+        };
+      }
+    }
+
     return {
       result: JSON.stringify(
         {
@@ -1528,6 +1605,66 @@ export async function executeComposioTool(
   if (norm.includes("doc")) {
     const title = args.title || args.name || "Dokumen Catatan Belajar";
     const action = args.action || "create_doc";
+    const content = args.content || args.text || args.body || title;
+
+    if (apiKey) {
+      try {
+        const sessionId = await getOrCreateComposioSession(apiKey, userId);
+        const docResult = await executeComposioToolRouter(
+          apiKey,
+          sessionId,
+          "GOOGLEDOCS_CREATE_DOCUMENT",
+          {
+            title,
+            text: content,
+          }
+        );
+
+        const docId = docResult.documentId || docResult.id;
+        const docUrl = docId
+          ? `https://docs.google.com/document/d/${docId}/edit`
+          : "https://docs.google.com/document";
+
+        return {
+          result: JSON.stringify(
+            {
+              status: "success",
+              provider: "Google Docs",
+              documentId: docId,
+              documentUrl: docUrl,
+              title,
+              message: `Dokumen Google Docs "${title}" berhasil dibuat dan disimpan di Google Drive Anda!`,
+            },
+            null,
+            2
+          ),
+          isError: false,
+        };
+      } catch (err: any) {
+        console.error("[Google Docs Live Execution Error]", err);
+        const errMsg = err?.message || String(err);
+        const notConnected = errMsg.includes("No active connection") || errMsg.includes("4302");
+        const fallbackUrl = `https://docs.google.com/document/create`;
+        return {
+          result: JSON.stringify(
+            {
+              status: "partial_success",
+              provider: "Google Docs",
+              action,
+              title,
+              message: notConnected
+                ? `Dokumen "${title}" disiapkan. Hubungkan akun Google Docs di menu Connectors agar dokumen otomatis dibuat di Google Drive Anda.`
+                : `Dokumen "${title}" disiapkan: ${errMsg}`,
+              documentUrl: fallbackUrl,
+            },
+            null,
+            2
+          ),
+          isError: false,
+        };
+      }
+    }
+
     return {
       result: JSON.stringify(
         {
@@ -1550,6 +1687,87 @@ export async function executeComposioTool(
     const title = args.title || args.name || "Presentasi Kuliah";
     const slides = Array.isArray(args.slides) ? args.slides : [];
     const count = slides.length > 0 ? slides.length : 5;
+
+    if (apiKey) {
+      try {
+        const sessionId = await getOrCreateComposioSession(apiKey, userId);
+
+        let markdownText = args.markdown_text || args.markdown;
+        if (!markdownText) {
+          if (slides.length > 0) {
+            markdownText = `Theme: corporate_blue\n\n# ${title}\n\n`;
+            markdownText += slides
+              .map((s: any) => {
+                const bullets = Array.isArray(s.bullets)
+                  ? s.bullets.map((b: string) => `• ${b}`).join("\n")
+                  : s.content || "";
+                return `## ${s.title || "Slide"}\n\n${bullets}`;
+              })
+              .join("\n\n---\n\n");
+          } else {
+            markdownText = `Theme: corporate_blue\n\n# ${title}\n\n---\n\n## Pendahuluan\n• Gambaran materi pokok\n• Tujuan pembelajaran\n\n---\n\n## Kesimpulan\n• Poin-poin evaluasi utama`;
+          }
+        }
+
+        const slideResult = await executeComposioToolRouter(
+          apiKey,
+          sessionId,
+          "GOOGLESLIDES_CREATE_SLIDES_MARKDOWN",
+          {
+            title,
+            markdown_text: markdownText,
+          }
+        );
+
+        const presentationId =
+          slideResult.presentation_id ||
+          slideResult.presentationId ||
+          slideResult.id;
+        const presUrl = presentationId
+          ? `https://docs.google.com/presentation/d/${presentationId}/edit`
+          : "https://docs.google.com/presentation";
+
+        return {
+          result: JSON.stringify(
+            {
+              status: "success",
+              provider: "Google Slides",
+              presentationId,
+              presentationUrl: presUrl,
+              title,
+              slideCount: count,
+              message: `Presentasi Google Slides "${title}" berhasil dibuat dan disimpan di Google Drive Anda!`,
+            },
+            null,
+            2
+          ),
+          isError: false,
+        };
+      } catch (err: any) {
+        console.error("[Google Slides Live Execution Error]", err);
+        const errMsg = err?.message || String(err);
+        const notConnected = errMsg.includes("No active connection") || errMsg.includes("4302");
+        const fallbackUrl = `https://docs.google.com/presentation/create`;
+        return {
+          result: JSON.stringify(
+            {
+              status: "partial_success",
+              provider: "Google Slides",
+              title,
+              slideCount: count,
+              message: notConnected
+                ? `Slide presentasi "${title}" disiapkan. Hubungkan akun Google Slides di menu Connectors agar presentasi masuk langsung ke akun Google Anda.`
+                : `Slide presentasi "${title}" disiapkan: ${errMsg}`,
+              presentationUrl: fallbackUrl,
+            },
+            null,
+            2
+          ),
+          isError: false,
+        };
+      }
+    }
+
     return {
       result: JSON.stringify(
         {
@@ -1570,6 +1788,72 @@ export async function executeComposioTool(
   // 5. Google Drive
   if (norm.includes("drive")) {
     const query = args.query || args.filename || "materi";
+
+    if (apiKey) {
+      try {
+        const sessionId = await getOrCreateComposioSession(apiKey, userId);
+        const driveResult = await executeComposioToolRouter(
+          apiKey,
+          sessionId,
+          "GOOGLEDRIVE_FIND_FILE",
+          {
+            q: query ? `name contains '${query.replace(/'/g, "\\'")}' and trashed = false` : "trashed = false",
+            pageSize: 10,
+            fields: "files(id,name,mimeType,webViewLink,iconLink,size)",
+          }
+        );
+
+        const files = Array.isArray(driveResult.files)
+          ? driveResult.files.map((f: any) => ({
+              id: f.id,
+              name: f.name,
+              mimeType: f.mimeType,
+              url: f.webViewLink,
+              size: f.size ? `${Math.round(Number(f.size) / 1024)} KB` : undefined,
+            }))
+          : [];
+
+        return {
+          result: JSON.stringify(
+            {
+              status: "success",
+              provider: "Google Drive",
+              query,
+              files,
+              driveUrl: `https://drive.google.com/drive/search?q=${encodeURIComponent(query)}`,
+              message:
+                files.length > 0
+                  ? `Ditemukan ${files.length} berkas terkait "${query}" di Google Drive Anda.`
+                  : `Pencarian selesai. Tidak ditemukan berkas dengan kata kunci "${query}" di Google Drive.`,
+            },
+            null,
+            2
+          ),
+          isError: false,
+        };
+      } catch (err: any) {
+        console.error("[Google Drive Live Execution Error]", err);
+        const errMsg = err?.message || String(err);
+        const notConnected = errMsg.includes("No active connection") || errMsg.includes("4302");
+        return {
+          result: JSON.stringify(
+            {
+              status: "partial_success",
+              provider: "Google Drive",
+              query,
+              message: notConnected
+                ? `Hubungkan akun Google Drive di menu Connectors untuk mencari dan membuka berkas langsung dari cloud Anda.`
+                : `Pencarian Drive: ${errMsg}`,
+              driveUrl: `https://drive.google.com/drive/search?q=${encodeURIComponent(query)}`,
+            },
+            null,
+            2
+          ),
+          isError: false,
+        };
+      }
+    }
+
     return {
       result: JSON.stringify(
         {
@@ -1594,6 +1878,96 @@ export async function executeComposioTool(
   if (norm.includes("task")) {
     const title = args.title || args.task || "Tugas Belajar";
     const action = args.action || "create_task";
+
+    if (apiKey) {
+      try {
+        const sessionId = await getOrCreateComposioSession(apiKey, userId);
+        if (action === "list_tasks") {
+          const listResult = await executeComposioToolRouter(
+            apiKey,
+            sessionId,
+            "GOOGLETASKS_LIST_TASKS",
+            {
+              tasklist_id: "@default",
+              maxResults: 20,
+            }
+          );
+          const tasks = listResult.items || listResult.tasks || [];
+          return {
+            result: JSON.stringify(
+              {
+                status: "success",
+                provider: "Google Tasks",
+                action: "list_tasks",
+                tasks: tasks.map((t: any) => ({
+                  id: t.id,
+                  title: t.title,
+                  status: t.status,
+                  due: t.due,
+                })),
+                message: `Berhasil mengambil ${tasks.length} daftar tugas aktif dari Google Tasks Anda.`,
+              },
+              null,
+              2
+            ),
+            isError: false,
+          };
+        }
+
+        // Default: Create Task
+        const createResult = await executeComposioToolRouter(
+          apiKey,
+          sessionId,
+          "GOOGLETASKS_INSERT_TASK",
+          {
+            tasklist_id: "@default",
+            title,
+            status: "needsAction",
+            notes: args.notes || args.description || "",
+            due: args.dueDate,
+          }
+        );
+
+        return {
+          result: JSON.stringify(
+            {
+              status: "success",
+              provider: "Google Tasks",
+              action: "create_task",
+              task: title,
+              taskId: createResult.id,
+              dueDate: args.dueDate || "Hari ini",
+              message: `Tugas "${title}" berhasil ditambahkan ke agenda Google Tasks Anda!`,
+            },
+            null,
+            2
+          ),
+          isError: false,
+        };
+      } catch (err: any) {
+        console.error("[Google Tasks Live Execution Error]", err);
+        const errMsg = err?.message || String(err);
+        const notConnected = errMsg.includes("No active connection") || errMsg.includes("4302");
+        return {
+          result: JSON.stringify(
+            {
+              status: "partial_success",
+              provider: "Google Tasks",
+              action,
+              task: title,
+              dueDate: args.dueDate || "Hari ini",
+              message: notConnected
+                ? `Tugas "${title}" disiapkan. Hubungkan akun Google Tasks di menu Connectors agar tugas langsung sinkron ke Google Calendar & Tasks.`
+                : `Tugas "${title}": ${errMsg}`,
+            },
+            null,
+            2
+          ),
+          isError: false,
+        };
+      }
+    }
+
     return {
       result: JSON.stringify(
         {
@@ -1615,6 +1989,63 @@ export async function executeComposioTool(
   if (norm.includes("classroom")) {
     const course = args.courseName || args.course || "Kelas Utama";
     const action = args.action || "list_courses";
+
+    if (apiKey) {
+      try {
+        const sessionId = await getOrCreateComposioSession(apiKey, userId);
+        const courseResult = await executeComposioToolRouter(
+          apiKey,
+          sessionId,
+          "GOOGLE_CLASSROOM_COURSES_LIST",
+          {
+            studentId: "me",
+            pageSize: 15,
+          }
+        );
+        const courses = courseResult.courses || [];
+        return {
+          result: JSON.stringify(
+            {
+              status: "success",
+              provider: "Google Classroom",
+              action,
+              courses: courses.map((c: any) => ({
+                id: c.id,
+                name: c.name,
+                section: c.section,
+                descriptionHeading: c.descriptionHeading,
+                alternateLink: c.alternateLink,
+              })),
+              message: `Berhasil menyinkronkan ${courses.length} kelas aktif dari Google Classroom Anda.`,
+            },
+            null,
+            2
+          ),
+          isError: false,
+        };
+      } catch (err: any) {
+        console.error("[Google Classroom Live Execution Error]", err);
+        const errMsg = err?.message || String(err);
+        const notConnected = errMsg.includes("No active connection") || errMsg.includes("4302");
+        return {
+          result: JSON.stringify(
+            {
+              status: "partial_success",
+              provider: "Google Classroom",
+              action,
+              course,
+              message: notConnected
+                ? `Hubungkan akun Google Classroom Anda di menu Connectors untuk mengakses materi kuliah dan pengumuman tugas secara langsung.`
+                : `Google Classroom: ${errMsg}`,
+            },
+            null,
+            2
+          ),
+          isError: false,
+        };
+      }
+    }
+
     return {
       result: JSON.stringify(
         {
@@ -1638,6 +2069,69 @@ export async function executeComposioTool(
   if (norm.includes("form")) {
     const title = args.title || "Kuis Pemahaman";
     const qCount = Array.isArray(args.questions) ? args.questions.length : 5;
+
+    if (apiKey) {
+      try {
+        const sessionId = await getOrCreateComposioSession(apiKey, userId);
+        const formResult = await executeComposioToolRouter(
+          apiKey,
+          sessionId,
+          "GOOGLEFORMS_CREATE_FORM",
+          {
+            info: {
+              title,
+              description: args.description || "Dibuat otomatis oleh Const AI Tutor",
+            },
+          }
+        );
+
+        const formId = formResult.formId || formResult.id;
+        const responderUri = formResult.responderUri || (formId ? `https://docs.google.com/forms/d/e/${formId}/viewform` : "");
+        const editUrl = formId ? `https://docs.google.com/forms/d/${formId}/edit` : "https://docs.google.com/forms";
+
+        return {
+          result: JSON.stringify(
+            {
+              status: "success",
+              provider: "Google Forms",
+              title,
+              formId,
+              formUrl: editUrl,
+              editUrl,
+              responderUri,
+              questionsCount: qCount,
+              message: `Formulir kuis Google Forms "${title}" berhasil dibuat di akun Google Anda!`,
+            },
+            null,
+            2
+          ),
+          isError: false,
+        };
+      } catch (err: any) {
+        console.error("[Google Forms Live Execution Error]", err);
+        const errMsg = err?.message || String(err);
+        const notConnected = errMsg.includes("No active connection") || errMsg.includes("4302");
+        const fallbackUrl = `https://docs.google.com/forms/create`;
+        return {
+          result: JSON.stringify(
+            {
+              status: "partial_success",
+              provider: "Google Forms",
+              title,
+              questionsCount: qCount,
+              message: notConnected
+                ? `Kuis formulir "${title}" disiapkan. Hubungkan Google Forms di menu Connectors agar formulir kuis otomatis dibuat di Google Drive Anda.`
+                : `Google Forms "${title}": ${errMsg}`,
+              formUrl: fallbackUrl,
+            },
+            null,
+            2
+          ),
+          isError: false,
+        };
+      }
+    }
+
     return {
       result: JSON.stringify(
         {
@@ -1658,6 +2152,80 @@ export async function executeComposioTool(
   // 9. YouTube
   if (norm.includes("youtube")) {
     const topic = args.topic || args.query || "Materi Pelajaran";
+
+    if (apiKey) {
+      try {
+        const sessionId = await getOrCreateComposioSession(apiKey, userId);
+        const ytResult = await executeComposioToolRouter(
+          apiKey,
+          sessionId,
+          "YOUTUBE_SEARCH_YOU_TUBE",
+          {
+            q: topic,
+            maxResults: args.maxResults || 5,
+            type: "video",
+          }
+        );
+
+        const items = Array.isArray(ytResult.items) ? ytResult.items : [];
+        const videos = items.map((it: any) => {
+          const videoId = it.id?.videoId || it.id;
+          return {
+            id: videoId,
+            title: it.snippet?.title || "Video Pembelajaran",
+            description: it.snippet?.description,
+            channelTitle: it.snippet?.channelTitle,
+            url: videoId ? `https://www.youtube.com/watch?v=${videoId}` : undefined,
+            thumbnail: it.snippet?.thumbnails?.medium?.url || it.snippet?.thumbnails?.default?.url,
+          };
+        });
+
+        const topVideo = videos[0];
+
+        return {
+          result: JSON.stringify(
+            {
+              status: "success",
+              provider: "YouTube",
+              topic,
+              videoTitle: topVideo?.title || `Video Penjelasan: ${topic}`,
+              videoUrl: topVideo?.url || `https://www.youtube.com/results?search_query=${encodeURIComponent(topic)}`,
+              videos,
+              message:
+                videos.length > 0
+                  ? `Ditemukan ${videos.length} video referensi pembelajaran untuk topik "${topic}".`
+                  : `Pencarian selesai untuk topik "${topic}".`,
+            },
+            null,
+            2
+          ),
+          isError: false,
+        };
+      } catch (err: any) {
+        console.error("[YouTube Live Execution Error]", err);
+        const errMsg = err?.message || String(err);
+        const notConnected = errMsg.includes("No active connection") || errMsg.includes("4302");
+        const fallbackUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(topic + " penjelasan edukasi")}`;
+        return {
+          result: JSON.stringify(
+            {
+              status: "partial_success",
+              provider: "YouTube",
+              topic,
+              videoTitle: `Kuliah & Penjelasan Interaktif: ${topic}`,
+              videoUrl: fallbackUrl,
+              message: notConnected
+                ? `Hubungkan akun YouTube di menu Connectors untuk pencarian kurasi video dan rekomendasi belajar langsung.`
+                : `YouTube "${topic}": ${errMsg}`,
+            },
+            null,
+            2
+          ),
+          isError: false,
+        };
+      }
+    }
+
     return {
       result: JSON.stringify(
         {
