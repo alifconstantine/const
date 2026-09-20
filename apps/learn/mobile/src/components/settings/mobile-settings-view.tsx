@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Avatar,
   AvatarImage,
@@ -152,6 +152,40 @@ export function MobileSettingsView({
     { id: "models", label: "Models", icon: Bot },
   ] as const;
 
+  // Sliding Tab Refs & Indicator (Matching ModelSelectionSheet & McpToolsSheet)
+  const generalTabRef = useRef<HTMLButtonElement>(null);
+  const usageTabRef = useRef<HTMLButtonElement>(null);
+  const appearanceTabRef = useRef<HTMLButtonElement>(null);
+  const modelsTabRef = useRef<HTMLButtonElement>(null);
+
+  const tabRefs: Record<string, React.RefObject<HTMLButtonElement | null>> = {
+    general: generalTabRef,
+    usage: usageTabRef,
+    appearance: appearanceTabRef,
+    models: modelsTabRef,
+  };
+
+  const [indicatorStyle, setIndicatorStyle] = useState<{ left: number; width: number }>({
+    left: 0,
+    width: 0,
+  });
+
+  useEffect(() => {
+    const updateIndicator = () => {
+      const activeEl = tabRefs[activeTab]?.current;
+      if (activeEl) {
+        setIndicatorStyle({
+          left: activeEl.offsetLeft,
+          width: activeEl.offsetWidth,
+        });
+      }
+    };
+
+    updateIndicator();
+    const timer = setTimeout(updateIndicator, 50);
+    return () => clearTimeout(timer);
+  }, [activeTab, language]);
+
   // Usage calculations
   const usedCount = usage.used || 0;
   const limitCount = usage.limit || 300;
@@ -231,26 +265,37 @@ export function MobileSettingsView({
         )}
       </header>
 
-      {/* 2. Top Segmented Navigation Tabs */}
-      <div className="px-4 pt-3 pb-1 shrink-0 bg-background">
-        <div className="grid grid-cols-4 gap-1 p-1 rounded-xl bg-secondary/70 border border-border/50">
+      {/* 2. Top Sliding Navigation Tabs - Matching ModelSelectionSheet & McpToolsSheet */}
+      <div className="px-4 pt-3 pb-2 shrink-0 bg-background border-b border-border/50">
+        <div className="relative flex items-center h-9 p-0.5 rounded-xl bg-muted/70 border border-border w-full">
+          <div
+            className="absolute top-0.5 bottom-0.5 left-0 rounded-lg bg-background shadow-2xs pointer-events-none transition-all duration-300"
+            style={{
+              transform: `translateX(${indicatorStyle.left}px)`,
+              width: `${indicatorStyle.width}px`,
+              opacity: indicatorStyle.width > 0 ? 1 : 0,
+              transitionTimingFunction: "cubic-bezier(0.16, 1, 0.3, 1)",
+            }}
+          />
+
           {navTabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
             return (
               <button
                 key={tab.id}
+                ref={tabRefs[tab.id]}
                 type="button"
                 onClick={() => setActiveTab(tab.id)}
                 className={cn(
-                  "py-2 rounded-lg text-xs font-medium flex flex-col sm:flex-row items-center justify-center gap-1 transition-all cursor-pointer",
+                  "relative z-10 flex-1 h-full rounded-lg text-xs font-medium transition-colors duration-200 cursor-pointer select-none text-center flex items-center justify-center gap-1.5",
                   isActive
-                    ? "bg-background text-foreground shadow-2xs font-semibold"
+                    ? "text-foreground font-semibold"
                     : "text-muted-foreground hover:text-foreground"
                 )}
               >
                 <Icon className={cn("h-3.5 w-3.5 shrink-0", isActive ? "text-foreground" : "text-muted-foreground")} />
-                <span className="text-[11px] truncate">{tab.label}</span>
+                <span className="truncate">{tab.label}</span>
               </button>
             );
           })}
