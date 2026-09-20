@@ -429,6 +429,7 @@ interface MobileLearnWorkspaceProps {
   onSelectLearn?: (learnId: string) => void;
   user?: any;
   onSignOut?: () => void;
+  onSwitchAccount?: () => void;
   onOpenSettings?: () => void;
 }
 
@@ -440,6 +441,7 @@ export function MobileLearnWorkspace({
   onSelectLearn,
   user,
   onSignOut,
+  onSwitchAccount,
   onOpenSettings,
 }: MobileLearnWorkspaceProps) {
   const { t, language } = useI18n();
@@ -2632,6 +2634,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
         onTogglePinChat={handleTogglePinChat}
         user={user}
         onSignOut={onSignOut}
+        onSwitchAccount={onSwitchAccount}
         onOpenSettings={onOpenSettings}
       />
 

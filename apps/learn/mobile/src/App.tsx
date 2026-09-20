@@ -65,6 +65,7 @@ function AuthenticatedContent({
         }}
         user={user}
         onSignOut={onSignOut}
+        onSwitchAccount={onSwitchAccount}
         onOpenSettings={() => setIsSettingsOpen(true)}
       />
     );

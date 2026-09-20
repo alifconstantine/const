@@ -1,3 +1,4 @@
+import React, { useState } from "react";
 import {
   Avatar,
   AvatarImage,
@@ -8,6 +9,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   useTheme,
+  cn,
 } from "@const/ui";
 import {
   Settings,
@@ -18,6 +20,8 @@ import {
   Moon,
   Laptop,
   Globe,
+  ChevronRight,
+  Check,
 } from "lucide-react";
 import { useI18n, LANGUAGE_OPTIONS } from "../lib/i18n";
 
@@ -67,9 +71,21 @@ export function Navbar({
   const initials = getUserInitials(user?.name, user?.email);
   const [theme, setTheme] = useTheme();
 
+  const [isThemeOpen, setIsThemeOpen] = useState(false);
+  const [isLanguageOpen, setIsLanguageOpen] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  const handleOpenChange = (open: boolean) => {
+    setIsMenuOpen(open);
+    if (!open) {
+      setIsThemeOpen(false);
+      setIsLanguageOpen(false);
+    }
+  };
+
   return (
     <header className="sticky top-0 w-full h-16 sm:h-20 bg-background/95 backdrop-blur-md px-5 flex items-center justify-between select-none z-40">
-      {/* Left: Const Learn Brand Title (Styled like apps/router: Lora Const + pill badge Learn) */}
+      {/* Left: Const Learn Brand Title */}
       <div className="flex items-center gap-2 select-none py-1">
         <span className="font-serif text-2xl font-medium tracking-tight text-foreground">
           Const
@@ -82,16 +98,16 @@ export function Navbar({
       {/* Middle Spacer */}
       <div className="flex-1" />
 
-      {/* Right: User Account Avatar Dropdown */}
+      {/* Right: User Account Avatar & Popover Menu */}
       <div className="flex items-center">
-        <DropdownMenu>
+        <DropdownMenu open={isMenuOpen} onOpenChange={handleOpenChange}>
           <DropdownMenuTrigger asChild>
             <button
               type="button"
-              className="relative flex items-center justify-center rounded-full outline-none ring-offset-background transition-all hover:ring-2 hover:ring-ring/20 focus-visible:ring-2 focus-visible:ring-ring cursor-pointer select-none p-0.5"
+              className="relative flex items-center justify-center rounded-full outline-none ring-offset-background transition-all hover:ring-2 hover:ring-ring/20 focus-visible:ring-2 focus-visible:ring-ring cursor-pointer select-none p-0.5 active:scale-95"
               aria-label="Account menu"
             >
-              <Avatar className="h-9 w-9 rounded-full border border-border/70 transition-transform active:scale-95">
+              <Avatar className="h-9 w-9 rounded-full border border-border/70 transition-transform">
                 {user?.image ? (
                   <AvatarImage
                     src={user.image}
@@ -110,10 +126,16 @@ export function Navbar({
             </button>
           </DropdownMenuTrigger>
 
-          <DropdownMenuContent align="end" className="w-56 p-1.5 shadow-md mr-1">
+          <DropdownMenuContent
+            align="end"
+            side="bottom"
+            sideOffset={8}
+            className="w-56 p-1.5 bg-popover/95 border border-border text-popover-foreground rounded-2xl shadow-xl select-none text-xs font-sans backdrop-blur-md z-50 mr-1 animate-in fade-in-50 zoom-in-95 duration-100"
+          >
+            {/* User Profile Header */}
             {(user?.name || user?.email) && (
               <>
-                <div className="px-2 py-1.5">
+                <div className="px-2.5 py-1.5">
                   {user.name && (
                     <p className="text-xs font-semibold text-foreground truncate">
                       {user.name}
@@ -125,117 +147,152 @@ export function Navbar({
                     </p>
                   )}
                 </div>
-                <DropdownMenuSeparator />
+                <DropdownMenuSeparator className="my-1 bg-border/60" />
               </>
             )}
 
-            {/* App Language (Segmented Control) */}
-            <div className="px-2 py-1.5 flex flex-col gap-1.5">
-              <span className="text-[11px] text-muted-foreground font-medium flex items-center gap-1.5">
-                <Globe className="h-3.5 w-3.5" />
-                {t("language")}
-              </span>
-              <div className="flex items-center gap-1 p-0.5 rounded-lg bg-secondary/80 border border-border/50">
-                {LANGUAGE_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.code}
-                    type="button"
-                    onClick={() => setLanguage(opt.code)}
-                    className={`flex-1 flex items-center justify-center gap-1 py-1 rounded-md text-[11px] font-medium transition-all cursor-pointer ${
-                      language === opt.code
-                        ? "bg-background text-foreground shadow-2xs font-semibold"
-                        : "text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    <span>{opt.label === "Bahasa Indonesia" ? "Indonesia" : opt.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <DropdownMenuSeparator />
-
-            {/* App Theme (Segmented Control) */}
-            <div className="px-2 py-1.5 flex flex-col gap-1.5">
-              <span className="text-[11px] text-muted-foreground font-medium flex items-center gap-1.5">
-                {theme === "dark" ? (
-                  <Moon className="h-3.5 w-3.5" />
-                ) : theme === "light" ? (
-                  <Sun className="h-3.5 w-3.5" />
-                ) : (
-                  <Laptop className="h-3.5 w-3.5" />
-                )}
-                {t("theme")}
-              </span>
-              <div className="flex items-center gap-1 p-0.5 rounded-lg bg-secondary/80 border border-border/50">
-                <button
-                  type="button"
-                  onClick={() => setTheme("system")}
-                  className={`flex-1 flex items-center justify-center gap-1 py-1 rounded-md text-[11px] font-medium transition-all cursor-pointer ${
-                    theme === "system"
-                      ? "bg-background text-foreground shadow-2xs"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  <Laptop className="h-3 w-3" />
-                  <span>{t("themeSystem")}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setTheme("light")}
-                  className={`flex-1 flex items-center justify-center gap-1 py-1 rounded-md text-[11px] font-medium transition-all cursor-pointer ${
-                    theme === "light"
-                      ? "bg-background text-foreground shadow-2xs"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  <Sun className="h-3 w-3" />
-                  <span>{t("themeLight")}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setTheme("dark")}
-                  className={`flex-1 flex items-center justify-center gap-1 py-1 rounded-md text-[11px] font-medium transition-all cursor-pointer ${
-                    theme === "dark"
-                      ? "bg-background text-foreground shadow-2xs"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  <Moon className="h-3 w-3" />
-                  <span>{t("themeDark")}</span>
-                </button>
-              </div>
-            </div>
-
+            {/* 1. Settings */}
             <DropdownMenuItem
-              className="cursor-pointer flex items-center gap-2 text-xs py-2 px-2 text-muted-foreground hover:text-foreground"
               onClick={() => {
-                if (onOpenSettings) {
-                  onOpenSettings();
-                }
+                if (onOpenSettings) onOpenSettings();
               }}
+              className="cursor-pointer flex items-center gap-2.5 py-2 px-2.5 rounded-xl hover:bg-secondary focus:bg-secondary text-foreground transition-colors"
             >
-              <Settings className="h-4 w-4" />
-              <span>{t("settings")}</span>
+              <Settings className="w-4 h-4 text-muted-foreground shrink-0" />
+              <span className="font-medium">{t("settings")}</span>
             </DropdownMenuItem>
 
-            <DropdownMenuSeparator />
+            {/* 2. Theme (Menu Ke Bawah / Collapsible Downwards) */}
+            <div>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsThemeOpen((prev) => !prev);
+                }}
+                className="w-full cursor-pointer flex items-center justify-between py-2 px-2.5 rounded-xl hover:bg-secondary focus:bg-secondary text-foreground transition-colors outline-none text-left"
+              >
+                <div className="flex items-center gap-2.5">
+                  <Sun className="w-4 h-4 text-muted-foreground shrink-0" />
+                  <span className="font-medium">{t("theme")}</span>
+                </div>
+                <ChevronRight
+                  className={cn(
+                    "w-3.5 h-3.5 text-muted-foreground transition-transform duration-200",
+                    isThemeOpen && "rotate-90 text-foreground"
+                  )}
+                />
+              </button>
 
+              {isThemeOpen && (
+                <div className="my-1 ml-3 pl-2.5 border-l border-border/70 flex flex-col gap-0.5 animate-in fade-in-50 slide-in-from-top-1 duration-150">
+                  {[
+                    { value: "system", label: t("themeSystem"), icon: Laptop },
+                    { value: "light", label: t("themeLight"), icon: Sun },
+                    { value: "dark", label: t("themeDark"), icon: Moon },
+                  ].map((item) => {
+                    const Icon = item.icon;
+                    const isSelected = theme === item.value;
+                    return (
+                      <button
+                        key={item.value}
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setTheme(item.value as any);
+                        }}
+                        className={cn(
+                          "flex items-center justify-between py-1.5 px-2 rounded-lg text-xs transition-colors cursor-pointer text-left",
+                          isSelected
+                            ? "bg-secondary text-foreground font-medium"
+                            : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
+                        )}
+                      >
+                        <div className="flex items-center gap-2">
+                          <Icon className="w-3.5 h-3.5" />
+                          <span>{item.label}</span>
+                        </div>
+                        {isSelected && <Check className="w-3.5 h-3.5 text-foreground ml-2 shrink-0" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* 3. Language (Menu Ke Bawah / Collapsible Downwards) */}
+            <div>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsLanguageOpen((prev) => !prev);
+                }}
+                className="w-full cursor-pointer flex items-center justify-between py-2 px-2.5 rounded-xl hover:bg-secondary focus:bg-secondary text-foreground transition-colors outline-none text-left"
+              >
+                <div className="flex items-center gap-2.5">
+                  <Globe className="w-4 h-4 text-muted-foreground shrink-0" />
+                  <span className="font-medium">{t("language")}</span>
+                </div>
+                <ChevronRight
+                  className={cn(
+                    "w-3.5 h-3.5 text-muted-foreground transition-transform duration-200",
+                    isLanguageOpen && "rotate-90 text-foreground"
+                  )}
+                />
+              </button>
+
+              {isLanguageOpen && (
+                <div className="my-1 ml-3 pl-2.5 border-l border-border/70 flex flex-col gap-0.5 animate-in fade-in-50 slide-in-from-top-1 duration-150">
+                  {LANGUAGE_OPTIONS.map((opt) => {
+                    const isSelected = language === opt.code;
+                    return (
+                      <button
+                        key={opt.code}
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setLanguage(opt.code);
+                        }}
+                        className={cn(
+                          "flex items-center justify-between py-1.5 px-2 rounded-lg text-xs transition-colors cursor-pointer text-left",
+                          isSelected
+                            ? "bg-secondary text-foreground font-medium"
+                            : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
+                        )}
+                      >
+                        <span>{opt.label === "Bahasa Indonesia" ? "Indonesia" : opt.label}</span>
+                        {isSelected && <Check className="w-3.5 h-3.5 text-foreground ml-2 shrink-0" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <DropdownMenuSeparator className="my-1 bg-border/60" />
+
+            {/* 4. Switch account */}
             {onSwitchAccount && (
               <DropdownMenuItem
-                className="cursor-pointer flex items-center gap-2 text-xs py-2 px-2 text-muted-foreground hover:text-foreground"
                 onClick={onSwitchAccount}
+                className="cursor-pointer flex items-center gap-2.5 py-2 px-2.5 rounded-xl hover:bg-secondary focus:bg-secondary text-foreground transition-colors"
               >
-                <ArrowLeftRight className="h-4 w-4" />
+                <ArrowLeftRight className="w-4 h-4 text-muted-foreground shrink-0" />
                 <span>{t("switchAccount")}</span>
               </DropdownMenuItem>
             )}
 
+            {/* 5. Log out */}
             <DropdownMenuItem
-              className="cursor-pointer flex items-center gap-2 text-xs py-2 px-2 text-destructive focus:text-destructive"
               onClick={onSignOut}
+              className="cursor-pointer flex items-center gap-2.5 py-2 px-2.5 rounded-xl hover:bg-rose-500/10 focus:bg-rose-500/10 text-rose-500 focus:text-rose-500 transition-colors"
             >
-              <LogOut className="h-4 w-4" />
+              <LogOut className="w-4 h-4 shrink-0" />
               <span>{t("logout")}</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
