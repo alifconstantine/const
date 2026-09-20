@@ -136,14 +136,34 @@ export interface SlideDeckData {
   learnId?: string;
   title: string;
   topic?: string;
+  provider?: "native" | "canva" | "slides";
   lengthMode: "short" | "medium" | "long" | "auto";
+  slideCount?: number;
   language: "id" | "en";
-  themeId?: string;
+  themeId?: "bold_dark" | "swiss_blue" | "sea_indigo" | "ash_lime" | string;
   customCss?: string;
   sourceCount?: number;
   sourceTitles?: string[];
   sourceIds?: string[];
+  // Native slide deck properties
+  htmlContent?: string;
+  htmlPath?: string;
+  pdfPath?: string;
+  pdfUrl?: string;
   slides: SlideItem[];
+  // Canva properties
+  canvaJobId?: string;
+  canvaDesignId?: string;
+  canvaEditUrl?: string;
+  canvaViewUrl?: string;
+  canvaThumbnails?: Array<{ url: string }>;
+  // Google Slides properties
+  googleSlidesId?: string;
+  googleSlidesUrl?: string;
+  googleSlidesEmbedUrl?: string;
+  // Status & error handling
+  renderingStatus?: "generating" | "rendering" | "completed" | "error";
+  renderingError?: string;
   createdAt?: number;
   updatedAt?: number;
 }

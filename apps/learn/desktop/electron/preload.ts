@@ -32,6 +32,8 @@ contextBridge.exposeInMainWorld("electron", {
       ipcRenderer.invoke("composio:disconnect-account", payload),
     getConnectedAccounts: (payload?: { userId?: string; apiKey?: string }) =>
       ipcRenderer.invoke("composio:get-connected-accounts", payload),
+    executeTool: (payload: { toolSlug: string; arguments: any; userId?: string; apiKey?: string }) =>
+      ipcRenderer.invoke("composio:execute-tool", payload),
   },
   agent: {
     getModels: () => ipcRenderer.invoke("agent:get-models"),
@@ -142,6 +144,18 @@ contextBridge.exposeInMainWorld("electron", {
         ipcRenderer.removeListener("video:render-progress", handler);
       };
     },
+  },
+  presentation: {
+    save: (payload: { learnId: string; artifactId: string; htmlContent: string }) =>
+      ipcRenderer.invoke("presentation:save", payload),
+    exportPdf: (payload: {
+      learnId: string;
+      artifactId: string;
+      htmlPath?: string;
+      htmlContent?: string;
+    }) => ipcRenderer.invoke("presentation:export-pdf", payload),
+    checkStatus: (payload: { learnId: string; artifactId: string }) =>
+      ipcRenderer.invoke("presentation:check-status", payload),
   },
   minimize: () => ipcRenderer.send("window:minimize"),
   maximize: () => ipcRenderer.send("window:maximize"),

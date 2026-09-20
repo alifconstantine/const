@@ -6,7 +6,6 @@ import {
   Package,
   FileText,
   Download,
-  Layers,
   ArrowLeft,
   SquarePen,
   RotateCw,
@@ -23,8 +22,6 @@ import {
   BarChart3,
   BookOpen,
   Table2,
-  Loader2,
-  Sparkles,
 } from "lucide-react";
 import {
   cn,
@@ -72,19 +69,6 @@ export interface StudioSheetProps {
   onDownloadArtifact: (art: LocalArtifact) => void;
   onOpenArtifact?: (art: LocalArtifact) => void;
   onAddNote?: () => void;
-}
-
-function formatArtifactTimeAgo(date?: Date | number, isIndo?: boolean): string {
-  if (!date) return "";
-  const d = typeof date === "number" || typeof date === "string" ? new Date(date) : date;
-  const diffSec = Math.max(0, Math.floor((Date.now() - d.getTime()) / 1000));
-  if (diffSec < 60) return isIndo ? "Baru saja" : "Just now";
-  const diffMin = Math.floor(diffSec / 60);
-  if (diffMin < 60) return isIndo ? `${diffMin} menit lalu` : `${diffMin}m ago`;
-  const diffHour = Math.floor(diffMin / 60);
-  if (diffHour < 24) return isIndo ? `${diffHour} jam lalu` : `${diffHour}h ago`;
-  const diffDay = Math.floor(diffHour / 24);
-  return isIndo ? `${diffDay} hari lalu` : `${diffDay}d ago`;
 }
 
 export function StudioSheet({
@@ -344,8 +328,8 @@ export function StudioSheet({
                   ? art.data.questions.length
                   : isFlashcard && art.data?.cards
                   ? art.data.cards.length
-                  : isSlides && art.data?.slides
-                  ? art.data.slides.length
+                  : isSlides
+                  ? (art.data?.slideCount || (art.data?.slides && art.data.slides.length > 0 ? art.data.slides.length : art.data?.canvaThumbnails?.length || null))
                   : null;
                 const countText = itemCount !== null && itemCount !== undefined
                   ? isQuiz
@@ -423,6 +407,8 @@ export function StudioSheet({
                               ? (language === "id" ? "Buka Flashcard" : "Open Flashcards")
                               : isMindMap
                               ? (language === "id" ? "Buka Peta Pikiran" : "Open Mind Map")
+                              : isSlides
+                              ? (language === "id" ? "Buka Slide" : "Open Slides")
                               : (language === "id" ? "Buka Catatan" : "Open Note")}
                           </span>
                         </DropdownMenuItem>

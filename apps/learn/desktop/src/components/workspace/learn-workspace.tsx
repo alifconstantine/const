@@ -46,6 +46,7 @@ import { CreateStudioArtifactDialog } from "./create-studio-artifact-dialog";
 import { CreateMindMapDialog } from "./create-mind-map-dialog";
 import { CreateAudioSummaryDialog } from "./create-audio-summary-dialog";
 import { CreateVideoSummaryDialog } from "./create-video-summary-dialog";
+import { CreatePresentationDialog } from "./create-presentation-dialog";
 import { WorkspaceTitle } from "./workspace-title";
 import { SettingsView } from "../settings/settings-view";
 import { ErrorBoundary } from "../ui/error-boundary";
@@ -55,6 +56,7 @@ import { streamChatCompletion } from "../../lib/ai-stream";
 import {
   generateStudioArtifact,
   generateVideoSummaryArtifact,
+  generatePresentationArtifact,
 } from "../../lib/studio/generator";
 import type { FileMutationRecord } from "@const/agent";
 import type { LocalArtifact } from "../../lib/db";
@@ -134,6 +136,7 @@ export function LearnWorkspace({
   const [isCreateMindMapOpen, setIsCreateMindMapOpen] = useState(false);
   const [isCreateAudioSummaryOpen, setIsCreateAudioSummaryOpen] = useState(false);
   const [isCreateVideoOpen, setIsCreateVideoOpen] = useState(false);
+  const [isCreatePresentationOpen, setIsCreatePresentationOpen] = useState(false);
   const [generatingArtifacts, setGeneratingArtifacts] = useState<GeneratingArtifactStatus[]>([]);
 
   // Right Pane: Dual Studio & Preview/Review state
@@ -742,6 +745,83 @@ export function LearnWorkspace({
     }
   };
 
+  const handleGeneratePresentation = async (params: {
+    provider: "native" | "canva" | "slides";
+    selectedSourceIds: string[];
+    lengthMode: "short" | "medium" | "long" | "auto";
+    slideCount?: number;
+    themeId?: "bold_dark" | "swiss_blue" | "sea_indigo" | "ash_lime";
+    customInstructions?: string;
+  }) => {
+    if (!learnId) return;
+
+    const selectedSources = (sources || []).filter((s) =>
+      params.selectedSourceIds.includes(s.id)
+    );
+    if (selectedSources.length === 0) return;
+
+    const isIndo = language === "id";
+    const targetLang: "id" | "en" = isIndo ? "id" : "en";
+    const title = isIndo ? "Presentasi Materi" : "Presentation Slides";
+
+    // 1. Create generating artifact in Dexie
+    const artId = await localDb.createArtifact({
+      learnId,
+      title: isIndo ? "Menyusun Presentasi..." : "Creating Presentation...",
+      type: "slides",
+      status: "generating",
+      sourcesCount: selectedSources.length,
+      content: "",
+    });
+
+    try {
+      // 2. Call generator in background
+      const result = await generatePresentationArtifact({
+        artifactId: artId,
+        learnId,
+        sources: selectedSources,
+        provider: params.provider,
+        lengthMode: params.lengthMode,
+        slideCount: params.slideCount,
+        themeId: params.themeId || "bold_dark",
+        language: targetLang,
+        customInstructions: params.customInstructions,
+      });
+
+      // 3. Update artifact in Dexie
+      await localDb.updateArtifact(artId, {
+        title: result.title || title,
+        data: result.data,
+        content: JSON.stringify(result.data),
+        status: "completed",
+      });
+
+      toast.success(
+        isIndo
+          ? "Presentasi berhasil dibuat!"
+          : "Presentation created successfully!"
+      );
+
+      // 4. Auto-open in preview & auto-widen
+      const fullArt = await localDb.getArtifact(artId);
+      if (fullArt) {
+        handleOpenStudioArtifact(fullArt);
+      }
+    } catch (err: any) {
+      console.error("Failed to generate presentation:", err);
+      await localDb.updateArtifact(artId, {
+        title,
+        status: "error",
+        error: err?.message || "Generation failed",
+      });
+      toast.error(
+        isIndo
+          ? `Gagal menyusun presentasi: ${err?.message || "Terjadi kesalahan"}`
+          : `Failed to create presentation: ${err?.message || "An error occurred"}`
+      );
+    }
+  };
+
   const handleSelectStudioTool = (toolId: string) => {
     if (toolId === "browser") {
       handleOpenBrowser();
@@ -762,8 +842,9 @@ export function LearnWorkspace({
       setIsCreateAudioSummaryOpen(true);
     } else if (toolId === "video_summary" || toolId === "video") {
       setIsCreateVideoOpen(true);
+    } else if (toolId === "slides" || toolId === "presentation") {
+      setIsCreatePresentationOpen(true);
     } else {
-      // Menu lain (slides) tidak melakukan apa-apa (no-op)
       return;
     }
   };
@@ -775,11 +856,13 @@ export function LearnWorkspace({
       art.type === "mind_map" ||
       art.type === "audio_summary" ||
       art.type === "video_summary" ||
+      art.type === "slides" ||
       art.data?.questions ||
       art.data?.cards ||
       art.data?.root ||
       art.data?.script ||
-      art.data?.scenes
+      art.data?.scenes ||
+      art.data?.slides
     ) {
       handleOpenStudioArtifact(art);
       return;
@@ -1559,6 +1642,14 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
           setSettingsInitialTab("models");
           setIsSettingsOpen(true);
         }}
+      />
+
+      {/* Dedicated Create Presentation Dialog */}
+      <CreatePresentationDialog
+        open={isCreatePresentationOpen}
+        onOpenChange={setIsCreatePresentationOpen}
+        sources={sources || []}
+        onGenerate={handleGeneratePresentation}
       />
 
       {/* Settings Modal / Overlay */}

@@ -669,6 +669,74 @@ app.on("second-instance", (_event, commandLine) => {
     }
   );
 
+  ipcMain.handle(
+    "composio:execute-tool",
+    async (
+      _event,
+      payload: { toolSlug: string; arguments: any; userId?: string; apiKey?: string }
+    ) => {
+      try {
+        const apiKey =
+          payload.apiKey ||
+          process.env.COMPOSIO_API_KEY ||
+          process.env.VITE_COMPOSIO_API_KEY ||
+          "";
+        if (!apiKey) {
+          throw new Error("COMPOSIO_API_KEY is not configured. Please set COMPOSIO_API_KEY in .env.");
+        }
+        const userId = payload.userId || "learn_desktop_user";
+
+        // 1. Create or resume session
+        const sessRes = await fetch("https://backend.composio.dev/api/v3.1/tool_router/session", {
+          method: "POST",
+          headers: {
+            "x-api-key": apiKey,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            user_id: userId,
+            manage_connections: { enable: true },
+          }),
+        });
+
+        if (!sessRes.ok) {
+          const errText = await sessRes.text();
+          throw new Error(`Composio session creation failed (${sessRes.status}): ${errText}`);
+        }
+
+        const sessData = await sessRes.json();
+        const sessionId = sessData.session_id;
+
+        // 2. Execute tool
+        const execRes = await fetch(
+          `https://backend.composio.dev/api/v3.1/tool_router/session/${sessionId}/execute`,
+          {
+            method: "POST",
+            headers: {
+              "x-api-key": apiKey,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              tool_slug: payload.toolSlug,
+              arguments: payload.arguments,
+            }),
+          }
+        );
+
+        if (!execRes.ok) {
+          const errText = await execRes.text();
+          throw new Error(`Composio execute failed for ${payload.toolSlug} (${execRes.status}): ${errText}`);
+        }
+
+        const data = await execRes.json();
+        return { success: true, data: data.data || data };
+      } catch (err: any) {
+        console.error("[Composio execute-tool Error]", err);
+        return { success: false, error: err?.message || String(err) };
+      }
+    }
+  );
+
   ipcMain.handle("shell:open-path", async (_event, targetPath: string) => {
     if (!targetPath || !fs.existsSync(targetPath)) return false;
     const res = await shell.openPath(targetPath);
@@ -1999,8 +2067,173 @@ app.on("second-instance", (_event, commandLine) => {
     }
   );
 
+  // ---------------------------------------------------------------------------
+  // Presentation Slides IPC Handlers (Native Harness Execution & PDF Export)
+  // ---------------------------------------------------------------------------
+  ipcMain.handle(
+    "presentation:save",
+    async (
+      _event,
+      payload: {
+        learnId: string;
+        artifactId: string;
+        htmlContent: string;
+      }
+    ) => {
+      try {
+        const projDir = path.join(
+          learnWorkspacesDir,
+          payload.learnId || "default",
+          "presentations",
+          payload.artifactId || `pres_${Date.now()}`
+        );
+        if (!fs.existsSync(projDir)) {
+          fs.mkdirSync(projDir, { recursive: true });
+        }
+
+        const htmlPath = path.join(projDir, "presentation.html");
+        fs.writeFileSync(htmlPath, payload.htmlContent, "utf-8");
+
+        return {
+          success: true,
+          projectPath: projDir,
+          htmlPath,
+          htmlUrl: `const-media://file/${htmlPath.replace(/\\/g, "/")}`,
+        };
+      } catch (err: any) {
+        console.error("[Electron Presentation] save error:", err);
+        return { success: false, error: err.message || "Failed to save presentation" };
+      }
+    }
+  );
+
+  ipcMain.handle(
+    "presentation:export-pdf",
+    async (
+      _event,
+      payload: {
+        learnId: string;
+        artifactId: string;
+        htmlPath?: string;
+        htmlContent?: string;
+      }
+    ) => {
+      let printWin: BrowserWindow | null = null;
+      try {
+        const projDir = path.join(
+          learnWorkspacesDir,
+          payload.learnId || "default",
+          "presentations",
+          payload.artifactId || `pres_${Date.now()}`
+        );
+        if (!fs.existsSync(projDir)) {
+          fs.mkdirSync(projDir, { recursive: true });
+        }
+
+        let targetHtmlPath = payload.htmlPath;
+        if (!targetHtmlPath || !fs.existsSync(targetHtmlPath)) {
+          targetHtmlPath = path.join(projDir, "presentation.html");
+          if (payload.htmlContent) {
+            fs.writeFileSync(targetHtmlPath, payload.htmlContent, "utf-8");
+          }
+        }
+
+        if (!fs.existsSync(targetHtmlPath)) {
+          return { success: false, error: "presentation.html does not exist on disk." };
+        }
+
+        const pdfPath = path.join(projDir, "presentation.pdf");
+
+        // Hidden window for Chromium 1920x1080 PDF render
+        printWin = new BrowserWindow({
+          show: false,
+          width: 1920,
+          height: 1080,
+          webPreferences: {
+            offscreen: true,
+            webSecurity: false,
+          },
+        });
+
+        await printWin.loadFile(targetHtmlPath);
+        // Let Google fonts, styles, and scripts settle
+        await new Promise((r) => setTimeout(r, 700));
+
+        const pdfBuffer = await printWin.webContents.printToPDF({
+          printBackground: true,
+          landscape: true,
+          pageSize: {
+            width: 1920000,
+            height: 1080000,
+          },
+          margins: {
+            top: 0,
+            bottom: 0,
+            left: 0,
+            right: 0,
+          },
+        });
+
+        fs.writeFileSync(pdfPath, pdfBuffer);
+
+        return {
+          success: true,
+          pdfPath,
+          pdfUrl: `const-media://file/${pdfPath.replace(/\\/g, "/")}`,
+          sizeBytes: pdfBuffer.length,
+        };
+      } catch (err: any) {
+        console.error("[Electron Presentation] export-pdf error:", err);
+        return { success: false, error: err.message || "Failed to export presentation PDF" };
+      } finally {
+        if (printWin) {
+          try {
+            printWin.close();
+          } catch {}
+        }
+      }
+    }
+  );
+
+  ipcMain.handle(
+    "presentation:check-status",
+    async (
+      _event,
+      payload: {
+        learnId: string;
+        artifactId: string;
+      }
+    ) => {
+      try {
+        const projDir = path.join(
+          learnWorkspacesDir,
+          payload.learnId || "default",
+          "presentations",
+          payload.artifactId
+        );
+        const htmlPath = path.join(projDir, "presentation.html");
+        const pdfPath = path.join(projDir, "presentation.pdf");
+
+        const hasHtml = fs.existsSync(htmlPath);
+        const hasPdf = fs.existsSync(pdfPath);
+
+        return {
+          success: true,
+          hasHtml,
+          hasPdf,
+          htmlPath: hasHtml ? htmlPath : undefined,
+          htmlUrl: hasHtml ? `const-media://file/${htmlPath.replace(/\\/g, "/")}` : undefined,
+          pdfPath: hasPdf ? pdfPath : undefined,
+          pdfUrl: hasPdf ? `const-media://file/${pdfPath.replace(/\\/g, "/")}` : undefined,
+        };
+      } catch (err: any) {
+        return { success: false, error: err.message };
+      }
+    }
+  );
+
   app.whenReady().then(() => {
-    // Register protocol handler for streaming local video and audio artifacts
+    // Register protocol handler for streaming local video, audio, pdf, and html artifacts
     protocol.handle("const-media", (request) => {
       try {
         const urlObj = new URL(request.url);
@@ -2033,6 +2266,8 @@ app.on("second-instance", (_event, commandLine) => {
           ".jpeg": "image/jpeg",
           ".gif": "image/gif",
           ".svg": "image/svg+xml",
+          ".pdf": "application/pdf",
+          ".html": "text/html",
         };
         const contentType = mimeTypes[ext] || "application/octet-stream";
 

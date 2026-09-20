@@ -48,11 +48,12 @@ import { FlashcardViewer } from "./flashcard-viewer";
 import { MindMapTab } from "./mind-map-tab";
 import { AudioSummaryViewer } from "./audio-summary-viewer";
 import { VideoSummaryViewer } from "./video-summary-viewer";
+import { PresentationViewer } from "./presentation-viewer";
 import { STUDIO_TOOLS } from "../workspace/studio-panel";
 import { useI18n } from "../../lib/i18n";
 import type { RightPaneTab, RightPaneTabType, BrowserSelectedElement } from "./types";
 import type { FileMutationRecord } from "@const/agent";
-import type { LocalArtifact, AudioSummaryData, VideoSummaryData } from "../../lib/db";
+import type { LocalArtifact, AudioSummaryData, VideoSummaryData, SlideDeckData } from "../../lib/db";
 
 export interface GeneratingArtifactStatus {
   id: string;
@@ -342,6 +343,34 @@ export function RightPane({
           );
         }
       }
+      if (tab.artifact?.type === "slides") {
+        const slideData =
+          (tab.artifact.data as SlideDeckData) ||
+          (() => {
+            try {
+              return typeof tab.artifact.content === "string"
+                ? JSON.parse(tab.artifact.content)
+                : null;
+            } catch {
+              return null;
+            }
+          })();
+        if (slideData) {
+          return (
+            <PresentationViewer
+              artifact={tab.artifact}
+              data={{
+                ...slideData,
+                id: tab.artifact.id || slideData.id,
+                learnId: tab.artifact.learnId || slideData.learnId,
+              }}
+              onExplainInChat={onExplainInChat}
+              onToggleExpand={onToggleCollapse}
+              isExpanded={!isCollapsed}
+            />
+          );
+        }
+      }
       return null;
     }
     if (tab.type === "mind_map") {
@@ -618,8 +647,11 @@ export function RightPane({
                         const isQuiz = art.type === "quiz";
                         const isFlashcard = art.type === "flashcard" || art.type === "flashcards";
                         const isVideo = art.type === "video_summary";
+                        const isSlides = art.type === "slides";
                         const defaultGeneratingTitle = isVideo
                           ? (language === "id" ? "Membuat Ringkasan Video..." : "Creating Video Summary...")
+                          : isSlides
+                          ? (language === "id" ? "Menyusun Presentasi..." : "Creating Presentation...")
                           : isMindMap
                           ? (language === "id" ? "Membuat Peta Pikiran..." : "Creating Mind Map...")
                           : isQuiz
@@ -635,6 +667,8 @@ export function RightPane({
                               "p-3 rounded-2xl bg-card flex items-center gap-3 select-none animate-pulse shadow-xs border",
                               isVideo
                                 ? "border-emerald-500/30"
+                                : isSlides
+                                ? "border-amber-500/30"
                                 : isMindMap
                                 ? "border-purple-500/30"
                                 : isQuiz
@@ -649,6 +683,8 @@ export function RightPane({
                                 "h-9 w-9 rounded-xl flex items-center justify-center shrink-0 border",
                                 isVideo
                                   ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
+                                  : isSlides
+                                  ? "bg-amber-500/10 border-amber-500/20 text-amber-400"
                                   : isMindMap
                                   ? "bg-purple-500/10 border-purple-500/20 text-purple-400"
                                   : isQuiz
@@ -663,6 +699,8 @@ export function RightPane({
                                   "h-4 w-4 animate-spin",
                                   isVideo
                                     ? "text-emerald-400"
+                                    : isSlides
+                                    ? "text-amber-400"
                                     : isMindMap
                                     ? "text-purple-400"
                                     : isQuiz
@@ -711,8 +749,8 @@ export function RightPane({
                         ? art.data.questions.length
                         : isFlashcard && art.data?.cards
                         ? art.data.cards.length
-                        : isSlides && art.data?.slides
-                        ? art.data.slides.length
+                        : isSlides
+                        ? (art.data?.slideCount || (art.data?.slides && art.data.slides.length > 0 ? art.data.slides.length : art.data?.canvaThumbnails?.length || null))
                         : isVideo && art.data?.scenes
                         ? art.data.scenes.length
                         : null;

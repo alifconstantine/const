@@ -24,10 +24,11 @@ import {
 } from "lucide-react";
 import { cn, toast } from "@const/ui";
 import { useI18n } from "../../lib/i18n";
-import { localDb, type LocalArtifact, type QuizData, type QuizQuestion, type FlashcardData, type FlashcardItem, type AudioSummaryData, type VideoSummaryData } from "../../lib/db";
+import { localDb, type LocalArtifact, type QuizData, type QuizQuestion, type FlashcardData, type FlashcardItem, type AudioSummaryData, type VideoSummaryData, type SlideDeckData } from "../../lib/db";
 import { getStoredVoiceConfig, synthesizeSpeechChunked } from "../../lib/voice";
 import { MobileMindMapViewer } from "./mobile-mind-map-viewer";
 import { VideoSummarySheet } from "./video-summary-sheet";
+import { MobilePresentationViewer } from "./mobile-presentation-viewer";
 
 export interface MobileArtifactReaderProps {
   open: boolean;
@@ -99,6 +100,31 @@ export function MobileArtifactReader({
         open={open}
         onClose={onClose}
         data={videoSummaryData}
+        onExplainInChat={onExplainInChat}
+      />
+    );
+  }
+
+  const isSlides = artifact.type === "slides" || Boolean(artifact.data?.slides);
+  const slideDeckData = isSlides
+    ? (artifact.data as SlideDeckData) ||
+      (() => {
+        try {
+          return typeof artifact.content === "string"
+            ? JSON.parse(artifact.content)
+            : null;
+        } catch {
+          return null;
+        }
+      })()
+    : null;
+
+  if (isSlides && slideDeckData) {
+    return (
+      <MobilePresentationViewer
+        artifact={artifact}
+        data={slideDeckData}
+        onClose={onClose}
         onExplainInChat={onExplainInChat}
       />
     );

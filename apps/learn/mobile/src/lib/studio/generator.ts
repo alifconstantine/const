@@ -1,6 +1,10 @@
-import type { LocalSource, QuizData, FlashcardData, MindMapData, MindMapNode, AudioSummaryData } from "../db";
+import type { LocalSource, QuizData, FlashcardData, MindMapData, MindMapNode, AudioSummaryData, SlideDeckData, SlideItem } from "../db";
 import { getRouterBaseUrl } from "../ai-stream";
 import { getStoredVoiceConfig, synthesizeSpeechChunked } from "../voice";
+import { buildPresentationHtml } from "./presentation-builder";
+import { executeCanvaMcp, executeComposioTool, renderPresentationPdfInSandbox, exportCanvaPresentation } from "../composio";
+export { exportCanvaPresentation };
+import { localDb } from "../db";
 
 export interface GenerateStudioArtifactOptions {
   type: "quiz" | "flashcard" | "mind_map" | "audio_summary";
@@ -903,3 +907,385 @@ Rules:
   };
   return { title: fallbackTitle, data: fallbackMindMap };
 }
+
+// ---------------------------------------------------------------------------
+// Presentation Slides Generator for Mobile (Native Cloud Sandbox, Canva, Google Slides)
+// ---------------------------------------------------------------------------
+
+export interface GeneratePresentationOptions {
+  artifactId?: string;
+  learnId: string;
+  sources: LocalSource[];
+  provider: "native" | "canva" | "slides";
+  lengthMode: "short" | "medium" | "long" | "auto";
+  slideCount?: number;
+  language?: "id" | "en";
+  themeId?: "bold_dark" | "swiss_blue" | "sea_indigo" | "ash_lime" | string;
+  customInstructions?: string;
+}
+
+export async function generatePresentationArtifact(
+  options: GeneratePresentationOptions
+): Promise<{ title: string; data: SlideDeckData }> {
+  const {
+    artifactId,
+    learnId,
+    sources,
+    provider = "native",
+    lengthMode = "auto",
+    slideCount,
+    language = "id",
+    themeId = "bold_dark",
+    customInstructions,
+  } = options;
+
+  const isIndo = language === "id";
+  const primaryTitle = sources[0]?.title || (isIndo ? "Materi Belajar" : "Study Material");
+
+  const sourceSnippets = sources
+    .slice(0, 5)
+    .map((s, idx) => {
+      const rawContent =
+        typeof s.content === "string"
+          ? s.content
+          : typeof s.content === "object" && s.content !== null
+          ? JSON.stringify(s.content)
+          : String(s.content || "");
+      const content = rawContent.slice(0, 4000);
+      return `### Sumber [${idx + 1}]: "${s.title}"\n${content}`;
+    })
+    .join("\n\n");
+
+  // Determine slide count
+  let targetCount = 6;
+  if (slideCount && slideCount > 0) {
+    targetCount = slideCount;
+  } else if (lengthMode === "short") {
+    targetCount = 4;
+  } else if (lengthMode === "long") {
+    targetCount = 10;
+  } else if (lengthMode === "medium") {
+    targetCount = 7;
+  } else {
+    targetCount = Math.min(8, Math.max(5, sources.length * 2));
+  }
+
+  // -------------------------------------------------------------------------
+  // PROVIDER 1: CANVA (Canva MCP on Composio)
+  // -------------------------------------------------------------------------
+  if (provider === "canva") {
+    const canvaLength: "short" | "balanced" | "comprehensive" =
+      targetCount <= 5 ? "short" : targetCount <= 15 ? "balanced" : "comprehensive";
+
+    const promptText = `Slide presentasi profesional tentang: "${primaryTitle}". Target: ${targetCount} slide. ${
+      customInstructions ? `Instruksi: "${customInstructions}". ` : ""
+    }Konteks: ${sourceSnippets.slice(0, 2000)}`;
+
+    let canvaResult: any = null;
+    try {
+      const res = await executeCanvaMcp({
+        prompt: promptText,
+        slideCount: targetCount,
+        length: canvaLength,
+      });
+
+      if (res && res.success) {
+        canvaResult = {
+          designId: res.designId,
+          title: res.title || primaryTitle,
+          pageCount: res.pageCount || targetCount,
+          editUrl: res.editUrl,
+          viewUrl: res.viewUrl,
+          thumbnails: res.thumbnails || [],
+        };
+      }
+    } catch (err) {
+      console.warn("[Mobile Presentation] Canva MCP invocation error:", err);
+    }
+
+    const fallbackUrl = `https://www.canva.com/search?q=${encodeURIComponent(primaryTitle + " presentation")}`;
+    const actualSlideCount = canvaResult?.pageCount || canvaResult?.thumbnails?.length || targetCount;
+
+    // Build representation slide items so sheet/activity list displays real slide count
+    const canvaSlides: SlideItem[] =
+      canvaResult?.thumbnails && canvaResult.thumbnails.length > 0
+        ? canvaResult.thumbnails.map((t: any, idx: number) => ({
+            id: `canva_slide_${idx + 1}`,
+            slideNumber: idx + 1,
+            title: `Slide ${idx + 1}`,
+            subtitle: canvaResult?.title || primaryTitle,
+            layout: "hero" as const,
+            speakerNotes: `Canva Slide #${idx + 1}`,
+          }))
+        : Array.from({ length: actualSlideCount }).map((_, idx) => ({
+            id: `canva_slide_${idx + 1}`,
+            slideNumber: idx + 1,
+            title: `Slide ${idx + 1}`,
+            subtitle: canvaResult?.title || primaryTitle,
+            layout: "hero" as const,
+            speakerNotes: `Canva Slide #${idx + 1}`,
+          }));
+
+    const deckData: SlideDeckData = {
+      id: artifactId,
+      learnId,
+      title: canvaResult?.title || primaryTitle,
+      provider: "canva",
+      lengthMode,
+      slideCount: actualSlideCount,
+      language,
+      themeId,
+      sourceCount: sources.length,
+      sourceTitles: sources.map((s) => s.title),
+      slides: canvaSlides,
+      canvaDesignId: canvaResult?.designId,
+      canvaEditUrl: canvaResult?.editUrl || fallbackUrl,
+      canvaViewUrl: canvaResult?.viewUrl || fallbackUrl,
+      canvaThumbnails: canvaResult?.thumbnails || [],
+      renderingStatus: "completed",
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+
+    return { title: deckData.title, data: deckData };
+  }
+
+  // -------------------------------------------------------------------------
+  // PROVIDER 2: GOOGLE SLIDES & PROVIDER 3: NATIVE (Open-Design 1920x1080)
+  // -------------------------------------------------------------------------
+  const effectiveTheme = provider === "slides" ? "swiss_blue" : (themeId || "bold_dark");
+
+  const systemPrompt = isIndo
+    ? `Anda adalah Lead Presentation Designer dan Slide Architect profesional.
+Tugas Anda adalah merancang Slide Presentasi kelas dunia (1920x1080 canvas deck) yang memukau, terstruktur, berbasis data riil dari materi sumber rujukan.
+
+ATURAN DESAIN OPEN-DESIGN & HARNESS:
+1. Target jumlah slide: TEPAT ${targetCount} slide.
+2. Setiap slide memiliki satu fokus visual (visual hierarchy) yang tajam.
+3. Gunakan ragam layout yang dinamis dan bervariasi:
+   - "hero": Slide pembuka dengan judul tebal, kicker tag, dan 3 kartu intisari.
+   - "metrics": Slide statistik & data kuantitatif dengan angka besar ("statHighlight" atau "numbers"), label, dan konteks.
+   - "comparison": Slide komparasi/perbandingan ("comparisonDetails") dengan aspek kiri dan kanan yang seimbang.
+   - "timeline": Slide alur proses, fase, atau arsitektur langkah demi langkah ("timelineSteps").
+   - "bento-grid": Slide 3-4 kartu pilar ("bentoCards") dengan badge, judul, dan deskripsi.
+   - "quote": Slide kutipan esensial ("quote") dengan text, author, context.
+   - "takeaway": Slide penutup dengan bullet kesimpulan dan langkah aksi.
+4. Tulis "speakerNotes" lengkap untuk setiap slide agar pembicara dapat menyampaikan materi dengan artikulatif dan percaya diri.
+5. ZERO SITASI: JANGAN pernah menyertakan tag sitasi seperti [source:...] dalam teks slide atau speaker notes. Teks harus 100% bersih dan siap presentasi profesional.
+6. MANDAT BAHASA: Tulis judul, isi slide, dan speaker notes dalam Bahasa Indonesia.
+7. Output WAJIB berupa JSON murni sesuai format spesifikasi.`
+    : `You are an elite Presentation Designer and Slide Architect.
+Your task is to craft a world-class 1920x1080 slide presentation deck from the provided source materials.
+
+OPEN-DESIGN SPECIFICATIONS:
+1. Target slide count: EXACTLY ${targetCount} slides.
+2. Distinct visual hierarchy for each slide.
+3. Use rich, varied layouts across slides: "hero", "metrics", "comparison", "timeline", "bento-grid", "quote", "takeaway".
+4. Include detailed "speakerNotes" for each slide.
+5. NO CITATION TAGS: Do not include [source:...] tags in the output.
+6. Language: Output 100% in English.
+7. Return pure JSON only matching the schema.`;
+
+  const userPrompt = `Materi Sumber Rujukan:\n${sourceSnippets || primaryTitle}\n\n${
+    customInstructions ? `Instruksi Khusus: "${customInstructions}"\n` : ""
+  }Target Jumlah Slide: TEPAT ${targetCount} slide.\nKeluarkan output JSON terstruktur ("title", "topic", "slides" dengan "slideNumber", "title", "subtitle", "layout", "kicker", "bullets", "bentoCards", "numbers", "statHighlight", "comparisonDetails", "timelineSteps", "speakerNotes").`;
+
+  let parsedResponse: any = null;
+  try {
+    const routerBaseUrl = getRouterBaseUrl();
+    const endpoint = `${routerBaseUrl}/chat/completions`;
+
+    const authToken =
+      (typeof localStorage !== "undefined" &&
+        (localStorage.getItem("const_auth_token") ||
+          localStorage.getItem("authToken") ||
+          localStorage.getItem("token") ||
+          localStorage.getItem("const_learn_auth_token") ||
+          localStorage.getItem("const_sso_token"))) ||
+      "";
+
+    const apiKey =
+      authToken ||
+      (import.meta as any).env?.VITE_CONST_ROUTER_API_KEY ||
+      (import.meta as any).env?.VITE_CONST_ENGINE_API_KEY ||
+      "";
+
+    const activeModel =
+      (typeof localStorage !== "undefined" &&
+        localStorage.getItem("const_learn_active_model")) ||
+      "gemini-3.8-flash";
+
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (apiKey) headers["Authorization"] = `Bearer ${apiKey}`;
+
+    const response = await fetch(endpoint, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        model: activeModel,
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        temperature: 0.3,
+      }),
+    });
+
+    if (response.ok) {
+      const json = await response.json();
+      const content = json.choices?.[0]?.message?.content;
+      if (content) {
+        parsedResponse = extractJson(content);
+      }
+    }
+  } catch (err) {
+    console.warn("[Mobile Presentation] Direct LLM completion error:", err);
+  }
+
+  const deckTitle = parsedResponse?.title || primaryTitle;
+  const rawSlides: any[] = Array.isArray(parsedResponse?.slides) ? parsedResponse.slides : [];
+
+  const slides: SlideItem[] =
+    rawSlides.length > 0
+      ? rawSlides.map((s, idx) => ({
+          id: `slide_${idx + 1}`,
+          slideNumber: s.slideNumber || idx + 1,
+          title: s.title || `Slide ${idx + 1}`,
+          subtitle: s.subtitle,
+          layout: s.layout || (idx === 0 ? "hero" : "bullets"),
+          kicker: s.kicker,
+          bullets: Array.isArray(s.bullets) ? s.bullets : [],
+          bentoCards: Array.isArray(s.bentoCards) ? s.bentoCards : undefined,
+          numbers: Array.isArray(s.numbers) ? s.numbers : undefined,
+          statHighlight: s.statHighlight,
+          comparisonDetails: s.comparisonDetails,
+          timelineSteps: Array.isArray(s.timelineSteps) ? s.timelineSteps : undefined,
+          quote: s.quote,
+          speakerNotes: s.speakerNotes,
+          accentTag: s.accentTag,
+        }))
+      : [
+          {
+            id: "slide_1",
+            slideNumber: 1,
+            title: deckTitle,
+            subtitle: isIndo ? "Ringkasan Eksekutif Materi" : "Executive Summary & Pillars",
+            layout: "hero",
+            kicker: "OVERVIEW",
+            bullets: [
+              isIndo ? "Konsep esensial materi rujukan" : "Essential reference concepts",
+              isIndo ? "Struktur logika dan metodologi" : "Methodology and framework",
+              isIndo ? "Hasil kunci dan kesimpulan" : "Key takeaways and insights",
+            ],
+            speakerNotes: isIndo
+              ? "Slide pengantar materi pembelajaran."
+              : "Introductory presentation slide.",
+          },
+          {
+            id: "slide_2",
+            slideNumber: 2,
+            title: isIndo ? "Pilar Inti Pembahasan" : "Core Knowledge Pillars",
+            subtitle: isIndo ? "Elemen dasar yang menopang konsep" : "Foundational elements",
+            layout: "bento-grid",
+            kicker: "KEY PILLARS",
+            bentoCards: [
+              { badge: "Pilar 1", title: isIndo ? "Konseptual" : "Conceptual", desc: isIndo ? "Definisi dan batasan konsep." : "Core definition and context." },
+              { badge: "Pilar 2", title: isIndo ? "Analisis" : "Analysis", desc: isIndo ? "Analisis mekanisme kerja." : "Mechanism and evaluation." },
+              { badge: "Pilar 3", title: isIndo ? "Penerapan" : "Execution", desc: isIndo ? "Langkah penerapan praktis." : "Practical execution steps." },
+            ],
+            speakerNotes: isIndo ? "Penjelasan tiga pilar utama materi." : "Overview of three core pillars.",
+          },
+          {
+            id: "slide_3",
+            slideNumber: 3,
+            title: isIndo ? "Kesimpulan & Rekomendasi" : "Summary & Action Points",
+            subtitle: isIndo ? "Poin kunci yang dapat segera diterapkan" : "Actionable next steps",
+            layout: "takeaway",
+            kicker: "SUMMARY",
+            bullets: [
+              isIndo ? "Pahami prinsip mula secara utuh" : "Understand core principles thoroughly",
+              isIndo ? "Implementasikan solusi secara bertahap" : "Implement steps progressively",
+              isIndo ? "Lakukan evaluasi berkala" : "Iterate with periodic evaluation",
+            ],
+            speakerNotes: isIndo ? "Kesimpulan penutup presentasi." : "Closing synthesis and takeaways.",
+          },
+        ];
+
+  let slidesResult: any = null;
+  if (provider === "slides") {
+    const markdownDeck = `Theme: corporate_blue\n\n# ${deckTitle}\n\n${sourceSnippets.slice(0, 2500)}`;
+    try {
+      const res = await executeComposioTool("GOOGLESLIDES_CREATE_SLIDES_MARKDOWN", {
+        title: deckTitle,
+        markdown_text: markdownDeck,
+      });
+      if (res?.success && res.data) {
+        const presId = res.data.presentation_id || res.data.presentationId || res.data.id;
+        if (presId) {
+          slidesResult = {
+            id: presId,
+            title: deckTitle,
+            url: `https://docs.google.com/presentation/d/${presId}/edit`,
+            embedUrl: `https://docs.google.com/presentation/d/${presId}/embed?start=false&loop=false&delayms=3000`,
+          };
+        }
+      }
+    } catch (err) {
+      console.warn("[Mobile Presentation] Google Slides execution error:", err);
+    }
+  }
+
+  const fallbackUrl = "https://docs.google.com/presentation/create";
+  const deckData: SlideDeckData = {
+    id: artifactId,
+    learnId,
+    title: deckTitle,
+    topic: parsedResponse?.topic || primaryTitle,
+    provider,
+    lengthMode,
+    slideCount: slides.length,
+    language,
+    themeId: effectiveTheme,
+    sourceCount: sources.length,
+    sourceTitles: sources.map((s) => s.title),
+    slides,
+    googleSlidesId: slidesResult?.id,
+    googleSlidesUrl: slidesResult?.url || (provider === "slides" ? fallbackUrl : undefined),
+    googleSlidesEmbedUrl: slidesResult?.embedUrl,
+    renderingStatus: "completed",
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  };
+
+  const htmlContent = buildPresentationHtml(deckData);
+  deckData.htmlContent = htmlContent;
+
+  // Mobile: Cloud Sandbox execution to render PDF via Composio CodeInterpreter (for native)
+  if (artifactId && provider === "native") {
+    (async () => {
+      try {
+        const sandboxRes = await renderPresentationPdfInSandbox({ htmlContent });
+        if (sandboxRes?.success && sandboxRes.pdfBase64) {
+          const pdfDataUrl = `data:application/pdf;base64,${sandboxRes.pdfBase64}`;
+          const existingArt = await localDb.getArtifact(artifactId);
+          if (existingArt) {
+            const updatedData: SlideDeckData = {
+              ...(existingArt.data as SlideDeckData),
+              pdfUrl: pdfDataUrl,
+              updatedAt: Date.now(),
+            };
+            await localDb.updateArtifact(artifactId, {
+              data: updatedData,
+              content: JSON.stringify(updatedData),
+            });
+          }
+        }
+      } catch (sandboxErr) {
+        console.warn("[Mobile Presentation] Sandbox PDF background render error:", sandboxErr);
+      }
+    })();
+  }
+
+  return { title: deckData.title, data: deckData };
+}
+

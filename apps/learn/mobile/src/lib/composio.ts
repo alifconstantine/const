@@ -286,6 +286,8 @@ print(f"Composio Sandbox Ready! Python {sys.version.split()[0]} on Linux.")
 export async function executeCanvaMcp(payload: {
   prompt: string;
   designType?: string;
+  slideCount?: number;
+  length?: "short" | "balanced" | "comprehensive";
   jobId?: string;
   candidateId?: string;
 }): Promise<{
@@ -343,13 +345,22 @@ export async function executeCanvaMcp(payload: {
       };
     }
 
+    // Dynamic Canva length determination
+    const canvaLength: "short" | "balanced" | "comprehensive" =
+      payload.length ||
+      (payload.slideCount && payload.slideCount > 15
+        ? "comprehensive"
+        : payload.slideCount && payload.slideCount > 5
+        ? "balanced"
+        : "short");
+
     // 2. Generate designs
     let genRes: Response;
     try {
       genRes = await runExec(sessionId, "CANVA_MCP_GENERATE_DESIGN", {
         query: payload.prompt,
         design_type: payload.designType || "presentation",
-        length: "short",
+        length: canvaLength,
       });
     } catch {
       genRes = await runExec(
@@ -358,7 +369,7 @@ export async function executeCanvaMcp(payload: {
         {
           query: payload.prompt,
           design_type: payload.designType || "presentation",
-          length: "short",
+          length: canvaLength,
         },
         baseUrl === "/composio-api" ? "https://backend.composio.dev/api/v3.1" : "/composio-api"
       );
@@ -369,7 +380,7 @@ export async function executeCanvaMcp(payload: {
       genRes = await runExec(sessionId, "CANVA_MCP_GENERATE_DESIGN", {
         query: payload.prompt,
         design_type: payload.designType || "presentation",
-        length: "short",
+        length: canvaLength,
       });
     }
 
@@ -504,4 +515,160 @@ else:
     durationMs: result.durationMs,
   };
 }
+
+/**
+ * Generic Composio Tool Execution helper for Mobile.
+ */
+export async function executeComposioTool(
+  toolSlug: string,
+  args: any
+): Promise<{ success: boolean; data?: any; error?: string }> {
+  const apiKey = getComposioApiKey();
+  const baseUrl = getComposioBaseUrl();
+  try {
+    let sessionId = await getOrCreateSessionId();
+    const runExec = async (sId: string, targetBase = baseUrl) => {
+      return await fetch(`${targetBase.replace(/\/+$/, "")}/tool_router/session/${sId}/execute`, {
+        method: "POST",
+        headers: {
+          "x-api-key": apiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          tool_slug: toolSlug,
+          arguments: args,
+        }),
+      });
+    };
+
+    let res = await runExec(sessionId);
+    if (res.status === 404 || res.status === 401) {
+      sessionId = await getOrCreateSessionId(true);
+      res = await runExec(sessionId);
+    }
+    if (!res.ok) {
+      const errText = await res.text().catch(() => "");
+      return { success: false, error: `Tool ${toolSlug} failed (HTTP ${res.status}): ${errText}` };
+    }
+    const json = await res.json();
+    return { success: true, data: json.data || json };
+  } catch (err: any) {
+    return { success: false, error: err?.message || String(err) };
+  }
+}
+
+/**
+ * Renders an Open-Design 1920x1080 HTML Presentation to PDF in Composio Cloud Sandbox.
+ */
+export async function renderPresentationPdfInSandbox(payload: {
+  htmlContent: string;
+}): Promise<{
+  success: boolean;
+  pdfBase64?: string;
+  error?: string | null;
+  durationMs: number;
+}> {
+  const pythonScript = `
+import os
+import sys
+import subprocess
+import base64
+
+html_data = """${payload.htmlContent.replace(/\\/g, "\\\\").replace(/"""/g, '\\"\\"\\"')}"
+"""
+
+workdir = "/tmp/const_presentation"
+os.makedirs(workdir, exist_ok=True)
+html_path = os.path.join(workdir, "index.html")
+with open(html_path, "w", encoding="utf-8") as f:
+    f.write(html_data)
+
+out_pdf = os.path.join(workdir, "presentation.pdf")
+
+# Attempt weasyprint or headless chromium if installed in sandbox
+cmd = ["weasyprint", "--page-size", "1920px 1080px", html_path, out_pdf]
+try:
+    subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+except Exception:
+    pass
+
+if not os.path.exists(out_pdf):
+    cmd2 = ["chromium", "--headless", "--disable-gpu", f"--print-to-pdf={out_pdf}", html_path]
+    try:
+        subprocess.run(cmd2, capture_output=True, text=True, timeout=60)
+    except Exception:
+        pass
+
+if os.path.exists(out_pdf):
+    with open(out_pdf, "rb") as f:
+        b64 = base64.b64encode(f.read()).decode("utf-8")
+    print(f"__PDF_DATA_START__{b64}__PDF_DATA_END__")
+else:
+    print("PDF_RENDER_SKIPPED")
+`;
+
+  const result = await executeCodeInterpreter(pythonScript, { timeout: 70 });
+
+  if (!result.success) {
+    return {
+      success: false,
+      error: result.error || result.stderr || "Sandbox execution failed",
+      durationMs: result.durationMs,
+    };
+  }
+
+  const match = result.stdout.match(/__PDF_DATA_START__([A-Za-z0-9+/=]+)__PDF_DATA_END__/);
+  if (match && match[1]) {
+    return {
+      success: true,
+      pdfBase64: match[1],
+      durationMs: result.durationMs,
+    };
+  }
+
+  return {
+    success: false,
+    error: "PDF rendering in sandbox was skipped or completed without binary",
+    durationMs: result.durationMs,
+  };
+}
+
+/**
+ * Exports a Canva presentation to downloadable file format (PDF, PPTX, PNG) via Canva MCP on Composio.
+ */
+export async function exportCanvaPresentation(options: {
+  designId?: string;
+  format?: "pdf" | "pptx" | "png";
+}): Promise<{ success: boolean; downloadUrl?: string; error?: string }> {
+  if (!options.designId) {
+    return { success: false, error: "Canva design ID is missing" };
+  }
+
+  const formatType = options.format || "pdf";
+
+  try {
+    const res = await executeComposioTool("CANVA_MCP_EXPORT_DESIGN", {
+      design_id: options.designId,
+      format: { type: formatType },
+      user_intent: `Export presentation as ${formatType.toUpperCase()}`,
+    });
+
+    if (res?.success && res.data) {
+      const downloadUrl =
+        res.data.url ||
+        res.data.download_url ||
+        res.data.export_url ||
+        res.data.job?.result?.export_url ||
+        res.data.job?.result?.download_url;
+
+      if (downloadUrl) {
+        return { success: true, downloadUrl };
+      }
+    }
+    return { success: false, error: res?.error || "Export did not return download URL" };
+  } catch (err: any) {
+    return { success: false, error: err?.message || String(err) };
+  }
+}
+
 
