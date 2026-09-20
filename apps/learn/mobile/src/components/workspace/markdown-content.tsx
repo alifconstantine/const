@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { marked, type Token, type Tokens } from "marked";
 import { Check, Copy, Download, Maximize2, X } from "lucide-react";
 import { cn } from "@const/ui";
-import { createMarkedLatexExtension, renderKatex, type MathToken } from "../../lib/marked-latex";
+import { createMarkedLatexExtension, renderKatex, sanitizeCurrencyAndMath, type MathToken } from "../../lib/marked-latex";
 import { convertReferencesToMarkdownLinks } from "../../lib/grounding/source-references";
 
 // Configure marked globally once with GitHub Flavored Markdown and LaTeX extensions
@@ -44,8 +44,11 @@ export function MarkdownContent({
 }: MarkdownContentProps) {
   if (!content || typeof content !== "string") return null;
 
+  // Sanitize currency and escaped math hallucinations (e.g. \1.60$ -> $1.60)
+  let normalizedContent = sanitizeCurrencyAndMath(content);
+
   // Normalize single-space indented list items so they parse cleanly into nested lists
-  let normalizedContent = content.replace(/\n( +)([*+-]) /g, (match, spaces, bullet) => {
+  normalizedContent = normalizedContent.replace(/\n( +)([*+-]) /g, (match, spaces, bullet) => {
     return spaces.length === 1 ? `\n  ${bullet} ` : match;
   });
 
@@ -688,7 +691,8 @@ function InlineRenderer({
 }) {
   const safeText = typeof text === "string" ? text : (text ? String(text) : "");
   if (!safeText) return null;
-  const normalized = convertReferencesToMarkdownLinks(safeText, sourcesMap);
+  const sanitized = sanitizeCurrencyAndMath(safeText);
+  const normalized = convertReferencesToMarkdownLinks(sanitized, sourcesMap);
   const html = marked.parseInline(normalized);
   if (typeof html === "string") {
     return (

@@ -20,6 +20,7 @@ export function renderKatex(
     return katex.renderToString(math, {
       displayMode,
       throwOnError: false,
+      errorColor: "inherit",
       output: "htmlAndMathml",
       ...options,
     });
@@ -28,8 +29,27 @@ export function renderKatex(
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;");
-    return `<span class="katex-error text-red-400 font-mono text-xs" title="KaTeX parse error">${escaped}</span>`;
+    return `<span class="katex-fallback font-mono text-xs">${escaped}</span>`;
   }
+}
+
+/**
+ * Sanitize common LLM currency hallucination patterns and broken escapes:
+ * e.g. "\1.60$", "$\1.60$", "\0.27$", "(\1.86$)" -> "$1.60", "$0.27", "($1.86)"
+ */
+export function sanitizeCurrencyAndMath(text: string): string {
+  if (!text || typeof text !== "string") return text;
+  
+  // 1. Convert patterns like \1.60$ or $\1.60$ or \0.27$ or \1.86$ into $1.60, $0.27, $1.86
+  let sanitized = text.replace(/(?:\\|\$)?\\(\d+(?:[.,]\d+)?)\$/g, "$$$1");
+
+  // 2. Convert raw backslash currency like "\$1.60" into "$1.60"
+  sanitized = sanitized.replace(/\\\$(\d+(?:[.,]\d+)?)/g, "$$$1");
+
+  // 3. Convert reverse currency like "1.60$" preceded by space/bracket/colon into "$1.60"
+  sanitized = sanitized.replace(/(^|[\s\(\[\{:])(\d+(?:[.,]\d+)?)\$/g, "$1$$$2");
+
+  return sanitized;
 }
 
 /**
@@ -118,8 +138,8 @@ export function createMarkedLatexExtension(
             // Ignore if leading or trailing space (standard LaTeX convention, prevents false positives)
             if (/^\s/.test(content) || /\s$/.test(content)) return;
 
-            // Ignore currency numbers: e.g. "$100", "$50.00", "$1,000"
-            if (/^\d+(?:[.,]\d+)?$/.test(content.trim())) return;
+            // Ignore currency numbers: e.g. "$100", "$50.00", "$1,000", "\$100", "100$", "\1.60$"
+            if (/^[\\\$]?\s*\d+(?:[.,]\d+)?\s*[\\\$]?$/.test(content.trim())) return;
 
             return {
               type: "inlineMath",

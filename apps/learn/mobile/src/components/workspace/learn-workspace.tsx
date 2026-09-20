@@ -25,7 +25,6 @@ import { ModelSelectionSheet } from "../home/sheets/model-selection-sheet";
 import { MobileArtifactReader } from "./mobile-artifact-reader";
 import { generateStudioArtifact, generatePresentationArtifact } from "../../lib/studio/generator";
 import { WorkingProcess } from "./working-process";
-import { MobileBrowserSheet } from "./mobile-browser-sheet";
 import { ImageLightbox } from "./image-lightbox";
 import {
   calculateConversationMetrics,
@@ -529,14 +528,10 @@ export function MobileLearnWorkspace({
   const [selectedReaderArtifact, setSelectedReaderArtifact] = useState<LocalArtifact | null>(null);
   const [isReaderOpen, setIsReaderOpen] = useState(false);
 
-  // In-App Mobile Browser State
-  const [activeBrowserUrl, setActiveBrowserUrl] = useState<string | null>(null);
-  const [isBrowserSheetOpen, setIsBrowserSheetOpen] = useState(false);
-
+  // Open link directly in user's default browser on mobile
   const handleOpenBrowser = (url: string) => {
     if (!url) return;
-    setActiveBrowserUrl(url);
-    setIsBrowserSheetOpen(true);
+    window.open(url, "_blank", "noopener,noreferrer");
   };
 
   // Local state
@@ -2728,16 +2723,6 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
         onClose={() => setIsReaderOpen(false)}
         artifact={selectedReaderArtifact}
         onExplainInChat={handleExplainInChat}
-      />
-
-      {/* In-App Mobile Browser Sheet */}
-      <MobileBrowserSheet
-        open={isBrowserSheetOpen}
-        url={activeBrowserUrl || ""}
-        onClose={() => {
-          setIsBrowserSheetOpen(false);
-          setActiveBrowserUrl(null);
-        }}
       />
 
       {/* Add Source Pop-up Modal */}

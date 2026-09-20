@@ -546,7 +546,7 @@ function ConnectorToolTraceItem({
     if (onOpenBrowser) {
       onOpenBrowser(url);
     } else {
-      window.open(url, "_blank");
+      window.open(url, "_blank", "noopener,noreferrer");
     }
   };
 
