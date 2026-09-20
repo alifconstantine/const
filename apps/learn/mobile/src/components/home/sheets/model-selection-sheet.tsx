@@ -63,7 +63,6 @@ import {
   saveStoredImageConfig,
   testImageModelConnectivity,
   testImageProviderConnection,
-  fetchRemoteImageModels,
 } from "../../../lib/image";
 
 export type ModelCategory = "llm" | "voice" | "image";
@@ -622,7 +621,6 @@ export function ModelSelectionSheet({
 
   const [isTestingImageConnection, setIsTestingImageConnection] = useState(false);
   const [testingImageModelId, setTestingImageModelId] = useState<string | null>(null);
-  const [isFetchingImageModels, setIsFetchingImageModels] = useState(false);
   const [newImageModelId, setNewImageModelId] = useState("");
   const [newImageModelName, setNewImageModelName] = useState("");
   const [isAddingImageModel, setIsAddingImageModel] = useState(false);
@@ -835,30 +833,6 @@ export function ModelSelectionSheet({
         ? `Model gambar aktif diubah ke ${modelId}`
         : `Active image model set to ${modelId}`
     );
-  };
-
-  const handleFetchImageModels = async () => {
-    if (!editImageFormData || !editImageFormData.baseUrl.trim()) {
-      toast.error(isIndo ? "Base URL wajib diisi terlebih dahulu." : "Base URL is required first.");
-      return;
-    }
-    setIsFetchingImageModels(true);
-    const res = await fetchRemoteImageModels(editImageFormData.baseUrl, editImageFormData.apiKey);
-    setIsFetchingImageModels(false);
-
-    if (res.success && res.models && res.models.length > 0) {
-      setEditImageFormData({
-        ...editImageFormData,
-        models: res.models,
-      });
-      toast.success(
-        isIndo
-          ? `Berhasil mengambil ${res.models.length} model gambar dari endpoint.`
-          : `Fetched ${res.models.length} image models from endpoint.`
-      );
-    } else {
-      toast.error(res.error || (isIndo ? "Gagal mengambil daftar model." : "Failed to fetch model list."));
-    }
   };
 
   return (
@@ -1999,19 +1973,13 @@ export function ModelSelectionSheet({
 
                           {/* 4. Models Catalog */}
                           <div className="space-y-2 pt-2 border-t border-border/40">
-                            <div className="flex items-center justify-between">
+                            <div>
                               <label className="text-[11px] font-medium text-foreground block">
                                 {isIndo ? "Model Gambar" : "Image Models"}
                               </label>
-                              <button
-                                type="button"
-                                onClick={handleFetchImageModels}
-                                disabled={isFetchingImageModels}
-                                className="text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-1 cursor-pointer disabled:opacity-50"
-                              >
-                                <RefreshCw className={cn("w-3 h-3", isFetchingImageModels && "animate-spin")} />
-                                <span>Fetch</span>
-                              </button>
+                              <span className="text-[10px] text-muted-foreground">
+                                {isIndo ? "Tambahkan Model ID secara manual." : "Add Model IDs manually."}
+                              </span>
                             </div>
 
                             {/* Models List */}
