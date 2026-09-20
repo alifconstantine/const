@@ -8,25 +8,51 @@ import {
   RotateCcw,
   Layers,
   ArrowLeft,
-  Link2,
-  Unlink2,
   ExternalLink,
-  ShieldCheck,
-  Sparkles,
+  Plus,
+  Cable,
+  Server,
+  MoreHorizontal,
+  Trash2,
   Search,
+  ShieldCheck,
+  ChevronDown,
+  ChevronRight,
+  Upload,
+  Download,
 } from "lucide-react";
 import {
+  Button,
+  Input,
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
+  Switch,
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  BrandLogo,
   AVAILABLE_CONNECTORS,
   type ConnectorMetadata,
-  BrandLogo,
-  Button,
   toast,
   cn,
 } from "@const/ui";
 import { useI18n } from "../../../lib/i18n";
 import {
+  type McpServerConfig,
   type McpConfigurationState,
-  MOBILE_PRESET_MCP_SERVERS,
+  type McpTransport,
+  type McpScope,
   getStoredMcpConfig,
   saveStoredMcpConfig,
   exportMcpJson,
@@ -39,7 +65,37 @@ import {
   disconnectConnector,
 } from "../../../lib/connectors-service";
 
-type TabView = "apps" | "json";
+type MainTab = "apps" | "custom_mcp";
+type CustomMcpSubTab = "servers" | "json";
+type FormMode = "form" | "json";
+type CategoryFilter = "All" | "Featured" | "Productivity" | "Creativity" | "Education" | "Developer";
+
+interface ServerFormData {
+  id?: string;
+  name: string;
+  scope: McpScope;
+  transport: McpTransport;
+  timeoutMs: number;
+  protocolVersion: string;
+  url: string;
+  headersText: string;
+  command: string;
+  argsText: string;
+  envText: string;
+}
+
+const DEFAULT_SERVER_FORM: ServerFormData = {
+  name: "my-mcp-server",
+  scope: "user",
+  transport: "http",
+  timeoutMs: 30000,
+  protocolVersion: "auto",
+  url: "https://mcp.example.com/mcp",
+  headersText: "{}",
+  command: "npx",
+  argsText: "",
+  envText: "{}",
+};
 
 interface McpToolsSheetProps {
   open: boolean;
@@ -50,52 +106,127 @@ export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
   const { language } = useI18n();
   const isIndo = language === "id";
 
-  const [activeTab, setActiveTab] = useState<TabView>("apps");
-  const [selectedConnector, setSelectedConnector] = useState<ConnectorMetadata | null>(null);
+  // Two Main Tabs: Apps & Tools (First) and Custom MCP (Second)
+  const [mainTab, setMainTab] = useState<MainTab>("apps");
+
+  // Apps & Tools State
+  const [selectedCategory, setSelectedCategory] = useState<CategoryFilter>("All");
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedConnector, setSelectedConnector] = useState<ConnectorMetadata | null>(null);
   const [connectedIds, setConnectedIds] = useState<string[]>(() => getConnectedConnectorIds());
-  const [isConnecting, setIsConnecting] = useState(false);
+  const [isConnectingId, setIsConnectingId] = useState<string | null>(null);
   const [copiedPromptIndex, setCopiedPromptIndex] = useState<number | null>(null);
 
-  // Raw JSON state (Tab 2)
+  // Custom MCP State
+  const [customMcpSubTab, setCustomMcpSubTab] = useState<CustomMcpSubTab>("servers");
   const [mcpConfig, setMcpConfig] = useState<McpConfigurationState>(() => getStoredMcpConfig());
-  const [rawJsonText, setRawJsonText] = useState("");
-  const [isCopiedJson, setIsCopiedJson] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Form / Editor View State (Image 3)
+  const [isEditingServer, setIsEditingServer] = useState(false);
+  const [isEditingExisting, setIsEditingExisting] = useState(false);
+  const [formMode, setFormMode] = useState<FormMode>("form");
+  const [formData, setFormData] = useState<ServerFormData>(DEFAULT_SERVER_FORM);
+  const [isHeadersOpen, setIsHeadersOpen] = useState(false);
+  const [isEnvOpen, setIsEnvOpen] = useState(false);
+  const [singleJsonText, setSingleJsonText] = useState("");
+
+  // Full JSON Config inside Custom MCP
+  const [fullJsonText, setFullJsonText] = useState("");
+  const [isCopiedFullJson, setIsCopiedFullJson] = useState(false);
+
+  // Import Dialog State
+  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
+  const [importJsonInput, setImportJsonInput] = useState("");
 
   useEffect(() => {
     if (open) {
       const stored = getStoredMcpConfig();
       setMcpConfig(stored);
-      setRawJsonText(exportMcpJson(stored));
+      setFullJsonText(exportMcpJson(stored));
       setConnectedIds(getConnectedConnectorIds());
       setSelectedConnector(null);
+      setIsEditingServer(false);
     }
   }, [open]);
 
+  useEffect(() => {
+    const handleUpdate = () => {
+      setMcpConfig(getStoredMcpConfig());
+      setConnectedIds(getConnectedConnectorIds());
+    };
+    window.addEventListener("mcp_servers_changed", handleUpdate);
+    window.addEventListener("connectors_changed", handleUpdate);
+    window.addEventListener("storage", handleUpdate);
+    return () => {
+      window.removeEventListener("mcp_servers_changed", handleUpdate);
+      window.removeEventListener("connectors_changed", handleUpdate);
+      window.removeEventListener("storage", handleUpdate);
+    };
+  }, []);
+
+  // Sync full json
+  useEffect(() => {
+    setFullJsonText(exportMcpJson(mcpConfig));
+  }, [mcpConfig]);
+
+  // Sync single json text
+  useEffect(() => {
+    if (formMode === "form") {
+      let parsedHeaders: Record<string, string> = {};
+      try {
+        if (formData.headersText.trim()) parsedHeaders = JSON.parse(formData.headersText);
+      } catch {}
+
+      let parsedEnv: Record<string, string> = {};
+      try {
+        if (formData.envText.trim()) parsedEnv = JSON.parse(formData.envText);
+      } catch {}
+
+      const singleObj: Record<string, any> = {
+        name: formData.name,
+        type: formData.transport,
+        scope: formData.scope,
+        timeoutMs: formData.timeoutMs,
+        protocolVersion: formData.protocolVersion,
+      };
+
+      if (formData.transport === "stdio") {
+        singleObj.command = formData.command;
+        singleObj.args = formData.argsText
+          ? formData.argsText.trim().split(/\s+/).filter(Boolean)
+          : [];
+        if (Object.keys(parsedEnv).length > 0) singleObj.env = parsedEnv;
+      } else {
+        singleObj.url = formData.url;
+        if (Object.keys(parsedHeaders).length > 0) singleObj.headers = parsedHeaders;
+      }
+
+      setSingleJsonText(JSON.stringify(singleObj, null, 2));
+    }
+  }, [formData, formMode]);
+
+  // Real Connectors Filtering (No dummy data)
   const filteredConnectors = useMemo(() => {
     return AVAILABLE_CONNECTORS.filter((c) => {
+      if (c.id === "cloud-sandbox") return false;
+      const matchCat = selectedCategory === "All" || c.category === selectedCategory;
       const q = searchQuery.toLowerCase().trim();
-      if (!q) return true;
-      return (
+      const matchSearch =
+        !q ||
         c.name.toLowerCase().includes(q) ||
         c.description.toLowerCase().includes(q) ||
-        c.skills.some((s) => s.toLowerCase().includes(q))
-      );
+        c.tagline.toLowerCase().includes(q) ||
+        c.skills.some((s) => s.toLowerCase().includes(q));
+      return matchCat && matchSearch;
     });
-  }, [searchQuery]);
+  }, [searchQuery, selectedCategory]);
 
-  const handleToggleConnect = async (connector: ConnectorMetadata) => {
-    if (connector.id === "cloud-sandbox") {
-      toast.info(
-        isIndo
-          ? "Cloud Sandbox adalah alat bawaan inti yang selalu aktif."
-          : "Cloud Sandbox is a core built-in tool that is always active."
-      );
-      return;
-    }
-
+  // Connect / Authorize Handler for Apps & Tools
+  const handleToggleConnect = async (connector: ConnectorMetadata, e?: React.MouseEvent) => {
+    e?.stopPropagation();
     const isActive = isConnectorActive(connector.id);
-    setIsConnecting(true);
+    setIsConnectingId(connector.id);
 
     try {
       if (isActive) {
@@ -116,62 +247,308 @@ export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
     } catch (err: any) {
       toast.error(err?.message || "Gagal mengubah status koneksi.");
     } finally {
-      setIsConnecting(false);
+      setIsConnectingId(null);
     }
   };
 
   const handleCopyPrompt = (prompt: string, idx: number) => {
     navigator.clipboard.writeText(prompt);
     setCopiedPromptIndex(idx);
-    toast.success(isIndo ? "Prompt disalin!" : "Prompt copied!");
+    toast.success(isIndo ? "Prompt disalin ke clipboard!" : "Prompt copied to clipboard!");
     setTimeout(() => setCopiedPromptIndex(null), 2000);
   };
 
-  // JSON Tab Actions
-  const handleApplyJson = () => {
-    try {
-      const parsed = importMcpJson(rawJsonText);
-      setMcpConfig(parsed);
-      saveStoredMcpConfig(parsed);
-      toast.success(isIndo ? "Konfigurasi JSON berhasil disimpan." : "JSON configuration saved successfully.");
-    } catch (err: any) {
-      toast.error(err?.message || "Format JSON tidak valid.");
+  // Custom MCP Handlers
+  const handleToggleServer = (serverId: string, nextChecked: boolean) => {
+    const updated = mcpConfig.servers.map((s) => {
+      if (s.id === serverId) {
+        return {
+          ...s,
+          enabled: nextChecked,
+          status: (nextChecked ? "ready" : "disabled") as any,
+        };
+      }
+      return s;
+    });
+    const nextConfig = { ...mcpConfig, servers: updated };
+    setMcpConfig(nextConfig);
+    saveStoredMcpConfig(nextConfig);
+    toast.success(
+      isIndo
+        ? `Server ${nextChecked ? "diaktifkan" : "dinonaktifkan"}.`
+        : `Server ${nextChecked ? "enabled" : "disabled"}.`
+    );
+  };
+
+  const handleRefresh = () => {
+    setIsRefreshing(true);
+    setTimeout(() => {
+      setIsRefreshing(false);
+      setMcpConfig(getStoredMcpConfig());
+      setConnectedIds(getConnectedConnectorIds());
+      toast.success(isIndo ? "Status server diperbarui." : "Server status refreshed.");
+    }, 500);
+  };
+
+  const handleOpenNewServer = () => {
+    setFormData(DEFAULT_SERVER_FORM);
+    setIsEditingExisting(false);
+    setFormMode("form");
+    setIsHeadersOpen(false);
+    setIsEnvOpen(false);
+    setIsEditingServer(true);
+  };
+
+  const handleEditServer = (server: McpServerConfig) => {
+    setFormData({
+      id: server.id,
+      name: server.name,
+      scope: server.scope || "user",
+      transport: server.transport,
+      timeoutMs: server.timeoutMs || 30000,
+      protocolVersion: server.protocolVersion || "auto",
+      url: server.url || "",
+      headersText:
+        server.headers && Object.keys(server.headers).length > 0
+          ? JSON.stringify(server.headers, null, 2)
+          : "{}",
+      command: server.command || "npx",
+      argsText: server.args ? server.args.join(" ") : "",
+      envText:
+        server.env && Object.keys(server.env).length > 0
+          ? JSON.stringify(server.env, null, 2)
+          : "{}",
+    });
+    setIsHeadersOpen(Boolean(server.headers && Object.keys(server.headers).length > 0));
+    setIsEnvOpen(Boolean(server.env && Object.keys(server.env).length > 0));
+    setIsEditingExisting(true);
+    setFormMode("form");
+    setIsEditingServer(true);
+  };
+
+  const handleSaveServer = () => {
+    if (formMode === "json") {
+      try {
+        const parsed = JSON.parse(singleJsonText);
+        if (!parsed.name && !formData.name) {
+          toast.error(isIndo ? "Name wajib diisi." : "Name is required.");
+          return;
+        }
+
+        const id =
+          formData.id ||
+          (parsed.name || formData.name)
+            .toLowerCase()
+            .trim()
+            .replace(/[^a-z0-9_-]/g, "-");
+
+        const isStdio = parsed.type === "stdio" || (!parsed.url && parsed.command);
+        const serverObj: McpServerConfig = {
+          id,
+          name: parsed.name || formData.name,
+          transport: (parsed.type || parsed.transport || (isStdio ? "stdio" : "http")) as McpTransport,
+          scope: parsed.scope || formData.scope,
+          timeoutMs: parsed.timeoutMs || formData.timeoutMs,
+          protocolVersion: parsed.protocolVersion || formData.protocolVersion,
+          command: parsed.command || (isStdio ? "npx" : undefined),
+          args: Array.isArray(parsed.args) ? parsed.args : [],
+          url: parsed.url,
+          headers: parsed.headers || {},
+          env: parsed.env || {},
+          enabled: true,
+          status: "ready",
+          isCustom: true,
+        };
+
+        const exists = mcpConfig.servers.some((s) => s.id === id);
+        let updatedServers: McpServerConfig[];
+        if (exists) {
+          updatedServers = mcpConfig.servers.map((s) => (s.id === id ? serverObj : s));
+        } else {
+          updatedServers = [...mcpConfig.servers, serverObj];
+        }
+
+        const nextConfig = { ...mcpConfig, servers: updatedServers };
+        setMcpConfig(nextConfig);
+        saveStoredMcpConfig(nextConfig);
+        setIsEditingServer(false);
+        toast.success(isIndo ? `Server ${serverObj.name} disimpan.` : `Server ${serverObj.name} saved.`);
+        return;
+      } catch (err: any) {
+        toast.error(
+          isIndo ? `Format JSON tidak valid: ${err?.message || ""}` : `Invalid JSON syntax: ${err?.message || ""}`
+        );
+        return;
+      }
+    }
+
+    // Form mode validation
+    if (!formData.name.trim()) {
+      toast.error(isIndo ? "Nama server wajib diisi." : "Server name is required.");
+      return;
+    }
+
+    if (formData.transport === "stdio" && !formData.command.trim()) {
+      toast.error(isIndo ? "Command wajib diisi untuk stdio." : "Command is required for stdio.");
+      return;
+    }
+
+    if ((formData.transport === "http" || formData.transport === "sse") && !formData.url.trim()) {
+      toast.error(isIndo ? "URL wajib diisi untuk HTTP/SSE." : "URL is required for HTTP/SSE.");
+      return;
+    }
+
+    let parsedHeaders: Record<string, string> = {};
+    if (formData.headersText.trim()) {
+      try {
+        parsedHeaders = JSON.parse(formData.headersText);
+      } catch {
+        toast.error(isIndo ? "Format Headers JSON tidak valid." : "Invalid Headers JSON syntax.");
+        return;
+      }
+    }
+
+    let parsedEnv: Record<string, string> = {};
+    if (formData.envText.trim()) {
+      try {
+        parsedEnv = JSON.parse(formData.envText);
+      } catch {
+        toast.error(isIndo ? "Format Environment variables JSON tidak valid." : "Invalid Environment variables JSON syntax.");
+        return;
+      }
+    }
+
+    const id =
+      formData.id ||
+      formData.name
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9_-]/g, "-");
+
+    const serverObj: McpServerConfig = {
+      id,
+      name: formData.name.trim(),
+      transport: formData.transport,
+      scope: formData.scope,
+      timeoutMs: Number(formData.timeoutMs) || 30000,
+      protocolVersion: formData.protocolVersion,
+      command: formData.transport === "stdio" ? formData.command.trim() : undefined,
+      args:
+        formData.transport === "stdio"
+          ? formData.argsText.trim().split(/\s+/).filter(Boolean)
+          : undefined,
+      url: formData.transport !== "stdio" ? formData.url.trim() : undefined,
+      headers: parsedHeaders,
+      env: parsedEnv,
+      enabled: true,
+      status: "ready",
+      isCustom: true,
+    };
+
+    const exists = mcpConfig.servers.some((s) => s.id === id);
+    let updatedServers: McpServerConfig[];
+    if (exists) {
+      updatedServers = mcpConfig.servers.map((s) => (s.id === id ? serverObj : s));
+    } else {
+      updatedServers = [...mcpConfig.servers, serverObj];
+    }
+
+    const nextConfig = { ...mcpConfig, servers: updatedServers };
+    setMcpConfig(nextConfig);
+    saveStoredMcpConfig(nextConfig);
+    setIsEditingServer(false);
+    toast.success(isIndo ? `Server ${serverObj.name} disimpan.` : `Server ${serverObj.name} saved.`);
+  };
+
+  const handleDeleteServer = (serverId: string) => {
+    const updated = mcpConfig.servers.filter((s) => s.id !== serverId);
+    const nextConfig = { ...mcpConfig, servers: updated };
+    setMcpConfig(nextConfig);
+    saveStoredMcpConfig(nextConfig);
+    setIsEditingServer(false);
+    toast.success(isIndo ? "Server berhasil dihapus." : "Server deleted.");
+  };
+
+  const handleResetAllServers = () => {
+    if (
+      window.confirm(
+        isIndo
+          ? "Apakah Anda yakin ingin menghapus semua server MCP kustom?"
+          : "Are you sure you want to clear all custom MCP servers?"
+      )
+    ) {
+      const nextConfig = { ...mcpConfig, servers: [] };
+      setMcpConfig(nextConfig);
+      saveStoredMcpConfig(nextConfig);
+      toast.success(isIndo ? "Semua server kustom dibersihkan." : "All custom servers cleared.");
     }
   };
 
-  const handleResetToPresets = () => {
-    const defaultConfig: McpConfigurationState = { servers: MOBILE_PRESET_MCP_SERVERS };
-    setMcpConfig(defaultConfig);
-    setRawJsonText(exportMcpJson(defaultConfig));
-    saveStoredMcpConfig(defaultConfig);
-    toast.success(isIndo ? "Reset ke preset default berhasil." : "Reset to default presets successfully.");
+  const handleSaveFullJson = () => {
+    try {
+      const imported = importMcpJson(fullJsonText);
+      setMcpConfig(imported);
+      saveStoredMcpConfig(imported);
+      toast.success(
+        isIndo
+          ? `Konfigurasi disimpan (${imported.servers.length} server).`
+          : `Configuration saved (${imported.servers.length} servers).`
+      );
+    } catch (err: any) {
+      toast.error(
+        isIndo
+          ? `Gagal menyimpan: ${err?.message || "Format JSON tidak valid"}`
+          : `Failed to save: ${err?.message || "Invalid JSON syntax"}`
+      );
+    }
   };
 
-  const handleCopyJson = () => {
-    navigator.clipboard.writeText(rawJsonText);
-    setIsCopiedJson(true);
-    toast.success(isIndo ? "JSON berhasil disalin." : "JSON copied to clipboard.");
-    setTimeout(() => setIsCopiedJson(false), 2000);
+  const handleCopyFullJson = () => {
+    navigator.clipboard.writeText(fullJsonText);
+    setIsCopiedFullJson(true);
+    toast.success(isIndo ? "mcpServers.json berhasil disalin." : "mcpServers.json copied to clipboard.");
+    setTimeout(() => setIsCopiedFullJson(false), 2000);
+  };
+
+  const handleImportSubmit = () => {
+    try {
+      const imported = importMcpJson(importJsonInput);
+      setMcpConfig(imported);
+      saveStoredMcpConfig(imported);
+      setIsImportDialogOpen(false);
+      setImportJsonInput("");
+      toast.success(
+        isIndo
+          ? `Berhasil mengimpor ${imported.servers.length} server.`
+          : `Successfully imported ${imported.servers.length} servers.`
+      );
+    } catch (err: any) {
+      toast.error(
+        isIndo
+          ? `Gagal mengimpor: ${err?.message || "Format JSON tidak valid"}`
+          : `Import failed: ${err?.message || "Invalid JSON format"}`
+      );
+    }
   };
 
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-xs p-0 sm:p-4 animate-in fade-in-50 duration-200">
-      <div className="w-full sm:max-w-xl h-[88vh] sm:h-[82vh] max-h-[750px] bg-background border border-border rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-5 duration-300">
-        {/* Top Drag Indicator (Mobile) */}
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-xs p-0 sm:p-4 animate-in fade-in-50 duration-200 font-sans">
+      <div className="w-full sm:max-w-2xl h-[92vh] sm:h-[85vh] max-h-[850px] bg-background border border-border rounded-t-3xl sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom-5 duration-300">
+        {/* Top Drag Handle (Mobile) */}
         <div className="w-full pt-3 pb-1 flex justify-center sm:hidden">
           <div className="w-10 h-1.5 rounded-full bg-border" />
         </div>
 
-        {/* Sheet Header */}
-        <div className="px-5 py-3 border-b border-border/60 flex items-center justify-between shrink-0">
+        {/* Sheet Top Header */}
+        <div className="px-4 sm:px-6 py-3.5 border-b border-border/60 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2">
             <h2 className="text-base font-semibold text-foreground tracking-tight">
-              {isIndo ? "Connectors & Integrasi MCP" : "Connectors & MCP Integrations"}
+              {isIndo ? "MCP Tools & Konektor" : "MCP Tools & Connectors"}
             </h2>
             <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10.5px] font-medium border border-primary/20">
-              {connectedIds.length} {isIndo ? "Aktif" : "Active"}
+              {mainTab === "apps" ? `${filteredConnectors.length} Connectors` : `${mcpConfig.servers.length} Installed`}
             </span>
           </div>
 
@@ -184,225 +561,300 @@ export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
           </button>
         </div>
 
-        {/* Tabs Bar */}
-        <div className="px-5 pt-3 shrink-0 flex items-center justify-between gap-2 border-b border-border/40 pb-2">
-          <div className="flex items-center bg-secondary/50 p-1 rounded-xl border border-border w-full">
+        {/* Main Tab Switcher - Left-Aligned Below Header (NOT in top right) */}
+        <div className="px-4 sm:px-6 pt-2.5 shrink-0 flex items-center gap-2 border-b border-border/40 pb-2.5">
+          <div className="flex items-center p-1 rounded-xl bg-secondary/50 border border-border w-full sm:w-auto">
             <button
               type="button"
               onClick={() => {
-                setActiveTab("apps");
+                setMainTab("apps");
                 setSelectedConnector(null);
+                setIsEditingServer(false);
               }}
               className={cn(
-                "flex-1 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1.5 cursor-pointer",
-                activeTab === "apps"
+                "flex-1 sm:flex-initial px-4 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1.5 cursor-pointer",
+                mainTab === "apps"
                   ? "bg-card text-foreground shadow-xs font-semibold"
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
               <Layers className="w-3.5 h-3.5" />
-              <span>{isIndo ? "Aplikasi & Tools" : "Apps & Tools"}</span>
+              <span>{isIndo ? "Apps & Tools" : "Apps & Tools"}</span>
             </button>
+
             <button
               type="button"
-              onClick={() => setActiveTab("json")}
+              onClick={() => {
+                setMainTab("custom_mcp");
+                setSelectedConnector(null);
+                setIsEditingServer(false);
+              }}
               className={cn(
-                "flex-1 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1.5 cursor-pointer",
-                activeTab === "json"
+                "flex-1 sm:flex-initial px-4 py-1.5 rounded-lg text-xs font-medium transition-all flex items-center justify-center gap-1.5 cursor-pointer",
+                mainTab === "custom_mcp"
                   ? "bg-card text-foreground shadow-xs font-semibold"
                   : "text-muted-foreground hover:text-foreground"
               )}
             >
               <Code2 className="w-3.5 h-3.5" />
-              <span>{isIndo ? "MCP JSON" : "MCP JSON"}</span>
+              <span>{isIndo ? "Custom MCP" : "Custom MCP"}</span>
+              {mcpConfig.servers.length > 0 && (
+                <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-secondary font-mono">
+                  {mcpConfig.servers.length}
+                </span>
+              )}
             </button>
           </div>
         </div>
 
-        {/* Sheet Content Area (Scrollable) */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4">
+        {/* Scrollable Content Body */}
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
           {/* ============================================================= */}
-          {/* TAB 1: APPS & CONNECTORS (LIST VIEW)                          */}
+          {/* TAB 1: APPS & TOOLS (Real Connectors with Open Authorization) */}
           {/* ============================================================= */}
-          {activeTab === "apps" && !selectedConnector && (
+          {mainTab === "apps" && !selectedConnector && (
             <div className="space-y-4">
-              {/* Search Bar */}
-              <div className="relative">
-                <Search className="w-3.5 h-3.5 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  placeholder={isIndo ? "Cari aplikasi atau tools..." : "Search apps or tools..."}
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-8 pr-3 py-1.5 text-xs rounded-xl bg-secondary/40 border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/30 transition-colors"
-                />
+              {/* Search & Category Pills */}
+              <div className="space-y-2.5">
+                <div className="relative w-full">
+                  <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    placeholder={isIndo ? "Cari aplikasi, alat, atau skill..." : "Search apps, tools, or skills..."}
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2 text-xs rounded-xl bg-secondary/40 border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/40 transition-colors"
+                  />
+                </div>
+
+                {/* Category Filters */}
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+                  {(["All", "Featured", "Productivity", "Creativity", "Education", "Developer"] as CategoryFilter[]).map(
+                    (cat) => (
+                      <button
+                        key={cat}
+                        type="button"
+                        onClick={() => setSelectedCategory(cat)}
+                        className={cn(
+                          "px-3 py-1 rounded-lg text-xs font-medium whitespace-nowrap transition-colors cursor-pointer",
+                          selectedCategory === cat
+                            ? "bg-foreground text-background"
+                            : "bg-secondary/40 text-muted-foreground hover:text-foreground hover:bg-secondary border border-border/60"
+                        )}
+                      >
+                        {cat}
+                      </button>
+                    )
+                  )}
+                </div>
               </div>
 
-              {/* Connectors List */}
+              {/* Connectors List (Matching Image 1: Open Authorization style) */}
               <div className="space-y-2.5">
                 {filteredConnectors.map((connector) => {
                   const isConnected = isConnectorActive(connector.id);
+                  const isConnecting = isConnectingId === connector.id;
 
                   return (
                     <div
                       key={connector.id}
                       onClick={() => setSelectedConnector(connector)}
-                      className={cn(
-                        "p-3.5 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-3 active:scale-[0.99]",
-                        isConnected
-                          ? "bg-card border-emerald-500/30 hover:border-emerald-500/50"
-                          : "bg-card/60 border-border hover:bg-secondary/30"
-                      )}
+                      className="group rounded-2xl border border-border/70 bg-card/60 hover:bg-secondary/20 transition-all p-3.5 flex items-center justify-between gap-3 cursor-pointer"
                     >
                       <div className="flex items-center gap-3 min-w-0">
-                        <BrandLogo id={connector.id} name={connector.name} size="sm" />
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-xs font-semibold text-foreground truncate">
-                              {connector.name}
-                            </span>
-                            {connector.isBuiltin && (
-                              <span className="text-[9.5px] px-1.5 py-0.2 rounded bg-primary/10 text-primary font-medium">
-                                Core
-                              </span>
+                        {/* Logo Box with Status Dot */}
+                        <div className="w-10 h-10 rounded-xl bg-secondary/80 border border-border flex items-center justify-center relative shrink-0">
+                          <BrandLogo id={connector.id} name={connector.name} size="md" />
+                          <span
+                            className={cn(
+                              "w-2.5 h-2.5 rounded-full ring-2 ring-card absolute -bottom-0.5 -right-0.5 transition-colors",
+                              isConnected ? "bg-emerald-500" : "bg-amber-400 ring-amber-400/30"
                             )}
+                            title={isConnected ? "Connected" : "Needs Authorization"}
+                          />
+                        </div>
+
+                        {/* Title & Subtitle */}
+                        <div className="min-w-0 space-y-0.5">
+                          <div className="flex items-center gap-2">
+                            <h4 className="text-xs font-semibold text-foreground group-hover:text-primary transition-colors truncate">
+                              {connector.name}
+                            </h4>
+                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-secondary text-muted-foreground font-mono shrink-0">
+                              {connector.authType}
+                            </span>
                           </div>
-                          <p className="text-[11px] text-muted-foreground truncate max-w-[200px] sm:max-w-xs">
-                            {connector.tagline}
+                          <p className="text-[11px] text-muted-foreground leading-relaxed line-clamp-1">
+                            {isConnected
+                              ? (isIndo ? "Konektor plugin ini sudah terhubung dan tersedia." : "This plugin MCP server is connected and available.")
+                              : (isIndo ? "Buka otorisasi untuk menyelesaikan koneksi plugin MCP ini." : "Open authorization to finish connecting this plugin MCP server.")}
                           </p>
                         </div>
                       </div>
 
-                      <div className="shrink-0 flex items-center gap-2">
-                        {isConnected ? (
-                          <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10.5px] font-medium border border-emerald-500/20">
-                            <Check className="w-2.5 h-2.5" />
-                            <span>{isIndo ? "Aktif" : "Active"}</span>
-                          </span>
+                      {/* Right Action: Open Authorization (Cyan link) or Disconnect */}
+                      <div className="shrink-0 flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                        {!isConnected ? (
+                          <button
+                            type="button"
+                            disabled={isConnecting}
+                            onClick={(e) => handleToggleConnect(connector, e)}
+                            className="text-cyan-400 hover:text-cyan-300 transition-colors text-xs font-medium flex items-center gap-1 cursor-pointer whitespace-nowrap"
+                          >
+                            <ExternalLink className="w-3 h-3" />
+                            <span>{isConnecting ? (isIndo ? "Menghubungkan..." : "Connecting...") : (isIndo ? "Buka otorisasi" : "Open authorization")}</span>
+                          </button>
                         ) : (
-                          <span className="px-2 py-0.5 rounded-full bg-secondary text-muted-foreground text-[10.5px] font-medium border border-border">
-                            {isIndo ? "Tersedia" : "Ready"}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 text-[10.5px] font-medium border border-emerald-500/20">
+                              <Check className="w-3 h-3" />
+                              <span>{isIndo ? "Terhubung" : "Connected"}</span>
+                            </span>
+                            <button
+                              type="button"
+                              disabled={isConnecting || connector.isBuiltin}
+                              onClick={(e) => handleToggleConnect(connector, e)}
+                              className="text-[11px] text-muted-foreground hover:text-destructive transition-colors cursor-pointer px-1.5 py-1"
+                            >
+                              {isIndo ? "Putus" : "Disconnect"}
+                            </button>
+                          </div>
                         )}
-                        <span className="text-muted-foreground text-xs">›</span>
                       </div>
                     </div>
                   );
                 })}
+
+                {filteredConnectors.length === 0 && (
+                  <div className="text-center py-10 rounded-2xl border border-dashed border-border bg-card/40">
+                    <p className="text-xs text-muted-foreground">
+                      {isIndo
+                        ? `Tidak ada aplikasi yang sesuai dengan "${searchQuery}".`
+                        : `No connectors found matching "${searchQuery}".`}
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           )}
 
-          {/* ============================================================= */}
-          {/* TAB 1: CONNECTOR DETAIL VIEW (Mobile)                         */}
-          {/* ============================================================= */}
-          {activeTab === "apps" && selectedConnector && (
+          {/* Single Connector Detail View */}
+          {mainTab === "apps" && selectedConnector && (
             <div className="space-y-4 animate-in fade-in-50 duration-200">
-              {/* Back to List */}
               <button
                 type="button"
                 onClick={() => setSelectedConnector(null)}
-                className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground cursor-pointer"
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border hover:bg-secondary text-xs font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
               >
                 <ArrowLeft className="w-3.5 h-3.5" />
-                <span>{isIndo ? "Kembali ke Daftar" : "Back to List"}</span>
+                <span>{isIndo ? "Kembali ke Semua Connectors" : "Back to All Connectors"}</span>
               </button>
 
-              {/* Hero Card */}
-              <div className="p-4 rounded-2xl border border-border bg-card/70 space-y-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex items-center gap-3">
-                    <BrandLogo id={selectedConnector.id} name={selectedConnector.name} size="md" />
-                    <div>
-                      <h3 className="text-sm font-semibold text-foreground">
+              <div className="p-4 rounded-2xl border border-border bg-card/80 space-y-4">
+                <div className="flex items-start gap-3.5">
+                  <BrandLogo id={selectedConnector.id} name={selectedConnector.name} size="md" />
+                  <div className="space-y-1 min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="text-base font-semibold text-foreground">
                         {selectedConnector.name}
                       </h3>
-                      <div className="flex items-center gap-1.5 text-[10.5px] text-muted-foreground">
-                        <span>{selectedConnector.category}</span>
-                        <span>•</span>
-                        <span>{selectedConnector.authType}</span>
-                        <span>•</span>
-                        <span>{selectedConnector.toolCount} Tools</span>
-                      </div>
+                      <span className="px-1.5 py-0.2 rounded bg-secondary text-muted-foreground text-[10px] font-mono border border-border/70">
+                        {selectedConnector.authType}
+                      </span>
+                      <span className="px-1.5 py-0.2 rounded bg-secondary text-muted-foreground text-[10px] font-medium border border-border/70">
+                        {selectedConnector.category}
+                      </span>
                     </div>
-                  </div>
-
-                  {/* Connect / Disconnect Action */}
-                  <div className="shrink-0">
-                    {isConnectorActive(selectedConnector.id) ? (
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        disabled={isConnecting || selectedConnector.isBuiltin}
-                        onClick={() => handleToggleConnect(selectedConnector)}
-                        className="rounded-xl h-8 text-[11px] px-3 cursor-pointer"
-                      >
-                        <Unlink2 className="w-3 h-3 mr-1" />
-                        <span>{isIndo ? "Putus" : "Disconnect"}</span>
-                      </Button>
-                    ) : (
-                      <Button
-                        variant="default"
-                        size="sm"
-                        disabled={isConnecting}
-                        onClick={() => handleToggleConnect(selectedConnector)}
-                        className="rounded-xl h-8 text-[11px] px-3 cursor-pointer bg-foreground text-background"
-                      >
-                        <Link2 className="w-3 h-3 mr-1" />
-                        <span>{isIndo ? "Hubungkan" : "Connect"}</span>
-                      </Button>
-                    )}
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      {selectedConnector.tagline}
+                    </p>
+                    <div className="text-[10.5px] text-muted-foreground/80 flex items-center gap-2 pt-0.5 flex-wrap">
+                      <span>{selectedConnector.info.developer}</span>
+                      <span>•</span>
+                      <span>v{selectedConnector.info.version}</span>
+                      <span>•</span>
+                      <span>{selectedConnector.toolCount} Available Tools</span>
+                    </div>
                   </div>
                 </div>
 
+                <div className="pt-2">
+                  {isConnectorActive(selectedConnector.id) ? (
+                    <Button
+                      variant="destructive"
+                      size="sm"
+                      disabled={isConnectingId === selectedConnector.id || selectedConnector.isBuiltin}
+                      onClick={(e) => handleToggleConnect(selectedConnector, e)}
+                      className="w-full rounded-xl text-xs h-8 cursor-pointer"
+                    >
+                      <span>{isIndo ? "Putuskan Koneksi" : "Disconnect"}</span>
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="default"
+                      size="sm"
+                      disabled={isConnectingId === selectedConnector.id}
+                      onClick={(e) => handleToggleConnect(selectedConnector, e)}
+                      className="w-full rounded-xl text-xs h-8 cursor-pointer bg-cyan-600 hover:bg-cyan-500 text-white"
+                    >
+                      <ExternalLink className="w-3.5 h-3.5 mr-1" />
+                      <span>{isIndo ? "Buka Otorisasi & Hubungkan" : "Open Authorization & Connect"}</span>
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              {/* Description & Capabilities */}
+              <div className="p-4 rounded-2xl border border-border bg-card/50 space-y-2.5">
+                <h4 className="text-xs font-semibold text-foreground">
+                  {isIndo ? "Deskripsi" : "Description"}
+                </h4>
                 <p className="text-xs text-muted-foreground leading-relaxed">
                   {selectedConnector.description}
                 </p>
               </div>
 
-              {/* Skills */}
-              <div className="p-4 rounded-2xl border border-border bg-card/40 space-y-2.5">
-                <h4 className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                  <ShieldCheck className="w-3.5 h-3.5 text-emerald-500" />
-                  <span>{isIndo ? "Kemampuan (Tools)" : "Capabilities & Tools"}</span>
+              <div className="p-4 rounded-2xl border border-border bg-card/50 space-y-2.5">
+                <h4 className="text-xs font-semibold text-foreground flex items-center gap-2">
+                  <ShieldCheck className="w-4 h-4 text-emerald-500" />
+                  <span>{isIndo ? "Kemampuan & Tools" : "Skills & Capabilities"}</span>
                 </h4>
-                <div className="space-y-1.5">
+                <div className="grid grid-cols-1 gap-1.5 pt-0.5">
                   {selectedConnector.skills.map((skill, i) => (
                     <div
                       key={i}
-                      className="px-2.5 py-1.5 rounded-lg bg-secondary/30 border border-border/60 text-[11px] text-foreground flex items-center gap-2"
+                      className="p-2 rounded-xl bg-secondary/40 border border-border/60 text-xs text-foreground flex items-center gap-2"
                     >
                       <div className="w-1.5 h-1.5 rounded-full bg-primary shrink-0" />
-                      <span>{skill}</span>
+                      <span className="truncate">{skill}</span>
                     </div>
                   ))}
                 </div>
               </div>
 
-              {/* Try Prompts */}
               {selectedConnector.tryPrompts && selectedConnector.tryPrompts.length > 0 && (
-                <div className="p-4 rounded-2xl border border-border bg-card/40 space-y-2.5">
-                  <h4 className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-primary" />
-                    <span>{isIndo ? "Contoh Prompt Belajar" : "Example Study Prompts"}</span>
+                <div className="p-4 rounded-2xl border border-border bg-card/50 space-y-2.5">
+                  <h4 className="text-xs font-semibold text-foreground">
+                    {isIndo ? "Contoh Prompt Belajar" : "Example Study Prompts"}
                   </h4>
-                  <div className="space-y-1.5">
-                    {selectedConnector.tryPrompts.map((p, idx) => (
+                  <div className="space-y-2">
+                    {selectedConnector.tryPrompts.map((prompt, idx) => (
                       <div
                         key={idx}
-                        onClick={() => handleCopyPrompt(p, idx)}
-                        className="p-2.5 rounded-lg bg-secondary/30 border border-border hover:bg-secondary/60 transition-colors cursor-pointer flex items-center justify-between gap-2"
+                        onClick={() => handleCopyPrompt(prompt, idx)}
+                        className="p-2.5 rounded-xl bg-secondary/30 border border-border hover:bg-secondary/60 transition-colors cursor-pointer flex items-center justify-between gap-2"
+                        title="Click to copy prompt"
                       >
-                        <span className="text-[11px] font-mono text-foreground/90 line-clamp-2 select-none">
-                          {p}
-                        </span>
-                        <span className="shrink-0 text-muted-foreground text-xs">
+                        <p className="text-xs text-foreground/90 font-mono select-none">
+                          {prompt}
+                        </p>
+                        <button type="button" className="p-1 rounded text-muted-foreground hover:text-foreground shrink-0">
                           {copiedPromptIndex === idx ? (
-                            <CheckCheck className="w-3 h-3 text-emerald-500" />
+                            <CheckCheck className="w-3.5 h-3.5 text-emerald-500" />
                           ) : (
-                            <Copy className="w-3 h-3" />
+                            <Copy className="w-3.5 h-3.5" />
                           )}
-                        </span>
+                        </button>
                       </div>
                     ))}
                   </div>
@@ -412,62 +864,523 @@ export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
           )}
 
           {/* ============================================================= */}
-          {/* TAB 2: RAW MCP JSON CONFIG (Mobile)                           */}
+          {/* TAB 2: CUSTOM MCP (Full JSON & Servers inside, Image 2 & 3)   */}
           {/* ============================================================= */}
-          {activeTab === "json" && (
-            <div className="space-y-3">
-              <div className="p-3 rounded-xl bg-secondary/30 border border-border text-[11px] text-muted-foreground leading-relaxed">
-                {isIndo
-                  ? "Format JSON ini kompatibel dengan standar mcpServers (Antigravity & Claude Desktop)."
-                  : "Adheres to standard mcpServers schema for Antigravity & Claude Desktop."}
-              </div>
+          {mainTab === "custom_mcp" && (
+            <div className="space-y-4">
+              {/* Sub-toolbar inside Custom MCP: Switcher (Servers | JSON Config) + Add Server */}
+              {!isEditingServer && (
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center p-0.5 rounded-xl bg-secondary/60 border border-border">
+                    <button
+                      type="button"
+                      onClick={() => setCustomMcpSubTab("servers")}
+                      className={cn(
+                        "px-3 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer flex items-center gap-1",
+                        customMcpSubTab === "servers"
+                          ? "bg-card text-foreground shadow-xs font-semibold"
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      <Server className="w-3 h-3" />
+                      <span>Servers</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCustomMcpSubTab("json")}
+                      className={cn(
+                        "px-3 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer flex items-center gap-1",
+                        customMcpSubTab === "json"
+                          ? "bg-card text-foreground shadow-xs font-semibold"
+                          : "text-muted-foreground hover:text-foreground"
+                      )}
+                    >
+                      <Code2 className="w-3 h-3" />
+                      <span>JSON Config</span>
+                    </button>
+                  </div>
 
-              <div className="rounded-xl border border-border bg-card/60 overflow-hidden">
-                <div className="px-3 py-2 border-b border-border/50 bg-secondary/20 flex items-center justify-between">
-                  <span className="text-[11px] font-mono text-muted-foreground">mcpServers.json</span>
-                  <button
-                    type="button"
-                    onClick={handleCopyJson}
-                    className="p-1 rounded text-muted-foreground hover:text-foreground"
-                    title="Copy"
-                  >
-                    {isCopiedJson ? (
-                      <CheckCheck className="w-3.5 h-3.5 text-emerald-500" />
-                    ) : (
-                      <Copy className="w-3.5 h-3.5" />
-                    )}
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          type="button"
+                          className="h-7 w-7 rounded-lg border border-border bg-card/60 hover:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
+                          title="Options"
+                        >
+                          <MoreHorizontal className="w-3.5 h-3.5" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-48 bg-card border-border text-foreground p-1 rounded-xl shadow-xl">
+                        <DropdownMenuItem
+                          onClick={() => setIsImportDialogOpen(true)}
+                          className="text-xs px-3 py-2 rounded-lg cursor-pointer hover:bg-secondary flex items-center gap-2"
+                        >
+                          <Upload className="w-3.5 h-3.5 text-muted-foreground" />
+                          <span>{isIndo ? "Impor dari JSON" : "Import from JSON"}</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
+                          onClick={handleCopyFullJson}
+                          className="text-xs px-3 py-2 rounded-lg cursor-pointer hover:bg-secondary flex items-center gap-2"
+                        >
+                          <Download className="w-3.5 h-3.5 text-muted-foreground" />
+                          <span>{isIndo ? "Salin mcpServers.json" : "Copy mcpServers.json"}</span>
+                        </DropdownMenuItem>
+                        {mcpConfig.servers.length > 0 && (
+                          <>
+                            <DropdownMenuSeparator className="my-1 bg-border/60" />
+                            <DropdownMenuItem
+                              onClick={handleResetAllServers}
+                              className="text-xs px-3 py-2 rounded-lg cursor-pointer text-destructive hover:bg-destructive/10 flex items-center gap-2"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>{isIndo ? "Hapus Semua Server" : "Clear All Servers"}</span>
+                            </DropdownMenuItem>
+                          </>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+
+                    <button
+                      type="button"
+                      onClick={handleRefresh}
+                      disabled={isRefreshing}
+                      className="h-7 w-7 rounded-lg border border-border bg-card/60 hover:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
+                      title="Refresh"
+                    >
+                      <RotateCcw className={cn("w-3.5 h-3.5", isRefreshing && "animate-spin text-primary")} />
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleOpenNewServer}
+                      className="h-7 px-3 rounded-lg bg-foreground text-background hover:opacity-90 font-medium text-xs flex items-center gap-1 shadow-xs cursor-pointer"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>Add server</span>
+                    </button>
+                  </div>
                 </div>
-                <textarea
-                  value={rawJsonText}
-                  onChange={(e) => setRawJsonText(e.target.value)}
-                  rows={10}
-                  spellCheck={false}
-                  className="w-full p-3 bg-transparent font-mono text-[11px] text-foreground outline-none resize-none"
-                />
-              </div>
+              )}
 
-              <div className="flex items-center justify-between pt-1">
-                <button
-                  type="button"
-                  onClick={handleResetToPresets}
-                  className="px-3 py-1.5 rounded-lg border border-border text-[11px] font-medium text-muted-foreground hover:text-foreground cursor-pointer"
-                >
-                  {isIndo ? "Reset Default" : "Reset Default"}
-                </button>
-                <Button
-                  size="sm"
-                  onClick={handleApplyJson}
-                  className="rounded-lg h-7 text-[11px] px-3 bg-foreground text-background cursor-pointer"
-                >
-                  <Check className="w-3 h-3 mr-1" />
-                  <span>{isIndo ? "Simpan JSON" : "Save JSON"}</span>
-                </Button>
-              </div>
+              {/* Sub-view: Servers list (Matching Image 2 - Zero dummy data) */}
+              {customMcpSubTab === "servers" && !isEditingServer && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-semibold text-foreground">Installed</span>
+                    <span className="text-xs text-muted-foreground font-mono">{mcpConfig.servers.length}</span>
+                  </div>
+
+                  {mcpConfig.servers.length === 0 ? (
+                    <div className="text-center py-12 px-4 rounded-3xl border border-dashed border-border bg-card/40 space-y-3">
+                      <div className="h-10 w-10 rounded-xl bg-secondary border border-border flex items-center justify-center mx-auto">
+                        <Cable className="w-5 h-5 text-muted-foreground" />
+                      </div>
+                      <div className="space-y-1">
+                        <h3 className="text-sm font-semibold text-foreground">
+                          {isIndo ? "Belum Ada Server MCP Kustom" : "No Custom MCP Servers"}
+                        </h3>
+                        <p className="text-xs text-muted-foreground max-w-xs mx-auto">
+                          {isIndo
+                            ? "Tambahkan server MCP kustom via Form atau JSON."
+                            : "Add a custom MCP server via Form or JSON."}
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleOpenNewServer}
+                        className="px-3.5 py-1.5 rounded-xl bg-foreground text-background text-xs font-medium cursor-pointer shadow-xs inline-flex items-center gap-1.5"
+                      >
+                        <Plus className="w-3.5 h-3.5" />
+                        <span>{isIndo ? "Tambah Server" : "Add Server"}</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {mcpConfig.servers.map((server) => {
+                        const isEnabled = server.enabled !== false;
+                        const isStdio = server.transport === "stdio";
+                        const detail = isStdio
+                          ? `stdio · ${server.command || "npx"} ${(server.args || []).join(" ")}`
+                          : `${server.transport} · ${server.url || ""}`;
+
+                        return (
+                          <div
+                            key={server.id}
+                            onClick={() => handleEditServer(server)}
+                            className="p-3 rounded-2xl border border-border bg-card/70 hover:bg-secondary/30 transition-all flex items-center justify-between gap-3 cursor-pointer"
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="w-9 h-9 rounded-xl bg-secondary border border-border/80 flex items-center justify-center relative shrink-0">
+                                <Cable className="w-4 h-4 text-muted-foreground" />
+                                <span
+                                  className={cn(
+                                    "w-2 h-2 rounded-full ring-2 ring-card absolute -bottom-0.5 -right-0.5",
+                                    isEnabled ? "bg-amber-400" : "bg-muted-foreground/40"
+                                  )}
+                                />
+                              </div>
+
+                              <div className="min-w-0 space-y-0.5">
+                                <span className="text-xs font-semibold text-foreground truncate block">
+                                  {server.name}
+                                </span>
+                                <p className="text-[11px] text-muted-foreground font-mono truncate max-w-[180px] sm:max-w-xs">
+                                  {detail}
+                                </p>
+                              </div>
+                            </div>
+
+                            <div className="shrink-0" onClick={(e) => e.stopPropagation()}>
+                              <Switch
+                                checked={isEnabled}
+                                onCheckedChange={(checked) => handleToggleServer(server.id, checked)}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Sub-view: Form / Edit View (Image 3 style) */}
+              {customMcpSubTab === "servers" && isEditingServer && (
+                <div className="space-y-4 animate-in fade-in-50 duration-200">
+                  <div className="flex items-center justify-between gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsEditingServer(false)}
+                      className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground cursor-pointer"
+                    >
+                      <ArrowLeft className="w-3.5 h-3.5" />
+                      <span>{isIndo ? "Kembali" : "Back"}</span>
+                    </button>
+
+                    <div className="flex items-center p-0.5 rounded-xl bg-secondary/80 border border-border">
+                      <button
+                        type="button"
+                        onClick={() => setFormMode("form")}
+                        className={cn(
+                          "px-2.5 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer",
+                          formMode === "form"
+                            ? "bg-card text-foreground shadow-xs font-semibold"
+                            : "text-muted-foreground hover:text-foreground"
+                        )}
+                      >
+                        Form
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setFormMode("json")}
+                        className={cn(
+                          "px-2.5 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer",
+                          formMode === "json"
+                            ? "bg-card text-foreground shadow-xs font-semibold"
+                            : "text-muted-foreground hover:text-foreground"
+                        )}
+                      >
+                        JSON
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="p-4 rounded-2xl border border-border bg-card/80 space-y-4">
+                    <div className="space-y-1">
+                      <h3 className="text-sm font-semibold text-foreground">
+                        {isEditingExisting ? "Edit MCP Server" : "New MCP Server"}
+                      </h3>
+                      <p className="text-[11px] text-muted-foreground">
+                        Fill in the new MCP configuration, then save to return to the list.
+                      </p>
+                    </div>
+
+                    {formMode === "form" ? (
+                      <div className="space-y-3 pt-1">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="flex-1 space-y-1">
+                            <label className="text-xs font-medium text-foreground">Name</label>
+                            <Input
+                              value={formData.name}
+                              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                              placeholder="my-mcp-server"
+                              className="h-8 text-xs rounded-xl bg-secondary/40 border-border"
+                            />
+                          </div>
+                          <div className="w-28 space-y-1 shrink-0">
+                            <label className="text-xs font-medium text-foreground">Scope</label>
+                            <Select
+                              value={formData.scope}
+                              onValueChange={(val: McpScope) => setFormData({ ...formData, scope: val })}
+                            >
+                              <SelectTrigger className="h-8 text-xs rounded-xl bg-secondary/40 border-border">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent className="bg-card border-border">
+                                <SelectItem value="user">User</SelectItem>
+                                <SelectItem value="workspace">Workspace</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-xs font-medium text-foreground">Type</label>
+                          <Select
+                            value={formData.transport}
+                            onValueChange={(val: McpTransport) => setFormData({ ...formData, transport: val })}
+                          >
+                            <SelectTrigger className="h-8 text-xs rounded-xl bg-secondary/40 border-border">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="bg-card border-border">
+                              <SelectItem value="http">HTTP</SelectItem>
+                              <SelectItem value="stdio">stdio</SelectItem>
+                              <SelectItem value="sse">SSE</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-xs font-medium text-foreground">Timeout MS</label>
+                          <Input
+                            type="number"
+                            value={formData.timeoutMs}
+                            onChange={(e) => setFormData({ ...formData, timeoutMs: Number(e.target.value) || 30000 })}
+                            className="h-8 text-xs rounded-xl bg-secondary/40 border-border"
+                          />
+                        </div>
+
+                        <div className="space-y-1">
+                          <label className="text-xs font-medium text-foreground">Protocol version</label>
+                          <Select
+                            value={formData.protocolVersion}
+                            onValueChange={(val) => setFormData({ ...formData, protocolVersion: val })}
+                          >
+                            <SelectTrigger className="h-8 text-xs rounded-xl bg-secondary/40 border-border">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="bg-card border-border">
+                              <SelectItem value="auto">Auto (recommended)</SelectItem>
+                              <SelectItem value="2024-11-05">2024-11-05</SelectItem>
+                              <SelectItem value="v1">v1</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        {formData.transport !== "stdio" ? (
+                          <>
+                            <div className="space-y-1">
+                              <label className="text-xs font-medium text-foreground">URL</label>
+                              <Input
+                                value={formData.url}
+                                onChange={(e) => setFormData({ ...formData, url: e.target.value })}
+                                placeholder="https://mcp.example.com/mcp"
+                                className="h-8 text-xs rounded-xl bg-secondary/40 border-border"
+                              />
+                            </div>
+
+                            <div>
+                              <button
+                                type="button"
+                                onClick={() => setIsHeadersOpen(!isHeadersOpen)}
+                                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground cursor-pointer"
+                              >
+                                {isHeadersOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                                <span>Headers (optional)</span>
+                              </button>
+                              {isHeadersOpen && (
+                                <textarea
+                                  value={formData.headersText}
+                                  onChange={(e) => setFormData({ ...formData, headersText: e.target.value })}
+                                  rows={3}
+                                  className="mt-1 w-full p-2.5 rounded-xl bg-secondary/30 border border-border text-xs font-mono text-foreground resize-none"
+                                />
+                              )}
+                            </div>
+                          </>
+                        ) : (
+                          <>
+                            <div className="space-y-1">
+                              <label className="text-xs font-medium text-foreground">Command</label>
+                              <Input
+                                value={formData.command}
+                                onChange={(e) => setFormData({ ...formData, command: e.target.value })}
+                                placeholder="npx"
+                                className="h-8 text-xs rounded-xl bg-secondary/40 border-border"
+                              />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-xs font-medium text-foreground">Arguments</label>
+                              <Input
+                                value={formData.argsText}
+                                onChange={(e) => setFormData({ ...formData, argsText: e.target.value })}
+                                placeholder="-y @modelcontextprotocol/server-..."
+                                className="h-8 text-xs rounded-xl bg-secondary/40 border-border"
+                              />
+                            </div>
+
+                            <div>
+                              <button
+                                type="button"
+                                onClick={() => setIsEnvOpen(!isEnvOpen)}
+                                className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground cursor-pointer"
+                              >
+                                {isEnvOpen ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                                <span>Environment variables (optional)</span>
+                              </button>
+                              {isEnvOpen && (
+                                <textarea
+                                  value={formData.envText}
+                                  onChange={(e) => setFormData({ ...formData, envText: e.target.value })}
+                                  rows={3}
+                                  className="mt-1 w-full p-2.5 rounded-xl bg-secondary/30 border border-border text-xs font-mono text-foreground resize-none"
+                                />
+                              )}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    ) : (
+                      <textarea
+                        value={singleJsonText}
+                        onChange={(e) => setSingleJsonText(e.target.value)}
+                        rows={10}
+                        className="w-full p-3 rounded-xl bg-secondary/40 border border-border text-xs font-mono text-foreground resize-none leading-relaxed"
+                      />
+                    )}
+
+                    <div className="pt-2 border-t border-border/50 flex items-center justify-between">
+                      {isEditingExisting && formData.id ? (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteServer(formData.id!)}
+                          className="px-3 py-1.5 rounded-xl border border-destructive/40 text-destructive text-xs font-medium cursor-pointer"
+                        >
+                          Delete
+                        </button>
+                      ) : <div />}
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setIsEditingServer(false)}
+                          className="px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleSaveServer}
+                          className="px-4 py-1.5 rounded-xl bg-foreground text-background text-xs font-semibold cursor-pointer shadow-xs"
+                        >
+                          Save
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Sub-view: Full JSON Config inside Custom MCP */}
+              {customMcpSubTab === "json" && !isEditingServer && (
+                <div className="space-y-3">
+                  <div className="p-3 rounded-xl bg-secondary/30 border border-border text-[11px] text-muted-foreground leading-relaxed">
+                    {isIndo
+                      ? "Format JSON ini kompatibel dengan standar mcpServers (Antigravity & Claude Desktop)."
+                      : "Adheres to standard mcpServers schema for Antigravity & Claude Desktop."}
+                  </div>
+
+                  <div className="rounded-xl border border-border bg-card/60 overflow-hidden">
+                    <div className="px-3 py-2 border-b border-border/50 bg-secondary/20 flex items-center justify-between">
+                      <span className="text-[11px] font-mono text-muted-foreground">mcpServers.json</span>
+                      <button
+                        type="button"
+                        onClick={handleCopyFullJson}
+                        className="p-1 rounded text-muted-foreground hover:text-foreground cursor-pointer"
+                        title="Copy"
+                      >
+                        {isCopiedFullJson ? (
+                          <CheckCheck className="w-3.5 h-3.5 text-emerald-500" />
+                        ) : (
+                          <Copy className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+                    </div>
+                    <textarea
+                      value={fullJsonText}
+                      onChange={(e) => setFullJsonText(e.target.value)}
+                      rows={12}
+                      spellCheck={false}
+                      className="w-full p-3 bg-transparent font-mono text-[11px] text-foreground outline-none resize-none leading-relaxed"
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2 pt-1">
+                    <Button
+                      size="sm"
+                      onClick={handleSaveFullJson}
+                      className="rounded-xl text-xs h-8 cursor-pointer bg-foreground text-background"
+                    >
+                      <span>{isIndo ? "Simpan JSON" : "Save JSON"}</span>
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
       </div>
+
+      {/* Import JSON Dialog */}
+      <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
+        <DialogContent className="max-w-md bg-card border-border text-foreground p-5 rounded-3xl">
+          <DialogHeader className="space-y-1.5">
+            <DialogTitle className="text-base font-semibold">
+              {isIndo ? "Impor Konfigurasi MCP" : "Import MCP Configuration"}
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
+              {isIndo
+                ? "Tempelkan konfigurasi mcpServers.json Anda di bawah ini."
+                : "Paste your mcpServers.json configuration below."}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-2">
+            <textarea
+              value={importJsonInput}
+              onChange={(e) => setImportJsonInput(e.target.value)}
+              placeholder={`{\n  "mcpServers": {\n    "my-server": {\n      "command": "npx",\n      "args": ["-y", "my-package"]\n    }\n  }\n}`}
+              rows={8}
+              spellCheck={false}
+              className="w-full p-3 rounded-2xl bg-secondary/40 border border-border text-xs font-mono text-foreground placeholder:text-muted-foreground resize-none focus:outline-none focus:border-foreground/40"
+            />
+          </div>
+
+          <DialogFooter className="flex items-center justify-end gap-2 pt-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setIsImportDialogOpen(false);
+                setImportJsonInput("");
+              }}
+              className="rounded-xl text-xs h-8 cursor-pointer border-border"
+            >
+              <span>{isIndo ? "Batal" : "Cancel"}</span>
+            </Button>
+            <Button
+              size="sm"
+              onClick={handleImportSubmit}
+              disabled={!importJsonInput.trim()}
+              className="rounded-xl text-xs h-8 cursor-pointer bg-foreground text-background"
+            >
+              <span>{isIndo ? "Impor Server" : "Import Servers"}</span>
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

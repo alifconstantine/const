@@ -483,8 +483,16 @@ export async function streamChatCompletion({
   const composioKey = getComposioApiKey();
   const mcpConfig = getStoredMcpConfig();
 
-  const hasSandbox = isConnectorActive("cloud-sandbox") || mcpConfig.servers.some((s) => s.id === "composio");
-  const hasCanva = isConnectorActive("canva_mcp") || mcpConfig.servers.some((s) => s.id === "canva");
+  const hasSandbox =
+    isConnectorActive("cloud-sandbox") ||
+    mcpConfig.servers.some(
+      (s) => s.id === "composio" && s.enabled !== false && s.status !== "disabled"
+    );
+  const hasCanva =
+    isConnectorActive("canva_mcp") ||
+    mcpConfig.servers.some(
+      (s) => s.id === "canva" && s.enabled !== false && s.status !== "disabled"
+    );
   const hasSheets = isConnectorActive("google-sheets");
   const hasDocs = isConnectorActive("google-docs");
   const hasSlides = isConnectorActive("google-slides");

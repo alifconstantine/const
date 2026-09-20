@@ -39,7 +39,7 @@ import { RecentlyViewedCard } from "./recently-viewed-card";
 import { Sidebar, HomeNavTab } from "./sidebar";
 import { SourcesView } from "./sources-view";
 import { ModelsView } from "./views/models-view";
-import { ConnectorsView } from "./views/connectors-view";
+import { McpToolsView } from "./views/mcp-tools-view";
 import { SettingsView } from "../settings/settings-view";
 import { CreateLearnDialog } from "./dialogs/create-learn-dialog";
 import { CreateCollectionDialog } from "./dialogs/create-collection-dialog";
@@ -924,7 +924,7 @@ export function LearnHome({
             {/* ============================================================ */}
             {/* TAB: MCP TOOLS & CONNECTORS                                  */}
             {/* ============================================================ */}
-            {activeTab === "mcp" && <ConnectorsView />}
+            {activeTab === "mcp" && <McpToolsView />}
           </div>
         </ScrollArea>
       </main>

@@ -1511,7 +1511,9 @@ export function ChatPanel({
           if (storedMcp) {
             const parsed = JSON.parse(storedMcp);
             if (Array.isArray(parsed?.servers) && parsed.servers.length > 0) {
-              parsedMcpServers = [...parsed.servers];
+              parsedMcpServers = parsed.servers.filter(
+                (s: any) => s.enabled !== false && s.status !== "disabled"
+              );
             }
           }
         } catch {}

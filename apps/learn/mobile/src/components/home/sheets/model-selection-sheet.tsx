@@ -14,6 +14,9 @@ import {
   ExternalLink,
   Volume2,
   Unplug,
+  Eye,
+  EyeOff,
+  Sparkles,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -52,6 +55,16 @@ import {
   fetchInworldModels,
   synthesizeSpeech,
 } from "../../../lib/voice";
+import {
+  type ImageModel,
+  type ImageProvider,
+  type ImageConfigState,
+  getStoredImageConfig,
+  saveStoredImageConfig,
+  testImageModelConnectivity,
+  testImageProviderConnection,
+  fetchRemoteImageModels,
+} from "../../../lib/image";
 
 export type ModelCategory = "llm" | "voice" | "image";
 
@@ -120,6 +133,7 @@ export function ModelSelectionSheet({
   useEffect(() => {
     if (open) {
       setAiConfig(getStoredAiConfig());
+      setImageConfig(getStoredImageConfig());
       if (initialCategory) {
         setActiveCategory(initialCategory);
       }
@@ -599,6 +613,254 @@ export function ModelSelectionSheet({
     }
   };
 
+  // =========================================================================
+  // Image State & Handlers
+  // =========================================================================
+  const [imageConfig, setImageConfig] = useState<ImageConfigState>(() => getStoredImageConfig());
+  const [expandedImageProviderId, setExpandedImageProviderId] = useState<string | null>(null);
+  const [editImageFormData, setEditImageFormData] = useState<ImageProvider | null>(null);
+
+  const [isTestingImageConnection, setIsTestingImageConnection] = useState(false);
+  const [testingImageModelId, setTestingImageModelId] = useState<string | null>(null);
+  const [isFetchingImageModels, setIsFetchingImageModels] = useState(false);
+  const [newImageModelId, setNewImageModelId] = useState("");
+  const [newImageModelName, setNewImageModelName] = useState("");
+  const [isAddingImageModel, setIsAddingImageModel] = useState(false);
+  const [showImageApiKey, setShowImageApiKey] = useState(false);
+
+  const handleToggleExpandImageProvider = (provider: ImageProvider) => {
+    if (expandedImageProviderId === provider.id) {
+      setExpandedImageProviderId(null);
+      setEditImageFormData(null);
+      setIsAddingImageModel(false);
+    } else {
+      setExpandedImageProviderId(provider.id);
+      setEditImageFormData(JSON.parse(JSON.stringify(provider)));
+      setIsAddingImageModel(false);
+    }
+  };
+
+  const handleAddCustomImageProvider = () => {
+    const id = `custom-img-${Date.now()}`;
+    const newProvider: ImageProvider = {
+      id,
+      name: "",
+      baseUrl: "",
+      apiKey: "",
+      protocol: "openai-image",
+      models: [],
+    };
+    const updated = [...imageConfig.providers, newProvider];
+    const newConfig: ImageConfigState = { ...imageConfig, providers: updated };
+    setImageConfig(newConfig);
+    saveStoredImageConfig(newConfig);
+
+    setExpandedImageProviderId(newProvider.id);
+    setEditImageFormData(JSON.parse(JSON.stringify(newProvider)));
+    setIsAddingImageModel(false);
+  };
+
+  const handleApplyImageProviderEdit = () => {
+    if (!editImageFormData) return;
+    if (!editImageFormData.name.trim() || !editImageFormData.baseUrl.trim()) {
+      toast.error(isIndo ? "Nama Provider dan Base URL wajib diisi." : "Provider Name and Base URL are required.");
+      return;
+    }
+
+    let updatedProviders = imageConfig.providers.map((p) =>
+      p.id === editImageFormData.id ? editImageFormData : p
+    );
+    if (!imageConfig.providers.some((p) => p.id === editImageFormData.id)) {
+      updatedProviders = [...imageConfig.providers, editImageFormData];
+    }
+
+    let activeModelId = imageConfig.activeModelId;
+    let activeProviderId = imageConfig.activeProviderId;
+    if (!activeModelId && editImageFormData.models.length > 0) {
+      activeModelId = editImageFormData.models[0]?.id || "";
+      activeProviderId = editImageFormData.id;
+    }
+
+    const newConfig: ImageConfigState = {
+      ...imageConfig,
+      providers: updatedProviders,
+      activeModelId,
+      activeProviderId,
+    };
+    setImageConfig(newConfig);
+    saveStoredImageConfig(newConfig);
+    setExpandedImageProviderId(null);
+    setEditImageFormData(null);
+    setIsAddingImageModel(false);
+    toast.success(isIndo ? "Penyedia gambar berhasil disimpan." : "Image provider saved successfully.");
+  };
+
+  const handleCancelImageProviderEdit = () => {
+    if (editImageFormData && !editImageFormData.name.trim() && !editImageFormData.baseUrl.trim()) {
+      const cleaned = imageConfig.providers.filter((p) => p.id !== editImageFormData.id);
+      const newConfig: ImageConfigState = { ...imageConfig, providers: cleaned };
+      setImageConfig(newConfig);
+      saveStoredImageConfig(newConfig);
+    }
+    setExpandedImageProviderId(null);
+    setEditImageFormData(null);
+    setIsAddingImageModel(false);
+  };
+
+  const handleDeleteImageProvider = (providerId: string, e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    const updated = imageConfig.providers.filter((p) => p.id !== providerId);
+    let activeProviderId = imageConfig.activeProviderId;
+    let activeModelId = imageConfig.activeModelId;
+    if (activeProviderId === providerId) {
+      activeProviderId = updated[0]?.id || "";
+      activeModelId = updated[0]?.models[0]?.id || "";
+    }
+    const newConfig: ImageConfigState = {
+      providers: updated,
+      activeProviderId,
+      activeModelId,
+    };
+    setImageConfig(newConfig);
+    saveStoredImageConfig(newConfig);
+    if (expandedImageProviderId === providerId) {
+      setExpandedImageProviderId(null);
+      setEditImageFormData(null);
+    }
+    toast.success(isIndo ? "Penyedia gambar dihapus." : "Image provider removed.");
+  };
+
+  const handleTestImageProviderConnection = async (targetProvider?: ImageProvider) => {
+    const target = targetProvider || editImageFormData;
+    if (!target) return;
+    if (!target.baseUrl.trim()) {
+      toast.error(isIndo ? "Base URL wajib diisi untuk menguji koneksi." : "Base URL is required to test connection.");
+      return;
+    }
+    setIsTestingImageConnection(true);
+    const res = await testImageProviderConnection(target.baseUrl, target.apiKey);
+    setIsTestingImageConnection(false);
+
+    if (res.success) {
+      toast.success(
+        isIndo
+          ? `Koneksi endpoint gambar berhasil! Latensi: ${res.latencyMs}ms`
+          : `Image endpoint connected! Latency: ${res.latencyMs}ms`
+      );
+    } else {
+      toast.error(
+        res.error || (isIndo ? "Gagal terhubung ke endpoint gambar." : "Failed to connect to image endpoint.")
+      );
+    }
+  };
+
+  const handleTestImageModel = async (provider: ImageProvider, modelId: string) => {
+    setTestingImageModelId(modelId);
+    try {
+      const res = await testImageModelConnectivity(provider, modelId);
+      if (res.success) {
+        toast.success(
+          isIndo ? `Model ${modelId} aktif & operasional!` : `Model ${modelId} is operational!`,
+          {
+            description: isIndo
+              ? `Latensi: ${res.latencyMs}ms • Endpoint berhasil merespons.`
+              : `Latency: ${res.latencyMs}ms • Endpoint responded successfully.`,
+          }
+        );
+      } else {
+        toast.error(
+          isIndo ? `Pengujian gagal untuk ${modelId}` : `Test failed for ${modelId}`,
+          {
+            description: res.error || (isIndo ? "Gagal berkomunikasi dengan provider." : "Failed to communicate with provider."),
+          }
+        );
+      }
+    } catch (err: any) {
+      toast.error(
+        isIndo ? `Error pengujian ${modelId}` : `Error testing ${modelId}`,
+        {
+          description: err.message || "Unknown error occurred.",
+        }
+      );
+    } finally {
+      setTestingImageModelId(null);
+    }
+  };
+
+  const handleAddModelToImageForm = () => {
+    if (!editImageFormData) return;
+    const cleanId = newImageModelId.trim();
+    if (!cleanId) {
+      toast.error(isIndo ? "Model ID wajib diisi." : "Model ID is required.");
+      return;
+    }
+    if (editImageFormData.models.some((m) => m.id === cleanId)) {
+      toast.error(isIndo ? "Model ID sudah ada." : "Model ID already exists.");
+      return;
+    }
+
+    const newModel: ImageModel = {
+      id: cleanId,
+      name: newImageModelName.trim() || cleanId,
+    };
+
+    setEditImageFormData({
+      ...editImageFormData,
+      models: [...editImageFormData.models, newModel],
+    });
+    setNewImageModelId("");
+    setNewImageModelName("");
+    setIsAddingImageModel(false);
+    toast.success(isIndo ? `Model ${cleanId} ditambahkan ke form.` : `Model ${cleanId} added to form.`);
+  };
+
+  const handleRemoveModelFromImageForm = (modelId: string) => {
+    if (!editImageFormData) return;
+    setEditImageFormData({
+      ...editImageFormData,
+      models: editImageFormData.models.filter((m) => m.id !== modelId),
+    });
+  };
+
+  const handleSelectActiveImageModel = (providerId: string, modelId: string) => {
+    const newConfig: ImageConfigState = {
+      ...imageConfig,
+      activeProviderId: providerId,
+      activeModelId: modelId,
+    };
+    setImageConfig(newConfig);
+    saveStoredImageConfig(newConfig);
+    toast.success(
+      isIndo
+        ? `Model gambar aktif diubah ke ${modelId}`
+        : `Active image model set to ${modelId}`
+    );
+  };
+
+  const handleFetchImageModels = async () => {
+    if (!editImageFormData || !editImageFormData.baseUrl.trim()) {
+      toast.error(isIndo ? "Base URL wajib diisi terlebih dahulu." : "Base URL is required first.");
+      return;
+    }
+    setIsFetchingImageModels(true);
+    const res = await fetchRemoteImageModels(editImageFormData.baseUrl, editImageFormData.apiKey);
+    setIsFetchingImageModels(false);
+
+    if (res.success && res.models && res.models.length > 0) {
+      setEditImageFormData({
+        ...editImageFormData,
+        models: res.models,
+      });
+      toast.success(
+        isIndo
+          ? `Berhasil mengambil ${res.models.length} model gambar dari endpoint.`
+          : `Fetched ${res.models.length} image models from endpoint.`
+      );
+    } else {
+      toast.error(res.error || (isIndo ? "Gagal mengambil daftar model." : "Failed to fetch model list."));
+    }
+  };
+
   return (
     <>
       {/* Backdrop */}
@@ -737,6 +999,17 @@ export function ModelSelectionSheet({
             <button
               type="button"
               onClick={handleAddCustomVoiceProvider}
+              className="h-9 px-3 rounded-xl border border-border hover:bg-secondary text-xs font-medium text-foreground transition-all flex items-center gap-1.5 cursor-pointer shrink-0 shadow-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-foreground/20"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>{isIndo ? "Tambah" : "Add"}</span>
+            </button>
+          )}
+
+          {activeCategory === "image" && (
+            <button
+              type="button"
+              onClick={handleAddCustomImageProvider}
               className="h-9 px-3 rounded-xl border border-border hover:bg-secondary text-xs font-medium text-foreground transition-all flex items-center gap-1.5 cursor-pointer shrink-0 shadow-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-foreground/20"
             >
               <Plus className="w-3.5 h-3.5" />
@@ -1570,22 +1843,359 @@ export function ModelSelectionSheet({
             </div>
           )}
 
-                  {/* ================================================================= */}
-          {/* TAB 3: IMAGE                                                      */}
+          {/* ================================================================= */}
+          {/* TAB 3: IMAGE MODELS & PROVIDERS                                   */}
           {/* ================================================================= */}
           {activeCategory === "image" && (
-            <div className="py-12 px-4 rounded-2xl border border-dashed border-border bg-card/40 text-center space-y-2.5">
-              <div className="h-10 w-10 rounded-2xl bg-secondary border border-border flex items-center justify-center mx-auto">
-                <ImageIcon className="w-5 h-5 text-muted-foreground" />
-              </div>
-              <h3 className="font-serif text-sm text-foreground font-medium">
-                {isIndo ? "Model Generator Gambar" : "Image Generation Models"}
-              </h3>
-              <p className="text-[11px] text-muted-foreground max-w-xs mx-auto leading-relaxed">
-                {isIndo
-                  ? "Integrasi generator visual (Flux, Recraft, OpenRouter) akan segera hadir di Const Learn Mobile."
-                  : "Visual generation model integrations (Flux, Recraft, OpenRouter) are coming soon to Const Learn Mobile."}
-              </p>
+            <div className="space-y-3">
+              {imageConfig.providers.length === 0 ? (
+                <div className="py-12 px-4 rounded-2xl border border-dashed border-border bg-card/40 text-center space-y-3">
+                  <div className="h-10 w-10 rounded-2xl bg-secondary border border-border flex items-center justify-center mx-auto">
+                    <ImageIcon className="w-5 h-5 text-muted-foreground" />
+                  </div>
+                  <div className="space-y-1 max-w-xs mx-auto">
+                    <h3 className="font-serif text-sm text-foreground font-medium">
+                      {isIndo ? "Belum Ada Penyedia Gambar" : "No Image Providers Configured"}
+                    </h3>
+                    <p className="text-[11px] text-muted-foreground leading-relaxed">
+                      {isIndo
+                        ? "Dukung OpenRouter, Together AI, OpenAI DALL-E, atau endpoint kustom Anda sendiri."
+                        : "Supports OpenRouter, Together AI, OpenAI DALL-E, or your own custom endpoint."}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAddCustomImageProvider}
+                    className="px-3.5 py-1.5 rounded-xl bg-foreground text-background text-xs font-medium hover:opacity-90 active:scale-95 transition-all cursor-pointer inline-flex items-center gap-1.5"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>{isIndo ? "Tambah Penyedia" : "Add Provider"}</span>
+                  </button>
+                </div>
+              ) : (
+                imageConfig.providers.map((provider) => {
+                  const isExpanded = expandedImageProviderId === provider.id;
+                  const isActiveProvider = imageConfig.activeProviderId === provider.id;
+
+                  return (
+                    <div
+                      key={provider.id}
+                      className={cn(
+                        "rounded-2xl border border-border bg-card/60 transition-all duration-300 overflow-hidden",
+                        isExpanded
+                          ? "bg-card/90 border-border/90 shadow-xs"
+                          : "hover:border-foreground/20 hover:bg-secondary/30"
+                      )}
+                    >
+                      {/* Provider Header */}
+                      <div
+                        onClick={() => handleToggleExpandImageProvider(provider)}
+                        className="p-3.5 flex items-center justify-between gap-3 cursor-pointer select-none"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="text-xs font-semibold text-foreground truncate">
+                            {provider.name || (isIndo ? "Penyedia Baru" : "New Provider")}
+                          </span>
+                          <span className="px-1.5 py-0.5 rounded-md bg-secondary text-muted-foreground text-[10px] font-sans border border-border/70 shrink-0">
+                            {provider.models.length} {isIndo ? "model" : "models"}
+                          </span>
+                          {isActiveProvider && (
+                            <span className="px-1.5 py-0.5 rounded-md bg-foreground/10 text-foreground text-[10px] font-medium border border-foreground/20 shrink-0">
+                              Active
+                            </span>
+                          )}
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                        </div>
+
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleToggleExpandImageProvider(provider);
+                            }}
+                            className={cn(
+                              "px-2.5 py-1 rounded-lg border text-[11px] font-medium transition-all cursor-pointer",
+                              isExpanded
+                                ? "bg-secondary text-foreground border-foreground/30 font-semibold"
+                                : "border-border hover:bg-secondary text-foreground"
+                            )}
+                          >
+                            {isExpanded ? (isIndo ? "Tutup" : "Close") : "Edit"}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => handleDeleteImageProvider(provider.id, e)}
+                            className="px-2.5 py-1 rounded-lg border border-destructive/30 hover:border-destructive/60 hover:bg-destructive/10 text-destructive text-[11px] font-medium transition-all cursor-pointer"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Expanded Form */}
+                      {isExpanded && editImageFormData && (
+                        <div className="px-3.5 pb-4 pt-1 space-y-4 border-t border-border/40 animate-in fade-in-50 duration-200">
+                          {/* 1. Name */}
+                          <div className="space-y-1">
+                            <label className="text-[11px] font-medium text-foreground block">
+                              {isIndo ? "Nama Penyedia" : "Provider Name"}
+                            </label>
+                            <input
+                              type="text"
+                              value={editImageFormData.name}
+                              onChange={(e) =>
+                                setEditImageFormData({ ...editImageFormData, name: e.target.value })
+                              }
+                              placeholder="e.g. OpenRouter, Together AI, OpenAI"
+                              className="w-full px-3 py-1.5 rounded-xl bg-secondary/30 border border-border text-xs text-foreground outline-none focus:ring-1 focus:ring-foreground/20"
+                            />
+                          </div>
+
+                          {/* 2. Base URL */}
+                          <div className="space-y-1">
+                            <label className="text-[11px] font-medium text-foreground block">
+                              Base URL
+                            </label>
+                            <input
+                              type="text"
+                              value={editImageFormData.baseUrl}
+                              onChange={(e) =>
+                                setEditImageFormData({ ...editImageFormData, baseUrl: e.target.value })
+                              }
+                              placeholder="https://api.openai.com/v1"
+                              className="w-full px-3 py-1.5 rounded-xl bg-secondary/30 border border-border text-xs font-mono text-foreground outline-none focus:ring-1 focus:ring-foreground/20"
+                            />
+                          </div>
+
+                          {/* 3. API Key */}
+                          <div className="space-y-1">
+                            <label className="text-[11px] font-medium text-foreground block">
+                              API Key
+                            </label>
+                            <div className="relative">
+                              <input
+                                type={showImageApiKey ? "text" : "password"}
+                                value={editImageFormData.apiKey || ""}
+                                onChange={(e) =>
+                                  setEditImageFormData({ ...editImageFormData, apiKey: e.target.value })
+                                }
+                                placeholder="sk-..."
+                                className="w-full px-3 py-1.5 pr-8 rounded-xl bg-secondary/30 border border-border text-xs font-mono text-foreground outline-none focus:ring-1 focus:ring-foreground/20"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowImageApiKey(!showImageApiKey)}
+                                className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground p-1"
+                              >
+                                {showImageApiKey ? (
+                                  <EyeOff className="w-3.5 h-3.5" />
+                                ) : (
+                                  <Eye className="w-3.5 h-3.5" />
+                                )}
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* 4. Models Catalog */}
+                          <div className="space-y-2 pt-2 border-t border-border/40">
+                            <div className="flex items-center justify-between">
+                              <label className="text-[11px] font-medium text-foreground block">
+                                {isIndo ? "Model Gambar" : "Image Models"}
+                              </label>
+                              <button
+                                type="button"
+                                onClick={handleFetchImageModels}
+                                disabled={isFetchingImageModels}
+                                className="text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                              >
+                                <RefreshCw className={cn("w-3 h-3", isFetchingImageModels && "animate-spin")} />
+                                <span>Fetch</span>
+                              </button>
+                            </div>
+
+                            {/* Models List */}
+                            <div className="space-y-1.5">
+                              {editImageFormData.models.length === 0 ? (
+                                <div className="p-3 rounded-xl border border-dashed border-border text-center text-[11px] text-muted-foreground bg-secondary/10">
+                                  {isIndo
+                                    ? "Belum ada model. Tambahkan manual di bawah."
+                                    : "No models configured. Add manually below."}
+                                </div>
+                              ) : (
+                                editImageFormData.models.map((model) => {
+                                  const isActive = imageConfig.activeModelId === model.id;
+                                  const isTestingThisModel = testingImageModelId === model.id;
+
+                                  return (
+                                    <div
+                                      key={model.id}
+                                      className={cn(
+                                        "p-2.5 rounded-xl border transition-colors flex items-center justify-between gap-2",
+                                        isActive
+                                          ? "bg-secondary/60 border-foreground/30"
+                                          : "bg-secondary/20 border-border"
+                                      )}
+                                    >
+                                      <div className="min-w-0 flex-1">
+                                        <div className="text-xs font-semibold text-foreground truncate">
+                                          {model.name}
+                                        </div>
+                                        {model.name !== model.id && (
+                                          <div className="text-[10px] text-muted-foreground font-mono truncate">
+                                            {model.id}
+                                          </div>
+                                        )}
+                                      </div>
+
+                                      <div className="flex items-center gap-1.5 shrink-0">
+                                        {isActive ? (
+                                          <span className="text-[10px] font-medium text-foreground px-2 py-0.5 rounded-md bg-foreground/10 border border-foreground/20 flex items-center gap-0.5">
+                                            <Check className="w-2.5 h-2.5 text-emerald-500" />
+                                            <span>Active</span>
+                                          </span>
+                                        ) : (
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              handleSelectActiveImageModel(editImageFormData.id, model.id)
+                                            }
+                                            className="text-[10px] text-muted-foreground hover:text-foreground px-2 py-0.5 rounded-md border border-border hover:bg-secondary cursor-pointer"
+                                          >
+                                            Set Active
+                                          </button>
+                                        )}
+
+                                        {/* Test Model button */}
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            handleTestImageModel(editImageFormData, model.id)
+                                          }
+                                          disabled={isTestingThisModel}
+                                          className="px-2 py-0.5 rounded-md border border-border hover:bg-secondary text-[10px] font-medium text-foreground flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                                        >
+                                          {isTestingThisModel ? (
+                                            <RefreshCw className="w-2.5 h-2.5 animate-spin" />
+                                          ) : (
+                                            <Play className="w-2.5 h-2.5 text-muted-foreground" />
+                                          )}
+                                          <span>{isTestingThisModel ? "..." : "Test"}</span>
+                                        </button>
+
+                                        {/* Delete Model button */}
+                                        <button
+                                          type="button"
+                                          onClick={() => handleRemoveModelFromImageForm(model.id)}
+                                          className="h-6 w-6 rounded-md border border-border hover:border-destructive/40 hover:bg-destructive/10 text-muted-foreground hover:text-destructive flex items-center justify-center cursor-pointer"
+                                        >
+                                          <Trash2 className="w-3 h-3" />
+                                        </button>
+                                      </div>
+                                    </div>
+                                  );
+                                })
+                              )}
+                            </div>
+
+                            {/* Manual Model Add inline form */}
+                            {isAddingImageModel ? (
+                              <div className="p-3 rounded-xl border border-border bg-secondary/30 space-y-2.5 animate-in fade-in-50 duration-200">
+                                <div className="text-[11px] font-semibold text-foreground">
+                                  {isIndo ? "Tambah Model Manual" : "Add Model Manually"}
+                                </div>
+                                <div className="space-y-1.5">
+                                  <input
+                                    type="text"
+                                    value={newImageModelId}
+                                    onChange={(e) => setNewImageModelId(e.target.value)}
+                                    placeholder="Model ID (e.g. flux-1-schnell, dall-e-3)"
+                                    className="w-full px-2.5 py-1.5 rounded-lg bg-background border border-border text-xs font-mono text-foreground outline-none focus:ring-1 focus:ring-foreground/20"
+                                  />
+                                  <input
+                                    type="text"
+                                    value={newImageModelName}
+                                    onChange={(e) => setNewImageModelName(e.target.value)}
+                                    placeholder="Display Name (e.g. FLUX.1 Schnell)"
+                                    className="w-full px-2.5 py-1.5 rounded-lg bg-background border border-border text-xs text-foreground outline-none focus:ring-1 focus:ring-foreground/20"
+                                  />
+                                </div>
+                                <div className="flex items-center justify-end gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setIsAddingImageModel(false);
+                                      setNewImageModelId("");
+                                      setNewImageModelName("");
+                                    }}
+                                    className="px-2.5 py-1 rounded-lg border border-border text-[11px] text-muted-foreground hover:text-foreground cursor-pointer"
+                                  >
+                                    Cancel
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={handleAddModelToImageForm}
+                                    className="px-3 py-1 rounded-lg bg-foreground text-background text-[11px] font-medium cursor-pointer"
+                                  >
+                                    {isIndo ? "Tambah" : "Add"}
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => setIsAddingImageModel(true)}
+                                className="w-full py-1.5 rounded-xl border border-dashed border-border hover:bg-secondary/40 text-[11px] font-medium text-muted-foreground hover:text-foreground flex items-center justify-center gap-1 cursor-pointer"
+                              >
+                                <Plus className="w-3 h-3" />
+                                <span>{isIndo ? "Tambah Model Manual" : "Add Model Manually"}</span>
+                              </button>
+                            )}
+                          </div>
+
+                          {/* Footer Actions: Test Connection, Cancel, Apply */}
+                          <div className="flex items-center justify-between gap-2 pt-3 border-t border-border/70">
+                            <div>
+                              {editImageFormData.baseUrl && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleTestImageProviderConnection(editImageFormData)}
+                                  disabled={isTestingImageConnection}
+                                  className="px-2.5 py-1.5 rounded-xl border border-border hover:bg-secondary text-[11px] font-medium text-foreground flex items-center gap-1 cursor-pointer disabled:opacity-50"
+                                >
+                                  {isTestingImageConnection ? (
+                                    <RefreshCw className="w-3 h-3 animate-spin" />
+                                  ) : (
+                                    <Unplug className="w-3 h-3" />
+                                  )}
+                                  <span>{isTestingImageConnection ? "..." : (isIndo ? "Uji Koneksi" : "Test")}</span>
+                                </button>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={handleCancelImageProviderEdit}
+                                className="px-3 py-1.5 rounded-xl border border-border hover:bg-secondary text-xs font-medium text-foreground cursor-pointer"
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                type="button"
+                                onClick={handleApplyImageProviderEdit}
+                                className="px-3.5 py-1.5 rounded-xl bg-foreground text-background text-xs font-semibold hover:opacity-90 active:scale-95 cursor-pointer"
+                              >
+                                Apply
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
             </div>
           )}
         </div>

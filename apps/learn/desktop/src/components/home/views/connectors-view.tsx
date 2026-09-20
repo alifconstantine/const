@@ -28,12 +28,15 @@ import {
   connectConnector,
   disconnectConnector,
 } from "../../../lib/connectors-service";
-import { McpToolsView } from "./mcp-tools-view";
 
 type MainTab = "connectors" | "mcp_json";
 type CategoryFilter = "All" | "Featured" | "Productivity" | "Creativity" | "Education" | "Developer";
 
-export function ConnectorsView() {
+interface ConnectorsViewProps {
+  showHeader?: boolean;
+}
+
+export function ConnectorsView({ showHeader = false }: ConnectorsViewProps) {
   const { language } = useI18n();
   const isIndo = language === "id";
 
@@ -109,58 +112,47 @@ export function ConnectorsView() {
   };
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto pb-10">
-      {/* Top Header & Tab Navigation */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-border/50">
-        <div>
-          <div className="flex items-center gap-2">
-            <h2 className="text-xl sm:text-2xl font-serif font-normal text-foreground tracking-tight">
-              {isIndo ? "Connectors & Integrasi MCP" : "Connectors & MCP Integrations"}
-            </h2>
-            <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[11px] font-medium border border-primary/20">
-              {connectedIds.length} {isIndo ? "Aktif" : "Active"}
-            </span>
+    <div className={cn("space-y-6 pb-10", showHeader && "max-w-5xl mx-auto")}>
+      {/* Top Header & Tab Navigation (Optional) */}
+      {showHeader && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-border/50">
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-xl sm:text-2xl font-serif font-normal text-foreground tracking-tight">
+                {isIndo ? "Connectors & Integrasi MCP" : "Connectors & MCP Integrations"}
+              </h2>
+              <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[11px] font-medium border border-primary/20">
+                {connectedIds.length} {isIndo ? "Aktif" : "Active"}
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {isIndo
+                ? "Hubungkan akun Canva MCP, Google Workspace, dan YouTube untuk memperluas kapabilitas AI Tutor."
+                : "Connect Canva MCP, Google Workspace, and YouTube to expand your AI Tutor's capabilities."}
+            </p>
           </div>
-          <p className="text-xs text-muted-foreground mt-1">
-            {isIndo
-              ? "Hubungkan akun Canva MCP, Google Workspace, dan YouTube untuk memperluas kapabilitas AI Tutor."
-              : "Connect Canva MCP, Google Workspace, and YouTube to expand your AI Tutor's capabilities."}
-          </p>
-        </div>
 
-        {/* Tab Switcher */}
-        <div className="flex items-center bg-secondary/50 p-1 rounded-xl border border-border shrink-0 self-start sm:self-auto">
-          <button
-            type="button"
-            onClick={() => {
-              setMainTab("connectors");
-              setSelectedConnector(null);
-            }}
-            className={cn(
-              "px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5",
-              mainTab === "connectors"
-                ? "bg-card text-foreground shadow-xs font-semibold"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            <Layers className="w-3.5 h-3.5" />
-            <span>{isIndo ? "Aplikasi & Tools" : "Apps & Tools"}</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setMainTab("mcp_json")}
-            className={cn(
-              "px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5",
-              mainTab === "mcp_json"
-                ? "bg-card text-foreground shadow-xs font-semibold"
-                : "text-muted-foreground hover:text-foreground"
-            )}
-          >
-            <Code2 className="w-3.5 h-3.5" />
-            <span>{isIndo ? "Kustom MCP (JSON)" : "Custom MCP (JSON)"}</span>
-          </button>
+          {/* Tab Switcher */}
+          <div className="flex items-center bg-secondary/50 p-1 rounded-xl border border-border shrink-0 self-start sm:self-auto">
+            <button
+              type="button"
+              onClick={() => {
+                setMainTab("connectors");
+                setSelectedConnector(null);
+              }}
+              className={cn(
+                "px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5",
+                mainTab === "connectors"
+                  ? "bg-card text-foreground shadow-xs font-semibold"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span>{isIndo ? "Aplikasi & Tools" : "Apps & Tools"}</span>
+            </button>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* ================================================================= */}
       {/* TAB 1: CONNECTORS & APPS (Const AI Style)                        */}
@@ -484,11 +476,6 @@ export function ConnectorsView() {
           </div>
         </div>
       )}
-
-      {/* ================================================================= */}
-      {/* TAB 2: RAW MCP JSON CONFIG (For Power Users)                      */}
-      {/* ================================================================= */}
-      {mainTab === "mcp_json" && <McpToolsView />}
     </div>
   );
 }

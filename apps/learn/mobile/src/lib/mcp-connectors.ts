@@ -16,17 +16,19 @@ export interface McpServerConfig {
   command?: string;
   args?: string[];
   url?: string;
+  headers?: Record<string, string>;
   env?: Record<string, string>;
+  enabled?: boolean;
   isDefault?: boolean;
   isCustom?: boolean;
-  status: "ready" | "needs_auth" | "disabled";
+  status?: "ready" | "needs_auth" | "disabled";
 }
 
 export interface McpConfigurationState {
   servers: McpServerConfig[];
 }
 
-export const MOBILE_PRESET_MCP_SERVERS: McpServerConfig[] = [
+export const AVAILABLE_PRESET_MCP_SERVERS: McpServerConfig[] = [
   {
     id: "composio",
     name: "Composio",
@@ -39,8 +41,9 @@ export const MOBILE_PRESET_MCP_SERVERS: McpServerConfig[] = [
     env: {
       COMPOSIO_API_KEY: "",
     },
-    isDefault: true,
+    enabled: true,
     status: "ready",
+    isCustom: false,
   },
   {
     id: "canva",
@@ -52,10 +55,68 @@ export const MOBILE_PRESET_MCP_SERVERS: McpServerConfig[] = [
     command: "npx",
     args: ["-y", "mcp-remote@latest", "https://mcp.canva.com/mcp"],
     env: {},
-    isDefault: true,
+    enabled: true,
     status: "ready",
+    isCustom: false,
+  },
+  {
+    id: "parallel-search",
+    name: "parallel-search",
+    transport: "http",
+    scope: "user",
+    timeoutMs: 30000,
+    protocolVersion: "auto",
+    url: "https://search.parallel.ai/mcp",
+    headers: {},
+    enabled: false,
+    status: "ready",
+    isCustom: false,
+  },
+  {
+    id: "tinyfish",
+    name: "tinyfish",
+    transport: "http",
+    scope: "user",
+    timeoutMs: 30000,
+    protocolVersion: "auto",
+    url: "https://agent.tinyfish.ai/mcp?source=tinyfish_cli&client=zcode",
+    headers: {},
+    enabled: false,
+    status: "ready",
+    isCustom: false,
+  },
+  {
+    id: "context7",
+    name: "Context7",
+    transport: "http",
+    scope: "user",
+    timeoutMs: 30000,
+    protocolVersion: "auto",
+    url: "https://mcp.context7.com/mcp",
+    headers: {},
+    enabled: false,
+    status: "ready",
+    isCustom: false,
+  },
+  {
+    id: "github",
+    name: "GitHub",
+    transport: "stdio",
+    scope: "user",
+    timeoutMs: 30000,
+    protocolVersion: "auto",
+    command: "npx",
+    args: ["-y", "@modelcontextprotocol/server-github"],
+    env: {
+      GITHUB_PERSONAL_ACCESS_TOKEN: "",
+    },
+    enabled: false,
+    status: "ready",
+    isCustom: false,
   },
 ];
+
+export const MOBILE_PRESET_MCP_SERVERS = AVAILABLE_PRESET_MCP_SERVERS;
 
 const STORAGE_KEY = "const_mcp_configuration_mobile_v3";
 
@@ -71,10 +132,13 @@ export function exportMcpJson(config: McpConfigurationState): string {
         command: server.command || "npx",
         args: server.args || [],
         ...(server.env && Object.keys(server.env).length > 0 ? { env: server.env } : {}),
+        ...(server.enabled === false ? { disabled: true } : {}),
       };
     } else {
       mcpServers[server.id] = {
         url: server.url || "",
+        ...(server.headers && Object.keys(server.headers).length > 0 ? { headers: server.headers } : {}),
+        ...(server.enabled === false ? { disabled: true } : {}),
       };
     }
   }
@@ -92,29 +156,21 @@ export function importMcpJson(jsonString: string): McpConfigurationState {
     const servers: McpServerConfig[] = [];
 
     for (const [id, val] of Object.entries<any>(mcpServers)) {
-      if (val.url) {
+      if (val && typeof val === "object") {
+        const isHttp = Boolean(val.url);
         servers.push({
           id,
-          name: id.charAt(0).toUpperCase() + id.slice(1).replace(/[-_]/g, " "),
-          transport: (val.transport as McpTransport) || "sse",
+          name: val.name || id.charAt(0).toUpperCase() + id.slice(1).replace(/[-_]/g, " "),
+          transport: (val.transport as McpTransport) || (isHttp ? (val.url?.startsWith("http") ? "http" : "sse") : "stdio"),
           scope: val.scope || "user",
           timeoutMs: val.timeoutMs || 30000,
           protocolVersion: val.protocolVersion || "auto",
           url: val.url,
-          status: "ready",
-          isCustom: true,
-        });
-      } else {
-        servers.push({
-          id,
-          name: id.charAt(0).toUpperCase() + id.slice(1).replace(/[-_]/g, " "),
-          transport: "stdio",
-          scope: val.scope || "user",
-          timeoutMs: val.timeoutMs || 30000,
-          protocolVersion: val.protocolVersion || "auto",
-          command: val.command || "npx",
+          command: val.command || (isHttp ? undefined : "npx"),
           args: val.args || [],
+          headers: val.headers || {},
           env: val.env || {},
+          enabled: val.disabled ? false : true,
           status: "ready",
           isCustom: true,
         });
@@ -128,24 +184,25 @@ export function importMcpJson(jsonString: string): McpConfigurationState {
 }
 
 /**
- * Retrieves the stored MCP configuration from localStorage, or falls back to presets
+ * Retrieves the stored MCP configuration from localStorage.
+ * Defaults to EMPTY array so user starts with a clean slate as requested.
  */
 export function getStoredMcpConfig(): McpConfigurationState {
   if (typeof window === "undefined") {
-    return { servers: MOBILE_PRESET_MCP_SERVERS };
+    return { servers: [] };
   }
 
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (parsed && Array.isArray(parsed.servers) && parsed.servers.length > 0) {
+      if (parsed && Array.isArray(parsed.servers)) {
         return parsed;
       }
     }
   } catch {}
 
-  return { servers: MOBILE_PRESET_MCP_SERVERS };
+  return { servers: [] };
 }
 
 /**
@@ -154,5 +211,6 @@ export function getStoredMcpConfig(): McpConfigurationState {
 export function saveStoredMcpConfig(config: McpConfigurationState): void {
   if (typeof window !== "undefined") {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(config));
+    window.dispatchEvent(new CustomEvent("mcp_servers_changed", { detail: config }));
   }
 }
