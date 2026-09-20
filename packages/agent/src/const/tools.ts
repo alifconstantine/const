@@ -1747,7 +1747,6 @@ export async function executeComposioTool(
         console.error("[Google Slides Live Execution Error]", err);
         const errMsg = err?.message || String(err);
         const notConnected = errMsg.includes("No active connection") || errMsg.includes("4302");
-        const fallbackUrl = `https://docs.google.com/presentation/create`;
         return {
           result: JSON.stringify(
             {
@@ -1755,10 +1754,10 @@ export async function executeComposioTool(
               provider: "Google Slides",
               title,
               slideCount: count,
+              slides,
               message: notConnected
-                ? `Slide presentasi "${title}" disiapkan. Hubungkan akun Google Slides di menu Connectors agar presentasi masuk langsung ke akun Google Anda.`
-                : `Slide presentasi "${title}" disiapkan: ${errMsg}`,
-              presentationUrl: fallbackUrl,
+                ? `Struktur slide presentasi "${title}" (${count} slide) telah dirancang di chat. Hubungkan akun Google Slides di menu Connectors agar presentasi masuk langsung ke akun Google Anda.`
+                : `Struktur slide presentasi "${title}" (${count} slide) disiapkan: ${errMsg}`,
             },
             null,
             2
@@ -1771,12 +1770,12 @@ export async function executeComposioTool(
     return {
       result: JSON.stringify(
         {
-          status: "success",
+          status: "partial_success",
           provider: "Google Slides",
           title,
           slideCount: count,
-          message: `Slide presentasi Google Slides "${title}" berhasil disiapkan dengan ${count} slide terstruktur.`,
-          presentationUrl: "https://docs.google.com/presentation/create",
+          slides,
+          message: `Struktur slide presentasi Google Slides "${title}" (${count} slide) telah dirancang di chat. Hubungkan akun Google Slides di menu Connectors agar presentasi masuk langsung ke akun Google Anda.`,
         },
         null,
         2

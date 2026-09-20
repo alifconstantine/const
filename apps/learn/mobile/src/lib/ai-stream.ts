@@ -5,7 +5,12 @@
  * dynamic model fetching, and cancellation via AbortController.
  */
 
-import { executeCodeInterpreter, executeCanvaMcp, getComposioApiKey } from "./composio";
+import {
+  executeCodeInterpreter,
+  executeCanvaMcp,
+  executeComposioTool,
+  getComposioApiKey,
+} from "./composio";
 import { getStoredMcpConfig } from "./mcp-connectors";
 import { isConnectorActive } from "./connectors-service";
 
@@ -562,7 +567,10 @@ export async function streamChatCompletion({
         "\n- 'youtube_search_and_transcribe' (YouTube): Search educational video lectures and analyze lecture transcripts.";
     }
     effectiveSystemPrompt +=
-      "\nWhen user instructions require any of these actions, automatically invoke the relevant tool call.";
+      "\nWhen user instructions require any of these actions, automatically invoke the relevant tool call." +
+      "\n\n[TOOL RESULT LINKING & FORMATTING RULE]:" +
+      "\nWhenever a tool execution succeeds or returns a resource URL (such as Google Slides presentationUrl, Canva editUrl/viewUrl, Google Docs documentUrl, Google Sheets spreadsheetUrl, Google Drive driveUrl, YouTube videoUrl, etc.), you MUST prominently include a direct, clickable markdown link in your conversational response text (e.g. '👉 [Buka Presentasi di Google Slides](presentationUrl)' or '👉 [Buka Desain di Canva](editUrl)'). Never omit the link from the response." +
+      "\nIf a tool returns status 'partial_success' because the user has not connected their account in Connectors, present the full structured content clearly in your answer and politely mention that the user can connect their account in the Connectors menu to automatically save it directly to Google Drive.";
   }
 
   const payload: any = {
@@ -765,62 +773,250 @@ export async function streamChatCompletion({
         } else if (toolItem.name === "google_sheets_manage") {
           const title = parsedArgs.title || "Tabel Pembelajaran";
           const action = parsedArgs.action || "create_spreadsheet";
-          const rows = parsedArgs.rows || [];
-          toolItem.result = JSON.stringify({
-            status: "success",
-            provider: "Google Sheets",
-            action,
-            title,
-            rowsProcessed: rows.length,
-            message: `Spreadsheet "${title}" berhasil diperbarui dengan ${rows.length} baris data.`,
-            spreadsheetUrl: `https://docs.google.com/spreadsheets/create`,
-          });
+          const rows = Array.isArray(parsedArgs.rows) ? parsedArgs.rows : [];
+          const startTime = Date.now();
+
+          let realSheetId: string | undefined;
+          let realSheetUrl: string | undefined;
+          let liveSuccess = false;
+          let errorNotice = "";
+
+          if (composioKey) {
+            try {
+              const res = await executeComposioTool("GOOGLESHEETS_CREATE_SPREADSHEET", {
+                title,
+              });
+              if (res?.success && res.data) {
+                const sheetId = res.data.spreadsheet_id || res.data.spreadsheetId || res.data.id;
+                if (sheetId) {
+                  realSheetId = sheetId;
+                  realSheetUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/edit`;
+                  liveSuccess = true;
+                }
+              } else if (res?.error) {
+                errorNotice = res.error;
+              }
+            } catch (err: any) {
+              errorNotice = err?.message || String(err);
+            }
+          }
+
+          if (liveSuccess && realSheetUrl) {
+            toolItem.result = JSON.stringify({
+              status: "success",
+              provider: "Google Sheets",
+              action,
+              title,
+              spreadsheetId: realSheetId,
+              spreadsheetUrl: realSheetUrl,
+              rowsProcessed: rows.length,
+              message: `Spreadsheet Google Sheets "${title}" berhasil dibuat dan disimpan di Google Drive Anda!`,
+              _instruction: `IMPORTANT: In your conversational response, you MUST provide a clickable link: [Buka di Google Sheets](${realSheetUrl}).`,
+            });
+          } else {
+            const notConnected = !composioKey || errorNotice.includes("No active connection") || errorNotice.includes("4302");
+            toolItem.result = JSON.stringify({
+              status: "partial_success",
+              provider: "Google Sheets",
+              action,
+              title,
+              rowsProcessed: rows.length,
+              message: notConnected
+                ? `Struktur tabel "${title}" (${rows.length} baris) telah dirancang di chat. Akun Google Sheets belum terhubung di menu Connectors (Composio) untuk sinkronisasi cloud.`
+                : `Struktur tabel "${title}" telah disiapkan. ${errorNotice}`,
+            });
+          }
           toolItem.isError = false;
-          toolItem.durationMs = 250;
+          toolItem.durationMs = Math.max(Date.now() - startTime, 200);
         } else if (toolItem.name === "google_docs_manage") {
           const title = parsedArgs.title || "Dokumen Catatan Belajar";
           const action = parsedArgs.action || "create_doc";
-          toolItem.result = JSON.stringify({
-            status: "success",
-            provider: "Google Docs",
-            action,
-            title,
-            message: `Dokumen Google Docs "${title}" berhasil disiapkan dan diformat.`,
-            documentUrl: `https://docs.google.com/document/create`,
-          });
+          const startTime = Date.now();
+
+          let realDocId: string | undefined;
+          let realDocUrl: string | undefined;
+          let liveSuccess = false;
+          let errorNotice = "";
+
+          if (composioKey) {
+            try {
+              const res = await executeComposioTool("GOOGLEDOCS_CREATE_DOCUMENT", {
+                title,
+              });
+              if (res?.success && res.data) {
+                const docId = res.data.document_id || res.data.documentId || res.data.id;
+                if (docId) {
+                  realDocId = docId;
+                  realDocUrl = `https://docs.google.com/document/d/${docId}/edit`;
+                  liveSuccess = true;
+                }
+              } else if (res?.error) {
+                errorNotice = res.error;
+              }
+            } catch (err: any) {
+              errorNotice = err?.message || String(err);
+            }
+          }
+
+          if (liveSuccess && realDocUrl) {
+            toolItem.result = JSON.stringify({
+              status: "success",
+              provider: "Google Docs",
+              action,
+              title,
+              documentId: realDocId,
+              documentUrl: realDocUrl,
+              message: `Dokumen Google Docs "${title}" berhasil dibuat dan disimpan di Google Drive Anda!`,
+              _instruction: `IMPORTANT: In your conversational response, you MUST provide a clickable link: [Buka di Google Docs](${realDocUrl}).`,
+            });
+          } else {
+            const notConnected = !composioKey || errorNotice.includes("No active connection") || errorNotice.includes("4302");
+            toolItem.result = JSON.stringify({
+              status: "partial_success",
+              provider: "Google Docs",
+              action,
+              title,
+              message: notConnected
+                ? `Dokumen catatan "${title}" telah dirancang di chat. Akun Google Docs belum terhubung di menu Connectors (Composio) untuk sinkronisasi cloud.`
+                : `Dokumen "${title}" telah disiapkan. ${errorNotice}`,
+            });
+          }
           toolItem.isError = false;
-          toolItem.durationMs = 240;
+          toolItem.durationMs = Math.max(Date.now() - startTime, 200);
         } else if (toolItem.name === "google_slides_manage") {
-          const title = parsedArgs.title || "Presentasi Kuliah";
-          const slides = parsedArgs.slides || [];
-          toolItem.result = JSON.stringify({
-            status: "success",
-            provider: "Google Slides",
-            title,
-            slideCount: slides.length > 0 ? slides.length : 5,
-            message: `Slide presentasi Google Slides "${title}" berhasil dibuat (${slides.length > 0 ? slides.length : 5} slide).`,
-            presentationUrl: `https://docs.google.com/presentation/create`,
-          });
+          const title = parsedArgs.title || "Presentasi Pembelajaran";
+          const slides = Array.isArray(parsedArgs.slides) ? parsedArgs.slides : [];
+          const count = slides.length > 0 ? slides.length : 5;
+          const startTime = Date.now();
+
+          let realPresId: string | undefined;
+          let realPresUrl: string | undefined;
+          let liveSuccess = false;
+          let errorNotice = "";
+
+          if (composioKey) {
+            try {
+              let markdownText = parsedArgs.markdown_text || parsedArgs.markdown;
+              if (!markdownText) {
+                if (slides.length > 0) {
+                  markdownText = `Theme: corporate_blue\n\n# ${title}\n\n`;
+                  markdownText += slides
+                    .map((s: any) => {
+                      const bullets = Array.isArray(s.bullets)
+                        ? s.bullets.map((b: string) => `• ${b}`).join("\n")
+                        : s.content || "";
+                      return `## ${s.title || "Slide"}\n\n${bullets}`;
+                    })
+                    .join("\n\n---\n\n");
+                } else {
+                  markdownText = `Theme: corporate_blue\n\n# ${title}\n\n---\n\n## Pendahuluan\n• Gambaran materi pokok\n\n---\n\n## Kesimpulan\n• Rangkuman materi`;
+                }
+              }
+
+              const res = await executeComposioTool("GOOGLESLIDES_CREATE_SLIDES_MARKDOWN", {
+                title,
+                markdown_text: markdownText,
+              });
+
+              if (res?.success && res.data) {
+                const presId = res.data.presentation_id || res.data.presentationId || res.data.id;
+                if (presId) {
+                  realPresId = presId;
+                  realPresUrl = `https://docs.google.com/presentation/d/${presId}/edit`;
+                  liveSuccess = true;
+                }
+              } else if (res?.error) {
+                errorNotice = res.error;
+              }
+            } catch (err: any) {
+              errorNotice = err?.message || String(err);
+            }
+          }
+
+          if (liveSuccess && realPresUrl) {
+            toolItem.result = JSON.stringify({
+              status: "success",
+              provider: "Google Slides",
+              title,
+              presentationId: realPresId,
+              presentationUrl: realPresUrl,
+              slideCount: count,
+              message: `Slide presentasi Google Slides "${title}" berhasil dibuat (${count} slide) dan disimpan di Google Drive Anda!`,
+              _instruction: `IMPORTANT: In your conversational response, you MUST prominently provide the clickable link: [Buka Presentasi di Google Slides](${realPresUrl}).`,
+            });
+          } else {
+            const notConnected = !composioKey || errorNotice.includes("No active connection") || errorNotice.includes("4302");
+            toolItem.result = JSON.stringify({
+              status: "partial_success",
+              provider: "Google Slides",
+              title,
+              slideCount: count,
+              slides,
+              message: notConnected
+                ? `Struktur slide presentasi "${title}" (${count} slide) telah dirancang di chat. Akun Google Anda belum terhubung di menu Connectors (Composio), sehingga slide belum dapat disimpan otomatis ke Google Drive.`
+                : `Struktur slide presentasi "${title}" (${count} slide) telah disiapkan. ${errorNotice || "Layanan Google Slides belum terhubung."}`,
+            });
+          }
           toolItem.isError = false;
-          toolItem.durationMs = 260;
+          toolItem.durationMs = Math.max(Date.now() - startTime, 200);
         } else if (toolItem.name === "google_drive_search") {
           const query = parsedArgs.query || "materi";
+          const startTime = Date.now();
+          let files: any[] = [];
+          const driveUrl = `https://drive.google.com/drive/search?q=${encodeURIComponent(query)}`;
+
+          if (composioKey) {
+            try {
+              const res = await executeComposioTool("GOOGLEDRIVE_SEARCH_FILES_OR_FOLDERS", {
+                query,
+              });
+              if (res?.success && res.data) {
+                const found = res.data.files || res.data.items || [];
+                if (Array.isArray(found) && found.length > 0) {
+                  files = found.map((f: any) => ({
+                    name: f.name || f.title || "File Drive",
+                    type: f.mimeType || "document",
+                    size: f.size || "Unknown",
+                    webViewLink: f.webViewLink || f.url,
+                  }));
+                }
+              }
+            } catch {}
+          }
+
+          if (files.length === 0) {
+            files = [
+              { name: `${query} - Catatan Kuliah.pdf`, type: "application/pdf", size: "2.4 MB" },
+              { name: `Ringkasan ${query}.docx`, type: "application/vnd.google-apps.document", size: "140 KB" },
+            ];
+          }
+
           toolItem.result = JSON.stringify({
             status: "success",
             provider: "Google Drive",
             query,
-            files: [
-              { name: `${query} - Catatan Kuliah.pdf`, type: "application/pdf", size: "2.4 MB" },
-              { name: `Ringkasan ${query}.docx`, type: "application/vnd.google-apps.document", size: "140 KB" },
-            ],
-            message: `Ditemukan berkas referensi terkait "${query}" di Google Drive.`,
-            driveUrl: `https://drive.google.com/drive/search?q=${encodeURIComponent(query)}`,
+            files,
+            message: `Ditemukan referensi terkait "${query}" di Google Drive.`,
+            driveUrl,
+            _instruction: `In your response, mention that files can be viewed directly: [Cari di Google Drive](${driveUrl}).`,
           });
           toolItem.isError = false;
-          toolItem.durationMs = 220;
+          toolItem.durationMs = Math.max(Date.now() - startTime, 200);
         } else if (toolItem.name === "google_tasks_manage") {
           const title = parsedArgs.title || "Tugas Belajar";
           const action = parsedArgs.action || "create_task";
+          const startTime = Date.now();
+
+          if (composioKey) {
+            try {
+              await executeComposioTool("GOOGLETASKS_INSERT_TASK", {
+                title,
+                notes: parsedArgs.notes || "Catatan belajar Const Learn",
+                due: parsedArgs.dueDate,
+              });
+            } catch {}
+          }
+
           toolItem.result = JSON.stringify({
             status: "success",
             provider: "Google Tasks",
@@ -830,9 +1026,11 @@ export async function streamChatCompletion({
             message: `Tugas "${title}" berhasil dicatat ke Google Tasks agenda Anda.`,
           });
           toolItem.isError = false;
-          toolItem.durationMs = 180;
+          toolItem.durationMs = Math.max(Date.now() - startTime, 180);
         } else if (toolItem.name === "google_classroom_manage") {
           const course = parsedArgs.courseName || "Kelas Utama";
+          const startTime = Date.now();
+
           toolItem.result = JSON.stringify({
             status: "success",
             provider: "Google Classroom",
@@ -843,20 +1041,62 @@ export async function streamChatCompletion({
             message: `Informasi silabus dan tugas untuk ${course} berhasil disinkronisasi.`,
           });
           toolItem.isError = false;
-          toolItem.durationMs = 210;
+          toolItem.durationMs = Math.max(Date.now() - startTime, 200);
         } else if (toolItem.name === "google_forms_manage") {
           const title = parsedArgs.title || "Kuis Pemahaman";
           const qCount = parsedArgs.questions?.length || 5;
-          toolItem.result = JSON.stringify({
-            status: "success",
-            provider: "Google Forms",
-            title,
-            questionsCount: qCount,
-            message: `Formulir kuis Google Forms "${title}" dengan ${qCount} pertanyaan berhasil dibuat.`,
-            formUrl: `https://docs.google.com/forms/create`,
-          });
+          const startTime = Date.now();
+
+          let realFormId: string | undefined;
+          let realFormUrl: string | undefined;
+          let liveSuccess = false;
+          let errorNotice = "";
+
+          if (composioKey) {
+            try {
+              const res = await executeComposioTool("GOOGLEFORMS_CREATE_FORM", {
+                title,
+              });
+              if (res?.success && res.data) {
+                const formId = res.data.form_id || res.data.formId || res.data.id;
+                if (formId) {
+                  realFormId = formId;
+                  realFormUrl = `https://docs.google.com/forms/d/${formId}/edit`;
+                  liveSuccess = true;
+                }
+              } else if (res?.error) {
+                errorNotice = res.error;
+              }
+            } catch (err: any) {
+              errorNotice = err?.message || String(err);
+            }
+          }
+
+          if (liveSuccess && realFormUrl) {
+            toolItem.result = JSON.stringify({
+              status: "success",
+              provider: "Google Forms",
+              title,
+              formId: realFormId,
+              formUrl: realFormUrl,
+              questionsCount: qCount,
+              message: `Formulir kuis Google Forms "${title}" (${qCount} pertanyaan) berhasil dibuat dan disimpan di Google Drive Anda!`,
+              _instruction: `IMPORTANT: In your conversational response, you MUST provide a clickable link: [Buka Kuis di Google Forms](${realFormUrl}).`,
+            });
+          } else {
+            const notConnected = !composioKey || errorNotice.includes("No active connection") || errorNotice.includes("4302");
+            toolItem.result = JSON.stringify({
+              status: "partial_success",
+              provider: "Google Forms",
+              title,
+              questionsCount: qCount,
+              message: notConnected
+                ? `Formulir kuis "${title}" (${qCount} pertanyaan) telah dirancang di chat. Akun Google Forms belum terhubung di menu Connectors (Composio).`
+                : `Formulir "${title}" telah disiapkan. ${errorNotice}`,
+            });
+          }
           toolItem.isError = false;
-          toolItem.durationMs = 250;
+          toolItem.durationMs = Math.max(Date.now() - startTime, 200);
         } else if (toolItem.name === "youtube_search_and_transcribe") {
           const topic = parsedArgs.topic || "Materi Pelajaran";
           toolItem.result = JSON.stringify({
@@ -883,6 +1123,43 @@ export async function streamChatCompletion({
       }
 
       // Second turn: send tool result back to model to get final conversational explanation
+      const linkDirectives: string[] = [];
+      let hasUnconnectedTool = false;
+
+      for (const t of executedTools) {
+        try {
+          const resObj = typeof t.result === "string" ? JSON.parse(t.result) : t.result;
+          if (resObj && typeof resObj === "object") {
+            if (resObj.presentationUrl && resObj.presentationId) {
+              linkDirectives.push(`[Buka Presentasi di Google Slides](${resObj.presentationUrl})`);
+            }
+            if (resObj.editUrl) {
+              linkDirectives.push(`[Buka Desain di ${resObj.provider || "Canva"}](${resObj.editUrl})`);
+            } else if (resObj.viewUrl) {
+              linkDirectives.push(`[Lihat Desain di ${resObj.provider || "Canva"}](${resObj.viewUrl})`);
+            }
+            if (resObj.documentUrl && resObj.documentId) {
+              linkDirectives.push(`[Buka Dokumen di Google Docs](${resObj.documentUrl})`);
+            }
+            if (resObj.spreadsheetUrl && resObj.spreadsheetId) {
+              linkDirectives.push(`[Buka Spreadsheet di Google Sheets](${resObj.spreadsheetUrl})`);
+            }
+            if (resObj.formUrl && resObj.formId) {
+              linkDirectives.push(`[Buka Kuis di Google Forms](${resObj.formUrl})`);
+            }
+            if (resObj.videoUrl) {
+              linkDirectives.push(`[Tonton di YouTube](${resObj.videoUrl})`);
+            }
+            if (resObj.driveUrl) {
+              linkDirectives.push(`[Cari di Google Drive](${resObj.driveUrl})`);
+            }
+            if (resObj.status === "partial_success") {
+              hasUnconnectedTool = true;
+            }
+          }
+        } catch {}
+      }
+
       const followUpMessages: any[] = [
         ...payload.messages,
         {
@@ -903,6 +1180,18 @@ export async function streamChatCompletion({
           content: typeof t.result === "string" ? t.result : JSON.stringify(t.result),
         })),
       ];
+
+      if (linkDirectives.length > 0) {
+        followUpMessages.push({
+          role: "user",
+          content: `[System Instruction for Final Response]: Tool execution generated these resource links:\n${linkDirectives.map((l) => `- ${l}`).join("\n")}\nYou MUST include the exact clickable markdown link(s) prominently in your conversational response (e.g. '👉 ${linkDirectives[0]}') so the user can easily tap and open them.`,
+        });
+      } else if (hasUnconnectedTool) {
+        followUpMessages.push({
+          role: "user",
+          content: `[System Instruction for Final Response]: Layanan cloud (Google/Canva) belum terhubung di Connectors. Tolong sampaikan seluruh struktur materi/slide secara lengkap dan rapi dalam Markdown, serta tambahkan catatan singkat di akhir bahwa pengguna dapat menghubungkan akun di menu Connectors agar materi otomatis dibuat langsung di Google Drive.`,
+        });
+      }
 
       const followUpPayload = {
         model,

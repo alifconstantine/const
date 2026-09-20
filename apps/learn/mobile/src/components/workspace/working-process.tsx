@@ -12,6 +12,7 @@ import {
   ExternalLink,
   Check,
   ListTodo,
+  Copy,
 } from "lucide-react";
 import { ScrollArea, cn, BrandLogo, getConnectorForTool, type ConnectorMetadata } from "@const/ui";
 import { FileIcon } from "./file-icon";
@@ -476,7 +477,7 @@ function ConnectorToolTraceItem({
   connector: ConnectorMetadata;
   onOpenBrowser?: (url: string) => void;
 }) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const [isOpen, setIsOpen] = useState(false);
   const isRunning = tool.status === "running" || (!tool.result && !tool.isError);
 
@@ -523,7 +524,7 @@ function ConnectorToolTraceItem({
     tool.args?.fileType ||
     (tool.args?.code ? "python" : null);
 
-  const resultUrl =
+  const rawUrl =
     parsedResult?.editUrl ||
     parsedResult?.edit_url ||
     parsedResult?.spreadsheetUrl ||
@@ -532,6 +533,42 @@ function ConnectorToolTraceItem({
     parsedResult?.driveUrl ||
     parsedResult?.videoUrl ||
     parsedResult?.formUrl;
+
+  // Filter out blank new document creator links that have no real created file ID
+  const isBlankCreateLink =
+    typeof rawUrl === "string" &&
+    (rawUrl.endsWith("/presentation/create") ||
+      rawUrl.endsWith("/document/create") ||
+      rawUrl.endsWith("/spreadsheets/create") ||
+      rawUrl.endsWith("/forms/create"));
+
+  const resultUrl = isBlankCreateLink ? null : rawUrl;
+
+  const [copiedSlides, setCopiedSlides] = useState(false);
+  const slides = Array.isArray(tool.args?.slides)
+    ? tool.args.slides
+    : Array.isArray(parsedResult?.slides)
+    ? parsedResult.slides
+    : null;
+
+  const handleCopySlides = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!slides || slides.length === 0) return;
+    const title = tool.args?.title || parsedResult?.title || "Slide Presentasi";
+    const text =
+      `# ${title}\n\n` +
+      slides
+        .map((s: any, idx: number) => {
+          const bullets = Array.isArray(s.bullets)
+            ? s.bullets.map((b: string) => `• ${b}`).join("\n")
+            : s.content || "";
+          return `## Slide ${idx + 1}: ${s.title || ""}\n${bullets}`;
+        })
+        .join("\n\n---\n\n");
+    navigator.clipboard.writeText(text);
+    setCopiedSlides(true);
+    setTimeout(() => setCopiedSlides(false), 2000);
+  };
 
   const viewUrl = parsedResult?.viewUrl || parsedResult?.view_url;
   const thumbnails: Array<{ url: string }> = Array.isArray(parsedResult?.thumbnails)
@@ -585,9 +622,9 @@ function ConnectorToolTraceItem({
           )}
         </div>
 
-        {/* Right: Quick Action Button (Open in App) + Status Badge + Chevron */}
+        {/* Right: Quick Action Button (Open in App / Copy Slides) + Status Badge + Chevron */}
         <div className="flex items-center gap-1.5 xs:gap-2 shrink-0">
-          {resultUrl && !isRunning && !isError && (
+          {resultUrl && !isRunning && !isError ? (
             <button
               type="button"
               onClick={(e) => {
@@ -600,7 +637,26 @@ function ConnectorToolTraceItem({
               <span>{connector.id === "canva_mcp" ? t("editInCanva") : t("openInApp", { app: connector.name })}</span>
               <ExternalLink className="w-2.5 h-2.5" />
             </button>
-          )}
+          ) : slides && slides.length > 0 && !isRunning && !isError ? (
+            <button
+              type="button"
+              onClick={handleCopySlides}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-secondary hover:bg-secondary/80 text-foreground text-[10.5px] font-medium border border-border/70 shadow-xs cursor-pointer transition-colors"
+              title={language === "id" ? "Salin Teks Slide" : "Copy Slides Text"}
+            >
+              {copiedSlides ? (
+                <>
+                  <Check className="w-2.5 h-2.5 text-emerald-400" />
+                  <span className="text-emerald-400">{language === "id" ? "Tersalin!" : "Copied!"}</span>
+                </>
+              ) : (
+                <>
+                  <Copy className="w-2.5 h-2.5 text-muted-foreground" />
+                  <span>{language === "id" ? "Salin Slide" : "Copy Slides"}</span>
+                </>
+              )}
+            </button>
+          ) : null}
 
           {/* Status Indicator */}
           {isRunning ? (
@@ -647,6 +703,26 @@ function ConnectorToolTraceItem({
                   <div className="text-[11.5px] leading-relaxed opacity-90 text-foreground/90">
                     {resultMessage || t("connectAccountNotice", { app: connector.name })}
                   </div>
+                  {slides && slides.length > 0 && (
+                    <div className="pt-1">
+                      <button
+                        type="button"
+                        onClick={handleCopySlides}
+                        className="inline-flex items-center gap-1 text-[11px] text-amber-300 hover:text-amber-200 underline font-medium cursor-pointer"
+                      >
+                        <Copy className="w-2.5 h-2.5" />
+                        <span>
+                          {copiedSlides
+                            ? language === "id"
+                              ? "Teks Slide Berhasil Disalin!"
+                              : "Slide Text Copied!"
+                            : language === "id"
+                            ? "Salin Format Materi Slide"
+                            : "Copy Slide Markdown"}
+                        </span>
+                      </button>
+                    </div>
+                  )}
                   {resultUrl && (
                     <div className="pt-1">
                       <button
