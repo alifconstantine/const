@@ -4,6 +4,12 @@
  * using the CODEINTERPRETER toolkit.
  */
 
+import {
+  checkComposioLimit,
+  recordComposioToolCall,
+  getStoredComposioUsage,
+} from "./composio-usage";
+
 export interface CodeInterpreterResult {
   success: boolean;
   stdout: string;
@@ -154,6 +160,17 @@ export async function executeCodeInterpreter(
     timeout?: number;
   }
 ): Promise<CodeInterpreterResult> {
+  const limit = checkComposioLimit();
+  if (!limit.allowed) {
+    return {
+      success: false,
+      stdout: "",
+      stderr: limit.message || "Batas mingguan 300 tool call Composio telah tercapai.",
+      error: "Weekly limit exceeded",
+      durationMs: 0,
+    };
+  }
+
   const apiKey = getComposioApiKey();
   if (!apiKey) {
     return {
@@ -224,6 +241,8 @@ export async function executeCodeInterpreter(
     const data = json.data || {};
     const hasError = Boolean(json.error || data.error);
 
+    recordComposioToolCall("CODEINTERPRETER_EXECUTE_CODE", !hasError);
+
     return {
       success: !hasError,
       stdout: data.stdout || "",
@@ -235,6 +254,7 @@ export async function executeCodeInterpreter(
       durationMs,
     };
   } catch (err: any) {
+    recordComposioToolCall("CODEINTERPRETER_EXECUTE_CODE", false, undefined, err?.message);
     return {
       success: false,
       stdout: "",
@@ -302,6 +322,18 @@ export async function executeCanvaMcp(payload: {
   error?: string | null;
   durationMs: number;
 }> {
+  const limitCheck = checkComposioLimit();
+  if (!limitCheck.allowed) {
+    const fallbackUrl = `https://www.canva.com/search?q=${encodeURIComponent(payload.prompt)}`;
+    return {
+      success: false,
+      editUrl: fallbackUrl,
+      message: limitCheck.message || "Batas mingguan 300 tool call Composio telah tercapai.",
+      error: "Weekly limit exceeded",
+      durationMs: 0,
+    };
+  }
+
   const apiKey = getComposioApiKey();
   const startTime = Date.now();
   const baseUrl = getComposioBaseUrl();
@@ -408,6 +440,13 @@ export async function executeCanvaMcp(payload: {
         const pageCount = summary?.page_count || 4;
         const title = summary?.title || payload.prompt;
 
+        recordComposioToolCall(
+          payload.jobId && payload.candidateId
+            ? "CANVA_MCP_CREATE_DESIGN_FROM_CANDIDATE"
+            : "CANVA_MCP_GENERATE_DESIGN",
+          true
+        );
+
         return {
           success: true,
           designId: summary?.id,
@@ -423,6 +462,7 @@ export async function executeCanvaMcp(payload: {
     }
 
     if (firstCand?.url) {
+      recordComposioToolCall("CANVA_MCP_GENERATE_DESIGN", true);
       return {
         success: true,
         title: payload.prompt,
@@ -436,6 +476,7 @@ export async function executeCanvaMcp(payload: {
 
     throw new Error("No design candidates returned by Canva MCP");
   } catch (err: any) {
+    recordComposioToolCall("CANVA_MCP_GENERATE_DESIGN", false, undefined, err?.message);
     const fallbackUrl = `https://www.canva.com/search?q=${encodeURIComponent(payload.prompt)}`;
     return {
       success: false,
@@ -523,6 +564,14 @@ export async function executeComposioTool(
   toolSlug: string,
   args: any
 ): Promise<{ success: boolean; data?: any; error?: string }> {
+  const limitCheck = checkComposioLimit();
+  if (!limitCheck.allowed) {
+    return {
+      success: false,
+      error: limitCheck.message || "Batas mingguan 300 tool call Composio telah tercapai.",
+    };
+  }
+
   const apiKey = getComposioApiKey();
   const baseUrl = getComposioBaseUrl();
   try {
@@ -548,11 +597,14 @@ export async function executeComposioTool(
     }
     if (!res.ok) {
       const errText = await res.text().catch(() => "");
+      recordComposioToolCall(toolSlug, false, undefined, `HTTP ${res.status}: ${errText}`);
       return { success: false, error: `Tool ${toolSlug} failed (HTTP ${res.status}): ${errText}` };
     }
     const json = await res.json();
+    recordComposioToolCall(toolSlug, true);
     return { success: true, data: json.data || json };
   } catch (err: any) {
+    recordComposioToolCall(toolSlug, false, undefined, err?.message);
     return { success: false, error: err?.message || String(err) };
   }
 }

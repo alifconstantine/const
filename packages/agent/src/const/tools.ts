@@ -1281,12 +1281,114 @@ async function getOrCreateComposioSession(apiKey: string, userId: string = "lear
   return sessionId;
 }
 
+const composioUsageFile = path.join(os.homedir(), ".const", "learn", "composio-usage.json");
+const WEEKLY_TOOL_CALL_LIMIT = 300;
+
+function getAgentWeekWindowStart(): number {
+  const d = new Date();
+  const day = d.getUTCDay();
+  const diff = d.getUTCDate() - day + (day === 0 ? -6 : 1);
+  const monday = new Date(d.setUTCDate(diff));
+  monday.setUTCHours(0, 0, 0, 0);
+  return monday.getTime();
+}
+
+function checkAgentComposioLimit(userId = "learn_desktop_user"): { allowed: boolean; message?: string } {
+  try {
+    const currentWindowStart = getAgentWeekWindowStart();
+    if (fsSync.existsSync(composioUsageFile)) {
+      const raw = fsSync.readFileSync(composioUsageFile, "utf-8");
+      const allUsages = JSON.parse(raw);
+      const userUsage = allUsages[userId];
+      if (userUsage) {
+        if (!userUsage.windowStart || Date.now() >= userUsage.resetAt || userUsage.windowStart < currentWindowStart) {
+          return { allowed: true };
+        }
+        if (userUsage.used >= (userUsage.limit || WEEKLY_TOOL_CALL_LIMIT)) {
+          const resetDate = new Date(userUsage.resetAt).toLocaleString(undefined, {
+            weekday: "long",
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+            hour: "2-digit",
+            minute: "2-digit",
+            timeZoneName: "short",
+          });
+          return {
+            allowed: false,
+            message: `Batas mingguan 300 tool call Composio telah tercapai. Kuota Anda akan di-reset otomatis pada ${resetDate}.`,
+          };
+        }
+      }
+    }
+  } catch {}
+  return { allowed: true };
+}
+
+function recordAgentComposioCall(toolSlug: string, success: boolean, userId = "learn_desktop_user", error?: string) {
+  try {
+    const currentWindowStart = getAgentWeekWindowStart();
+    const currentResetAt = currentWindowStart + 7 * 24 * 60 * 60 * 1000;
+    let allUsages: Record<string, any> = {};
+    if (fsSync.existsSync(composioUsageFile)) {
+      try {
+        allUsages = JSON.parse(fsSync.readFileSync(composioUsageFile, "utf-8"));
+      } catch {}
+    }
+
+    const current =
+      allUsages[userId] && allUsages[userId].windowStart >= currentWindowStart
+        ? allUsages[userId]
+        : {
+            limit: WEEKLY_TOOL_CALL_LIMIT,
+            used: 0,
+            remaining: WEEKLY_TOOL_CALL_LIMIT,
+            windowStart: currentWindowStart,
+            resetAt: currentResetAt,
+            byTool: {},
+            recentCalls: [],
+          };
+
+    const newUsed = current.used + 1;
+    const byTool = { ...current.byTool, [toolSlug]: (current.byTool?.[toolSlug] || 0) + 1 };
+    const newCall = {
+      id: `call_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      toolSlug,
+      timestamp: Date.now(),
+      success,
+      error,
+    };
+    const recentCalls = [newCall, ...(current.recentCalls || [])].slice(0, 30);
+
+    allUsages[userId] = {
+      ...current,
+      used: newUsed,
+      remaining: Math.max(0, current.limit - newUsed),
+      lastUsedAt: Date.now(),
+      byTool,
+      recentCalls,
+    };
+
+    const dir = path.dirname(composioUsageFile);
+    if (!fsSync.existsSync(dir)) {
+      fsSync.mkdirSync(dir, { recursive: true });
+    }
+    fsSync.writeFileSync(composioUsageFile, JSON.stringify(allUsages, null, 2), "utf-8");
+  } catch {}
+}
+
 async function executeComposioToolRouter(
   apiKey: string,
   sessionId: string,
   toolSlug: string,
-  argumentsObj: Record<string, any>
+  argumentsObj: Record<string, any>,
+  userId = "learn_desktop_user"
 ): Promise<any> {
+  const limitCheck = checkAgentComposioLimit(userId);
+  if (!limitCheck.allowed) {
+    throw new Error(limitCheck.message);
+  }
+
   const execRes = await fetch(
     `https://backend.composio.dev/api/v3.1/tool_router/session/${sessionId}/execute`,
     {
@@ -1304,9 +1406,11 @@ async function executeComposioToolRouter(
 
   if (!execRes.ok) {
     const errText = await execRes.text();
+    recordAgentComposioCall(toolSlug, false, userId, `HTTP ${execRes.status}: ${errText}`);
     throw new Error(`Composio execution failed for ${toolSlug} (${execRes.status}): ${errText}`);
   }
 
+  recordAgentComposioCall(toolSlug, true, userId);
   const data = await execRes.json();
   return data.data || data;
 }
@@ -1326,6 +1430,20 @@ export async function executeComposioTool(
     process.env.VITE_COMPOSIO_API_KEY ||
     "";
   const userId = process.env.COMPOSIO_USER_ID || "learn_desktop_user";
+
+  if (apiKey) {
+    const limitCheck = checkAgentComposioLimit(userId);
+    if (!limitCheck.allowed) {
+      return {
+        result: JSON.stringify({
+          error: limitCheck.message,
+          status: "limit_exceeded",
+          tool: toolName,
+        }),
+        isError: true,
+      };
+    }
+  }
 
   // 1. Canva MCP (Live generation + materialization into real presentation)
   if (norm.includes("canva")) {

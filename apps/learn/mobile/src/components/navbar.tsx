@@ -32,6 +32,7 @@ interface NavbarProps {
   user?: UserProfile | null;
   onSignOut: () => void;
   onSwitchAccount?: () => void;
+  onOpenSettings?: () => void;
 }
 
 export function getUserInitials(name?: string | null, email?: string | null): string {
@@ -60,6 +61,7 @@ export function Navbar({
   user,
   onSignOut,
   onSwitchAccount,
+  onOpenSettings,
 }: NavbarProps) {
   const { t, language, setLanguage } = useI18n();
   const initials = getUserInitials(user?.name, user?.email);
@@ -208,7 +210,9 @@ export function Navbar({
             <DropdownMenuItem
               className="cursor-pointer flex items-center gap-2 text-xs py-2 px-2 text-muted-foreground hover:text-foreground"
               onClick={() => {
-                // Settings placeholder: intentionally does nothing
+                if (onOpenSettings) {
+                  onOpenSettings();
+                }
               }}
             >
               <Settings className="h-4 w-4" />

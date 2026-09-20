@@ -48,12 +48,14 @@ interface LearnHomeProps {
   onOpenLearn?: (learnId: string, openAddSource?: boolean) => void;
   searchQuery?: string;
   onSearchQueryChange?: (query: string) => void;
+  onOpenSettings?: () => void;
 }
 
 export function LearnHome({
   onOpenLearn,
   searchQuery: propSearchQuery,
   onSearchQueryChange,
+  onOpenSettings,
 }: LearnHomeProps) {
   const { t, language } = useI18n();
 
@@ -915,7 +917,11 @@ export function LearnHome({
             icon={<Settings size={20} strokeWidth={1.8} className="text-white" />}
             onClick={() => {
               setIsFluidMenuExpanded(false);
-              setIsSettingsSheetOpen(true);
+              if (onOpenSettings) {
+                onOpenSettings();
+              } else {
+                setIsSettingsSheetOpen(true);
+              }
             }}
           />
         </MenuContainer>

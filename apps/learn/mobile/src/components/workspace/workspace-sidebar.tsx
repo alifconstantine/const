@@ -18,6 +18,7 @@ import {
   Globe,
   Moon,
   Sun,
+  Settings,
 } from "lucide-react";
 import {
   cn,
@@ -56,6 +57,7 @@ export interface WorkspaceSidebarProps {
   onTogglePinChat?: (chatId: string, isPinned: boolean) => void;
   user?: any;
   onSignOut?: () => void;
+  onOpenSettings?: () => void;
 }
 
 function getUserInitials(name?: string | null, email?: string | null): string {
@@ -77,7 +79,7 @@ function getUserInitials(name?: string | null, email?: string | null): string {
       return username.substring(0, 2).toUpperCase();
     }
   }
-  return "A";
+  return "U";
 }
 
 export function WorkspaceSidebar({
@@ -85,9 +87,13 @@ export function WorkspaceSidebar({
   onClose,
   onBack,
   onNewChat,
+  notebookTitle,
+  notebookEmoji = "📘",
+  onRenameNotebook,
   sourcesCount,
   onOpenSources,
   toolsCount = 8,
+  artifactsCount,
   onOpenStudio,
   sessions,
   activeChatId,
@@ -97,6 +103,7 @@ export function WorkspaceSidebar({
   onTogglePinChat,
   user,
   onSignOut,
+  onOpenSettings,
 }: WorkspaceSidebarProps) {
   const { t, language, setLanguage } = useI18n();
   const [theme, setTheme] = useTheme();
@@ -601,6 +608,22 @@ export function WorkspaceSidebar({
                   ))}
                 </div>
               </div>
+
+              {onOpenSettings && (
+                <>
+                  <DropdownMenuSeparator className="bg-border my-1" />
+                  <DropdownMenuItem
+                    onClick={() => {
+                      onClose();
+                      onOpenSettings();
+                    }}
+                    className="cursor-pointer flex items-center gap-2.5 py-2 px-2.5 rounded-xl hover:bg-secondary text-foreground text-xs"
+                  >
+                    <Settings className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <span>{t("settings")}</span>
+                  </DropdownMenuItem>
+                </>
+              )}
 
               {onSignOut && (
                 <>

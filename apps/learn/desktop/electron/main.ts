@@ -66,6 +66,135 @@ if (!fs.existsSync(learnWorkspacesDir)) {
   } catch {}
 }
 
+const composioUsageFile = path.join(learnHomeDir, "composio-usage.json");
+const WEEKLY_TOOL_CALL_LIMIT = 300;
+
+function getWeekWindowStart(date = new Date()): number {
+  const d = new Date(date);
+  const day = d.getUTCDay();
+  const diff = d.getUTCDate() - day + (day === 0 ? -6 : 1);
+  const monday = new Date(d.setUTCDate(diff));
+  monday.setUTCHours(0, 0, 0, 0);
+  return monday.getTime();
+}
+
+function getNextResetTimestamp(windowStart: number): number {
+  return windowStart + 7 * 24 * 60 * 60 * 1000;
+}
+
+function loadComposioUsage(userId = "learn_desktop_user") {
+  const now = Date.now();
+  const currentWindowStart = getWeekWindowStart();
+  const currentResetAt = getNextResetTimestamp(currentWindowStart);
+
+  const defaultRecord = {
+    limit: WEEKLY_TOOL_CALL_LIMIT,
+    used: 0,
+    remaining: WEEKLY_TOOL_CALL_LIMIT,
+    windowStart: currentWindowStart,
+    resetAt: currentResetAt,
+    byTool: {} as Record<string, number>,
+    recentCalls: [] as any[],
+  };
+
+  try {
+    if (fs.existsSync(composioUsageFile)) {
+      const raw = fs.readFileSync(composioUsageFile, "utf-8");
+      const allUsages = JSON.parse(raw);
+      const userUsage = allUsages[userId];
+      if (userUsage) {
+        if (!userUsage.windowStart || now >= userUsage.resetAt || userUsage.windowStart < currentWindowStart) {
+          allUsages[userId] = defaultRecord;
+          fs.writeFileSync(composioUsageFile, JSON.stringify(allUsages, null, 2), "utf-8");
+          return defaultRecord;
+        }
+        return {
+          ...defaultRecord,
+          ...userUsage,
+          limit: WEEKLY_TOOL_CALL_LIMIT,
+          remaining: Math.max(0, WEEKLY_TOOL_CALL_LIMIT - (userUsage.used || 0)),
+        };
+      }
+    }
+  } catch {}
+
+  return defaultRecord;
+}
+
+function saveComposioUsage(usage: any, userId = "learn_desktop_user") {
+  try {
+    let allUsages: Record<string, any> = {};
+    if (fs.existsSync(composioUsageFile)) {
+      try {
+        allUsages = JSON.parse(fs.readFileSync(composioUsageFile, "utf-8"));
+      } catch {}
+    }
+    allUsages[userId] = usage;
+    fs.writeFileSync(composioUsageFile, JSON.stringify(allUsages, null, 2), "utf-8");
+  } catch (err) {
+    console.error("[saveComposioUsage Error]", err);
+  }
+}
+
+function checkComposioLimit(userId = "learn_desktop_user") {
+  const usage = loadComposioUsage(userId);
+  if (usage.used >= usage.limit) {
+    const resetDate = new Date(usage.resetAt).toLocaleString(undefined, {
+      weekday: "long",
+      year: "numeric",
+      month: "long",
+      day: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZoneName: "short",
+    });
+    return {
+      allowed: false,
+      used: usage.used,
+      remaining: 0,
+      resetAt: usage.resetAt,
+      message: `Batas mingguan 300 tool call Composio telah tercapai. Kuota Anda akan di-reset otomatis pada ${resetDate}.`,
+    };
+  }
+  return {
+    allowed: true,
+    used: usage.used,
+    remaining: usage.remaining,
+    resetAt: usage.resetAt,
+  };
+}
+
+function recordComposioToolCall(toolSlug: string, success: boolean, userId = "learn_desktop_user", error?: string) {
+  const current = loadComposioUsage(userId);
+  const now = Date.now();
+  const newUsed = current.used + 1;
+  const newRemaining = Math.max(0, current.limit - newUsed);
+  const updatedByTool = { ...current.byTool };
+  updatedByTool[toolSlug] = (updatedByTool[toolSlug] || 0) + 1;
+
+  const newCall = {
+    id: `call_${now}_${Math.random().toString(36).substring(2, 7)}`,
+    toolSlug,
+    timestamp: now,
+    success,
+    error,
+  };
+
+  const updatedRecent = [newCall, ...(current.recentCalls || [])].slice(0, 30);
+
+  const updated = {
+    ...current,
+    used: newUsed,
+    remaining: newRemaining,
+    lastUsedAt: now,
+    byTool: updatedByTool,
+    recentCalls: updatedRecent,
+  };
+
+  saveComposioUsage(updated, userId);
+  return updated;
+}
+
 export interface ProviderConfig {
   name: string;
   baseUrl: string;
@@ -686,6 +815,14 @@ app.on("second-instance", (_event, commandLine) => {
       _event,
       payload: { toolSlug: string; arguments: any; userId?: string; apiKey?: string }
     ) => {
+      const userId = payload.userId || "learn_desktop_user";
+
+      // Enforce weekly 300 tool call limit
+      const limitCheck = checkComposioLimit(userId);
+      if (!limitCheck.allowed) {
+        return { success: false, error: limitCheck.message };
+      }
+
       try {
         const apiKey =
           payload.apiKey ||
@@ -695,7 +832,6 @@ app.on("second-instance", (_event, commandLine) => {
         if (!apiKey) {
           throw new Error("COMPOSIO_API_KEY is not configured. Please set COMPOSIO_API_KEY in .env.");
         }
-        const userId = payload.userId || "learn_desktop_user";
 
         // 1. Create or resume session
         const sessRes = await fetch("https://backend.composio.dev/api/v3.1/tool_router/session", {
@@ -736,17 +872,24 @@ app.on("second-instance", (_event, commandLine) => {
 
         if (!execRes.ok) {
           const errText = await execRes.text();
+          recordComposioToolCall(payload.toolSlug, false, userId, `HTTP ${execRes.status}: ${errText}`);
           throw new Error(`Composio execute failed for ${payload.toolSlug} (${execRes.status}): ${errText}`);
         }
 
         const data = await execRes.json();
+        recordComposioToolCall(payload.toolSlug, true, userId);
         return { success: true, data: data.data || data };
       } catch (err: any) {
         console.error("[Composio execute-tool Error]", err);
+        recordComposioToolCall(payload.toolSlug, false, userId, err?.message);
         return { success: false, error: err?.message || String(err) };
       }
     }
   );
+
+  ipcMain.handle("composio:get-usage", async (_event, userId?: string) => {
+    return loadComposioUsage(userId || "learn_desktop_user");
+  });
 
   ipcMain.handle("shell:open-path", async (_event, targetPath: string) => {
     if (!targetPath || !fs.existsSync(targetPath)) return false;

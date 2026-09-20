@@ -39,6 +39,8 @@ contextBridge.exposeInMainWorld("electron", {
       ipcRenderer.invoke("composio:get-connected-accounts", payload),
     executeTool: (payload: { toolSlug: string; arguments: any; userId?: string; apiKey?: string }) =>
       ipcRenderer.invoke("composio:execute-tool", payload),
+    getUsage: (userId?: string) =>
+      ipcRenderer.invoke("composio:get-usage", userId),
   },
   agent: {
     getModels: () => ipcRenderer.invoke("agent:get-models"),
