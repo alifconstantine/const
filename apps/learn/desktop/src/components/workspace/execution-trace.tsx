@@ -1252,16 +1252,9 @@ function ConnectorToolTraceItem({
   tool: TraceStep | DisplayToolCall;
   connector: ConnectorMetadata;
 }) {
+  const { t } = useI18n();
   const [isOpen, setIsOpen] = useState(false);
   const isRunning = tool.status === "running" || (!tool.result && !tool.isError);
-  const isError = Boolean(tool.isError || tool.status === "error");
-
-  // Determine badge tag
-  const tag =
-    tool.args?.action ||
-    tool.args?.designType ||
-    tool.args?.fileType ||
-    (tool.args?.code ? "python" : null);
 
   // Parse result if JSON
   let parsedResult: any = null;
@@ -1277,6 +1270,35 @@ function ConnectorToolTraceItem({
     }
   }
 
+  const isPartialSuccess = parsedResult?.status === "partial_success";
+  const isExplicitError = Boolean(
+    tool.isError ||
+      tool.status === "error" ||
+      parsedResult?.status === "error" ||
+      (parsedResult?.status &&
+        parsedResult.status !== "success" &&
+        parsedResult.status !== "partial_success")
+  );
+  const isError = isExplicitError && !isPartialSuccess;
+
+  // Extract clean summary text from arguments
+  const summaryText =
+    tool.args?.title ||
+    tool.args?.prompt ||
+    tool.args?.query ||
+    tool.args?.topic ||
+    (tool.args?.code ? "code_execution" : "");
+
+  // Page / Slide count
+  const pageCount = parsedResult?.page_count || parsedResult?.slideCount;
+
+  // Tag / Action
+  const tag =
+    tool.args?.action ||
+    tool.args?.designType ||
+    tool.args?.fileType ||
+    (tool.args?.code ? "python" : null);
+
   const resultUrl =
     parsedResult?.editUrl ||
     parsedResult?.edit_url ||
@@ -1291,9 +1313,10 @@ function ConnectorToolTraceItem({
   const thumbnails: Array<{ url: string }> = Array.isArray(parsedResult?.thumbnails)
     ? parsedResult.thumbnails
     : [];
-  const pageCount = parsedResult?.page_count || parsedResult?.slideCount;
 
-  const resultMessage = parsedResult?.message || (typeof tool.result === "string" ? tool.result : null);
+  const resultMessage =
+    parsedResult?.message ||
+    (typeof tool.result === "string" ? tool.result : null);
 
   const handleOpenExternal = (url: string) => {
     if ((window as any).electron?.openExternal) {
@@ -1303,140 +1326,183 @@ function ConnectorToolTraceItem({
     }
   };
 
+  const hasContent = Boolean(tool.args || tool.result);
+
   return (
-    <div className="w-full min-w-0 flex flex-col my-1 font-sans">
-      <div className="p-2.5 rounded-xl bg-secondary/30 border border-border/70 space-y-2 select-text">
-        {/* Tool Header */}
-        <div className="flex items-center justify-between text-[12px]">
-          <div className="flex items-center gap-2 font-medium text-foreground">
-            <BrandLogo id={connector.id} size="xs" />
-            <span>{connector.name}</span>
-            {pageCount && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20 font-medium">
-                {pageCount} Slide
-              </span>
-            )}
-            {tag && (
-              <span className="text-[10px] px-1.5 py-0.5 rounded bg-secondary text-muted-foreground border border-border/50 font-mono">
-                {tag}
-              </span>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2 text-[11px]">
-            {isRunning ? (
-              <span className="flex items-center gap-1.5 text-amber-500 font-mono">
-                <Loader2 className="w-3 h-3 animate-spin" />
-                Working...
-              </span>
-            ) : isError ? (
-              <span className="flex items-center gap-1.5 text-destructive font-mono">
-                <AlertCircle className="w-3 h-3" />
-                Error
-              </span>
-            ) : (
-              <span className="flex items-center gap-1.5 text-emerald-500 font-mono">
-                <Check className="w-3 h-3" />
-                {tool.durationMs ? `${tool.durationMs}ms` : "Done"}
-              </span>
-            )}
-
-            <button
-              type="button"
-              onClick={() => setIsOpen((prev) => !prev)}
-              className="p-1 hover:bg-secondary rounded cursor-pointer text-muted-foreground hover:text-foreground transition-colors"
-            >
-              <ChevronDown
-                className="w-3 h-3 transition-transform duration-200"
-                style={{ transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)" }}
-              />
-            </button>
-          </div>
+    <div className="w-full min-w-0 flex flex-col my-0.5 font-sans">
+      {/* Sleek, compact Trigger Row matching TerminalCard & FileReadCard */}
+      <div
+        onClick={() => hasContent && setIsOpen((prev) => !prev)}
+        className={`flex items-center justify-between py-1 px-1.5 rounded-md hover:bg-muted text-[13px] text-muted-foreground min-w-0 select-none ${
+          hasContent ? "cursor-pointer group" : ""
+        }`}
+      >
+        {/* Left: App Logo + Name + Tag/Slide Count + Brief Summary */}
+        <div className="flex items-center gap-2 min-w-0 pr-2">
+          <BrandLogo id={connector.id} size="xs" />
+          <span className="text-foreground group-hover:text-foreground font-medium truncate font-sans text-xs">
+            {connector.name}
+          </span>
+          {pageCount && (
+            <span className="text-[10px] px-1.5 py-0.2 rounded bg-primary/10 text-primary border border-primary/20 font-medium shrink-0">
+              {t("slidesCount", { count: pageCount })}
+            </span>
+          )}
+          {tag && !pageCount && (
+            <span className="text-[10px] px-1.5 py-0.2 rounded bg-secondary text-muted-foreground border border-border/50 font-mono shrink-0">
+              {tag}
+            </span>
+          )}
+          {summaryText && (
+            <span className="text-[11px] text-muted-foreground/80 truncate font-mono hidden sm:inline-block max-w-[220px]">
+              "{summaryText}"
+            </span>
+          )}
         </div>
 
-        {/* Input Parameters Preview */}
-        {tool.args && (
-          <div className="p-2 rounded-lg bg-black/30 dark:bg-black/40 border border-border/40 text-[11.5px] font-mono text-foreground/90 whitespace-pre-wrap leading-tight">
-            {tool.args.code ? (
-              <code>{tool.args.code}</code>
-            ) : tool.args.prompt ? (
-              <div>
-                <span className="text-muted-foreground">prompt: </span>
-                <span>"{tool.args.prompt}"</span>
-              </div>
-            ) : tool.args.title ? (
-              <div>
-                <span className="text-muted-foreground">{tool.args.action || "title"}: </span>
-                <span>"{tool.args.title}"</span>
-              </div>
-            ) : tool.args.query ? (
-              <div>
-                <span className="text-muted-foreground">query: </span>
-                <span>"{tool.args.query}"</span>
-              </div>
-            ) : tool.args.topic ? (
-              <div>
-                <span className="text-muted-foreground">topic: </span>
-                <span>"{tool.args.topic}"</span>
-              </div>
-            ) : (
-              <code>{JSON.stringify(tool.args, null, 2)}</code>
-            )}
-          </div>
-        )}
+        {/* Right: Direct Action Button (e.g. Open in App) + Status Badge + Chevron */}
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Quick Direct Link Button on the trigger row for instant clickability */}
+          {resultUrl && !isRunning && !isError && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleOpenExternal(resultUrl);
+              }}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-600/15 hover:bg-emerald-600/25 text-emerald-500 dark:text-emerald-400 text-[10.5px] font-medium border border-emerald-500/20 shadow-xs cursor-pointer transition-colors"
+              title={connector.id === "canva_mcp" ? t("editInCanva") : t("openInApp", { app: connector.name })}
+            >
+              <span>{connector.id === "canva_mcp" ? t("editInCanva") : t("openInApp", { app: connector.name })}</span>
+              <ExternalLink className="w-2.5 h-2.5" />
+            </button>
+          )}
 
-        {/* Output Result */}
-        {tool.result && (
-          <div
-            className={cn(
-              "p-2.5 rounded-lg text-[11.5px] border leading-relaxed space-y-2",
-              isError
-                ? "bg-destructive/10 border-destructive/30 text-destructive font-mono"
-                : "bg-emerald-500/5 border-emerald-500/20 text-emerald-600 dark:text-emerald-400"
-            )}
-          >
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <div className="text-[10px] font-sans font-semibold uppercase tracking-wider text-muted-foreground">
-                Output Result
-              </div>
-              <div className="flex items-center gap-1.5 flex-wrap">
-                {viewUrl && viewUrl !== resultUrl && (
-                  <button
-                    type="button"
-                    onClick={() => handleOpenExternal(viewUrl)}
-                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-secondary hover:bg-secondary/80 text-foreground text-[10.5px] font-medium border border-border/70 shadow-xs cursor-pointer transition-colors"
-                  >
-                    <span>Lihat Presentasi</span>
-                    <ExternalLink className="w-2.5 h-2.5" />
-                  </button>
-                )}
-                {resultUrl && (
-                  <button
-                    type="button"
-                    onClick={() => handleOpenExternal(resultUrl)}
-                    className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-[10.5px] font-medium shadow-xs cursor-pointer transition-colors"
-                  >
-                    <span>{connector.id === "canva_mcp" ? "Edit di Canva" : `Buka di ${connector.name}`}</span>
-                    <ExternalLink className="w-2.5 h-2.5" />
-                  </button>
-                )}
-              </div>
-            </div>
+          {/* Status Indicator */}
+          {isRunning ? (
+            <span className="flex items-center gap-1 text-amber-500 text-[11px] font-mono">
+              <Loader2 className="w-3 h-3 animate-spin" />
+              <span>{t("working")}</span>
+            </span>
+          ) : isError ? (
+            <span className="flex items-center gap-1 text-destructive text-[11px] font-mono">
+              <AlertCircle className="w-3 h-3" />
+              <span>{t("failed")}</span>
+            </span>
+          ) : isPartialSuccess ? (
+            <span className="flex items-center gap-1 text-amber-400 text-[11px] font-mono">
+              <AlertCircle className="w-3 h-3" />
+              <span>{t("notConnected")}</span>
+            </span>
+          ) : (
+            <span className="flex items-center gap-1 text-emerald-500 text-[11px] font-mono">
+              <Check className="w-3 h-3" />
+              <span>{tool.durationMs ? `${tool.durationMs}ms` : t("completed")}</span>
+            </span>
+          )}
 
-            {/* Slide Thumbnails Preview if returned by Canva MCP */}
+          {hasContent && (
+            <ChevronDown
+              className="w-3 h-3 text-muted-foreground transition-transform duration-200 ease-out"
+              style={{ transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)" }}
+            />
+          )}
+        </div>
+      </div>
+
+      {/* Collapsible Content with Smooth Animation */}
+      {hasContent && (
+        <SmoothCollapse isOpen={isOpen}>
+          <div className="mt-1 p-2.5 rounded-xl bg-secondary/60 border border-border text-xs select-text shadow-xs w-full min-w-0 space-y-2.5">
+            {/* Warning Banner: Account Not Connected */}
+            {isPartialSuccess && (
+              <div className="p-2.5 rounded-lg border bg-amber-500/10 border-amber-500/30 text-amber-400 flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <div className="space-y-1 min-w-0 flex-1">
+                  <div className="font-semibold text-xs">{t("connectionRequired")}</div>
+                  <div className="text-[11.5px] leading-relaxed opacity-90 text-foreground/90">
+                    {resultMessage || t("connectAccountNotice", { app: connector.name })}
+                  </div>
+                  {resultUrl && (
+                    <div className="pt-1">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenExternal(resultUrl)}
+                        className="inline-flex items-center gap-1 text-[11px] text-amber-400 underline hover:text-amber-300 font-medium cursor-pointer"
+                      >
+                        <span>{t("openInApp", { app: connector.name })}</span>
+                        <ExternalLink className="w-2.5 h-2.5" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Error Banner: Execution Failed */}
+            {isError && (
+              <div className="p-2.5 rounded-lg border bg-destructive/10 border-destructive/30 text-destructive flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <div className="space-y-1 min-w-0 flex-1">
+                  <div className="font-semibold text-xs">{t("executionFailed")}</div>
+                  <div className="text-[11.5px] leading-relaxed opacity-90 font-mono whitespace-pre-wrap break-all">
+                    {resultMessage || (typeof tool.result === "string" ? tool.result : t("unknownError"))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Success Result Message & Action Buttons */}
+            {!isError && !isPartialSuccess && resultMessage && (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-[11px]">
+                  <span className="font-semibold text-muted-foreground uppercase tracking-wider text-[10px]">
+                    {t("outputResult")}
+                  </span>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {viewUrl && viewUrl !== resultUrl && (
+                      <button
+                        type="button"
+                        onClick={() => handleOpenExternal(viewUrl)}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-secondary hover:bg-secondary/80 text-foreground text-[10.5px] font-medium border border-border/70 shadow-xs cursor-pointer transition-colors"
+                      >
+                        <span>{t("viewPresentation")}</span>
+                        <ExternalLink className="w-2.5 h-2.5" />
+                      </button>
+                    )}
+                    {resultUrl && (
+                      <button
+                        type="button"
+                        onClick={() => handleOpenExternal(resultUrl)}
+                        className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-[10.5px] font-medium shadow-xs cursor-pointer transition-colors"
+                      >
+                        <span>{connector.id === "canva_mcp" ? t("editInCanva") : t("openInApp", { app: connector.name })}</span>
+                        <ExternalLink className="w-2.5 h-2.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="p-2.5 rounded-lg bg-background/60 border border-border/40 text-[12px] text-foreground/90 leading-relaxed">
+                  {resultMessage}
+                </div>
+              </div>
+            )}
+
+            {/* Slide Thumbnails Preview (Canva MCP) */}
             {thumbnails.length > 0 && (
               <div className="space-y-1 pt-1">
-                <div className="text-[10.5px] text-muted-foreground font-medium">Pratinjau Slide:</div>
+                <div className="text-[10.5px] text-muted-foreground font-medium">{t("slidePreview")}:</div>
                 <div className="flex items-center gap-2 overflow-x-auto pb-1.5 pt-0.5">
-                  {thumbnails.map((t, tIdx) => (
+                  {thumbnails.map((thumb, tIdx) => (
                     <div
                       key={tIdx}
                       className="relative shrink-0 rounded-md overflow-hidden border border-border/60 hover:border-primary transition-all shadow-xs group cursor-pointer"
                       onClick={() => resultUrl && handleOpenExternal(resultUrl)}
-                      title={`Buka slide ${tIdx + 1} di Canva`}
+                      title={t("openSlideInCanva", { index: tIdx + 1 })}
                     >
                       <img
-                        src={t.url}
+                        src={thumb.url}
                         alt={`Slide ${tIdx + 1}`}
                         className="h-16 w-auto object-cover group-hover:scale-105 transition-transform duration-200"
                         loading="lazy"
@@ -1450,34 +1516,20 @@ function ConnectorToolTraceItem({
               </div>
             )}
 
-            {resultMessage ? (
-              <div className="font-sans text-[12px]">{resultMessage}</div>
-            ) : (
-              <pre className="font-mono text-[11px] whitespace-pre-wrap break-all">
-                {typeof tool.result === "string" ? tool.result : JSON.stringify(tool.result, null, 2)}
-              </pre>
-            )}
-          </div>
-        )}
-
-        {/* Details Accordion (for full args & raw JSON inspection) */}
-        <SmoothCollapse isOpen={isOpen}>
-          <div className="pt-2 border-t border-border/50 text-[11px] font-mono space-y-1.5">
-            <div className="text-muted-foreground text-[10px]">Full Arguments:</div>
-            <pre className="p-2 rounded bg-black/40 border border-border/30 overflow-x-auto text-muted-foreground">
-              {JSON.stringify(tool.args, null, 2)}
-            </pre>
-            {tool.result && (
-              <>
-                <div className="text-muted-foreground text-[10px]">Raw Result:</div>
-                <pre className="p-2 rounded bg-black/40 border border-border/30 overflow-x-auto text-muted-foreground">
-                  {typeof tool.result === "string" ? tool.result : JSON.stringify(tool.result, null, 2)}
+            {/* Input Parameters Preview */}
+            {tool.args && (
+              <div className="pt-1.5 border-t border-border/30">
+                <div className="text-[10px] text-muted-foreground font-mono uppercase mb-1">
+                  {t("inputParams")}
+                </div>
+                <pre className="p-2 rounded-lg bg-black/20 dark:bg-black/40 border border-border/30 text-[11px] font-mono text-foreground/80 overflow-x-auto whitespace-pre-wrap max-h-40">
+                  {typeof tool.args === "string" ? tool.args : JSON.stringify(tool.args, null, 2)}
                 </pre>
-              </>
+              </div>
             )}
           </div>
         </SmoothCollapse>
-      </div>
+      )}
     </div>
   );
 }
