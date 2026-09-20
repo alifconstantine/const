@@ -123,6 +123,13 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
         if (!initialUrlRef.current) {
           initialUrlRef.current = trimmed;
         }
+        if (webviewRef.current && trimmed) {
+          try {
+            webviewRef.current.loadURL(normalizeUrl(trimmed));
+          } catch (e) {
+            console.error("Failed to load URL in webview on tab update:", e);
+          }
+        }
       }
     }
   }, [tab.url, currentUrl]);

@@ -25,6 +25,11 @@ contextBridge.exposeInMainWorld("electron", {
     ipcRenderer.on("auth:deep-link", handler);
     return () => ipcRenderer.removeListener("auth:deep-link", handler);
   },
+  onOpenBrowserUrl: (callback: (url: string) => void) => {
+    const handler = (_event: any, url: string) => callback(url);
+    ipcRenderer.on("app:open-browser-url", handler);
+    return () => ipcRenderer.removeListener("app:open-browser-url", handler);
+  },
   composio: {
     getAuthLink: (payload: { toolkit: string; userId?: string; callbackUrl?: string; apiKey?: string }) =>
       ipcRenderer.invoke("composio:get-auth-link", payload),

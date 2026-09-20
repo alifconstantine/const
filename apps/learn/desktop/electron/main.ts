@@ -413,6 +413,17 @@ app.on("second-instance", (_event, commandLine) => {
       }
     });
 
+    // Intercept external link popups / target="_blank" and route to Learn's internal browser
+    win.webContents.setWindowOpenHandler(({ url }) => {
+      if (url.startsWith("http://") || url.startsWith("https://")) {
+        if (win && !win.isDestroyed()) {
+          win.webContents.send("app:open-browser-url", url);
+        }
+        return { action: "deny" };
+      }
+      return { action: "allow" };
+    });
+
     const devUrl =
       process.env.VITE_DEV_SERVER_URL ||
       process.env.ELECTRON_RENDERER_URL ||

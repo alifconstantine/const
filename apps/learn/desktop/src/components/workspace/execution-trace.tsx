@@ -61,6 +61,7 @@ export interface ExecutionTraceProps {
   onRollbackAll?: (records: FileMutationRecord[]) => void;
   onOpenFileDiff?: (record: FileMutationRecord) => void;
   showMutationsSummary?: boolean;
+  onOpenBrowser?: (url: string) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -104,6 +105,7 @@ export function ExecutionTrace({
   onRollbackAll,
   onOpenFileDiff,
   showMutationsSummary = false,
+  onOpenBrowser,
 }: ExecutionTraceProps) {
   // Auto-open while executing to view progress live; auto-close when finished
   const [isMainOpen, setIsMainOpen] = useState(isExecuting);
@@ -216,6 +218,7 @@ export function ExecutionTrace({
                       durationMs={step.durationMs}
                       startTime={step.startTime}
                       isExecuting={isExecuting && idx === steps.length - 1 && !step.durationMs}
+                      onOpenBrowser={onOpenBrowser}
                     />
                   );
                 }
@@ -231,6 +234,7 @@ export function ExecutionTrace({
                     key={step.id || `conn_${idx}`}
                     tool={step}
                     connector={connector}
+                    onOpenBrowser={onOpenBrowser}
                   />
                 );
               }
@@ -377,11 +381,13 @@ function ThoughtItem({
   isExecuting,
   durationMs,
   startTime,
+  onOpenBrowser,
 }: {
   thinking: string;
   isExecuting?: boolean;
   durationMs?: number;
   startTime?: number;
+  onOpenBrowser?: (url: string) => void;
 }) {
   const [isOpen, setIsOpen] = useState(Boolean(isExecuting));
   const prevExecutingRef = useRef(Boolean(isExecuting));
@@ -443,6 +449,7 @@ function ThoughtItem({
           <ScrollArea className="w-full max-h-56 pr-2.5 [&>div>div[style]]:!block">
             <MarkdownContent
               content={thinking}
+              onOpenBrowser={onOpenBrowser}
               className="text-[12.5px] leading-relaxed text-muted-foreground [&_strong]:font-semibold [&_strong]:text-foreground [&_strong]:block [&_strong]:mb-1 [&_h1]:text-[13px] [&_h1]:font-semibold [&_h1]:text-foreground [&_h1]:mb-1 [&_h2]:text-[13px] [&_h2]:font-semibold [&_h2]:text-foreground [&_h2]:mb-1 [&_h3]:text-[12.5px] [&_h3]:font-semibold [&_h3]:text-foreground [&_h3]:mb-1 [&_p]:my-1"
             />
           </ScrollArea>
@@ -1254,9 +1261,11 @@ function TodoWriteTraceItem({ tool }: { tool: TraceStep | DisplayToolCall }) {
 function ConnectorToolTraceItem({
   tool,
   connector,
+  onOpenBrowser,
 }: {
   tool: TraceStep | DisplayToolCall;
   connector: ConnectorMetadata;
+  onOpenBrowser?: (url: string) => void;
 }) {
   const { t } = useI18n();
   const [isOpen, setIsOpen] = useState(false);
@@ -1325,7 +1334,9 @@ function ConnectorToolTraceItem({
     (typeof tool.result === "string" ? tool.result : null);
 
   const handleOpenExternal = (url: string) => {
-    if ((window as any).electron?.openExternal) {
+    if (onOpenBrowser) {
+      onOpenBrowser(url);
+    } else if ((window as any).electron?.openExternal) {
       (window as any).electron.openExternal(url);
     } else {
       window.open(url, "_blank");

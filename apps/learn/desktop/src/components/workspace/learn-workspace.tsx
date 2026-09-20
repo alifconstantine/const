@@ -495,6 +495,18 @@ export function LearnWorkspace({
     }
   };
 
+  // Automatically open intercepted external URLs in Learn's internal Browser Tab
+  useEffect(() => {
+    const unsubscribe = window.electron?.onOpenBrowserUrl?.((url: string) => {
+      if (url) {
+        handleOpenBrowser(url);
+      }
+    });
+    return () => {
+      unsubscribe?.();
+    };
+  }, []);
+
   const handleOpenStudioArtifact = (art: LocalArtifact) => {
     setIsStudioCollapsed(false);
     setRightPaneMode("preview");
@@ -1516,6 +1528,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
           permissionMode={learn?.permissionMode || "ask_before_changes"}
           sourcesCount={learn?.sourcesCount || 0}
           onAddSource={() => setIsAddSourceOpen(true)}
+          onOpenBrowser={handleOpenBrowser}
           onOpenSettings={(tab) => {
             setSettingsInitialTab(tab || "models");
             setIsSettingsOpen(true);

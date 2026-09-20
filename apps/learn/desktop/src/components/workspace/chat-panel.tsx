@@ -86,6 +86,7 @@ interface ChatPanelProps {
   onExternalPromptConsumed?: () => void;
   onOpenFileDiff?: (record: FileMutationRecord) => void;
   onMutationsChange?: (mutations: FileMutationRecord[]) => void;
+  onOpenBrowser?: (url: string) => void;
 }
 
 interface DisplayMessage {
@@ -229,6 +230,7 @@ export function ChatPanel({
   onExternalPromptConsumed,
   onOpenFileDiff,
   onMutationsChange,
+  onOpenBrowser,
 }: ChatPanelProps) {
   const { t, language } = useI18n();
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
@@ -3053,6 +3055,7 @@ export function ChatPanel({
                   }
                   sourcesMap={sourcesMap}
                   onSourceClick={handleCitationClick}
+                  onOpenBrowser={onOpenBrowser}
                 />
               </div>
 
@@ -3310,6 +3313,7 @@ export function ChatPanel({
                     onRollback={(rec) => handleRollbackFile(rec, msg.id)}
                     onRollbackAll={(recs) => handleRollbackAll(recs, msg.id)}
                     onOpenFileDiff={onOpenFileDiff}
+                    onOpenBrowser={onOpenBrowser}
                   />
 
                   {/* Formatted Markdown Content Bubble */}
@@ -3319,6 +3323,7 @@ export function ChatPanel({
                         content={msg.content}
                         sourcesMap={sourcesMap}
                         onSourceClick={handleCitationClick}
+                        onOpenBrowser={onOpenBrowser}
                       />
                       {isLatestAssistant && (
                         <span className="inline-block w-1.5 h-3.5 ml-1 bg-primary animate-pulse align-middle" />

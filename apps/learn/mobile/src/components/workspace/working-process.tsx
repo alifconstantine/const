@@ -13,13 +13,16 @@ export interface ToolCallTrace {
   durationMs?: number;
 }
 
-export interface ThinkingProcessProps {
+export interface WorkingProcessProps {
   thinking?: string;
   isExecuting?: boolean;
   durationMs?: number;
   startTime?: number;
   toolCalls?: ToolCallTrace[];
+  onOpenBrowser?: (url: string) => void;
 }
+
+export type ThinkingProcessProps = WorkingProcessProps;
 
 /**
  * SmoothCollapse: Hardware-accelerated CSS grid accordion for smooth mobile animations
@@ -51,16 +54,17 @@ export function SmoothCollapse({
 }
 
 /**
- * ThinkingProcess / WorkingProcess (Mobile):
+ * WorkingProcess (Mobile):
  * Clean minimalist accordion rendering reasoning traces and tool executions (Composio & Cloud Sandbox).
  */
-export function ThinkingProcess({
+export function WorkingProcess({
   thinking = "",
   isExecuting = false,
   durationMs,
   startTime,
   toolCalls = [],
-}: ThinkingProcessProps) {
+  onOpenBrowser,
+}: WorkingProcessProps) {
   const { t, language } = useI18n();
   const hasTools = Boolean(toolCalls && toolCalls.length > 0);
   const hasThinking = Boolean(thinking && thinking.trim().length > 0);
@@ -90,7 +94,7 @@ export function ThinkingProcess({
     return () => clearInterval(interval);
   }, [isExecuting, startTime]);
 
-  const thoughtLabel = () => {
+  const workLabel = () => {
     const isRunningTool = hasTools && toolCalls.some((tc) => !tc.result);
 
     if (isExecuting) {
@@ -108,9 +112,9 @@ export function ThinkingProcess({
           : `${language === "id" ? "Menjalankan" : "Running"} ${toolTitle}...`;
       }
       if (liveSeconds >= 1) {
-        return `${language === "id" ? "Sedang berpikir" : "Thinking"} (${liveSeconds}s)...`;
+        return `${language === "id" ? "Bekerja" : "Working"} (${liveSeconds}s)...`;
       }
-      return language === "id" ? "Sedang berpikir..." : "Thinking...";
+      return language === "id" ? "Bekerja..." : "Working...";
     }
 
     const finalMs = durationMs ?? (liveStepDuration > 0 ? liveStepDuration : undefined);
@@ -126,17 +130,17 @@ export function ThinkingProcess({
       const toolsCountLabel = toolCalls.length > 1 ? (language === "id" ? "Alat" : "Tools") : toolTitle;
       return s > 0
         ? language === "id"
-          ? `Berpikir & Menjalankan ${toolsCountLabel} (${s}s)`
-          : `Thought & Ran ${toolsCountLabel} (${s}s)`
+          ? `Bekerja & Menjalankan ${toolsCountLabel} (${s}s)`
+          : `Worked & Ran ${toolsCountLabel} (${s}s)`
         : language === "id"
-        ? `Berpikir & Menjalankan ${toolsCountLabel}`
-        : `Thought & Ran ${toolsCountLabel}`;
+        ? `Bekerja & Menjalankan ${toolsCountLabel}`
+        : `Worked & Ran ${toolsCountLabel}`;
     }
 
     if (s > 0) {
-      return language === "id" ? `Berpikir selama ${s}s` : `Thought for ${s}s`;
+      return language === "id" ? `Bekerja selama ${s}s` : `Worked for ${s}s`;
     }
-    return language === "id" ? "Berpikir beberapa detik" : "Thought for a few seconds";
+    return language === "id" ? "Bekerja beberapa detik" : "Worked for a few seconds";
   };
 
   if (!hasThinking && !hasTools && !isExecuting) return null;
@@ -151,7 +155,7 @@ export function ThinkingProcess({
         {hasTools && (
           <Terminal className="w-3.5 h-3.5 text-foreground/80 shrink-0" />
         )}
-        <span>{thoughtLabel()}</span>
+        <span>{workLabel()}</span>
         <ChevronDown
           className="w-3 h-3 text-muted-foreground transition-transform duration-200 ease-out shrink-0"
           style={{ transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)" }}
@@ -170,6 +174,7 @@ export function ThinkingProcess({
                     tc={tc}
                     idx={idx}
                     isExecuting={isExecuting}
+                    onOpenBrowser={onOpenBrowser}
                   />
                 ))}
               </div>
@@ -185,13 +190,14 @@ export function ThinkingProcess({
                 )}
                 <MarkdownContent
                   content={thinking}
+                  onOpenBrowser={onOpenBrowser}
                   className="text-[12px] leading-relaxed text-muted-foreground [&_strong]:font-semibold [&_strong]:text-foreground [&_strong]:block [&_strong]:mb-0.5 [&_h1]:text-[13px] [&_h1]:font-semibold [&_h1]:text-foreground [&_h1]:mb-1 [&_h2]:text-[12.5px] [&_h2]:font-semibold [&_h2]:text-foreground [&_h2]:mb-1 [&_h3]:text-[12px] [&_h3]:font-semibold [&_h3]:text-foreground [&_h3]:mb-0.5 [&_p]:my-1"
                 />
               </div>
             ) : isExecuting && !hasTools ? (
               <div className="flex items-center gap-2 py-1 text-xs text-muted-foreground">
                 <Loader2 className="w-3 h-3 animate-spin text-amber-500" />
-                <span>{language === "id" ? "Sedang berpikir..." : "Thinking..."}</span>
+                <span>{language === "id" ? "Bekerja..." : "Working..."}</span>
               </div>
             ) : null}
           </ScrollArea>
@@ -209,10 +215,12 @@ function MobileToolCardItem({
   tc,
   idx,
   isExecuting,
+  onOpenBrowser,
 }: {
   tc: ToolCallTrace;
   idx: number;
   isExecuting: boolean;
+  onOpenBrowser?: (url: string) => void;
 }) {
   const { t } = useI18n();
   const [isOpen, setIsOpen] = useState(false);
@@ -222,6 +230,15 @@ function MobileToolCardItem({
     tc.name === "code_interpreter" ||
     tc.name?.toLowerCase().includes("python") ||
     tc.args?.code;
+
+  const handleOpenLink = (e: React.MouseEvent, targetUrl?: string) => {
+    e.stopPropagation();
+    if (!targetUrl) return;
+    if (onOpenBrowser) {
+      e.preventDefault();
+      onOpenBrowser(targetUrl);
+    }
+  };
 
   const tag =
     tc.args?.action ||
@@ -332,8 +349,8 @@ function MobileToolCardItem({
               href={resultUrl}
               target="_blank"
               rel="noreferrer"
-              onClick={(e) => e.stopPropagation()}
-              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-600/15 text-emerald-500 dark:text-emerald-400 border border-emerald-500/20 text-[9.5px] font-medium shadow-xs"
+              onClick={(e) => handleOpenLink(e, resultUrl)}
+              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-emerald-600/15 text-emerald-500 dark:text-emerald-400 border border-emerald-500/20 text-[9.5px] font-medium shadow-xs cursor-pointer"
               title={connector?.id === "canva_mcp" ? t("editInCanva") : t("openInApp", { app: displayName })}
             >
               <span>{connector?.id === "canva_mcp" ? t("editInCanva") : t("openInApp", { app: displayName })}</span>
@@ -391,7 +408,8 @@ function MobileToolCardItem({
                         href={resultUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="inline-flex items-center gap-1 text-[10.5px] text-amber-400 underline hover:text-amber-300 font-medium"
+                        onClick={(e) => handleOpenLink(e, resultUrl)}
+                        className="inline-flex items-center gap-1 text-[10.5px] text-amber-400 underline hover:text-amber-300 font-medium cursor-pointer"
                       >
                         <span>{t("openInApp", { app: displayName })}</span>
                         <ExternalLink className="w-2.5 h-2.5" />
@@ -428,7 +446,8 @@ function MobileToolCardItem({
                         href={viewUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-secondary text-foreground text-[10px] font-medium border border-border/70 shadow-xs"
+                        onClick={(e) => handleOpenLink(e, viewUrl)}
+                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-secondary text-foreground text-[10px] font-medium border border-border/70 shadow-xs cursor-pointer"
                       >
                         <span>{t("viewPresentation")}</span>
                         <ExternalLink className="w-2.5 h-2.5" />
@@ -439,7 +458,8 @@ function MobileToolCardItem({
                         href={resultUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-medium shadow-xs"
+                        onClick={(e) => handleOpenLink(e, resultUrl)}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-medium shadow-xs cursor-pointer"
                       >
                         <span>{connector?.id === "canva_mcp" ? t("editInCanva") : t("openInApp", { app: displayName })}</span>
                         <ExternalLink className="w-2.5 h-2.5" />
@@ -464,10 +484,11 @@ function MobileToolCardItem({
                     {thumbnails.map((thumb, tIdx) => (
                       <a
                         key={tIdx}
-                        href={resultUrl || "#"}
+                        href={resultUrl || viewUrl || "#"}
                         target="_blank"
                         rel="noreferrer"
-                        className="relative shrink-0 rounded overflow-hidden border border-border/60 hover:border-primary transition-all shadow-xs"
+                        onClick={(e) => handleOpenLink(e, resultUrl || viewUrl)}
+                        className="relative shrink-0 rounded overflow-hidden border border-border/60 hover:border-primary transition-all shadow-xs cursor-pointer"
                         title={t("openSlideInCanva", { index: tIdx + 1 })}
                       >
                         <img
@@ -531,4 +552,4 @@ function MobileToolCardItem({
 }
 
 // Alias for backward compatibility
-export const WorkingProcess = ThinkingProcess;
+export const ThinkingProcess = WorkingProcess;

@@ -33,6 +33,7 @@ interface MarkdownContentProps {
   className?: string;
   sourcesMap?: Map<string, { title: string }>;
   onSourceClick?: (sourceId: string) => void;
+  onOpenBrowser?: (url: string) => void;
 }
 
 export function MarkdownContent({
@@ -40,6 +41,7 @@ export function MarkdownContent({
   className = "",
   sourcesMap,
   onSourceClick,
+  onOpenBrowser,
 }: MarkdownContentProps) {
   if (!content || typeof content !== "string") return null;
 
@@ -62,6 +64,13 @@ export function MarkdownContent({
         e.stopPropagation();
         const sourceId = href.replace(/^#ref-(?:source-)?/, "");
         onSourceClick?.(sourceId);
+      } else if (href && (href.startsWith("http://") || href.startsWith("https://") || href.startsWith("www."))) {
+        if (onOpenBrowser) {
+          e.preventDefault();
+          e.stopPropagation();
+          const targetUrl = href.startsWith("www.") ? `https://${href}` : href;
+          onOpenBrowser(targetUrl);
+        }
       }
     }
   };

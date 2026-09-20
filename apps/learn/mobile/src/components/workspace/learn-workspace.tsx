@@ -24,7 +24,8 @@ import { CreatePresentationSheet } from "./create-presentation-sheet";
 import { ModelSelectionSheet } from "../home/sheets/model-selection-sheet";
 import { MobileArtifactReader } from "./mobile-artifact-reader";
 import { generateStudioArtifact, generatePresentationArtifact } from "../../lib/studio/generator";
-import { ThinkingProcess } from "./working-process";
+import { WorkingProcess } from "./working-process";
+import { MobileBrowserSheet } from "./mobile-browser-sheet";
 import { ImageLightbox } from "./image-lightbox";
 import {
   calculateConversationMetrics,
@@ -527,6 +528,16 @@ export function MobileLearnWorkspace({
   const [generatingArtifacts, setGeneratingArtifacts] = useState<GeneratingArtifactStatus[]>([]);
   const [selectedReaderArtifact, setSelectedReaderArtifact] = useState<LocalArtifact | null>(null);
   const [isReaderOpen, setIsReaderOpen] = useState(false);
+
+  // In-App Mobile Browser State
+  const [activeBrowserUrl, setActiveBrowserUrl] = useState<string | null>(null);
+  const [isBrowserSheetOpen, setIsBrowserSheetOpen] = useState(false);
+
+  const handleOpenBrowser = (url: string) => {
+    if (!url) return;
+    setActiveBrowserUrl(url);
+    setIsBrowserSheetOpen(true);
+  };
 
   // Local state
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
@@ -2248,6 +2259,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
                       }
                       sourcesMap={sourcesMap}
                       onSourceClick={handleCitationClick}
+                      onOpenBrowser={handleOpenBrowser}
                     />
                   </div>
 
@@ -2483,8 +2495,8 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
                   </div>
                 ) : (
                   <div className="w-full flex flex-col gap-2 group select-text">
-                    {/* Thinking & Tool Execution Process */}
-                    <ThinkingProcess
+                    {/* Working & Tool Execution Process */}
+                    <WorkingProcess
                       thinking={msg.thinking}
                       toolCalls={msg.toolCalls}
                       isExecuting={Boolean(
@@ -2496,6 +2508,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
                         msg.thinkingDurationMs ||
                         (msg.isStreaming && !msg.content ? liveDurationMs : undefined)
                       }
+                      onOpenBrowser={handleOpenBrowser}
                     />
 
                     {/* Assistant Output Message (Pure clean MarkdownContent, matching apps/harness/desktop!) */}
@@ -2505,6 +2518,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
                           content={msg.content}
                           sourcesMap={sourcesMap}
                           onSourceClick={handleCitationClick}
+                          onOpenBrowser={handleOpenBrowser}
                         />
                         {msg.isStreaming && (
                           <span className="inline-block w-1.5 h-3.5 ml-1 bg-foreground animate-pulse align-middle" />
@@ -2714,6 +2728,16 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
         onClose={() => setIsReaderOpen(false)}
         artifact={selectedReaderArtifact}
         onExplainInChat={handleExplainInChat}
+      />
+
+      {/* In-App Mobile Browser Sheet */}
+      <MobileBrowserSheet
+        open={isBrowserSheetOpen}
+        url={activeBrowserUrl || ""}
+        onClose={() => {
+          setIsBrowserSheetOpen(false);
+          setActiveBrowserUrl(null);
+        }}
       />
 
       {/* Add Source Pop-up Modal */}

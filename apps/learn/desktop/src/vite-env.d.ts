@@ -66,6 +66,7 @@ declare global {
       onAuthCallback: (
         callback: (data: { url: string; token?: string; cancelled?: boolean; error?: string }) => void
       ) => () => void;
+      onOpenBrowserUrl?: (callback: (url: string) => void) => () => void;
       agent?: {
         getModels: () => Promise<any[]>;
         sendMessage: (payload: {
