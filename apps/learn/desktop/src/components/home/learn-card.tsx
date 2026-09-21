@@ -7,7 +7,7 @@ import {
   DropdownMenuSeparator,
   Checkbox,
 } from "@const/ui";
-import { MoreVertical, FolderPlus, Edit3, Trash2, ExternalLink } from "lucide-react";
+import { MoreVertical, FolderPlus, FolderMinus, Edit3, Trash2, ExternalLink } from "lucide-react";
 import { LocalLearn } from "../../lib/db";
 import { useI18n } from "../../lib/i18n";
 
@@ -22,6 +22,7 @@ interface LearnCardProps {
   onClick?: (learn: LearnItem) => void;
   onEdit?: (learn: LearnItem) => void;
   onManageCollections?: (learn: LearnItem) => void;
+  onRemoveFromCollection?: (learn: LearnItem) => void;
   onDelete?: (learn: LearnItem) => void;
 }
 
@@ -48,6 +49,7 @@ export function LearnCard({
   onClick,
   onEdit,
   onManageCollections,
+  onRemoveFromCollection,
   onDelete,
 }: LearnCardProps) {
   const { t, language } = useI18n();
@@ -130,6 +132,15 @@ export function LearnCard({
                 <FolderPlus className="h-3.5 w-3.5" />
                 <span>{t("manageCollections")}</span>
               </DropdownMenuItem>
+              {onRemoveFromCollection && (
+                <DropdownMenuItem
+                  className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2 hover:bg-secondary text-amber-600 dark:text-amber-400"
+                  onClick={() => onRemoveFromCollection(learn)}
+                >
+                  <FolderMinus className="h-3.5 w-3.5" />
+                  <span>{t("removeFromModule")}</span>
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem
                 className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2 hover:bg-secondary"
                 onClick={() => onEdit?.(learn)}
@@ -203,6 +214,15 @@ export function LearnCard({
                 <FolderPlus className="h-3.5 w-3.5" />
                 <span>{t("manageCollections")}</span>
               </DropdownMenuItem>
+              {onRemoveFromCollection && (
+                <DropdownMenuItem
+                  className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2 hover:bg-secondary text-amber-600 dark:text-amber-400"
+                  onClick={() => onRemoveFromCollection(learn)}
+                >
+                  <FolderMinus className="h-3.5 w-3.5" />
+                  <span>{t("removeFromModule")}</span>
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem
                 className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2 hover:bg-secondary"
                 onClick={() => onEdit?.(learn)}

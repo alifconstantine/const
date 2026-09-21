@@ -10,6 +10,7 @@ import {
 } from "@const/ui";
 import { Folder, Check } from "lucide-react";
 import { useI18n } from "../../../lib/i18n";
+import { ModuleIcon } from "../module-icon";
 interface ManageCollectionDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -101,7 +102,9 @@ export function ManageCollectionDialog({
                   }`}
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <span className="text-base shrink-0">{col.emoji || "📁"}</span>
+                    <div className="h-7 w-7 rounded-lg bg-secondary/80 border border-border/50 flex items-center justify-center shrink-0 text-foreground">
+                      <ModuleIcon icon={col.emoji} className="w-3.5 h-3.5 text-foreground/90" />
+                    </div>
                     <span className="text-xs font-medium truncate">{col.name}</span>
                   </div>
                   <div

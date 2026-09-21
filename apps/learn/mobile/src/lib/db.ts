@@ -21,6 +21,7 @@ export interface LocalCollection {
   color?: string;
   updatedAt: number;
   createdAt: number;
+  lastOpenedAt?: number;
 }
 
 export interface QuizOption {
@@ -469,20 +470,26 @@ export const localDb = {
   },
 
   async deleteLearn(id: string) {
-    // Delete associated artifacts, messages, and chat sessions
-    await db.artifacts.where("learnId").equals(id).delete();
-    await db.messages.where("learnId").equals(id).delete();
-    await db.chatSessions.where("learnId").equals(id).delete();
-    await db.learns.delete(id);
-  },
-
-  async batchDeleteLearns(ids: string[]) {
-    for (const id of ids) {
+    await db.transaction("rw", [db.learns, db.artifacts, db.messages, db.chatSessions, db.sources], async () => {
       await db.artifacts.where("learnId").equals(id).delete();
       await db.messages.where("learnId").equals(id).delete();
       await db.chatSessions.where("learnId").equals(id).delete();
-    }
-    await db.learns.bulkDelete(ids);
+      await db.sources.where("learnId").equals(id).delete();
+      await db.learns.delete(id);
+    });
+  },
+
+  async batchDeleteLearns(ids: string[]) {
+    if (ids.length === 0) return;
+    await db.transaction("rw", [db.learns, db.artifacts, db.messages, db.chatSessions, db.sources], async () => {
+      for (const id of ids) {
+        await db.artifacts.where("learnId").equals(id).delete();
+        await db.messages.where("learnId").equals(id).delete();
+        await db.chatSessions.where("learnId").equals(id).delete();
+        await db.sources.where("learnId").equals(id).delete();
+      }
+      await db.learns.bulkDelete(ids);
+    });
   },
 
   async toggleCollection(learnId: string, collectionId: string) {
@@ -498,6 +505,36 @@ export const localDb = {
     });
   },
 
+  async addLearnsToCollection(collectionId: string, learnIds: string[]) {
+    if (learnIds.length === 0) return;
+    const now = Date.now();
+    await db.transaction("rw", [db.learns], async () => {
+      for (const learnId of learnIds) {
+        const learn = await db.learns.get(learnId);
+        if (!learn) continue;
+        const current = learn.collectionIds || [];
+        if (!current.includes(collectionId)) {
+          await db.learns.update(learnId, {
+            collectionIds: [...current, collectionId],
+            updatedAt: now,
+          });
+        }
+      }
+    });
+  },
+
+  async removeLearnFromCollection(collectionId: string, learnId: string) {
+    const learn = await db.learns.get(learnId);
+    if (!learn) return;
+    const current = learn.collectionIds || [];
+    if (current.includes(collectionId)) {
+      await db.learns.update(learnId, {
+        collectionIds: current.filter((cid) => cid !== collectionId),
+        updatedAt: Date.now(),
+      });
+    }
+  },
+
   // Collections
   async createCollection(data: {
     name: string;
@@ -511,10 +548,11 @@ export const localDb = {
       id,
       name: data.name.trim() || "New Collection",
       description: data.description?.trim(),
-      emoji: data.emoji || "📁",
+      emoji: data.emoji || "folder",
       color: data.color || "#0066ff",
       updatedAt: now,
       createdAt: now,
+      lastOpenedAt: now,
     });
     return id;
   },
@@ -526,6 +564,7 @@ export const localDb = {
       description?: string;
       emoji?: string;
       color?: string;
+      lastOpenedAt?: number;
     }
   ) {
     const updates: Partial<LocalCollection> = {
@@ -535,22 +574,45 @@ export const localDb = {
     if (data.description !== undefined) updates.description = data.description?.trim();
     if (data.emoji !== undefined) updates.emoji = data.emoji;
     if (data.color !== undefined) updates.color = data.color;
+    if (data.lastOpenedAt !== undefined) updates.lastOpenedAt = data.lastOpenedAt;
 
     await db.collections.update(id, updates);
   },
 
+  async markCollectionOpened(id: string) {
+    await db.collections.update(id, {
+      lastOpenedAt: Date.now(),
+    });
+  },
+
   async deleteCollection(id: string) {
-    // Remove collection reference from any learns
-    const allLearns = await db.learns.toArray();
-    for (const l of allLearns) {
-      if (l.collectionIds?.includes(id)) {
+    await db.transaction("rw", [db.collections, db.learns], async () => {
+      const affectedLearns = await db.learns.where("collectionIds").equals(id).toArray();
+      for (const l of affectedLearns) {
         await db.learns.update(l.id, {
-          collectionIds: l.collectionIds.filter((cid) => cid !== id),
+          collectionIds: (l.collectionIds || []).filter((cid) => cid !== id),
           updatedAt: Date.now(),
         });
       }
-    }
-    await db.collections.delete(id);
+      await db.collections.delete(id);
+    });
+  },
+
+  async batchDeleteCollections(ids: string[]) {
+    if (ids.length === 0) return;
+    const idSet = new Set(ids);
+    await db.transaction("rw", [db.collections, db.learns], async () => {
+      for (const id of ids) {
+        const affectedLearns = await db.learns.where("collectionIds").equals(id).toArray();
+        for (const l of affectedLearns) {
+          await db.learns.update(l.id, {
+            collectionIds: (l.collectionIds || []).filter((cid) => !idSet.has(cid)),
+            updatedAt: Date.now(),
+          });
+        }
+      }
+      await db.collections.bulkDelete(ids);
+    });
   },
 
   async createArtifact(data: {

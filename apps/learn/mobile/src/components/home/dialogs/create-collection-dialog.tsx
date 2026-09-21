@@ -10,7 +10,7 @@ import {
 } from "@const/ui";
 import { FolderPlus } from "lucide-react";
 import { useI18n } from "../../../lib/i18n";
-const COLLECTION_EMOJIS = ["📁", "📚", "🔬", "💻", "🎯", "🚀", "🧪", "📊", "🎨", "⚡", "🧠", "💡"];
+import { MODULE_ICONS, LEGACY_EMOJI_TO_ICON } from "../module-icon";
 
 interface CreateCollectionDialogProps {
   open: boolean;
@@ -36,16 +36,22 @@ export function CreateCollectionDialog({
   onSubmit,
 }: CreateCollectionDialogProps) {
   const { t } = useI18n();
+
+  const resolveIconId = (emoji?: string) => {
+    if (!emoji) return "folder";
+    return LEGACY_EMOJI_TO_ICON[emoji] || emoji;
+  };
+
   const [name, setName] = useState(initialData?.name ?? "");
   const [description, setDescription] = useState(initialData?.description ?? "");
-  const [selectedEmoji, setSelectedEmoji] = useState(initialData?.emoji ?? "📁");
+  const [selectedEmoji, setSelectedEmoji] = useState(resolveIconId(initialData?.emoji));
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   React.useEffect(() => {
     if (open) {
       setName(initialData?.name ?? "");
       setDescription(initialData?.description ?? "");
-      setSelectedEmoji(initialData?.emoji ?? "📁");
+      setSelectedEmoji(resolveIconId(initialData?.emoji));
     }
   }, [open, initialData]);
 
@@ -73,7 +79,7 @@ export function CreateCollectionDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[92vw] max-w-[400px] p-5 rounded-2xl border border-border/80 bg-card text-card-foreground shadow-lg">
+      <DialogContent className="w-[92vw] max-w-[400px] p-5 rounded-2xl border border-border/80 bg-card text-card-foreground outline-none focus:outline-none focus-visible:outline-none ring-0 focus-visible:ring-0">
         <form onSubmit={handleSubmit} className="space-y-4">
           <DialogHeader>
             <DialogTitle className="font-sans text-lg font-semibold tracking-tight text-foreground flex items-center gap-2">
@@ -82,26 +88,32 @@ export function CreateCollectionDialog({
             </DialogTitle>
           </DialogHeader>
 
-          {/* Emoji Picker */}
+          {/* Clean Modern Icon Selector (8 cols x 2 rows) */}
           <div>
             <label className="text-xs font-medium text-muted-foreground mb-1.5 block">
               {t("collectionIcon")}
             </label>
-            <div className="grid grid-cols-6 gap-2 p-2 rounded-xl bg-secondary/50 border border-border/60">
-              {COLLECTION_EMOJIS.map((emoji) => (
-                <button
-                  key={emoji}
-                  type="button"
-                  onClick={() => setSelectedEmoji(emoji)}
-                  className={`h-9 w-9 rounded-lg flex items-center justify-center text-lg transition-all cursor-pointer ${
-                    selectedEmoji === emoji
-                      ? "bg-background border-2 border-primary shadow-xs scale-105"
-                      : "hover:bg-background/60"
-                  }`}
-                >
-                  {emoji}
-                </button>
-              ))}
+            <div className="grid grid-cols-8 gap-1.5 p-2 rounded-xl bg-secondary/50 border border-border/60 justify-items-center">
+              {MODULE_ICONS.map((item) => {
+                const IconComponent = item.icon;
+                const isSelected = selectedEmoji === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setSelectedEmoji(item.id)}
+                    className={`h-8 w-8 rounded-lg flex items-center justify-center transition-all cursor-pointer ${
+                      isSelected
+                        ? "bg-foreground text-background shadow-xs scale-105"
+                        : "text-muted-foreground hover:text-foreground hover:bg-secondary border border-transparent"
+                    }`}
+                    title={item.label}
+                    aria-label={item.label}
+                  >
+                    <IconComponent className="h-4 w-4" />
+                  </button>
+                );
+              })}
             </div>
           </div>
 
