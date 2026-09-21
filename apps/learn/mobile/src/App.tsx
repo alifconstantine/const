@@ -82,6 +82,9 @@ function AuthenticatedContent({
       <LearnHome
         onOpenLearn={handleOpenLearn}
         onOpenSettings={() => setIsSettingsOpen(true)}
+        user={user}
+        onSignOut={onSignOut}
+        onSwitchAccount={onSwitchAccount}
       />
     </div>
   );

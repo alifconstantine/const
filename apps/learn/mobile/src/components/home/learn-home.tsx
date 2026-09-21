@@ -39,6 +39,7 @@ import { MenuContainer, MenuItem } from "../ui/fluid-menu";
 import { ModelSelectionSheet } from "./sheets/model-selection-sheet";
 import { McpToolsSheet } from "./sheets/mcp-tools-sheet";
 import { MobileSettingsSheet } from "./sheets/mobile-settings-sheet";
+import type { UserProfile } from "../navbar";
 import { useI18n } from "../../lib/i18n";
 
 type TabKey = "all" | "learns" | "sources" | "collections" | "artifact";
@@ -49,6 +50,9 @@ interface LearnHomeProps {
   searchQuery?: string;
   onSearchQueryChange?: (query: string) => void;
   onOpenSettings?: () => void;
+  user?: UserProfile | null;
+  onSignOut?: () => void;
+  onSwitchAccount?: () => void;
 }
 
 export function LearnHome({
@@ -56,6 +60,9 @@ export function LearnHome({
   searchQuery: propSearchQuery,
   onSearchQueryChange,
   onOpenSettings,
+  user,
+  onSignOut,
+  onSwitchAccount,
 }: LearnHomeProps) {
   const { t, language } = useI18n();
 
@@ -917,11 +924,7 @@ export function LearnHome({
             icon={<Settings size={20} strokeWidth={1.8} className="text-white" />}
             onClick={() => {
               setIsFluidMenuExpanded(false);
-              if (onOpenSettings) {
-                onOpenSettings();
-              } else {
-                setIsSettingsSheetOpen(true);
-              }
+              setIsSettingsSheetOpen(true);
             }}
           />
         </MenuContainer>
@@ -1008,6 +1011,9 @@ export function LearnHome({
       <MobileSettingsSheet
         open={isSettingsSheetOpen}
         onClose={() => setIsSettingsSheetOpen(false)}
+        user={user}
+        onSignOut={onSignOut}
+        onSwitchAccount={onSwitchAccount}
       />
     </div>
   );

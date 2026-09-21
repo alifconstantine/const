@@ -16,9 +16,18 @@ import {
   LogOut,
   BarChart2,
   Database,
-  Layers,
   Cpu,
+  Clock,
+  AlertCircle,
+  CheckCircle2,
+  Info,
 } from "lucide-react";
+import {
+  getStoredComposioUsage,
+  getResetCountdown,
+  type ComposioUsageRecord,
+  WEEKLY_TOOL_CALL_LIMIT,
+} from "../../../lib/composio-usage";
 import {
   useTheme,
   cn,
@@ -222,6 +231,70 @@ export function MobileSettingsSheet({
     }
   }, []);
 
+  // Composio Weekly MCP Rate Limiter & Tool Calls Telemetry (Matching Desktop settings-view.tsx)
+  const [composioUsage, setComposioUsage] = useState<ComposioUsageRecord>(() =>
+    getStoredComposioUsage(user?.email || user?.name || undefined)
+  );
+
+  useEffect(() => {
+    const handleUsageChange = (e: Event) => {
+      const customEvent = e as CustomEvent<ComposioUsageRecord>;
+      if (customEvent.detail) {
+        setComposioUsage(customEvent.detail);
+      } else {
+        setComposioUsage(getStoredComposioUsage(user?.email || user?.name || undefined));
+      }
+    };
+
+    window.addEventListener("composio_usage_changed", handleUsageChange);
+    return () => {
+      window.removeEventListener("composio_usage_changed", handleUsageChange);
+    };
+  }, [user]);
+
+  useEffect(() => {
+    if (open) {
+      setComposioUsage(getStoredComposioUsage(user?.email || user?.name || undefined));
+    }
+  }, [open, user]);
+
+  const usedCount = composioUsage.used || 0;
+  const limitCount = composioUsage.limit || WEEKLY_TOOL_CALL_LIMIT;
+  const remainingCount = Math.max(0, limitCount - usedCount);
+  const usagePercent = Math.min(100, Math.round((usedCount / limitCount) * 100));
+  const countdown = getResetCountdown(composioUsage.resetAt);
+
+  const resetDateFormatted = new Date(composioUsage.resetAt).toLocaleString(
+    language === "id" ? "id-ID" : "en-US",
+    {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+    }
+  );
+
+  const isExceeded = usedCount >= limitCount;
+  const isWarning = !isExceeded && usagePercent >= 75;
+
+  const statusBadge = isExceeded ? (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-rose-500/10 text-rose-500 border border-rose-500/20">
+      <AlertCircle className="w-3 h-3" />
+      {t("statusExceeded")}
+    </span>
+  ) : isWarning ? (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/10 text-amber-500 border border-amber-500/20">
+      <Clock className="w-3 h-3" />
+      {t("statusWarning")}
+    </span>
+  ) : (
+    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">
+      <CheckCircle2 className="w-3 h-3" />
+      {t("statusSafe")}
+    </span>
+  );
+
   return (
     <InteractiveBottomSheet
       open={open}
@@ -230,115 +303,115 @@ export function MobileSettingsSheet({
       ariaLabel={t("settings") || "Settings"}
     >
       {/* Top Header */}
-        <div className="px-4 sm:px-5 py-2.5 border-b border-border/80 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-2.5">
-            <div className="h-8 w-8 rounded-xl bg-secondary border border-border flex items-center justify-center">
-              <Settings className="h-4 w-4 text-foreground" />
-            </div>
-            <div>
-              <div className="flex items-center gap-1.5">
-                <h2 className="text-sm font-semibold text-foreground tracking-tight">
-                  {t("settings")}
-                </h2>
-                <span className="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-secondary text-muted-foreground border border-border/50">
-                  Mobile
-                </span>
-              </div>
-              <p className="text-[11px] text-muted-foreground">
-                {isIndo
-                  ? "Preferensi akun, tampilan, model AI, dan kuota"
-                  : "Account, appearance, AI models, and usage telemetry"}
-              </p>
-            </div>
+      <div className="px-4 sm:px-5 py-2.5 border-b border-border/80 flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-2.5">
+          <div className="h-8 w-8 rounded-xl bg-secondary border border-border flex items-center justify-center">
+            <Settings className="h-4 w-4 text-foreground" />
           </div>
+          <div>
+            <div className="flex items-center gap-1.5">
+              <h2 className="text-sm font-semibold text-foreground tracking-tight">
+                {t("settings")}
+              </h2>
+              <span className="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-secondary text-muted-foreground border border-border/50">
+                Mobile
+              </span>
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              {isIndo
+                ? "Preferensi akun, tampilan, model AI, dan kuota"
+                : "Account, appearance, AI models, and usage telemetry"}
+            </p>
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={onClose}
+          className="h-8 w-8 rounded-full hover:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer active:scale-95"
+          aria-label="Tutup"
+        >
+          <X className="h-4 w-4" />
+        </button>
+      </div>
+
+      {/* Sliding Tabs Switcher - Matching ModelSelectionSheet & McpToolsSheet */}
+      <div className="px-4 sm:px-5 pt-2.5 pb-2 flex items-center justify-between gap-3 shrink-0 border-b border-border/60 bg-muted/20">
+        <div className="relative flex items-center h-9 p-0.5 rounded-xl bg-muted/70 border border-border w-full">
+          <div
+            className="absolute top-0.5 bottom-0.5 left-0 rounded-lg bg-background shadow-2xs pointer-events-none transition-all duration-300"
+            style={{
+              transform: `translateX(${indicatorStyle.left}px)`,
+              width: `${indicatorStyle.width}px`,
+              opacity: indicatorStyle.width > 0 ? 1 : 0,
+              transitionTimingFunction: "cubic-bezier(0.16, 1, 0.3, 1)",
+            }}
+          />
 
           <button
+            ref={generalTabRef}
             type="button"
-            onClick={onClose}
-            className="h-8 w-8 rounded-full hover:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer active:scale-95"
-            aria-label="Tutup"
+            onClick={() => setActiveTab("general")}
+            className={cn(
+              "relative z-10 flex-1 h-full rounded-lg text-xs font-medium transition-colors duration-200 cursor-pointer select-none text-center flex items-center justify-center gap-1.5",
+              activeTab === "general"
+                ? "text-foreground font-semibold"
+                : "text-muted-foreground hover:text-foreground"
+            )}
           >
-            <X className="h-4 w-4" />
+            <SlidersHorizontal className="w-3.5 h-3.5" />
+            <span>{isIndo ? "Umum" : "General"}</span>
+          </button>
+
+          <button
+            ref={appearanceTabRef}
+            type="button"
+            onClick={() => setActiveTab("appearance")}
+            className={cn(
+              "relative z-10 flex-1 h-full rounded-lg text-xs font-medium transition-colors duration-200 cursor-pointer select-none text-center flex items-center justify-center gap-1.5",
+              activeTab === "appearance"
+                ? "text-foreground font-semibold"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <Palette className="w-3.5 h-3.5" />
+            <span>{isIndo ? "Tampilan" : "Theme"}</span>
+          </button>
+
+          <button
+            ref={modelsTabRef}
+            type="button"
+            onClick={() => setActiveTab("models")}
+            className={cn(
+              "relative z-10 flex-1 h-full rounded-lg text-xs font-medium transition-colors duration-200 cursor-pointer select-none text-center flex items-center justify-center gap-1.5",
+              activeTab === "models"
+                ? "text-foreground font-semibold"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <Bot className="w-3.5 h-3.5" />
+            <span>{isIndo ? "Model" : "Models"}</span>
+          </button>
+
+          <button
+            ref={usageTabRef}
+            type="button"
+            onClick={() => setActiveTab("usage")}
+            className={cn(
+              "relative z-10 flex-1 h-full rounded-lg text-xs font-medium transition-colors duration-200 cursor-pointer select-none text-center flex items-center justify-center gap-1.5",
+              activeTab === "usage"
+                ? "text-foreground font-semibold"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            <BarChart2 className="w-3.5 h-3.5" />
+            <span>{isIndo ? "Usage" : "Usage"}</span>
           </button>
         </div>
+      </div>
 
-        {/* Sliding Tabs Switcher - Matching ModelSelectionSheet & McpToolsSheet */}
-        <div className="px-4 sm:px-5 pt-2.5 pb-2 flex items-center justify-between gap-3 shrink-0 border-b border-border/60 bg-muted/20">
-          <div className="relative flex items-center h-9 p-0.5 rounded-xl bg-muted/70 border border-border w-full">
-            <div
-              className="absolute top-0.5 bottom-0.5 left-0 rounded-lg bg-background shadow-2xs pointer-events-none transition-all duration-300"
-              style={{
-                transform: `translateX(${indicatorStyle.left}px)`,
-                width: `${indicatorStyle.width}px`,
-                opacity: indicatorStyle.width > 0 ? 1 : 0,
-                transitionTimingFunction: "cubic-bezier(0.16, 1, 0.3, 1)",
-              }}
-            />
-
-            <button
-              ref={generalTabRef}
-              type="button"
-              onClick={() => setActiveTab("general")}
-              className={cn(
-                "relative z-10 flex-1 h-full rounded-lg text-xs font-medium transition-colors duration-200 cursor-pointer select-none text-center flex items-center justify-center gap-1.5",
-                activeTab === "general"
-                  ? "text-foreground font-semibold"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <SlidersHorizontal className="w-3.5 h-3.5" />
-              <span>{isIndo ? "Umum" : "General"}</span>
-            </button>
-
-            <button
-              ref={appearanceTabRef}
-              type="button"
-              onClick={() => setActiveTab("appearance")}
-              className={cn(
-                "relative z-10 flex-1 h-full rounded-lg text-xs font-medium transition-colors duration-200 cursor-pointer select-none text-center flex items-center justify-center gap-1.5",
-                activeTab === "appearance"
-                  ? "text-foreground font-semibold"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <Palette className="w-3.5 h-3.5" />
-              <span>{isIndo ? "Tampilan" : "Theme"}</span>
-            </button>
-
-            <button
-              ref={modelsTabRef}
-              type="button"
-              onClick={() => setActiveTab("models")}
-              className={cn(
-                "relative z-10 flex-1 h-full rounded-lg text-xs font-medium transition-colors duration-200 cursor-pointer select-none text-center flex items-center justify-center gap-1.5",
-                activeTab === "models"
-                  ? "text-foreground font-semibold"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <Bot className="w-3.5 h-3.5" />
-              <span>{isIndo ? "Model" : "Models"}</span>
-            </button>
-
-            <button
-              ref={usageTabRef}
-              type="button"
-              onClick={() => setActiveTab("usage")}
-              className={cn(
-                "relative z-10 flex-1 h-full rounded-lg text-xs font-medium transition-colors duration-200 cursor-pointer select-none text-center flex items-center justify-center gap-1.5",
-                activeTab === "usage"
-                  ? "text-foreground font-semibold"
-                  : "text-muted-foreground hover:text-foreground"
-              )}
-            >
-              <BarChart2 className="w-3.5 h-3.5" />
-              <span>{isIndo ? "Usage" : "Usage"}</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Scrollable Content: Matching user-preferred rich card design */}
-        <ScrollArea className="flex-1 min-h-0 w-full" viewportClassName="px-4 py-3 space-y-4 text-xs">
+      {/* Scrollable Content: Matching user-preferred rich card design */}
+      <ScrollArea className="flex-1 min-h-0 w-full" viewportClassName="px-4 py-3 space-y-4 text-xs">
           {/* 1. GENERAL (UMUM) */}
           {activeTab === "general" && (
             <div className="space-y-3.5">
@@ -596,62 +669,142 @@ export function MobileSettingsSheet({
             </div>
           )}
 
-          {/* 4. USAGE & TELEMETRY */}
+          {/* 4. USAGE (COMPOSIO MCP TOOL CALLS & LOCAL STORAGE) */}
           {activeTab === "usage" && (
             <div className="space-y-3.5">
-              {/* Context Window & Quota Overview */}
-              <div className="p-3.5 rounded-2xl bg-card border border-border space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Cpu className="w-4 h-4 text-muted-foreground" />
-                    <h3 className="text-xs font-semibold text-foreground">
-                      {isIndo ? "Kapasitas & Batas Model" : "Model Capacity & Limits"}
-                    </h3>
+              {/* Main Composio Quota Card (Matching Desktop Settings) */}
+              <div className="p-4 rounded-2xl bg-card border border-border shadow-2xs space-y-4">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground block">
+                        Composio MCP Tool Calls
+                      </span>
+                      {statusBadge}
+                    </div>
+                    <div className="flex items-baseline gap-1.5 mt-1">
+                      <span className="text-2xl font-bold font-mono tracking-tight text-foreground">
+                        {usedCount}
+                      </span>
+                      <span className="text-xs text-muted-foreground font-mono">
+                        / {limitCount} {t("toolCallsUsed").toLowerCase()}
+                      </span>
+                    </div>
                   </div>
-                  <span className="inline-flex items-center gap-1 text-[10px] font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    <span>{isIndo ? "Aktif" : "Active"}</span>
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2.5">
-                  <div className="p-3 rounded-xl bg-secondary/40 border border-border/60 space-y-1">
+                  <div className="text-right shrink-0">
                     <span className="text-[10px] text-muted-foreground block">
-                      {isIndo ? "Batas Context Window" : "Context Window Limit"}
+                      {t("toolCallsRemaining")}
                     </span>
-                    <span className="text-xs font-semibold text-foreground font-mono">
-                      1,048,576 Tokens
-                    </span>
-                    <span className="text-[9.5px] text-muted-foreground block">
-                      ~1M {isIndo ? "token masukan" : "input tokens"}
-                    </span>
-                  </div>
-
-                  <div className="p-3 rounded-xl bg-secondary/40 border border-border/60 space-y-1">
-                    <span className="text-[10px] text-muted-foreground block">
-                      {isIndo ? "Maksimal Output Jawaban" : "Max Output Tokens"}
-                    </span>
-                    <span className="text-xs font-semibold text-foreground font-mono">
-                      131,072 Tokens
-                    </span>
-                    <span className="text-[9.5px] text-muted-foreground block">
-                      ~128K {isIndo ? "token keluaran" : "output tokens"}
+                    <span
+                      className={cn(
+                        "text-lg font-bold font-mono",
+                        isExceeded
+                          ? "text-rose-500"
+                          : isWarning
+                          ? "text-amber-500"
+                          : "text-foreground"
+                      )}
+                    >
+                      {remainingCount}
                     </span>
                   </div>
                 </div>
 
-                <div className="p-2.5 rounded-xl bg-secondary/30 border border-border/50 text-[11px] text-muted-foreground flex items-center gap-2">
-                  <Sparkles className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-                  <span>
-                    {isIndo
-                      ? "Penghitungan token akurat dengan isolasi ground context dan telemetry pelacakan real-time."
-                      : "Accurate token metering with grounded context isolation and real-time session tracking."}
+                {/* Progress Bar */}
+                <div className="space-y-1.5">
+                  <div className="h-2.5 w-full bg-secondary rounded-full overflow-hidden p-0.5 border border-border/40">
+                    <div
+                      className={cn(
+                        "h-full rounded-full transition-all duration-500 ease-out",
+                        isExceeded
+                          ? "bg-rose-500"
+                          : isWarning
+                          ? "bg-amber-500"
+                          : "bg-emerald-500"
+                      )}
+                      style={{ width: `${usagePercent}%` }}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between text-[10px] text-muted-foreground font-mono">
+                    <span>0 call</span>
+                    <span>{usagePercent}% {isIndo ? "kuota terpakai" : "quota used"}</span>
+                    <span>{limitCount} calls</span>
+                  </div>
+                </div>
+
+                {/* Reset Info */}
+                <div className="pt-2.5 border-t border-border/40 flex items-center justify-between text-xs text-muted-foreground">
+                  <div className="flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                    <span>
+                      {t("resetsIn")}{" "}
+                      <strong className="text-foreground font-semibold">
+                        {countdown.formatted}
+                      </strong>
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-mono text-muted-foreground">
+                    Reset: {resetDateFormatted}
                   </span>
                 </div>
               </div>
 
+              {/* Recent Tool Activity */}
+              <div className="p-3.5 rounded-2xl bg-card border border-border shadow-2xs space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    {t("recentActivity")}
+                  </span>
+                  <span className="text-[10px] font-mono text-muted-foreground">
+                    {(composioUsage.recentCalls || []).length} {isIndo ? "aktivitas" : "activity"}
+                  </span>
+                </div>
+
+                {(!composioUsage.recentCalls || composioUsage.recentCalls.length === 0) ? (
+                  <div className="py-6 text-center text-xs text-muted-foreground">
+                    {t("noRecentActivity")}
+                  </div>
+                ) : (
+                  <div className="divide-y divide-border/40 max-h-48 overflow-y-auto pr-1">
+                    {composioUsage.recentCalls.slice(0, 10).map((call) => (
+                      <div
+                        key={call.id}
+                        className="py-2 flex items-center justify-between text-xs gap-2"
+                      >
+                        <div className="min-w-0 flex-1 flex items-center gap-2">
+                          <span
+                            className={cn(
+                              "w-2 h-2 rounded-full shrink-0",
+                              call.success ? "bg-emerald-500" : "bg-rose-500"
+                            )}
+                          />
+                          <span className="font-mono text-xs text-foreground truncate">
+                            {call.toolSlug}
+                          </span>
+                        </div>
+                        <span className="text-[10px] font-mono text-muted-foreground shrink-0">
+                          {new Date(call.timestamp).toLocaleTimeString([], {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Quota Policy Note */}
+              <div className="p-3.5 rounded-2xl bg-secondary/40 border border-border/50 flex items-start gap-2.5 text-xs text-muted-foreground">
+                <Info className="w-4 h-4 text-primary shrink-0 mt-0.5" />
+                <div className="space-y-0.5">
+                  <p className="font-semibold text-foreground text-xs">{t("resetSchedule")}</p>
+                  <p className="leading-relaxed text-[11px]">{t("limitPolicyInfo")}</p>
+                </div>
+              </div>
+
               {/* Local Storage & IndexedDB Telemetry */}
-              <div className="p-3.5 rounded-2xl bg-card border border-border space-y-3">
+              <div className="p-3.5 rounded-2xl bg-card border border-border space-y-2.5">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Database className="w-4 h-4 text-muted-foreground" />
