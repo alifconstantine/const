@@ -565,7 +565,7 @@ export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
       <InteractiveBottomSheet
         open={open}
         onClose={onClose}
-        defaultHeightVh={85}
+        defaultHeightVh={75}
         ariaLabel={isIndo ? "MCP Tools & Konektor" : "MCP Tools & Connectors"}
       >
       {/* Sheet Top Header */}

@@ -299,7 +299,7 @@ export function MobileSettingsSheet({
     <InteractiveBottomSheet
       open={open}
       onClose={onClose}
-      defaultHeightVh={85}
+      defaultHeightVh={75}
       ariaLabel={t("settings") || "Settings"}
     >
       {/* Top Header */}

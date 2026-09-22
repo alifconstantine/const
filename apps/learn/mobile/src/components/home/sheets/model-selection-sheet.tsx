@@ -842,7 +842,7 @@ export function ModelSelectionSheet({
     <InteractiveBottomSheet
       open={open}
       onClose={onClose}
-      defaultHeightVh={85}
+      defaultHeightVh={75}
       ariaLabel="Models and Voice Settings"
     >
       {/* Header */}
