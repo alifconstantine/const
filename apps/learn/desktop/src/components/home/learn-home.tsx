@@ -190,6 +190,11 @@ export function LearnHome({
   const [searchQuery, setSearchQuery] = useState("");
   const [activeCollectionId, setActiveCollectionId] = useState<string | null>(null);
 
+  // Artifacts View & Filter States
+  const [artifactViewMode, setArtifactViewMode] = useState<"grid" | "list">("grid");
+  const [artifactSearchQuery, setArtifactSearchQuery] = useState("");
+  const [artifactCategory, setArtifactCategory] = useState<string>("all");
+
   // Folder Sorting States
   type FolderSortBy = "createdAt" | "name" | "lastOpened";
   type SortDirection = "asc" | "desc";
@@ -373,6 +378,96 @@ export function LearnHome({
     }
     return map;
   }, [allLearns]);
+
+  // Category counts and definitions for Artifacts tab
+  const artifactCategories = useMemo(() => {
+    type ArtifactCategoryKey =
+      | "all"
+      | "slide"
+      | "note"
+      | "diagram"
+      | "quiz"
+      | "flashcard"
+      | "media"
+      | "report"
+      | "table";
+
+    const counts: Record<ArtifactCategoryKey, number> = {
+      all: artifacts.length,
+      slide: 0,
+      note: 0,
+      diagram: 0,
+      quiz: 0,
+      flashcard: 0,
+      media: 0,
+      report: 0,
+      table: 0,
+    };
+
+    for (const art of artifacts) {
+      const type = (art.type || "").toLowerCase().trim();
+      if (type === "slide" || type === "slides") counts.slide++;
+      else if (type === "note" || type === "notes") counts.note++;
+      else if (type === "diagram" || type === "mind_map" || type === "mindmap") counts.diagram++;
+      else if (type === "quiz") counts.quiz++;
+      else if (type === "flashcard" || type === "flashcards") counts.flashcard++;
+      else if (type === "audio" || type === "audio_summary" || type === "video" || type === "video_summary") counts.media++;
+      else if (type === "report" || type === "infographic") counts.report++;
+      else if (type === "table" || type === "data_table") counts.table++;
+    }
+
+    const allCategories: Array<{
+      id: string;
+      label: string;
+      icon: React.ElementType;
+      count: number;
+    }> = [
+      { id: "all", label: language === "id" ? "Semua" : "All", icon: Layers, count: counts.all },
+      { id: "slide", label: "Slides", icon: Presentation, count: counts.slide },
+      { id: "note", label: language === "id" ? "Catatan" : "Notes", icon: SquarePen, count: counts.note },
+      { id: "diagram", label: "Diagram & Mind Map", icon: GitFork, count: counts.diagram },
+      { id: "quiz", label: "Quiz", icon: HelpCircle, count: counts.quiz },
+      { id: "flashcard", label: "Flashcards", icon: BookOpen, count: counts.flashcard },
+      { id: "media", label: language === "id" ? "Audio & Video" : "Audio & Video", icon: Video, count: counts.media },
+      { id: "report", label: language === "id" ? "Laporan" : "Reports", icon: FileText, count: counts.report },
+      { id: "table", label: language === "id" ? "Tabel" : "Tables", icon: Table2, count: counts.table },
+    ];
+
+    return allCategories.filter((c) => c.id === "all" || c.count > 0);
+  }, [artifacts, language]);
+
+  // Filtered artifacts by category and search query
+  const filteredArtifacts = useMemo(() => {
+    let list = artifacts;
+
+    if (artifactCategory !== "all") {
+      list = list.filter((art) => {
+        const type = (art.type || "").toLowerCase().trim();
+        if (artifactCategory === "slide") return type === "slide" || type === "slides";
+        if (artifactCategory === "note") return type === "note" || type === "notes";
+        if (artifactCategory === "diagram") return type === "diagram" || type === "mind_map" || type === "mindmap";
+        if (artifactCategory === "quiz") return type === "quiz";
+        if (artifactCategory === "flashcard") return type === "flashcard" || type === "flashcards";
+        if (artifactCategory === "media") return type === "audio" || type === "audio_summary" || type === "video" || type === "video_summary";
+        if (artifactCategory === "report") return type === "report" || type === "infographic";
+        if (artifactCategory === "table") return type === "table" || type === "data_table";
+        return true;
+      });
+    }
+
+    if (artifactSearchQuery.trim()) {
+      const q = artifactSearchQuery.toLowerCase().trim();
+      list = list.filter((art) => {
+        const titleMatch = art.title.toLowerCase().includes(q);
+        const typeMatch = (art.type || "").toLowerCase().includes(q);
+        const parent = art.learnId ? learnsMap.get(art.learnId) : null;
+        const parentMatch = parent ? parent.title.toLowerCase().includes(q) : false;
+        return titleMatch || typeMatch || parentMatch;
+      });
+    }
+
+    return list;
+  }, [artifacts, artifactCategory, artifactSearchQuery, learnsMap]);
 
   // Active collection object when drilled down
   const activeCollection = useMemo(() => {
@@ -1510,112 +1605,302 @@ export function LearnHome({
             )}
 
             {/* ============================================================ */}
-            {/* TAB: ARTIFACT                                                */}
+            {/* TAB: ARTIFACTS                                               */}
             {/* ============================================================ */}
             {activeTab === "artifacts" && (
-              <section className="space-y-5">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    {renderSidebarToggle()}
-                    <h2 className="font-serif text-2xl font-normal text-foreground">
-                      {t("artifacts")}
-                    </h2>
-                    <span className="text-xs px-2.5 py-0.5 rounded-full bg-secondary text-muted-foreground font-mono">
-                      {artifacts.length}
-                    </span>
+              <section className="space-y-6">
+                {/* Header & Controls Toolbar */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <div className="flex items-center gap-2.5">
+                      {renderSidebarToggle()}
+                      <h1 className="font-serif text-2xl sm:text-3xl font-normal tracking-tight text-foreground">
+                        {t("artifacts")}
+                      </h1>
+                      <span className="text-xs px-2.5 py-0.5 rounded-full bg-secondary text-muted-foreground font-mono">
+                        {filteredArtifacts.length}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {language === "id"
+                        ? "Semua hasil dan artefak belajar yang dihasilkan"
+                        : "All generated learning artifacts and materials"}
+                    </p>
+                  </div>
+
+                  {/* Right: Grid/List Toggle, Category Dropdown & Search */}
+                  <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
+                    {/* View Mode Toggle (Grid vs List) */}
+                    <div className="flex items-center p-0.5 rounded-xl bg-muted/70 border border-border">
+                      <button
+                        type="button"
+                        onClick={() => setArtifactViewMode("grid")}
+                        className={`p-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                          artifactViewMode === "grid"
+                            ? "bg-background text-foreground shadow-2xs"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                        title="Grid"
+                        aria-label="Grid"
+                      >
+                        <LayoutGrid className="w-4 h-4" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setArtifactViewMode("list")}
+                        className={`p-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                          artifactViewMode === "list"
+                            ? "bg-background text-foreground shadow-2xs"
+                            : "text-muted-foreground hover:text-foreground"
+                        }`}
+                        title="List"
+                        aria-label="List"
+                      >
+                        <ListIcon className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    {/* Category Dropdown Filter */}
+                    {(() => {
+                      const activeCat = artifactCategories.find((c) => c.id === artifactCategory) || artifactCategories[0];
+                      const ActiveCatIcon = activeCat?.icon || Layers;
+                      return (
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-8 px-2.5 rounded-xl text-xs font-medium gap-1.5 border-border/70 hover:bg-secondary text-muted-foreground hover:text-foreground cursor-pointer"
+                              title={language === "id" ? "Filter Kategori" : "Filter Category"}
+                            >
+                              <ActiveCatIcon className="w-3.5 h-3.5 text-muted-foreground" />
+                              <span>{activeCat?.label}</span>
+                              <span className="text-[10px] opacity-70 font-mono">({activeCat?.count})</span>
+                              <ChevronDown className="w-3.5 h-3.5 ml-0.5 opacity-70" />
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-52 p-1.5 shadow-md">
+                            <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground/70 px-2 py-1 font-medium">
+                              {language === "id" ? "Kategori Artefak" : "Artifact Categories"}
+                            </DropdownMenuLabel>
+                            {artifactCategories.map((cat) => {
+                              const CatIcon = cat.icon;
+                              const isSelected = artifactCategory === cat.id;
+                              return (
+                                <DropdownMenuItem
+                                  key={cat.id}
+                                  className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2"
+                                  onClick={() => setArtifactCategory(cat.id)}
+                                >
+                                  <CatIcon className="h-3.5 w-3.5 text-muted-foreground" />
+                                  <span className="flex-1">{cat.label}</span>
+                                  <span className="text-[10px] text-muted-foreground font-mono">({cat.count})</span>
+                                  {isSelected && <Check className="h-3.5 w-3.5 ml-1 text-primary" />}
+                                </DropdownMenuItem>
+                              );
+                            })}
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      );
+                    })()}
+
+                    {/* Search Input */}
+                    <div className="relative">
+                      <Search className="w-3.5 h-3.5 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                      <Input
+                        type="text"
+                        value={artifactSearchQuery}
+                        onChange={(e) => setArtifactSearchQuery(e.target.value)}
+                        placeholder={language === "id" ? "Cari artefak..." : "Search artifacts..."}
+                        className="h-8 w-44 sm:w-56 pl-8 pr-7 text-xs rounded-xl bg-card border-border text-foreground placeholder-muted-foreground focus-visible:ring-1 focus-visible:ring-primary/40 shadow-none"
+                      />
+                      {artifactSearchQuery && (
+                        <button
+                          type="button"
+                          onClick={() => setArtifactSearchQuery("")}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
 
-                {artifacts.length > 0 ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                    {artifacts.map((art) => {
-                      const config = getArtifactConfig(art.type, art.isZip);
-                      const Icon = config.icon;
-                      const parentLearn = art.learnId ? learnsMap.get(art.learnId) : undefined;
+                {/* Content: Grid or List */}
+                {filteredArtifacts.length > 0 ? (
+                  artifactViewMode === "grid" ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                      {filteredArtifacts.map((art) => {
+                        const config = getArtifactConfig(art.type, art.isZip);
+                        const Icon = config.icon;
+                        const parentLearn = art.learnId ? learnsMap.get(art.learnId) : undefined;
 
-                      return (
-                        <div
-                          key={art.id}
-                          onClick={() => {
-                            if (art.learnId && onOpenLearn) {
-                              onOpenLearn(art.learnId);
-                            }
-                          }}
-                          className={cn(
-                            "min-h-[170px] w-full p-5 rounded-2xl border transition-all flex flex-col justify-between select-none shadow-none relative",
-                            art.learnId && onOpenLearn
-                              ? "border-border hover:border-foreground/20 bg-card hover:bg-secondary/70 cursor-pointer group"
-                              : "border-border bg-card"
-                          )}
-                        >
-                          <div className="flex items-start justify-between">
-                            <div
-                              className={cn(
-                                "h-10 w-10 rounded-xl border flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform",
-                                config.bgClass
-                              )}
-                            >
-                              <Icon className={cn("h-5 w-5", config.iconColor)} />
+                        return (
+                          <div
+                            key={art.id}
+                            onClick={() => {
+                              if (art.learnId && onOpenLearn) {
+                                onOpenLearn(art.learnId);
+                              }
+                            }}
+                            className={cn(
+                              "min-h-[145px] w-full p-4 rounded-xl border transition-all flex flex-col justify-between select-none shadow-none relative",
+                              art.learnId && onOpenLearn
+                                ? "border-border hover:border-foreground/20 bg-card hover:bg-secondary/70 cursor-pointer group"
+                                : "border-border bg-card"
+                            )}
+                          >
+                            <div className="flex items-start justify-between">
+                              <div
+                                className={cn(
+                                  "h-9 w-9 rounded-xl border flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform",
+                                  config.bgClass
+                                )}
+                              >
+                                <Icon className={cn("h-4 w-4", config.iconColor)} />
+                              </div>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  localDb.deleteArtifact(art.id);
+                                }}
+                                className="h-7 w-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
+                                title={t("delete")}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
                             </div>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                localDb.deleteArtifact(art.id);
-                              }}
-                              className="h-7 w-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-500/10 transition-colors cursor-pointer"
-                              title={t("delete")}
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
-                          </div>
 
-                          <div className="space-y-1.5 my-2.5">
-                            <h4
-                              className="text-sm font-medium text-foreground truncate group-hover:text-primary transition-colors"
-                              title={art.title}
-                            >
-                              {art.title}
-                            </h4>
-                            <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="inline-flex items-center text-[10px] uppercase font-mono px-2 py-0.5 rounded-md bg-secondary text-muted-foreground border border-border/60">
-                                {art.type.replace(/_/g, " ")}
-                              </span>
+                            <div className="space-y-1.5 my-2">
+                              <h4
+                                className="text-xs font-medium text-foreground truncate group-hover:text-primary transition-colors leading-snug"
+                                title={art.title}
+                              >
+                                {art.title}
+                              </h4>
                               {parentLearn && (
-                                <span
-                                  className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-0.5 rounded-md bg-secondary/80 border border-border/70 text-muted-foreground hover:text-foreground transition-colors max-w-[170px] truncate"
-                                  title={parentLearn.title}
-                                >
-                                  <LearnIcon icon={parentLearn.emoji} className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
-                                  <span className="truncate">{parentLearn.title}</span>
-                                </span>
+                                <div className="flex items-center">
+                                  <span
+                                    className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-0.5 rounded-md bg-secondary border border-border/70 text-muted-foreground hover:text-foreground transition-colors max-w-full truncate"
+                                    title={parentLearn.title}
+                                  >
+                                    <LearnIcon icon={parentLearn.emoji} className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+                                    <span className="truncate">{parentLearn.title}</span>
+                                  </span>
+                                </div>
                               )}
                             </div>
-                          </div>
 
-                          <div className="flex items-center justify-between text-xs text-muted-foreground pt-3 border-t border-border/40 font-mono text-[11px]">
-                            <span>
-                              {new Intl.DateTimeFormat(language === "id" ? "id-ID" : "en-US", {
-                                day: "numeric",
-                                month: "short",
-                                year: "numeric",
-                              }).format(new Date(art.updatedAt))}
-                            </span>
+                            <div className="flex items-center justify-between text-xs text-muted-foreground pt-2.5 border-t border-border/40 font-mono text-[10px]">
+                              <span>
+                                {new Intl.DateTimeFormat(language === "id" ? "id-ID" : "en-US", {
+                                  day: "numeric",
+                                  month: "short",
+                                  year: "numeric",
+                                }).format(new Date(art.updatedAt))}
+                              </span>
+                            </div>
                           </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {filteredArtifacts.map((art) => {
+                        const config = getArtifactConfig(art.type, art.isZip);
+                        const Icon = config.icon;
+                        const parentLearn = art.learnId ? learnsMap.get(art.learnId) : undefined;
+
+                        return (
+                          <div
+                            key={art.id}
+                            onClick={() => {
+                              if (art.learnId && onOpenLearn) {
+                                onOpenLearn(art.learnId);
+                              }
+                            }}
+                            className={cn(
+                              "w-full px-4 py-3 rounded-xl border transition-all flex items-center justify-between gap-4 select-none group shadow-none",
+                              art.learnId && onOpenLearn
+                                ? "border-border hover:border-foreground/20 bg-card hover:bg-secondary/70 cursor-pointer"
+                                : "border-border bg-card"
+                            )}
+                          >
+                            <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                              <div
+                                className={cn(
+                                  "h-9 w-9 rounded-xl border flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform",
+                                  config.bgClass
+                                )}
+                              >
+                                <Icon className={cn("h-4 w-4", config.iconColor)} />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <h4
+                                  className="text-xs sm:text-sm font-medium text-foreground truncate group-hover:text-primary transition-colors leading-snug"
+                                  title={art.title}
+                                >
+                                  {art.title}
+                                </h4>
+                                {parentLearn && (
+                                  <div className="flex items-center gap-1.5 mt-0.5">
+                                    <span
+                                      className="inline-flex items-center gap-1.5 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors max-w-[240px] truncate"
+                                      title={parentLearn.title}
+                                    >
+                                      <LearnIcon icon={parentLearn.emoji} className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+                                      <span className="truncate">{parentLearn.title}</span>
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-3 shrink-0 text-xs text-muted-foreground font-mono">
+                              <span className="text-[11px] hidden sm:inline">
+                                {new Intl.DateTimeFormat(language === "id" ? "id-ID" : "en-US", {
+                                  day: "numeric",
+                                  month: "short",
+                                  year: "numeric",
+                                }).format(new Date(art.updatedAt))}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  localDb.deleteArtifact(art.id);
+                                }}
+                                className="h-7 w-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-500/10 cursor-pointer transition-colors"
+                                title={t("delete")}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )
                 ) : (
                   <div className="text-center py-16 px-4 rounded-2xl border border-dashed border-border bg-card/40">
                     <div className="h-12 w-12 rounded-2xl bg-secondary border border-border flex items-center justify-center mx-auto mb-3">
                       <Layers className="w-5 h-5 text-muted-foreground" />
                     </div>
                     <h3 className="font-serif text-lg text-foreground font-medium">
-                      {t("noArtifactsTitle")}
+                      {artifactSearchQuery || artifactCategory !== "all"
+                        ? language === "id"
+                          ? "Tidak ada artefak yang cocok"
+                          : "No matching artifacts"
+                        : t("noArtifactsTitle")}
                     </h3>
                     <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto leading-relaxed">
-                      {t("noArtifactsDesc")}
+                      {artifactSearchQuery || artifactCategory !== "all"
+                        ? language === "id"
+                          ? "Coba ubah kata kunci pencarian atau kategori filter."
+                          : "Try adjusting your search query or category filter."
+                        : t("noArtifactsDesc")}
                     </p>
                   </div>
                 )}

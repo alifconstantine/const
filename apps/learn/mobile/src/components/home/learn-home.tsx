@@ -219,6 +219,7 @@ export function LearnHome({
   const setSearchQuery = onSearchQueryChange ?? setLocalSearchQuery;
   const [sortOption, setSortOption] = useState<SortOption>("recent");
   const [activeCollectionId, setActiveCollectionId] = useState<string | null>(null);
+  const [artifactCategory, setArtifactCategory] = useState<string>("all");
 
   // Folder Sorting States
   type FolderSortBy = "createdAt" | "name" | "lastOpened";
@@ -417,6 +418,96 @@ export function LearnHome({
     }
     return map;
   }, [allLearns]);
+
+  // Category counts and definitions for Artifacts tab
+  const artifactCategories = useMemo(() => {
+    type ArtifactCategoryKey =
+      | "all"
+      | "slide"
+      | "note"
+      | "diagram"
+      | "quiz"
+      | "flashcard"
+      | "media"
+      | "report"
+      | "table";
+
+    const counts: Record<ArtifactCategoryKey, number> = {
+      all: artifacts.length,
+      slide: 0,
+      note: 0,
+      diagram: 0,
+      quiz: 0,
+      flashcard: 0,
+      media: 0,
+      report: 0,
+      table: 0,
+    };
+
+    for (const art of artifacts) {
+      const type = (art.type || "").toLowerCase().trim();
+      if (type === "slide" || type === "slides") counts.slide++;
+      else if (type === "note" || type === "notes") counts.note++;
+      else if (type === "diagram" || type === "mind_map" || type === "mindmap") counts.diagram++;
+      else if (type === "quiz") counts.quiz++;
+      else if (type === "flashcard" || type === "flashcards") counts.flashcard++;
+      else if (type === "audio" || type === "audio_summary" || type === "video" || type === "video_summary") counts.media++;
+      else if (type === "report" || type === "infographic") counts.report++;
+      else if (type === "table" || type === "data_table") counts.table++;
+    }
+
+    const allCategories: Array<{
+      id: string;
+      label: string;
+      icon: React.ElementType;
+      count: number;
+    }> = [
+      { id: "all", label: language === "id" ? "Semua" : "All", icon: Layers, count: counts.all },
+      { id: "slide", label: "Slides", icon: Presentation, count: counts.slide },
+      { id: "note", label: language === "id" ? "Catatan" : "Notes", icon: SquarePen, count: counts.note },
+      { id: "diagram", label: "Diagram & Mind Map", icon: GitFork, count: counts.diagram },
+      { id: "quiz", label: "Quiz", icon: HelpCircle, count: counts.quiz },
+      { id: "flashcard", label: "Flashcards", icon: BookOpen, count: counts.flashcard },
+      { id: "media", label: language === "id" ? "Audio & Video" : "Audio & Video", icon: Video, count: counts.media },
+      { id: "report", label: language === "id" ? "Laporan" : "Reports", icon: FileText, count: counts.report },
+      { id: "table", label: language === "id" ? "Tabel" : "Tables", icon: Table2, count: counts.table },
+    ];
+
+    return allCategories.filter((c) => c.id === "all" || c.count > 0);
+  }, [artifacts, language]);
+
+  // Filtered artifacts by category and search query
+  const filteredArtifacts = useMemo(() => {
+    let list = artifacts;
+
+    if (artifactCategory !== "all") {
+      list = list.filter((art) => {
+        const type = (art.type || "").toLowerCase().trim();
+        if (artifactCategory === "slide") return type === "slide" || type === "slides";
+        if (artifactCategory === "note") return type === "note" || type === "notes";
+        if (artifactCategory === "diagram") return type === "diagram" || type === "mind_map" || type === "mindmap";
+        if (artifactCategory === "quiz") return type === "quiz";
+        if (artifactCategory === "flashcard") return type === "flashcard" || type === "flashcards";
+        if (artifactCategory === "media") return type === "audio" || type === "audio_summary" || type === "video" || type === "video_summary";
+        if (artifactCategory === "report") return type === "report" || type === "infographic";
+        if (artifactCategory === "table") return type === "table" || type === "data_table";
+        return true;
+      });
+    }
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      list = list.filter((art) => {
+        const titleMatch = art.title.toLowerCase().includes(q);
+        const typeMatch = (art.type || "").toLowerCase().includes(q);
+        const parent = art.learnId ? learnsMap.get(art.learnId) : null;
+        const parentMatch = parent ? parent.title.toLowerCase().includes(q) : false;
+        return titleMatch || typeMatch || parentMatch;
+      });
+    }
+
+    return list;
+  }, [artifacts, artifactCategory, searchQuery, learnsMap]);
 
   // Filtered and sorted collections based on search and sort preferences
   const filteredCollections = useMemo(() => {
@@ -1456,19 +1547,64 @@ export function LearnHome({
             TAB 5: ARTIFACTS
             ========================================================= */}
         {activeTab === "artifact" && (
-          <section className="space-y-2.5">
-            <div className="flex items-center gap-2 px-0.5">
-              <h2 className="font-sans text-sm font-semibold tracking-tight text-foreground">
-                {t("artifacts")}
-              </h2>
-              <span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary border border-border/60 text-muted-foreground font-mono">
-                {artifacts.length}
-              </span>
+          <section className="space-y-3">
+            <div className="flex items-center justify-between gap-2 px-0.5">
+              <div className="flex items-center gap-2">
+                <h2 className="font-sans text-sm font-semibold tracking-tight text-foreground">
+                  {t("artifacts")}
+                </h2>
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary border border-border/60 text-muted-foreground font-mono">
+                  {filteredArtifacts.length}
+                </span>
+              </div>
+
+              {/* Category Dropdown Menu */}
+              {(() => {
+                const activeCat = artifactCategories.find((c) => c.id === artifactCategory) || artifactCategories[0];
+                const ActiveCatIcon = activeCat?.icon || Layers;
+                return (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-7 px-2 rounded-lg text-xs font-medium gap-1.5 border-border/70 hover:bg-secondary text-muted-foreground hover:text-foreground cursor-pointer"
+                      >
+                        <ActiveCatIcon className="w-3 h-3 text-muted-foreground" />
+                        <span>{activeCat?.label}</span>
+                        <span className="text-[10px] opacity-70 font-mono">({activeCat?.count})</span>
+                        <ChevronDown className="w-3 h-3 ml-0.5 opacity-70" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-48 p-1.5 shadow-md">
+                      <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground/70 px-2 py-1 font-medium">
+                        {language === "id" ? "Kategori Artefak" : "Artifact Categories"}
+                      </DropdownMenuLabel>
+                      {artifactCategories.map((cat) => {
+                        const CatIcon = cat.icon;
+                        const isSelected = artifactCategory === cat.id;
+                        return (
+                          <DropdownMenuItem
+                            key={cat.id}
+                            className="cursor-pointer text-xs py-2 px-2 flex items-center gap-2"
+                            onClick={() => setArtifactCategory(cat.id)}
+                          >
+                            <CatIcon className="h-3.5 w-3.5 text-muted-foreground" />
+                            <span className="flex-1">{cat.label}</span>
+                            <span className="text-[10px] text-muted-foreground font-mono">({cat.count})</span>
+                            {isSelected && <Check className="h-3.5 w-3.5 ml-1 text-primary" />}
+                          </DropdownMenuItem>
+                        );
+                      })}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                );
+              })()}
             </div>
 
-            {artifacts.length > 0 ? (
+            {filteredArtifacts.length > 0 ? (
               <div className="space-y-2">
-                {artifacts.map((art) => {
+                {filteredArtifacts.map((art) => {
                   const config = getArtifactConfig(art.type, art.isZip);
                   const Icon = config.icon;
                   const parentLearn = art.learnId ? learnsMap.get(art.learnId) : undefined;
@@ -1508,27 +1644,24 @@ export function LearnHome({
                         </button>
                       </div>
 
-                      <div className="space-y-1.5 my-2.5">
+                      <div className="space-y-1.5 my-2">
                         <h4
-                          className="text-sm font-medium text-foreground truncate leading-snug group-hover:text-primary transition-colors"
+                          className="text-xs font-medium text-foreground truncate leading-snug group-hover:text-primary transition-colors"
                           title={art.title}
                         >
                           {art.title}
                         </h4>
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="inline-flex items-center text-[9px] uppercase font-mono px-2 py-0.5 rounded-md bg-secondary border border-border/60 text-muted-foreground">
-                            {art.type.replace(/_/g, " ")}
-                          </span>
-                          {parentLearn && (
+                        {parentLearn && (
+                          <div className="flex items-center">
                             <span
-                              className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md bg-secondary/80 border border-border/60 text-muted-foreground max-w-[180px] truncate"
+                              className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md bg-secondary/80 border border-border/60 text-muted-foreground max-w-full truncate"
                               title={parentLearn.title}
                             >
                               <LearnIcon icon={parentLearn.emoji} className="w-3 h-3 shrink-0 text-muted-foreground" />
                               <span className="truncate">{parentLearn.title}</span>
                             </span>
-                          )}
-                        </div>
+                          </div>
+                        )}
                       </div>
 
                       <div className="text-[10px] text-muted-foreground pt-2 border-t border-border/40 flex items-center justify-between font-mono">
@@ -1550,10 +1683,18 @@ export function LearnHome({
                   <Layers className="h-5 w-5" />
                 </div>
                 <h3 className="font-sans text-sm text-foreground font-semibold">
-                  {t("noArtifactsTitle")}
+                  {searchQuery || artifactCategory !== "all"
+                    ? language === "id"
+                      ? "Tidak ada artefak yang cocok"
+                      : "No matching artifacts"
+                    : t("noArtifactsTitle")}
                 </h3>
                 <p className="text-xs text-muted-foreground mt-1 leading-relaxed max-w-xs mx-auto">
-                  {t("noArtifactsDesc")}
+                  {searchQuery || artifactCategory !== "all"
+                    ? language === "id"
+                      ? "Coba ubah kata kunci pencarian atau kategori filter."
+                      : "Try adjusting your search query or category filter."
+                    : t("noArtifactsDesc")}
                 </p>
               </div>
             )}
