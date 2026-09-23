@@ -24,18 +24,20 @@ import {
 } from "lucide-react";
 import { cn, toast } from "@const/ui";
 import { useI18n } from "../../lib/i18n";
-import { localDb, type LocalArtifact, type QuizData, type QuizQuestion, type FlashcardData, type FlashcardItem, type AudioSummaryData, type VideoSummaryData, type SlideDeckData, type InfographicData } from "../../lib/db";
+import { localDb, type LocalArtifact, type QuizData, type QuizQuestion, type FlashcardData, type FlashcardItem, type AudioSummaryData, type VideoSummaryData, type SlideDeckData, type InfographicData, type ReportData } from "../../lib/db";
 import { getStoredVoiceConfig, synthesizeSpeechChunked } from "../../lib/voice";
 import { MobileMindMapViewer } from "./mobile-mind-map-viewer";
 import { VideoSummarySheet } from "./video-summary-sheet";
 import { MobilePresentationViewer } from "./mobile-presentation-viewer";
 import { MobileInfographicViewer } from "./mobile-infographic-viewer";
+import { MobileReportViewer } from "./mobile-report-viewer";
 
 export interface MobileArtifactReaderProps {
   open: boolean;
   onClose: () => void;
   artifact: LocalArtifact | null;
   onExplainInChat: (prompt: string) => void;
+  onSelectStudioTool?: (toolId: string) => void;
 }
 
 export function MobileArtifactReader({
@@ -43,6 +45,7 @@ export function MobileArtifactReader({
   onClose,
   artifact,
   onExplainInChat,
+  onSelectStudioTool,
 }: MobileArtifactReaderProps) {
   const { language } = useI18n();
   const isIndo = language === "id";
@@ -119,6 +122,32 @@ export function MobileArtifactReader({
         }
       })()
     : null;
+
+  const isReport = artifact.type === "report" || Boolean(artifact.data?.sections);
+  const reportData = isReport
+    ? (artifact.data as ReportData) ||
+      (() => {
+        try {
+          return typeof artifact.content === "string"
+            ? JSON.parse(artifact.content)
+            : null;
+        } catch {
+          return null;
+        }
+      })()
+    : null;
+
+  if (isReport && reportData) {
+    return (
+      <MobileReportViewer
+        artifact={artifact}
+        data={reportData}
+        onClose={onClose}
+        onExplainInChat={onExplainInChat}
+        onSelectStudioTool={onSelectStudioTool}
+      />
+    );
+  }
 
   if (isSlides && slideDeckData) {
     return (

@@ -279,13 +279,48 @@ export interface InfographicData {
   updatedAt?: number;
 }
 
+export interface ReportSectionWidget {
+  type: "infographic" | "quiz" | "flashcard" | "chart" | "callout" | string;
+  badge?: string;
+  title: string;
+  description?: string;
+  targetTool?: string;
+}
+
+export interface ReportSection {
+  id: string;
+  order: number;
+  title: string;
+  content: string; // Markdown with LaTeX KaTeX support
+  recommendedWidget?: ReportSectionWidget;
+}
+
+export interface ReportData {
+  id?: string;
+  learnId?: string;
+  title: string;
+  format: "interactive" | "document";
+  templateId: string;
+  depth?: "short" | "medium" | "long" | "auto";
+  language: "id" | "en";
+  sourceCount?: number;
+  sourceTitles?: string[];
+  sourceIds?: string[];
+  toc: Array<{ id: string; title: string; order: number }>;
+  sections: ReportSection[];
+  feedback?: "good" | "bad";
+  customInstructions?: string;
+  createdAt?: number;
+  updatedAt?: number;
+}
+
 export interface LocalArtifact {
   id: string;
   learnId?: string;
   title: string;
   type: string;
   content?: string;
-  data?: QuizData | FlashcardData | MindMapData | SlideDeckData | AudioSummaryData | VideoSummaryData | InfographicData | any;
+  data?: QuizData | FlashcardData | MindMapData | SlideDeckData | AudioSummaryData | VideoSummaryData | InfographicData | ReportData | any;
   sourceCount?: number;
   fileUrl?: string;
   isZip?: boolean;

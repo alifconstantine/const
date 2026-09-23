@@ -22,9 +22,10 @@ import { CreateMindMapSheet } from "./create-mind-map-sheet";
 import { CreateAudioSummarySheet } from "./create-audio-summary-sheet";
 import { CreatePresentationSheet } from "./create-presentation-sheet";
 import { CreateInfographicSheet } from "./create-infographic-sheet";
+import { CreateReportSheet } from "./create-report-sheet";
 import { ModelSelectionSheet } from "../home/sheets/model-selection-sheet";
 import { MobileArtifactReader } from "./mobile-artifact-reader";
-import { generateStudioArtifact, generatePresentationArtifact, generateInfographicArtifact } from "../../lib/studio/generator";
+import { generateStudioArtifact, generatePresentationArtifact, generateInfographicArtifact, generateReportArtifact } from "../../lib/studio/generator";
 import { WorkingProcess } from "./working-process";
 import { ImageLightbox } from "./image-lightbox";
 import {
@@ -529,6 +530,7 @@ export function MobileLearnWorkspace({
   const [isCreateAudioSummaryOpen, setIsCreateAudioSummaryOpen] = useState(false);
   const [isCreatePresentationOpen, setIsCreatePresentationOpen] = useState(false);
   const [isCreateInfographicOpen, setIsCreateInfographicOpen] = useState(false);
+  const [isCreateReportSheetOpen, setIsCreateReportSheetOpen] = useState(false);
   const [modelSelectionCategory, setModelSelectionCategory] = useState<"llm" | "voice" | "image">("voice");
   const [isModelSelectionSheetOpen, setIsModelSelectionSheetOpen] = useState(false);
   const [generatingArtifacts, setGeneratingArtifacts] = useState<GeneratingArtifactStatus[]>([]);
@@ -1319,11 +1321,13 @@ export function MobileLearnWorkspace({
       art.type === "mind_map" ||
       art.type === "slides" ||
       art.type === "infographic" ||
+      art.type === "report" ||
       art.data?.imageUrl ||
       art.data?.questions ||
       art.data?.cards ||
       art.data?.root ||
-      art.data?.slides
+      art.data?.slides ||
+      art.data?.sections
     ) {
       handleOpenArtifactReader(art);
       return;
@@ -1641,7 +1645,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
     setSearchQuery("");
   };
 
-  const handleSelectStudioTool = (toolId: string, _toolTitle: string) => {
+  const handleSelectStudioTool = (toolId: string, _toolTitle?: string) => {
     if (toolId === "quiz") {
       setCreateArtifactType("quiz");
       setIsCreateArtifactSheetOpen(true);
@@ -1666,6 +1670,10 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
     }
     if (toolId === "infographic") {
       setIsCreateInfographicOpen(true);
+      return;
+    }
+    if (toolId === "report") {
+      setIsCreateReportSheetOpen(true);
       return;
     }
     // Other tools: strictly no-op as requested
@@ -1938,6 +1946,83 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
         isIndo
           ? `Gagal membuat infografis: ${err?.message || "Terjadi kesalahan"}`
           : `Failed to create infographic: ${err?.message || "An error occurred"}`
+      );
+    }
+  };
+
+  const handleGenerateReport = async (options: {
+    selectedSourceIds: string[];
+    format: "interactive" | "document";
+    templateId: string;
+    templateTitle: string;
+    templateDescription?: string;
+    depth: "short" | "medium" | "long" | "auto";
+    language: "id" | "en";
+    customInstructions?: string;
+  }) => {
+    if (!learnId) return;
+
+    const selectedSources = (sources || []).filter((s) =>
+      options.selectedSourceIds.includes(s.id)
+    );
+    if (selectedSources.length === 0) return;
+
+    const isIndo = options.language === "id";
+    const title = options.templateTitle || (isIndo ? "Laporan Pembelajaran" : "Learning Report");
+
+    const artId = await localDb.createArtifact({
+      learnId,
+      title: isIndo ? "Menyusun Laporan..." : "Generating Report...",
+      type: "report",
+      status: "generating",
+      sourcesCount: selectedSources.length,
+      content: "",
+    });
+
+    setIsStudioSheetOpen(true);
+
+    try {
+      const result = await generateReportArtifact({
+        artifactId: artId,
+        learnId,
+        sources: selectedSources,
+        format: options.format,
+        templateId: options.templateId,
+        templateTitle: options.templateTitle,
+        templateDescription: options.templateDescription,
+        depth: options.depth,
+        language: options.language,
+        customInstructions: options.customInstructions,
+      });
+
+      await localDb.updateArtifact(artId, {
+        title: result.title || title,
+        data: result.data,
+        content: JSON.stringify(result.data),
+        status: "completed",
+      });
+
+      toast.success(
+        isIndo ? "Laporan berhasil dibuat!" : "Report created successfully!"
+      );
+
+      const fullArt = await localDb.getArtifact(artId);
+      if (fullArt) {
+        setIsStudioSheetOpen(false);
+        setSelectedReaderArtifact(fullArt);
+        setIsReaderOpen(true);
+      }
+    } catch (err: any) {
+      console.error("Failed to generate report on mobile:", err);
+      await localDb.updateArtifact(artId, {
+        title,
+        status: "error",
+        error: err?.message || "Generation failed",
+      });
+      toast.error(
+        isIndo
+          ? `Gagal membuat laporan: ${err?.message || "Terjadi kesalahan"}`
+          : `Failed to create report: ${err?.message || "An error occurred"}`
       );
     }
   };
@@ -2848,12 +2933,21 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
         }}
       />
 
+      {/* Create Report Bottom Sheet */}
+      <CreateReportSheet
+        open={isCreateReportSheetOpen}
+        onClose={() => setIsCreateReportSheetOpen(false)}
+        sources={sources || []}
+        onGenerate={handleGenerateReport}
+      />
+
       {/* Interactive Full-Screen Reader Overlay */}
       <MobileArtifactReader
         open={isReaderOpen}
         onClose={() => setIsReaderOpen(false)}
         artifact={selectedReaderArtifact}
         onExplainInChat={handleExplainInChat}
+        onSelectStudioTool={handleSelectStudioTool}
       />
 
       {/* Add Source Pop-up Modal */}

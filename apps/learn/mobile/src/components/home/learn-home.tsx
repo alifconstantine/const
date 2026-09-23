@@ -1247,7 +1247,19 @@ export function LearnHome({
                   >
                     <div className="flex items-start justify-between">
                       <div className="h-8 w-8 rounded-xl bg-secondary border border-border/60 flex items-center justify-center text-base shrink-0">
-                        {art.type === "slide" ? "📊" : art.type === "diagram" ? "📐" : "⚡"}
+                        {art.type === "slide" || art.type === "slides"
+                          ? "📊"
+                          : art.type === "diagram" || art.type === "mind_map"
+                          ? "📐"
+                          : art.type === "report"
+                          ? "📄"
+                          : art.type === "infographic"
+                          ? "🖼️"
+                          : art.type === "video_summary"
+                          ? "🎬"
+                          : art.type === "audio_summary"
+                          ? "🎙️"
+                          : "⚡"}
                       </div>
                       <button
                         type="button"

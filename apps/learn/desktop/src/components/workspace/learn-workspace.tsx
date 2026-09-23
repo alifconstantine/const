@@ -48,6 +48,7 @@ import { CreateAudioSummaryDialog } from "./create-audio-summary-dialog";
 import { CreateVideoSummaryDialog } from "./create-video-summary-dialog";
 import { CreatePresentationDialog } from "./create-presentation-dialog";
 import { CreateInfographicDialog } from "./create-infographic-dialog";
+import { CreateReportDialog } from "./create-report-dialog";
 import { WorkspaceTitle } from "./workspace-title";
 import { SettingsView } from "../settings/settings-view";
 import { ErrorBoundary } from "../ui/error-boundary";
@@ -59,6 +60,7 @@ import {
   generateVideoSummaryArtifact,
   generatePresentationArtifact,
   generateInfographicArtifact,
+  generateReportArtifact,
 } from "../../lib/studio/generator";
 import type { FileMutationRecord } from "@const/agent";
 import type { LocalArtifact } from "../../lib/db";
@@ -140,6 +142,7 @@ export function LearnWorkspace({
   const [isCreateVideoOpen, setIsCreateVideoOpen] = useState(false);
   const [isCreatePresentationOpen, setIsCreatePresentationOpen] = useState(false);
   const [isCreateInfographicOpen, setIsCreateInfographicOpen] = useState(false);
+  const [isCreateReportOpen, setIsCreateReportOpen] = useState(false);
   const [generatingArtifacts, setGeneratingArtifacts] = useState<GeneratingArtifactStatus[]>([]);
 
   // Right Pane: Dual Studio & Preview/Review state
@@ -918,6 +921,85 @@ export function LearnWorkspace({
     }
   };
 
+  const handleGenerateReport = async (params: {
+    selectedSourceIds: string[];
+    format: "interactive" | "document";
+    templateId: string;
+    templateTitle: string;
+    templateDescription?: string;
+    depth: "short" | "medium" | "long" | "auto";
+    language: "id" | "en";
+    customInstructions?: string;
+  }) => {
+    if (!learnId) return;
+
+    const selectedSources = (sources || []).filter((s) =>
+      params.selectedSourceIds.includes(s.id)
+    );
+    if (selectedSources.length === 0) return;
+
+    const isIndo = params.language === "id";
+    const title = params.templateTitle || (isIndo ? "Laporan Pembelajaran" : "Learning Report");
+
+    // 1. Create generating artifact in Dexie
+    const artId = await localDb.createArtifact({
+      learnId,
+      title: isIndo ? "Menyusun Laporan..." : "Generating Report...",
+      type: "report",
+      status: "generating",
+      sourcesCount: selectedSources.length,
+      content: "",
+    });
+
+    try {
+      // 2. Call generator in background
+      const result = await generateReportArtifact({
+        artifactId: artId,
+        learnId,
+        sources: selectedSources,
+        format: params.format,
+        templateId: params.templateId,
+        templateTitle: params.templateTitle,
+        templateDescription: params.templateDescription,
+        depth: params.depth,
+        language: params.language,
+        customInstructions: params.customInstructions,
+      });
+
+      // 3. Update artifact in Dexie
+      await localDb.updateArtifact(artId, {
+        title: result.title || title,
+        data: result.data,
+        content: JSON.stringify(result.data),
+        status: "completed",
+      });
+
+      toast.success(
+        isIndo
+          ? "Laporan berhasil dibuat!"
+          : "Report created successfully!"
+      );
+
+      // 4. Auto-open in preview & auto-widen
+      const fullArt = await localDb.getArtifact(artId);
+      if (fullArt) {
+        handleOpenStudioArtifact(fullArt);
+      }
+    } catch (err: any) {
+      console.error("Failed to generate report:", err);
+      await localDb.updateArtifact(artId, {
+        title,
+        status: "error",
+        error: err?.message || "Generation failed",
+      });
+      toast.error(
+        isIndo
+          ? `Gagal menyusun laporan: ${err?.message || "Terjadi kesalahan"}`
+          : `Failed to create report: ${err?.message || "An error occurred"}`
+      );
+    }
+  };
+
   const handleSelectStudioTool = (toolId: string) => {
     if (toolId === "browser") {
       handleOpenBrowser();
@@ -942,6 +1024,8 @@ export function LearnWorkspace({
       setIsCreatePresentationOpen(true);
     } else if (toolId === "infographic") {
       setIsCreateInfographicOpen(true);
+    } else if (toolId === "report") {
+      setIsCreateReportOpen(true);
     } else {
       return;
     }
@@ -956,13 +1040,15 @@ export function LearnWorkspace({
       art.type === "video_summary" ||
       art.type === "slides" ||
       art.type === "infographic" ||
+      art.type === "report" ||
       art.data?.questions ||
       art.data?.cards ||
       art.data?.root ||
       art.data?.script ||
       art.data?.scenes ||
       art.data?.slides ||
-      art.data?.imageUrl
+      art.data?.imageUrl ||
+      art.data?.sections
     ) {
       handleOpenStudioArtifact(art);
       return;
@@ -1763,6 +1849,14 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
           setSettingsInitialTab("models");
           setIsSettingsOpen(true);
         }}
+      />
+
+      {/* Dedicated Create Report Dialog */}
+      <CreateReportDialog
+        open={isCreateReportOpen}
+        onOpenChange={setIsCreateReportOpen}
+        sources={sources || []}
+        onGenerate={handleGenerateReport}
       />
 
       {/* Settings Modal / Overlay */}

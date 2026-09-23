@@ -50,11 +50,12 @@ import { AudioSummaryViewer } from "./audio-summary-viewer";
 import { VideoSummaryViewer } from "./video-summary-viewer";
 import { PresentationViewer } from "./presentation-viewer";
 import { InfographicViewer } from "./infographic-viewer";
+import { ReportViewer } from "./report-viewer";
 import { STUDIO_TOOLS } from "../workspace/studio-panel";
 import { useI18n } from "../../lib/i18n";
 import type { RightPaneTab, RightPaneTabType, BrowserSelectedElement } from "./types";
 import type { FileMutationRecord } from "@const/agent";
-import type { LocalArtifact, AudioSummaryData, VideoSummaryData, SlideDeckData, InfographicData } from "../../lib/db";
+import type { LocalArtifact, AudioSummaryData, VideoSummaryData, SlideDeckData, InfographicData, ReportData } from "../../lib/db";
 
 export interface GeneratingArtifactStatus {
   id: string;
@@ -400,6 +401,35 @@ export function RightPane({
           );
         }
       }
+      if (tab.artifact?.type === "report") {
+        const reportData =
+          (tab.artifact.data as ReportData) ||
+          (() => {
+            try {
+              return typeof tab.artifact.content === "string"
+                ? JSON.parse(tab.artifact.content)
+                : null;
+            } catch {
+              return null;
+            }
+          })();
+        if (reportData) {
+          return (
+            <ReportViewer
+              artifact={tab.artifact}
+              data={{
+                ...reportData,
+                id: tab.artifact.id || reportData.id,
+                learnId: tab.artifact.learnId || reportData.learnId,
+              }}
+              onExplainInChat={onExplainInChat}
+              onToggleExpand={onToggleCollapse}
+              isExpanded={!isCollapsed}
+              onSelectStudioTool={onSelectStudioTool}
+            />
+          );
+        }
+      }
       return null;
     }
     if (tab.type === "mind_map") {
@@ -678,12 +708,15 @@ export function RightPane({
                         const isVideo = art.type === "video_summary";
                         const isSlides = art.type === "slides";
                         const isInfographic = art.type === "infographic";
+                        const isReport = art.type === "report";
                         const defaultGeneratingTitle = isInfographic
                           ? (language === "id" ? "Membuat Infografis..." : "Creating Infographic...")
                           : isVideo
                           ? (language === "id" ? "Membuat Ringkasan Video..." : "Creating Video Summary...")
                           : isSlides
                           ? (language === "id" ? "Menyusun Presentasi..." : "Creating Presentation...")
+                          : isReport
+                          ? (language === "id" ? "Menyusun Laporan..." : "Creating Report...")
                           : isMindMap
                           ? (language === "id" ? "Membuat Peta Pikiran..." : "Creating Mind Map...")
                           : isQuiz
@@ -703,6 +736,8 @@ export function RightPane({
                                 ? "border-emerald-500/30"
                                 : isSlides
                                 ? "border-amber-500/30"
+                                : isReport
+                                ? "border-foreground/30"
                                 : isMindMap
                                 ? "border-purple-500/30"
                                 : isQuiz
@@ -721,6 +756,8 @@ export function RightPane({
                                   ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
                                   : isSlides
                                   ? "bg-amber-500/10 border-amber-500/20 text-amber-400"
+                                  : isReport
+                                  ? "bg-foreground/10 border-foreground/20 text-foreground"
                                   : isMindMap
                                   ? "bg-purple-500/10 border-purple-500/20 text-purple-400"
                                   : isQuiz
@@ -739,6 +776,8 @@ export function RightPane({
                                     ? "text-emerald-400"
                                     : isSlides
                                     ? "text-amber-400"
+                                    : isReport
+                                    ? "text-foreground"
                                     : isMindMap
                                     ? "text-purple-400"
                                     : isQuiz
@@ -784,6 +823,7 @@ export function RightPane({
                       const isSlides = art.type === "slides";
                       const isVideo = art.type === "video_summary";
                       const isInfographic = art.type === "infographic";
+                      const isReport = art.type === "report";
                       const itemCount = isQuiz && art.data?.questions
                         ? art.data.questions.length
                         : isFlashcard && art.data?.cards
@@ -792,6 +832,8 @@ export function RightPane({
                         ? (art.data?.slideCount || (art.data?.slides && art.data.slides.length > 0 ? art.data.slides.length : art.data?.canvaThumbnails?.length || null))
                         : isVideo && art.data?.scenes
                         ? art.data.scenes.length
+                        : isReport && art.data?.sections
+                        ? art.data.sections.length
                         : null;
                       const countText = itemCount !== null && itemCount !== undefined
                         ? isQuiz
@@ -802,6 +844,8 @@ export function RightPane({
                           ? (language === "id" ? `${itemCount} Slide` : `${itemCount} Slide${itemCount > 1 ? "s" : ""}`)
                           : isVideo
                           ? (language === "id" ? `${itemCount} Scene` : `${itemCount} Scenes`)
+                          : isReport
+                          ? (language === "id" ? `${itemCount} Bagian` : `${itemCount} Section${itemCount > 1 ? "s" : ""}`)
                           : null
                         : isMindMap
                         ? (language === "id" ? "Peta Konsep" : "Concept Map")
