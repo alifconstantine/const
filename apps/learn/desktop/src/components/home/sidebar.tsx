@@ -124,26 +124,24 @@ export function Sidebar({
         </div>
 
         {/* Action: Create New Notebook Button (Kimi Reference Style) */}
-        {activeTab !== "collections" && (
-          <div className="pt-1">
-            <button
-              type="button"
-              onClick={onCreateNewLearn}
-              className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-secondary/80 hover:bg-secondary border border-border/60 hover:border-border text-foreground font-medium text-xs transition-all cursor-pointer shadow-2xs group active:scale-[0.99]"
-              title={`${t("newLearn")} (${isMac ? "⌘K" : "Ctrl+K"})`}
-            >
-              <div className="flex items-center gap-2">
-                <PlusCircle className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors stroke-[1.8]" />
-                <span className="font-medium text-foreground/90 group-hover:text-foreground">
-                  {t("newLearn")}
-                </span>
-              </div>
-              <span className="text-xs text-muted-foreground/60 group-hover:text-muted-foreground font-sans transition-colors select-none tracking-tight">
-                {isMac ? "⌘K" : "Ctrl+K"}
+        <div className="pt-1">
+          <button
+            type="button"
+            onClick={onCreateNewLearn}
+            className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-secondary/80 hover:bg-secondary border border-border/60 hover:border-border text-foreground font-medium text-xs transition-all cursor-pointer shadow-2xs group active:scale-[0.99]"
+            title={`${t("newLearn")} (${isMac ? "⌘K" : "Ctrl+K"})`}
+          >
+            <div className="flex items-center gap-2">
+              <PlusCircle className="w-4 h-4 text-muted-foreground group-hover:text-foreground transition-colors stroke-[1.8]" />
+              <span className="font-medium text-foreground/90 group-hover:text-foreground">
+                {t("newLearn")}
               </span>
-            </button>
-          </div>
-        )}
+            </div>
+            <span className="text-xs text-muted-foreground/60 group-hover:text-muted-foreground font-sans transition-colors select-none tracking-tight">
+              {isMac ? "⌘K" : "Ctrl+K"}
+            </span>
+          </button>
+        </div>
 
         {/* Navigation Items (Learns, Sources, Collections, Artifact) */}
         <nav className="flex flex-col gap-0.5 pt-1">
