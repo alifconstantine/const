@@ -24,11 +24,12 @@ import {
 } from "lucide-react";
 import { cn, toast } from "@const/ui";
 import { useI18n } from "../../lib/i18n";
-import { localDb, type LocalArtifact, type QuizData, type QuizQuestion, type FlashcardData, type FlashcardItem, type AudioSummaryData, type VideoSummaryData, type SlideDeckData } from "../../lib/db";
+import { localDb, type LocalArtifact, type QuizData, type QuizQuestion, type FlashcardData, type FlashcardItem, type AudioSummaryData, type VideoSummaryData, type SlideDeckData, type InfographicData } from "../../lib/db";
 import { getStoredVoiceConfig, synthesizeSpeechChunked } from "../../lib/voice";
 import { MobileMindMapViewer } from "./mobile-mind-map-viewer";
 import { VideoSummarySheet } from "./video-summary-sheet";
 import { MobilePresentationViewer } from "./mobile-presentation-viewer";
+import { MobileInfographicViewer } from "./mobile-infographic-viewer";
 
 export interface MobileArtifactReaderProps {
   open: boolean;
@@ -132,6 +133,31 @@ export function MobileArtifactReader({
 
   if (isMindMap && mindMapData) {
     return <MobileMindMapViewer data={mindMapData} onClose={onClose} />;
+  }
+
+  const isInfographic = artifact.type === "infographic" || Boolean(artifact.data?.imageUrl);
+  const infographicData = isInfographic
+    ? (artifact.data as InfographicData) ||
+      (() => {
+        try {
+          return typeof artifact.content === "string"
+            ? JSON.parse(artifact.content)
+            : null;
+        } catch {
+          return null;
+        }
+      })()
+    : null;
+
+  if (isInfographic && infographicData) {
+    return (
+      <MobileInfographicViewer
+        artifact={artifact}
+        data={infographicData}
+        onClose={onClose}
+        onExplainInChat={onExplainInChat}
+      />
+    );
   }
 
   return (

@@ -254,13 +254,38 @@ export interface VideoSummaryData {
   updatedAt?: number;
 }
 
+export interface InfographicData {
+  id?: string;
+  learnId?: string;
+  title: string;
+  topic?: string;
+  imageUrl: string;
+  prompt: string;
+  visualPrompt?: string;
+  orientation: "landscape" | "portrait" | "square";
+  style: string;
+  styleLabel?: string;
+  detailLevel: "brief" | "standard" | "detailed";
+  language: "id" | "en" | string;
+  summary?: string;
+  keyPoints?: string[];
+  dimensions?: { width: number; height: number };
+  sourceCount?: number;
+  sourceTitles?: string[];
+  sourceIds?: string[];
+  modelUsed?: string;
+  providerUsed?: string;
+  createdAt?: number;
+  updatedAt?: number;
+}
+
 export interface LocalArtifact {
   id: string;
   learnId?: string;
   title: string;
   type: string;
   content?: string;
-  data?: QuizData | FlashcardData | MindMapData | SlideDeckData | AudioSummaryData | VideoSummaryData | any;
+  data?: QuizData | FlashcardData | MindMapData | SlideDeckData | AudioSummaryData | VideoSummaryData | InfographicData | any;
   sourceCount?: number;
   fileUrl?: string;
   isZip?: boolean;

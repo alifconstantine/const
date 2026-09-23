@@ -21,9 +21,10 @@ import { CreateArtifactSheet } from "./create-artifact-sheet";
 import { CreateMindMapSheet } from "./create-mind-map-sheet";
 import { CreateAudioSummarySheet } from "./create-audio-summary-sheet";
 import { CreatePresentationSheet } from "./create-presentation-sheet";
+import { CreateInfographicSheet } from "./create-infographic-sheet";
 import { ModelSelectionSheet } from "../home/sheets/model-selection-sheet";
 import { MobileArtifactReader } from "./mobile-artifact-reader";
-import { generateStudioArtifact, generatePresentationArtifact } from "../../lib/studio/generator";
+import { generateStudioArtifact, generatePresentationArtifact, generateInfographicArtifact } from "../../lib/studio/generator";
 import { WorkingProcess } from "./working-process";
 import { ImageLightbox } from "./image-lightbox";
 import {
@@ -527,7 +528,9 @@ export function MobileLearnWorkspace({
   const [isCreateMindMapSheetOpen, setIsCreateMindMapSheetOpen] = useState(false);
   const [isCreateAudioSummaryOpen, setIsCreateAudioSummaryOpen] = useState(false);
   const [isCreatePresentationOpen, setIsCreatePresentationOpen] = useState(false);
-  const [isVoiceModelSheetOpen, setIsVoiceModelSheetOpen] = useState(false);
+  const [isCreateInfographicOpen, setIsCreateInfographicOpen] = useState(false);
+  const [modelSelectionCategory, setModelSelectionCategory] = useState<"llm" | "voice" | "image">("voice");
+  const [isModelSelectionSheetOpen, setIsModelSelectionSheetOpen] = useState(false);
   const [generatingArtifacts, setGeneratingArtifacts] = useState<GeneratingArtifactStatus[]>([]);
   const [selectedReaderArtifact, setSelectedReaderArtifact] = useState<LocalArtifact | null>(null);
   const [isReaderOpen, setIsReaderOpen] = useState(false);
@@ -1315,6 +1318,8 @@ export function MobileLearnWorkspace({
       art.type === "flashcard" ||
       art.type === "mind_map" ||
       art.type === "slides" ||
+      art.type === "infographic" ||
+      art.data?.imageUrl ||
       art.data?.questions ||
       art.data?.cards ||
       art.data?.root ||
@@ -1659,6 +1664,10 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
       setIsCreatePresentationOpen(true);
       return;
     }
+    if (toolId === "infographic") {
+      setIsCreateInfographicOpen(true);
+      return;
+    }
     // Other tools: strictly no-op as requested
     return;
   };
@@ -1850,6 +1859,85 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
         language === "id"
           ? `Gagal membuat presentasi: ${err?.message || "Terjadi kesalahan"}`
           : `Failed to create presentation: ${err?.message || "An error occurred"}`
+      );
+    }
+  };
+
+  const handleGenerateInfographic = async (params: {
+    selectedSourceIds: string[];
+    language: "id" | "en";
+    orientation: "landscape" | "portrait" | "square";
+    style: string;
+    detailLevel: "brief" | "standard" | "detailed";
+    customDescription?: string;
+    providerId?: string;
+    modelId?: string;
+  }) => {
+    if (!learnId) return;
+
+    const selectedSources = (sources || []).filter((s) =>
+      params.selectedSourceIds.includes(s.id)
+    );
+    if (selectedSources.length === 0) return;
+
+    const isIndo = params.language === "id";
+    const title = isIndo ? "Infografis Materi" : "Study Infographic";
+
+    // 1. Create generating artifact in Dexie
+    const artId = await localDb.createArtifact({
+      learnId,
+      title: isIndo ? "Membuat Infografis..." : "Creating Infographic...",
+      type: "infographic",
+      status: "generating",
+      sourcesCount: selectedSources.length,
+      content: "",
+    });
+
+    // Open StudioSheet so user sees progress card immediately
+    setIsStudioSheetOpen(true);
+
+    try {
+      const result = await generateInfographicArtifact({
+        artifactId: artId,
+        learnId,
+        sources: selectedSources,
+        language: params.language,
+        orientation: params.orientation,
+        style: params.style,
+        detailLevel: params.detailLevel,
+        customDescription: params.customDescription,
+        providerId: params.providerId,
+        modelId: params.modelId,
+      });
+
+      await localDb.updateArtifact(artId, {
+        title: result.title || title,
+        data: result.data,
+        content: JSON.stringify(result.data),
+        status: "completed",
+      });
+
+      toast.success(
+        isIndo ? "Infografis berhasil dibuat!" : "Infographic created successfully!"
+      );
+
+      const fullArt = await localDb.getArtifact(artId);
+      if (fullArt) {
+        setIsStudioSheetOpen(false);
+        setSelectedReaderArtifact(fullArt);
+        setIsReaderOpen(true);
+      }
+    } catch (err: any) {
+      console.error("Failed to generate infographic on mobile:", err);
+      await localDb.updateArtifact(artId, {
+        title,
+        status: "error",
+        error: err?.message || "Generation failed",
+      });
+      toast.error(
+        isIndo
+          ? `Gagal membuat infografis: ${err?.message || "Terjadi kesalahan"}`
+          : `Failed to create infographic: ${err?.message || "An error occurred"}`
       );
     }
   };
@@ -2727,14 +2815,17 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
         onClose={() => setIsCreateAudioSummaryOpen(false)}
         sources={sources || []}
         onGenerate={handleGenerateStudioArtifact}
-        onOpenModelsSettings={() => setIsVoiceModelSheetOpen(true)}
+        onOpenModelsSettings={() => {
+          setModelSelectionCategory("voice");
+          setIsModelSelectionSheetOpen(true);
+        }}
       />
 
-      {/* Model Selection Sheet for Voice */}
+      {/* Model Selection Sheet for Voice, Image & LLM */}
       <ModelSelectionSheet
-        open={isVoiceModelSheetOpen}
-        onClose={() => setIsVoiceModelSheetOpen(false)}
-        initialCategory="voice"
+        open={isModelSelectionSheetOpen}
+        onClose={() => setIsModelSelectionSheetOpen(false)}
+        initialCategory={modelSelectionCategory}
       />
 
       {/* Create Presentation Bottom Sheet */}
@@ -2743,6 +2834,18 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
         onClose={() => setIsCreatePresentationOpen(false)}
         sources={sources || []}
         onGenerate={handleGeneratePresentation}
+      />
+
+      {/* Create Infographic Bottom Sheet */}
+      <CreateInfographicSheet
+        open={isCreateInfographicOpen}
+        onClose={() => setIsCreateInfographicOpen(false)}
+        sources={sources || []}
+        onGenerate={handleGenerateInfographic}
+        onOpenModelsSettings={() => {
+          setModelSelectionCategory("image");
+          setIsModelSelectionSheetOpen(true);
+        }}
       />
 
       {/* Interactive Full-Screen Reader Overlay */}

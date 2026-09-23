@@ -9,7 +9,9 @@ import type {
   VideoSummaryScene,
   SlideDeckData,
   SlideItem,
+  InfographicData,
 } from "../db";
+import { generateImage, getActiveImageModel, getStoredImageConfig, type ImageProvider } from "../image";
 import { buildGroundedContext } from "../grounding/context-builder";
 import {
   getStoredVoiceConfig,
@@ -2599,6 +2601,351 @@ ${groundedContext.formattedContext.slice(0, 3000)}`;
   return {
     title: deckData.title,
     data: deckData,
+  };
+}
+
+export interface GenerateInfographicOptions {
+  artifactId?: string;
+  learnId: string;
+  sources: LocalSource[];
+  language?: "id" | "en";
+  orientation: "landscape" | "portrait" | "square";
+  style: string;
+  detailLevel: "brief" | "standard" | "detailed";
+  customDescription?: string;
+  providerId?: string;
+  modelId?: string;
+}
+
+const INFOGRAPHIC_STYLE_DESCRIPTORS: Record<string, { labelId: string; labelEn: string; promptDesc: string }> = {
+  auto: {
+    labelId: "Pilih otomatis",
+    labelEn: "Auto select",
+    promptDesc: "Modern, clean, highly informative visual infographic with structured data visualization cards, elegant layout, balanced hierarchy, and sharp typography.",
+  },
+  kawaii: {
+    labelId: "Kawaii",
+    labelEn: "Kawaii",
+    promptDesc: "Adorable Japanese kawaii aesthetic, cute rounded mascot characters with joyful expressions, pastel rainbow color palette, playful sparkle stars, and charming educational badges.",
+  },
+  clay: {
+    labelId: "Tanah liat",
+    labelEn: "Claymation",
+    promptDesc: "Tactile plasticine claymation art style, handcrafted 3D colorful clay figures, miniature sculpted scene, soft studio clay lighting, subtle matte clay textures, stop-motion animation feel.",
+  },
+  sketch_notes: {
+    labelId: "Catatan Sketsa",
+    labelEn: "Sketch Notes",
+    promptDesc: "Architectural sketchnotes, hand-drawn ink line art, clean notebook doodle annotations, black and white technical diagram style with clean cross-hatching and callout arrows.",
+  },
+  anime: {
+    labelId: "Anime",
+    labelEn: "Anime",
+    promptDesc: "Vibrant Japanese anime dynamic keyframe art style, cinematic high-energy composition, glowing neon accents, sharp mecha lines, dramatic perspective and colorful cel-shading.",
+  },
+  editorial: {
+    labelId: "Editorial",
+    labelEn: "Editorial",
+    promptDesc: "High-end Swiss modernist graphic design, bold minimalist grid composition, elegant editorial magazine poster layout, refined color blocking, sophisticated graphic layout.",
+  },
+  vector: {
+    labelId: "Minimalis Vektor",
+    labelEn: "Vector Minimalist",
+    promptDesc: "Crisp flat minimalist vector infographic art, clean geometric iconography, smooth subtle gradients, modern tech diagram aesthetic, precise lines and clean cards.",
+  },
+  "3d_photorealistic": {
+    labelId: "Fotorealistik 3D",
+    labelEn: "3D Photorealistic",
+    promptDesc: "Photorealistic 3D Octane render, cinematic studio lighting, detailed realistic textures, volumetric light rays, polished materials and depth of field.",
+  },
+  retro_comic: {
+    labelId: "Komik Retro",
+    labelEn: "Retro Comic",
+    promptDesc: "Classic vintage comic book pop-art style, bold halftone dots, dynamic action paneling, Roy Lichtenstein inspired retro print aesthetic with bold ink outlines.",
+  },
+};
+
+export async function generateInfographicArtifact(
+  options: GenerateInfographicOptions
+): Promise<{ title: string; data: InfographicData }> {
+  const {
+    artifactId,
+    learnId,
+    sources = [],
+    language = "id",
+    orientation = "landscape",
+    style = "auto",
+    detailLevel = "standard",
+    customDescription = "",
+    providerId,
+    modelId,
+  } = options;
+
+  const isIndo = language === "id";
+  const primaryTitle = sources[0]?.title || (isIndo ? "Infografis Materi" : "Study Infographic");
+
+  // Determine pixel dimensions and aspect ratio string
+  const dimensions =
+    orientation === "portrait"
+      ? { width: 1024, height: 1792 }
+      : orientation === "square"
+      ? { width: 1024, height: 1024 }
+      : { width: 1792, height: 1024 };
+
+  const sizeStr = `${dimensions.width}x${dimensions.height}`;
+
+  const styleMeta = INFOGRAPHIC_STYLE_DESCRIPTORS[style] || INFOGRAPHIC_STYLE_DESCRIPTORS["auto"] || {
+    labelId: "Pilih otomatis",
+    labelEn: "Auto select",
+    promptDesc: "Modern, clean, highly informative visual infographic with structured data visualization cards, elegant layout, balanced hierarchy, and sharp typography.",
+  };
+  const styleLabel = isIndo ? styleMeta.labelId : styleMeta.labelEn;
+
+  // Build grounded context from study sources
+  const sourceSnippets = sources
+    .map(
+      (s, idx) =>
+        `--- SUMBER [${idx + 1}]: "${s.title || "Untitled"}" ---\n${(s.content || "").slice(0, 3500)}`
+    )
+    .join("\n\n");
+
+  const detailGuideline =
+    detailLevel === "brief"
+      ? "Focus on high-level executive essence, 3 key takeaways, and a bold clean visual focus."
+      : detailLevel === "detailed"
+      ? "Comprehensive data density: detail 5-7 core points, structured sections, multi-dimensional visual layout."
+      : "Standard balanced depth: 4-5 well-structured insights, clear visual hierarchy and clean callout highlights.";
+
+  const systemPrompt = isIndo
+    ? `Anda adalah Art Director & Visual Content Strategist ahli untuk Const Learn.
+Tugas Anda adalah membaca materi sumber belajar dan merancang Infografis visual yang memukau, akurat, dan edukatif.
+Anda harus mengembalikan HANYA sebuah objek JSON dengan struktur:
+{
+  "title": "Judul infografis yang menarik dan informatif",
+  "summary": "Ringkasan intisari materi 2-3 kalimat",
+  "keyPoints": ["Poin kunci 1", "Poin kunci 2", "Poin kunci 3", "Poin kunci 4"],
+  "visualPrompt": "Prompt bahasa Inggris yang sangat deskriptif dan detail untuk image generation model (Flux / SDXL / DALL-E) yang menggambarkan seluruh komposisi infografis, palet warna, elemen grafis, diagram/karakter, dan teks visual yang rapi sesuai gaya yang dipilih."
+}
+Aturan Penting untuk "visualPrompt":
+- WAJIB dalam bahasa Inggris agar kualitas generasi gambar maksimal.
+- Gaya visual yang dipilih: ${styleMeta.promptDesc}
+- Orientasi kanvas: ${orientation} (${dimensions.width}x${dimensions.height} aspect ratio).
+- Instruksi detail: ${detailGuideline}
+${customDescription ? `- Permintaan khusus pengguna: "${customDescription}"` : ""}
+- Jangan sertakan teks lorem ipsum acak. Pastikan prompt meminta tipografi yang tajam dan elemen data/kartu yang tertata rapi.
+Output HANYA JSON valid tanpa teks pendahuluan.`
+    : `You are an expert Art Director and Visual Content Strategist for Const Learn.
+Your task is to analyze study sources and design a stunning, informative, visually rich Infographic.
+Return ONLY a valid JSON object matching:
+{
+  "title": "Engaging, concise title for the infographic",
+  "summary": "2-3 sentence executive summary of the core concepts",
+  "keyPoints": ["Key takeaway 1", "Key takeaway 2", "Key takeaway 3", "Key takeaway 4"],
+  "visualPrompt": "A highly detailed English prompt for an AI image generator (Flux / SDXL / DALL-E) describing the visual layout, infographic cards, diagrams, colors, illustration style, and crisp composition."
+}
+Crucial rules for "visualPrompt":
+- MUST be in English for optimal image generation fidelity.
+- Target visual style: ${styleMeta.promptDesc}
+- Canvas orientation: ${orientation} (${dimensions.width}x${dimensions.height} aspect ratio).
+- Detail guideline: ${detailGuideline}
+${customDescription ? `- User specific styling / focus: "${customDescription}"` : ""}
+- Pure valid JSON only with no markdown wrapping or preamble.`;
+
+  const userPrompt = `Materi Sumber Belajar:\n${sourceSnippets || "Topik: " + primaryTitle}\n\n` +
+    (customDescription ? `Fokus / Deskripsi Tambahan: ${customDescription}\n\n` : "") +
+    `Gaya visual: ${styleLabel}\nOrientasi: ${orientation}\nTingkat detail: ${detailLevel}\n\n` +
+    `Silakan rancang infografis dan kembalikan JSON valid.`;
+
+  // Step 1: Synthesize Content & Visual Prompt via LLM
+  let parsedSynthesis: {
+    title?: string;
+    summary?: string;
+    keyPoints?: string[];
+    visualPrompt?: string;
+  } | null = null;
+
+  const electron = typeof window !== "undefined" ? (window as any).electron : null;
+  if (electron?.agent?.generateCompletion) {
+    try {
+      const activeModel =
+        (typeof localStorage !== "undefined" &&
+          localStorage.getItem("const_learn_active_model")) ||
+        "gemini-3.8-flash";
+
+      const authToken =
+        (typeof localStorage !== "undefined" &&
+          (localStorage.getItem("const_learn_auth_token") ||
+            localStorage.getItem("const_sso_token"))) ||
+        "";
+
+      const res = await electron.agent.generateCompletion({
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        model: activeModel,
+        authToken: authToken || undefined,
+        temperature: 0.3,
+      });
+
+      if (res?.success && res.content) {
+        parsedSynthesis = extractJson(res.content);
+      }
+    } catch (ipcErr) {
+      console.warn("[Infographic] Electron synthesis error:", ipcErr);
+    }
+  }
+
+  if (!parsedSynthesis) {
+    try {
+      const baseUrl = getRouterBaseUrl();
+      const endpoint = baseUrl.endsWith("/chat/completions")
+        ? baseUrl
+        : `${baseUrl.replace(/\/+$/, "")}/chat/completions`;
+
+      const authToken =
+        (typeof localStorage !== "undefined" &&
+          (localStorage.getItem("const_learn_auth_token") ||
+            localStorage.getItem("const_sso_token"))) ||
+        "";
+
+      const apiKey =
+        authToken ||
+        (import.meta as any).env?.VITE_CONST_ROUTER_API_KEY ||
+        (import.meta as any).env?.VITE_CONST_ENGINE_API_KEY ||
+        "";
+
+      const activeModel =
+        (typeof localStorage !== "undefined" &&
+          localStorage.getItem("const_learn_active_model")) ||
+        "gemini-3.8-flash";
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000);
+
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+        },
+        body: JSON.stringify({
+          model: activeModel,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+          ],
+          temperature: 0.3,
+          stream: false,
+        }),
+        signal: controller.signal,
+      }).finally(() => clearTimeout(timeoutId));
+
+      if (response.ok) {
+        const json = await response.json();
+        const content = json.choices?.[0]?.message?.content;
+        if (content) {
+          parsedSynthesis = extractJson(content);
+        }
+      }
+    } catch (httpErr) {
+      console.warn("[Infographic] HTTP router synthesis error:", httpErr);
+    }
+  }
+
+  // Fallbacks if LLM response couldn't be parsed
+  const infoTitle = parsedSynthesis?.title || (isIndo ? `Infografis: ${primaryTitle}` : `Infographic: ${primaryTitle}`);
+  const summary = parsedSynthesis?.summary || (isIndo ? "Visualisasi rangkuman materi pembelajaran terstruktur." : "Structured visual summary of study material.");
+  const keyPoints = Array.isArray(parsedSynthesis?.keyPoints) && parsedSynthesis.keyPoints.length > 0
+    ? parsedSynthesis.keyPoints
+    : [
+        isIndo ? "Intisari konsep utama materi" : "Core concept key takeaways",
+        isIndo ? "Visualisasi komprehensif & terarah" : "Comprehensive targeted visualization",
+        isIndo ? "Analisis mendalam poin penting" : "In-depth breakdown of essential points",
+      ];
+
+  const visualPrompt = parsedSynthesis?.visualPrompt ||
+    `High-resolution infographic poster about ${primaryTitle}, ${styleMeta.promptDesc}, ${detailGuideline}, clean layout, sharp focus, professional graphic design, 8k resolution.`;
+
+  // Step 2: Resolve Image Provider & Model
+  const imageConfig = getStoredImageConfig();
+  let resolvedProvider: ImageProvider | null = null;
+  let resolvedModelId: string = "";
+
+  if (providerId) {
+    resolvedProvider = imageConfig.providers.find((p) => p.id === providerId) || null;
+  }
+  if (!resolvedProvider) {
+    const active = getActiveImageModel();
+    resolvedProvider = active.provider;
+    resolvedModelId = active.model?.id || "";
+  }
+
+  if (modelId) {
+    resolvedModelId = modelId;
+  } else if (!resolvedModelId && resolvedProvider) {
+    resolvedModelId = resolvedProvider.models[0]?.id || "";
+  }
+
+  if (!resolvedProvider) {
+    throw new Error(
+      isIndo
+        ? "Belum ada Provider Model Gambar yang dikonfigurasi. Silakan buka Pengaturan > Model > Image."
+        : "No Image Provider configured. Please configure an Image Provider in Settings > Models > Image."
+    );
+  }
+
+  if (!resolvedModelId) {
+    throw new Error(
+      isIndo
+        ? `Provider "${resolvedProvider.name}" belum memiliki Model ID. Silakan tambahkan model di Pengaturan > Model > Image.`
+        : `Provider "${resolvedProvider.name}" has no Model ID. Please add a model in Settings > Models > Image.`
+    );
+  }
+
+  // Step 3: Call Image Generation Service
+  const imgResult = await generateImage({
+    prompt: visualPrompt,
+    provider: resolvedProvider,
+    modelId: resolvedModelId,
+    size: sizeStr,
+    timeoutMs: 90000, // 90 seconds timeout for high-res generation
+  });
+
+  if (!imgResult.success || !imgResult.imageUrl) {
+    throw new Error(
+      imgResult.error || (isIndo ? "Gagal menghasilkan gambar infografis." : "Failed to generate infographic image.")
+    );
+  }
+
+  const infographicData: InfographicData = {
+    id: artifactId || `info_${Date.now()}`,
+    learnId,
+    title: infoTitle,
+    topic: primaryTitle,
+    imageUrl: imgResult.imageUrl,
+    prompt: customDescription || visualPrompt,
+    visualPrompt,
+    orientation,
+    style,
+    styleLabel,
+    detailLevel,
+    language,
+    summary,
+    keyPoints,
+    dimensions,
+    sourceCount: sources.length,
+    sourceTitles: sources.map((s) => s.title),
+    sourceIds: sources.map((s) => s.id),
+    modelUsed: resolvedModelId,
+    providerUsed: resolvedProvider.name,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  };
+
+  return {
+    title: infographicData.title,
+    data: infographicData,
   };
 }
 

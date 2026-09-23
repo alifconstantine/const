@@ -49,11 +49,12 @@ import { MindMapTab } from "./mind-map-tab";
 import { AudioSummaryViewer } from "./audio-summary-viewer";
 import { VideoSummaryViewer } from "./video-summary-viewer";
 import { PresentationViewer } from "./presentation-viewer";
+import { InfographicViewer } from "./infographic-viewer";
 import { STUDIO_TOOLS } from "../workspace/studio-panel";
 import { useI18n } from "../../lib/i18n";
 import type { RightPaneTab, RightPaneTabType, BrowserSelectedElement } from "./types";
 import type { FileMutationRecord } from "@const/agent";
-import type { LocalArtifact, AudioSummaryData, VideoSummaryData, SlideDeckData } from "../../lib/db";
+import type { LocalArtifact, AudioSummaryData, VideoSummaryData, SlideDeckData, InfographicData } from "../../lib/db";
 
 export interface GeneratingArtifactStatus {
   id: string;
@@ -371,6 +372,34 @@ export function RightPane({
           );
         }
       }
+      if (tab.artifact?.type === "infographic") {
+        const infoData =
+          (tab.artifact.data as InfographicData) ||
+          (() => {
+            try {
+              return typeof tab.artifact.content === "string"
+                ? JSON.parse(tab.artifact.content)
+                : null;
+            } catch {
+              return null;
+            }
+          })();
+        if (infoData) {
+          return (
+            <InfographicViewer
+              artifact={tab.artifact}
+              data={{
+                ...infoData,
+                id: tab.artifact.id || infoData.id,
+                learnId: tab.artifact.learnId || infoData.learnId,
+              }}
+              onExplainInChat={onExplainInChat}
+              onToggleExpand={onToggleCollapse}
+              isExpanded={!isCollapsed}
+            />
+          );
+        }
+      }
       return null;
     }
     if (tab.type === "mind_map") {
@@ -648,7 +677,10 @@ export function RightPane({
                         const isFlashcard = art.type === "flashcard" || art.type === "flashcards";
                         const isVideo = art.type === "video_summary";
                         const isSlides = art.type === "slides";
-                        const defaultGeneratingTitle = isVideo
+                        const isInfographic = art.type === "infographic";
+                        const defaultGeneratingTitle = isInfographic
+                          ? (language === "id" ? "Membuat Infografis..." : "Creating Infographic...")
+                          : isVideo
                           ? (language === "id" ? "Membuat Ringkasan Video..." : "Creating Video Summary...")
                           : isSlides
                           ? (language === "id" ? "Menyusun Presentasi..." : "Creating Presentation...")
@@ -665,7 +697,9 @@ export function RightPane({
                             key={art.id}
                             className={cn(
                               "p-3 rounded-2xl bg-card flex items-center gap-3 select-none animate-pulse shadow-xs border",
-                              isVideo
+                              isInfographic
+                                ? "border-purple-500/30"
+                                : isVideo
                                 ? "border-emerald-500/30"
                                 : isSlides
                                 ? "border-amber-500/30"
@@ -681,7 +715,9 @@ export function RightPane({
                             <div
                               className={cn(
                                 "h-9 w-9 rounded-xl flex items-center justify-center shrink-0 border",
-                                isVideo
+                                isInfographic
+                                  ? "bg-purple-500/10 border-purple-500/20 text-purple-400"
+                                  : isVideo
                                   ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
                                   : isSlides
                                   ? "bg-amber-500/10 border-amber-500/20 text-amber-400"
@@ -697,7 +733,9 @@ export function RightPane({
                               <RotateCw
                                 className={cn(
                                   "h-4 w-4 animate-spin",
-                                  isVideo
+                                  isInfographic
+                                    ? "text-purple-400"
+                                    : isVideo
                                     ? "text-emerald-400"
                                     : isSlides
                                     ? "text-amber-400"
@@ -745,6 +783,7 @@ export function RightPane({
                       const isMindMap = art.type === "mind_map";
                       const isSlides = art.type === "slides";
                       const isVideo = art.type === "video_summary";
+                      const isInfographic = art.type === "infographic";
                       const itemCount = isQuiz && art.data?.questions
                         ? art.data.questions.length
                         : isFlashcard && art.data?.cards
@@ -766,6 +805,8 @@ export function RightPane({
                           : null
                         : isMindMap
                         ? (language === "id" ? "Peta Konsep" : "Concept Map")
+                        : isInfographic
+                        ? (art.data?.styleLabel || (language === "id" ? "Poster Visual" : "Visual Poster"))
                         : null;
 
                       const handleOpenThis = () => {

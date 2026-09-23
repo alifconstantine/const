@@ -47,6 +47,7 @@ import { CreateMindMapDialog } from "./create-mind-map-dialog";
 import { CreateAudioSummaryDialog } from "./create-audio-summary-dialog";
 import { CreateVideoSummaryDialog } from "./create-video-summary-dialog";
 import { CreatePresentationDialog } from "./create-presentation-dialog";
+import { CreateInfographicDialog } from "./create-infographic-dialog";
 import { WorkspaceTitle } from "./workspace-title";
 import { SettingsView } from "../settings/settings-view";
 import { ErrorBoundary } from "../ui/error-boundary";
@@ -57,6 +58,7 @@ import {
   generateStudioArtifact,
   generateVideoSummaryArtifact,
   generatePresentationArtifact,
+  generateInfographicArtifact,
 } from "../../lib/studio/generator";
 import type { FileMutationRecord } from "@const/agent";
 import type { LocalArtifact } from "../../lib/db";
@@ -137,6 +139,7 @@ export function LearnWorkspace({
   const [isCreateAudioSummaryOpen, setIsCreateAudioSummaryOpen] = useState(false);
   const [isCreateVideoOpen, setIsCreateVideoOpen] = useState(false);
   const [isCreatePresentationOpen, setIsCreatePresentationOpen] = useState(false);
+  const [isCreateInfographicOpen, setIsCreateInfographicOpen] = useState(false);
   const [generatingArtifacts, setGeneratingArtifacts] = useState<GeneratingArtifactStatus[]>([]);
 
   // Right Pane: Dual Studio & Preview/Review state
@@ -838,6 +841,83 @@ export function LearnWorkspace({
     }
   };
 
+  const handleGenerateInfographic = async (params: {
+    selectedSourceIds: string[];
+    language: "id" | "en";
+    orientation: "landscape" | "portrait" | "square";
+    style: string;
+    detailLevel: "brief" | "standard" | "detailed";
+    customDescription?: string;
+    providerId?: string;
+    modelId?: string;
+  }) => {
+    if (!learnId) return;
+
+    const selectedSources = (sources || []).filter((s) =>
+      params.selectedSourceIds.includes(s.id)
+    );
+    if (selectedSources.length === 0) return;
+
+    const isIndo = params.language === "id";
+    const title = isIndo ? "Infografis Materi" : "Study Infographic";
+
+    // 1. Create generating artifact in Dexie
+    const artId = await localDb.createArtifact({
+      learnId,
+      title: isIndo ? "Membuat Infografis..." : "Creating Infographic...",
+      type: "infographic",
+      status: "generating",
+      sourcesCount: selectedSources.length,
+      content: "",
+    });
+
+    setIsStudioCollapsed(false);
+    setRightPaneMode("studio");
+
+    try {
+      const result = await generateInfographicArtifact({
+        artifactId: artId,
+        learnId,
+        sources: selectedSources,
+        language: params.language,
+        orientation: params.orientation,
+        style: params.style,
+        detailLevel: params.detailLevel,
+        customDescription: params.customDescription,
+        providerId: params.providerId,
+        modelId: params.modelId,
+      });
+
+      await localDb.updateArtifact(artId, {
+        title: result.title || title,
+        data: result.data,
+        content: JSON.stringify(result.data),
+        status: "completed",
+      });
+
+      toast.success(
+        isIndo ? "Infografis berhasil dibuat!" : "Infographic created successfully!"
+      );
+
+      const fullArt = await localDb.getArtifact(artId);
+      if (fullArt) {
+        handleOpenStudioArtifact(fullArt);
+      }
+    } catch (err: any) {
+      console.error("Failed to generate infographic:", err);
+      await localDb.updateArtifact(artId, {
+        title,
+        status: "error",
+        error: err?.message || "Generation failed",
+      });
+      toast.error(
+        isIndo
+          ? `Gagal membuat infografis: ${err?.message || "Terjadi kesalahan"}`
+          : `Failed to create infographic: ${err?.message || "An error occurred"}`
+      );
+    }
+  };
+
   const handleSelectStudioTool = (toolId: string) => {
     if (toolId === "browser") {
       handleOpenBrowser();
@@ -860,6 +940,8 @@ export function LearnWorkspace({
       setIsCreateVideoOpen(true);
     } else if (toolId === "slides" || toolId === "presentation") {
       setIsCreatePresentationOpen(true);
+    } else if (toolId === "infographic") {
+      setIsCreateInfographicOpen(true);
     } else {
       return;
     }
@@ -873,12 +955,14 @@ export function LearnWorkspace({
       art.type === "audio_summary" ||
       art.type === "video_summary" ||
       art.type === "slides" ||
+      art.type === "infographic" ||
       art.data?.questions ||
       art.data?.cards ||
       art.data?.root ||
       art.data?.script ||
       art.data?.scenes ||
-      art.data?.slides
+      art.data?.slides ||
+      art.data?.imageUrl
     ) {
       handleOpenStudioArtifact(art);
       return;
@@ -1667,6 +1751,18 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
         onOpenChange={setIsCreatePresentationOpen}
         sources={sources || []}
         onGenerate={handleGeneratePresentation}
+      />
+
+      {/* Dedicated Create Infographic Dialog */}
+      <CreateInfographicDialog
+        open={isCreateInfographicOpen}
+        onOpenChange={setIsCreateInfographicOpen}
+        sources={sources || []}
+        onGenerate={handleGenerateInfographic}
+        onOpenImageSettings={() => {
+          setSettingsInitialTab("models");
+          setIsSettingsOpen(true);
+        }}
       />
 
       {/* Settings Modal / Overlay */}

@@ -1,4 +1,4 @@
-import type { ImageConfigState, ImageProvider, ImageProtocol } from "./types";
+import type { ImageConfigState, ImageProvider, ImageProtocol, ImageModel } from "./types";
 
 const STORAGE_KEY_IMAGE_PROVIDERS = "const_learn_image_providers";
 const STORAGE_KEY_ACTIVE_IMAGE_PROVIDER = "const_learn_active_image_provider";
@@ -82,4 +82,34 @@ export function saveStoredImageConfig(state: Partial<ImageConfigState>): void {
         .catch((err: any) => console.warn("[ImageStorage] Failed to sync to Electron:", err));
     } catch {}
   }
+}
+
+/**
+ * Returns the currently active image provider and model,
+ * falling back to the first available if not explicitly set.
+ */
+export function getActiveImageModel(): {
+  provider: ImageProvider | null;
+  model: ImageModel | null;
+} {
+  const config = getStoredImageConfig();
+  if (!config.providers || config.providers.length === 0) {
+    return { provider: null, model: null };
+  }
+
+  const provider =
+    config.providers.find((p) => p.id === config.activeProviderId) ||
+    config.providers[0] ||
+    null;
+
+  if (!provider) {
+    return { provider: null, model: null };
+  }
+
+  const model =
+    provider.models.find((m) => m.id === config.activeModelId) ||
+    provider.models[0] ||
+    null;
+
+  return { provider, model };
 }
