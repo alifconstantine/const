@@ -55,6 +55,7 @@ import {
 import { LearnCard, LearnItem } from "./learn-card";
 import { CollectionCard, CollectionItem } from "./collection-card";
 import { ModuleIcon, getModuleIconDef, getModuleIconLabel } from "./module-icon";
+import { LearnIcon } from "./learn-icon";
 import { CreateCard } from "./create-card";
 import { RecentlyViewedCard } from "./recently-viewed-card";
 import { Sidebar, HomeNavTab } from "./sidebar";
@@ -362,6 +363,15 @@ export function LearnHome({
   // Recently Viewed Learns (Top 5 most recent)
   const recentlyViewedLearns = useMemo(() => {
     return allLearns.slice(0, 5);
+  }, [allLearns]);
+
+  // Lookup map of learnId -> LocalLearn (for parent learn info in cards)
+  const learnsMap = useMemo(() => {
+    const map = new Map<string, LocalLearn>();
+    for (const l of allLearns) {
+      map.set(l.id, l);
+    }
+    return map;
   }, [allLearns]);
 
   // Active collection object when drilled down
@@ -1521,6 +1531,7 @@ export function LearnHome({
                     {artifacts.map((art) => {
                       const config = getArtifactConfig(art.type, art.isZip);
                       const Icon = config.icon;
+                      const parentLearn = art.learnId ? learnsMap.get(art.learnId) : undefined;
 
                       return (
                         <div
@@ -1531,18 +1542,20 @@ export function LearnHome({
                             }
                           }}
                           className={cn(
-                            "p-4 rounded-2xl border border-border bg-card hover:border-foreground/20 hover:bg-secondary/40 transition-all flex flex-col justify-between shadow-none",
-                            art.learnId && onOpenLearn && "cursor-pointer group"
+                            "min-h-[170px] w-full p-5 rounded-2xl border transition-all flex flex-col justify-between select-none shadow-none relative",
+                            art.learnId && onOpenLearn
+                              ? "border-border hover:border-foreground/20 bg-card hover:bg-secondary/70 cursor-pointer group"
+                              : "border-border bg-card"
                           )}
                         >
                           <div className="flex items-start justify-between">
                             <div
                               className={cn(
-                                "h-9 w-9 rounded-xl border flex items-center justify-center shrink-0",
+                                "h-10 w-10 rounded-xl border flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform",
                                 config.bgClass
                               )}
                             >
-                              <Icon className={cn("h-4 w-4", config.iconColor)} />
+                              <Icon className={cn("h-5 w-5", config.iconColor)} />
                             </div>
                             <button
                               type="button"
@@ -1557,21 +1570,37 @@ export function LearnHome({
                             </button>
                           </div>
 
-                          <div className="my-3">
-                            <h4 className="text-sm font-medium text-card-foreground line-clamp-2 group-hover:text-foreground">
+                          <div className="space-y-1.5 my-2.5">
+                            <h4
+                              className="text-sm font-medium text-foreground truncate group-hover:text-primary transition-colors"
+                              title={art.title}
+                            >
                               {art.title}
                             </h4>
-                            <span className="inline-block mt-1 text-[10px] uppercase font-mono px-2 py-0.5 rounded bg-secondary text-muted-foreground border border-border">
-                              {art.type.replace(/_/g, " ")}
-                            </span>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="inline-flex items-center text-[10px] uppercase font-mono px-2 py-0.5 rounded-md bg-secondary text-muted-foreground border border-border/60">
+                                {art.type.replace(/_/g, " ")}
+                              </span>
+                              {parentLearn && (
+                                <span
+                                  className="inline-flex items-center gap-1.5 text-[11px] font-medium px-2 py-0.5 rounded-md bg-secondary/80 border border-border/70 text-muted-foreground hover:text-foreground transition-colors max-w-[170px] truncate"
+                                  title={parentLearn.title}
+                                >
+                                  <LearnIcon icon={parentLearn.emoji} className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+                                  <span className="truncate">{parentLearn.title}</span>
+                                </span>
+                              )}
+                            </div>
                           </div>
 
-                          <div className="text-[11px] text-muted-foreground pt-1">
-                            {new Intl.DateTimeFormat(language === "id" ? "id-ID" : "en-US", {
-                              day: "numeric",
-                              month: "short",
-                              year: "numeric",
-                            }).format(new Date(art.updatedAt))}
+                          <div className="flex items-center justify-between text-xs text-muted-foreground pt-3 border-t border-border/40 font-mono text-[11px]">
+                            <span>
+                              {new Intl.DateTimeFormat(language === "id" ? "id-ID" : "en-US", {
+                                day: "numeric",
+                                month: "short",
+                                year: "numeric",
+                              }).format(new Date(art.updatedAt))}
+                            </span>
                           </div>
                         </div>
                       );

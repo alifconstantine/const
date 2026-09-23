@@ -41,11 +41,22 @@ import {
   Clock,
   Rows3,
   ChevronDown,
+  Package,
+  Presentation,
+  SquarePen,
+  HelpCircle,
+  GitFork,
+  AudioLines,
+  Video,
+  BarChart3,
+  Table2,
+  Layers,
 } from "lucide-react";
 
 import { LearnCard, LearnItem } from "./learn-card";
 import { CollectionCard, CollectionItem } from "./collection-card";
 import { ModuleIcon, getModuleIconDef, getModuleIconLabel } from "./module-icon";
+import { LearnIcon } from "./learn-icon";
 import { SourcesView } from "./sources-view";
 import { CreateLearnDialog } from "./dialogs/create-learn-dialog";
 import { CreateCollectionDialog } from "./dialogs/create-collection-dialog";
@@ -71,6 +82,101 @@ interface LearnHomeProps {
   user?: UserProfile | null;
   onSignOut?: () => void;
   onSwitchAccount?: () => void;
+}
+
+interface ArtifactConfig {
+  icon: React.ElementType;
+  iconColor: string;
+  bgClass: string;
+}
+
+function getArtifactConfig(type: string, isZip?: boolean): ArtifactConfig {
+  if (isZip) {
+    return {
+      icon: Package,
+      iconColor: "text-orange-600 dark:text-[#fb923c]",
+      bgClass: "bg-orange-500/10 border-orange-500/20",
+    };
+  }
+
+  const normalized = (type || "").toLowerCase().trim();
+
+  switch (normalized) {
+    case "slide":
+    case "slides":
+      return {
+        icon: Presentation,
+        iconColor: "text-amber-600 dark:text-[#fde047]",
+        bgClass: "bg-amber-500/10 border-amber-500/20",
+      };
+    case "note":
+    case "notes":
+      return {
+        icon: SquarePen,
+        iconColor: "text-blue-600 dark:text-[#60a5fa]",
+        bgClass: "bg-blue-500/10 border-blue-500/20",
+      };
+    case "quiz":
+      return {
+        icon: HelpCircle,
+        iconColor: "text-teal-600 dark:text-[#5eead4]",
+        bgClass: "bg-teal-500/10 border-teal-500/20",
+      };
+    case "flashcard":
+    case "flashcards":
+      return {
+        icon: BookOpen,
+        iconColor: "text-emerald-600 dark:text-[#86efac]",
+        bgClass: "bg-emerald-500/10 border-emerald-500/20",
+      };
+    case "mind_map":
+    case "mindmap":
+    case "diagram":
+      return {
+        icon: GitFork,
+        iconColor: "text-pink-600 dark:text-[#f472b6]",
+        bgClass: "bg-pink-500/10 border-pink-500/20",
+      };
+    case "audio_summary":
+    case "audio":
+      return {
+        icon: AudioLines,
+        iconColor: "text-indigo-600 dark:text-[#a5b4fc]",
+        bgClass: "bg-indigo-500/10 border-indigo-500/20",
+      };
+    case "video_summary":
+    case "video":
+      return {
+        icon: Video,
+        iconColor: "text-emerald-600 dark:text-[#86efac]",
+        bgClass: "bg-emerald-500/10 border-emerald-500/20",
+      };
+    case "report":
+      return {
+        icon: FileText,
+        iconColor: "text-stone-600 dark:text-[#dedac2]",
+        bgClass: "bg-stone-500/10 border-stone-500/20",
+      };
+    case "infographic":
+      return {
+        icon: BarChart3,
+        iconColor: "text-purple-600 dark:text-[#c084fc]",
+        bgClass: "bg-purple-500/10 border-purple-500/20",
+      };
+    case "data_table":
+    case "table":
+      return {
+        icon: Table2,
+        iconColor: "text-sky-600 dark:text-[#38bdf8]",
+        bgClass: "bg-sky-500/10 border-sky-500/20",
+      };
+    default:
+      return {
+        icon: Layers,
+        iconColor: "text-muted-foreground",
+        bgClass: "bg-secondary border-border",
+      };
+  }
 }
 
 export function LearnHome({
@@ -297,6 +403,20 @@ export function LearnHome({
   const learns = useMemo(() => learnsData ?? [], [learnsData]);
   const collections = useMemo(() => collectionsData ?? [], [collectionsData]);
   const artifacts = useMemo(() => artifactsData ?? [], [artifactsData]);
+
+  const rawAllLearns = useLiveQuery(async () => {
+    return await db.learns.toArray();
+  });
+  const allLearns = useMemo(() => rawAllLearns ?? [], [rawAllLearns]);
+
+  // Lookup map of learnId -> LocalLearn (for parent learn info in cards)
+  const learnsMap = useMemo(() => {
+    const map = new Map<string, LocalLearn>();
+    for (const l of allLearns) {
+      map.set(l.id, l);
+    }
+    return map;
+  }, [allLearns]);
 
   // Filtered and sorted collections based on search and sort preferences
   const filteredCollections = useMemo(() => {
@@ -1348,48 +1468,86 @@ export function LearnHome({
 
             {artifacts.length > 0 ? (
               <div className="space-y-2">
-                {artifacts.map((art) => (
-                  <div
-                    key={art.id}
-                    className="p-3.5 rounded-2xl border border-border/80 bg-card hover:bg-secondary/60 active:scale-[0.99] transition-all duration-200 flex flex-col justify-between select-none shadow-2xs"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="h-8 w-8 rounded-xl bg-secondary border border-border/60 flex items-center justify-center text-base shrink-0">
-                        {art.type === "slide" ? "📊" : art.type === "diagram" ? "📐" : "⚡"}
+                {artifacts.map((art) => {
+                  const config = getArtifactConfig(art.type, art.isZip);
+                  const Icon = config.icon;
+                  const parentLearn = art.learnId ? learnsMap.get(art.learnId) : undefined;
+
+                  return (
+                    <div
+                      key={art.id}
+                      onClick={() => {
+                        if (art.learnId && onOpenLearn) {
+                          onOpenLearn(art.learnId);
+                        }
+                      }}
+                      className={cn(
+                        "p-3.5 rounded-2xl border border-border/80 bg-card hover:bg-secondary/60 active:scale-[0.99] transition-all duration-200 flex flex-col justify-between select-none shadow-2xs",
+                        art.learnId && onOpenLearn && "cursor-pointer group"
+                      )}
+                    >
+                      <div className="flex items-start justify-between">
+                        <div
+                          className={cn(
+                            "h-9 w-9 rounded-xl border flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform",
+                            config.bgClass
+                          )}
+                        >
+                          <Icon className={cn("h-4 w-4", config.iconColor)} />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            localDb.deleteArtifact(art.id);
+                          }}
+                          className="h-7 w-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-destructive active:text-destructive cursor-pointer transition-colors"
+                          title={t("deleteArtifact")}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => localDb.deleteArtifact(art.id)}
-                        className="h-7 w-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-destructive active:text-destructive cursor-pointer transition-colors"
-                        title={t("deleteArtifact")}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </div>
 
-                    <div className="my-2">
-                      <h4 className="text-xs font-medium text-foreground line-clamp-2">
-                        {art.title}
-                      </h4>
-                      <span className="inline-block mt-1 text-[9px] uppercase font-mono px-1.5 py-0.5 rounded-full bg-secondary border border-border/60 text-muted-foreground">
-                        {art.type}
-                      </span>
-                    </div>
+                      <div className="space-y-1.5 my-2.5">
+                        <h4
+                          className="text-sm font-medium text-foreground truncate leading-snug group-hover:text-primary transition-colors"
+                          title={art.title}
+                        >
+                          {art.title}
+                        </h4>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="inline-flex items-center text-[9px] uppercase font-mono px-2 py-0.5 rounded-md bg-secondary border border-border/60 text-muted-foreground">
+                            {art.type.replace(/_/g, " ")}
+                          </span>
+                          {parentLearn && (
+                            <span
+                              className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md bg-secondary/80 border border-border/60 text-muted-foreground max-w-[180px] truncate"
+                              title={parentLearn.title}
+                            >
+                              <LearnIcon icon={parentLearn.emoji} className="w-3 h-3 shrink-0 text-muted-foreground" />
+                              <span className="truncate">{parentLearn.title}</span>
+                            </span>
+                          )}
+                        </div>
+                      </div>
 
-                    <div className="text-[10px] text-muted-foreground pt-1.5">
-                      {new Intl.DateTimeFormat(language === "id" ? "id-ID" : "en-US", {
-                        day: "numeric",
-                        month: "short",
-                        year: "numeric",
-                      }).format(new Date(art.updatedAt))}
+                      <div className="text-[10px] text-muted-foreground pt-2 border-t border-border/40 flex items-center justify-between font-mono">
+                        <span>
+                          {new Intl.DateTimeFormat(language === "id" ? "id-ID" : "en-US", {
+                            day: "numeric",
+                            month: "short",
+                            year: "numeric",
+                          }).format(new Date(art.updatedAt))}
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             ) : (
               <div className="text-center py-14 px-4 border border-dashed border-border/80 rounded-2xl bg-card">
-                <div className="h-10 w-10 rounded-xl bg-secondary border border-border/60 flex items-center justify-center text-xl mx-auto mb-2">
-                  🎨
+                <div className="h-10 w-10 rounded-xl bg-secondary border border-border/60 flex items-center justify-center text-muted-foreground mx-auto mb-2">
+                  <Layers className="h-5 w-5" />
                 </div>
                 <h3 className="font-sans text-sm text-foreground font-semibold">
                   {t("noArtifactsTitle")}
