@@ -480,8 +480,8 @@ app.on("second-instance", (_event, commandLine) => {
         ? false
         : {
             color: isDark ? "#161616" : "#f3f3f3",
-            symbolColor: isDark ? "#d4d4d4" : "#374151",
-            height: 30,
+            symbolColor: isDark ? "#a1a1aa" : "#52525b",
+            height: 36,
           },
       show: true,
       webPreferences: {
@@ -507,8 +507,8 @@ app.on("second-instance", (_event, commandLine) => {
           try {
             win.setTitleBarOverlay?.({
               color: dark ? "#161616" : "#f3f3f3",
-              symbolColor: dark ? "#d4d4d4" : "#374151",
-              height: 30,
+              symbolColor: dark ? "#a1a1aa" : "#52525b",
+              height: 36,
             });
           } catch {}
         }

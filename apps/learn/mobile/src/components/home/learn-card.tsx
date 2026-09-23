@@ -10,6 +10,7 @@ import {
 import { MoreVertical, FolderPlus, FolderMinus, Edit3, Trash2, ExternalLink } from "lucide-react";
 import { LocalLearn } from "../../lib/db";
 import { useI18n } from "../../lib/i18n";
+import { LearnIcon } from "./learn-icon";
 
 export type LearnItem = LocalLearn;
 
@@ -90,8 +91,8 @@ export function LearnCard({
               />
             </div>
           ) : (
-            <div className="h-10 w-10 rounded-xl bg-secondary/80 flex items-center justify-center text-xl shrink-0 border border-border/60 shadow-2xs">
-              {learn.emoji || "🚀"}
+            <div className="h-10 w-10 rounded-xl bg-secondary/80 flex items-center justify-center shrink-0 border border-border/60 text-foreground shadow-2xs">
+              <LearnIcon icon={learn.emoji} className="w-5 h-5 text-foreground/90" />
             </div>
           )}
           <div className="min-w-0 flex-1">
@@ -172,8 +173,8 @@ export function LearnCard({
     >
       {/* Top */}
       <div className="flex items-start justify-between">
-        <div className="h-9 w-9 rounded-xl bg-secondary/80 border border-border/60 flex items-center justify-center text-lg shadow-2xs shrink-0">
-          {learn.emoji || "🚀"}
+        <div className="h-9 w-9 rounded-xl bg-secondary/80 border border-border/60 flex items-center justify-center text-foreground shadow-2xs shrink-0">
+          <LearnIcon icon={learn.emoji} className="w-4 h-4 text-foreground/90" />
         </div>
 
         {isSelectionMode ? (

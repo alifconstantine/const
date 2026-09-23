@@ -637,7 +637,7 @@ export function LearnHome({
           detail.folderPath.split(/[\\/]/).filter(Boolean).pop() || t("untitledNotebook");
         const newId = await localDb.createLearn({
           title: folderName,
-          emoji: "📁",
+          emoji: "folder",
           projectPath: detail.folderPath,
           permissionMode: "ask_before_changes",
         });

@@ -10,6 +10,7 @@ import {
 import { MoreVertical, FolderPlus, FolderMinus, Edit3, Trash2, ExternalLink } from "lucide-react";
 import { LocalLearn } from "../../lib/db";
 import { useI18n } from "../../lib/i18n";
+import { LearnIcon } from "./learn-icon";
 
 export type LearnItem = LocalLearn;
 
@@ -86,8 +87,8 @@ export function LearnCard({
               />
             </div>
           ) : (
-            <div className="h-9 w-9 rounded-xl bg-secondary flex items-center justify-center text-lg shrink-0 border border-border">
-              {learn.emoji || "🚀"}
+            <div className="h-9 w-9 rounded-xl bg-secondary/80 flex items-center justify-center shrink-0 border border-border/50 text-foreground shadow-2xs">
+              <LearnIcon icon={learn.emoji} className="w-4 h-4 text-foreground/90" />
             </div>
           )}
           <div className="min-w-0 flex-1">
@@ -173,10 +174,10 @@ export function LearnCard({
           : "border-border hover:border-foreground/20 bg-card hover:bg-secondary/70"
       }`}
     >
-      {/* Top row: Squircle emoji & Menu / Selection Checkbox */}
+      {/* Top row: Squircle icon & Menu / Selection Checkbox */}
       <div className="flex items-start justify-between">
-        <div className="h-10 w-10 rounded-xl bg-secondary border border-border flex items-center justify-center text-xl group-hover:scale-105 transition-transform shrink-0">
-          {learn.emoji || "🚀"}
+        <div className="h-10 w-10 rounded-xl bg-secondary/80 border border-border/60 flex items-center justify-center text-foreground shadow-2xs group-hover:scale-105 group-hover:border-foreground/30 transition-all shrink-0">
+          <LearnIcon icon={learn.emoji} className="w-5 h-5 text-foreground/90" />
         </div>
 
         {isSelectionMode ? (

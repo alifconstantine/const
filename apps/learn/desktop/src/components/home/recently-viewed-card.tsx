@@ -2,6 +2,7 @@ import React from "react";
 import { LocalLearn } from "../../lib/db";
 import { BookOpen } from "lucide-react";
 import { useI18n } from "../../lib/i18n";
+import { LearnIcon } from "./learn-icon";
 
 interface RecentlyViewedCardProps {
   learn: LocalLearn;
@@ -46,8 +47,8 @@ export function RecentlyViewedCard({ learn, onClick }: RecentlyViewedCardProps) 
       className="min-w-[170px] max-w-[240px] flex-1 p-3 rounded-xl border border-border bg-card hover:bg-secondary/60 hover:border-foreground/20 transition-all cursor-pointer group flex flex-col justify-between select-none shadow-none"
     >
       <div className="flex items-center justify-between gap-2 mb-2.5">
-        <div className="w-8 h-8 rounded-lg bg-secondary border border-border flex items-center justify-center text-base shrink-0 group-hover:scale-105 transition-transform">
-          {learn.emoji || "📘"}
+        <div className="w-8 h-8 rounded-lg bg-secondary/80 border border-border/60 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform text-foreground">
+          <LearnIcon icon={learn.emoji} className="w-4 h-4 text-foreground/90" />
         </div>
         <span className="text-[10px] font-mono text-muted-foreground shrink-0">
           {relativeTime}

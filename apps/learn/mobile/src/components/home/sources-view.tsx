@@ -27,6 +27,7 @@ import { db, localDb, type LocalSource, type LocalLearn } from "../../lib/db";
 import { useI18n } from "../../lib/i18n";
 import { DeleteConfirmDialog } from "./dialogs/delete-confirm-dialog";
 import { SourcePreviewDialog } from "../workspace/source-preview-dialog";
+import { LearnIcon } from "./learn-icon";
 
 export interface SourcesViewProps {
   onAddSource?: () => void;
@@ -280,7 +281,7 @@ export function SourcesView({
     setIsAddSourceModalOpen(false);
     const newId = await localDb.createLearn({
       title: t("untitledNotebook"),
-      emoji: "📘",
+      emoji: "book",
     });
     onOpenLearn?.(newId, true);
   };
@@ -387,7 +388,7 @@ export function SourcesView({
                 className="font-medium px-2 py-0.5 rounded-md bg-secondary border border-border/70 text-foreground hover:bg-secondary/80 hover:border-border transition-colors cursor-pointer flex items-center gap-1.5 shrink-0 max-w-[170px] truncate active:scale-95"
                 title={workspaceTitle}
               >
-                <span className="shrink-0">{workspaceEmoji}</span>
+                <LearnIcon icon={workspace?.emoji} className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
                 <span className="truncate">{workspaceTitle}</span>
               </button>
             )}
@@ -490,7 +491,7 @@ export function SourcesView({
                       : "bg-secondary/70 border-border/70 text-muted-foreground hover:text-foreground hover:bg-secondary active:scale-95"
                   }`}
                 >
-                  <span>{ws.emoji || "📘"}</span>
+                  <LearnIcon icon={ws.emoji} className="w-3.5 h-3.5 shrink-0" />
                   <span className="max-w-[120px] truncate">{ws.title}</span>
                   <span className="text-[10px] opacity-75 font-mono">
                     {ws.sourcesInDb}
@@ -554,7 +555,7 @@ export function SourcesView({
               {/* Workspace Header */}
               <div className="flex items-center justify-between px-1 py-1 text-xs">
                 <div className="flex items-center gap-2">
-                  <span className="text-base">{workspace.emoji || "📘"}</span>
+                  <LearnIcon icon={workspace.emoji} className="w-4 h-4 shrink-0 text-foreground/90" />
                   <span className="font-semibold text-foreground truncate max-w-[180px] sm:max-w-xs">
                     {workspace.title}
                   </span>
@@ -627,7 +628,9 @@ export function SourcesView({
                   className="w-full px-3.5 py-2.5 rounded-xl border border-border hover:border-border/80 bg-secondary/40 hover:bg-secondary active:bg-secondary/90 transition-all flex items-center justify-between text-left cursor-pointer group select-none"
                 >
                   <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                    <span className="text-lg shrink-0">{l.emoji || "📘"}</span>
+                    <div className="w-7 h-7 rounded-lg bg-secondary/80 border border-border/50 flex items-center justify-center shrink-0 text-foreground">
+                      <LearnIcon icon={l.emoji} className="w-4 h-4 text-foreground/90" />
+                    </div>
                     <div className="min-w-0 flex-1">
                       <p className="text-xs font-medium text-foreground truncate">
                         {l.title}

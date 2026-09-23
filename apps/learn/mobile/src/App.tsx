@@ -58,7 +58,7 @@ function AuthenticatedContent({
         onCreateNew={async () => {
           const id = await localDb.createLearn({
             title: t("untitledNotebook"),
-            emoji: "📘",
+            emoji: "book",
           });
           setActiveLearnId(id);
           setOpenAddSourceOnLoad(false);

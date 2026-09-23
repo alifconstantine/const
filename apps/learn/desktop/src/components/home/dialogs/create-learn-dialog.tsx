@@ -10,11 +10,7 @@ import {
 } from "@const/ui";
 import { BookOpen, Check, Folder, FolderOpen, Hand, ShieldAlert, X } from "lucide-react";
 import { useI18n } from "../../../lib/i18n";
-
-const EMOJI_OPTIONS = [
-  "🚀", "🧠", "💡", "🎨", "🏆", "📚", "💻", "🔬",
-  "📐", "⚡", "🌐", "📝", "🧬", "🪐", "🎯", "🤖"
-];
+import { LEARN_ICONS, LEGACY_EMOJI_TO_LEARN_ICON } from "../learn-icon";
 
 interface CreateLearnDialogProps {
   open: boolean;
@@ -47,8 +43,13 @@ export function CreateLearnDialog({
   initialData,
   onSubmit,
 }: CreateLearnDialogProps) {
+  const getInitialIcon = (raw?: string) => {
+    if (!raw) return "book";
+    return LEGACY_EMOJI_TO_LEARN_ICON[raw] || raw;
+  };
+
   const [title, setTitle] = useState(initialData?.title ?? "");
-  const [selectedEmoji, setSelectedEmoji] = useState(initialData?.emoji ?? "🚀");
+  const [selectedEmoji, setSelectedEmoji] = useState(getInitialIcon(initialData?.emoji));
   const [selectedCollectionId, setSelectedCollectionId] = useState<string | undefined>(
     initialData?.collectionIds?.[0]
   );
@@ -61,7 +62,7 @@ export function CreateLearnDialog({
   React.useEffect(() => {
     if (open) {
       setTitle(initialData?.title ?? "");
-      setSelectedEmoji(initialData?.emoji ?? "🚀");
+      setSelectedEmoji(getInitialIcon(initialData?.emoji));
       setSelectedCollectionId(initialData?.collectionIds?.[0]);
       setProjectPath(initialData?.projectPath ?? "");
       setPermissionMode(initialData?.permissionMode ?? "ask_before_changes");
@@ -105,7 +106,7 @@ export function CreateLearnDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-full max-w-[440px] p-5 rounded-2xl border border-border/80 bg-card text-card-foreground shadow-2xl overflow-hidden">
+      <DialogContent className="w-full max-w-[440px] p-5 rounded-2xl border border-border/80 bg-card text-card-foreground shadow-2xl overflow-hidden outline-none focus:outline-none focus-visible:outline-none ring-0 focus-visible:ring-0">
         <form onSubmit={handleSubmit} className="space-y-3.5 w-full min-w-0">
           <DialogHeader className="pb-0.5">
             <DialogTitle className="font-serif text-base font-medium tracking-tight text-foreground flex items-center gap-2">
@@ -114,26 +115,32 @@ export function CreateLearnDialog({
             </DialogTitle>
           </DialogHeader>
 
-          {/* Emoji Picker */}
+          {/* Clean Modern Icon Selector (8 cols x 2 rows) */}
           <div>
             <label className="text-[12px] font-medium text-muted-foreground mb-1.5 block">
-              {t("pickIconEmoji")}
+              {t("learnIcon") || t("pickIconEmoji")}
             </label>
-            <div className="grid grid-cols-8 gap-1 p-1.5 rounded-xl bg-secondary/40 border border-border/60 w-full justify-items-center">
-              {EMOJI_OPTIONS.map((emoji) => (
-                <button
-                  key={emoji}
-                  type="button"
-                  onClick={() => setSelectedEmoji(emoji)}
-                  className={`h-8 w-8 rounded-lg flex items-center justify-center text-sm transition-all cursor-pointer ${
-                    selectedEmoji === emoji
-                      ? "bg-background border border-primary shadow-xs"
-                      : "hover:bg-background/60"
-                  }`}
-                >
-                  {emoji}
-                </button>
-              ))}
+            <div className="grid grid-cols-8 gap-1.5 p-2 rounded-xl bg-secondary/40 border border-border/60 w-full justify-items-center">
+              {LEARN_ICONS.map((item) => {
+                const IconComponent = item.icon;
+                const isSelected = selectedEmoji === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setSelectedEmoji(item.id)}
+                    className={`h-8 w-8 rounded-lg flex items-center justify-center transition-all cursor-pointer ${
+                      isSelected
+                        ? "bg-foreground text-background shadow-xs scale-105"
+                        : "text-muted-foreground hover:text-foreground hover:bg-secondary border border-transparent hover:border-border/50"
+                    }`}
+                    title={item.label}
+                    aria-label={item.label}
+                  >
+                    <IconComponent className="h-4 w-4" />
+                  </button>
+                );
+              })}
             </div>
           </div>
 
