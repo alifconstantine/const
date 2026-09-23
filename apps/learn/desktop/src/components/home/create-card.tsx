@@ -6,11 +6,29 @@ interface CreateCardProps {
   type: "learn" | "collection";
   onClick: () => void;
   className?: string;
+  viewMode?: "grid" | "list";
 }
 
-export function CreateCard({ type, onClick, className = "" }: CreateCardProps) {
+export function CreateCard({ type, onClick, className = "", viewMode = "grid" }: CreateCardProps) {
   const { t } = useI18n();
   const label = type === "learn" ? t("createCardLearn") : t("createCardCollection");
+
+  if (viewMode === "list") {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className={`w-full px-4 py-3 rounded-xl border border-dashed border-border/80 hover:border-foreground/40 bg-secondary/30 hover:bg-secondary/60 transition-all cursor-pointer flex items-center justify-center gap-2.5 group select-none shadow-none active:scale-[0.99] ${className}`}
+      >
+        <div className="h-6 w-6 rounded-lg bg-secondary/80 border border-border group-hover:bg-card group-hover:border-foreground/30 flex items-center justify-center text-muted-foreground group-hover:text-foreground transition-all">
+          <Plus className="h-3.5 w-3.5 stroke-[2.2]" />
+        </div>
+        <span className="text-xs font-medium text-muted-foreground group-hover:text-foreground transition-colors">
+          {label}
+        </span>
+      </button>
+    );
+  }
 
   return (
     <button

@@ -3134,22 +3134,24 @@ export function ChatPanel({
             </div>
           ) : (
             /* Welcome Empty State when no sources attached yet */
-            <div className="flex-1 flex flex-col justify-center my-auto py-10">
-              <div className="text-3xl sm:text-4xl mb-3 select-none">👋</div>
+            <div className="flex-1 flex flex-col items-center justify-center text-center my-auto py-12 max-w-xl mx-auto px-4 select-none animate-in fade-in duration-300">
+              <div className="h-14 w-14 rounded-2xl bg-secondary/80 border border-border/70 flex items-center justify-center text-2xl mb-4 shadow-2xs">
+                👋
+              </div>
 
-              <h1 className="text-2xl sm:text-3xl font-sans font-medium tracking-tight text-foreground mb-2">
+              <h1 className="text-2xl sm:text-3xl font-sans font-semibold tracking-tight text-foreground mb-2">
                 {t("welcomeNotebookTitle")}
               </h1>
 
-              <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed mb-4 max-w-xl font-sans">
+              <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed mb-4 max-w-md mx-auto font-sans">
                 {t("welcomeNotebookDesc")}
               </p>
 
-              <p className="text-xs text-muted-foreground/80 font-medium mb-3 font-sans">
+              <p className="text-xs text-muted-foreground/80 font-medium mb-3.5 font-sans">
                 {t("welcomeNotebookPrompt")}
               </p>
 
-              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2.5 font-sans">
+              <div className="flex flex-wrap items-center justify-center gap-2 font-sans">
                 {[
                   t("chipLearnNewTopic"),
                   t("chipCreateContent"),
@@ -3162,7 +3164,7 @@ export function ChatPanel({
                       onSelectPromptChip?.(chip);
                       handleSend(chip);
                     }}
-                    className="px-4 py-2 rounded-full bg-muted/60 hover:bg-muted border border-border/50 text-xs text-foreground transition-all cursor-pointer shadow-xs active:scale-98"
+                    className="px-4 py-2 rounded-full bg-secondary/70 hover:bg-secondary border border-border/70 hover:border-foreground/30 text-xs font-medium text-foreground transition-all cursor-pointer shadow-2xs active:scale-95"
                   >
                     {chip}
                   </button>

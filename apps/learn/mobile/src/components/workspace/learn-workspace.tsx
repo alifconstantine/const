@@ -2328,22 +2328,44 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
                   </div>
                 </div>
               ) : (
-                <div className="flex-1 flex flex-col items-center justify-center text-center py-12 px-4 text-muted-foreground">
-                  <div className="text-3xl mb-2">👋</div>
-                  <h2 className="text-base font-medium text-foreground mb-1">
-                    Mulai Belajar dengan Sumber
+                <div className="flex-1 flex flex-col items-center justify-center text-center my-auto py-10 px-4 text-muted-foreground select-none">
+                  <div className="h-12 w-12 rounded-2xl bg-secondary/80 border border-border/70 flex items-center justify-center text-xl mx-auto mb-3 shadow-2xs">
+                    👋
+                  </div>
+                  <h2 className="text-base sm:text-lg font-semibold text-foreground mb-1 tracking-tight font-sans">
+                    {t("welcomeNotebookTitle")}
                   </h2>
-                  <p className="text-xs leading-relaxed max-w-xs mb-4">
-                    Tambahkan tautan web, dokumen PDF, atau video YouTube untuk membuka sitasi dan pembelajaran terverifikasi.
+                  <p className="text-xs text-muted-foreground leading-relaxed max-w-xs mx-auto mb-4 font-sans">
+                    {t("welcomeNotebookDesc")}
                   </p>
-                  <button
-                    type="button"
-                    onClick={() => setIsAddSourceOpen(true)}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-foreground text-background font-medium text-xs cursor-pointer active:scale-95 shadow-xs"
-                  >
-                    <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
-                    <span>Tambahkan Sumber</span>
-                  </button>
+                  
+                  <div className="flex flex-col items-center gap-2.5 w-full max-w-xs">
+                    <button
+                      type="button"
+                      onClick={() => setIsAddSourceOpen(true)}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-primary text-primary-foreground font-medium text-xs cursor-pointer active:scale-95 shadow-xs"
+                    >
+                      <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
+                      <span>{t("addSource")}</span>
+                    </button>
+
+                    <div className="flex flex-col w-full gap-1.5 font-sans pt-1">
+                      {[
+                        t("chipLearnNewTopic"),
+                        t("chipCreateContent"),
+                        t("chipContinueProject"),
+                      ].map((chip) => (
+                        <button
+                          key={chip}
+                          type="button"
+                          onClick={() => handleSend(chip)}
+                          className="w-full text-center px-3.5 py-2 rounded-xl bg-secondary/60 hover:bg-secondary border border-border/70 text-xs font-medium text-foreground transition-all cursor-pointer active:scale-[0.98]"
+                        >
+                          {chip}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               )
             ) : (
