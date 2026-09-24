@@ -4,7 +4,6 @@ import {
   Check,
   ChevronDown,
   FileText,
-  Sparkles,
   Pencil,
 } from "lucide-react";
 import { Dialog, DialogContent, ScrollArea, cn } from "@const/ui";
@@ -264,12 +263,12 @@ export function CreateReportDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[700px] p-0 bg-[#161616] border border-[#2b2b2b] text-[#d4d4d4] rounded-2xl shadow-2xl overflow-hidden font-sans [&>button]:hidden">
+      <DialogContent className="max-w-[700px] max-h-[88vh] flex flex-col gap-0 p-0 bg-[#161616] border border-[#2b2b2b] text-[#d4d4d4] rounded-2xl shadow-2xl overflow-hidden font-sans [&>button]:hidden outline-none focus:outline-none focus-visible:outline-none ring-0 focus-visible:ring-0">
         {/* Header - Borderless austere studio style */}
-        <div className="flex items-center justify-between px-6 pt-5 pb-3 bg-[#161616]">
+        <div className="shrink-0 flex items-center justify-between px-6 pt-5 pb-2 bg-[#161616]">
           <div className="flex items-center gap-2.5">
-            <FileText className="h-5 w-5 text-stone-300" />
-            <span className="text-base font-medium text-white tracking-tight">
+            <FileText className="h-4 w-4 text-white shrink-0" />
+            <span className="text-sm font-semibold text-white tracking-tight">
               {isIndo ? "Buat Laporan" : "Create Report"}
             </span>
           </div>
@@ -283,8 +282,8 @@ export function CreateReportDialog({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex flex-col max-h-[82vh]">
-          <ScrollArea className="flex-1 w-full px-6 py-2">
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+          <ScrollArea className="flex-1 min-h-0 w-full px-6 py-2">
             <div className="space-y-5 pb-4">
               {/* Sumber Rujukan Materi */}
               <div className="space-y-1.5 relative">
@@ -378,21 +377,21 @@ export function CreateReportDialog({
                     className={cn(
                       "p-3.5 rounded-2xl border text-left flex flex-col justify-between transition-all cursor-pointer relative",
                       format === "interactive"
-                        ? "bg-[#1e2330] border-[#3b5998] shadow-sm text-white"
-                        : "bg-[#1f1f1f] border-[#2b2b2b] hover:border-[#383838] text-[#888888] hover:text-[#d4d4d4]"
+                        ? "bg-[#2b2b2b] border-[#444444] shadow-sm text-white"
+                        : "bg-[#222222] border-[#2b2b2b] hover:border-[#383838] text-[#888888] hover:text-[#d4d4d4]"
                     )}
                   >
                     <div className="flex items-center justify-between mb-1.5">
-                      <div className="text-sm font-semibold text-white">
+                      <div className="text-xs font-semibold text-white">
                         {isIndo ? "Interaktif" : "Interactive"}
                       </div>
                       {format === "interactive" && (
-                        <div className="h-4 w-4 rounded-full bg-[#4c75f2] flex items-center justify-center">
-                          <Check className="h-2.5 w-2.5 text-white stroke-[3]" />
+                        <div className="h-4 w-4 rounded-full bg-white flex items-center justify-center">
+                          <Check className="h-2.5 w-2.5 text-black stroke-[3]" />
                         </div>
                       )}
                     </div>
-                    <div className="text-xs text-[#a0a6b5] leading-relaxed">
+                    <div className="text-[11px] text-[#a0a0a0] leading-relaxed">
                       {isIndo
                         ? "Laporan interaktif dengan sematan konten studio"
                         : "Interactive report with embedded studio widgets and quizzes"}
@@ -406,21 +405,21 @@ export function CreateReportDialog({
                     className={cn(
                       "p-3.5 rounded-2xl border text-left flex flex-col justify-between transition-all cursor-pointer relative",
                       format === "document"
-                        ? "bg-[#1e2330] border-[#3b5998] shadow-sm text-white"
-                        : "bg-[#1f1f1f] border-[#2b2b2b] hover:border-[#383838] text-[#888888] hover:text-[#d4d4d4]"
+                        ? "bg-[#2b2b2b] border-[#444444] shadow-sm text-white"
+                        : "bg-[#222222] border-[#2b2b2b] hover:border-[#383838] text-[#888888] hover:text-[#d4d4d4]"
                     )}
                   >
                     <div className="flex items-center justify-between mb-1.5">
-                      <div className="text-sm font-semibold text-white">
+                      <div className="text-xs font-semibold text-white">
                         {isIndo ? "Dokumen" : "Document"}
                       </div>
                       {format === "document" && (
-                        <div className="h-4 w-4 rounded-full bg-[#4c75f2] flex items-center justify-center">
-                          <Check className="h-2.5 w-2.5 text-white stroke-[3]" />
+                        <div className="h-4 w-4 rounded-full bg-white flex items-center justify-center">
+                          <Check className="h-2.5 w-2.5 text-black stroke-[3]" />
                         </div>
                       )}
                     </div>
-                    <div className="text-xs text-[#a0a6b5] leading-relaxed">
+                    <div className="text-[11px] text-[#a0a0a0] leading-relaxed">
                       {isIndo
                         ? "Dokumen terstruktur yang hanya berisi teks"
                         : "Structured narrative document focused purely on text & math"}
@@ -483,7 +482,7 @@ export function CreateReportDialog({
               {format === "document" && suggestedTemplates.length > 0 && (
                 <div className="space-y-2.5 pt-1">
                   <div className="flex items-center gap-1.5 text-[12px] font-medium text-[#969696]">
-                    <Sparkles className="h-3.5 w-3.5 text-amber-400" />
+                    <FileText className="h-3.5 w-3.5 text-neutral-400" />
                     <span>{isIndo ? "Template yang Disarankan" : "Recommended Templates"}</span>
                   </div>
                   <div className="grid grid-cols-2 gap-2.5">
@@ -621,7 +620,7 @@ export function CreateReportDialog({
           </ScrollArea>
 
           {/* Footer - No AI Usage bar, austere studio buttons */}
-          <div className="px-6 py-4 bg-[#161616] border-t border-[#222222] flex items-center justify-end gap-3">
+          <div className="shrink-0 px-6 py-3.5 bg-[#161616] flex items-center justify-end gap-2">
             <button
               type="button"
               onClick={() => onOpenChange(false)}
@@ -633,13 +632,12 @@ export function CreateReportDialog({
               type="submit"
               disabled={selectedSourceIds.length === 0}
               className={cn(
-                "px-5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer shadow-xs active:scale-[0.99]",
+                "px-5 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer shadow-xs active:scale-[0.99]",
                 selectedSourceIds.length > 0
                   ? "bg-white hover:bg-neutral-200 text-black font-semibold"
-                  : "bg-[#252525] text-[#666] cursor-not-allowed"
+                  : "bg-white/40 text-black/50 cursor-not-allowed"
               )}
             >
-              <FileText className="h-3.5 w-3.5" />
               <span>{isIndo ? "Buat sekarang" : "Create now"}</span>
             </button>
           </div>

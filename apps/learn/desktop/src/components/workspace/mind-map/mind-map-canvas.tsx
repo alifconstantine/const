@@ -15,7 +15,6 @@ import {
   Search,
   X,
   Copy,
-  Sparkles,
   Target,
   ExternalLink,
   UnfoldHorizontal,

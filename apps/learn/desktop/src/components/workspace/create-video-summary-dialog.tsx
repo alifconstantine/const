@@ -301,9 +301,9 @@ export function CreateVideoSummaryDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[620px] p-0 bg-[#161616] border border-[#2b2b2b] text-[#e0e0e0] rounded-2xl shadow-2xl overflow-hidden font-sans [&>button]:hidden outline-none focus:outline-none focus-visible:outline-none ring-0 focus-visible:ring-0">
+      <DialogContent className="max-w-[620px] max-h-[88vh] flex flex-col gap-0 p-0 bg-[#161616] border border-[#2b2b2b] text-[#e0e0e0] rounded-2xl shadow-2xl overflow-hidden font-sans [&>button]:hidden outline-none focus:outline-none focus-visible:outline-none ring-0 focus-visible:ring-0">
         {/* Header - Icon + "Video Summarize" + X button (No dividing line) */}
-        <div className="flex items-center justify-between px-5 pt-5 pb-2 bg-[#161616]">
+        <div className="shrink-0 flex items-center justify-between px-5 pt-5 pb-2 bg-[#161616]">
           <div className="flex items-center gap-2.5">
             <Video className="h-4 w-4 text-white shrink-0" />
             <span className="text-sm font-semibold text-white tracking-tight">
@@ -320,8 +320,8 @@ export function CreateVideoSummaryDialog({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex flex-col max-h-[82vh]">
-          <ScrollArea className="flex-1 w-full px-5 py-2">
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+          <ScrollArea className="flex-1 min-h-0 w-full px-5 py-2">
             <div className="space-y-4 pb-2">
               {/* 1. Pemilihan Source (Lebar) & Dropdown Durasi/Cakupan (Kanan) */}
               <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-2.5">
@@ -915,7 +915,7 @@ export function CreateVideoSummaryDialog({
           </ScrollArea>
 
           {/* Footer Actions - No divider line */}
-          <div className="flex items-center justify-end gap-2 px-5 py-3.5 bg-[#161616]">
+          <div className="shrink-0 flex items-center justify-end gap-2 px-5 py-3.5 bg-[#161616]">
             <button
               type="button"
               onClick={() => onOpenChange(false)}

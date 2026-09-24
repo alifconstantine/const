@@ -5,9 +5,9 @@ import {
   ChevronDown,
   Presentation,
   Sliders,
-  Sparkles,
   Layers,
   Palette,
+  LayoutTemplate,
 } from "lucide-react";
 import { Dialog, DialogContent, ScrollArea, cn } from "@const/ui";
 import { useI18n } from "../../lib/i18n";
@@ -45,7 +45,7 @@ const getProviders = (isIndo: boolean) => [
       ? "Template Canva & Desain Interaktif"
       : "Editable Canva Design & Live Templates",
     badge: "Canva AI",
-    icon: Sparkles,
+    icon: LayoutTemplate,
     color: "text-cyan-400",
   },
   {
@@ -146,11 +146,11 @@ export function CreatePresentationDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[640px] p-0 bg-[#161616] border border-[#2b2b2b] text-[#e0e0e0] rounded-2xl shadow-2xl overflow-hidden font-sans [&>button]:hidden">
+      <DialogContent className="max-w-[640px] max-h-[88vh] flex flex-col gap-0 p-0 bg-[#161616] border border-[#2b2b2b] text-[#e0e0e0] rounded-2xl shadow-2xl overflow-hidden font-sans [&>button]:hidden outline-none focus:outline-none focus-visible:outline-none ring-0 focus-visible:ring-0">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 pt-5 pb-3 bg-[#161616]">
+        <div className="shrink-0 flex items-center justify-between px-5 pt-5 pb-2 bg-[#161616]">
           <div className="flex items-center gap-2.5">
-            <Presentation className="h-5 w-5 text-amber-400" />
+            <Presentation className="h-4 w-4 text-white shrink-0" />
             <span className="text-sm font-semibold text-white tracking-tight">
               {isIndo ? "Buat Slide Presentasi" : "Create Presentation Slides"}
             </span>
@@ -165,8 +165,8 @@ export function CreatePresentationDialog({
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="flex flex-col max-h-[82vh]">
-          <ScrollArea className="flex-1 w-full px-5 py-1">
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+          <ScrollArea className="flex-1 min-h-0 w-full px-5 py-1">
             <div className="space-y-4 pb-3">
               {/* Concept Box */}
               <div className="p-3.5 rounded-xl bg-[#222222] border border-[#2b2b2b] flex items-start gap-3">
@@ -441,26 +441,20 @@ export function CreatePresentationDialog({
             </div>
           </ScrollArea>
 
-          {/* Footer */}
-          <div className="px-5 py-4 bg-[#161616] border-t border-[#222222] flex items-center justify-end gap-3">
+          {/* Footer Actions - Borderless */}
+          <div className="shrink-0 px-5 py-3.5 bg-[#161616] flex items-center justify-end gap-2">
             <button
               type="button"
               onClick={() => onOpenChange(false)}
-              className="px-4 py-2 rounded-xl hover:bg-[#222222] text-xs font-medium text-[#888888] hover:text-white transition-colors cursor-pointer"
+              className="px-4 py-2 rounded-xl bg-transparent hover:bg-[#222222] text-xs font-medium text-[#888888] hover:text-white transition-colors cursor-pointer"
             >
               {isIndo ? "Batal" : "Cancel"}
             </button>
             <button
               type="submit"
               disabled={selectedSourceIds.length === 0}
-              className={cn(
-                "px-5 py-2 rounded-xl text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer shadow-lg",
-                selectedSourceIds.length > 0
-                  ? "bg-amber-500 hover:bg-amber-400 text-black shadow-amber-500/20"
-                  : "bg-[#252525] text-[#666] cursor-not-allowed"
-              )}
+              className="px-4 py-2 rounded-xl bg-white hover:bg-neutral-200 disabled:opacity-40 disabled:hover:bg-white disabled:cursor-not-allowed text-xs font-semibold text-black flex items-center gap-1.5 transition-all cursor-pointer shadow-sm active:scale-98"
             >
-              <Presentation className="h-4 w-4" />
               <span>{isIndo ? "Buat Slide Presentasi" : "Create Slides"}</span>
             </button>
           </div>

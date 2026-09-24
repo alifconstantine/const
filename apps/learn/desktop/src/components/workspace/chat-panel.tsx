@@ -28,7 +28,6 @@ import {
   Pin,
   ThumbsUp,
   ThumbsDown,
-  Sparkles,
 } from "lucide-react";
 import {
   ScrollArea,
