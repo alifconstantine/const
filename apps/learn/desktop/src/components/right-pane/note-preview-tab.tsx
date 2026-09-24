@@ -467,8 +467,8 @@ export function NotePreviewTab({
           </span>
         </div>
 
-        {/* Right: Trash / Delete icon & Collapse */}
-        <div className="flex items-center gap-1">
+        {/* Right: Trash / Delete icon (Clear of persistent toggle button) */}
+        <div className="flex items-center gap-1 pr-9">
           <button
             type="button"
             onClick={handleDelete}
@@ -477,16 +477,6 @@ export function NotePreviewTab({
           >
             <Trash2 className="h-4 w-4" />
           </button>
-          {onToggleCollapse && (
-            <button
-              type="button"
-              onClick={onToggleCollapse}
-              className="h-7 w-7 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
-              title={t("hidePanel") || "Collapse panel"}
-            >
-              <PanelRight className="h-4 w-4" />
-            </button>
-          )}
         </div>
       </div>
 

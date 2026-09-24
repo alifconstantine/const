@@ -22,6 +22,7 @@ import {
 import { MarkdownContent } from "./markdown-content";
 import { SourceIcon, getSourceCategoryLabel } from "./source-icon";
 import { useI18n } from "../../lib/i18n";
+import { openExternalUrl } from "../../lib/open-external";
 import type { LocalSource } from "../../lib/db";
 
 export interface SourcePreviewDialogProps {
@@ -29,6 +30,7 @@ export interface SourcePreviewDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onOpenLearn?: (learnId: string) => void;
+  onOpenBrowser?: (url: string) => void;
 }
 
 function formatFileSize(bytes?: number): string {
@@ -60,6 +62,7 @@ export function SourcePreviewDialog({
   open,
   onOpenChange,
   onOpenLearn,
+  onOpenBrowser,
 }: SourcePreviewDialogProps) {
   const { t } = useI18n();
   const [viewMode, setViewMode] = useState<"formatted" | "raw">("formatted");
@@ -139,16 +142,22 @@ export function SourcePreviewDialog({
 
                 {/* URL if available */}
                 {source.url && (
-                  <a
-                    href={source.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-primary hover:underline inline-flex items-center gap-1 mt-1 max-w-full truncate group font-mono"
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      if (onOpenBrowser) {
+                        onOpenBrowser(source.url!);
+                      } else {
+                        openExternalUrl(source.url);
+                      }
+                    }}
+                    className="text-xs text-primary hover:underline inline-flex items-center gap-1 mt-1 max-w-full truncate group font-mono text-left cursor-pointer"
                     title={source.url}
                   >
                     <span className="truncate">{source.url}</span>
                     <ExternalLink className="w-3 h-3 shrink-0 opacity-70 group-hover:opacity-100 transition-opacity" />
-                  </a>
+                  </button>
                 )}
               </div>
             </div>
@@ -272,6 +281,7 @@ export function SourcePreviewDialog({
               <div className="max-w-none">
                 <MarkdownContent
                   content={contentString}
+                  onOpenBrowser={onOpenBrowser || openExternalUrl}
                   className="space-y-4 text-sm sm:text-[14.5px] leading-relaxed select-text"
                 />
               </div>

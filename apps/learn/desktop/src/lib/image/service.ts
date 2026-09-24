@@ -1,4 +1,5 @@
 import type { ImageProvider, ImageModel, ImageProtocol } from "./types";
+import { getActiveImageModel } from "./storage";
 
 export interface TestImageResult {
   success: boolean;
@@ -33,6 +34,9 @@ export function resolveImageEndpoint(baseUrl: string, protocol?: ImageProtocol):
     }
     if (cleanUrl.endsWith("/images/generations")) {
       return cleanUrl.replace(/\/images\/generations$/, "/images");
+    }
+    if (cleanUrl.includes("openrouter.ai")) {
+      return "https://openrouter.ai/api/v1/images";
     }
     return `${cleanUrl}/images`;
   }
@@ -146,12 +150,15 @@ export async function testImageModelConnectivity(
       ? data.images[0]
       : null;
 
+    const b64 = sampleItem?.b64_json || sampleItem?.base64;
+    const rawUrl = sampleItem?.url || sampleItem?.image_url || sampleItem?.image;
+
     const sampleUrl =
       typeof sampleItem === "string"
         ? sampleItem
-        : sampleItem?.url ||
-          (sampleItem?.b64_json
-            ? `data:image/png;base64,${sampleItem.b64_json}`
+        : rawUrl ||
+          (b64
+            ? b64.startsWith("data:") ? b64 : `data:image/png;base64,${b64}`
             : undefined);
 
     return {
@@ -167,6 +174,210 @@ export async function testImageModelConnectivity(
         ? "Request timed out after 25 seconds."
         : err?.message || "Failed to communicate with image generation endpoint.",
     };
+  }
+}
+
+export interface GenerateImageOptions {
+  prompt: string;
+  provider?: ImageProvider;
+  modelId?: string;
+  size?: string; // e.g. "1024x1024", "1024x1792", "1792x1024"
+  n?: number;
+  timeoutMs?: number;
+}
+
+export interface GenerateImageResult {
+  success: boolean;
+  imageUrl?: string;
+  latencyMs?: number;
+  error?: string;
+}
+
+/**
+ * Generates an image using the specified or currently active image provider and model.
+ * Readily pluggable for Infographics, illustrations, and visual study artifacts.
+ */
+export async function generateImage(
+  options: GenerateImageOptions
+): Promise<GenerateImageResult> {
+  const prompt = (options.prompt || "").trim();
+  if (!prompt) {
+    return { success: false, error: "Prompt is required to generate image." };
+  }
+
+  // Resolve provider and model from options or active configuration
+  const active = getActiveImageModel();
+  const provider = options.provider || active.provider;
+  if (!provider) {
+    return {
+      success: false,
+      error: "No image provider configured. Please configure an Image Provider in Settings > Models > Image.",
+    };
+  }
+
+  const cleanBaseUrl = (provider.baseUrl || "").trim();
+  if (!cleanBaseUrl) {
+    return {
+      success: false,
+      error: `Provider "${provider.name}" has no Base URL configured.`,
+    };
+  }
+
+  const modelId = options.modelId || active.model?.id || provider.models[0]?.id;
+  if (!modelId) {
+    return {
+      success: false,
+      error: `No model configured for provider "${provider.name}". Please add a Model ID in Settings > Models > Image.`,
+    };
+  }
+
+  const protocol: ImageProtocol = provider.protocol || "openrouter";
+  const endpoint = resolveImageEndpoint(cleanBaseUrl, protocol);
+
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+
+  const cleanKey = (provider.apiKey || "").trim();
+  if (cleanKey) {
+    headers["Authorization"] = cleanKey.startsWith("Bearer ") ? cleanKey : `Bearer ${cleanKey}`;
+  }
+
+  if (protocol === "openrouter" || cleanBaseUrl.includes("openrouter.ai")) {
+    headers["HTTP-Referer"] = "https://const.education";
+    headers["X-Title"] = "Const Learn";
+  }
+
+  // Build body based on protocol
+  let requestBody: Record<string, any>;
+  if (protocol === "openrouter") {
+    // OpenRouter images specification: { model, prompt }
+    requestBody = {
+      model: modelId,
+      prompt,
+    };
+    if (options.size) {
+      requestBody.size = options.size;
+    }
+  } else if (protocol === "custom") {
+    requestBody = {
+      model: modelId,
+      prompt,
+      n: options.n || 1,
+    };
+    if (options.size) {
+      requestBody.size = options.size;
+    }
+  } else {
+    // openai-generations
+    requestBody = {
+      model: modelId,
+      prompt,
+      n: options.n || 1,
+      size: options.size || "1024x1024",
+    };
+  }
+
+  const timeoutMs = options.timeoutMs || 60000; // 60s timeout for full generation
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  const start = performance.now();
+  try {
+    const res = await fetch(endpoint, {
+      method: "POST",
+      headers,
+      body: JSON.stringify(requestBody),
+      signal: controller.signal,
+    }).finally(() => clearTimeout(timeoutId));
+
+    const latencyMs = Math.round(performance.now() - start);
+    const data = await res.json().catch(() => null);
+
+    if (!res.ok) {
+      const errorMsg =
+        data?.error?.message ||
+        data?.error ||
+        data?.message ||
+        `HTTP ${res.status}: ${res.statusText || "Image provider returned an error."}`;
+
+      return {
+        success: false,
+        latencyMs,
+        error: typeof errorMsg === "object" ? JSON.stringify(errorMsg) : String(errorMsg),
+      };
+    }
+
+    const sampleItem = Array.isArray(data?.data)
+      ? data.data[0]
+      : Array.isArray(data?.images)
+      ? data.images[0]
+      : null;
+
+    const b64 = sampleItem?.b64_json || sampleItem?.base64;
+    const rawUrl = sampleItem?.url || sampleItem?.image_url || sampleItem?.image;
+
+    const imageUrl =
+      typeof sampleItem === "string"
+        ? sampleItem
+        : rawUrl ||
+          (b64
+            ? b64.startsWith("data:") ? b64 : `data:image/png;base64,${b64}`
+            : undefined);
+
+    if (!imageUrl) {
+      return {
+        success: false,
+        latencyMs,
+        error: "Provider responded successfully but no image data or URL was found in response.",
+      };
+    }
+
+    // Persist remote URLs as data URLs if accessible to avoid expiration
+    let persistentImageUrl = imageUrl;
+    if (imageUrl.startsWith("http://") || imageUrl.startsWith("https://")) {
+      try {
+        persistentImageUrl = await cacheImageUrlAsDataUrl(imageUrl);
+      } catch {}
+    }
+
+    return {
+      success: true,
+      imageUrl: persistentImageUrl,
+      latencyMs,
+    };
+  } catch (err: any) {
+    const isTimeout = err?.name === "AbortError";
+    return {
+      success: false,
+      error: isTimeout
+        ? `Image generation timed out after ${Math.round(timeoutMs / 1000)} seconds.`
+        : err?.message || "Failed to communicate with image generation endpoint.",
+    };
+  }
+}
+
+
+/**
+ * Converts a remote HTTP image URL into a persistent Base64 Data URL,
+ * preventing temporary signed URLs (e.g. OpenAI/Azure 1hr expiry) from expiring.
+ */
+export async function cacheImageUrlAsDataUrl(url: string): Promise<string> {
+  if (!url || url.startsWith("data:")) return url;
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return url;
+    const blob = await res.blob();
+    return new Promise<string>((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        resolve(typeof reader.result === "string" ? reader.result : url);
+      };
+      reader.onerror = () => resolve(url);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return url;
   }
 }
 

@@ -7,15 +7,21 @@ import {
   DialogFooter,
   Button,
   Input,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
 } from "@const/ui";
 import { BookOpen, Check, Folder, FolderOpen, Hand, ShieldAlert, X } from "lucide-react";
 import { useI18n } from "../../../lib/i18n";
 import { LEARN_ICONS, LEGACY_EMOJI_TO_LEARN_ICON } from "../learn-icon";
+import { ModuleIcon } from "../module-icon";
 
 interface CreateLearnDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  collections?: Array<{ id: string; name: string }>;
+  collections?: Array<{ id: string; name: string; emoji?: string }>;
   initialData?: {
     id: string;
     title: string;
@@ -268,24 +274,36 @@ export function CreateLearnDialog({
 
           {/* Collection Assignment */}
           {!isEdit && collections.length > 0 && (
-            <div className="space-y-1">
-              <label className="text-[12px] font-medium text-muted-foreground">
+            <div className="space-y-1.5">
+              <label className="text-[12px] font-medium text-muted-foreground block">
                 {t("collectionCategoryOptional")}
               </label>
-              <select
-                value={selectedCollectionId ?? ""}
-                onChange={(e) =>
-                  setSelectedCollectionId(e.target.value || undefined)
+              <Select
+                value={selectedCollectionId || "none"}
+                onValueChange={(val) =>
+                  setSelectedCollectionId(val === "none" ? undefined : val)
                 }
-                className="w-full h-8 px-2.5 rounded-xl bg-secondary/40 border border-border/70 text-[12px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
               >
-                <option value="">{t("noCollection")}</option>
-                {collections.map((col) => (
-                  <option key={col.id} value={col.id}>
-                    {col.name}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="w-full h-8 px-2.5 rounded-xl bg-secondary/40 border border-border/70 text-[12px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring">
+                  <SelectValue placeholder={t("noCollection")} />
+                </SelectTrigger>
+                <SelectContent className="max-h-56 z-50 rounded-xl border-border bg-popover text-popover-foreground shadow-lg">
+                  <SelectItem value="none" className="text-xs py-2 cursor-pointer">
+                    <div className="flex items-center gap-2">
+                      <Folder className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                      <span>{t("noCollection")}</span>
+                    </div>
+                  </SelectItem>
+                  {collections.map((col) => (
+                    <SelectItem key={col.id} value={col.id} className="text-xs py-2 cursor-pointer">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <ModuleIcon icon={col.emoji} className="w-3.5 h-3.5 text-foreground/80 shrink-0" />
+                        <span className="truncate">{col.name}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           )}
 

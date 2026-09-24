@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { LogIn, Globe } from "lucide-react";
-import { ConstLogoIcon, Button } from "@const/ui";
+import { ConstLogoIcon, Button, TooltipProvider } from "@const/ui";
 import { useQuery } from "convex/react";
 import { api } from "@const/backend/_generated/api";
 import { ConvexClientProvider } from "./components/convex-provider";
@@ -9,6 +9,7 @@ import { LearnWorkspace } from "./components/workspace/learn-workspace";
 import { localDb } from "./lib/db";
 import { useI18n } from "./lib/i18n";
 import { TitleBar } from "./components/title-bar";
+import { openExternalUrl } from "./lib/open-external";
 import authArt from "./assets/auth-art.jpg";
 
 function AuthenticatedContent({
@@ -22,6 +23,21 @@ function AuthenticatedContent({
   const user = useQuery(api.auth.queries.currentUser, {});
   const [activeLearnId, setActiveLearnId] = useState<string | null>(null);
   const [openAddSourceOnLoad, setOpenAddSourceOnLoad] = useState(false);
+
+  // When outside of a workspace (e.g. HomePage), route any intercepted URLs directly
+  // to the user's default system browser via Electron openExternal
+  useEffect(() => {
+    if (!activeLearnId) {
+      const unsubscribe = window.electron?.onOpenBrowserUrl?.((url: string) => {
+        if (url) {
+          openExternalUrl(url);
+        }
+      });
+      return () => {
+        unsubscribe?.();
+      };
+    }
+  }, [activeLearnId]);
 
   const handleOpenLearn = (learnId: string, openAddSource = false) => {
     setActiveLearnId(learnId);
@@ -223,14 +239,15 @@ export default function App() {
 
       {/* 2. Main View Content */}
       <div className="flex-1 min-h-0 w-full overflow-hidden">
-        {token ? (
-          <ConvexClientProvider token={token} signOut={handleSignOut}>
-            <AuthenticatedContent
-              onSignOut={handleSignOut}
-              onSwitchAccount={handleSwitchAccount}
-            />
-          </ConvexClientProvider>
-        ) : (
+        <TooltipProvider delayDuration={150}>
+          {token ? (
+            <ConvexClientProvider token={token} signOut={handleSignOut}>
+              <AuthenticatedContent
+                onSignOut={handleSignOut}
+                onSwitchAccount={handleSwitchAccount}
+              />
+            </ConvexClientProvider>
+          ) : (
           <div className="h-full w-full overflow-hidden flex bg-background text-foreground">
             {/* Left Column: Sign-in Card */}
             <div className="flex h-full w-full flex-col justify-between p-6 sm:p-8 lg:p-10 lg:w-1/2 overflow-hidden">
@@ -304,6 +321,7 @@ export default function App() {
             </div>
           </div>
         )}
+        </TooltipProvider>
       </div>
     </div>
   );

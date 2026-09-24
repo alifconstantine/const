@@ -47,6 +47,8 @@ import { CreateMindMapDialog } from "./create-mind-map-dialog";
 import { CreateAudioSummaryDialog } from "./create-audio-summary-dialog";
 import { CreateVideoSummaryDialog } from "./create-video-summary-dialog";
 import { CreatePresentationDialog } from "./create-presentation-dialog";
+import { CreateInfographicDialog } from "./create-infographic-dialog";
+import { CreateReportDialog } from "./create-report-dialog";
 import { WorkspaceTitle } from "./workspace-title";
 import { SettingsView } from "../settings/settings-view";
 import { ErrorBoundary } from "../ui/error-boundary";
@@ -57,6 +59,8 @@ import {
   generateStudioArtifact,
   generateVideoSummaryArtifact,
   generatePresentationArtifact,
+  generateInfographicArtifact,
+  generateReportArtifact,
 } from "../../lib/studio/generator";
 import type { FileMutationRecord } from "@const/agent";
 import type { LocalArtifact } from "../../lib/db";
@@ -137,6 +141,8 @@ export function LearnWorkspace({
   const [isCreateAudioSummaryOpen, setIsCreateAudioSummaryOpen] = useState(false);
   const [isCreateVideoOpen, setIsCreateVideoOpen] = useState(false);
   const [isCreatePresentationOpen, setIsCreatePresentationOpen] = useState(false);
+  const [isCreateInfographicOpen, setIsCreateInfographicOpen] = useState(false);
+  const [isCreateReportOpen, setIsCreateReportOpen] = useState(false);
   const [generatingArtifacts, setGeneratingArtifacts] = useState<GeneratingArtifactStatus[]>([]);
 
   // Right Pane: Dual Studio & Preview/Review state
@@ -838,6 +844,162 @@ export function LearnWorkspace({
     }
   };
 
+  const handleGenerateInfographic = async (params: {
+    selectedSourceIds: string[];
+    language: "id" | "en";
+    orientation: "landscape" | "portrait" | "square";
+    style: string;
+    detailLevel: "brief" | "standard" | "detailed";
+    customDescription?: string;
+    providerId?: string;
+    modelId?: string;
+  }) => {
+    if (!learnId) return;
+
+    const selectedSources = (sources || []).filter((s) =>
+      params.selectedSourceIds.includes(s.id)
+    );
+    if (selectedSources.length === 0) return;
+
+    const isIndo = params.language === "id";
+    const title = isIndo ? "Infografis Materi" : "Study Infographic";
+
+    // 1. Create generating artifact in Dexie
+    const artId = await localDb.createArtifact({
+      learnId,
+      title: isIndo ? "Membuat Infografis..." : "Creating Infographic...",
+      type: "infographic",
+      status: "generating",
+      sourcesCount: selectedSources.length,
+      content: "",
+    });
+
+    setIsStudioCollapsed(false);
+    setRightPaneMode("studio");
+
+    try {
+      const result = await generateInfographicArtifact({
+        artifactId: artId,
+        learnId,
+        sources: selectedSources,
+        language: params.language,
+        orientation: params.orientation,
+        style: params.style,
+        detailLevel: params.detailLevel,
+        customDescription: params.customDescription,
+        providerId: params.providerId,
+        modelId: params.modelId,
+      });
+
+      await localDb.updateArtifact(artId, {
+        title: result.title || title,
+        data: result.data,
+        content: JSON.stringify(result.data),
+        status: "completed",
+      });
+
+      toast.success(
+        isIndo ? "Infografis berhasil dibuat!" : "Infographic created successfully!"
+      );
+
+      const fullArt = await localDb.getArtifact(artId);
+      if (fullArt) {
+        handleOpenStudioArtifact(fullArt);
+      }
+    } catch (err: any) {
+      console.error("Failed to generate infographic:", err);
+      await localDb.updateArtifact(artId, {
+        title,
+        status: "error",
+        error: err?.message || "Generation failed",
+      });
+      toast.error(
+        isIndo
+          ? `Gagal membuat infografis: ${err?.message || "Terjadi kesalahan"}`
+          : `Failed to create infographic: ${err?.message || "An error occurred"}`
+      );
+    }
+  };
+
+  const handleGenerateReport = async (params: {
+    selectedSourceIds: string[];
+    format: "interactive" | "document";
+    templateId: string;
+    templateTitle: string;
+    templateDescription?: string;
+    depth: "short" | "medium" | "long" | "auto";
+    language: "id" | "en";
+    customInstructions?: string;
+  }) => {
+    if (!learnId) return;
+
+    const selectedSources = (sources || []).filter((s) =>
+      params.selectedSourceIds.includes(s.id)
+    );
+    if (selectedSources.length === 0) return;
+
+    const isIndo = params.language === "id";
+    const title = params.templateTitle || (isIndo ? "Laporan Pembelajaran" : "Learning Report");
+
+    // 1. Create generating artifact in Dexie
+    const artId = await localDb.createArtifact({
+      learnId,
+      title: isIndo ? "Menyusun Laporan..." : "Generating Report...",
+      type: "report",
+      status: "generating",
+      sourcesCount: selectedSources.length,
+      content: "",
+    });
+
+    try {
+      // 2. Call generator in background
+      const result = await generateReportArtifact({
+        artifactId: artId,
+        learnId,
+        sources: selectedSources,
+        format: params.format,
+        templateId: params.templateId,
+        templateTitle: params.templateTitle,
+        templateDescription: params.templateDescription,
+        depth: params.depth,
+        language: params.language,
+        customInstructions: params.customInstructions,
+      });
+
+      // 3. Update artifact in Dexie
+      await localDb.updateArtifact(artId, {
+        title: result.title || title,
+        data: result.data,
+        content: JSON.stringify(result.data),
+        status: "completed",
+      });
+
+      toast.success(
+        isIndo
+          ? "Laporan berhasil dibuat!"
+          : "Report created successfully!"
+      );
+
+      // 4. Auto-open in preview & auto-widen
+      const fullArt = await localDb.getArtifact(artId);
+      if (fullArt) {
+        handleOpenStudioArtifact(fullArt);
+      }
+    } catch (err: any) {
+      console.error("Failed to generate report:", err);
+      await localDb.updateArtifact(artId, {
+        title,
+        status: "error",
+        error: err?.message || "Generation failed",
+      });
+      toast.error(
+        isIndo
+          ? `Gagal menyusun laporan: ${err?.message || "Terjadi kesalahan"}`
+          : `Failed to create report: ${err?.message || "An error occurred"}`
+      );
+    }
+  };
+
   const handleSelectStudioTool = (toolId: string) => {
     if (toolId === "browser") {
       handleOpenBrowser();
@@ -860,6 +1022,10 @@ export function LearnWorkspace({
       setIsCreateVideoOpen(true);
     } else if (toolId === "slides" || toolId === "presentation") {
       setIsCreatePresentationOpen(true);
+    } else if (toolId === "infographic") {
+      setIsCreateInfographicOpen(true);
+    } else if (toolId === "report") {
+      setIsCreateReportOpen(true);
     } else {
       return;
     }
@@ -873,12 +1039,16 @@ export function LearnWorkspace({
       art.type === "audio_summary" ||
       art.type === "video_summary" ||
       art.type === "slides" ||
+      art.type === "infographic" ||
+      art.type === "report" ||
       art.data?.questions ||
       art.data?.cards ||
       art.data?.root ||
       art.data?.script ||
       art.data?.scenes ||
-      art.data?.slides
+      art.data?.slides ||
+      art.data?.imageUrl ||
+      art.data?.sections
     ) {
       handleOpenStudioArtifact(art);
       return;
@@ -1500,6 +1670,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
           onAddSource={() => setIsAddSourceOpen(true)}
           onSelectSource={handleSelectSource}
           onDropFiles={handleDropFiles}
+          onOpenBrowser={handleOpenBrowser}
           isCollapsed={isSourcesCollapsed}
           isResizing={isDraggingSources}
           onToggleCollapse={() => setIsSourcesCollapsed(!isSourcesCollapsed)}
@@ -1559,57 +1730,57 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
         </div>
 
         {/* Right Column: Dual Studio & Preview RightPane */}
-        <div
-          style={{ width: isStudioCollapsed ? 48 : (studioWidth || 400) }}
-          className={cn(
-            "h-full flex flex-col shrink-0 overflow-hidden",
-            isStudioCollapsed && "w-12"
-          )}
+        <ErrorBoundary
+          title="Panel samping mengalami kendala"
+          description="Terjadi kesalahan pada panel Studio/Preview."
+          fallback={
+            <div
+              style={{ width: isStudioCollapsed ? 48 : (studioWidth || 400) }}
+              className="h-full shrink-0 flex flex-col justify-center items-center p-6 bg-card rounded-2xl border border-destructive/30 text-center select-none"
+            >
+              <p className="text-xs text-muted-foreground">Terjadi kesalahan pada panel Studio.</p>
+            </div>
+          }
         >
-          <ErrorBoundary
-            title="Panel samping mengalami kendala"
-            description="Terjadi kesalahan pada panel Studio/Preview."
-          >
-            <RightPane
-              width={studioWidth}
-              onWidthChange={(w) => {
-                setIsManualWidth(true);
-                setStudioWidth(clampStudioWidth(w));
-              }}
-              isCollapsed={isStudioCollapsed}
-              isResizing={isDraggingStudio}
-              onToggleCollapse={() => setIsStudioCollapsed(!isStudioCollapsed)}
-              mode={rightPaneMode}
-              onModeChange={setRightPaneMode}
-              tabs={rightPaneTabs}
-              activeTabId={activeRightPaneTabId}
-              isOpeningNewTab={isOpeningNewTab}
-              onSelectTab={handleSelectTab}
-              onCloseTab={handleCloseTab}
-              onNewTab={handleNewTab}
-              onOpenTabType={handleOpenTabType}
-              onReorderTabs={handleReorderTabs}
-              onUpdateTab={handleUpdateTab}
-              mutations={sessionMutations}
-              onRollbackFile={handleRollbackFile}
-              onRollbackAll={handleRollbackAll}
-              onOpenFileDiff={handleOpenFileDiff}
-              onSelectStudioTool={handleSelectStudioTool}
-              onAddNote={handleAddNote}
-              onOpenArtifact={handleOpenArtifact}
-              onDeleteArtifact={handleDeleteArtifact}
-              activeNoteArtifact={activeNoteArtifact}
-              onCloseNote={handleCloseNote}
-              onConvertToSource={handleConvertToSource}
-              onGenerateNote={handleGenerateNote}
-              artifacts={artifacts || []}
-              onDownloadArtifact={handleDownloadArtifact}
-              generatingArtifacts={generatingArtifacts}
-              onSelectArtifact={handleOpenStudioArtifact}
-              onExplainInChat={(prompt) => setPendingStudioPrompt(prompt)}
-            />
-          </ErrorBoundary>
-        </div>
+          <RightPane
+            width={studioWidth}
+            onWidthChange={(w) => {
+              setIsManualWidth(true);
+              setStudioWidth(clampStudioWidth(w));
+            }}
+            isCollapsed={isStudioCollapsed}
+            isResizing={isDraggingStudio}
+            onToggleCollapse={() => setIsStudioCollapsed(!isStudioCollapsed)}
+            mode={rightPaneMode}
+            onModeChange={setRightPaneMode}
+            tabs={rightPaneTabs}
+            activeTabId={activeRightPaneTabId}
+            isOpeningNewTab={isOpeningNewTab}
+            onSelectTab={handleSelectTab}
+            onCloseTab={handleCloseTab}
+            onNewTab={handleNewTab}
+            onOpenTabType={handleOpenTabType}
+            onReorderTabs={handleReorderTabs}
+            onUpdateTab={handleUpdateTab}
+            mutations={sessionMutations}
+            onRollbackFile={handleRollbackFile}
+            onRollbackAll={handleRollbackAll}
+            onOpenFileDiff={handleOpenFileDiff}
+            onSelectStudioTool={handleSelectStudioTool}
+            onAddNote={handleAddNote}
+            onOpenArtifact={handleOpenArtifact}
+            onDeleteArtifact={handleDeleteArtifact}
+            activeNoteArtifact={activeNoteArtifact}
+            onCloseNote={handleCloseNote}
+            onConvertToSource={handleConvertToSource}
+            onGenerateNote={handleGenerateNote}
+            artifacts={artifacts || []}
+            onDownloadArtifact={handleDownloadArtifact}
+            generatingArtifacts={generatingArtifacts}
+            onSelectArtifact={handleOpenStudioArtifact}
+            onExplainInChat={(prompt) => setPendingStudioPrompt(prompt)}
+          />
+        </ErrorBoundary>
       </div>
 
       {/* Add Source Pop-up Modal */}
@@ -1667,6 +1838,26 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
         onOpenChange={setIsCreatePresentationOpen}
         sources={sources || []}
         onGenerate={handleGeneratePresentation}
+      />
+
+      {/* Dedicated Create Infographic Dialog */}
+      <CreateInfographicDialog
+        open={isCreateInfographicOpen}
+        onOpenChange={setIsCreateInfographicOpen}
+        sources={sources || []}
+        onGenerate={handleGenerateInfographic}
+        onOpenImageSettings={() => {
+          setSettingsInitialTab("models");
+          setIsSettingsOpen(true);
+        }}
+      />
+
+      {/* Dedicated Create Report Dialog */}
+      <CreateReportDialog
+        open={isCreateReportOpen}
+        onOpenChange={setIsCreateReportOpen}
+        sources={sources || []}
+        onGenerate={handleGenerateReport}
       />
 
       {/* Settings Modal / Overlay */}

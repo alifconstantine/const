@@ -243,9 +243,6 @@ export function CollectionCard({
             </>
           )}
         </div>
-        <span className="text-[10px] text-muted-foreground/80 group-hover:text-foreground flex items-center gap-1 transition-colors shrink-0">
-          {t("open")} &rarr;
-        </span>
       </div>
     </div>
   );

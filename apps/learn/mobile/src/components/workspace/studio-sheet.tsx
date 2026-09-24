@@ -260,23 +260,37 @@ export function StudioSheet({
                 if (isGenerating) {
                   const isMindMap = art.type === "mind_map";
                   const isSlides = art.type === "slides";
-                  const defaultGenTitle =
-                    art.type === "quiz"
-                      ? (language === "id" ? "Membuat Kuis..." : "Creating Quiz...")
-                      : art.type === "flashcard" || art.type === "flashcards"
-                      ? (language === "id" ? "Membuat Kartu Tanya-Jawab..." : "Creating Flashcards...")
-                      : isMindMap
-                      ? (language === "id" ? "Membuat Peta Pikiran..." : "Creating Mind Map...")
-                      : isSlides
-                      ? (language === "id" ? "Membuat Presentasi..." : "Creating Presentation...")
-                      : (language === "id" ? "Membuat Catatan..." : "Creating Note...");
+                  const isReport = art.type === "report";
+                  const isInfographic = art.type === "infographic";
+                  const isVideo = art.type === "video_summary";
+                  const defaultGenTitle = isInfographic
+                    ? (language === "id" ? "Membuat Infografis..." : "Creating Infographic...")
+                    : isVideo
+                    ? (language === "id" ? "Membuat Ringkasan Video..." : "Creating Video Summary...")
+                    : isReport
+                    ? (language === "id" ? "Menyusun Laporan..." : "Creating Report...")
+                    : isSlides
+                    ? (language === "id" ? "Membuat Presentasi..." : "Creating Presentation...")
+                    : isMindMap
+                    ? (language === "id" ? "Membuat Peta Pikiran..." : "Creating Mind Map...")
+                    : art.type === "quiz"
+                    ? (language === "id" ? "Membuat Kuis..." : "Creating Quiz...")
+                    : art.type === "flashcard" || art.type === "flashcards"
+                    ? (language === "id" ? "Membuat Kartu Tanya-Jawab..." : "Creating Flashcards...")
+                    : (language === "id" ? "Membuat Catatan..." : "Creating Note...");
 
                   return (
                     <div
                       key={art.id}
                       className={cn(
                         "p-2.5 rounded-2xl bg-secondary/50 flex items-center gap-2.5 select-none animate-pulse shadow-xs border",
-                        isMindMap
+                        isReport
+                          ? "border-foreground/30"
+                          : isInfographic
+                          ? "border-purple-500/30"
+                          : isVideo
+                          ? "border-emerald-500/30"
+                          : isMindMap
                           ? "border-purple-500/30"
                           : isSlides
                           ? "border-amber-400/40"
@@ -286,7 +300,13 @@ export function StudioSheet({
                       <div
                         className={cn(
                           "h-8 w-8 rounded-xl flex items-center justify-center shrink-0 border",
-                          isMindMap
+                          isReport
+                            ? "bg-foreground/10 border-foreground/20 text-foreground"
+                            : isInfographic
+                            ? "bg-purple-500/10 border-purple-500/20 text-purple-400"
+                            : isVideo
+                            ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
+                            : isMindMap
                             ? "bg-purple-500/10 border-purple-500/20 text-purple-400"
                             : isSlides
                             ? "bg-amber-500/10 border-amber-500/20 text-amber-400"
@@ -296,7 +316,13 @@ export function StudioSheet({
                         <RotateCw
                           className={cn(
                             "h-4 w-4 animate-spin",
-                            isMindMap
+                            isReport
+                              ? "text-foreground"
+                              : isInfographic
+                              ? "text-purple-400"
+                              : isVideo
+                              ? "text-emerald-400"
+                              : isMindMap
                               ? "text-purple-400"
                               : isSlides
                               ? "text-amber-400"
@@ -324,12 +350,19 @@ export function StudioSheet({
                 const isFlashcard = art.type === "flashcard" || art.type === "flashcards";
                 const isMindMap = art.type === "mind_map";
                 const isSlides = art.type === "slides";
+                const isReport = art.type === "report";
+                const isInfographic = art.type === "infographic";
+                const isVideo = art.type === "video_summary";
                 const itemCount = isQuiz && art.data?.questions
                   ? art.data.questions.length
                   : isFlashcard && art.data?.cards
                   ? art.data.cards.length
                   : isSlides
                   ? (art.data?.slideCount || (art.data?.slides && art.data.slides.length > 0 ? art.data.slides.length : art.data?.canvaThumbnails?.length || null))
+                  : isVideo && art.data?.scenes
+                  ? art.data.scenes.length
+                  : isReport && art.data?.sections
+                  ? art.data.sections.length
                   : null;
                 const countText = itemCount !== null && itemCount !== undefined
                   ? isQuiz
@@ -338,9 +371,15 @@ export function StudioSheet({
                     ? (language === "id" ? `${itemCount} kartu` : `${itemCount} cards`)
                     : isSlides
                     ? (language === "id" ? `${itemCount} slide` : `${itemCount} slide${itemCount > 1 ? "s" : ""}`)
+                    : isVideo
+                    ? (language === "id" ? `${itemCount} scene` : `${itemCount} scenes`)
+                    : isReport
+                    ? (language === "id" ? `${itemCount} bagian` : `${itemCount} section${itemCount > 1 ? "s" : ""}`)
                     : null
                   : isMindMap
                   ? (language === "id" ? "Peta Konsep" : "Concept Map")
+                  : isInfographic
+                  ? (art.data?.styleLabel || (language === "id" ? "Poster Visual" : "Visual Poster"))
                   : null;
 
                 const handleOpenThis = () => {

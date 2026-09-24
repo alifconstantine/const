@@ -22,7 +22,6 @@ import {
   ArrowLeft,
   Trash2,
   X,
-  Folder,
   FolderInput,
   FolderMinus,
   FolderPlus,
@@ -47,9 +46,7 @@ import {
   Calendar,
   Type,
   Check,
-  Rows3,
   ChevronDown,
-  ChevronRight,
 } from "lucide-react";
 
 import { LearnCard, LearnItem } from "./learn-card";
@@ -219,15 +216,6 @@ export function LearnHome({
     return "desc";
   });
 
-  const [folderGroupByIcon, setFolderGroupByIcon] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem("const_learn_folder_group_icon") === "1";
-    } catch {}
-    return false;
-  });
-
-  const [collapsedIconGroups, setCollapsedIconGroups] = useState<Set<string>>(new Set());
-
   useEffect(() => {
     try {
       localStorage.setItem("const_learn_folder_sort_by", folderSortBy);
@@ -239,12 +227,6 @@ export function LearnHome({
       localStorage.setItem("const_learn_folder_sort_direction", folderSortDirection);
     } catch {}
   }, [folderSortDirection]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem("const_learn_folder_group_icon", folderGroupByIcon ? "1" : "0");
-    } catch {}
-  }, [folderGroupByIcon]);
 
   const getSortLabel = (sort: FolderSortBy) => {
     switch (sort) {
@@ -349,21 +331,6 @@ export function LearnHome({
       return folderSortDirection === "asc" ? result : -result;
     });
   }, [collections, searchQuery, folderSortBy, folderSortDirection]);
-
-  // Grouped collections by icon (for groupByIcon mode)
-  const groupedCollections = useMemo(() => {
-    const groupMap = new Map<string, { iconId: string; label: string; items: CollectionItem[] }>();
-    for (const col of filteredCollections) {
-      const iconId = col.emoji || "folder";
-      if (!groupMap.has(iconId)) {
-        const label = getModuleIconLabel(iconId, language);
-        groupMap.set(iconId, { iconId, label, items: [] });
-      }
-      groupMap.get(iconId)!.items.push(col);
-    }
-    // Sort groups by label alphabetically
-    return Array.from(groupMap.values()).sort((a, b) => a.label.localeCompare(b.label));
-  }, [filteredCollections, language]);
 
   // Recently Viewed Learns (Top 5 most recent)
   const recentlyViewedLearns = useMemo(() => {
@@ -985,8 +952,8 @@ export function LearnHome({
                         : "space-y-2"
                     }
                   >
-                    {/* First Card: Quick Create Learn Card (Grid view mode only) */}
-                    {viewMode === "grid" && (
+                    {/* First Card: Quick Create Learn Card (Grid view mode only, not searching) */}
+                    {viewMode === "grid" && !searchQuery && (
                       <CreateCard
                         type="learn"
                         onClick={() => handleCreateNewLearn()}
@@ -1020,23 +987,38 @@ export function LearnHome({
                     ))}
                   </div>
 
-                  {filteredLearns.length === 0 && (
-                    <div className="text-center py-14 px-4 rounded-2xl border border-dashed border-border bg-card/40">
-                      <p className="text-xs text-muted-foreground">
-                        {searchQuery ? t("noLearnsMatchSearch", { query: searchQuery }) : "Belum ada notebook tersimpan"}
+                  {/* Empty State when no learns exist - only in list mode */}
+                  {viewMode === "list" && filteredLearns.length === 0 && !searchQuery && (
+                    <div className="flex-1 flex flex-col items-center justify-center text-center min-h-[50vh] sm:min-h-[55vh] py-12 px-4 select-none col-span-full">
+                      <div className="h-16 w-16 rounded-3xl bg-secondary/80 border border-border/80 flex items-center justify-center text-muted-foreground mb-4 shadow-2xs">
+                        <BookOpen className="h-7 w-7 stroke-[1.5] text-muted-foreground/80" />
+                      </div>
+                      <h3 className="text-base sm:text-lg font-medium text-foreground mb-1.5 tracking-tight font-sans">
+                        {t("noLearnsFound")}
+                      </h3>
+                      <p className="text-xs sm:text-sm text-muted-foreground max-w-sm mb-5 leading-relaxed font-sans">
+                        {t("noLearnsDescription")}
                       </p>
-                      {!searchQuery && (
-                        <div className="mt-3">
-                          <Button
-                            size="sm"
-                            onClick={() => handleCreateNewLearn()}
-                            className="h-8 px-3 rounded-xl text-xs font-medium cursor-pointer"
-                          >
-                            <Plus className="w-3.5 h-3.5 mr-1" />
-                            <span>{t("newLearn")}</span>
-                          </Button>
-                        </div>
-                      )}
+                      <Button
+                        size="sm"
+                        onClick={() => handleCreateNewLearn()}
+                        className="h-9 px-4 rounded-xl text-xs font-medium gap-1.5 cursor-pointer shadow-xs active:scale-95"
+                      >
+                        <Plus className="h-4 w-4 stroke-[2.5]" />
+                        <span>{t("newLearn")}</span>
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Empty Search Result State */}
+                  {filteredLearns.length === 0 && searchQuery && (
+                    <div className="flex-1 flex flex-col items-center justify-center text-center min-h-[40vh] py-12 px-4 col-span-full">
+                      <div className="h-12 w-12 rounded-2xl bg-secondary/60 border border-border/70 flex items-center justify-center text-muted-foreground mb-3 shadow-2xs">
+                        <Search className="h-5 w-5 text-muted-foreground/70" />
+                      </div>
+                      <p className="text-sm font-medium text-foreground mb-1 font-sans">
+                        {t("noLearnsMatchSearch", { query: searchQuery })}
+                      </p>
                     </div>
                   )}
                 </section>
@@ -1061,8 +1043,8 @@ export function LearnHome({
                 {activeCollection ? (
                   // Drilled-down collection view (Page Collection)
                   <div className="space-y-6">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2">
-                      <div className="flex items-start sm:items-center gap-3.5 min-w-0">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                      <div className="flex items-center gap-3 min-w-0">
                         {renderSidebarToggle()}
                         <button
                           type="button"
@@ -1070,66 +1052,62 @@ export function LearnHome({
                             setActiveCollectionId(null);
                             setSearchQuery("");
                           }}
-                          className="h-9 w-9 rounded-xl border border-border/70 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary cursor-pointer transition-colors shrink-0 mt-0.5 sm:mt-0"
+                          className="h-8 w-8 rounded-xl border border-border/70 flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary cursor-pointer transition-colors shrink-0"
                           title={t("backToAllCollections")}
                         >
                           <ArrowLeft className="h-4 w-4" />
                         </button>
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="h-11 w-11 rounded-2xl bg-secondary/80 border border-border/70 flex items-center justify-center text-foreground shadow-2xs shrink-0">
-                            <ModuleIcon icon={activeCollection.emoji} className="w-5 h-5 text-foreground" />
-                          </div>
-                          <div className="min-w-0">
-                            <h2 className="font-serif text-2xl sm:text-3xl font-normal tracking-tight text-foreground leading-tight truncate">
+                        <div className="h-10 w-10 rounded-xl bg-secondary/80 border border-border/70 flex items-center justify-center text-foreground shadow-2xs shrink-0">
+                          <ModuleIcon icon={activeCollection.emoji} className="w-5 h-5 text-foreground" />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2.5">
+                            <h1 className="font-serif text-2xl sm:text-3xl font-normal tracking-tight text-foreground truncate">
                               {activeCollection.name}
-                            </h2>
-                            <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
-                              <span>
-                                {collectionLearns.length}{" "}
-                                {language === "id" ? "materi belajar" : "notebooks"}
-                              </span>
-                              {activeCollection.description && (
-                                <>
-                                  <span>•</span>
-                                  <span className="line-clamp-1 truncate max-w-xs">{activeCollection.description}</span>
-                                </>
-                              )}
-                            </div>
+                            </h1>
+                            <span className="text-xs px-2.5 py-0.5 rounded-full bg-secondary text-muted-foreground font-sans">
+                              {collectionLearns.length === 1
+                                ? t("learnCountTextSingle")
+                                : t("learnCountText", { count: collectionLearns.length })}
+                            </span>
                           </div>
+                          <p className="text-xs text-muted-foreground mt-0.5 truncate max-w-xl">
+                            {activeCollection.description || t("modulesSubtitle")}
+                          </p>
                         </div>
                       </div>
 
                       {/* Collection Actions */}
-                      <div className="flex items-center gap-2 self-end sm:self-auto flex-wrap shrink-0">
-                        {/* Search within collection */}
-                        <div className="relative flex items-center">
-                          <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
-                          <Input
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            placeholder={language === "id" ? "Cari dalam folder..." : "Search in folder..."}
-                            className="h-8 w-36 sm:w-48 pl-8 pr-7 text-xs rounded-xl bg-card border-border text-foreground placeholder-muted-foreground focus-visible:ring-1 focus-visible:ring-primary/40 shadow-none"
-                          />
-                          {searchQuery && (
-                            <button
-                              type="button"
-                              onClick={() => setSearchQuery("")}
-                              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
-                            >
-                              <X className="w-3.5 h-3.5" />
-                            </button>
-                          )}
+                      <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap shrink-0">
+                        {/* View Mode Toggle (Grid vs List/Rows) */}
+                        <div className="flex items-center p-0.5 rounded-xl bg-muted/70 border border-border">
+                          <button
+                            type="button"
+                            onClick={() => setViewMode("grid")}
+                            className={`p-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                              viewMode === "grid"
+                                ? "bg-background text-foreground shadow-2xs"
+                                : "text-muted-foreground hover:text-foreground"
+                            }`}
+                            title="Grid"
+                            aria-label="Grid"
+                          >
+                            <LayoutGrid className="w-4 h-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setViewMode("list")}
+                            className={`p-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                              viewMode === "list"
+                                ? "bg-background text-foreground shadow-2xs"
+                                : "text-muted-foreground hover:text-foreground"
+                            }`}
+                            title="List"
+                            aria-label="List"
+                          >
+                            <ListIcon className="w-4 h-4" />
+                          </button>
                         </div>
-
-                        {/* View Mode Toggle */}
-                        <button
-                          type="button"
-                          onClick={() => setViewMode(viewMode === "grid" ? "list" : "grid")}
-                          className="h-8 w-8 rounded-xl flex items-center justify-center hover:bg-secondary text-muted-foreground hover:text-foreground cursor-pointer border border-border/60 transition-colors"
-                          title={viewMode === "grid" ? "Tampilan Daftar" : "Tampilan Grid"}
-                        >
-                          {viewMode === "grid" ? <ListIcon className="h-4 w-4" /> : <LayoutGrid className="h-4 w-4" />}
-                        </button>
 
                         {/* Multi-Select Toggle */}
                         <Button
@@ -1153,22 +1131,43 @@ export function LearnHome({
                           <span className="hidden sm:inline">{isSelectionMode ? t("cancelSelect") : t("select")}</span>
                         </Button>
 
+                        {/* Search within collection */}
+                        <div className="relative">
+                          <Search className="w-3.5 h-3.5 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                          <Input
+                            type="text"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder={language === "id" ? "Cari dalam folder..." : "Search in folder..."}
+                            className="h-8 w-36 sm:w-48 pl-8 pr-7 text-xs rounded-xl bg-card border-border text-foreground placeholder-muted-foreground focus-visible:ring-1 focus-visible:ring-primary/40 shadow-none"
+                          />
+                          {searchQuery && (
+                            <button
+                              type="button"
+                              onClick={() => setSearchQuery("")}
+                              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+
                         {/* Import Learn Button */}
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => setIsImportDialogOpen(true)}
-                          className="h-8 px-3 rounded-xl text-xs font-medium gap-1.5 border-border hover:bg-secondary cursor-pointer"
+                          className="h-8 px-3 rounded-xl text-xs font-medium gap-1.5 border-border/70 hover:bg-secondary text-muted-foreground hover:text-foreground cursor-pointer"
                         >
                           <FolderInput className="w-3.5 h-3.5 text-primary" />
-                          <span>{language === "id" ? "Import Materi" : "Import Notebooks"}</span>
+                          <span className="hidden sm:inline">{language === "id" ? "Import Materi" : "Import"}</span>
                         </Button>
 
                         {/* New Learn inside this collection */}
                         <Button
                           size="sm"
                           onClick={() => handleCreateNewLearn(activeCollection.id)}
-                          className="h-8 px-3 rounded-xl text-xs font-medium gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer shadow-none"
+                          className="h-8 px-3.5 rounded-xl text-xs font-medium gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 transition-all cursor-pointer shadow-none"
                         >
                           <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
                           <span>{t("newLearn")}</span>
@@ -1227,6 +1226,7 @@ export function LearnHome({
                       {viewMode === "grid" && (
                         <CreateCard
                           type="learn"
+                          viewMode={viewMode}
                           onClick={() => handleCreateNewLearn(activeCollection.id)}
                         />
                       )}
@@ -1258,49 +1258,38 @@ export function LearnHome({
                       ))}
                     </div>
 
-                    {/* Empty State */}
-                    {collectionLearns.length === 0 && (
-                      <div className="text-center py-14 px-4 bg-card/40 rounded-2xl border border-dashed border-border flex flex-col items-center justify-center">
-                        <div className="h-12 w-12 rounded-2xl bg-secondary/80 border border-border flex items-center justify-center mb-3">
-                          <Folder className="w-5 h-5 text-muted-foreground" />
+                    {/* Empty State when no learns in collection - only in list mode */}
+                    {viewMode === "list" && collectionLearns.length === 0 && !searchQuery && (
+                      <div className="flex-1 flex flex-col items-center justify-center text-center min-h-[50vh] sm:min-h-[55vh] py-12 px-4 select-none">
+                        <div className="h-16 w-16 rounded-3xl bg-secondary/80 border border-border/80 flex items-center justify-center text-muted-foreground mb-4 shadow-2xs">
+                          <BookOpen className="h-7 w-7 stroke-[1.5] text-muted-foreground/80" />
                         </div>
-                        <h3 className="text-sm font-medium text-foreground mb-1">
-                          {searchQuery
-                            ? t("noLearnsMatchSearch", { query: searchQuery })
-                            : language === "id"
-                            ? "Folder ini masih kosong"
-                            : "This folder is empty"}
+                        <h3 className="text-base sm:text-lg font-medium text-foreground mb-1.5 tracking-tight font-sans">
+                          {t("noLearnsInCollection")}
                         </h3>
-                        <p className="text-xs text-muted-foreground max-w-sm">
-                          {searchQuery
-                            ? language === "id"
-                              ? "Coba kata kunci lain untuk mencari di dalam folder ini."
-                              : "Try searching with different keywords."
-                            : language === "id"
-                            ? "Mulai tambahkan materi belajar ke dalam folder ini dengan membuat learn baru atau mengimpor dari materi yang sudah ada."
-                            : "Start organizing your notebooks here by creating a new one or importing existing ones."}
+                        <p className="text-xs sm:text-sm text-muted-foreground max-w-sm mb-5 leading-relaxed font-sans">
+                          {t("noLearnsInCollectionDesc")}
                         </p>
-                        {!searchQuery && (
-                          <div className="flex items-center gap-2 mt-4">
-                            <Button
-                              size="sm"
-                              onClick={() => handleCreateNewLearn(activeCollection.id)}
-                              className="h-8 px-3.5 rounded-xl text-xs font-medium cursor-pointer shadow-none"
-                            >
-                              <Plus className="w-3.5 h-3.5 mr-1 stroke-[2.5]" />
-                              <span>{t("newLearn")}</span>
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => setIsImportDialogOpen(true)}
-                              className="h-8 px-3.5 rounded-xl text-xs font-medium border-border hover:bg-secondary cursor-pointer"
-                            >
-                              <FolderInput className="w-3.5 h-3.5 mr-1.5 text-primary" />
-                              <span>{language === "id" ? "Import dari yang Ada" : "Import Existing"}</span>
-                            </Button>
-                          </div>
-                        )}
+                        <Button
+                          size="sm"
+                          onClick={() => handleCreateNewLearn(activeCollection.id)}
+                          className="h-9 px-4 rounded-xl text-xs font-medium gap-1.5 cursor-pointer shadow-xs active:scale-95"
+                        >
+                          <Plus className="h-4 w-4 stroke-[2.5]" />
+                          <span>{t("createCardLearn")}</span>
+                        </Button>
+                      </div>
+                    )}
+
+                    {/* Empty Search Result State */}
+                    {collectionLearns.length === 0 && searchQuery && (
+                      <div className="flex-1 flex flex-col items-center justify-center text-center min-h-[40vh] py-12 px-4">
+                        <div className="h-12 w-12 rounded-2xl bg-secondary/60 border border-border/70 flex items-center justify-center text-muted-foreground mb-3 shadow-2xs">
+                          <Search className="h-5 w-5 text-muted-foreground/70" />
+                        </div>
+                        <p className="text-sm font-medium text-foreground mb-1 font-sans">
+                          {t("noLearnsMatchSearch", { query: searchQuery })}
+                        </p>
                       </div>
                     )}
                   </div>
@@ -1315,7 +1304,9 @@ export function LearnHome({
                             {t("collections")}
                           </h1>
                           <span className="text-xs px-2.5 py-0.5 rounded-full bg-secondary text-muted-foreground font-sans">
-                            {t("collectionsCountText", { count: collections.length })}
+                            {collections.length === 1
+                              ? t("collectionsCountTextSingle")
+                              : t("collectionsCountText", { count: collections.length })}
                           </span>
                         </div>
                         <p className="text-xs text-muted-foreground mt-0.5">
@@ -1329,7 +1320,7 @@ export function LearnHome({
                             <Button
                               variant="outline"
                               size="sm"
-                              className="h-8 px-2.5 rounded-xl text-xs font-medium gap-1.5 border-border/70 hover:bg-secondary text-muted-foreground hover:text-foreground cursor-pointer"
+                              className="h-8 w-8 p-0 rounded-xl border-border/70 hover:bg-secondary text-muted-foreground hover:text-foreground cursor-pointer flex items-center justify-center"
                               title={t("sortBy")}
                             >
                               {folderSortDirection === "asc" ? (
@@ -1337,7 +1328,6 @@ export function LearnHome({
                               ) : (
                                 <ArrowDown className="w-3.5 h-3.5" />
                               )}
-                              <span className="hidden sm:inline">{getSortLabel(folderSortBy)}</span>
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-52 p-1.5 shadow-md">
@@ -1385,24 +1375,6 @@ export function LearnHome({
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
-
-                        {/* Group by Icon Toggle */}
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setFolderGroupByIcon((v) => !v);
-                            setCollapsedIconGroups(new Set());
-                          }}
-                          className={`h-8 px-2.5 rounded-xl text-xs font-medium gap-1.5 transition-all cursor-pointer ${
-                            folderGroupByIcon
-                              ? "bg-primary/10 border-primary/40 text-primary hover:bg-primary/20"
-                              : "border-border/70 hover:bg-secondary text-muted-foreground hover:text-foreground"
-                          }`}
-                          title={language === "id" ? "Kelompokkan berdasarkan ikon" : "Group by icon"}
-                        >
-                          <Rows3 className="w-3.5 h-3.5" />
-                        </Button>
 
                         {/* View Mode Toggle */}
                         <div className="flex items-center p-0.5 rounded-xl bg-muted/70 border border-border">
@@ -1456,6 +1428,27 @@ export function LearnHome({
                           <span className="hidden sm:inline">{isSelectionMode ? t("cancelSelect") : t("select")}</span>
                         </Button>
 
+                        {/* Search Input */}
+                        <div className="relative">
+                          <Search className="w-3.5 h-3.5 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                          <Input
+                            type="text"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            placeholder={t("searchCollections")}
+                            className="h-8 w-36 sm:w-48 pl-8 pr-7 text-xs rounded-xl bg-card border-border text-foreground placeholder-muted-foreground focus-visible:ring-1 focus-visible:ring-primary/40 shadow-none"
+                          />
+                          {searchQuery && (
+                            <button
+                              type="button"
+                              onClick={() => setSearchQuery("")}
+                              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
+                            >
+                              <X className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+                        </div>
+
                         <Button
                           size="sm"
                           onClick={() => {
@@ -1470,133 +1463,88 @@ export function LearnHome({
                       </div>
                     </div>
 
-                    {/* ---- Grouped by icon view ---- */}
-                    {folderGroupByIcon ? (
-                      <div className="space-y-1">
-                        {groupedCollections.length === 0 && (
-                          <p className="text-sm text-muted-foreground text-center py-12">
-                            {t("noCollectionsYet")}
-                          </p>
-                        )}
-                        {groupedCollections.map((group) => {
-                          const isCollapsed = collapsedIconGroups.has(group.iconId);
-                          const IconComp = getModuleIconDef(group.iconId).icon;
-                          const toggleGroup = () =>
-                            setCollapsedIconGroups((prev) => {
-                              const next = new Set(prev);
-                              if (next.has(group.iconId)) next.delete(group.iconId);
-                              else next.add(group.iconId);
-                              return next;
-                            });
+                    {/* Flat collections view */}
+                    <div
+                      className={
+                        viewMode === "grid"
+                          ? "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4"
+                          : "space-y-2"
+                      }
+                    >
+                      {viewMode === "grid" && (
+                        <CreateCard
+                          type="collection"
+                          viewMode={viewMode}
+                          onClick={() => {
+                            setEditingCollection(null);
+                            setIsCreateCollectionOpen(true);
+                          }}
+                        />
+                      )}
 
-                          return (
-                            <div key={group.iconId} className="rounded-xl border border-border/60 overflow-hidden">
-                              {/* Group header — clickable to collapse/expand */}
-                              <button
-                                type="button"
-                                onClick={toggleGroup}
-                                className="w-full flex items-center gap-2.5 px-3.5 py-2.5 bg-muted/40 hover:bg-muted/70 transition-colors text-left cursor-pointer group"
-                              >
-                                <IconComp className="w-4 h-4 text-muted-foreground shrink-0" />
-                                <span className="text-sm font-medium text-foreground flex-1">
-                                  {group.label}
-                                </span>
-                                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-secondary text-muted-foreground font-mono mr-1">
-                                  {group.items.length}
-                                </span>
-                                {isCollapsed ? (
-                                  <ChevronRight className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground transition-colors" />
-                                ) : (
-                                  <ChevronDown className="w-3.5 h-3.5 text-muted-foreground group-hover:text-foreground transition-colors" />
-                                )}
-                              </button>
+                      {filteredCollections.map((col) => (
+                        <CollectionCard
+                          key={col.id}
+                          collection={col}
+                          viewMode={viewMode}
+                          isSelectionMode={isSelectionMode}
+                          isSelected={selectedCollectionIds.has(col.id)}
+                          onSelect={toggleCollectionSelection}
+                          onClick={(c) => {
+                            localDb.markCollectionOpened(c.id).catch(() => {});
+                            setActiveCollectionId(c.id);
+                          }}
+                          onEdit={(c) => {
+                            setEditingCollection(c);
+                            setIsCreateCollectionOpen(true);
+                          }}
+                          onDelete={(c) =>
+                            setDeleteTarget({
+                              type: "collection",
+                              id: c.id,
+                              title: t("deleteCollectionTitle", { name: c.name }),
+                              description: t("deleteCollectionConfirm"),
+                            })
+                          }
+                        />
+                      ))}
+                    </div>
 
-                              {/* Group body */}
-                              {!isCollapsed && (
-                                <div
-                                  className={
-                                    viewMode === "grid"
-                                      ? "p-3 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3"
-                                      : "divide-y divide-border/40"
-                                  }
-                                >
-                                  {group.items.map((col) => (
-                                    <CollectionCard
-                                      key={col.id}
-                                      collection={col}
-                                      viewMode={viewMode}
-                                      isSelectionMode={isSelectionMode}
-                                      isSelected={selectedCollectionIds.has(col.id)}
-                                      onSelect={toggleCollectionSelection}
-                                      onClick={(c) => {
-                                        localDb.markCollectionOpened(c.id).catch(() => {});
-                                        setActiveCollectionId(c.id);
-                                      }}
-                                      onEdit={(c) => {
-                                        setEditingCollection(c);
-                                        setIsCreateCollectionOpen(true);
-                                      }}
-                                      onDelete={(c) =>
-                                        setDeleteTarget({
-                                          type: "collection",
-                                          id: c.id,
-                                          title: t("deleteCollectionTitle", { name: c.name }),
-                                          description: t("deleteCollectionConfirm"),
-                                        })
-                                      }
-                                    />
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
+                    {/* Empty State when no collections exist - only in list mode */}
+                    {viewMode === "list" && collections.length === 0 && !searchQuery && (
+                      <div className="flex-1 flex flex-col items-center justify-center text-center min-h-[50vh] sm:min-h-[55vh] py-12 px-4 select-none">
+                        <div className="h-16 w-16 rounded-3xl bg-secondary/80 border border-border/80 flex items-center justify-center text-muted-foreground mb-4 shadow-2xs">
+                          <FolderPlus className="h-7 w-7 stroke-[1.5] text-muted-foreground/80" />
+                        </div>
+                        <h3 className="text-base sm:text-lg font-medium text-foreground mb-1.5 tracking-tight font-sans">
+                          {t("noCollectionsYet")}
+                        </h3>
+                        <p className="text-xs sm:text-sm text-muted-foreground max-w-sm mb-5 leading-relaxed font-sans">
+                          {t("noCollectionsYetDesc")}
+                        </p>
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            setEditingCollection(null);
+                            setIsCreateCollectionOpen(true);
+                          }}
+                          className="h-9 px-4 rounded-xl text-xs font-medium gap-1.5 cursor-pointer shadow-xs active:scale-95"
+                        >
+                          <Plus className="h-4 w-4 stroke-[2.5]" />
+                          <span>{t("createCardCollection")}</span>
+                        </Button>
                       </div>
-                    ) : (
-                      /* ---- Flat view (default) ---- */
-                      <div
-                        className={
-                          viewMode === "grid"
-                            ? "grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4"
-                            : "space-y-2"
-                        }
-                      >
-                        {viewMode === "grid" && (
-                          <CreateCard
-                            type="collection"
-                            onClick={() => {
-                              setEditingCollection(null);
-                              setIsCreateCollectionOpen(true);
-                            }}
-                          />
-                        )}
+                    )}
 
-                        {filteredCollections.map((col) => (
-                          <CollectionCard
-                            key={col.id}
-                            collection={col}
-                            viewMode={viewMode}
-                            isSelectionMode={isSelectionMode}
-                            isSelected={selectedCollectionIds.has(col.id)}
-                            onSelect={toggleCollectionSelection}
-                            onClick={(c) => {
-                              localDb.markCollectionOpened(c.id).catch(() => {});
-                              setActiveCollectionId(c.id);
-                            }}
-                            onEdit={(c) => {
-                              setEditingCollection(c);
-                              setIsCreateCollectionOpen(true);
-                            }}
-                            onDelete={(c) =>
-                              setDeleteTarget({
-                                type: "collection",
-                                id: c.id,
-                                title: t("deleteCollectionTitle", { name: c.name }),
-                                description: t("deleteCollectionConfirm"),
-                              })
-                            }
-                          />
-                        ))}
+                    {/* Empty Search Result State */}
+                    {filteredCollections.length === 0 && searchQuery && (
+                      <div className="flex-1 flex flex-col items-center justify-center text-center min-h-[40vh] py-12 px-4">
+                        <div className="h-12 w-12 rounded-2xl bg-secondary/60 border border-border/70 flex items-center justify-center text-muted-foreground mb-3 shadow-2xs">
+                          <Search className="h-5 w-5 text-muted-foreground/70" />
+                        </div>
+                        <p className="text-sm font-medium text-foreground mb-1 font-sans">
+                          {t("noCollectionsMatchSearch", { query: searchQuery })}
+                        </p>
                       </div>
                     )}
                   </div>

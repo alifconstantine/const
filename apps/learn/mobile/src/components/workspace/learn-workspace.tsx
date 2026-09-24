@@ -21,9 +21,11 @@ import { CreateArtifactSheet } from "./create-artifact-sheet";
 import { CreateMindMapSheet } from "./create-mind-map-sheet";
 import { CreateAudioSummarySheet } from "./create-audio-summary-sheet";
 import { CreatePresentationSheet } from "./create-presentation-sheet";
+import { CreateInfographicSheet } from "./create-infographic-sheet";
+import { CreateReportSheet } from "./create-report-sheet";
 import { ModelSelectionSheet } from "../home/sheets/model-selection-sheet";
 import { MobileArtifactReader } from "./mobile-artifact-reader";
-import { generateStudioArtifact, generatePresentationArtifact } from "../../lib/studio/generator";
+import { generateStudioArtifact, generatePresentationArtifact, generateInfographicArtifact, generateReportArtifact } from "../../lib/studio/generator";
 import { WorkingProcess } from "./working-process";
 import { ImageLightbox } from "./image-lightbox";
 import {
@@ -527,7 +529,10 @@ export function MobileLearnWorkspace({
   const [isCreateMindMapSheetOpen, setIsCreateMindMapSheetOpen] = useState(false);
   const [isCreateAudioSummaryOpen, setIsCreateAudioSummaryOpen] = useState(false);
   const [isCreatePresentationOpen, setIsCreatePresentationOpen] = useState(false);
-  const [isVoiceModelSheetOpen, setIsVoiceModelSheetOpen] = useState(false);
+  const [isCreateInfographicOpen, setIsCreateInfographicOpen] = useState(false);
+  const [isCreateReportSheetOpen, setIsCreateReportSheetOpen] = useState(false);
+  const [modelSelectionCategory, setModelSelectionCategory] = useState<"llm" | "voice" | "image">("voice");
+  const [isModelSelectionSheetOpen, setIsModelSelectionSheetOpen] = useState(false);
   const [generatingArtifacts, setGeneratingArtifacts] = useState<GeneratingArtifactStatus[]>([]);
   const [selectedReaderArtifact, setSelectedReaderArtifact] = useState<LocalArtifact | null>(null);
   const [isReaderOpen, setIsReaderOpen] = useState(false);
@@ -1315,10 +1320,14 @@ export function MobileLearnWorkspace({
       art.type === "flashcard" ||
       art.type === "mind_map" ||
       art.type === "slides" ||
+      art.type === "infographic" ||
+      art.type === "report" ||
+      art.data?.imageUrl ||
       art.data?.questions ||
       art.data?.cards ||
       art.data?.root ||
-      art.data?.slides
+      art.data?.slides ||
+      art.data?.sections
     ) {
       handleOpenArtifactReader(art);
       return;
@@ -1636,7 +1645,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
     setSearchQuery("");
   };
 
-  const handleSelectStudioTool = (toolId: string, _toolTitle: string) => {
+  const handleSelectStudioTool = (toolId: string, _toolTitle?: string) => {
     if (toolId === "quiz") {
       setCreateArtifactType("quiz");
       setIsCreateArtifactSheetOpen(true);
@@ -1657,6 +1666,14 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
     }
     if (toolId === "slides" || toolId === "presentation") {
       setIsCreatePresentationOpen(true);
+      return;
+    }
+    if (toolId === "infographic") {
+      setIsCreateInfographicOpen(true);
+      return;
+    }
+    if (toolId === "report") {
+      setIsCreateReportSheetOpen(true);
       return;
     }
     // Other tools: strictly no-op as requested
@@ -1850,6 +1867,162 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
         language === "id"
           ? `Gagal membuat presentasi: ${err?.message || "Terjadi kesalahan"}`
           : `Failed to create presentation: ${err?.message || "An error occurred"}`
+      );
+    }
+  };
+
+  const handleGenerateInfographic = async (params: {
+    selectedSourceIds: string[];
+    language: "id" | "en";
+    orientation: "landscape" | "portrait" | "square";
+    style: string;
+    detailLevel: "brief" | "standard" | "detailed";
+    customDescription?: string;
+    providerId?: string;
+    modelId?: string;
+  }) => {
+    if (!learnId) return;
+
+    const selectedSources = (sources || []).filter((s) =>
+      params.selectedSourceIds.includes(s.id)
+    );
+    if (selectedSources.length === 0) return;
+
+    const isIndo = params.language === "id";
+    const title = isIndo ? "Infografis Materi" : "Study Infographic";
+
+    // 1. Create generating artifact in Dexie
+    const artId = await localDb.createArtifact({
+      learnId,
+      title: isIndo ? "Membuat Infografis..." : "Creating Infographic...",
+      type: "infographic",
+      status: "generating",
+      sourcesCount: selectedSources.length,
+      content: "",
+    });
+
+    // Open StudioSheet so user sees progress card immediately
+    setIsStudioSheetOpen(true);
+
+    try {
+      const result = await generateInfographicArtifact({
+        artifactId: artId,
+        learnId,
+        sources: selectedSources,
+        language: params.language,
+        orientation: params.orientation,
+        style: params.style,
+        detailLevel: params.detailLevel,
+        customDescription: params.customDescription,
+        providerId: params.providerId,
+        modelId: params.modelId,
+      });
+
+      await localDb.updateArtifact(artId, {
+        title: result.title || title,
+        data: result.data,
+        content: JSON.stringify(result.data),
+        status: "completed",
+      });
+
+      toast.success(
+        isIndo ? "Infografis berhasil dibuat!" : "Infographic created successfully!"
+      );
+
+      const fullArt = await localDb.getArtifact(artId);
+      if (fullArt) {
+        setIsStudioSheetOpen(false);
+        setSelectedReaderArtifact(fullArt);
+        setIsReaderOpen(true);
+      }
+    } catch (err: any) {
+      console.error("Failed to generate infographic on mobile:", err);
+      await localDb.updateArtifact(artId, {
+        title,
+        status: "error",
+        error: err?.message || "Generation failed",
+      });
+      toast.error(
+        isIndo
+          ? `Gagal membuat infografis: ${err?.message || "Terjadi kesalahan"}`
+          : `Failed to create infographic: ${err?.message || "An error occurred"}`
+      );
+    }
+  };
+
+  const handleGenerateReport = async (options: {
+    selectedSourceIds: string[];
+    format: "interactive" | "document";
+    templateId: string;
+    templateTitle: string;
+    templateDescription?: string;
+    depth: "short" | "medium" | "long" | "auto";
+    language: "id" | "en";
+    customInstructions?: string;
+  }) => {
+    if (!learnId) return;
+
+    const selectedSources = (sources || []).filter((s) =>
+      options.selectedSourceIds.includes(s.id)
+    );
+    if (selectedSources.length === 0) return;
+
+    const isIndo = options.language === "id";
+    const title = options.templateTitle || (isIndo ? "Laporan Pembelajaran" : "Learning Report");
+
+    const artId = await localDb.createArtifact({
+      learnId,
+      title: isIndo ? "Menyusun Laporan..." : "Generating Report...",
+      type: "report",
+      status: "generating",
+      sourcesCount: selectedSources.length,
+      content: "",
+    });
+
+    setIsStudioSheetOpen(true);
+
+    try {
+      const result = await generateReportArtifact({
+        artifactId: artId,
+        learnId,
+        sources: selectedSources,
+        format: options.format,
+        templateId: options.templateId,
+        templateTitle: options.templateTitle,
+        templateDescription: options.templateDescription,
+        depth: options.depth,
+        language: options.language,
+        customInstructions: options.customInstructions,
+      });
+
+      await localDb.updateArtifact(artId, {
+        title: result.title || title,
+        data: result.data,
+        content: JSON.stringify(result.data),
+        status: "completed",
+      });
+
+      toast.success(
+        isIndo ? "Laporan berhasil dibuat!" : "Report created successfully!"
+      );
+
+      const fullArt = await localDb.getArtifact(artId);
+      if (fullArt) {
+        setIsStudioSheetOpen(false);
+        setSelectedReaderArtifact(fullArt);
+        setIsReaderOpen(true);
+      }
+    } catch (err: any) {
+      console.error("Failed to generate report on mobile:", err);
+      await localDb.updateArtifact(artId, {
+        title,
+        status: "error",
+        error: err?.message || "Generation failed",
+      });
+      toast.error(
+        isIndo
+          ? `Gagal membuat laporan: ${err?.message || "Terjadi kesalahan"}`
+          : `Failed to create report: ${err?.message || "An error occurred"}`
       );
     }
   };
@@ -2328,22 +2501,44 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
                   </div>
                 </div>
               ) : (
-                <div className="flex-1 flex flex-col items-center justify-center text-center py-12 px-4 text-muted-foreground">
-                  <div className="text-3xl mb-2">👋</div>
-                  <h2 className="text-base font-medium text-foreground mb-1">
-                    Mulai Belajar dengan Sumber
+                <div className="flex-1 flex flex-col items-center justify-center text-center my-auto py-10 px-4 text-muted-foreground select-none">
+                  <div className="h-12 w-12 rounded-2xl bg-secondary/80 border border-border/70 flex items-center justify-center text-xl mx-auto mb-3 shadow-2xs">
+                    👋
+                  </div>
+                  <h2 className="text-base sm:text-lg font-semibold text-foreground mb-1 tracking-tight font-sans">
+                    {t("welcomeNotebookTitle")}
                   </h2>
-                  <p className="text-xs leading-relaxed max-w-xs mb-4">
-                    Tambahkan tautan web, dokumen PDF, atau video YouTube untuk membuka sitasi dan pembelajaran terverifikasi.
+                  <p className="text-xs text-muted-foreground leading-relaxed max-w-xs mx-auto mb-4 font-sans">
+                    {t("welcomeNotebookDesc")}
                   </p>
-                  <button
-                    type="button"
-                    onClick={() => setIsAddSourceOpen(true)}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-foreground text-background font-medium text-xs cursor-pointer active:scale-95 shadow-xs"
-                  >
-                    <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
-                    <span>Tambahkan Sumber</span>
-                  </button>
+                  
+                  <div className="flex flex-col items-center gap-2.5 w-full max-w-xs">
+                    <button
+                      type="button"
+                      onClick={() => setIsAddSourceOpen(true)}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-primary text-primary-foreground font-medium text-xs cursor-pointer active:scale-95 shadow-xs"
+                    >
+                      <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
+                      <span>{t("addSource")}</span>
+                    </button>
+
+                    <div className="flex flex-col w-full gap-1.5 font-sans pt-1">
+                      {[
+                        t("chipLearnNewTopic"),
+                        t("chipCreateContent"),
+                        t("chipContinueProject"),
+                      ].map((chip) => (
+                        <button
+                          key={chip}
+                          type="button"
+                          onClick={() => handleSend(chip)}
+                          className="w-full text-center px-3.5 py-2 rounded-xl bg-secondary/60 hover:bg-secondary border border-border/70 text-xs font-medium text-foreground transition-all cursor-pointer active:scale-[0.98]"
+                        >
+                          {chip}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               )
             ) : (
@@ -2705,14 +2900,17 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
         onClose={() => setIsCreateAudioSummaryOpen(false)}
         sources={sources || []}
         onGenerate={handleGenerateStudioArtifact}
-        onOpenModelsSettings={() => setIsVoiceModelSheetOpen(true)}
+        onOpenModelsSettings={() => {
+          setModelSelectionCategory("voice");
+          setIsModelSelectionSheetOpen(true);
+        }}
       />
 
-      {/* Model Selection Sheet for Voice */}
+      {/* Model Selection Sheet for Voice, Image & LLM */}
       <ModelSelectionSheet
-        open={isVoiceModelSheetOpen}
-        onClose={() => setIsVoiceModelSheetOpen(false)}
-        initialCategory="voice"
+        open={isModelSelectionSheetOpen}
+        onClose={() => setIsModelSelectionSheetOpen(false)}
+        initialCategory={modelSelectionCategory}
       />
 
       {/* Create Presentation Bottom Sheet */}
@@ -2723,12 +2921,33 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
         onGenerate={handleGeneratePresentation}
       />
 
+      {/* Create Infographic Bottom Sheet */}
+      <CreateInfographicSheet
+        open={isCreateInfographicOpen}
+        onClose={() => setIsCreateInfographicOpen(false)}
+        sources={sources || []}
+        onGenerate={handleGenerateInfographic}
+        onOpenModelsSettings={() => {
+          setModelSelectionCategory("image");
+          setIsModelSelectionSheetOpen(true);
+        }}
+      />
+
+      {/* Create Report Bottom Sheet */}
+      <CreateReportSheet
+        open={isCreateReportSheetOpen}
+        onClose={() => setIsCreateReportSheetOpen(false)}
+        sources={sources || []}
+        onGenerate={handleGenerateReport}
+      />
+
       {/* Interactive Full-Screen Reader Overlay */}
       <MobileArtifactReader
         open={isReaderOpen}
         onClose={() => setIsReaderOpen(false)}
         artifact={selectedReaderArtifact}
         onExplainInChat={handleExplainInChat}
+        onSelectStudioTool={handleSelectStudioTool}
       />
 
       {/* Add Source Pop-up Modal */}

@@ -23,7 +23,6 @@ import {
   Plus,
   ChevronRight,
   ArrowLeft,
-  Folder,
   FolderInput,
   FolderMinus,
   FolderPlus,
@@ -245,15 +244,6 @@ export function LearnHome({
     return "desc";
   });
 
-  const [folderGroupByIcon, setFolderGroupByIcon] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem("const_learn_folder_group_icon") === "1";
-    } catch {}
-    return false;
-  });
-
-  const [collapsedIconGroups, setCollapsedIconGroups] = useState<Set<string>>(new Set());
-
   useEffect(() => {
     try {
       localStorage.setItem("const_learn_folder_sort_by", folderSortBy);
@@ -265,12 +255,6 @@ export function LearnHome({
       localStorage.setItem("const_learn_folder_sort_direction", folderSortDirection);
     } catch {}
   }, [folderSortDirection]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem("const_learn_folder_group_icon", folderGroupByIcon ? "1" : "0");
-    } catch {}
-  }, [folderGroupByIcon]);
 
   const getSortLabel = (sort: FolderSortBy) => {
     switch (sort) {
@@ -538,20 +522,6 @@ export function LearnHome({
       return folderSortDirection === "asc" ? result : -result;
     });
   }, [collectionsData, searchQuery, folderSortBy, folderSortDirection]);
-
-  // Grouped collections by icon (for groupByIcon mode)
-  const groupedCollections = useMemo(() => {
-    const groupMap = new Map<string, { iconId: string; label: string; items: CollectionItem[] }>();
-    for (const col of filteredCollections) {
-      const iconId = col.emoji || "folder";
-      if (!groupMap.has(iconId)) {
-        const label = getModuleIconLabel(iconId, language);
-        groupMap.set(iconId, { iconId, label, items: [] });
-      }
-      groupMap.get(iconId)!.items.push(col);
-    }
-    return Array.from(groupMap.values()).sort((a, b) => a.label.localeCompare(b.label));
-  }, [filteredCollections, language]);
 
   // Notebooks that have sources attached
   const sourcesLearns = useMemo(() => {
@@ -989,7 +959,7 @@ export function LearnHome({
                     />
                   ))
                 ) : (
-                  <div className="text-center py-6 px-4 bg-card rounded-2xl border border-dashed border-border/80 shadow-2xs">
+                  <div className="text-center py-8 px-4">
                     <p className="text-xs text-muted-foreground">{t("noLearnsFound")}</p>
                   </div>
                 )}
@@ -1049,7 +1019,7 @@ export function LearnHome({
                     />
                   ))
                 ) : (
-                  <div className="text-center py-6 px-4 bg-card rounded-2xl border border-dashed border-border/80 shadow-2xs">
+                  <div className="text-center py-8 px-4">
                     <p className="text-xs text-muted-foreground">{t("noCollectionsYet")}</p>
                   </div>
                 )}
@@ -1100,16 +1070,30 @@ export function LearnHome({
                     }
                   />
                 ))
-              ) : (
-                <div className="text-center py-12 px-4 bg-card rounded-2xl border border-dashed border-border/80 shadow-2xs">
-                  <div className="h-10 w-10 rounded-xl bg-secondary border border-border flex items-center justify-center text-lg mx-auto mb-2 text-muted-foreground">
-                    📘
+              ) : !searchQuery ? (
+                <div className="flex-1 flex flex-col items-center justify-center text-center min-h-[48vh] py-12 px-4 select-none">
+                  <div className="h-14 w-14 rounded-2xl bg-secondary/80 border border-border/70 flex items-center justify-center text-muted-foreground mb-3 shadow-2xs">
+                    <BookOpen className="h-6 w-6 stroke-[1.5] text-muted-foreground/80" />
                   </div>
-                  <h3 className="text-sm font-medium text-foreground mb-1">
+                  <h3 className="text-sm font-semibold text-foreground mb-1 font-sans">
                     {t("noLearnsFound")}
                   </h3>
+                  <p className="text-xs text-muted-foreground max-w-xs mx-auto mb-4 font-sans leading-relaxed">
+                    {t("noLearnsDescription")}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => handleCreateNewLearn()}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-primary text-primary-foreground text-xs font-medium transition-colors cursor-pointer shadow-xs active:scale-95"
+                  >
+                    <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
+                    <span>{t("newLearn")}</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="text-center py-12 px-4">
                   <p className="text-xs text-muted-foreground">
-                    {searchQuery ? t("noLearnsMatchSearch", { query: searchQuery }) : t("noLearnsDescription")}
+                    {t("noLearnsMatchSearch", { query: searchQuery })}
                   </p>
                 </div>
               )}
@@ -1158,23 +1142,19 @@ export function LearnHome({
                         <ModuleIcon icon={activeCollection.emoji} className="w-4 h-4 text-foreground" />
                       </div>
                       <div className="min-w-0">
-                        <h2 className="font-sans text-sm font-semibold text-foreground truncate leading-tight">
-                          {activeCollection.name}
-                        </h2>
-                        <div className="flex items-center gap-1.5 text-[11px] text-muted-foreground mt-0.5">
-                          <span>
-                            {collectionLearns.length}{" "}
-                            {language === "id" ? "materi" : "notebooks"}
+                        <div className="flex items-center gap-2">
+                          <h2 className="font-sans text-sm font-semibold text-foreground truncate leading-tight">
+                            {activeCollection.name}
+                          </h2>
+                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary border border-border/60 text-muted-foreground font-sans">
+                            {collectionLearns.length}
                           </span>
-                          {activeCollection.description && (
-                            <>
-                              <span>•</span>
-                              <span className="truncate max-w-[120px]">
-                                {activeCollection.description}
-                              </span>
-                            </>
-                          )}
                         </div>
+                        {activeCollection.description && (
+                          <p className="text-[11px] text-muted-foreground mt-0.5 truncate max-w-[200px]">
+                            {activeCollection.description}
+                          </p>
+                        )}
                       </div>
                     </div>
 
@@ -1268,38 +1248,34 @@ export function LearnHome({
                         }
                       />
                     ))
-                  ) : (
-                    <div className="text-center py-10 px-4 bg-card rounded-2xl border border-dashed border-border/80 shadow-2xs flex flex-col items-center">
-                      <div className="h-10 w-10 rounded-xl bg-secondary border border-border/60 flex items-center justify-center mb-2">
-                        <Folder className="w-5 h-5 text-muted-foreground" />
+                  ) : !searchQuery ? (
+                    <div className="flex-1 flex flex-col items-center justify-center text-center min-h-[48vh] py-12 px-4 select-none">
+                      <div className="h-14 w-14 rounded-2xl bg-secondary/80 border border-border/70 flex items-center justify-center text-muted-foreground mb-3 shadow-2xs">
+                        <BookOpen className="h-6 w-6 stroke-[1.5] text-muted-foreground/80" />
                       </div>
-                      <p className="text-xs font-medium text-foreground mb-0.5">
-                        {language === "id" ? "Folder ini masih kosong" : "This folder is empty"}
+                      <h3 className="text-sm font-semibold text-foreground mb-1 font-sans">
+                        {t("noLearnsInCollection")}
+                      </h3>
+                      <p className="text-xs text-muted-foreground max-w-xs mb-4 leading-relaxed font-sans">
+                        {t("noLearnsInCollectionDesc")}
                       </p>
-                      <p className="text-[11px] text-muted-foreground max-w-xs mb-3">
-                        {language === "id"
-                          ? "Mulai tambahkan materi belajar ke dalam folder ini."
-                          : "Start organizing notebooks inside this folder."}
+                      <button
+                        type="button"
+                        onClick={() => handleCreateNewLearn(activeCollection.id)}
+                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-medium transition-colors cursor-pointer shadow-xs active:scale-95"
+                      >
+                        <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
+                        <span>{t("createCardLearn")}</span>
+                      </button>
+                    </div>
+                  ) : null}
+
+                  {/* Empty Search Result State */}
+                  {collectionLearns.length === 0 && searchQuery && (
+                    <div className="text-center py-12 px-4">
+                      <p className="text-xs text-muted-foreground">
+                        {t("noLearnsMatchSearch", { query: searchQuery })}
                       </p>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          size="sm"
-                          onClick={() => handleCreateNewLearn(activeCollection.id)}
-                          className="h-7 px-3 rounded-full text-xs font-medium cursor-pointer"
-                        >
-                          <Plus className="h-3 w-3 mr-1 stroke-[2.5]" />
-                          <span>{t("newLearn")}</span>
-                        </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setIsImportDialogOpen(true)}
-                          className="h-7 px-3 rounded-full text-xs font-medium border-border cursor-pointer"
-                        >
-                          <FolderInput className="h-3 w-3 mr-1 text-primary" />
-                          <span>{language === "id" ? "Import" : "Import"}</span>
-                        </Button>
-                      </div>
                     </div>
                   )}
                 </div>
@@ -1383,23 +1359,6 @@ export function LearnHome({
                       </DropdownMenuContent>
                     </DropdownMenu>
 
-                    {/* Group by Icon Toggle */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setFolderGroupByIcon((v) => !v);
-                        setCollapsedIconGroups(new Set());
-                      }}
-                      className={`h-7 w-7 rounded-full border flex items-center justify-center transition-colors cursor-pointer shadow-2xs ${
-                        folderGroupByIcon
-                          ? "bg-primary/10 border-primary/40 text-primary"
-                          : "bg-secondary hover:bg-secondary/80 text-muted-foreground border-border/80"
-                      }`}
-                      title={language === "id" ? "Kelompokkan berdasarkan ikon" : "Group by icon"}
-                    >
-                      <Rows3 className="h-3 w-3" />
-                    </button>
-
                     <button
                       type="button"
                       onClick={() => {
@@ -1414,130 +1373,66 @@ export function LearnHome({
                   </div>
                 </div>
 
-                {/* Grouped by icon accordion view */}
-                {folderGroupByIcon ? (
-                  <div className="space-y-1.5">
-                    {groupedCollections.length === 0 && (
-                      <div className="text-center py-12 px-4 bg-card rounded-2xl border border-dashed border-border/80 shadow-2xs">
-                        <p className="text-xs text-muted-foreground">{t("noCollectionsYet")}</p>
+                {/* Flat list view */}
+                <div className="space-y-2">
+                  {filteredCollections.length > 0 ? (
+                    filteredCollections.map((col) => (
+                      <CollectionCard
+                        key={col.id}
+                        collection={col}
+                        viewMode={viewMode}
+                        isSelectionMode={isSelectionMode}
+                        isSelected={selectedCollectionIds.has(col.id)}
+                        onSelect={toggleCollectionSelection}
+                        onClick={(c) => {
+                          localDb.markCollectionOpened(c.id).catch(() => {});
+                          setActiveCollectionId(c.id);
+                        }}
+                        onEdit={(c) => {
+                          setEditingCollection(c);
+                          setIsCreateCollectionOpen(true);
+                        }}
+                        onDelete={(c) =>
+                          setDeleteTarget({
+                            type: "collection",
+                            id: c.id,
+                            title: t("deleteCollectionTitle", { name: c.name }),
+                            description: t("deleteCollectionConfirm"),
+                          })
+                        }
+                      />
+                    ))
+                  ) : !searchQuery ? (
+                    <div className="flex-1 flex flex-col items-center justify-center text-center min-h-[48vh] py-12 px-4 select-none">
+                      <div className="h-14 w-14 rounded-2xl bg-secondary/80 border border-border/70 flex items-center justify-center text-muted-foreground mb-3 shadow-2xs">
+                        <FolderPlus className="h-6 w-6 stroke-[1.5] text-muted-foreground/80" />
                       </div>
-                    )}
-                    {groupedCollections.map((group) => {
-                      const isCollapsed = collapsedIconGroups.has(group.iconId);
-                      const IconComp = getModuleIconDef(group.iconId).icon;
-                      const toggleGroup = () =>
-                        setCollapsedIconGroups((prev) => {
-                          const next = new Set(prev);
-                          if (next.has(group.iconId)) next.delete(group.iconId);
-                          else next.add(group.iconId);
-                          return next;
-                        });
-
-                      return (
-                        <div key={group.iconId} className="rounded-xl border border-border/60 overflow-hidden">
-                          {/* Group header */}
-                          <button
-                            type="button"
-                            onClick={toggleGroup}
-                            className="w-full flex items-center gap-2.5 px-3.5 py-2.5 bg-muted/40 active:bg-muted/80 transition-colors text-left cursor-pointer"
-                          >
-                            <IconComp className="w-4 h-4 text-muted-foreground shrink-0" />
-                            <span className="text-sm font-medium text-foreground flex-1">
-                              {group.label}
-                            </span>
-                            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-secondary text-muted-foreground font-mono mr-1">
-                              {group.items.length}
-                            </span>
-                            {isCollapsed ? (
-                              <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
-                            ) : (
-                              <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
-                            )}
-                          </button>
-
-                          {/* Group body */}
-                          {!isCollapsed && (
-                            <div className="divide-y divide-border/40">
-                              {group.items.map((col) => (
-                                <CollectionCard
-                                  key={col.id}
-                                  collection={col}
-                                  viewMode={viewMode}
-                                  isSelectionMode={isSelectionMode}
-                                  isSelected={selectedCollectionIds.has(col.id)}
-                                  onSelect={toggleCollectionSelection}
-                                  onClick={(c) => {
-                                    localDb.markCollectionOpened(c.id).catch(() => {});
-                                    setActiveCollectionId(c.id);
-                                  }}
-                                  onEdit={(c) => {
-                                    setEditingCollection(c);
-                                    setIsCreateCollectionOpen(true);
-                                  }}
-                                  onDelete={(c) =>
-                                    setDeleteTarget({
-                                      type: "collection",
-                                      id: c.id,
-                                      title: t("deleteCollectionTitle", { name: c.name }),
-                                      description: t("deleteCollectionConfirm"),
-                                    })
-                                  }
-                                />
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                ) : (
-                  /* Flat list view (default) */
-                  <div className="space-y-2">
-                    {filteredCollections.length > 0 ? (
-                      filteredCollections.map((col) => (
-                        <CollectionCard
-                          key={col.id}
-                          collection={col}
-                          viewMode={viewMode}
-                          isSelectionMode={isSelectionMode}
-                          isSelected={selectedCollectionIds.has(col.id)}
-                          onSelect={toggleCollectionSelection}
-                          onClick={(c) => {
-                            localDb.markCollectionOpened(c.id).catch(() => {});
-                            setActiveCollectionId(c.id);
-                          }}
-                          onEdit={(c) => {
-                            setEditingCollection(c);
-                            setIsCreateCollectionOpen(true);
-                          }}
-                          onDelete={(c) =>
-                            setDeleteTarget({
-                              type: "collection",
-                              id: c.id,
-                              title: t("deleteCollectionTitle", { name: c.name }),
-                              description: t("deleteCollectionConfirm"),
-                            })
-                          }
-                        />
-                      ))
-                    ) : (
-                      <div className="text-center py-12 px-4 bg-card rounded-2xl border border-dashed border-border/80 shadow-2xs">
-                        <p className="text-xs text-muted-foreground">{t("noCollectionsYet")}</p>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditingCollection(null);
-                            setIsCreateCollectionOpen(true);
-                          }}
-                          className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-secondary hover:bg-secondary/80 text-foreground text-xs font-medium border border-border/80 transition-colors cursor-pointer shadow-2xs"
-                        >
-                          <Plus className="h-3.5 w-3.5" />
-                          <span>{t("createCardCollection")}</span>
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
+                      <h3 className="text-sm font-semibold text-foreground mb-1 font-sans">
+                        {t("noCollectionsYet")}
+                      </h3>
+                      <p className="text-xs text-muted-foreground max-w-xs mb-4 leading-relaxed font-sans">
+                        {t("noCollectionsYetDesc")}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingCollection(null);
+                          setIsCreateCollectionOpen(true);
+                        }}
+                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-medium transition-colors cursor-pointer shadow-xs active:scale-95"
+                      >
+                        <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
+                        <span>{t("createCardCollection")}</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="text-center py-12 px-4">
+                      <p className="text-xs text-muted-foreground">
+                        {t("noCollectionsMatchSearch", { query: searchQuery })}
+                      </p>
+                    </div>
+                  )}
+                </div>
               </>
             )}
           </section>

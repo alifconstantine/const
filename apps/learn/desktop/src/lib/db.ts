@@ -258,13 +258,73 @@ export interface VideoSummaryData {
   updatedAt?: number;
 }
 
+export interface InfographicData {
+  id?: string;
+  learnId?: string;
+  title: string;
+  topic?: string;
+  imageUrl: string;
+  prompt: string;
+  visualPrompt?: string;
+  orientation: "landscape" | "portrait" | "square";
+  style: string;
+  styleLabel?: string;
+  detailLevel: "brief" | "standard" | "detailed";
+  language: "id" | "en" | string;
+  summary?: string;
+  keyPoints?: string[];
+  dimensions?: { width: number; height: number };
+  sourceCount?: number;
+  sourceTitles?: string[];
+  sourceIds?: string[];
+  modelUsed?: string;
+  providerUsed?: string;
+  createdAt?: number;
+  updatedAt?: number;
+}
+
+export interface ReportSectionWidget {
+  type: "infographic" | "quiz" | "flashcard" | "chart" | "callout" | string;
+  badge?: string;
+  title: string;
+  description?: string;
+  targetTool?: string;
+}
+
+export interface ReportSection {
+  id: string;
+  order: number;
+  title: string;
+  content: string; // Markdown with LaTeX KaTeX support
+  recommendedWidget?: ReportSectionWidget;
+}
+
+export interface ReportData {
+  id?: string;
+  learnId?: string;
+  title: string;
+  format: "interactive" | "document";
+  templateId: string;
+  depth?: "short" | "medium" | "long" | "auto";
+  language: "id" | "en";
+  sourceCount?: number;
+  sourceTitles?: string[];
+  sourceIds?: string[];
+  toc: Array<{ id: string; title: string; order: number }>;
+  sections: ReportSection[];
+  feedback?: "good" | "bad";
+  customInstructions?: string;
+  createdAt?: number;
+  updatedAt?: number;
+}
+
 export interface LocalArtifact {
   id: string;
   learnId?: string;
   title: string;
   type: string;
   content?: string;
-  data?: QuizData | FlashcardData | MindMapData | SlideDeckData | AudioSummaryData | VideoSummaryData | any;
+  data?: QuizData | FlashcardData | MindMapData | SlideDeckData | AudioSummaryData | VideoSummaryData | InfographicData | ReportData | any;
   fileUrl?: string;
   isZip?: boolean;
   status?: "generating" | "completed" | "error";
