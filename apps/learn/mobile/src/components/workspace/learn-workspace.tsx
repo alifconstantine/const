@@ -36,8 +36,10 @@ import {
 import { WorkingProcess } from "./working-process";
 import { ImageLightbox } from "./image-lightbox";
 import {
+  calculateConversationMetrics,
   calculateContextUsage,
   formatTokenDisplay,
+  formatDurationDisplay,
   parseContextWindowTokens,
 } from "../../lib/telemetry";
 import {
@@ -52,6 +54,9 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
 } from "@const/ui";
 import { marked } from "marked";
 import { useI18n } from "../../lib/i18n";
@@ -355,6 +360,8 @@ import {
   RemoveFormatting,
   Wand2,
   Layers,
+  Gauge,
+  Database,
 } from "lucide-react";
 
 type WorkspaceTab = "sources" | "chat" | "tools";
@@ -716,6 +723,11 @@ export function MobileLearnWorkspace({
       DEFAULT_MOBILE_MODELS[0]!
     );
   }, [availableModels, selectedModelId]);
+
+  // Dynamic telemetry metrics for active conversation
+  const conversationMetrics = useMemo(() => {
+    return calculateConversationMetrics(messages);
+  }, [messages]);
 
   // Context window usage estimation for learning sources and discussion history
   const contextUsage = useMemo(() => {
@@ -3206,6 +3218,105 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
               onAttachmentsChange={setAttachedFiles}
               onPreviewMedia={setLightboxItem}
             />
+
+            {/* Active Conversation Footer Telemetry Bar */}
+            {conversationMetrics && (
+              <div className="w-full flex items-center justify-center gap-1.5 pt-1.5 pb-0.5 select-none flex-wrap">
+                {/* Pill 1: Session statistics (Gauge) */}
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-sans text-muted-foreground hover:text-foreground hover:bg-muted/50 active:bg-muted/50 data-[state=open]:bg-muted/50 data-[state=open]:text-foreground transition-colors select-none cursor-pointer"
+                    >
+                      <Gauge className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+                      <span>
+                        {conversationMetrics.turns} turns {conversationMetrics.steps} steps · {conversationMetrics.tokPerSec} tok/s
+                      </span>
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    side="top"
+                    align="center"
+                    sideOffset={8}
+                    className="w-[88vw] max-w-80 p-3.5 rounded-xl bg-popover/95 backdrop-blur-md border border-border/80 shadow-2xl text-xs z-50 font-sans"
+                  >
+                    <div className="flex items-center gap-2 mb-3">
+                      <Gauge className="w-4 h-4 text-muted-foreground shrink-0" />
+                      <span className="font-semibold text-xs text-foreground">Session statistics</span>
+                    </div>
+                    <div className="space-y-2 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">LLM time</span>
+                        <span className="font-mono tabular-nums text-foreground">{formatDurationDisplay(conversationMetrics.llmDurationMs)}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Tool time</span>
+                        <span className="font-mono tabular-nums text-foreground">{formatDurationDisplay(conversationMetrics.toolDurationMs)}</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Avg time to first token (TTFT)</span>
+                        <span className="font-mono tabular-nums text-foreground">{conversationMetrics.ttftSeconds.toFixed(1)}s</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Tokens per second (TPS)</span>
+                        <span className="font-mono tabular-nums text-foreground">{conversationMetrics.tokPerSec} tok/s</span>
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+
+                {/* Pill 2: Token usage (Database) */}
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-sans text-muted-foreground hover:text-foreground hover:bg-muted/50 active:bg-muted/50 data-[state=open]:bg-muted/50 data-[state=open]:text-foreground transition-colors select-none cursor-pointer"
+                    >
+                      <Database className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+                      <span>
+                        {formatTokenDisplay(conversationMetrics.totalTokens)} tok · Cache hit {conversationMetrics.cacheHitRate}%
+                      </span>
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    side="top"
+                    align="center"
+                    sideOffset={8}
+                    className="w-[88vw] max-w-80 p-3.5 rounded-xl bg-popover/95 backdrop-blur-md border border-border/80 shadow-2xl text-xs z-50 font-sans"
+                  >
+                    <div className="flex items-center justify-between mb-2.5">
+                      <div className="flex items-center gap-2">
+                        <Database className="w-4 h-4 text-muted-foreground shrink-0" />
+                        <span className="font-semibold text-xs text-foreground">Token usage</span>
+                      </div>
+                      <span className="font-mono tabular-nums font-medium text-foreground text-xs">
+                        {conversationMetrics.totalTokens.toLocaleString()} tok
+                      </span>
+                    </div>
+                    <div className="my-2 border-t border-border/60" />
+                    <div className="space-y-2 text-xs">
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Cache hit</span>
+                        <span className="font-mono tabular-nums text-foreground">{conversationMetrics.cacheHitRate}%</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Uncached input</span>
+                        <span className="font-mono tabular-nums text-foreground">{conversationMetrics.uncachedInputTokens.toLocaleString()} tok</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Cached input</span>
+                        <span className="font-mono tabular-nums text-foreground">{conversationMetrics.cachedInputTokens.toLocaleString()} tok</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Output</span>
+                        <span className="font-mono tabular-nums text-foreground">{conversationMetrics.outputTokens.toLocaleString()} tok</span>
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
+              </div>
+            )}
 
             <input
               ref={editFileInputRef}

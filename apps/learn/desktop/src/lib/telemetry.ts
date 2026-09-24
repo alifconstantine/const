@@ -8,6 +8,9 @@ export interface ConversationMetrics {
   cacheHitRate: number;
   inputTokens: number;
   outputTokens: number;
+  totalTokens: number;
+  cachedInputTokens: number;
+  uncachedInputTokens: number;
 }
 
 export interface ContextUsage {
@@ -124,6 +127,9 @@ export function calculateConversationMetrics(
       ? Math.max(25, Math.min(180, Math.round(outputTokens / (estimatedLlmMs / 1000))))
       : 64;
   const cacheHitRate = turns > 1 ? 78 : turns === 1 ? 62 : 0;
+  const totalTokens = inputTokens + outputTokens;
+  const cachedInputTokens = Math.round(inputTokens * (cacheHitRate / 100));
+  const uncachedInputTokens = Math.max(0, inputTokens - cachedInputTokens);
 
   return {
     turns,
@@ -135,6 +141,9 @@ export function calculateConversationMetrics(
     cacheHitRate,
     inputTokens,
     outputTokens,
+    totalTokens,
+    cachedInputTokens,
+    uncachedInputTokens,
   };
 }
 
