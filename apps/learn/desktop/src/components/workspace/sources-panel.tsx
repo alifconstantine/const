@@ -35,6 +35,7 @@ interface SourcesPanelProps {
   onSelectSource?: (sourceType: string) => void;
   onDropFiles?: (files: File[]) => void;
   onToggleCollapse?: () => void;
+  onOpenBrowser?: (url: string) => void;
   isCollapsed?: boolean;
   isResizing?: boolean;
 }
@@ -54,6 +55,7 @@ export function SourcesPanel({
   onSelectSource,
   onDropFiles,
   onToggleCollapse,
+  onOpenBrowser,
   isCollapsed = false,
   isResizing = false,
 }: SourcesPanelProps) {
@@ -438,6 +440,7 @@ export function SourcesPanel({
         onOpenChange={(open) => {
           if (!open) setSelectedSourceForPreview(null);
         }}
+        onOpenBrowser={onOpenBrowser}
       />
     </>
   );

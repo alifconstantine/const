@@ -1670,6 +1670,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
           onAddSource={() => setIsAddSourceOpen(true)}
           onSelectSource={handleSelectSource}
           onDropFiles={handleDropFiles}
+          onOpenBrowser={handleOpenBrowser}
           isCollapsed={isSourcesCollapsed}
           isResizing={isDraggingSources}
           onToggleCollapse={() => setIsSourcesCollapsed(!isSourcesCollapsed)}

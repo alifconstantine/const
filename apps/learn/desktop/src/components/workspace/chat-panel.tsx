@@ -3564,6 +3564,7 @@ Tokens: ↑${formatTokenDisplay(conversationMetrics.inputTokens)} · ↓${format
         onOpenChange={(open) => {
           if (!open) setSelectedSourceForPreview(null);
         }}
+        onOpenBrowser={onOpenBrowser}
       />
     </main>
   );

@@ -9,6 +9,7 @@ import { LearnWorkspace } from "./components/workspace/learn-workspace";
 import { localDb } from "./lib/db";
 import { useI18n } from "./lib/i18n";
 import { TitleBar } from "./components/title-bar";
+import { openExternalUrl } from "./lib/open-external";
 import authArt from "./assets/auth-art.jpg";
 
 function AuthenticatedContent({
@@ -22,6 +23,21 @@ function AuthenticatedContent({
   const user = useQuery(api.auth.queries.currentUser, {});
   const [activeLearnId, setActiveLearnId] = useState<string | null>(null);
   const [openAddSourceOnLoad, setOpenAddSourceOnLoad] = useState(false);
+
+  // When outside of a workspace (e.g. HomePage), route any intercepted URLs directly
+  // to the user's default system browser via Electron openExternal
+  useEffect(() => {
+    if (!activeLearnId) {
+      const unsubscribe = window.electron?.onOpenBrowserUrl?.((url: string) => {
+        if (url) {
+          openExternalUrl(url);
+        }
+      });
+      return () => {
+        unsubscribe?.();
+      };
+    }
+  }, [activeLearnId]);
 
   const handleOpenLearn = (learnId: string, openAddSource = false) => {
     setActiveLearnId(learnId);

@@ -28,6 +28,7 @@ import {
 } from "@const/ui";
 import { db, localDb, type LocalSource, type LocalLearn } from "../../lib/db";
 import { useI18n } from "../../lib/i18n";
+import { openExternalUrl, openExternalPath } from "../../lib/open-external";
 import { DeleteConfirmDialog } from "./dialogs/delete-confirm-dialog";
 import { SourcePreviewDialog } from "../workspace/source-preview-dialog";
 import { LearnIcon } from "./learn-icon";
@@ -240,13 +241,21 @@ export function SourcesView({
     return groups;
   }, [learns, selectedWorkspaceId, filteredSources]);
 
+  const handleOpenSource = (source: LocalSource) => {
+    if (source.url) {
+      openExternalUrl(source.url);
+      return;
+    }
+    if (source.path) {
+      openExternalPath(source.path);
+      return;
+    }
+    setPreviewSource(source);
+  };
+
   const handleOpenSourceUrl = (url?: string) => {
     if (!url) return;
-    try {
-      window.open(url, "_blank", "noopener,noreferrer");
-    } catch {
-      window.open(url);
-    }
+    openExternalUrl(url);
   };
 
   const handleTriggerAddSource = () => {
@@ -276,7 +285,7 @@ export function SourcesView({
     return (
       <div
         key={source.id}
-        onClick={() => setPreviewSource(source)}
+        onClick={() => handleOpenSource(source)}
         className="w-full px-3.5 py-2.5 rounded-xl border border-border hover:border-foreground/20 bg-card hover:bg-secondary/70 transition-colors flex items-center justify-between gap-3 group select-none cursor-pointer shadow-none"
       >
         {/* Left: Icon, Title & Optional Link */}
@@ -696,6 +705,7 @@ export function SourcesView({
           if (!open) setPreviewSource(null);
         }}
         onOpenLearn={onOpenLearn}
+        onOpenBrowser={openExternalUrl}
       />
     </div>
   );
