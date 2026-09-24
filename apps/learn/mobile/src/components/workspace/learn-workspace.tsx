@@ -29,10 +29,9 @@ import { generateStudioArtifact, generatePresentationArtifact, generateInfograph
 import { WorkingProcess } from "./working-process";
 import { ImageLightbox } from "./image-lightbox";
 import {
-  calculateConversationMetrics,
   calculateContextUsage,
   formatTokenDisplay,
-  formatDurationDisplay,
+  parseContextWindowTokens,
 } from "../../lib/telemetry";
 import {
   ScrollArea,
@@ -643,11 +642,6 @@ export function MobileLearnWorkspace({
     };
   }, []);
 
-  // Dynamic telemetry metrics for active conversation
-  const conversationMetrics = useMemo(() => {
-    return calculateConversationMetrics(messages);
-  }, [messages]);
-
   const currentModel = useMemo(() => {
     return (
       availableModels.find((m) => m.id === selectedModelId) ??
@@ -658,7 +652,7 @@ export function MobileLearnWorkspace({
 
   // Context window usage estimation for learning sources and discussion history
   const contextUsage = useMemo(() => {
-    const totalTokens = (currentModel as any)?.contextWindow || 1048576;
+    const totalTokens = parseContextWindowTokens((currentModel as any)?.contextWindow);
     return calculateContextUsage({
       sources,
       sourcesCount: learn?.sourcesCount || 0,
@@ -2219,107 +2213,144 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
                     className="fixed inset-0 z-40"
                     onClick={() => setIsContextDropdownOpen(false)}
                   />
-                  <div className="absolute right-0 mt-1.5 w-72 max-w-[calc(100vw-32px)] rounded-2xl bg-popover border border-border text-popover-foreground shadow-2xl p-3 z-50 animate-in fade-in duration-100 flex flex-col font-sans select-none">
-                    {/* Header: % of context used and tokens */}
-                    <div className="flex items-center justify-between pb-2 border-b border-border">
-                      <span className="text-xs font-semibold text-foreground">
-                        {contextUsage.rawPercentUsed === 0 ? "0%" : contextUsage.percentUsed} {t("contextUsed")}
-                      </span>
-                      <span className="font-mono text-[11px] text-muted-foreground">
+                  <div className="absolute right-0 mt-1.5 w-72 max-w-[calc(100vw-32px)] rounded-2xl bg-popover border border-border text-popover-foreground shadow-2xl p-3.5 z-50 animate-in fade-in duration-100 flex flex-col gap-2.5 font-sans select-none">
+                    {/* Header: X% of context used and ~usedTokens / totalTokens */}
+                    <div className="flex items-center justify-between text-xs">
+                      <div className="flex items-baseline gap-1 text-xs">
+                        <span className="font-bold text-foreground">
+                          {contextUsage.rawPercentUsed === 0 ? "0%" : contextUsage.rawPercentUsed < 1 ? "<1%" : contextUsage.percentUsed}
+                        </span>
+                        <span className="text-muted-foreground font-normal">
+                          {t("contextUsed") || "of context used"}
+                        </span>
+                      </div>
+                      <span className="font-mono text-xs font-semibold text-foreground/90">
                         ~{formatTokenDisplay(contextUsage.usedTokens)} / {formatTokenDisplay(contextUsage.totalTokens)}
                       </span>
                     </div>
 
-                    {/* Thin progress bar */}
-                    <div className="w-full h-1.5 bg-secondary rounded-full overflow-hidden flex gap-0.5 my-2">
-                      {contextUsage.sourcesTokens > 0 && (
-                        <div
-                          className="bg-emerald-500 h-full transition-all"
-                          style={{ width: `${Math.max(1, (contextUsage.sourcesTokens / contextUsage.totalTokens) * 100)}%` }}
-                        />
-                      )}
+                    {/* Multi-segment Horizontal Progress Bar */}
+                    <div className="w-full h-1.5 bg-muted dark:bg-zinc-800 rounded-full overflow-hidden flex gap-0.5">
                       {contextUsage.systemPromptTokens > 0 && (
                         <div
-                          className="bg-muted-foreground h-full transition-all"
-                          style={{ width: `${Math.max(1, (contextUsage.systemPromptTokens / contextUsage.totalTokens) * 100)}%` }}
+                          className="bg-zinc-400 dark:bg-zinc-400 h-full rounded-full transition-all"
+                          style={{
+                            width: `${Math.max(0.8, (contextUsage.systemPromptTokens / contextUsage.totalTokens) * 100)}%`,
+                          }}
+                          title={`${t("systemPrompt") || "System prompt"}: ~${formatTokenDisplay(contextUsage.systemPromptTokens)}`}
+                        />
+                      )}
+                      {contextUsage.toolDefinitionsTokens > 0 && (
+                        <div
+                          className="bg-purple-500 dark:bg-purple-400 h-full rounded-full transition-all"
+                          style={{
+                            width: `${Math.max(0.8, (contextUsage.toolDefinitionsTokens / contextUsage.totalTokens) * 100)}%`,
+                          }}
+                          title={`${t("toolDefinitions") || "Tool definitions"}: ~${formatTokenDisplay(contextUsage.toolDefinitionsTokens)}`}
+                        />
+                      )}
+                      {contextUsage.sourcesTokens > 0 && (
+                        <div
+                          className="bg-emerald-500 h-full rounded-full transition-all"
+                          style={{
+                            width: `${Math.max(0.8, (contextUsage.sourcesTokens / contextUsage.totalTokens) * 100)}%`,
+                          }}
+                          title={`${t("learningSources") || "Learning sources"}: ~${formatTokenDisplay(contextUsage.sourcesTokens)}`}
                         />
                       )}
                       {contextUsage.messagesTokens > 0 && (
                         <div
-                          className="bg-blue-500 h-full transition-all"
-                          style={{ width: `${Math.max(1, (contextUsage.messagesTokens / contextUsage.totalTokens) * 100)}%` }}
+                          className="bg-blue-500 dark:bg-blue-400 h-full rounded-full transition-all"
+                          style={{
+                            width: `${Math.max(0.8, (contextUsage.messagesTokens / contextUsage.totalTokens) * 100)}%`,
+                          }}
+                          title={`${t("messages") || "Messages"}: ~${formatTokenDisplay(contextUsage.messagesTokens)}`}
                         />
                       )}
                       {contextUsage.draftInputTokens > 0 && (
                         <div
-                          className="bg-purple-500 h-full transition-all"
-                          style={{ width: `${Math.max(1, (contextUsage.draftInputTokens / contextUsage.totalTokens) * 100)}%` }}
+                          className="bg-pink-500 h-full rounded-full transition-all"
+                          style={{
+                            width: `${Math.max(0.8, (contextUsage.draftInputTokens / contextUsage.totalTokens) * 100)}%`,
+                          }}
+                          title={`${t("currentInput") || "Current input"}: ~${formatTokenDisplay(contextUsage.draftInputTokens)}`}
                         />
                       )}
                     </div>
 
-                    {/* Breakdown list */}
-                    <div className="flex flex-col gap-1.5 text-[11px]">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1.5 text-muted-foreground">
-                          <span className="w-2 h-2 rounded-xs bg-emerald-500" />
-                          <span>{t("learningSources")} ({learn?.sourcesCount || 0})</span>
+                    {/* Breakdown List */}
+                    <div className="flex flex-col gap-2 pt-0.5">
+                      {/* System Prompt */}
+                      <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span className="w-2.5 h-2.5 rounded-[2px] bg-zinc-400 dark:bg-zinc-400 shrink-0" />
+                          <span className="text-foreground/90 font-medium truncate">
+                            {t("systemPrompt") || "System prompt"}
+                          </span>
                         </div>
-                        <span className="font-mono text-muted-foreground">~{formatTokenDisplay(contextUsage.sourcesTokens)}</span>
+                        <span className="font-mono text-xs font-medium text-foreground/80 shrink-0 ml-2">
+                          ~{formatTokenDisplay(contextUsage.systemPromptTokens)}
+                        </span>
                       </div>
 
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1.5 text-muted-foreground">
-                          <span className="w-2 h-2 rounded-xs bg-muted-foreground" />
-                          <span>{t("tutorInstructions")}</span>
-                        </div>
-                        <span className="font-mono text-muted-foreground">~{formatTokenDisplay(contextUsage.systemPromptTokens)}</span>
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1.5 text-muted-foreground">
-                          <span className="w-2 h-2 rounded-xs bg-blue-500" />
-                          <span>{t("chatHistory")}</span>
-                        </div>
-                        <span className="font-mono text-muted-foreground">~{formatTokenDisplay(contextUsage.messagesTokens)}</span>
-                      </div>
-
-                      {contextUsage.draftInputTokens > 0 && (
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-1.5 text-purple-500">
-                            <span className="w-2 h-2 rounded-xs bg-purple-500" />
-                            <span>{t("currentInput")}</span>
+                      {/* Tool Definitions */}
+                      {contextUsage.toolDefinitionsTokens > 0 && (
+                        <div className="flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <span className="w-2.5 h-2.5 rounded-[2px] bg-purple-500 dark:bg-purple-400 shrink-0" />
+                            <span className="text-foreground/90 font-medium truncate">
+                              {t("toolDefinitions") || "Tool definitions"}
+                            </span>
                           </div>
-                          <span className="font-mono text-purple-500">~{formatTokenDisplay(contextUsage.draftInputTokens)}</span>
+                          <span className="font-mono text-xs font-medium text-foreground/80 shrink-0 ml-2">
+                            ~{formatTokenDisplay(contextUsage.toolDefinitionsTokens)}
+                          </span>
                         </div>
                       )}
 
-                      <div className="flex items-center justify-between pt-1 border-t border-border text-muted-foreground">
-                        <span>{t("availableContext")}</span>
-                        <span className="font-mono">~{formatTokenDisplay(contextUsage.availableTokens)}</span>
-                      </div>
-                    </div>
+                      {/* Learning Sources (if attached) */}
+                      {contextUsage.sourcesTokens > 0 && (
+                        <div className="flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <span className="w-2.5 h-2.5 rounded-[2px] bg-emerald-500 shrink-0" />
+                            <span className="text-foreground/90 font-medium truncate">
+                              {t("learningSources") || "Learning sources"}
+                            </span>
+                          </div>
+                          <span className="font-mono text-xs font-medium text-foreground/80 shrink-0 ml-2">
+                            ~{formatTokenDisplay(contextUsage.sourcesTokens)}
+                          </span>
+                        </div>
+                      )}
 
-                    {/* Session Telemetry */}
-                    {conversationMetrics && (
-                      <div className="mt-2.5 pt-2 border-t border-border flex flex-col gap-1.5">
-                        <div className="text-[10px] uppercase font-semibold text-muted-foreground tracking-wider">
-                          {t("sessionTelemetry")}
+                      {/* Messages */}
+                      <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span className="w-2.5 h-2.5 rounded-[2px] bg-blue-500 dark:bg-blue-400 shrink-0" />
+                          <span className="text-foreground/90 font-medium truncate">
+                            {t("messages") || "Messages"}
+                          </span>
                         </div>
-                        <div className="flex items-center justify-between text-[11px]">
-                          <span className="text-muted-foreground">Turns & Steps</span>
-                          <span className="font-mono text-foreground">{conversationMetrics.turns} turns · {conversationMetrics.steps} steps</span>
-                        </div>
-                        <div className="flex items-center justify-between text-[11px]">
-                          <span className="text-muted-foreground">Speed & Time</span>
-                          <span className="font-mono text-foreground">LLM {formatDurationDisplay(conversationMetrics.llmDurationMs)} · {conversationMetrics.tokPerSec} tok/s</span>
-                        </div>
-                        <div className="flex items-center justify-between text-[11px]">
-                          <span className="text-muted-foreground">Cache & Tokens</span>
-                          <span className="font-mono text-foreground">{conversationMetrics.cacheHitRate}% cache · ↑{formatTokenDisplay(conversationMetrics.inputTokens)} ↓{formatTokenDisplay(conversationMetrics.outputTokens)}</span>
-                        </div>
+                        <span className="font-mono text-xs font-medium text-foreground/80 shrink-0 ml-2">
+                          ~{formatTokenDisplay(contextUsage.messagesTokens)}
+                        </span>
                       </div>
-                    )}
+
+                      {/* Current Input (if typing) */}
+                      {contextUsage.draftInputTokens > 0 && (
+                        <div className="flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <span className="w-2.5 h-2.5 rounded-[2px] bg-pink-500 shrink-0" />
+                            <span className="text-foreground/90 font-medium truncate">
+                              {t("currentInput") || "Current input"}
+                            </span>
+                          </div>
+                          <span className="font-mono text-xs font-medium text-foreground/80 shrink-0 ml-2">
+                            ~{formatTokenDisplay(contextUsage.draftInputTokens)}
+                          </span>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </>
               )}

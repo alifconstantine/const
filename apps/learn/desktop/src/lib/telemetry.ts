@@ -18,6 +18,7 @@ export interface ContextUsage {
   safePercent: number;
   sourcesTokens: number;
   systemPromptTokens: number;
+  toolDefinitionsTokens: number;
   messagesTokens: number;
   draftInputTokens: number;
   availableTokens: number;
@@ -26,9 +27,31 @@ export interface ContextUsage {
 export function formatTokenDisplay(tokens: number): string {
   if (tokens <= 0) return "0";
   if (tokens < 1000) return `${tokens}`;
-  if (tokens < 10000) return `${(tokens / 1000).toFixed(1)}k`;
-  if (tokens < 1000000) return `${Math.round(tokens / 1000)}k`;
-  return `${(tokens / 1000000).toFixed(1)}M`;
+  if (tokens < 100000) {
+    const val = (tokens / 1000).toFixed(1);
+    return `${val.endsWith(".0") ? val.slice(0, -2) : val}K`;
+  }
+  if (tokens < 1000000) return `${Math.round(tokens / 1000)}K`;
+  const mVal = (tokens / 1000000).toFixed(1);
+  return `${mVal.endsWith(".0") ? mVal.slice(0, -2) : mVal}M`;
+}
+
+export function parseContextWindowTokens(val: any): number {
+  if (typeof val === "number" && val > 0) return val;
+  if (typeof val === "string") {
+    const clean = val.toLowerCase().replace(/context/g, "").trim();
+    if (clean.endsWith("m")) {
+      const num = parseFloat(clean.replace("m", ""));
+      return isNaN(num) ? 1048576 : Math.round(num * 1048576);
+    }
+    if (clean.endsWith("k")) {
+      const num = parseFloat(clean.replace("k", ""));
+      return isNaN(num) ? 1048576 : Math.round(num * 1024);
+    }
+    const parsed = parseInt(clean, 10);
+    if (!isNaN(parsed) && parsed > 0) return parsed;
+  }
+  return 1048576;
 }
 
 export function formatDurationDisplay(ms: number): string {
@@ -117,14 +140,23 @@ export function calculateConversationMetrics(
 
 export function calculateContextUsage(params: {
   sources?: Array<{ content?: string; size?: number; includedInChat?: boolean }>;
+  sourcesCount?: number;
   messages?: Array<{ role: string; content?: string; thinking?: string }>;
   draftInput?: string;
+  systemPrompt?: string;
   totalTokens?: number;
+  toolsTokens?: number;
+  hasTools?: boolean;
 }): ContextUsage {
   const totalTokens = params.totalTokens && params.totalTokens > 0 ? params.totalTokens : 1048576;
 
-  // System/Socratic Tutor Prompt baseline
-  const systemPromptTokens = 850;
+  // System/Socratic Tutor Prompt baseline (~4.7K tokens for full socratic & grounding instructions)
+  const systemPromptTokens = params.systemPrompt
+    ? Math.max(850, Math.round(params.systemPrompt.length / 3.8))
+    : 4700;
+
+  // Tool definitions (~8.8K tokens for MCP & Workspace tools schema)
+  const toolDefinitionsTokens = params.toolsTokens ?? (params.hasTools !== false ? 8800 : 0);
 
   // Carried sources tokens estimation
   let sourcesTokens = 0;
@@ -141,6 +173,8 @@ export function calculateContextUsage(params: {
         }
       }
     }
+  } else if (params.sourcesCount && params.sourcesCount > 0) {
+    sourcesTokens = params.sourcesCount * 750;
   }
 
   // Messages tokens estimation
@@ -157,9 +191,14 @@ export function calculateContextUsage(params: {
   // Draft input in textarea
   const draftInputTokens = params.draftInput ? Math.round(params.draftInput.length / 3.8) : 0;
 
-  const usedTokens = systemPromptTokens + sourcesTokens + messagesTokens + draftInputTokens;
+  const usedTokens = systemPromptTokens + toolDefinitionsTokens + sourcesTokens + messagesTokens + draftInputTokens;
   const rawPercentUsed = totalTokens > 0 ? (usedTokens / totalTokens) * 100 : 0;
-  const percentUsed = rawPercentUsed < 0.1 ? "<0.1%" : `${rawPercentUsed.toFixed(1)}%`;
+  const percentUsed =
+    rawPercentUsed <= 0
+      ? "0%"
+      : rawPercentUsed < 1
+      ? `${rawPercentUsed.toFixed(1)}%`
+      : `${Math.round(rawPercentUsed)}%`;
   const safePercent = Math.min(100, Math.max(0.5, rawPercentUsed));
   const availableTokens = Math.max(0, totalTokens - usedTokens);
 
@@ -171,6 +210,7 @@ export function calculateContextUsage(params: {
     safePercent,
     sourcesTokens,
     systemPromptTokens,
+    toolDefinitionsTokens,
     messagesTokens,
     draftInputTokens,
     availableTokens,

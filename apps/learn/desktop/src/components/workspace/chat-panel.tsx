@@ -40,7 +40,6 @@ import {
   Popover,
   PopoverTrigger,
   PopoverContent,
-  Badge,
   Tooltip,
   TooltipTrigger,
   TooltipContent,
@@ -62,6 +61,7 @@ import {
   calculateContextUsage,
   formatTokenDisplay,
   formatDurationDisplay,
+  parseContextWindowTokens,
 } from "../../lib/telemetry";
 import { ChatHistoryPanel } from "./chat-history-panel";
 import {
@@ -614,7 +614,7 @@ export function ChatPanel({
 
   // Context window usage estimation for learning sources and discussion history
   const contextUsage = useMemo(() => {
-    const totalTokens = (currentModel as any)?.contextWindow || 1048576;
+    const totalTokens = parseContextWindowTokens((currentModel as any)?.contextWindow);
     return calculateContextUsage({
       sources,
       messages,
@@ -2153,7 +2153,6 @@ export function ChatPanel({
 
     const isHigh = rawPercentUsed >= 90;
     const isModerate = rawPercentUsed >= 70 && rawPercentUsed < 90;
-    const activeModelName = currentModel.displayName?.split("(")[0]?.trim() || currentModel.id || "Const";
 
     return (
       <Popover open={isContextOpen} onOpenChange={setIsContextOpen}>
@@ -2207,203 +2206,144 @@ export function ChatPanel({
 
         <PopoverContent
           align="end"
-          sideOffset={6}
-          className="w-80 sm:w-88 max-w-[calc(100vw-32px)] bg-card border border-border rounded-2xl shadow-2xl p-4 z-50 flex flex-col gap-3 text-left select-none font-sans"
+          sideOffset={8}
+          className="w-72 sm:w-80 max-w-[calc(100vw-32px)] bg-popover border border-border text-popover-foreground rounded-2xl shadow-2xl p-3.5 z-50 flex flex-col gap-2.5 text-left select-none font-sans"
         >
-          {/* Header: Title & Model & Status Badge */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 min-w-0">
-              <div className="h-7 w-7 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
-                <Cpu className="h-4 w-4" />
-              </div>
-              <div className="min-w-0">
-                <h4 className="text-xs font-semibold text-foreground tracking-tight truncate">
-                  {t("contextWindow") || "Jendela Konteks"}
-                </h4>
-                <p className="text-[10.5px] text-muted-foreground truncate font-mono">
-                  {activeModelName}
-                </p>
-              </div>
-            </div>
-            <Badge
-              variant="outline"
-              className={cn(
-                "text-[10px] px-2 py-0.5 font-medium rounded-full font-sans shrink-0",
-                isHigh
-                  ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30"
-                  : isModerate
-                  ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30"
-                  : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
-              )}
-            >
-              {isHigh
-                ? (t("contextFull") || "Hampir Penuh")
-                : isModerate
-                ? (t("contextModerate") || "Sedang")
-                : (t("contextOptimal") || "Optimal")}
-            </Badge>
-          </div>
-
-          {/* Metric Summary Card */}
-          <div className="bg-muted/40 dark:bg-muted/20 border border-border/50 rounded-xl p-2.5 flex items-center justify-between">
-            <div>
-              <span className="text-[10.5px] text-muted-foreground block font-medium">
-                {t("contextUsed") || "Kapasitas Terpakai"}
+          {/* Header: X% of context used and ~usedTokens / totalTokens */}
+          <div className="flex items-center justify-between text-xs">
+            <div className="flex items-baseline gap-1 text-xs">
+              <span className="font-bold text-foreground">
+                {rawPercentUsed === 0 ? "0%" : rawPercentUsed < 1 ? "<1%" : percentUsed}
               </span>
-              <div className="flex items-baseline gap-1 mt-0.5">
-                <span className="text-lg font-bold font-mono text-foreground tracking-tight">
-                  {rawPercentUsed === 0 ? "0%" : rawPercentUsed < 0.1 ? "<0.1%" : `${percentUsed}`}
-                </span>
-                <span className="text-[11px] text-muted-foreground/80 font-sans">
-                  kapasitas
-                </span>
-              </div>
-            </div>
-            <div className="text-right">
-              <span className="text-[10.5px] text-muted-foreground block font-medium">
-                Estimasi Token
+              <span className="text-muted-foreground font-normal">
+                {t("contextUsed") || "of context used"}
               </span>
-              <div className="font-mono text-xs font-semibold text-foreground mt-0.5">
-                ~{formatTokenDisplay(usedTokens)}
-                <span className="text-muted-foreground font-normal text-[11px]"> / {formatTokenDisplay(totalTokens)}</span>
-              </div>
             </div>
+            <span className="font-mono text-xs font-semibold text-foreground/90">
+              ~{formatTokenDisplay(usedTokens)} / {formatTokenDisplay(totalTokens)}
+            </span>
           </div>
 
           {/* Multi-segment Horizontal Progress Bar */}
-          <div className="space-y-1">
-            <div className="w-full h-2.5 bg-muted/80 dark:bg-muted/50 rounded-full overflow-hidden flex gap-0.5 p-[1px] border border-border/40">
-              {contextUsage.sourcesTokens > 0 && (
-                <div
-                  className="bg-emerald-500 h-full rounded-full transition-all"
-                  style={{
-                    width: `${Math.max(1, (contextUsage.sourcesTokens / totalTokens) * 100)}%`,
-                  }}
-                  title={`Sumber Belajar: ~${formatTokenDisplay(contextUsage.sourcesTokens)}`}
-                />
-              )}
-              {contextUsage.systemPromptTokens > 0 && (
-                <div
-                  className="bg-slate-400 dark:bg-zinc-400 h-full rounded-full transition-all"
-                  style={{
-                    width: `${Math.max(1, (contextUsage.systemPromptTokens / totalTokens) * 100)}%`,
-                  }}
-                  title={`Instruksi Tutor: ~${formatTokenDisplay(contextUsage.systemPromptTokens)}`}
-                />
-              )}
-              {contextUsage.messagesTokens > 0 && (
-                <div
-                  className="bg-sky-500 h-full rounded-full transition-all"
-                  style={{
-                    width: `${Math.max(1, (contextUsage.messagesTokens / totalTokens) * 100)}%`,
-                  }}
-                  title={`Riwayat Obrolan: ~${formatTokenDisplay(contextUsage.messagesTokens)}`}
-                />
-              )}
-              {contextUsage.draftInputTokens > 0 && (
-                <div
-                  className="bg-purple-500 h-full rounded-full transition-all"
-                  style={{
-                    width: `${Math.max(1, (contextUsage.draftInputTokens / totalTokens) * 100)}%`,
-                  }}
-                  title={`Input Saat Ini: ~${formatTokenDisplay(contextUsage.draftInputTokens)}`}
-                />
-              )}
-            </div>
+          <div className="w-full h-1.5 bg-muted dark:bg-zinc-800 rounded-full overflow-hidden flex gap-0.5">
+            {contextUsage.systemPromptTokens > 0 && (
+              <div
+                className="bg-zinc-400 dark:bg-zinc-400 h-full rounded-full transition-all"
+                style={{
+                  width: `${Math.max(0.8, (contextUsage.systemPromptTokens / totalTokens) * 100)}%`,
+                }}
+                title={`${t("systemPrompt") || "System prompt"}: ~${formatTokenDisplay(contextUsage.systemPromptTokens)}`}
+              />
+            )}
+            {contextUsage.toolDefinitionsTokens > 0 && (
+              <div
+                className="bg-purple-500 dark:bg-purple-400 h-full rounded-full transition-all"
+                style={{
+                  width: `${Math.max(0.8, (contextUsage.toolDefinitionsTokens / totalTokens) * 100)}%`,
+                }}
+                title={`${t("toolDefinitions") || "Tool definitions"}: ~${formatTokenDisplay(contextUsage.toolDefinitionsTokens)}`}
+              />
+            )}
+            {contextUsage.sourcesTokens > 0 && (
+              <div
+                className="bg-emerald-500 h-full rounded-full transition-all"
+                style={{
+                  width: `${Math.max(0.8, (contextUsage.sourcesTokens / totalTokens) * 100)}%`,
+                }}
+                title={`${t("learningSources") || "Learning sources"}: ~${formatTokenDisplay(contextUsage.sourcesTokens)}`}
+              />
+            )}
+            {contextUsage.messagesTokens > 0 && (
+              <div
+                className="bg-blue-500 dark:bg-blue-400 h-full rounded-full transition-all"
+                style={{
+                  width: `${Math.max(0.8, (contextUsage.messagesTokens / totalTokens) * 100)}%`,
+                }}
+                title={`${t("messages") || "Messages"}: ~${formatTokenDisplay(contextUsage.messagesTokens)}`}
+              />
+            )}
+            {contextUsage.draftInputTokens > 0 && (
+              <div
+                className="bg-pink-500 h-full rounded-full transition-all"
+                style={{
+                  width: `${Math.max(0.8, (contextUsage.draftInputTokens / totalTokens) * 100)}%`,
+                }}
+                title={`${t("currentInput") || "Current input"}: ~${formatTokenDisplay(contextUsage.draftInputTokens)}`}
+              />
+            )}
           </div>
 
-          {/* Legend / Breakdown List */}
-          <div className="flex flex-col gap-1 pt-0.5">
-            {/* Learning Sources */}
-            <div className="flex items-center justify-between text-xs py-1 px-1.5 rounded-lg hover:bg-muted/40 transition-colors">
-              <div className="flex items-center gap-2 min-w-0">
-                <div className="w-2.5 h-2.5 rounded-xs bg-emerald-500 shrink-0" />
-                <span className="text-foreground truncate">{t("learningSources") || "Sumber Belajar"}</span>
-                {carriedSources.length > 0 && (
-                  <span className="text-[10.5px] text-muted-foreground font-mono">
-                    ({carriedSources.length})
-                  </span>
-                )}
+          {/* Breakdown List */}
+          <div className="flex flex-col gap-2 pt-0.5">
+            {/* System Prompt */}
+            <div className="flex items-center justify-between text-xs">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className="w-2.5 h-2.5 rounded-[2px] bg-zinc-400 dark:bg-zinc-400 shrink-0" />
+                <span className="text-foreground/90 font-medium truncate">
+                  {t("systemPrompt") || "System prompt"}
+                </span>
               </div>
-              <span className="font-mono text-xs font-medium text-foreground shrink-0 ml-2">
-                ~{formatTokenDisplay(contextUsage.sourcesTokens)}
-              </span>
-            </div>
-
-            {/* Socratic Tutor */}
-            <div className="flex items-center justify-between text-xs py-1 px-1.5 rounded-lg hover:bg-muted/40 transition-colors">
-              <div className="flex items-center gap-2 min-w-0">
-                <div className="w-2.5 h-2.5 rounded-xs bg-slate-400 dark:bg-zinc-400 shrink-0" />
-                <span className="text-foreground truncate">{t("tutorInstructions") || "Tutor Socrates"}</span>
-              </div>
-              <span className="font-mono text-xs font-medium text-foreground shrink-0 ml-2">
+              <span className="font-mono text-xs font-medium text-foreground/80 shrink-0 ml-2">
                 ~{formatTokenDisplay(contextUsage.systemPromptTokens)}
               </span>
             </div>
 
-            {/* Chat History */}
-            <div className="flex items-center justify-between text-xs py-1 px-1.5 rounded-lg hover:bg-muted/40 transition-colors">
-              <div className="flex items-center gap-2 min-w-0">
-                <div className="w-2.5 h-2.5 rounded-xs bg-sky-500 shrink-0" />
-                <span className="text-foreground truncate">{t("chatHistory") || "Riwayat Obrolan"}</span>
-                {messages.length > 0 && (
-                  <span className="text-[10.5px] text-muted-foreground font-mono">
-                    ({messages.length})
-                  </span>
-                )}
-              </div>
-              <span className="font-mono text-xs font-medium text-foreground shrink-0 ml-2">
-                ~{formatTokenDisplay(contextUsage.messagesTokens)}
-              </span>
-            </div>
-
-            {/* Current Input */}
-            {contextUsage.draftInputTokens > 0 && (
-              <div className="flex items-center justify-between text-xs py-1 px-1.5 rounded-lg bg-purple-500/5 hover:bg-purple-500/10 transition-colors">
-                <div className="flex items-center gap-2 min-w-0">
-                  <div className="w-2.5 h-2.5 rounded-xs bg-purple-500 shrink-0" />
-                  <span className="text-purple-600 dark:text-purple-400 font-medium truncate">
-                    {t("currentInput") || "Input Saat Ini"}
+            {/* Tool Definitions */}
+            {contextUsage.toolDefinitionsTokens > 0 && (
+              <div className="flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className="w-2.5 h-2.5 rounded-[2px] bg-purple-500 dark:bg-purple-400 shrink-0" />
+                  <span className="text-foreground/90 font-medium truncate">
+                    {t("toolDefinitions") || "Tool definitions"}
                   </span>
                 </div>
-                <span className="font-mono text-xs font-medium text-purple-600 dark:text-purple-400 shrink-0 ml-2">
-                  ~{formatTokenDisplay(contextUsage.draftInputTokens)}
+                <span className="font-mono text-xs font-medium text-foreground/80 shrink-0 ml-2">
+                  ~{formatTokenDisplay(contextUsage.toolDefinitionsTokens)}
                 </span>
               </div>
             )}
 
-            {/* Available Space */}
-            <div className="flex items-center justify-between text-xs py-1.5 px-1.5 border-t border-border/50 text-muted-foreground mt-0.5">
-              <div className="flex items-center gap-2 min-w-0">
-                <div className="w-2.5 h-2.5 rounded-xs bg-muted-foreground/30 shrink-0" />
-                <span className="truncate">{t("availableContext") || "Kapasitas Tersisa"}</span>
+            {/* Learning Sources (if attached) */}
+            {contextUsage.sourcesTokens > 0 && (
+              <div className="flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className="w-2.5 h-2.5 rounded-[2px] bg-emerald-500 shrink-0" />
+                  <span className="text-foreground/90 font-medium truncate">
+                    {t("learningSources") || "Learning sources"}
+                  </span>
+                </div>
+                <span className="font-mono text-xs font-medium text-foreground/80 shrink-0 ml-2">
+                  ~{formatTokenDisplay(contextUsage.sourcesTokens)}
+                </span>
               </div>
-              <span className="font-mono text-xs font-semibold text-foreground/80 shrink-0 ml-2">
-                ~{formatTokenDisplay(contextUsage.availableTokens)}
+            )}
+
+            {/* Messages */}
+            <div className="flex items-center justify-between text-xs">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <span className="w-2.5 h-2.5 rounded-[2px] bg-blue-500 dark:bg-blue-400 shrink-0" />
+                <span className="text-foreground/90 font-medium truncate">
+                  {t("messages") || "Messages"}
+                </span>
+              </div>
+              <span className="font-mono text-xs font-medium text-foreground/80 shrink-0 ml-2">
+                ~{formatTokenDisplay(contextUsage.messagesTokens)}
               </span>
             </div>
-          </div>
 
-          {/* Health Tip & Action */}
-          <div className="pt-1.5 border-t border-border/50 flex flex-col gap-2">
-            <p className="text-[11px] leading-relaxed text-muted-foreground">
-              {isHigh
-                ? (t("contextWarningTip") || "Penggunaan konteks tinggi. Mulai obrolan baru jika respons model mulai lambat.")
-                : (t("contextOptimalTip") || "Kapasitas konteks optimal. Model dapat memahami seluruh dokumen dan konteks obrolan.")}
-            </p>
-
-            {hasStartedChat && (
-              <button
-                type="button"
-                onClick={() => {
-                  setIsContextOpen(false);
-                  handleNewChat();
-                }}
-                className="w-full h-7 rounded-xl bg-muted/50 hover:bg-muted text-xs font-medium text-foreground flex items-center justify-center gap-1.5 transition-colors cursor-pointer border border-border/50"
-              >
-                <MessageCirclePlus className="h-3.5 w-3.5 text-muted-foreground" />
-                <span>{t("startConversationNew")}</span>
-              </button>
+            {/* Current Input (if typing) */}
+            {contextUsage.draftInputTokens > 0 && (
+              <div className="flex items-center justify-between text-xs">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <span className="w-2.5 h-2.5 rounded-[2px] bg-pink-500 shrink-0" />
+                  <span className="text-foreground/90 font-medium truncate">
+                    {t("currentInput") || "Current input"}
+                  </span>
+                </div>
+                <span className="font-mono text-xs font-medium text-foreground/80 shrink-0 ml-2">
+                  ~{formatTokenDisplay(contextUsage.draftInputTokens)}
+                </span>
+              </div>
             )}
           </div>
         </PopoverContent>
