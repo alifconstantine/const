@@ -3,10 +3,11 @@ import {
   Button,
   Input,
   cn,
-  Sheet,
-  SheetContent,
-  SheetClose,
-  SheetTitle,
+  Drawer,
+  DrawerContent,
+  DrawerClose,
+  DrawerTitle,
+  DrawerDescription,
   ScrollArea,
 } from "@const/ui";
 import {
@@ -87,24 +88,30 @@ export function ChatHistoryPanel({
     return groups;
   }, [filteredSessions, t]);
 
-  if (!open) return null;
-
   return (
-    <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
-      <SheetContent
-        side="right"
-        showCloseButton={false}
-        className="w-full sm:max-w-[400px] p-0 flex flex-col bg-card border-l border-border/70 shadow-2xl z-50 gap-0 select-none"
+    <Drawer
+      direction="right"
+      open={open}
+      onOpenChange={(v) => !v && onClose()}
+      shouldScaleBackground={false}
+    >
+      <DrawerContent
+        overlayClassName="top-9 h-[calc(100vh-2.25rem)]"
+        className="top-9 bottom-0 h-[calc(100vh-2.25rem)] w-full sm:max-w-[400px] p-0 flex flex-col bg-card border-l border-t border-b border-border/70 shadow-2xl z-50 gap-0 select-none focus:outline-none rounded-l-2xl sm:rounded-l-3xl overflow-hidden"
       >
+        <DrawerDescription className="sr-only">
+          {t("chatHistory") || "Chat History"}
+        </DrawerDescription>
+
         {/* Header */}
         <div className="p-4 sm:p-5 pb-2 flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <div className="h-8 w-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
               <History className="h-4 w-4" />
             </div>
-            <SheetTitle className="font-serif text-base font-semibold text-foreground">
+            <DrawerTitle className="font-serif text-base font-semibold text-foreground">
               {t("chatHistory")}
-            </SheetTitle>
+            </DrawerTitle>
           </div>
 
           <div className="flex items-center gap-1.5">
@@ -122,7 +129,7 @@ export function ChatHistoryPanel({
               <span>{t("newChat")}</span>
             </Button>
 
-            <SheetClose asChild>
+            <DrawerClose asChild>
               <Button
                 variant="ghost"
                 size="icon"
@@ -131,7 +138,7 @@ export function ChatHistoryPanel({
               >
                 <X className="h-4 w-4" />
               </Button>
-            </SheetClose>
+            </DrawerClose>
           </div>
         </div>
 
@@ -257,7 +264,7 @@ export function ChatHistoryPanel({
             })
           )}
         </ScrollArea>
-      </SheetContent>
-    </Sheet>
+      </DrawerContent>
+    </Drawer>
   );
 }
