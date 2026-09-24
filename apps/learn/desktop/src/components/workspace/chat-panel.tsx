@@ -37,6 +37,10 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+  Badge,
   Tooltip,
   TooltipTrigger,
   TooltipContent,
@@ -468,26 +472,16 @@ export function ChatPanel({
     };
   }, [isStreaming]);
 
-  // Close dropdown on outside click
+  // Close model dropdown on outside click
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       const target = e.target as Node;
       const isOutsideDropdown =
         !dropdownRef.current || !dropdownRef.current.contains(target);
-      const isOutsideSourcesDropdown =
-        !sourcesDropdownRef.current || !sourcesDropdownRef.current.contains(target);
-      const isOutsideContextDropdown =
-        !contextMenuRef.current || !contextMenuRef.current.contains(target);
 
       if (isOutsideDropdown) {
         setIsModelDropdownOpen(false);
         setMenuView("main");
-      }
-      if (isOutsideSourcesDropdown) {
-        setIsSourcesDropdownOpen(false);
-      }
-      if (isOutsideContextDropdown) {
-        setIsContextOpen(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -2023,39 +2017,38 @@ export function ChatPanel({
         : t("sourcesCountNone");
 
     return (
-      <div className="relative" ref={sourcesDropdownRef}>
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            setIsSourcesDropdownOpen(!isSourcesDropdownOpen);
-          }}
-          className={cn(
-            "h-8 rounded-xl text-xs font-medium transition-all cursor-pointer select-none flex items-center gap-1.5 border shrink-0 shadow-xs active:scale-98 font-sans",
-            isCompact ? "px-2" : "px-2.5",
-            carriedSourcesCount > 0
-              ? "bg-muted/60 hover:bg-muted border-border/70 text-foreground dark:text-white"
-              : "bg-muted/40 hover:bg-muted text-foreground/80 dark:text-white/90 hover:dark:text-white border-border/50"
-          )}
-          aria-label={t("manageCarriedSources")}
-          title={fullSourcesLabel}
-        >
-          <FileText className="h-3.5 w-3.5 text-foreground/70 dark:text-white/80 shrink-0" />
-          <span className="font-sans text-xs text-foreground dark:text-white font-medium">
-            {isCompact ? carriedSourcesCount : fullSourcesLabel}
-          </span>
-          <ChevronDown
+      <Popover open={isSourcesDropdownOpen} onOpenChange={setIsSourcesDropdownOpen}>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
             className={cn(
-              "h-3 w-3 text-foreground/60 dark:text-white/70 transition-transform duration-150 ml-0.5",
-              isSourcesDropdownOpen && "rotate-180"
+              "h-8 rounded-xl text-xs font-medium transition-all cursor-pointer select-none flex items-center gap-1.5 border shrink-0 shadow-xs active:scale-98 font-sans",
+              isCompact ? "px-2" : "px-2.5",
+              carriedSourcesCount > 0
+                ? "bg-muted/60 hover:bg-muted border-border/70 text-foreground dark:text-white"
+                : "bg-muted/40 hover:bg-muted text-foreground/80 dark:text-white/90 hover:dark:text-white border-border/50",
+              isSourcesDropdownOpen && "bg-muted border-foreground/30"
             )}
-          />
-        </button>
+            aria-label={t("manageCarriedSources")}
+            title={fullSourcesLabel}
+          >
+            <FileText className="h-3.5 w-3.5 text-foreground/70 dark:text-white/80 shrink-0" />
+            <span className="font-sans text-xs text-foreground dark:text-white font-medium">
+              {isCompact ? carriedSourcesCount : fullSourcesLabel}
+            </span>
+            <ChevronDown
+              className={cn(
+                "h-3 w-3 text-foreground/60 dark:text-white/70 transition-transform duration-150 ml-0.5",
+                isSourcesDropdownOpen && "rotate-180"
+              )}
+            />
+          </button>
+        </PopoverTrigger>
 
-      {isSourcesDropdownOpen && (
-        <div
-          className="absolute top-full right-0 mt-1.5 w-72 sm:w-80 rounded-2xl bg-card border border-border shadow-2xl p-2.5 z-50 animate-in fade-in zoom-in-95 duration-100 font-sans"
-          onClick={(e) => e.stopPropagation()}
+        <PopoverContent
+          align="end"
+          sideOffset={6}
+          className="w-72 sm:w-80 rounded-2xl bg-card border border-border shadow-2xl p-2.5 z-50 font-sans"
         >
           {/* Header */}
           <div className="flex items-center justify-between px-1.5 pb-1.5 mb-1">
@@ -2143,15 +2136,14 @@ export function ChatPanel({
               </button>
             </div>
           )}
-        </div>
-      )}
-    </div>
-  );
-};
+        </PopoverContent>
+      </Popover>
+    );
+  };
 
   const renderContextIndicator = () => {
-    // Only show Context Window indicator once user has sent their first message
-    if (!hasStartedChat) return null;
+    // Only show Context Window indicator once user has sent a message or attached sources
+    if (!hasStartedChat && carriedSourcesCount === 0) return null;
 
     const rawPercentUsed = contextUsage.rawPercentUsed;
     const percentUsed = contextUsage.percentUsed;
@@ -2159,164 +2151,263 @@ export function ChatPanel({
     const totalTokens = contextUsage.totalTokens;
     const safePercent = contextUsage.safePercent;
 
+    const isHigh = rawPercentUsed >= 90;
+    const isModerate = rawPercentUsed >= 70 && rawPercentUsed < 90;
+    const activeModelName = currentModel.displayName?.split("(")[0]?.trim() || currentModel.id || "Const";
+
     return (
-      <div className="relative" ref={contextMenuRef}>
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            setIsModelDropdownOpen(false);
-            setIsSourcesDropdownOpen(false);
-            setIsContextOpen(!isContextOpen);
-          }}
-          className={cn(
-            "h-8 w-8 rounded-xl hover:bg-muted text-foreground/80 hover:text-foreground flex items-center justify-center transition-all cursor-pointer border border-border bg-muted/40 shadow-xs active:scale-98 shrink-0",
-            rawPercentUsed >= 90
-              ? "text-destructive hover:text-destructive/80"
-              : rawPercentUsed >= 75
-              ? "text-amber-500 hover:text-amber-400"
-              : ""
-          )}
-          title={`Context window: ${rawPercentUsed === 0 ? "0%" : percentUsed} (~${formatTokenDisplay(usedTokens)} / ${formatTokenDisplay(totalTokens)})`}
-          aria-label="Context window usage"
-        >
-          <svg className="w-3.5 h-3.5 transform -rotate-90" viewBox="0 0 24 24">
-            <circle
-              cx="12"
-              cy="12"
-              r="9"
-              fill="none"
-              stroke="currentColor"
-              className="text-border"
-              strokeWidth="2.5"
-            />
-            <circle
-              cx="12"
-              cy="12"
-              r="9"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeDasharray={56.55}
-              strokeDashoffset={56.55 - (56.55 * safePercent) / 100}
-              strokeLinecap="round"
-            />
-          </svg>
-        </button>
-
-        {/* Context Window Popover */}
-        {isContextOpen && (
-          <div
-            className="absolute top-full mt-1.5 right-0 w-72 sm:w-80 max-w-[calc(100vw-32px)] bg-card border border-border rounded-2xl shadow-2xl p-4 z-50 flex flex-col gap-3 text-left select-none animate-in fade-in zoom-in-95 duration-100 font-sans"
-            onClick={(e) => e.stopPropagation()}
+      <Popover open={isContextOpen} onOpenChange={setIsContextOpen}>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            className={cn(
+              "h-8 w-8 rounded-xl flex items-center justify-center transition-all cursor-pointer border border-border/60 bg-muted/40 shadow-xs active:scale-98 shrink-0 hover:bg-muted",
+              isContextOpen && "bg-muted border-foreground/30",
+              isHigh
+                ? "text-rose-500 border-rose-500/30"
+                : isModerate
+                ? "text-amber-500 border-amber-500/30"
+                : "text-foreground/80 hover:text-foreground"
+            )}
+            title={`Context window: ${rawPercentUsed === 0 ? "0%" : percentUsed} (~${formatTokenDisplay(usedTokens)} / ${formatTokenDisplay(totalTokens)})`}
+            aria-label={t("contextWindow") || "Context window usage"}
           >
-            {/* Header: % of context used and tokens */}
-            <div className="flex items-center justify-between text-[13px]">
-              <span className="text-foreground font-medium">
-                {rawPercentUsed === 0 ? "0%" : rawPercentUsed < 0.1 ? "<0.1%" : `${percentUsed}`} {t("contextUsed") || "of context used"}
-              </span>
-              <span className="font-mono text-[12px] text-muted-foreground">
-                ~{formatTokenDisplay(usedTokens)} / {formatTokenDisplay(totalTokens)}
-              </span>
-            </div>
+            <svg className="w-3.5 h-3.5 transform -rotate-90" viewBox="0 0 24 24">
+              <circle
+                cx="12"
+                cy="12"
+                r="9"
+                fill="none"
+                stroke="currentColor"
+                className="text-border/80 dark:text-muted/40"
+                strokeWidth="2.5"
+              />
+              <circle
+                cx="12"
+                cy="12"
+                r="9"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeDasharray={56.55}
+                strokeDashoffset={56.55 - (56.55 * safePercent) / 100}
+                strokeLinecap="round"
+                className={cn(
+                  "transition-all duration-300",
+                  isHigh
+                    ? "text-rose-500 dark:text-rose-400"
+                    : isModerate
+                    ? "text-amber-500 dark:text-amber-400"
+                    : "text-emerald-500 dark:text-emerald-400"
+                )}
+              />
+            </svg>
+          </button>
+        </PopoverTrigger>
 
-            {/* Multi-segment Horizontal Progress Bar */}
-            <div className="w-full h-2 bg-muted rounded-full overflow-hidden flex gap-0.5">
+        <PopoverContent
+          align="end"
+          sideOffset={6}
+          className="w-80 sm:w-88 max-w-[calc(100vw-32px)] bg-card border border-border rounded-2xl shadow-2xl p-4 z-50 flex flex-col gap-3 text-left select-none font-sans"
+        >
+          {/* Header: Title & Model & Status Badge */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="h-7 w-7 rounded-xl bg-primary/10 flex items-center justify-center text-primary shrink-0">
+                <Cpu className="h-4 w-4" />
+              </div>
+              <div className="min-w-0">
+                <h4 className="text-xs font-semibold text-foreground tracking-tight truncate">
+                  {t("contextWindow") || "Jendela Konteks"}
+                </h4>
+                <p className="text-[10.5px] text-muted-foreground truncate font-mono">
+                  {activeModelName}
+                </p>
+              </div>
+            </div>
+            <Badge
+              variant="outline"
+              className={cn(
+                "text-[10px] px-2 py-0.5 font-medium rounded-full font-sans shrink-0",
+                isHigh
+                  ? "bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30"
+                  : isModerate
+                  ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30"
+                  : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
+              )}
+            >
+              {isHigh
+                ? (t("contextFull") || "Hampir Penuh")
+                : isModerate
+                ? (t("contextModerate") || "Sedang")
+                : (t("contextOptimal") || "Optimal")}
+            </Badge>
+          </div>
+
+          {/* Metric Summary Card */}
+          <div className="bg-muted/40 dark:bg-muted/20 border border-border/50 rounded-xl p-2.5 flex items-center justify-between">
+            <div>
+              <span className="text-[10.5px] text-muted-foreground block font-medium">
+                {t("contextUsed") || "Kapasitas Terpakai"}
+              </span>
+              <div className="flex items-baseline gap-1 mt-0.5">
+                <span className="text-lg font-bold font-mono text-foreground tracking-tight">
+                  {rawPercentUsed === 0 ? "0%" : rawPercentUsed < 0.1 ? "<0.1%" : `${percentUsed}`}
+                </span>
+                <span className="text-[11px] text-muted-foreground/80 font-sans">
+                  kapasitas
+                </span>
+              </div>
+            </div>
+            <div className="text-right">
+              <span className="text-[10.5px] text-muted-foreground block font-medium">
+                Estimasi Token
+              </span>
+              <div className="font-mono text-xs font-semibold text-foreground mt-0.5">
+                ~{formatTokenDisplay(usedTokens)}
+                <span className="text-muted-foreground font-normal text-[11px]"> / {formatTokenDisplay(totalTokens)}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Multi-segment Horizontal Progress Bar */}
+          <div className="space-y-1">
+            <div className="w-full h-2.5 bg-muted/80 dark:bg-muted/50 rounded-full overflow-hidden flex gap-0.5 p-[1px] border border-border/40">
               {contextUsage.sourcesTokens > 0 && (
                 <div
-                  className="bg-emerald-500 h-full transition-all"
+                  className="bg-emerald-500 h-full rounded-full transition-all"
                   style={{
-                    width: `${Math.max(0.5, (contextUsage.sourcesTokens / totalTokens) * 100)}%`,
+                    width: `${Math.max(1, (contextUsage.sourcesTokens / totalTokens) * 100)}%`,
                   }}
-                  title={`Sources: ~${formatTokenDisplay(contextUsage.sourcesTokens)}`}
+                  title={`Sumber Belajar: ~${formatTokenDisplay(contextUsage.sourcesTokens)}`}
                 />
               )}
               {contextUsage.systemPromptTokens > 0 && (
                 <div
-                  className="bg-muted-foreground/60 h-full transition-all"
+                  className="bg-slate-400 dark:bg-zinc-400 h-full rounded-full transition-all"
                   style={{
-                    width: `${Math.max(0.5, (contextUsage.systemPromptTokens / totalTokens) * 100)}%`,
+                    width: `${Math.max(1, (contextUsage.systemPromptTokens / totalTokens) * 100)}%`,
                   }}
-                  title={`Socratic Tutor: ~${formatTokenDisplay(contextUsage.systemPromptTokens)}`}
+                  title={`Instruksi Tutor: ~${formatTokenDisplay(contextUsage.systemPromptTokens)}`}
                 />
               )}
               {contextUsage.messagesTokens > 0 && (
                 <div
-                  className="bg-sky-500 h-full transition-all"
+                  className="bg-sky-500 h-full rounded-full transition-all"
                   style={{
-                    width: `${Math.max(0.5, (contextUsage.messagesTokens / totalTokens) * 100)}%`,
+                    width: `${Math.max(1, (contextUsage.messagesTokens / totalTokens) * 100)}%`,
                   }}
-                  title={`Messages: ~${formatTokenDisplay(contextUsage.messagesTokens)}`}
+                  title={`Riwayat Obrolan: ~${formatTokenDisplay(contextUsage.messagesTokens)}`}
                 />
               )}
               {contextUsage.draftInputTokens > 0 && (
                 <div
-                  className="bg-purple-500 h-full transition-all"
+                  className="bg-purple-500 h-full rounded-full transition-all"
                   style={{
-                    width: `${Math.max(0.5, (contextUsage.draftInputTokens / totalTokens) * 100)}%`,
+                    width: `${Math.max(1, (contextUsage.draftInputTokens / totalTokens) * 100)}%`,
                   }}
-                  title={`Current Input: ~${formatTokenDisplay(contextUsage.draftInputTokens)}`}
+                  title={`Input Saat Ini: ~${formatTokenDisplay(contextUsage.draftInputTokens)}`}
                 />
               )}
             </div>
+          </div>
 
-            {/* Legend / Breakdown List */}
-            <div className="flex flex-col gap-2 pt-1">
-              <div className="flex items-center justify-between text-[12px]">
-                <div className="flex items-center gap-2">
-                  <div className="w-2.5 h-2.5 rounded-xs bg-emerald-500 shrink-0" />
-                  <span className="text-foreground">{t("learningSources") || "Learning Sources"}</span>
-                </div>
-                <span className="font-mono text-foreground">
-                  ~{formatTokenDisplay(contextUsage.sourcesTokens)}
-                </span>
+          {/* Legend / Breakdown List */}
+          <div className="flex flex-col gap-1 pt-0.5">
+            {/* Learning Sources */}
+            <div className="flex items-center justify-between text-xs py-1 px-1.5 rounded-lg hover:bg-muted/40 transition-colors">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-2.5 h-2.5 rounded-xs bg-emerald-500 shrink-0" />
+                <span className="text-foreground truncate">{t("learningSources") || "Sumber Belajar"}</span>
+                {carriedSources.length > 0 && (
+                  <span className="text-[10.5px] text-muted-foreground font-mono">
+                    ({carriedSources.length})
+                  </span>
+                )}
               </div>
+              <span className="font-mono text-xs font-medium text-foreground shrink-0 ml-2">
+                ~{formatTokenDisplay(contextUsage.sourcesTokens)}
+              </span>
+            </div>
 
-              <div className="flex items-center justify-between text-[12px]">
-                <div className="flex items-center gap-2">
-                  <div className="w-2.5 h-2.5 rounded-xs bg-muted-foreground/60 shrink-0" />
-                  <span className="text-foreground">{t("tutorInstructions") || "Socratic Tutor"}</span>
-                </div>
-                <span className="font-mono text-foreground">
-                  ~{formatTokenDisplay(contextUsage.systemPromptTokens)}
-                </span>
+            {/* Socratic Tutor */}
+            <div className="flex items-center justify-between text-xs py-1 px-1.5 rounded-lg hover:bg-muted/40 transition-colors">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-2.5 h-2.5 rounded-xs bg-slate-400 dark:bg-zinc-400 shrink-0" />
+                <span className="text-foreground truncate">{t("tutorInstructions") || "Tutor Socrates"}</span>
               </div>
+              <span className="font-mono text-xs font-medium text-foreground shrink-0 ml-2">
+                ~{formatTokenDisplay(contextUsage.systemPromptTokens)}
+              </span>
+            </div>
 
-              <div className="flex items-center justify-between text-[12px]">
-                <div className="flex items-center gap-2">
-                  <div className="w-2.5 h-2.5 rounded-xs bg-sky-500 shrink-0" />
-                  <span className="text-foreground">{t("chatHistory") || "Discussion History"}</span>
-                </div>
-                <span className="font-mono text-foreground">
-                  ~{formatTokenDisplay(contextUsage.messagesTokens)}
-                </span>
+            {/* Chat History */}
+            <div className="flex items-center justify-between text-xs py-1 px-1.5 rounded-lg hover:bg-muted/40 transition-colors">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-2.5 h-2.5 rounded-xs bg-sky-500 shrink-0" />
+                <span className="text-foreground truncate">{t("chatHistory") || "Riwayat Obrolan"}</span>
+                {messages.length > 0 && (
+                  <span className="text-[10.5px] text-muted-foreground font-mono">
+                    ({messages.length})
+                  </span>
+                )}
               </div>
+              <span className="font-mono text-xs font-medium text-foreground shrink-0 ml-2">
+                ~{formatTokenDisplay(contextUsage.messagesTokens)}
+              </span>
+            </div>
 
-              {contextUsage.draftInputTokens > 0 && (
-                <div className="flex items-center justify-between text-[12px]">
-                  <div className="flex items-center gap-2">
-                    <div className="w-2.5 h-2.5 rounded-xs bg-purple-500 shrink-0" />
-                    <span className="text-purple-600 dark:text-purple-400 font-medium">{t("currentInput") || "Current Input"}</span>
-                  </div>
-                  <span className="font-mono text-purple-600 dark:text-purple-400">
-                    ~{formatTokenDisplay(contextUsage.draftInputTokens)}
+            {/* Current Input */}
+            {contextUsage.draftInputTokens > 0 && (
+              <div className="flex items-center justify-between text-xs py-1 px-1.5 rounded-lg bg-purple-500/5 hover:bg-purple-500/10 transition-colors">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="w-2.5 h-2.5 rounded-xs bg-purple-500 shrink-0" />
+                  <span className="text-purple-600 dark:text-purple-400 font-medium truncate">
+                    {t("currentInput") || "Input Saat Ini"}
                   </span>
                 </div>
-              )}
-
-              <div className="flex items-center justify-between text-[12px] pt-1 border-t border-border">
-                <div className="flex items-center gap-2">
-                  <div className="w-2.5 h-2.5 rounded-xs bg-muted shrink-0" />
-                  <span className="text-muted-foreground">{t("availableContext") || "Available Context"}</span>
-                </div>
-                <span className="font-mono text-muted-foreground">
-                  ~{formatTokenDisplay(contextUsage.availableTokens)}
+                <span className="font-mono text-xs font-medium text-purple-600 dark:text-purple-400 shrink-0 ml-2">
+                  ~{formatTokenDisplay(contextUsage.draftInputTokens)}
                 </span>
               </div>
+            )}
+
+            {/* Available Space */}
+            <div className="flex items-center justify-between text-xs py-1.5 px-1.5 border-t border-border/50 text-muted-foreground mt-0.5">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-2.5 h-2.5 rounded-xs bg-muted-foreground/30 shrink-0" />
+                <span className="truncate">{t("availableContext") || "Kapasitas Tersisa"}</span>
+              </div>
+              <span className="font-mono text-xs font-semibold text-foreground/80 shrink-0 ml-2">
+                ~{formatTokenDisplay(contextUsage.availableTokens)}
+              </span>
             </div>
           </div>
-        )}
-      </div>
+
+          {/* Health Tip & Action */}
+          <div className="pt-1.5 border-t border-border/50 flex flex-col gap-2">
+            <p className="text-[11px] leading-relaxed text-muted-foreground">
+              {isHigh
+                ? (t("contextWarningTip") || "Penggunaan konteks tinggi. Mulai obrolan baru jika respons model mulai lambat.")
+                : (t("contextOptimalTip") || "Kapasitas konteks optimal. Model dapat memahami seluruh dokumen dan konteks obrolan.")}
+            </p>
+
+            {hasStartedChat && (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsContextOpen(false);
+                  handleNewChat();
+                }}
+                className="w-full h-7 rounded-xl bg-muted/50 hover:bg-muted text-xs font-medium text-foreground flex items-center justify-center gap-1.5 transition-colors cursor-pointer border border-border/50"
+              >
+                <MessageCirclePlus className="h-3.5 w-3.5 text-muted-foreground" />
+                <span>{t("startConversationNew")}</span>
+              </button>
+            )}
+          </div>
+        </PopoverContent>
+      </Popover>
     );
   };
 
@@ -2888,7 +2979,7 @@ export function ChatPanel({
   return (
     <main ref={panelRef} className="flex-1 h-full flex flex-col bg-card rounded-2xl border border-border/50 text-foreground min-w-0 relative select-text overflow-hidden shadow-xs">
       {/* Top Header Bar */}
-      <div className="h-12 px-3 sm:px-5 flex items-center justify-between shrink-0 select-none gap-2 overflow-hidden">
+      <div className="h-12 px-3 sm:px-5 flex items-center justify-between shrink-0 select-none gap-2 relative z-20">
         {/* Left: Project / Workspace Folder Indicator */}
         <div className="flex items-center min-w-0 shrink">
           <button
