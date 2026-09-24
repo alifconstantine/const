@@ -609,7 +609,7 @@ export function RightPane({
             )}
             style={{ display: mode === "studio" ? "flex" : "none" }}
           >
-              <ScrollArea className="flex-1 w-full min-h-0" viewportClassName="p-3 sm:p-3.5">
+              <ScrollArea className="flex-1 w-full min-h-0" viewportClassName="p-3 sm:p-3.5 [&>div]:!flex [&>div]:!flex-col [&>div]:!min-h-full">
                 {/* Grid of Studio Tools */}
               <div className="grid grid-cols-3 gap-2 mb-4 shrink-0">
                 {STUDIO_TOOLS.map((tool) => {
@@ -646,7 +646,7 @@ export function RightPane({
               </div>
 
               {/* Studio Activities & Generated Outputs List (Image 1) */}
-              <div className="flex-1 flex flex-col min-h-0 space-y-2 mb-4">
+              <div className={cn("flex-1 flex flex-col min-h-0", artifacts && artifacts.length > 0 ? "space-y-2 mb-4" : "justify-center")}>
                 {artifacts && artifacts.length > 0 ? (
                   <div className="space-y-2">
                     {artifacts.map((art) => {
@@ -923,7 +923,7 @@ export function RightPane({
                   </div>
                 ) : (
                   /* Empty State Studio Output */
-                  <div className="flex-1 flex flex-col items-center justify-center text-center p-4 min-h-[160px]">
+                  <div className="flex-1 flex flex-col items-center justify-center text-center p-4 my-auto min-h-[160px]">
                     <div className="h-12 w-12 rounded-2xl bg-muted border border-border flex items-center justify-center text-muted-foreground mb-3 shadow-2xs">
                       <Layers className="h-6 w-6 stroke-[1.5]" />
                     </div>

@@ -220,7 +220,7 @@ export function StudioPanel({
       </div>
 
       {/* Scrollable Studio Content using ScrollArea from @const/ui */}
-      <ScrollArea className="flex-1 w-full min-h-0 -mr-1 pr-1">
+      <ScrollArea className="flex-1 w-full min-h-0 -mr-1 pr-1" viewportClassName="[&>div]:!flex [&>div]:!flex-col [&>div]:!min-h-full">
         <div className="flex flex-col min-h-full pb-1">
           {/* 3-Column Grid of Studio Tools (8 Tools) */}
           <div className="grid grid-cols-3 gap-2 mb-6">
@@ -250,7 +250,7 @@ export function StudioPanel({
           </div>
 
           {/* Empty State Studio Output (Zero Dummy Data) */}
-          <div className="flex-1 flex flex-col items-center justify-center text-center p-4 min-h-[180px]">
+          <div className="flex-1 flex flex-col items-center justify-center text-center p-4 my-auto min-h-[180px]">
             <div className="h-12 w-12 rounded-2xl bg-secondary/80 border border-border/50 flex items-center justify-center text-muted-foreground/80 mb-3 shadow-2xs">
               <PenTool className="h-6 w-6 stroke-[1.5]" />
             </div>
