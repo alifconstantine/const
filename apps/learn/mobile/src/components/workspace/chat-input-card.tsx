@@ -483,7 +483,7 @@ export function ChatInputCard({
 
       <div
         className={cn(
-          "w-full bg-card border border-border transition-[border-color,padding] duration-150 focus-within:border-foreground/30 shadow-xs rounded-[24px]",
+          "w-full bg-card border border-border transition-[border-color,padding] duration-150 shadow-xs rounded-[24px]",
           isMultiline
             ? "p-2.5 sm:p-3"
             : "px-2.5 py-1.5 min-h-[48px]"
@@ -528,7 +528,7 @@ export function ChatInputCard({
                 : t("askModel", { model: selectedModelName || "Const" })
             }
             className={cn(
-              "w-full bg-transparent text-[15px] sm:text-[15px] text-foreground placeholder:text-muted-foreground outline-none resize-none font-sans block transition-[height] duration-200 ease-out",
+              "w-full bg-transparent text-[15px] sm:text-[15px] text-foreground placeholder:text-muted-foreground outline-none focus:outline-none focus:ring-0 resize-none font-sans block transition-[height] duration-200 ease-out",
               isMultiline
                 ? "leading-5 py-1 min-h-[44px] max-h-36 overflow-y-auto px-1"
                 : "leading-6 py-0.5 h-[28px] max-h-[28px] overflow-hidden px-1.5"

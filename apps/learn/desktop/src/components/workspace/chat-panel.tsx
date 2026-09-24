@@ -3723,7 +3723,7 @@ export function ChatPanel({
               }
             }}
             className={cn(
-              "w-full bg-card border border-border focus-within:border-primary/50 transition-[border-color,padding,opacity] duration-150 shadow-md rounded-[24px]",
+              "w-full bg-card border border-border transition-[border-color,padding,opacity] duration-150 shadow-md rounded-[24px]",
               editingMessageId !== null && "opacity-50 pointer-events-none",
               isMultiline || attachments.length > 0
                 ? "p-3 sm:p-3.5"
@@ -3795,7 +3795,7 @@ export function ChatPanel({
                       : t("inputPlaceholder")
                   }
                   className={cn(
-                    "w-full resize-none bg-transparent text-[14px] text-foreground placeholder:text-muted-foreground/60 outline-none font-sans block disabled:opacity-50 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden overflow-hidden transition-[height] duration-200 ease-out",
+                    "w-full resize-none bg-transparent text-[14px] text-foreground placeholder:text-muted-foreground/60 outline-none focus:outline-none focus:ring-0 font-sans block disabled:opacity-50 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden overflow-hidden transition-[height] duration-200 ease-out",
                     isMultiline || attachments.length > 0
                       ? "leading-[1.65] py-0.5 min-h-[48px]"
                       : isCompact
