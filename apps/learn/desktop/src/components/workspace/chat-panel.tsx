@@ -12,6 +12,7 @@ import {
   Check,
   FileText,
   Image as ImageIcon,
+  Camera,
   X,
   Mic,
   MoreVertical,
@@ -127,6 +128,62 @@ function cleanUserMessageContent(content: string): string {
   cleaned = cleaned.replace(/\n\n- \[(?:Sumber|Source):[\s\S]*$/, "");
   cleaned = cleaned.replace(/^\[(?:Attached media \/ Lampiran media|Lampiran [Mm]edia|Attached [Mm]edia)[\s\S]*?\]\n*/, "");
   return cleaned.trim();
+}
+
+async function parseUploadedFiles(files: FileList | File[]): Promise<AttachedFile[]> {
+  const result: AttachedFile[] = [];
+  const list = Array.from(files);
+
+  for (let i = 0; i < list.length; i++) {
+    const file = list[i]!;
+    const fileType = file.type;
+    let kind: AttachedFile["type"] = "other";
+
+    if (fileType.startsWith("image/")) kind = "image";
+    else if (fileType.startsWith("video/")) kind = "video";
+    else if (fileType === "application/pdf" || file.name.endsWith(".pdf")) kind = "pdf";
+    else if (
+      file.name.endsWith(".ts") ||
+      file.name.endsWith(".tsx") ||
+      file.name.endsWith(".js") ||
+      file.name.endsWith(".py") ||
+      file.name.endsWith(".json")
+    ) {
+      kind = "code";
+    } else if (file.name.endsWith(".md") || file.name.endsWith(".txt")) {
+      kind = "document";
+    }
+
+    let base64: string | undefined = undefined;
+    let url: string | undefined = undefined;
+
+    if (kind === "image" || kind === "video") {
+      url = URL.createObjectURL(file);
+    }
+
+    if (kind === "image") {
+      try {
+        base64 = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+      } catch {}
+    }
+
+    result.push({
+      id: `att_${Date.now()}_${i}_${Math.random().toString(36).slice(2, 6)}`,
+      name: file.name,
+      size: file.size,
+      type: kind,
+      url: url || base64,
+      base64,
+      path: (file as any).path,
+    });
+  }
+
+  return result;
 }
 
 function formatMessageTimestamp(ts?: number): string {
@@ -320,6 +377,14 @@ export function ChatPanel({
   const [isContextOpen, setIsContextOpen] = useState(false);
   const contextMenuRef = useRef<HTMLDivElement>(null);
   const activeAssistantIdRef = useRef<string | null>(null);
+
+  // Inline Message Editing State
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editingText, setEditingText] = useState("");
+  const [editingAttachments, setEditingAttachments] = useState<AttachedFile[]>([]);
+  const editFileInputRef = useRef<HTMLInputElement>(null);
+  const editImageInputRef = useRef<HTMLInputElement>(null);
+  const editTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   const handleRespondApproval = async (
     decision: ApprovalDecision,
@@ -1174,62 +1239,45 @@ export function ChatPanel({
       return;
     }
 
-    const filesToProcess = Array.from(files).slice(0, remaining);
-    const newAttached: AttachedFile[] = [];
-
-    for (let i = 0; i < filesToProcess.length; i++) {
-      const file = filesToProcess[i]!;
-      const fileType = file.type;
-      let kind: AttachedFile["type"] = "other";
-
-      if (fileType.startsWith("image/")) kind = "image";
-      else if (fileType.startsWith("video/")) kind = "video";
-      else if (fileType === "application/pdf" || file.name.endsWith(".pdf")) kind = "pdf";
-      else if (
-        file.name.endsWith(".ts") ||
-        file.name.endsWith(".tsx") ||
-        file.name.endsWith(".js") ||
-        file.name.endsWith(".py") ||
-        file.name.endsWith(".json")
-      ) {
-        kind = "code";
-      } else if (file.name.endsWith(".md") || file.name.endsWith(".txt")) {
-        kind = "document";
-      }
-
-      let base64: string | undefined = undefined;
-      let url: string | undefined = undefined;
-
-      if (kind === "image" || kind === "video") {
-        url = URL.createObjectURL(file);
-      }
-
-      if (kind === "image") {
-        try {
-          base64 = await new Promise<string>((resolve, reject) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result as string);
-            reader.onerror = reject;
-            reader.readAsDataURL(file);
-          });
-        } catch {}
-      }
-
-      newAttached.push({
-        id: `att_${Date.now()}_${i}_${Math.random().toString(36).slice(2, 6)}`,
-        name: file.name,
-        size: file.size,
-        type: kind,
-        url: url || base64,
-        base64,
-        path: (file as any).path,
-      });
-    }
-
+    const newAttached = await parseUploadedFiles(Array.from(files).slice(0, remaining));
     setAttachments((prev) => [...prev, ...newAttached].slice(0, MAX_ATTACHMENTS));
     setIsMultiline(true);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
+    }
+  };
+
+  const handleEditFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const remaining = MAX_ATTACHMENTS - editingAttachments.length;
+    if (remaining <= 0) {
+      if (editFileInputRef.current) editFileInputRef.current.value = "";
+      return;
+    }
+
+    const newAttached = await parseUploadedFiles(Array.from(files).slice(0, remaining));
+    setEditingAttachments((prev) => [...prev, ...newAttached].slice(0, MAX_ATTACHMENTS));
+    if (editFileInputRef.current) {
+      editFileInputRef.current.value = "";
+    }
+  };
+
+  const handleEditImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const remaining = MAX_ATTACHMENTS - editingAttachments.length;
+    if (remaining <= 0) {
+      if (editImageInputRef.current) editImageInputRef.current.value = "";
+      return;
+    }
+
+    const newAttached = await parseUploadedFiles(Array.from(files).slice(0, remaining));
+    setEditingAttachments((prev) => [...prev, ...newAttached].slice(0, MAX_ATTACHMENTS));
+    if (editImageInputRef.current) {
+      editImageInputRef.current.value = "";
     }
   };
 
@@ -1250,9 +1298,23 @@ export function ChatPanel({
     });
   };
 
-  const handleSend = async (customPrompt?: string) => {
-    let textToSend = (customPrompt || inputMessage).trim();
-    const currentAttachmentsRaw = [...attachments];
+  const removeEditAttachment = (id: string) => {
+    setEditingAttachments((prev) => {
+      const item = prev.find((a) => a.id === id);
+      if (item?.url) {
+        URL.revokeObjectURL(item.url);
+      }
+      return prev.filter((a) => a.id !== id);
+    });
+  };
+
+  const handleSend = async (
+    customPrompt?: string,
+    customAttachments?: AttachedFile[],
+    overrideHistory?: DisplayMessage[]
+  ) => {
+    let textToSend = (customPrompt !== undefined ? customPrompt : inputMessage).trim();
+    const currentAttachmentsRaw = customAttachments ? [...customAttachments] : [...attachments];
 
     if ((!textToSend && currentAttachmentsRaw.length === 0) || isStreaming) return;
 
@@ -1274,8 +1336,9 @@ export function ChatPanel({
     }
 
     // 2. Count prior images in this session to maintain chronological session index (Image 1, Image 2, Image 3...)
+    const historyBase = overrideHistory !== undefined ? overrideHistory : messages;
     let priorImagesCount = 0;
-    for (const msg of messages) {
+    for (const msg of historyBase) {
       if (msg.role === "user" && msg.attachments) {
         for (const att of msg.attachments) {
           if (att.type === "image") {
@@ -1410,14 +1473,16 @@ export function ChatPanel({
       }
     }
 
-    const nextMessages = [...messages, newUserMsg];
+    const nextMessages = [...historyBase, newUserMsg];
     setMessages([...nextMessages, newAssistantMsg]);
-    setInputMessage("");
-    setIsMultiline(false);
-    if (textareaRef.current) {
-      textareaRef.current.style.height = `${SINGLE_LINE_HEIGHT}px`;
+    if (overrideHistory === undefined) {
+      setInputMessage("");
+      setIsMultiline(false);
+      if (textareaRef.current) {
+        textareaRef.current.style.height = `${SINGLE_LINE_HEIGHT}px`;
+      }
+      setAttachments([]);
     }
-    setAttachments([]);
     setIsStreaming(true);
     streamStartTimeRef.current = Date.now();
     activeAssistantRef.current = newAssistantMsg;
@@ -1926,61 +1991,88 @@ export function ChatPanel({
     }
   };
 
-  const handleEditAndUndoTurn = async (userMsg: DisplayMessage) => {
+  const handleStartEditMessage = (msg: DisplayMessage) => {
+    if (isStreaming) {
+      toast.warning(
+        language === "id"
+          ? "Tunggu AI selesai merespons sebelum mengedit pesan"
+          : "Please wait for AI to finish responding before editing"
+      );
+      return;
+    }
+    const cleaned = cleanUserMessageContent(msg.content);
+    setEditingMessageId(msg.id);
+    setEditingText(cleaned || msg.content || "");
+    setEditingAttachments(msg.attachments ? [...msg.attachments] : []);
+    setTimeout(() => {
+      if (editTextareaRef.current) {
+        editTextareaRef.current.focus();
+        editTextareaRef.current.style.height = "auto";
+        editTextareaRef.current.style.height = `${Math.min(editTextareaRef.current.scrollHeight, 260)}px`;
+      }
+    }, 50);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingMessageId(null);
+    setEditingText("");
+    setEditingAttachments([]);
+  };
+
+  const handleConfirmEditTurn = async (userMsg: DisplayMessage) => {
+    const textToSend = editingText.trim();
+    const attachmentsToSend = [...editingAttachments];
+
+    if (!textToSend && attachmentsToSend.length === 0) return;
+
     const userIdx = messages.findIndex((m) => m.id === userMsg.id);
     if (userIdx === -1) return;
 
-    let assistantMsg: DisplayMessage | undefined;
-    if (userIdx + 1 < messages.length && messages[userIdx + 1]?.role === "assistant") {
-      assistantMsg = messages[userIdx + 1];
-    }
-
+    // 1. Gather all subsequent assistant messages that might have mutations
+    const subsequentMsgs = messages.slice(userIdx);
     let rolledBackFilesCount = 0;
-    if (assistantMsg?.mutations && assistantMsg.mutations.length > 0) {
-      const electron = (window as any).electron;
-      const rollbackFn = electron?.agent?.rollbackFile || electron?.rollbackFile;
-      if (rollbackFn) {
-        const unrolled = assistantMsg.mutations.filter((m) => !m.rolledBack);
-        for (const rec of [...unrolled].reverse()) {
-          try {
-            const res = await rollbackFn(rec);
-            if (res.success) {
-              rolledBackFilesCount++;
-            }
-          } catch {}
+    const electron = (window as any).electron;
+    const rollbackFn = electron?.agent?.rollbackFile || electron?.rollbackFile;
+
+    if (rollbackFn) {
+      const allMutations: FileMutationRecord[] = [];
+      for (const m of subsequentMsgs) {
+        if (m.role === "assistant" && m.mutations && m.mutations.length > 0) {
+          const unrolled = m.mutations.filter((mut) => !mut.rolledBack);
+          allMutations.push(...unrolled);
         }
+      }
+      for (const rec of [...allMutations].reverse()) {
+        try {
+          const res = await rollbackFn(rec);
+          if (res?.success) {
+            rolledBackFilesCount++;
+          }
+        } catch {}
       }
     }
 
-    await localDb.deleteTurn(userMsg.id, assistantMsg?.id, activeSessionId || undefined);
+    // 2. Truncate from DB starting from this user message
+    await localDb.truncateSessionFromMessage(userMsg.id, activeSessionId || undefined);
 
-    setMessages((prev) => prev.filter((m) => m.id !== userMsg.id && m.id !== assistantMsg?.id));
+    // 3. Keep prior conversation history
+    const priorHistory = messages.slice(0, userIdx);
 
-    const cleanedPrompt = cleanUserMessageContent(userMsg.content);
-    setInputMessage(cleanedPrompt);
-
-    if (userMsg.attachments && userMsg.attachments.length > 0) {
-      setAttachments([...userMsg.attachments]);
-    }
-
-    setIsMultiline(true);
-    setTimeout(() => {
-      textareaRef.current?.focus();
-    }, 50);
+    // 4. Exit inline editing
+    setEditingMessageId(null);
+    setEditingText("");
+    setEditingAttachments([]);
 
     if (rolledBackFilesCount > 0) {
       toast.success(
         language === "id"
-          ? `Pesan dikembalikan untuk diedit & ${rolledBackFilesCount} berkas berhasil di-rollback`
-          : `Message restored for editing & ${rolledBackFilesCount} file(s) rolled back`
-      );
-    } else {
-      toast.info(
-        language === "id"
-          ? "Pesan dikembalikan ke input untuk diedit"
-          : "Message restored to input for editing"
+          ? `${rolledBackFilesCount} berkas berhasil di-rollback`
+          : `${rolledBackFilesCount} file(s) rolled back`
       );
     }
+
+    // 5. Send updated prompt to AI
+    await handleSend(textToSend, attachmentsToSend, priorHistory);
   };
 
   const handleAnswerQuestion = async (toolCallId: string, answer: any) => {
@@ -2776,6 +2868,21 @@ export function ChatPanel({
           onChange={handleFileChange}
           accept="image/*,video/*,audio/*,.pdf,.md,.txt,.py,.json,.csv,.doc,.docx"
         />
+        <input
+          ref={editFileInputRef}
+          type="file"
+          multiple
+          className="hidden"
+          onChange={handleEditFileSelect}
+          accept="image/*,video/*,audio/*,.pdf,.md,.txt,.py,.json,.csv,.doc,.docx"
+        />
+        <input
+          ref={editImageInputRef}
+          type="file"
+          className="hidden"
+          onChange={handleEditImageSelect}
+          accept="image/*"
+        />
       </>
     );
   };
@@ -3210,8 +3317,120 @@ export function ChatPanel({
               const isLatestAssistant = isAssistant && isStreaming && idx === messages.length - 1;
 
               if (isUser) {
+                const isEditingThisMsg = editingMessageId === msg.id;
                 const cleanedContent = cleanUserMessageContent(msg.content);
                 const hasAttachments = msg.attachments && msg.attachments.length > 0;
+
+                if (isEditingThisMsg) {
+                  return (
+                    <div key={msg.id} className="flex flex-col items-end w-full group">
+                      <div className="w-full max-w-[85%] rounded-2xl bg-muted/90 text-foreground p-3 sm:p-3.5 border border-border shadow-md flex flex-col gap-2.5 font-sans transition-all">
+                        {/* Attachments Shelf inside edit mode */}
+                        {editingAttachments.length > 0 && (
+                          <div className="flex flex-wrap items-center gap-2 pb-1.5 border-b border-border/40">
+                            {editingAttachments.map((att) => {
+                              const isImage = att.type === "image";
+                              return (
+                                <div
+                                  key={att.id}
+                                  className="relative rounded-lg border border-border/60 bg-background/80 px-2.5 py-1.5 flex items-center gap-2 text-xs select-none shadow-2xs"
+                                >
+                                  {isImage && (att.url || att.base64) ? (
+                                    <img
+                                      src={att.url || att.base64}
+                                      alt={att.name}
+                                      className="w-6 h-6 rounded object-cover"
+                                    />
+                                  ) : (
+                                    <FileText className="w-4 h-4 text-primary shrink-0" />
+                                  )}
+                                  <span className="max-w-[130px] truncate text-[11px] font-medium text-foreground">
+                                    {att.name}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => removeEditAttachment(att.id)}
+                                    className="p-0.5 rounded-full hover:bg-destructive/15 text-muted-foreground hover:text-destructive transition-colors cursor-pointer"
+                                    title={language === "id" ? "Hapus lampiran" : "Remove attachment"}
+                                  >
+                                    <X className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {/* Textarea */}
+                        <textarea
+                          ref={editTextareaRef}
+                          value={editingText}
+                          onChange={(e) => {
+                            setEditingText(e.target.value);
+                            e.target.style.height = "auto";
+                            e.target.style.height = `${Math.min(e.target.scrollHeight, 280)}px`;
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && !e.shiftKey) {
+                              e.preventDefault();
+                              if (editingText.trim() || editingAttachments.length > 0) {
+                                handleConfirmEditTurn(msg);
+                              }
+                            } else if (e.key === "Escape") {
+                              e.preventDefault();
+                              handleCancelEdit();
+                            }
+                          }}
+                          rows={Math.max(2, Math.min(8, editingText.split("\n").length))}
+                          className="w-full resize-none bg-transparent text-[13.5px] leading-relaxed text-foreground placeholder:text-muted-foreground/60 outline-none font-sans block"
+                          placeholder={language === "id" ? "Edit pesan Anda..." : "Edit your message..."}
+                        />
+
+                        {/* Action Bar matching screenshot */}
+                        <div className="flex items-center justify-between pt-1 border-t border-border/30">
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => editFileInputRef.current?.click()}
+                              className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                              title={language === "id" ? "Tambah lampiran berkas" : "Add file attachment"}
+                            >
+                              <Plus className="w-4 h-4" />
+                            </button>
+                          </div>
+
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={handleCancelEdit}
+                              className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                              title={language === "id" ? "Batal" : "Cancel"}
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => editImageInputRef.current?.click()}
+                              className="p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                              title={language === "id" ? "Lampirkan foto / tangkapan layar" : "Attach image / screenshot"}
+                            >
+                              <Camera className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleConfirmEditTurn(msg)}
+                              disabled={!editingText.trim() && editingAttachments.length === 0}
+                              className="h-7 w-7 rounded-full bg-foreground text-background flex items-center justify-center hover:opacity-90 disabled:opacity-40 transition-opacity cursor-pointer disabled:cursor-not-allowed shadow-xs"
+                              title={language === "id" ? "Kirim revisi" : "Send update"}
+                            >
+                              <ArrowUp className="w-4 h-4 stroke-[2.5]" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                }
 
                 return (
                   <div key={msg.id} className="flex flex-col items-end w-full group">
@@ -3320,7 +3539,7 @@ export function ChatPanel({
                       </button>
                       <button
                         type="button"
-                        onClick={() => handleEditAndUndoTurn(msg)}
+                        onClick={() => handleStartEditMessage(msg)}
                         className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
                         title={t("editMessage")}
                       >
@@ -3426,7 +3645,8 @@ export function ChatPanel({
               }
             }}
             className={cn(
-              "w-full bg-card border border-border focus-within:border-primary/50 transition-[border-color,padding] duration-150 shadow-md rounded-[24px]",
+              "w-full bg-card border border-border focus-within:border-primary/50 transition-[border-color,padding,opacity] duration-150 shadow-md rounded-[24px]",
+              editingMessageId !== null && "opacity-50 pointer-events-none",
               isMultiline || attachments.length > 0
                 ? "p-3 sm:p-3.5"
                 : isCompact
@@ -3488,10 +3708,12 @@ export function ChatPanel({
                     }
                   }}
                   rows={isMultiline || attachments.length > 0 ? 2 : 1}
-                  disabled={isStreaming}
+                  disabled={isStreaming || editingMessageId !== null}
                   placeholder={
                     isStreaming
                       ? t("inputStreamingPlaceholder")
+                      : editingMessageId !== null
+                      ? (language === "id" ? "Sedang mengedit pesan di atas..." : "Editing message above...")
                       : t("inputPlaceholder")
                   }
                   className={cn(

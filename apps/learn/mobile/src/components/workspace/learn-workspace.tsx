@@ -74,6 +74,52 @@ function cleanUserMessageContent(content: string): string {
   return cleaned.trim();
 }
 
+async function parseUploadedMedia(files: FileList | File[]): Promise<AttachedMedia[]> {
+  const readBase64 = (file: File): Promise<string> =>
+    new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = () => resolve("");
+      reader.readAsDataURL(file);
+    });
+
+  const newItems: AttachedMedia[] = [];
+  const list = Array.from(files);
+
+  for (const file of list) {
+    if (!file) continue;
+
+    let type: AttachedMedia["type"] = "other";
+    if (file.type.startsWith("image/")) type = "image";
+    else if (file.type.startsWith("video/")) type = "video";
+    else if (
+      file.type.includes("pdf") ||
+      file.type.includes("document") ||
+      file.type.includes("text") ||
+      file.name.endsWith(".md") ||
+      file.name.endsWith(".txt")
+    ) {
+      type = "document";
+    }
+
+    const url =
+      type === "image" || type === "video" ? URL.createObjectURL(file) : undefined;
+    const base64 = type === "image" ? await readBase64(file) : undefined;
+
+    newItems.push({
+      id: `att_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      name: file.name,
+      size: file.size,
+      type,
+      url,
+      base64,
+      file,
+    });
+  }
+
+  return newItems;
+}
+
 function markdownToHtml(md: string): string {
   if (!md || !md.trim()) return "";
   try {
@@ -254,6 +300,8 @@ function htmlToMarkdown(element: HTMLElement | null): string {
 }
 import {
   ArrowLeft,
+  ArrowUp,
+  Camera,
   Share2,
   Plus,
   FolderOpen,
@@ -608,6 +656,14 @@ export function MobileLearnWorkspace({
     }
   }, [artifacts, selectedNoteArtifact?.id, selectedNoteArtifact?.title, selectedNoteArtifact?.content, selectedNoteArtifact?.status]);
 
+  // Inline Message Editing State
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+  const [editingText, setEditingText] = useState("");
+  const [editingAttachments, setEditingAttachments] = useState<AttachedMedia[]>([]);
+  const editFileInputRef = useRef<HTMLInputElement>(null);
+  const editImageInputRef = useRef<HTMLInputElement>(null);
+  const editTextareaRef = useRef<HTMLTextAreaElement>(null);
+
   // Dynamic visualViewport tracking to adjust cleanly when software keyboard opens/closes
   const [viewportHeight, setViewportHeight] = useState<number | null>(null);
   const [isKeyboardOpen, setIsKeyboardOpen] = useState(false);
@@ -937,35 +993,104 @@ export function MobileLearnWorkspace({
     setIsStreaming(false);
   };
 
-  const handleEditAndUndoTurn = async (userMsg: DisplayMessage) => {
+  const handleEditFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const remainingSlots = 5 - editingAttachments.length;
+    if (remainingSlots <= 0) {
+      if (editFileInputRef.current) editFileInputRef.current.value = "";
+      return;
+    }
+
+    const newItems = await parseUploadedMedia(Array.from(files).slice(0, remainingSlots));
+    setEditingAttachments((prev) => [...prev, ...newItems].slice(0, 5));
+    if (editFileInputRef.current) editFileInputRef.current.value = "";
+  };
+
+  const handleEditImageSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const remainingSlots = 5 - editingAttachments.length;
+    if (remainingSlots <= 0) {
+      if (editImageInputRef.current) editImageInputRef.current.value = "";
+      return;
+    }
+
+    const newItems = await parseUploadedMedia(Array.from(files).slice(0, remainingSlots));
+    setEditingAttachments((prev) => [...prev, ...newItems].slice(0, 5));
+    if (editImageInputRef.current) editImageInputRef.current.value = "";
+  };
+
+  const removeEditAttachment = (id: string) => {
+    setEditingAttachments((prev) => {
+      const item = prev.find((a) => a.id === id);
+      if (item?.url) {
+        URL.revokeObjectURL(item.url);
+      }
+      return prev.filter((a) => a.id !== id);
+    });
+  };
+
+  const handleStartEditMessage = (msg: DisplayMessage) => {
+    if (isStreaming) {
+      toast.warning(
+        language === "id"
+          ? "Tunggu AI selesai merespons sebelum mengedit pesan"
+          : "Please wait for AI to finish responding before editing"
+      );
+      return;
+    }
+    const cleaned = cleanUserMessageContent(msg.content);
+    setEditingMessageId(msg.id);
+    setEditingText(cleaned || msg.content || "");
+    setEditingAttachments(msg.attachments ? [...msg.attachments] : []);
+    setTimeout(() => {
+      if (editTextareaRef.current) {
+        editTextareaRef.current.focus();
+        editTextareaRef.current.style.height = "auto";
+        editTextareaRef.current.style.height = `${Math.min(editTextareaRef.current.scrollHeight, 240)}px`;
+      }
+    }, 50);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingMessageId(null);
+    setEditingText("");
+    setEditingAttachments([]);
+  };
+
+  const handleConfirmEditTurn = async (userMsg: DisplayMessage) => {
+    const textToSend = editingText.trim();
+    const attachmentsToSend = [...editingAttachments];
+
+    if (!textToSend && attachmentsToSend.length === 0) return;
+
     const userIdx = messages.findIndex((m) => m.id === userMsg.id);
     if (userIdx === -1) return;
 
-    let assistantMsg: DisplayMessage | undefined;
-    if (userIdx + 1 < messages.length && messages[userIdx + 1]?.role === "assistant") {
-      assistantMsg = messages[userIdx + 1];
-    }
+    // 1. Truncate from DB starting from this user message
+    await localDb.truncateSessionFromMessage(userMsg.id, activeSessionId || undefined);
 
-    await localDb.deleteTurn(userMsg.id, assistantMsg?.id, activeSessionId || undefined);
+    // 2. Keep prior conversation history
+    const priorHistory = messages.slice(0, userIdx);
 
-    setMessages((prev) => prev.filter((m) => m.id !== userMsg.id && m.id !== assistantMsg?.id));
+    // 3. Exit inline editing
+    setEditingMessageId(null);
+    setEditingText("");
+    setEditingAttachments([]);
 
-    const cleanedPrompt = cleanUserMessageContent(userMsg.content);
-    setInputMessage(cleanedPrompt);
-
-    if (userMsg.attachments && userMsg.attachments.length > 0) {
-      setAttachedFiles([...userMsg.attachments]);
-    }
-
-    toast.info(
-      language === "id"
-        ? "Pesan dikembalikan ke input untuk diedit"
-        : "Message restored to input for editing"
-    );
+    // 4. Send updated prompt to AI
+    await handleSend(textToSend, attachmentsToSend, priorHistory);
   };
 
-  const handleSend = async (customPrompt?: string, attachmentsToSend?: AttachedMedia[]) => {
-    let textToSend = (customPrompt || inputMessage).trim();
+  const handleSend = async (
+    customPrompt?: string,
+    attachmentsToSend?: AttachedMedia[],
+    overrideHistory?: DisplayMessage[]
+  ) => {
+    let textToSend = (customPrompt !== undefined ? customPrompt : inputMessage).trim();
     const currentAttachments = attachmentsToSend || attachedFiles;
     if ((!textToSend && currentAttachments.length === 0) || isStreaming) return;
 
@@ -998,8 +1123,9 @@ export function MobileLearnWorkspace({
     const assistantMsgId = `asst_${now}`;
 
     // Count prior images in the session
+    const historyBase = overrideHistory !== undefined ? overrideHistory : messages;
     let priorImagesCount = 0;
-    for (const m of messages) {
+    for (const m of historyBase) {
       if (m.role === "user" && m.attachments) {
         for (const a of m.attachments) {
           if (a.type === "image") {
@@ -1107,10 +1233,12 @@ export function MobileLearnWorkspace({
       });
     }
 
-    const nextMessages = [...messages, newUserMsg];
+    const nextMessages = [...historyBase, newUserMsg];
     setMessages([...nextMessages, newAssistantMsg]);
-    setInputMessage("");
-    setAttachedFiles([]);
+    if (overrideHistory === undefined) {
+      setInputMessage("");
+      setAttachedFiles([]);
+    }
     setIsStreaming(true);
 
     const formattedMessages = nextMessages.map((m, idx) => {
@@ -2672,143 +2800,252 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
                 } w-full`}
               >
                 {msg.role === "user" ? (
-                  <div className="w-full flex flex-col items-end group">
-                    {/* Attached Media / Files Preview (Compact) */}
-                    {msg.attachments && msg.attachments.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5 mb-1.5 justify-end max-w-[88%]">
-                        {msg.attachments.map((att: any, attIdx: number) => {
-                          const isImage = att.type === "image";
-                          const isVideo = att.type === "video";
-                          const isMedia = isImage || isVideo;
-                          const imgIdx = sessionImageMap.get(att.id) ?? att.imageIndex;
-                          const ext = (att.name.split(".").pop() || "FILE").toUpperCase();
-
-                          return (
-                            <div
-                              key={att.id || attIdx}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (att.url || att.base64) {
-                                  setLightboxItem({
-                                    src: att.url || att.base64 || "",
-                                    alt: att.name,
-                                    type: att.type,
-                                    fileSize: att.size,
-                                    imageIndex: imgIdx,
-                                  });
-                                }
-                              }}
-                              className={cn(
-                                "relative shrink-0 rounded-xl border border-border bg-secondary/50 overflow-hidden shadow-xs select-none",
-                                isMedia
-                                  ? "w-16 h-16 sm:w-20 sm:h-20 cursor-pointer active:scale-95 transition-transform"
-                                  : "w-28 sm:w-32 h-16 sm:h-20"
-                              )}
-                            >
-                              {isImage && (att.url || att.base64) ? (
-                                <div className="w-full h-full rounded-xl overflow-hidden relative">
-                                  <img
-                                    src={att.url || att.base64}
-                                    alt={att.name}
-                                    className="w-full h-full object-cover block"
-                                  />
-                                </div>
-                              ) : isVideo && att.url ? (
-                                <div className="w-full h-full rounded-xl overflow-hidden bg-black relative flex items-center justify-center">
-                                  <Video className="w-5 h-5 text-muted-foreground" />
-                                  <span className="absolute bottom-1 right-1 text-[7px] font-mono bg-black/70 text-white px-1 rounded uppercase font-bold">
-                                    VID
+                  editingMessageId === msg.id ? (
+                    <div className="w-full flex flex-col items-end group">
+                      <div className="w-full max-w-[92%] rounded-2xl bg-secondary/95 text-foreground p-3 border border-border shadow-md flex flex-col gap-2.5 font-sans transition-all">
+                        {/* Attachments Shelf inside edit mode */}
+                        {editingAttachments.length > 0 && (
+                          <div className="flex flex-wrap items-center gap-1.5 pb-1.5 border-b border-border/40">
+                            {editingAttachments.map((att) => {
+                              const isImage = att.type === "image";
+                              return (
+                                <div
+                                  key={att.id}
+                                  className="relative rounded-lg border border-border/60 bg-background/80 px-2 py-1 flex items-center gap-1.5 text-xs select-none shadow-2xs"
+                                >
+                                  {isImage && (att.url || att.base64) ? (
+                                    <img
+                                      src={att.url || att.base64}
+                                      alt={att.name}
+                                      className="w-5 h-5 rounded object-cover"
+                                    />
+                                  ) : (
+                                    <FileText className="w-3.5 h-3.5 text-primary shrink-0" />
+                                  )}
+                                  <span className="max-w-[100px] truncate text-[11px] font-medium text-foreground">
+                                    {att.name}
                                   </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => removeEditAttachment(att.id)}
+                                    className="p-0.5 rounded-full hover:bg-destructive/15 text-muted-foreground hover:text-destructive transition-colors cursor-pointer"
+                                    title={language === "id" ? "Hapus lampiran" : "Remove attachment"}
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
                                 </div>
-                              ) : (
-                                <div className="w-full h-full p-1.5 flex flex-col justify-between rounded-xl bg-secondary/80 text-left">
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-[8px] font-bold text-muted-foreground font-mono uppercase">
-                                      {ext}
-                                    </span>
-                                    <FileText className="w-3 h-3 text-foreground shrink-0" />
-                                  </div>
-                                  <div className="w-full flex-1 my-0.5 min-h-0 overflow-hidden">
-                                    <ScrollArea className="w-full h-full max-h-[30px] sm:max-h-[34px]">
-                                      <span className="text-[9px] font-medium text-foreground leading-tight break-words block pr-1">
-                                        {att.name}
-                                      </span>
-                                    </ScrollArea>
-                                  </div>
-                                  <span className="text-[7.5px] text-muted-foreground font-mono block truncate">
-                                    {formatFileSize(att.size)}
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
+                              );
+                            })}
+                          </div>
+                        )}
 
-                    {/* User Message Bubble with ScrollArea when long */}
-                    {(() => {
-                      const cleanedContent = cleanUserMessageContent(msg.content);
-                      if (!cleanedContent) return null;
-
-                      const isLongPrompt =
-                        cleanedContent.length > 250 || cleanedContent.split("\n").length > 4;
-                      const isExpanded = expandedUserMessageId === msg.id;
-
-                      return (
-                        <div
-                          onClick={() => {
-                            if (isLongPrompt) {
-                              setExpandedUserMessageId(isExpanded ? null : msg.id);
+                        {/* Textarea */}
+                        <textarea
+                          ref={editTextareaRef}
+                          value={editingText}
+                          onChange={(e) => {
+                            setEditingText(e.target.value);
+                            e.target.style.height = "auto";
+                            e.target.style.height = `${Math.min(e.target.scrollHeight, 240)}px`;
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && !e.shiftKey) {
+                              e.preventDefault();
+                              if (editingText.trim() || editingAttachments.length > 0) {
+                                handleConfirmEditTurn(msg);
+                              }
+                            } else if (e.key === "Escape") {
+                              e.preventDefault();
+                              handleCancelEdit();
                             }
                           }}
-                          className={cn(
-                            "max-w-[88%] rounded-2xl bg-secondary text-secondary-foreground border border-border px-3.5 py-2.5 text-[13.5px] select-text leading-relaxed whitespace-pre-wrap break-words [overflow-wrap:anywhere] [word-break:break-word] shadow-xs font-sans transition-colors duration-150",
-                            isLongPrompt && !isExpanded && "cursor-pointer hover:border-foreground/30"
-                          )}
-                        >
-                          {isLongPrompt ? (
-                            <ScrollArea
-                              className={cn(
-                                "w-full transition-[max-height] duration-200 ease-in-out",
-                                isExpanded ? "max-h-[360px]" : "max-h-24"
-                              )}
-                              viewportClassName="[&>div[style]]:!block"
-                            >
-                              <div className="pr-1.5">{cleanedContent}</div>
-                            </ScrollArea>
-                          ) : (
-                            <div>{cleanedContent}</div>
-                          )}
-                        </div>
-                      );
-                    })()}
+                          rows={Math.max(2, Math.min(6, editingText.split("\n").length))}
+                          className="w-full resize-none bg-transparent text-[13.5px] leading-relaxed text-foreground placeholder:text-muted-foreground/60 outline-none font-sans block"
+                          placeholder={language === "id" ? "Edit pesan Anda..." : "Edit your message..."}
+                        />
 
-                    {/* User Message Action Bar: Timestamp, Copy, Edit - Always visible */}
-                    <div className="flex items-center gap-2 pt-1 pr-1 text-[10.5px] font-mono text-muted-foreground select-none">
-                      {msg.createdAt && <span>{formatTimestamp(msg.createdAt)}</span>}
-                      <button
-                        type="button"
-                        onClick={() => handleCopy(msg.id, cleanUserMessageContent(msg.content) || msg.content)}
-                        className="p-1 rounded hover:bg-secondary hover:text-foreground transition-colors cursor-pointer active:scale-95"
-                        title={t("copyMessage")}
-                      >
-                        {copiedId === msg.id ? (
-                          <Check className="w-3 h-3 text-emerald-500" />
-                        ) : (
-                          <Copy className="w-3 h-3" />
-                        )}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleEditAndUndoTurn(msg)}
-                        className="p-1 rounded hover:bg-secondary hover:text-foreground transition-colors cursor-pointer active:scale-95"
-                        title={t("editMessage")}
-                      >
-                        <Pencil className="w-3 h-3" />
-                      </button>
+                        {/* Action Bar matching screenshot */}
+                        <div className="flex items-center justify-between pt-1 border-t border-border/30">
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => editFileInputRef.current?.click()}
+                              className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                              title={language === "id" ? "Tambah lampiran berkas" : "Add file attachment"}
+                            >
+                              <Plus className="w-4 h-4" />
+                            </button>
+                          </div>
+
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={handleCancelEdit}
+                              className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                              title={language === "id" ? "Batal" : "Cancel"}
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => editImageInputRef.current?.click()}
+                              className="p-1.5 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                              title={language === "id" ? "Lampirkan foto / tangkapan layar" : "Attach image / screenshot"}
+                            >
+                              <Camera className="w-4 h-4" />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleConfirmEditTurn(msg)}
+                              disabled={!editingText.trim() && editingAttachments.length === 0}
+                              className="h-7 w-7 rounded-full bg-foreground text-background flex items-center justify-center hover:opacity-90 disabled:opacity-40 transition-opacity cursor-pointer disabled:cursor-not-allowed shadow-xs"
+                              title={language === "id" ? "Kirim revisi" : "Send update"}
+                            >
+                              <ArrowUp className="w-4 h-4 stroke-[2.5]" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                  ) : (
+                    <div className="w-full flex flex-col items-end group">
+                      {/* Attached Media / Files Preview (Compact) */}
+                      {msg.attachments && msg.attachments.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 mb-1.5 justify-end max-w-[88%]">
+                          {msg.attachments.map((att: any, attIdx: number) => {
+                            const isImage = att.type === "image";
+                            const isVideo = att.type === "video";
+                            const isMedia = isImage || isVideo;
+                            const imgIdx = sessionImageMap.get(att.id) ?? att.imageIndex;
+                            const ext = (att.name.split(".").pop() || "FILE").toUpperCase();
+
+                            return (
+                              <div
+                                key={att.id || attIdx}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (att.url || att.base64) {
+                                    setLightboxItem({
+                                      src: att.url || att.base64 || "",
+                                      alt: att.name,
+                                      type: att.type,
+                                      fileSize: att.size,
+                                      imageIndex: imgIdx,
+                                    });
+                                  }
+                                }}
+                                className={cn(
+                                  "relative shrink-0 rounded-xl border border-border bg-secondary/50 overflow-hidden shadow-xs select-none",
+                                  isMedia
+                                    ? "w-16 h-16 sm:w-20 sm:h-20 cursor-pointer active:scale-95 transition-transform"
+                                    : "w-28 sm:w-32 h-16 sm:h-20"
+                                )}
+                              >
+                                {isImage && (att.url || att.base64) ? (
+                                  <div className="w-full h-full rounded-xl overflow-hidden relative">
+                                    <img
+                                      src={att.url || att.base64}
+                                      alt={att.name}
+                                      className="w-full h-full object-cover block"
+                                    />
+                                  </div>
+                                ) : isVideo && att.url ? (
+                                  <div className="w-full h-full rounded-xl overflow-hidden bg-black relative flex items-center justify-center">
+                                    <Video className="w-5 h-5 text-muted-foreground" />
+                                    <span className="absolute bottom-1 right-1 text-[7px] font-mono bg-black/70 text-white px-1 rounded uppercase font-bold">
+                                      VID
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <div className="w-full h-full p-1.5 flex flex-col justify-between rounded-xl bg-secondary/80 text-left">
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-[8px] font-bold text-muted-foreground font-mono uppercase">
+                                        {ext}
+                                      </span>
+                                      <FileText className="w-3 h-3 text-foreground shrink-0" />
+                                    </div>
+                                    <div className="w-full flex-1 my-0.5 min-h-0 overflow-hidden">
+                                      <ScrollArea className="w-full h-full max-h-[30px] sm:max-h-[34px]">
+                                        <span className="text-[9px] font-medium text-foreground leading-tight break-words block pr-1">
+                                          {att.name}
+                                        </span>
+                                      </ScrollArea>
+                                    </div>
+                                    <span className="text-[7.5px] text-muted-foreground font-mono block truncate">
+                                      {formatFileSize(att.size)}
+                                    </span>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {/* User Message Bubble with ScrollArea when long */}
+                      {(() => {
+                        const cleanedContent = cleanUserMessageContent(msg.content);
+                        if (!cleanedContent) return null;
+
+                        const isLongPrompt =
+                          cleanedContent.length > 250 || cleanedContent.split("\n").length > 4;
+                        const isExpanded = expandedUserMessageId === msg.id;
+
+                        return (
+                          <div
+                            onClick={() => {
+                              if (isLongPrompt) {
+                                setExpandedUserMessageId(isExpanded ? null : msg.id);
+                              }
+                            }}
+                            className={cn(
+                              "max-w-[88%] rounded-2xl bg-secondary text-secondary-foreground border border-border px-3.5 py-2.5 text-[13.5px] select-text leading-relaxed whitespace-pre-wrap break-words [overflow-wrap:anywhere] [word-break:break-word] shadow-xs font-sans transition-colors duration-150",
+                              isLongPrompt && !isExpanded && "cursor-pointer hover:border-foreground/30"
+                            )}
+                          >
+                            {isLongPrompt ? (
+                              <ScrollArea
+                                className={cn(
+                                  "w-full transition-[max-height] duration-200 ease-in-out",
+                                  isExpanded ? "max-h-[360px]" : "max-h-24"
+                                )}
+                                viewportClassName="[&>div[style]]:!block"
+                              >
+                                <div className="pr-1.5">{cleanedContent}</div>
+                              </ScrollArea>
+                            ) : (
+                              <div>{cleanedContent}</div>
+                            )}
+                          </div>
+                        );
+                      })()}
+
+                      {/* User Message Action Bar: Timestamp, Copy, Edit - Always visible */}
+                      <div className="flex items-center gap-2 pt-1 pr-1 text-[10.5px] font-mono text-muted-foreground select-none">
+                        {msg.createdAt && <span>{formatTimestamp(msg.createdAt)}</span>}
+                        <button
+                          type="button"
+                          onClick={() => handleCopy(msg.id, cleanUserMessageContent(msg.content) || msg.content)}
+                          className="p-1 rounded hover:bg-secondary hover:text-foreground transition-colors cursor-pointer active:scale-95"
+                          title={t("copyMessage")}
+                        >
+                          {copiedId === msg.id ? (
+                            <Check className="w-3 h-3 text-emerald-500" />
+                          ) : (
+                            <Copy className="w-3 h-3" />
+                          )}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleStartEditMessage(msg)}
+                          className="p-1 rounded hover:bg-secondary hover:text-foreground transition-colors cursor-pointer active:scale-95"
+                          title={t("editMessage")}
+                        >
+                          <Pencil className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
+                  )
                 ) : (
                   <div className="w-full flex flex-col gap-2 group select-text">
                     {/* Working & Tool Execution Process */}
@@ -2871,7 +3108,8 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
           {/* Sticky Bottom Chat Input Bar - Pinned right above keyboard or safe-area */}
           <div
             className={cn(
-              "px-3 pt-1.5 shrink-0 bg-background/95 backdrop-blur-xs z-10 w-full transition-[padding] duration-150",
+              "px-3 pt-1.5 shrink-0 bg-background/95 backdrop-blur-xs z-10 w-full transition-[padding,opacity] duration-150",
+              editingMessageId !== null && "opacity-50 pointer-events-none",
               isKeyboardOpen
                 ? "pb-1.5"
                 : "pb-[max(0.75rem,env(safe-area-inset-bottom))]"
@@ -2889,6 +3127,22 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
               attachments={attachedFiles}
               onAttachmentsChange={setAttachedFiles}
               onPreviewMedia={setLightboxItem}
+            />
+
+            <input
+              ref={editFileInputRef}
+              type="file"
+              multiple
+              className="hidden"
+              onChange={handleEditFileSelect}
+              accept="image/*,video/*,audio/*,.pdf,.md,.txt,.py,.json,.csv,.doc,.docx"
+            />
+            <input
+              ref={editImageInputRef}
+              type="file"
+              className="hidden"
+              onChange={handleEditImageSelect}
+              accept="image/*"
             />
           </div>
         </div>

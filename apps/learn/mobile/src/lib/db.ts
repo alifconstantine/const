@@ -873,6 +873,32 @@ export const localDb = {
     }
   },
 
+  async truncateSessionFromMessage(userMsgId: string, sessionId?: string): Promise<string[]> {
+    if (!sessionId) {
+      await db.messages.delete(userMsgId);
+      return [userMsgId];
+    }
+    const allMsgs = await db.messages.where("sessionId").equals(sessionId).sortBy("createdAt");
+    const targetIdx = allMsgs.findIndex((m) => m.id === userMsgId);
+    if (targetIdx === -1) {
+      await db.messages.delete(userMsgId);
+      return [userMsgId];
+    }
+    const toDeleteMsgs = allMsgs.slice(targetIdx);
+    const toDeleteIds = toDeleteMsgs.map((m) => m.id);
+    await db.messages.bulkDelete(toDeleteIds);
+
+    const remaining = allMsgs.slice(0, targetIdx);
+    const last = remaining[remaining.length - 1];
+    const snippet = last && typeof last.content === "string" ? last.content.slice(0, 80) : "";
+    await db.chatSessions.update(sessionId, {
+      lastMessageSnippet: snippet,
+      messageCount: remaining.length,
+      updatedAt: Date.now(),
+    });
+    return toDeleteIds;
+  },
+
   // Sources
   async createSource(data: {
     learnId: string;
