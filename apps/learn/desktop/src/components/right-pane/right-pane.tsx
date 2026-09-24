@@ -189,11 +189,6 @@ export function RightPane({
     }
   };
 
-  const isDraggingRef = useRef(false);
-  const [isInternalDragging, setIsInternalDragging] = useState(false);
-  const startXRef = useRef(0);
-  const startWidthRef = useRef(width || 400);
-
   // Tab indicator refs and style for animated sliding pill
   const studioBtnRef = useRef<HTMLButtonElement>(null);
   const reviewBtnRef = useRef<HTMLButtonElement>(null);
@@ -208,36 +203,6 @@ export function RightPane({
       });
     }
   }, [mode, mutations.length]);
-
-  // Resize handler
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (!onWidthChange || isCollapsed) return;
-    setIsInternalDragging(true);
-    isDraggingRef.current = true;
-    startXRef.current = e.clientX;
-    startWidthRef.current = width || 400;
-    document.body.style.cursor = "col-resize";
-    document.body.style.userSelect = "none";
-
-    const handleMouseMove = (moveEvent: MouseEvent) => {
-      if (!isDraggingRef.current) return;
-      const deltaX = startXRef.current - moveEvent.clientX;
-      const newWidth = Math.max(300, Math.min(window.innerWidth * 0.65, startWidthRef.current + deltaX));
-      onWidthChange(newWidth);
-    };
-
-    const handleMouseUp = () => {
-      setIsInternalDragging(false);
-      isDraggingRef.current = false;
-      document.body.style.cursor = "";
-      document.body.style.userSelect = "";
-      window.removeEventListener("mousemove", handleMouseMove);
-      window.removeEventListener("mouseup", handleMouseUp);
-    };
-
-    window.addEventListener("mousemove", handleMouseMove);
-    window.addEventListener("mouseup", handleMouseUp);
-  };
 
   const activeTab = tabs.find((t) => t.id === activeTabId) || tabs[0];
 
@@ -451,29 +416,33 @@ export function RightPane({
       style={{ width: isCollapsed ? 48 : (width || 400) }}
       className={cn(
         "h-full flex flex-col relative bg-card rounded-2xl border border-border/50 text-foreground shrink-0 select-none overflow-hidden shadow-xs font-sans",
-        !isResizing && !isInternalDragging && "transition-[width] duration-300 ease-[cubic-bezier(0.2,0,0,1)]"
+        !isResizing && "transition-[width] duration-300 ease-[cubic-bezier(0.2,0,0,1)]"
       )}
     >
-      {/* Collapsed Rail View */}
-      <div
-        className={cn(
-          "w-12 h-full flex flex-col items-center py-3 bg-card text-muted-foreground select-none font-sans absolute top-0 right-0 z-10 transition-opacity duration-200",
-          isCollapsed ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
-        )}
-      >
-        {/* Top: Reopen Panel Toggle */}
+      {/* Global Persistent Toggle Button (Stationary in top-right corner, zero jitter) */}
+      {onToggleCollapse && (
         <button
           type="button"
           onClick={onToggleCollapse}
-          className="h-8 w-8 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
-          title={t("openStudioPanel") || "Expand Panel"}
+          className="absolute top-2 right-2 z-30 h-8 w-8 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer active:scale-95"
+          title={isCollapsed ? (t("openStudioPanel") || "Expand Panel") : (t("hidePanel") || "Collapse panel")}
           aria-label={t("studioTitle")}
         >
           <PanelRight className="h-4 w-4" />
         </button>
+      )}
 
+      {/* Collapsed Rail View (Staggered dissolve to prevent icon collision) */}
+      <div
+        className={cn(
+          "w-12 h-full flex flex-col items-center pt-12 pb-3 bg-card text-muted-foreground select-none font-sans absolute top-0 right-0 z-10 origin-top-right transition-all ease-out",
+          isCollapsed
+            ? "opacity-100 scale-100 pointer-events-auto duration-200 delay-100"
+            : "opacity-0 scale-95 pointer-events-none duration-150 delay-0"
+        )}
+      >
         {/* 2-mode mini switcher */}
-        <div className="flex flex-col items-center gap-1 mt-3 pb-2 border-b border-border/40 w-full px-1">
+        <div className="flex flex-col items-center gap-1 pb-2 border-b border-border/40 w-full px-1">
           <button
             type="button"
             onClick={() => {
@@ -541,7 +510,10 @@ export function RightPane({
         {/* Bottom: Note Button pinned to bottom */}
         <button
           type="button"
-          onClick={onAddNote}
+          onClick={() => {
+            onAddNote?.();
+            if (isCollapsed) onToggleCollapse?.();
+          }}
           className="h-8 w-8 rounded-xl bg-muted/60 hover:bg-muted text-foreground flex items-center justify-center transition-colors cursor-pointer border border-border/40 shadow-xs mt-auto"
           title={t("addNote")}
           aria-label={t("addNote")}
@@ -550,24 +522,16 @@ export function RightPane({
         </button>
       </div>
 
-      {/* Expanded Content View */}
+      {/* Expanded Content View (Staggered dissolve to prevent icon collision) */}
       <div
         style={{ width: `${width || 400}px`, minWidth: `${width || 400}px` }}
         className={cn(
-          "h-full flex flex-col transition-opacity duration-200 relative",
-          isCollapsed ? "opacity-0 pointer-events-none" : "opacity-100 pointer-events-auto"
+          "h-full flex flex-col absolute top-0 right-0 origin-top-right transition-all ease-out",
+          isCollapsed
+            ? "opacity-0 scale-[0.98] pointer-events-none duration-150 delay-0"
+            : "opacity-100 scale-100 pointer-events-auto duration-200 delay-100"
         )}
       >
-        {/* Draggable resize handle on the left edge */}
-        <div
-          onMouseDown={handleMouseDown}
-          onDoubleClick={() => onWidthChange?.(400)}
-          className="absolute top-0 left-0 w-1 h-full cursor-col-resize hover:bg-muted-foreground/20 transition-colors z-30 group"
-          title="Drag to resize, double-click to reset"
-        >
-          <div className="w-0.5 h-full bg-transparent group-hover:bg-primary/50" />
-        </div>
-
         {/* Conditional View: When Note is Active in Studio (Image 3) vs Studio/Review Overview */}
         {mode === "studio" && activeNoteArtifact && activeNoteArtifact.type === "note" ? (
           <NotePreviewTab
@@ -582,7 +546,7 @@ export function RightPane({
           <>
             {/* Top Header with 2 Menus: Studio & Review */}
             <div
-              className={`h-12 px-3 bg-card flex items-center justify-between shrink-0 select-none ${
+              className={`h-12 pl-3 pr-12 bg-card flex items-center justify-between shrink-0 select-none ${
                 mode === "studio" ? "border-b-0" : "border-b border-border"
               }`}
             >
@@ -633,18 +597,6 @@ export function RightPane({
                   )}
                 </button>
               </div>
-
-              {/* Collapse Button */}
-              {onToggleCollapse && (
-                <button
-                  type="button"
-                  onClick={onToggleCollapse}
-                  className="h-7 w-7 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
-                  title={t("hidePanel") || "Collapse panel"}
-                >
-                  <PanelRight className="h-4 w-4" />
-                </button>
-              )}
             </div>
 
         {/* Main Body based on Active Menu with smooth fade */}

@@ -1729,57 +1729,57 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
         </div>
 
         {/* Right Column: Dual Studio & Preview RightPane */}
-        <div
-          style={{ width: isStudioCollapsed ? 48 : (studioWidth || 400) }}
-          className={cn(
-            "h-full flex flex-col shrink-0 overflow-hidden",
-            isStudioCollapsed && "w-12"
-          )}
+        <ErrorBoundary
+          title="Panel samping mengalami kendala"
+          description="Terjadi kesalahan pada panel Studio/Preview."
+          fallback={
+            <div
+              style={{ width: isStudioCollapsed ? 48 : (studioWidth || 400) }}
+              className="h-full shrink-0 flex flex-col justify-center items-center p-6 bg-card rounded-2xl border border-destructive/30 text-center select-none"
+            >
+              <p className="text-xs text-muted-foreground">Terjadi kesalahan pada panel Studio.</p>
+            </div>
+          }
         >
-          <ErrorBoundary
-            title="Panel samping mengalami kendala"
-            description="Terjadi kesalahan pada panel Studio/Preview."
-          >
-            <RightPane
-              width={studioWidth}
-              onWidthChange={(w) => {
-                setIsManualWidth(true);
-                setStudioWidth(clampStudioWidth(w));
-              }}
-              isCollapsed={isStudioCollapsed}
-              isResizing={isDraggingStudio}
-              onToggleCollapse={() => setIsStudioCollapsed(!isStudioCollapsed)}
-              mode={rightPaneMode}
-              onModeChange={setRightPaneMode}
-              tabs={rightPaneTabs}
-              activeTabId={activeRightPaneTabId}
-              isOpeningNewTab={isOpeningNewTab}
-              onSelectTab={handleSelectTab}
-              onCloseTab={handleCloseTab}
-              onNewTab={handleNewTab}
-              onOpenTabType={handleOpenTabType}
-              onReorderTabs={handleReorderTabs}
-              onUpdateTab={handleUpdateTab}
-              mutations={sessionMutations}
-              onRollbackFile={handleRollbackFile}
-              onRollbackAll={handleRollbackAll}
-              onOpenFileDiff={handleOpenFileDiff}
-              onSelectStudioTool={handleSelectStudioTool}
-              onAddNote={handleAddNote}
-              onOpenArtifact={handleOpenArtifact}
-              onDeleteArtifact={handleDeleteArtifact}
-              activeNoteArtifact={activeNoteArtifact}
-              onCloseNote={handleCloseNote}
-              onConvertToSource={handleConvertToSource}
-              onGenerateNote={handleGenerateNote}
-              artifacts={artifacts || []}
-              onDownloadArtifact={handleDownloadArtifact}
-              generatingArtifacts={generatingArtifacts}
-              onSelectArtifact={handleOpenStudioArtifact}
-              onExplainInChat={(prompt) => setPendingStudioPrompt(prompt)}
-            />
-          </ErrorBoundary>
-        </div>
+          <RightPane
+            width={studioWidth}
+            onWidthChange={(w) => {
+              setIsManualWidth(true);
+              setStudioWidth(clampStudioWidth(w));
+            }}
+            isCollapsed={isStudioCollapsed}
+            isResizing={isDraggingStudio}
+            onToggleCollapse={() => setIsStudioCollapsed(!isStudioCollapsed)}
+            mode={rightPaneMode}
+            onModeChange={setRightPaneMode}
+            tabs={rightPaneTabs}
+            activeTabId={activeRightPaneTabId}
+            isOpeningNewTab={isOpeningNewTab}
+            onSelectTab={handleSelectTab}
+            onCloseTab={handleCloseTab}
+            onNewTab={handleNewTab}
+            onOpenTabType={handleOpenTabType}
+            onReorderTabs={handleReorderTabs}
+            onUpdateTab={handleUpdateTab}
+            mutations={sessionMutations}
+            onRollbackFile={handleRollbackFile}
+            onRollbackAll={handleRollbackAll}
+            onOpenFileDiff={handleOpenFileDiff}
+            onSelectStudioTool={handleSelectStudioTool}
+            onAddNote={handleAddNote}
+            onOpenArtifact={handleOpenArtifact}
+            onDeleteArtifact={handleDeleteArtifact}
+            activeNoteArtifact={activeNoteArtifact}
+            onCloseNote={handleCloseNote}
+            onConvertToSource={handleConvertToSource}
+            onGenerateNote={handleGenerateNote}
+            artifacts={artifacts || []}
+            onDownloadArtifact={handleDownloadArtifact}
+            generatingArtifacts={generatingArtifacts}
+            onSelectArtifact={handleOpenStudioArtifact}
+            onExplainInChat={(prompt) => setPendingStudioPrompt(prompt)}
+          />
+        </ErrorBoundary>
       </div>
 
       {/* Add Source Pop-up Modal */}
