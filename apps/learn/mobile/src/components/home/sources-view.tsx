@@ -13,6 +13,8 @@ import {
   ArrowUpRight,
   FolderPlus,
   Eye,
+  ChevronDown,
+  Check,
 } from "lucide-react";
 import {
   Button,
@@ -22,6 +24,12 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
 } from "@const/ui";
 import { db, localDb, type LocalSource, type LocalLearn } from "../../lib/db";
 import { useI18n } from "../../lib/i18n";
@@ -138,34 +146,6 @@ export function SourcesView({
     propIsAddSourceModalOpen !== undefined ? propIsAddSourceModalOpen : localAddSourceModalOpen;
   const setIsAddSourceModalOpen = onAddSourceModalOpenChange ?? setLocalAddSourceModalOpen;
 
-  // Animated sliding pill indicator
-  const allTabRef = useRef<HTMLButtonElement>(null);
-  const workspaceTabRef = useRef<HTMLButtonElement>(null);
-  const [indicatorStyle, setIndicatorStyle] = useState<{ left: number; width: number }>({
-    left: 0,
-    width: 0,
-  });
-
-  useEffect(() => {
-    const updateIndicator = () => {
-      const activeEl = activeCategory === "all" ? allTabRef.current : workspaceTabRef.current;
-      if (activeEl) {
-        setIndicatorStyle({
-          left: activeEl.offsetLeft,
-          width: activeEl.offsetWidth,
-        });
-      }
-    };
-
-    updateIndicator();
-    const timer = setTimeout(updateIndicator, 50);
-    window.addEventListener("resize", updateIndicator);
-    return () => {
-      clearTimeout(timer);
-      window.removeEventListener("resize", updateIndicator);
-    };
-  }, [activeCategory, language]);
-
   // Dexie.js Live Queries
   const rawSources = useLiveQuery(() => db.sources.toArray());
   const rawLearns = useLiveQuery(() => db.learns.toArray());
@@ -177,6 +157,11 @@ export function SourcesView({
   const learnsMap = useMemo(() => {
     return new Map<string, LocalLearn>(learns.map((l) => [l.id, l]));
   }, [learns]);
+
+  const selectedWorkspace = useMemo(() => {
+    if (selectedWorkspaceId === "all") return null;
+    return learnsMap.get(selectedWorkspaceId) ?? null;
+  }, [selectedWorkspaceId, learnsMap]);
 
   // Workspaces that currently have at least 1 source
   const workspacesWithSources = useMemo(() => {
@@ -410,125 +395,114 @@ export function SourcesView({
   };
 
   return (
-    <div className="w-full flex flex-col space-y-3.5">
-      {/* 1. Header & Category Switcher */}
-      <div className="space-y-3">
-        {/* Title and total counter */}
-        <div className="flex items-center justify-between px-0.5">
-          <div className="flex items-center gap-2">
-            <h2 className="font-sans text-sm font-semibold tracking-tight text-foreground">
-              {t("sources")}
-            </h2>
-            <span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary border border-border/60 text-muted-foreground font-mono">
-              {filteredSources.length}
-            </span>
-          </div>
+    <section className="space-y-2.5">
+      {/* 1. Header & Category Switcher (Dropdown Menu di Kanan, Selaras seperti di Artifact) */}
+      <div className="flex items-center justify-between h-7 px-0.5">
+        <div className="flex items-center gap-2">
+          <h2 className="font-sans text-sm font-semibold tracking-tight text-foreground">
+            {t("sources")}
+          </h2>
+          <span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary border border-border/60 text-muted-foreground font-sans">
+            {filteredSources.length}
+          </span>
         </div>
 
-        {/* Category Switcher Tabs: "Semua" (All) vs "Berdasarkan Workspace" (By Workspace) */}
-        <div className="flex flex-col gap-2">
-          <div className="relative flex items-center p-0.5 rounded-xl bg-secondary/80 border border-border/70 w-full">
-            {/* Smooth animated sliding pill background */}
-            <div
-              className="absolute top-0.5 bottom-0.5 rounded-lg bg-card border border-border shadow-2xs transition-all duration-300 pointer-events-none"
-              style={{
-                left: `${indicatorStyle.left}px`,
-                width: `${indicatorStyle.width}px`,
-                opacity: indicatorStyle.width > 0 ? 1 : 0,
-                transitionTimingFunction: "cubic-bezier(0.16, 1, 0.3, 1)",
+        {/* Category Dropdown Menu */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <button
+              type="button"
+              className="h-7 px-2.5 rounded-full text-xs font-medium gap-1.5 bg-secondary/70 hover:bg-secondary text-muted-foreground hover:text-foreground cursor-pointer transition-colors active:scale-95 border-none shadow-none flex items-center"
+            >
+              {activeCategory === "all" ? (
+                <>
+                  <FileText className="w-3 h-3 text-muted-foreground" />
+                  <span>{t("allSources")}</span>
+                </>
+              ) : selectedWorkspace ? (
+                <>
+                  <LearnIcon icon={selectedWorkspace.emoji} className="w-3 h-3 text-muted-foreground shrink-0" />
+                  <span className="max-w-[100px] truncate">{selectedWorkspace.title}</span>
+                </>
+              ) : (
+                <>
+                  <BookOpen className="w-3 h-3 text-muted-foreground" />
+                  <span>{t("byWorkspace")}</span>
+                </>
+              )}
+              <ChevronDown className="w-3 h-3 ml-0.5 opacity-70" />
+            </button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56 p-1.5 shadow-md max-h-72 overflow-y-auto">
+            <DropdownMenuItem
+              className="cursor-pointer text-xs py-2 px-2 flex items-center gap-2"
+              onClick={() => {
+                setActiveCategory("all");
+                setSelectedWorkspaceId("all");
               }}
-            />
-
-            <button
-              ref={allTabRef}
-              type="button"
-              onClick={() => setActiveCategory("all")}
-              className={`relative z-10 flex-1 py-1.5 rounded-lg text-xs font-medium text-center transition-colors duration-200 cursor-pointer select-none ${
-                activeCategory === "all"
-                  ? "text-foreground font-semibold"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
             >
-              {t("allSources")}
-            </button>
-            <button
-              ref={workspaceTabRef}
-              type="button"
-              onClick={() => setActiveCategory("workspace")}
-              className={`relative z-10 flex-1 py-1.5 rounded-lg text-xs font-medium text-center transition-colors duration-200 cursor-pointer select-none ${
-                activeCategory === "workspace"
-                  ? "text-foreground font-semibold"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {t("byWorkspace")}
-            </button>
-          </div>
+              <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+              <span className="flex-1">{t("allSources")}</span>
+              <span className="text-[10px] text-muted-foreground font-sans">({sources.length})</span>
+              {activeCategory === "all" && <Check className="h-3.5 w-3.5 ml-1 text-primary" />}
+            </DropdownMenuItem>
 
-          {/* Sub-filter if in "Berdasarkan Workspace": Horizontal Workspace Pills */}
-          {activeCategory === "workspace" && (
-            <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1 max-w-full">
-              <button
-                type="button"
-                onClick={() => setSelectedWorkspaceId("all")}
-                className={`px-3 py-1.5 rounded-xl text-xs font-medium shrink-0 transition-all cursor-pointer border ${
-                  selectedWorkspaceId === "all"
-                    ? "bg-foreground text-background border-transparent font-semibold shadow-sm"
-                    : "bg-secondary/70 border-border/70 text-muted-foreground hover:text-foreground hover:bg-secondary active:scale-95"
-                }`}
-              >
-                {t("allWorkspaces")}
-              </button>
+            {workspacesWithSources.length > 0 && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground/70 px-2 py-1 font-medium">
+                  {t("byWorkspace")}
+                </DropdownMenuLabel>
 
-              {workspacesWithSources.map((ws) => (
-                <button
-                  key={ws.id}
-                  type="button"
-                  onClick={() => setSelectedWorkspaceId(ws.id)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-medium shrink-0 transition-all cursor-pointer border flex items-center gap-1.5 ${
-                    selectedWorkspaceId === ws.id
-                      ? "bg-foreground text-background border-transparent font-semibold shadow-sm"
-                      : "bg-secondary/70 border-border/70 text-muted-foreground hover:text-foreground hover:bg-secondary active:scale-95"
-                  }`}
-                >
-                  <LearnIcon icon={ws.emoji} className="w-3.5 h-3.5 shrink-0" />
-                  <span className="max-w-[120px] truncate">{ws.title}</span>
-                  <span className="text-[10px] opacity-75 font-mono">
-                    {ws.sourcesInDb}
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+                {workspacesWithSources.map((ws) => {
+                  const isSelected = activeCategory === "workspace" && selectedWorkspaceId === ws.id;
+                  return (
+                    <DropdownMenuItem
+                      key={ws.id}
+                      className="cursor-pointer text-xs py-2 px-2 flex items-center gap-2"
+                      onClick={() => {
+                        setActiveCategory("workspace");
+                        setSelectedWorkspaceId(ws.id);
+                      }}
+                    >
+                      <LearnIcon icon={ws.emoji} className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                      <span className="flex-1 truncate">{ws.title}</span>
+                      <span className="text-[10px] text-muted-foreground font-sans">({ws.sourcesInDb})</span>
+                      {isSelected && <Check className="h-3.5 w-3.5 ml-1 text-primary shrink-0" />}
+                    </DropdownMenuItem>
+                  );
+                })}
+              </>
+            )}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
 
       {/* 2. Main Content: Source Rows */}
       {sources.length === 0 ? (
         /* Empty State: Zero Sources in App */
-        <div className="flex-1 flex flex-col items-center justify-center text-center p-8 rounded-2xl border border-dashed border-border/80 bg-card min-h-[260px]">
-          <div className="w-12 h-12 rounded-2xl bg-secondary border border-border/60 flex items-center justify-center text-muted-foreground mb-3">
-            <FileText className="w-6 h-6 stroke-[1.5]" />
+        <div className="flex-1 flex flex-col items-center justify-center text-center min-h-[48vh] py-12 px-4 select-none">
+          <div className="h-14 w-14 rounded-2xl bg-secondary/80 border border-border/70 flex items-center justify-center text-muted-foreground mb-3 shadow-2xs">
+            <FileText className="h-6 w-6 stroke-[1.5] text-muted-foreground/80" />
           </div>
-          <h3 className="text-sm font-medium text-foreground mb-1">
+          <h3 className="text-sm font-semibold text-foreground mb-1 font-sans">
             {t("noSavedSourcesTitle")}
           </h3>
-          <p className="text-xs text-muted-foreground max-w-xs leading-relaxed mb-4">
+          <p className="text-xs text-muted-foreground max-w-xs mx-auto mb-4 font-sans leading-relaxed">
             {t("noSavedSourcesDesc")}
           </p>
-          <Button
-            variant="outline"
-            size="sm"
+          <button
+            type="button"
             onClick={handleTriggerAddSource}
-            className="rounded-full text-xs border-border hover:bg-secondary cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-primary text-primary-foreground text-xs font-medium transition-colors cursor-pointer shadow-xs active:scale-95"
           >
-            <Plus className="w-3.5 h-3.5 mr-1.5" />
+            <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
             <span>{t("addFirstSource")}</span>
-          </Button>
+          </button>
         </div>
       ) : filteredSources.length === 0 ? (
         /* Empty State: Zero Search Results */
-        <div className="py-12 text-center rounded-2xl border border-dashed border-border/80 bg-card px-4">
+        <div className="text-center py-12 px-4">
           <p className="text-xs text-muted-foreground">
             {t("noSourcesMatching", { query: searchQuery })}
           </p>
@@ -685,6 +659,6 @@ export function SourcesView({
         }}
         onOpenLearn={onOpenLearn}
       />
-    </div>
+    </section>
   );
 }

@@ -15,10 +15,6 @@ import {
 import {
   Search,
   ArrowUpDown,
-  ArrowUp,
-  ArrowDown,
-  Calendar,
-  Type,
   Check,
   Plus,
   ChevronRight,
@@ -38,7 +34,6 @@ import {
   Box,
   Cable,
   Settings,
-  Clock,
   Rows3,
   ChevronDown,
   Package,
@@ -89,6 +84,7 @@ interface ArtifactConfig {
   icon: React.ElementType;
   iconColor: string;
   bgClass: string;
+  label: string;
 }
 
 function getArtifactConfig(type: string, isZip?: boolean): ArtifactConfig {
@@ -97,6 +93,7 @@ function getArtifactConfig(type: string, isZip?: boolean): ArtifactConfig {
       icon: Package,
       iconColor: "text-orange-600 dark:text-[#fb923c]",
       bgClass: "bg-orange-500/10 border-orange-500/20",
+      label: "Package",
     };
   }
 
@@ -109,6 +106,7 @@ function getArtifactConfig(type: string, isZip?: boolean): ArtifactConfig {
         icon: Presentation,
         iconColor: "text-amber-600 dark:text-[#fde047]",
         bgClass: "bg-amber-500/10 border-amber-500/20",
+        label: "Slide",
       };
     case "note":
     case "notes":
@@ -116,12 +114,14 @@ function getArtifactConfig(type: string, isZip?: boolean): ArtifactConfig {
         icon: SquarePen,
         iconColor: "text-blue-600 dark:text-[#60a5fa]",
         bgClass: "bg-blue-500/10 border-blue-500/20",
+        label: "Note",
       };
     case "quiz":
       return {
         icon: HelpCircle,
         iconColor: "text-teal-600 dark:text-[#5eead4]",
         bgClass: "bg-teal-500/10 border-teal-500/20",
+        label: "Quiz",
       };
     case "flashcard":
     case "flashcards":
@@ -129,6 +129,7 @@ function getArtifactConfig(type: string, isZip?: boolean): ArtifactConfig {
         icon: BookOpen,
         iconColor: "text-emerald-600 dark:text-[#86efac]",
         bgClass: "bg-emerald-500/10 border-emerald-500/20",
+        label: "Flashcard",
       };
     case "mind_map":
     case "mindmap":
@@ -137,6 +138,7 @@ function getArtifactConfig(type: string, isZip?: boolean): ArtifactConfig {
         icon: GitFork,
         iconColor: "text-pink-600 dark:text-[#f472b6]",
         bgClass: "bg-pink-500/10 border-pink-500/20",
+        label: "Diagram",
       };
     case "audio_summary":
     case "audio":
@@ -144,6 +146,7 @@ function getArtifactConfig(type: string, isZip?: boolean): ArtifactConfig {
         icon: AudioLines,
         iconColor: "text-indigo-600 dark:text-[#a5b4fc]",
         bgClass: "bg-indigo-500/10 border-indigo-500/20",
+        label: "Audio",
       };
     case "video_summary":
     case "video":
@@ -151,18 +154,21 @@ function getArtifactConfig(type: string, isZip?: boolean): ArtifactConfig {
         icon: Video,
         iconColor: "text-emerald-600 dark:text-[#86efac]",
         bgClass: "bg-emerald-500/10 border-emerald-500/20",
+        label: "Video",
       };
     case "report":
       return {
         icon: FileText,
         iconColor: "text-stone-600 dark:text-[#dedac2]",
         bgClass: "bg-stone-500/10 border-stone-500/20",
+        label: "Report",
       };
     case "infographic":
       return {
         icon: BarChart3,
         iconColor: "text-purple-600 dark:text-[#c084fc]",
         bgClass: "bg-purple-500/10 border-purple-500/20",
+        label: "Infographic",
       };
     case "data_table":
     case "table":
@@ -170,12 +176,14 @@ function getArtifactConfig(type: string, isZip?: boolean): ArtifactConfig {
         icon: Table2,
         iconColor: "text-sky-600 dark:text-[#38bdf8]",
         bgClass: "bg-sky-500/10 border-sky-500/20",
+        label: "Table",
       };
     default:
       return {
         icon: Layers,
         iconColor: "text-muted-foreground",
         bgClass: "bg-secondary border-border",
+        label: type || "Artifact",
       };
   }
 }
@@ -222,49 +230,6 @@ export function LearnHome({
   const [activeCollectionId, setActiveCollectionId] = useState<string | null>(null);
   const [artifactCategory, setArtifactCategory] = useState<string>("all");
 
-  // Folder Sorting States
-  type FolderSortBy = "createdAt" | "name" | "lastOpened";
-  type FolderSortDirection = "asc" | "desc";
-
-  const [folderSortBy, setFolderSortBy] = useState<FolderSortBy>(() => {
-    try {
-      const saved = localStorage.getItem("const_learn_folder_sort_by");
-      if (saved === "createdAt" || saved === "name" || saved === "lastOpened") {
-        return saved;
-      }
-    } catch {}
-    return "createdAt";
-  });
-
-  const [folderSortDirection, setFolderSortDirection] = useState<FolderSortDirection>(() => {
-    try {
-      const saved = localStorage.getItem("const_learn_folder_sort_direction");
-      if (saved === "asc" || saved === "desc") {
-        return saved;
-      }
-    } catch {}
-    return "desc";
-  });
-
-  useEffect(() => {
-    try {
-      localStorage.setItem("const_learn_folder_sort_by", folderSortBy);
-    } catch {}
-  }, [folderSortBy]);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem("const_learn_folder_sort_direction", folderSortDirection);
-    } catch {}
-  }, [folderSortDirection]);
-
-  const getSortLabel = (sort: FolderSortBy) => {
-    switch (sort) {
-      case "createdAt": return t("sortCreatedAt");
-      case "name": return t("sortName");
-      case "lastOpened": return t("sortLastOpened");
-    }
-  };
 
   // Scroll active tab chip smoothly into view
   const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
@@ -377,9 +342,17 @@ export function LearnHome({
 
   const artifactsData = useLiveQuery(async () => {
     const arts = await db.artifacts.toArray();
-    arts.sort((a, b) => b.updatedAt - a.updatedAt);
+    if (sortOption === "recent") {
+      arts.sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
+    } else if (sortOption === "oldest") {
+      arts.sort((a, b) => (a.updatedAt || 0) - (b.updatedAt || 0));
+    } else if (sortOption === "title_asc") {
+      arts.sort((a, b) => a.title.localeCompare(b.title));
+    } else if (sortOption === "title_desc") {
+      arts.sort((a, b) => b.title.localeCompare(a.title));
+    }
     return arts;
-  });
+  }, [sortOption]);
 
   const learns = useMemo(() => learnsData ?? [], [learnsData]);
   const collections = useMemo(() => collectionsData ?? [], [collectionsData]);
@@ -502,22 +475,22 @@ export function LearnHome({
     }
 
     return [...list].sort((a, b) => {
-      let result = 0;
-      if (folderSortBy === "createdAt") {
+      if (sortOption === "recent") {
+        const aTime = a.updatedAt || a.createdAt || 0;
+        const bTime = b.updatedAt || b.createdAt || 0;
+        return bTime - aTime;
+      } else if (sortOption === "oldest") {
         const aTime = a.createdAt || a.updatedAt || 0;
         const bTime = b.createdAt || b.updatedAt || 0;
-        result = aTime - bTime;
-      } else if (folderSortBy === "name") {
-        result = a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" });
-      } else if (folderSortBy === "lastOpened") {
-        const aTime = a.lastOpenedAt || a.updatedAt || a.createdAt || 0;
-        const bTime = b.lastOpenedAt || b.updatedAt || b.createdAt || 0;
-        result = aTime - bTime;
+        return aTime - bTime;
+      } else if (sortOption === "title_asc") {
+        return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" });
+      } else if (sortOption === "title_desc") {
+        return b.name.localeCompare(a.name, undefined, { numeric: true, sensitivity: "base" });
       }
-
-      return folderSortDirection === "asc" ? result : -result;
+      return 0;
     });
-  }, [collectionsData, searchQuery, folderSortBy, folderSortDirection]);
+  }, [collectionsData, searchQuery, sortOption]);
 
   // Notebooks that have sources attached
   const sourcesLearns = useMemo(() => {
@@ -916,7 +889,7 @@ export function LearnHome({
           <div className="space-y-6">
             {/* Section 1: Learns */}
             <section className="space-y-2.5">
-              <div className="flex items-center justify-between px-0.5">
+              <div className="flex items-center justify-between h-7 px-0.5">
                 <div className="flex items-center gap-2">
                   <h2 className="font-sans text-sm font-semibold tracking-tight text-foreground">
                     {t("learns")}
@@ -974,7 +947,7 @@ export function LearnHome({
 
             {/* Section 2: Collections */}
             <section className="space-y-2.5 pt-1">
-              <div className="flex items-center justify-between px-0.5">
+              <div className="flex items-center justify-between h-7 px-0.5">
                 <div className="flex items-center gap-2">
                   <h2 className="font-sans text-sm font-semibold tracking-tight text-foreground">
                     {t("collections")}
@@ -1039,7 +1012,7 @@ export function LearnHome({
             ========================================================= */}
         {activeTab === "learns" && (
           <section className="space-y-2.5">
-            <div className="flex items-center justify-between px-0.5">
+            <div className="flex items-center justify-between h-7 px-0.5">
               <div className="flex items-center gap-2">
                 <h2 className="font-sans text-sm font-semibold tracking-tight text-foreground">
                   {t("allLearns")}
@@ -1289,93 +1262,14 @@ export function LearnHome({
             ) : (
               // All Collections
               <>
-                <div className="flex items-start justify-between px-0.5 gap-2">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <h2 className="font-serif text-lg font-normal tracking-tight text-foreground">
-                        {t("collections")}
-                      </h2>
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary border border-border/60 text-muted-foreground font-sans">
-                        {filteredCollections.length}
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-muted-foreground mt-0.5">
-                      {t("modulesSubtitle")}
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    {/* Sort Button */}
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <button
-                          type="button"
-                          className="h-7 w-7 rounded-full bg-secondary hover:bg-secondary/80 text-muted-foreground border border-border/80 flex items-center justify-center transition-colors cursor-pointer shadow-2xs"
-                          title={t("sortBy")}
-                        >
-                          {folderSortDirection === "asc" ? (
-                            <ArrowUp className="h-3 w-3" />
-                          ) : (
-                            <ArrowDown className="h-3 w-3" />
-                          )}
-                        </button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end" className="w-52 p-1.5 shadow-md mr-1">
-                        <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground/70 px-2 py-1 font-medium">
-                          {t("sortBy")}
-                        </DropdownMenuLabel>
-                        {(["createdAt", "name", "lastOpened"] as const).map((option) => {
-                          const iconMap = {
-                            createdAt: Calendar,
-                            name: Type,
-                            lastOpened: Clock,
-                          } as const;
-                          const Icon = iconMap[option];
-                          return (
-                            <DropdownMenuItem
-                              key={option}
-                              className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2"
-                              onClick={() => setFolderSortBy(option)}
-                            >
-                              <Icon className="h-3.5 w-3.5 text-muted-foreground" />
-                              <span>{getSortLabel(option)}</span>
-                              {folderSortBy === option && <Check className="h-3 w-3 ml-auto text-primary" />}
-                            </DropdownMenuItem>
-                          );
-                        })}
-                        <DropdownMenuSeparator />
-                        <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground/70 px-2 py-1 font-medium">
-                          {t("sortOrder")}
-                        </DropdownMenuLabel>
-                        <DropdownMenuItem
-                          className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2"
-                          onClick={() => setFolderSortDirection("asc")}
-                        >
-                          <ArrowUp className="h-3.5 w-3.5 text-muted-foreground" />
-                          <span>{t("sortAsc")}</span>
-                          {folderSortDirection === "asc" && <Check className="h-3 w-3 ml-auto text-primary" />}
-                        </DropdownMenuItem>
-                        <DropdownMenuItem
-                          className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2"
-                          onClick={() => setFolderSortDirection("desc")}
-                        >
-                          <ArrowDown className="h-3.5 w-3.5 text-muted-foreground" />
-                          <span>{t("sortDesc")}</span>
-                          {folderSortDirection === "desc" && <Check className="h-3 w-3 ml-auto text-primary" />}
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setEditingCollection(null);
-                        setIsCreateCollectionOpen(true);
-                      }}
-                      className="h-7 px-2.5 rounded-full bg-secondary hover:bg-secondary/80 text-foreground text-xs font-medium border border-border/80 flex items-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
-                    >
-                      <Plus className="h-3 w-3" />
-                      <span>{t("newCollection")}</span>
-                    </button>
+                <div className="flex items-center justify-between h-7 px-0.5">
+                  <div className="flex items-center gap-2">
+                    <h2 className="font-sans text-sm font-semibold tracking-tight text-foreground">
+                      {t("collections")}
+                    </h2>
+                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary border border-border/60 text-muted-foreground font-sans">
+                      {filteredCollections.length}
+                    </span>
                   </div>
                 </div>
 
@@ -1416,7 +1310,7 @@ export function LearnHome({
                       <h3 className="text-sm font-semibold text-foreground mb-1 font-sans">
                         {t("noCollectionsYet")}
                       </h3>
-                      <p className="text-xs text-muted-foreground max-w-xs mb-4 leading-relaxed font-sans">
+                      <p className="text-xs text-muted-foreground max-w-xs mx-auto mb-4 leading-relaxed font-sans">
                         {t("noCollectionsYetDesc")}
                       </p>
                       <button
@@ -1425,7 +1319,7 @@ export function LearnHome({
                           setEditingCollection(null);
                           setIsCreateCollectionOpen(true);
                         }}
-                        className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-xs font-medium transition-colors cursor-pointer shadow-xs active:scale-95"
+                        className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-primary text-primary-foreground text-xs font-medium transition-colors cursor-pointer shadow-xs active:scale-95"
                       >
                         <Plus className="h-3.5 w-3.5 stroke-[2.5]" />
                         <span>{t("createCardCollection")}</span>
@@ -1448,13 +1342,13 @@ export function LearnHome({
             TAB 5: ARTIFACTS
             ========================================================= */}
         {activeTab === "artifact" && (
-          <section className="space-y-3">
-            <div className="flex items-center justify-between gap-2 px-0.5">
+          <section className="space-y-2.5">
+            <div className="flex items-center justify-between h-7 px-0.5">
               <div className="flex items-center gap-2">
                 <h2 className="font-sans text-sm font-semibold tracking-tight text-foreground">
                   {t("artifacts")}
                 </h2>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary border border-border/60 text-muted-foreground font-mono">
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary border border-border/60 text-muted-foreground font-sans">
                   {filteredArtifacts.length}
                 </span>
               </div>
@@ -1469,11 +1363,11 @@ export function LearnHome({
                       <Button
                         variant="outline"
                         size="sm"
-                        className="h-7 px-2 rounded-lg text-xs font-medium gap-1.5 border-border/70 hover:bg-secondary text-muted-foreground hover:text-foreground cursor-pointer"
+                        className="h-7 px-2.5 rounded-full text-xs font-medium gap-1.5 bg-secondary/70 hover:bg-secondary text-muted-foreground hover:text-foreground cursor-pointer transition-colors active:scale-95 border-none shadow-none"
                       >
                         <ActiveCatIcon className="w-3 h-3 text-muted-foreground" />
                         <span>{activeCat?.label}</span>
-                        <span className="text-[10px] opacity-70 font-mono">({activeCat?.count})</span>
+                        <span className="text-[10px] opacity-70 font-sans">({activeCat?.count})</span>
                         <ChevronDown className="w-3 h-3 ml-0.5 opacity-70" />
                       </Button>
                     </DropdownMenuTrigger>
@@ -1519,78 +1413,75 @@ export function LearnHome({
                         }
                       }}
                       className={cn(
-                        "p-3.5 rounded-2xl border border-border/80 bg-card hover:bg-secondary/60 active:scale-[0.99] transition-all duration-200 flex flex-col justify-between select-none shadow-2xs",
+                        "w-full px-4 py-3.5 rounded-2xl border border-border/80 hover:border-border bg-card hover:bg-secondary/60 active:bg-secondary/80 text-card-foreground shadow-2xs active:scale-[0.99] transition-all duration-200 flex items-center justify-between gap-3.5 select-none",
                         art.learnId && onOpenLearn && "cursor-pointer group"
                       )}
                     >
-                      <div className="flex items-start justify-between">
+                      <div className="flex items-center gap-3.5 min-w-0 flex-1">
                         <div
                           className={cn(
-                            "h-9 w-9 rounded-xl border flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform",
+                            "h-10 w-10 rounded-xl border flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform",
                             config.bgClass
                           )}
                         >
-                          <Icon className={cn("h-4 w-4", config.iconColor)} />
+                          <Icon className={cn("h-5 w-5", config.iconColor)} />
                         </div>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            localDb.deleteArtifact(art.id);
-                          }}
-                          className="h-7 w-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-destructive active:text-destructive cursor-pointer transition-colors"
-                          title={t("deleteArtifact")}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
 
-                      <div className="space-y-1.5 my-2">
-                        <h4
-                          className="text-xs font-medium text-foreground truncate leading-snug group-hover:text-primary transition-colors"
-                          title={art.title}
-                        >
-                          {art.title}
-                        </h4>
-                        {parentLearn && (
-                          <div className="flex items-center">
-                            <span
-                              className="inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-md bg-secondary/80 border border-border/60 text-muted-foreground max-w-full truncate"
-                              title={parentLearn.title}
-                            >
-                              <LearnIcon icon={parentLearn.emoji} className="w-3 h-3 shrink-0 text-muted-foreground" />
-                              <span className="truncate">{parentLearn.title}</span>
+                        <div className="min-w-0 flex-1">
+                          <h4
+                            className="text-sm font-medium text-foreground truncate leading-snug group-hover:text-primary transition-colors"
+                            title={art.title}
+                          >
+                            {art.title}
+                          </h4>
+                          <div className="flex items-center gap-1.5 text-xs text-muted-foreground mt-0.5">
+                            <span className="capitalize">{config.label || art.type}</span>
+                            {parentLearn && (
+                              <>
+                                <span className="text-border/80">•</span>
+                                <span className="truncate max-w-[130px]">{parentLearn.title}</span>
+                              </>
+                            )}
+                            <span className="text-border/80">•</span>
+                            <span className="shrink-0 font-sans">
+                              {new Intl.DateTimeFormat(language === "id" ? "id-ID" : "en-US", {
+                                day: "numeric",
+                                month: "short",
+                                year: "numeric",
+                              }).format(new Date(art.updatedAt))}
                             </span>
                           </div>
-                        )}
+                        </div>
                       </div>
 
-                      <div className="text-[10px] text-muted-foreground pt-2 border-t border-border/40 flex items-center justify-between font-mono">
-                        <span>
-                          {new Intl.DateTimeFormat(language === "id" ? "id-ID" : "en-US", {
-                            day: "numeric",
-                            month: "short",
-                            year: "numeric",
-                          }).format(new Date(art.updatedAt))}
-                        </span>
-                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          localDb.deleteArtifact(art.id);
+                        }}
+                        className="h-8 w-8 rounded-lg flex items-center justify-center text-muted-foreground hover:text-destructive active:text-destructive cursor-pointer transition-colors shrink-0"
+                        title={t("deleteArtifact")}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
                     </div>
                   );
                 })}
               </div>
             ) : (
-              <div className="text-center py-14 px-4 border border-dashed border-border/80 rounded-2xl bg-card">
-                <div className="h-10 w-10 rounded-xl bg-secondary border border-border/60 flex items-center justify-center text-muted-foreground mx-auto mb-2">
-                  <Layers className="h-5 w-5" />
+              <div className="flex-1 flex flex-col items-center justify-center text-center min-h-[48vh] py-12 px-4 select-none">
+                <div className="h-14 w-14 rounded-2xl bg-secondary/80 border border-border/70 flex items-center justify-center text-muted-foreground mb-3 shadow-2xs">
+                  <Layers className="h-6 w-6 stroke-[1.5] text-muted-foreground/80" />
                 </div>
-                <h3 className="font-sans text-sm text-foreground font-semibold">
+                <h3 className="text-sm font-semibold text-foreground mb-1 font-sans">
                   {searchQuery || artifactCategory !== "all"
                     ? language === "id"
                       ? "Tidak ada artefak yang cocok"
                       : "No matching artifacts"
                     : t("noArtifactsTitle")}
                 </h3>
-                <p className="text-xs text-muted-foreground mt-1 leading-relaxed max-w-xs mx-auto">
+                <p className="text-xs text-muted-foreground max-w-xs mx-auto mb-4 font-sans leading-relaxed">
                   {searchQuery || artifactCategory !== "all"
                     ? language === "id"
                       ? "Coba ubah kata kunci pencarian atau kategori filter."
