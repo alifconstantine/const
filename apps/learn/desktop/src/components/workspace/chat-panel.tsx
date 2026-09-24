@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from "react";
 import {
   ArrowRight,
   ArrowUp,
@@ -294,6 +294,7 @@ export function ChatPanel({
 }: ChatPanelProps) {
   const { t, language } = useI18n();
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
+  const [isMessagesLoaded, setIsMessagesLoaded] = useState(false);
 
   // Observe container width for adaptive responsive UI (heading & chat input)
   const panelRef = useRef<HTMLElement>(null);
@@ -513,6 +514,9 @@ export function ChatPanel({
   const streamStartTimeRef = useRef<number | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const lastUserMessageRef = useRef<HTMLDivElement>(null);
+  const shouldScrollToLastUserRef = useRef<boolean>(true);
+  const isUserSendingRef = useRef<boolean>(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const activeAssistantRef = useRef<DisplayMessage | null>(null);
 
@@ -805,11 +809,15 @@ export function ChatPanel({
   useEffect(() => {
     if (!learnId || !activeSessionId) {
       setMessages([]);
+      setIsMessagesLoaded(true);
       return;
     }
     let isMounted = true;
+    setIsMessagesLoaded(false);
+    shouldScrollToLastUserRef.current = true;
     localDb.getMessages(learnId, activeSessionId).then((saved) => {
       if (!isMounted) return;
+      shouldScrollToLastUserRef.current = true;
       if (saved && saved.length > 0) {
         setMessages(
           saved.map((m: any) => ({
@@ -829,12 +837,21 @@ export function ChatPanel({
       } else {
         setMessages([]);
       }
+      setIsMessagesLoaded(true);
     });
 
     return () => {
       isMounted = false;
     };
   }, [learnId, activeSessionId]);
+
+  // ID of the last user message in the current conversation for scroll positioning
+  const lastUserMsgId = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i]?.role === "user") return messages[i]!.id;
+    }
+    return null;
+  }, [messages]);
 
   // Calculate chronological session image indices (Image 1, Image 2, Image 3...) across the entire session
   const sessionImageMap = useMemo(() => {
@@ -867,9 +884,11 @@ export function ChatPanel({
       return;
     }
 
+    shouldScrollToLastUserRef.current = true;
     const newSessionId = await localDb.createSession(learnId, "Percakapan Baru");
     setActiveSessionId(newSessionId);
     setMessages([]);
+    setIsMessagesLoaded(true);
     setIsHistoryOpen(false);
   };
 
@@ -877,6 +896,7 @@ export function ChatPanel({
     await localDb.deleteSession(sessionIdToDelete);
     if (activeSessionId === sessionIdToDelete) {
       const remaining = sessions.filter((s) => s.id !== sessionIdToDelete);
+      shouldScrollToLastUserRef.current = true;
       if (remaining.length > 0) {
         setActiveSessionId(remaining[0]!.id);
       } else if (learnId) {
@@ -886,10 +906,58 @@ export function ChatPanel({
     }
   };
 
-  // Auto scroll to bottom on message updates
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, isStreaming]);
+  // Scroll positioning helper: aligns to the last user message at top of viewport with comfortable margin, or scrolls to top if empty
+  const scrollToLastUserMessage = (behavior: ScrollBehavior = "auto") => {
+    const viewport = panelRef.current?.querySelector<HTMLElement>("[data-radix-scroll-area-viewport]");
+    if (!viewport) return;
+
+    if (lastUserMessageRef.current) {
+      const viewportRect = viewport.getBoundingClientRect();
+      const targetRect = lastUserMessageRef.current.getBoundingClientRect();
+      const currentScrollTop = viewport.scrollTop;
+      const targetOffsetTop = targetRect.top - viewportRect.top + currentScrollTop;
+      // Position with 16px top margin so user message bubble sits comfortably at top of viewport (matching Gemini reference)
+      const desiredScrollTop = Math.max(0, targetOffsetTop - 16);
+
+      if (behavior === "smooth") {
+        viewport.scrollTo({ top: desiredScrollTop, behavior: "smooth" });
+      } else {
+        viewport.scrollTop = desiredScrollTop;
+      }
+    } else {
+      viewport.scrollTop = 0;
+    }
+  };
+
+  // Smart scroll effect: positions viewport at the last user message immediately on load/switch before paint,
+  // scrolls smoothly when user sends a new message, and smoothly tracks incoming assistant stream.
+  useLayoutEffect(() => {
+    if (!isMessagesLoaded) return;
+
+    if (shouldScrollToLastUserRef.current) {
+      shouldScrollToLastUserRef.current = false;
+      scrollToLastUserMessage("auto");
+      requestAnimationFrame(() => {
+        scrollToLastUserMessage("auto");
+      });
+      return;
+    }
+
+    if (isUserSendingRef.current) {
+      isUserSendingRef.current = false;
+      requestAnimationFrame(() => {
+        scrollToLastUserMessage("smooth");
+      });
+      return;
+    }
+
+    if (isStreaming) {
+      const viewport = panelRef.current?.querySelector<HTMLElement>("[data-radix-scroll-area-viewport]");
+      if (viewport) {
+        viewport.scrollTo({ top: viewport.scrollHeight, behavior: "smooth" });
+      }
+    }
+  }, [messages, isStreaming, isMessagesLoaded]);
 
 
   // 2. Set up Electron stream listener with auto-persistence
@@ -1474,6 +1542,7 @@ export function ChatPanel({
     }
 
     const nextMessages = [...historyBase, newUserMsg];
+    isUserSendingRef.current = true;
     setMessages([...nextMessages, newAssistantMsg]);
     if (overrideHistory === undefined) {
       setInputMessage("");
@@ -3158,7 +3227,9 @@ export function ChatPanel({
 
       {/* Main Conversation Stream using Radix ScrollArea */}
       <ScrollArea className="flex-1 w-full" viewportClassName={cn("py-6 max-w-3xl mx-auto w-full", isCompact ? "px-3 sm:px-4" : "px-4 sm:px-8")}>
-        {messages.length === 0 ? (
+        {!isMessagesLoaded ? (
+          <div className="flex-1 w-full min-h-[300px]" />
+        ) : messages.length === 0 ? (
           carriedSources.length > 0 ? (
             /* NotebookLM Source Guide View (Panduan Sumber) */
             <div className="flex-1 flex flex-col justify-start py-4 max-w-2xl animate-in fade-in duration-200">
@@ -3433,7 +3504,14 @@ export function ChatPanel({
                 }
 
                 return (
-                  <div key={msg.id} className="flex flex-col items-end w-full group">
+                  <div
+                    key={msg.id}
+                    ref={msg.id === lastUserMsgId ? lastUserMessageRef : undefined}
+                    className={cn(
+                      "flex flex-col items-end w-full group",
+                      msg.id === lastUserMsgId && "scroll-mt-6"
+                    )}
+                  >
                     {/* User Attachments Thumbnails (Compact) */}
                     {hasAttachments && (
                       <div className="flex flex-wrap items-center justify-end gap-2 mb-1.5 max-w-[85%]">
@@ -3792,7 +3870,10 @@ Tokens: ↑${formatTokenDisplay(conversationMetrics.inputTokens)} · ↓${format
         onClose={() => setIsHistoryOpen(false)}
         sessions={sessions}
         activeSessionId={activeSessionId}
-        onSelectSession={(sessionId) => setActiveSessionId(sessionId)}
+        onSelectSession={(sessionId) => {
+          shouldScrollToLastUserRef.current = true;
+          setActiveSessionId(sessionId);
+        }}
         onDeleteSession={handleDeleteSession}
         onNewChat={handleNewChat}
       />

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db, localDb, type LocalMessage, type LocalArtifact, type LocalChatSession, type LocalSource } from "../../lib/db";
 import { buildGroundedContext } from "../../lib/grounding/context-builder";
@@ -603,6 +603,7 @@ export function MobileLearnWorkspace({
   // Local state
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
+  const [isMessagesLoaded, setIsMessagesLoaded] = useState(false);
   const [inputMessage, setInputMessage] = useState("");
   const [availableModels, setAvailableModels] = useState<MobileModel[]>(DEFAULT_MOBILE_MODELS);
   const [selectedModelId, setSelectedModelId] = useState<string>(
@@ -840,6 +841,10 @@ export function MobileLearnWorkspace({
   }, []);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatScrollContainerRef = useRef<HTMLDivElement>(null);
+  const lastUserMessageRef = useRef<HTMLDivElement>(null);
+  const shouldScrollToLastUserRef = useRef<boolean>(true);
+  const isUserSendingRef = useRef<boolean>(false);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   // Editable session title in header
@@ -856,15 +861,27 @@ export function MobileLearnWorkspace({
     }
   }, [activeSession?.title, language]);
 
+  // ID of the last user message in the current conversation for scroll positioning
+  const lastUserMsgId = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      if (messages[i]?.role === "user") return messages[i]!.id;
+    }
+    return null;
+  }, [messages]);
+
   // Load chat messages from local Dexie when activeSessionId changes
   useEffect(() => {
     if (!activeSessionId) {
       setMessages([]);
+      setIsMessagesLoaded(true);
       return;
     }
     let isMounted = true;
+    setIsMessagesLoaded(false);
+    shouldScrollToLastUserRef.current = true;
     localDb.getSessionMessages(activeSessionId).then((saved) => {
       if (!isMounted) return;
+      shouldScrollToLastUserRef.current = true;
       if (saved && saved.length > 0) {
         setMessages(
           saved.map((m) => {
@@ -890,6 +907,7 @@ export function MobileLearnWorkspace({
       } else {
         setMessages([]);
       }
+      setIsMessagesLoaded(true);
     });
 
     return () => {
@@ -897,12 +915,58 @@ export function MobileLearnWorkspace({
     };
   }, [activeSessionId]);
 
-  // Auto scroll to bottom on message updates in chat tab
-  useEffect(() => {
-    if (activeTab === "chat") {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  // Scroll positioning helper: aligns to the last user message at top of viewport with comfortable margin, or scrolls to top if empty
+  const scrollToLastUserMessage = (behavior: ScrollBehavior = "auto") => {
+    const container = chatScrollContainerRef.current;
+    if (!container) return;
+
+    if (lastUserMessageRef.current) {
+      const containerRect = container.getBoundingClientRect();
+      const targetRect = lastUserMessageRef.current.getBoundingClientRect();
+      const currentScrollTop = container.scrollTop;
+      const targetOffsetTop = targetRect.top - containerRect.top + currentScrollTop;
+      // Position with 12px top margin so user message bubble sits comfortably at top (matching Gemini reference)
+      const desiredScrollTop = Math.max(0, targetOffsetTop - 12);
+
+      if (behavior === "smooth") {
+        container.scrollTo({ top: desiredScrollTop, behavior: "smooth" });
+      } else {
+        container.scrollTop = desiredScrollTop;
+      }
+    } else {
+      container.scrollTop = 0;
     }
-  }, [messages, isStreaming, activeTab]);
+  };
+
+  // Smart scroll effect: positions viewport at the last user message immediately on load/switch before paint,
+  // scrolls smoothly when user sends a new message, and smoothly tracks incoming assistant stream.
+  useLayoutEffect(() => {
+    if (activeTab !== "chat" || !isMessagesLoaded) return;
+
+    if (shouldScrollToLastUserRef.current) {
+      shouldScrollToLastUserRef.current = false;
+      scrollToLastUserMessage("auto");
+      requestAnimationFrame(() => {
+        scrollToLastUserMessage("auto");
+      });
+      return;
+    }
+
+    if (isUserSendingRef.current) {
+      isUserSendingRef.current = false;
+      requestAnimationFrame(() => {
+        scrollToLastUserMessage("smooth");
+      });
+      return;
+    }
+
+    if (isStreaming) {
+      const container = chatScrollContainerRef.current;
+      if (container) {
+        container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
+      }
+    }
+  }, [messages, isStreaming, activeTab, isMessagesLoaded]);
 
   const handleCopy = (id: string, text: string) => {
     if (!text) return;
@@ -931,6 +995,7 @@ export function MobileLearnWorkspace({
     if (isStreaming) {
       handleStop();
     }
+    shouldScrollToLastUserRef.current = true;
     if (activeSessionId) {
       await localDb.clearSessionMessages(activeSessionId);
     }
@@ -943,10 +1008,12 @@ export function MobileLearnWorkspace({
       handleStop();
     }
     if (!learnId) return;
+    shouldScrollToLastUserRef.current = true;
     const defaultName = language === "id" ? "Percakapan Baru" : "New Chat";
     const newSessionId = await localDb.createChatSession(learnId, defaultName);
     setActiveSessionId(newSessionId);
     setMessages([]);
+    setIsMessagesLoaded(true);
     setInputMessage("");
     setAttachedFiles([]);
   };
@@ -955,11 +1022,13 @@ export function MobileLearnWorkspace({
     if (isStreaming) {
       handleStop();
     }
+    shouldScrollToLastUserRef.current = true;
     setActiveSessionId(sessionId);
   };
 
   const handleDeleteChat = async (sessionId: string) => {
     await localDb.deleteChatSession(sessionId);
+    shouldScrollToLastUserRef.current = true;
     if (activeSessionId === sessionId) {
       const remaining = (sessions || []).filter((s) => s.id !== sessionId);
       if (remaining.length > 0 && remaining[0]) {
@@ -1234,6 +1303,7 @@ export function MobileLearnWorkspace({
     }
 
     const nextMessages = [...historyBase, newUserMsg];
+    isUserSendingRef.current = true;
     setMessages([...nextMessages, newAssistantMsg]);
     if (overrideHistory === undefined) {
       setInputMessage("");
@@ -2646,8 +2716,13 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
       <div className="flex-1 flex flex-col min-h-0 overflow-hidden max-w-lg mx-auto w-full relative">
 
           {/* Scrollable Conversation Stream */}
-          <div className="flex-1 overflow-y-auto px-3 sm:px-4 py-3 space-y-5 min-h-0 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden overscroll-contain">
-            {messages.length === 0 ? (
+          <div
+            ref={chatScrollContainerRef}
+            className="flex-1 overflow-y-auto px-3 sm:px-4 py-3 space-y-5 min-h-0 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden overscroll-contain"
+          >
+            {!isMessagesLoaded ? (
+              <div className="flex-1 w-full min-h-[200px]" />
+            ) : messages.length === 0 ? (
               carriedSources.length > 0 ? (
                 /* Mobile NotebookLM Source Guide View */
                 <div className="flex flex-col justify-start py-3 animate-in fade-in duration-200 select-none">
@@ -2795,9 +2870,12 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
               messages.map((msg) => (
               <div
                 key={msg.id}
-                className={`flex flex-col ${
-                  msg.role === "user" ? "items-end" : "items-start"
-                } w-full`}
+                ref={msg.id === lastUserMsgId ? lastUserMessageRef : undefined}
+                className={cn(
+                  "flex flex-col w-full",
+                  msg.role === "user" ? "items-end" : "items-start",
+                  msg.id === lastUserMsgId && "scroll-mt-4"
+                )}
               >
                 {msg.role === "user" ? (
                   editingMessageId === msg.id ? (
