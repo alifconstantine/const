@@ -12,6 +12,8 @@ import type {
   InfographicData,
   ReportData,
   ReportSection,
+  CheatSheetData,
+  CheatSheetCard,
 } from "../db";
 import { generateImage, getActiveImageModel, getStoredImageConfig, type ImageProvider } from "../image";
 import { buildGroundedContext } from "../grounding/context-builder";
@@ -62,6 +64,15 @@ export interface GenerateVideoSummaryOptions {
   customInstructions?: string;
 }
 
+export interface GenerateCheatSheetOptions {
+  artifactId?: string;
+  learnId: string;
+  sources: LocalSource[];
+  coverageMode: "short" | "auto" | "long";
+  topicFocus?: string;
+  language?: "id" | "en";
+}
+
 function getRouterBaseUrl(): string {
   if (typeof window !== "undefined") {
     const envUrl =
@@ -79,36 +90,183 @@ function getRouterBaseUrl(): string {
   return "https://router.const.web.id/v1";
 }
 
-function extractJson(text: string): any {
-  if (!text) return null;
-  // Strip reasoning / thinking tags from thinking models (e.g. DeepSeek R1)
-  let cleaned = text.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+/**
+ * State-machine parser that safely escapes raw unescaped newlines, carriage returns,
+ * tabs, and invalid LaTeX backslashes inside JSON string literals.
+ */
+function repairJsonString(jsonStr: string): string {
+  let inString = false;
+  let isEscaped = false;
+  let out = "";
 
-  // Strip markdown fences
-  cleaned = cleaned
-    .replace(/^```(?:json)?\s*/i, "")
-    .replace(/\s*```$/i, "")
-    .trim();
+  for (let i = 0; i < jsonStr.length; i++) {
+    const char = jsonStr[i]!;
 
-  try {
-    return JSON.parse(cleaned);
-  } catch {
-    // Try to find the outermost JSON object
-    const startIdx = cleaned.indexOf("{");
-    const endIdx = cleaned.lastIndexOf("}");
-    if (startIdx >= 0 && endIdx > startIdx) {
-      const candidate = cleaned.slice(startIdx, endIdx + 1);
-      try {
-        return JSON.parse(candidate);
-      } catch {
-        // Fix trailing commas if present
-        try {
-          const sanitized = candidate.replace(/,\s*([}\]])/g, "$1");
-          return JSON.parse(sanitized);
-        } catch {}
+    if (inString) {
+      if (isEscaped) {
+        if (/["\\\/bfnrtu]/.test(char)) {
+          out += char;
+        } else {
+          // It's a LaTeX escape like \alpha, \frac, \sum -> escape the backslash!
+          out += "\\" + char;
+        }
+        isEscaped = false;
+        continue;
+      }
+
+      if (char === "\\") {
+        out += "\\";
+        isEscaped = true;
+        continue;
+      }
+
+      if (char === '"') {
+        inString = false;
+        out += '"';
+        continue;
+      }
+
+      // Raw unescaped control characters inside string:
+      if (char === "\n") {
+        out += "\\n";
+        continue;
+      }
+      if (char === "\r") {
+        out += "\\r";
+        continue;
+      }
+      if (char === "\t") {
+        out += "\\t";
+        continue;
+      }
+
+      out += char;
+    } else {
+      if (char === '"') {
+        inString = true;
+      }
+      out += char;
+    }
+  }
+
+  return out;
+}
+
+/**
+ * Rescues parsed card objects from raw text if the JSON array was cut off or slightly truncated
+ */
+function extractCardsByRescue(text: string): { title?: string; topic?: string; cards: any[] } | null {
+  const cards: any[] = [];
+  const cardsArrayMatch = text.match(/"cards"\s*:\s*\[([\s\S]*)/i);
+  if (!cardsArrayMatch || !cardsArrayMatch[1]) return null;
+
+  const rawCardsText = cardsArrayMatch[1];
+  let braceCount = 0;
+  let cardStart = -1;
+  let inStr = false;
+  let esc = false;
+  let idx = 1;
+
+  for (let i = 0; i < rawCardsText.length; i++) {
+    const c = rawCardsText[i]!;
+    if (inStr) {
+      if (esc) {
+        esc = false;
+      } else if (c === "\\") {
+        esc = true;
+      } else if (c === '"') {
+        inStr = false;
+      }
+    } else {
+      if (c === '"') {
+        inStr = true;
+      } else if (c === "{") {
+        if (braceCount === 0) cardStart = i;
+        braceCount++;
+      } else if (c === "}") {
+        braceCount--;
+        if (braceCount === 0 && cardStart >= 0) {
+          const block = rawCardsText.slice(cardStart, i + 1);
+          try {
+            const parsedCard = JSON.parse(repairJsonString(block));
+            if (parsedCard && (parsedCard.title || parsedCard.content)) {
+              cards.push({
+                id: String(parsedCard.id || idx++),
+                title: String(parsedCard.title || `Kartu #${idx}`),
+                badge: parsedCard.badge ? String(parsedCard.badge).toUpperCase() : undefined,
+                content: String(parsedCard.content || "").trim(),
+                span: parsedCard.span === "wide" ? "wide" : "normal",
+              });
+            }
+          } catch {}
+          cardStart = -1;
+        }
+      } else if (c === "]" && braceCount === 0) {
+        break;
       }
     }
   }
+
+  if (cards.length > 0) {
+    const titleMatch = text.match(/"title"\s*:\s*"([^"]+)"/i);
+    const topicMatch = text.match(/"topic"\s*:\s*"([^"]+)"/i);
+    return {
+      title: titleMatch ? titleMatch[1] : undefined,
+      topic: topicMatch ? topicMatch[1] : undefined,
+      cards,
+    };
+  }
+
+  return null;
+}
+
+function extractJson(text: string): any {
+  if (!text) return null;
+  // 1. Strip reasoning / thinking tags from thinking models
+  let cleaned = text.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+
+  // 2. Direct parse attempt first
+  try {
+    return JSON.parse(cleaned);
+  } catch {}
+
+  // 3. Strip outer markdown fences carefully without destroying internal code fences
+  cleaned = cleaned.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?\s*```\s*$/i, "").trim();
+  try {
+    return JSON.parse(cleaned);
+  } catch {}
+
+  // 4. Locate the outermost JSON boundaries { ... }
+  const startIdx = cleaned.indexOf("{");
+  const endIdx = cleaned.lastIndexOf("}");
+  if (startIdx >= 0 && endIdx > startIdx) {
+    const candidate = cleaned.slice(startIdx, endIdx + 1);
+    try {
+      return JSON.parse(candidate);
+    } catch {}
+
+    // Fix trailing commas
+    try {
+      const noTrailingCommas = candidate.replace(/,\s*([}\]])/g, "$1");
+      return JSON.parse(noTrailingCommas);
+    } catch {}
+
+    // Repair unescaped newlines, tabs, and invalid LaTeX backslashes inside JSON strings
+    try {
+      const repaired = repairJsonString(candidate);
+      return JSON.parse(repaired);
+    } catch {}
+
+    try {
+      const repairedNoCommas = repairJsonString(candidate).replace(/,\s*([}\]])/g, "$1");
+      return JSON.parse(repairedNoCommas);
+    } catch {}
+  }
+
+  // 5. Try rescue parser for cards if JSON root object syntax was truncated or mangled
+  const rescued = extractCardsByRescue(cleaned);
+  if (rescued) return rescued;
+
   return null;
 }
 
@@ -3278,4 +3436,362 @@ Guidelines:
   };
 }
 
+
+export interface GenerateCheatSheetOptions {
+  artifactId?: string;
+  learnId: string;
+  sources: LocalSource[];
+  coverageMode: "short" | "auto" | "long";
+  topicFocus?: string;
+  language?: "id" | "en";
+}
+
+/**
+ * Generates grounded reference cards directly from study sources
+ * when offline or when LLM output is unavailable, ensuring the flow never breaks.
+ */
+function extractCardsFromSource(
+  sources: LocalSource[],
+  numCardsTarget = 8,
+  isIndo = true
+): CheatSheetCard[] {
+  const cards: CheatSheetCard[] = [];
+  const primarySource = sources[0];
+  if (!primarySource) return [];
+
+  const rawContent = String(primarySource.content || "");
+
+  // Strategy A: Split by Markdown Headings (# or ## or ###)
+  const headingSections = rawContent.split(/\n(?=#{1,4}\s+)/);
+  if (headingSections.length > 1) {
+    for (const sec of headingSections) {
+      const trimmed = sec.trim();
+      if (!trimmed) continue;
+      const lines = trimmed.split("\n");
+      const firstLine = lines[0];
+      if (!firstLine) continue;
+      const headingLine = firstLine.replace(/^#{1,4}\s+/, "").trim();
+      const body = lines.slice(1).join("\n").trim();
+      if (headingLine && body) {
+        cards.push({
+          id: String(cards.length + 1),
+          title: headingLine.slice(0, 60),
+          badge: isIndo ? "INTISARI" : "TAKEAWAY",
+          content: body.slice(0, 800),
+          span: body.length > 350 ? "wide" : "normal",
+        });
+      }
+      if (cards.length >= numCardsTarget) break;
+    }
+  }
+
+  // Strategy B: If no headings or few headings, split into paragraphs
+  if (cards.length < 3) {
+    const paragraphs = rawContent
+      .split(/\n\s*\n/)
+      .map((p) => p.trim())
+      .filter((p) => p.length > 40);
+
+    for (let i = 0; i < paragraphs.length && cards.length < numCardsTarget; i++) {
+      const p = paragraphs[i];
+      if (!p) continue;
+      const sentences = p.split(/(?<=[.!?])\s+/);
+      const firstSentence = sentences[0] || ("Poin " + (i + 1));
+      const title = firstSentence.length > 55 ? firstSentence.slice(0, 52) + "..." : firstSentence;
+      const body = sentences.slice(1).join(" ") || p;
+      cards.push({
+        id: String(cards.length + 1),
+        title,
+        badge: isIndo ? "KONSEP" : "CONCEPT",
+        content: body.slice(0, 600) || p.slice(0, 600),
+        span: p.length > 300 ? "wide" : "normal",
+      });
+    }
+  }
+
+  // Strategy C: Multiple sources fallback
+  if (cards.length < 3 && sources.length > 1) {
+    for (let i = 1; i < sources.length && cards.length < numCardsTarget; i++) {
+      const s = sources[i];
+      if (!s) continue;
+      cards.push({
+        id: String(cards.length + 1),
+        title: (s.title || "").slice(0, 50),
+        badge: isIndo ? "RUJUKAN" : "SOURCE",
+        content: String(s.content || "").slice(0, 600),
+        span: "normal",
+      });
+    }
+  }
+
+  return cards;
+}
+
+export async function generateCheatSheetArtifact({
+  artifactId,
+  learnId,
+  sources,
+  coverageMode = "auto",
+  topicFocus,
+  language = "id",
+}: GenerateCheatSheetOptions): Promise<{
+  title: string;
+  data: CheatSheetData;
+}> {
+  const isIndo = language === "id";
+  const numCardsTarget =
+    coverageMode === "short" ? "6 hingga 8" : coverageMode === "long" ? "10 hingga 14" : "8 hingga 10";
+
+  // Build grounded context using verified sources
+  const groundedContext = buildGroundedContext(sources);
+  const contextSnippet =
+    groundedContext.formattedContext.slice(0, 16000) ||
+    sources
+      .slice(0, 5)
+      .map((s, i) => "### Sumber [" + (i + 1) + ']: "' + s.title + '"\n' + String(s.content || "").slice(0, 3000))
+      .join("\n\n");
+
+  const systemPrompt = isIndo
+    ? "Anda adalah pembuat Lembar Contekan (CheatSheet) profesional dan arsitek pengetahuan edukasi untuk Const Learn.\n" +
+      "Tugas Anda adalah merangkum materi rujukan menjadi kumpulan kartu referensi cepat (CheatSheet Cards) yang sangat padat informasi, rapi, tajam, dan mudah di-skim oleh siswa.\n\n" +
+      "Aturan Penting:\n" +
+      "1. Kembalikan HANYA format JSON valid tanpa teks pembuka atau penutup:\n" +
+      JSON.stringify({
+        title: "string",
+        topic: "string",
+        cards: [{ id: "string", title: "string", badge: "string", content: "string", span: "normal" }]
+      }, null, 2) + "\n\n" +
+      "2. Struktur & Ragam Kartu (Adaptif Sesuai Domain Materi):\n" +
+      "   - Buat tepat " + numCardsTarget + " kartu referensi esensial.\n" +
+      '   - "badge": label kategori ringkas 1-2 kata huruf kapital (misal: "TESIS", "RUMUS", "SINTAKS", "ASAS", "TIPS", "JEBAKAN", "DEFINISI", "KOMPARASI", "TIMELINE", "KEBIJAKAN").\n' +
+      '   - "title": judul kartu singkat dan spesifik (misal: "Dilema Keamanan AI", "Scaling Law and Horizon 2026", "Aturan Rantai Turunan", "Hooks Lifecycle").\n' +
+      '   - "content": format Markdown kaya:\n' +
+      "     * Jika materi adalah esai / analisis kebijakan / wacana: buat kartu intisari tesis, perbandingan posisi/kubu, timeline/fase penting, matriks risiko, dan implikasi strategis.\n" +
+      "     * Jika matematika / fisika: gunakan LaTeX valid ($...$ inline, $$...$$ blok). PENTING: Escape backslash di JSON dengan double backslash (misal: \\\\frac{a}{b}, \\\\alpha).\n" +
+      "     * Jika koding: sertakan blok kode ringkas dengan contoh konkret.\n" +
+      "     * Gunakan bullet point atau tabel Markdown untuk perbandingan.\n" +
+      '     * Sertakan 1-2 kartu khusus "JEBAKAN UMUM / PITFALLS" atau kesalahpahaman umum.\n' +
+      '   - "span": gunakan "wide" jika kartu memiliki tabel lebar, timeline horizontal, atau kode panjang, selain itu gunakan "normal".\n\n' +
+      "3. Kualitas & Ketepatan (Zero Slop):\n" +
+      '   - JANGAN menulis pengantar klise ("Di era modern ini..."). Langsung ke substansi teknis!\n' +
+      "   - Grounding 100% pada fakta dan argumen dari materi yang diberikan."
+    : "You are an expert CheatSheet author and educational knowledge architect for Const Learn.\n" +
+      "Your task is to transform the provided source material into high-density, beautifully structured quick-reference cards (CheatSheet Cards).\n\n" +
+      "Critical Rules:\n" +
+      "1. Return ONLY valid JSON without markdown wrapping or commentary:\n" +
+      JSON.stringify({
+        title: "string",
+        topic: "string",
+        cards: [{ id: "string", title: "string", badge: "string", content: "string", span: "normal" }]
+      }, null, 2) + "\n\n" +
+      "2. Adaptive Card Structure:\n" +
+      "   - Create exactly " + numCardsTarget + " high-value reference cards.\n" +
+      '   - "badge": uppercase concise category tag (e.g., "THESIS", "FORMULA", "SYNTAX", "PRINCIPLE", "TIPS", "PITFALL", "DEFINITION", "TIMELINE", "POLICY").\n' +
+      '   - "title": clear, specific card title.\n' +
+      '   - "content": rich Markdown.\n' +
+      "     * If essay/policy/humanities: extract core thesis, risk matrices, timeline/phases, and key dilemmas.\n" +
+      "     * If math/science: use valid LaTeX ($...$ inline, $$...$$ block). Double-escape backslashes in JSON (\\\\frac, \\\\alpha).\n" +
+      "     * If programming: clean code blocks.\n" +
+      '     * Include 1-2 "PITFALLS" cards highlighting common misconceptions or exam traps.\n' +
+      '   - "span": "wide" if containing a wide table or long code snippet, otherwise "normal".\n\n' +
+      "3. Zero Slop & Accuracy:\n" +
+      "   - No fluff. Be direct and dense. Ground strictly in the provided sources.";
+
+  const userPrompt = "Materi Sumber Belajar:\n" + (contextSnippet || "Topik: " + (topicFocus || sources[0]?.title || "Pengetahuan Umum")) + "\n\n" +
+    (topicFocus ? "Fokus Topik Spesifik / Instruksi Khusus: " + topicFocus + "\n\n" : "") +
+    "Silakan hasilkan Lembar Contekan (CheatSheet) dalam format JSON valid persis seperti contoh berikut:\n" +
+    JSON.stringify(
+      {
+        title: topicFocus || sources[0]?.title || (isIndo ? "Lembar Contekan" : "CheatSheet"),
+        topic: topicFocus || sources[0]?.title || (isIndo ? "Materi Belajar" : "Study Material"),
+        cards: [
+          {
+            id: "1",
+            title: isIndo ? "Tesis / Konsep Kunci" : "Key Concept / Thesis",
+            badge: isIndo ? "KONSEP" : "CONCEPT",
+            content: isIndo ? "Penjelasan padat berformat Markdown dengan poin-poin utama." : "Dense markdown explanation with key bullet points.",
+            span: "normal",
+          },
+          {
+            id: "2",
+            title: isIndo ? "Matriks / Aturan Esensial" : "Essential Rules / Matrix",
+            badge: isIndo ? "ATURAN" : "RULES",
+            content: isIndo ? "| Aspek | Keterangan |\n|---|---|\n| Parameter | Nilai acuan |" : "| Aspect | Details |\n|---|---|\n| Metric | Value |",
+            span: "wide",
+          },
+        ],
+      },
+      null,
+      2
+    ) +
+    "\n\nPENTING: Kembalikan HANYA format JSON valid tanpa teks pembuka atau penutup.";
+
+  let parsedJson = null;
+  let lastErrorMsg = "";
+
+  // 1. Try Electron agent isolated completion
+  const electron = typeof window !== "undefined" ? window.electron : null;
+  if (electron?.agent?.generateCompletion) {
+    try {
+      const activeModel =
+        (typeof localStorage !== "undefined" &&
+          localStorage.getItem("const_learn_active_model")) ||
+        "gemini-3.8-flash";
+
+      const authToken =
+        (typeof localStorage !== "undefined" &&
+          (localStorage.getItem("const_learn_auth_token") ||
+            localStorage.getItem("const_sso_token"))) ||
+        "";
+
+      const res = await electron.agent.generateCompletion({
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        model: activeModel,
+        authToken: authToken || undefined,
+        temperature: 0.2,
+      });
+
+      if (res?.success && res.content) {
+        parsedJson = extractJson(res.content);
+        if (!parsedJson) {
+          lastErrorMsg = isIndo
+            ? "Format JSON dari AI tidak valid atau terpotong."
+            : "Invalid or truncated JSON response from AI.";
+        }
+      } else if (res?.error) {
+        lastErrorMsg = res.error;
+      }
+    } catch (ipcErr: any) {
+      lastErrorMsg = ipcErr?.message || String(ipcErr);
+      console.warn("[CheatSheet Generator] Electron isolated completion failed, fallback to HTTP router:", ipcErr);
+    }
+  }
+
+  // 2. Fallback to Const Router HTTP
+  if (!parsedJson) {
+    try {
+      const baseUrl = getRouterBaseUrl();
+      const endpoint = baseUrl.endsWith("/chat/completions")
+        ? baseUrl
+        : (baseUrl.replace(/\/+$/, "") + "/chat/completions");
+
+      const authToken =
+        (typeof localStorage !== "undefined" &&
+          (localStorage.getItem("const_learn_auth_token") ||
+            localStorage.getItem("const_sso_token"))) ||
+        "";
+
+      const apiKey =
+        authToken ||
+        import.meta.env?.VITE_CONST_ROUTER_API_KEY ||
+        import.meta.env?.VITE_CONST_ENGINE_API_KEY ||
+        "";
+
+      const activeModel =
+        (typeof localStorage !== "undefined" &&
+          localStorage.getItem("const_learn_active_model")) ||
+        "gemini-3.8-flash";
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 120000);
+
+      const resp = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(apiKey ? { Authorization: "Bearer " + apiKey } : {}),
+        },
+        body: JSON.stringify({
+          model: activeModel,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: userPrompt },
+          ],
+          temperature: 0.2,
+          response_format: { type: "json_object" },
+        }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+      if (resp.ok) {
+        const jsonRes = await resp.json();
+        const contentStr = jsonRes.choices?.[0]?.message?.content || "";
+        parsedJson = extractJson(contentStr);
+        if (!parsedJson) {
+          lastErrorMsg = isIndo
+            ? "Format JSON dari AI tidak valid atau terpotong."
+            : "Failed to parse valid JSON from AI response.";
+        }
+      } else {
+        const errText = await resp.text().catch(() => "");
+        let serverMsg = "";
+        try {
+          const errObj = JSON.parse(errText);
+          serverMsg = errObj?.error?.message || errObj?.message || "";
+        } catch {}
+        lastErrorMsg = serverMsg || ("HTTP " + resp.status + ": " + errText.slice(0, 200));
+      }
+    } catch (httpErr: any) {
+      if (!lastErrorMsg) {
+        lastErrorMsg = httpErr?.message || "Koneksi ke server AI gagal.";
+      }
+    }
+  }
+
+  // 3. Graceful Grounded Source Fallback (Identical to Quiz & MindMap behavior)
+  if (!parsedJson || !Array.isArray(parsedJson.cards) || parsedJson.cards.length === 0) {
+    const targetCount = coverageMode === "short" ? 6 : coverageMode === "long" ? 12 : 8;
+    const fallbackCards = extractCardsFromSource(sources, targetCount, isIndo);
+    if (fallbackCards.length > 0) {
+      const fallbackTitle = topicFocus || sources[0]?.title || (isIndo ? "Lembar Contekan" : "CheatSheet");
+      parsedJson = {
+        title: fallbackTitle + " (CheatSheet)",
+        topic: fallbackTitle,
+        cards: fallbackCards,
+      };
+    } else {
+      throw new Error(
+        lastErrorMsg ||
+          (isIndo
+            ? "Gagal menghasilkan lembar contekan dari AI. Server AI tidak merespons atau mengembalikan data kosong."
+            : "Failed to generate cheat sheet cards from AI. The AI server did not respond or returned empty data.")
+      );
+    }
+  }
+
+  const primaryTitle =
+    parsedJson.title ||
+    (topicFocus ? (topicFocus + " (CheatSheet)") : ((sources[0]?.title || "Materi Belajar") + " (CheatSheet)"));
+
+  const cards: CheatSheetCard[] = parsedJson.cards.map((c: any, idx: number) => ({
+    id: String(c.id || idx + 1),
+    title: String(c.title || ("Kartu #" + (idx + 1))),
+    badge: c.badge ? String(c.badge).toUpperCase() : undefined,
+    content: String(c.content || "").trim(),
+    span: c.span === "wide" ? ("wide" as const) : ("normal" as const),
+  }));
+
+  const cheatSheetData: CheatSheetData = {
+    id: artifactId,
+    learnId,
+    title: primaryTitle,
+    topic: parsedJson.topic || topicFocus || sources[0]?.title,
+    coverageMode,
+    sourceCount: sources.length,
+    sourceTitles: sources.map((s) => s.title),
+    sourceIds: sources.map((s) => s.id),
+    cards,
+    createdAt: Date.now(),
+    updatedAt: Date.now(),
+  };
+
+  return {
+    title: primaryTitle,
+    data: cheatSheetData,
+  };
+}
 

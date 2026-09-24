@@ -23,9 +23,16 @@ import { CreateAudioSummarySheet } from "./create-audio-summary-sheet";
 import { CreatePresentationSheet } from "./create-presentation-sheet";
 import { CreateInfographicSheet } from "./create-infographic-sheet";
 import { CreateReportSheet } from "./create-report-sheet";
+import { CreateCheatSheetSheet } from "./create-cheatsheet-sheet";
 import { ModelSelectionSheet } from "../home/sheets/model-selection-sheet";
 import { MobileArtifactReader } from "./mobile-artifact-reader";
-import { generateStudioArtifact, generatePresentationArtifact, generateInfographicArtifact, generateReportArtifact } from "../../lib/studio/generator";
+import {
+  generateStudioArtifact,
+  generatePresentationArtifact,
+  generateInfographicArtifact,
+  generateReportArtifact,
+  generateCheatSheetArtifact,
+} from "../../lib/studio/generator";
 import { WorkingProcess } from "./working-process";
 import { ImageLightbox } from "./image-lightbox";
 import {
@@ -265,6 +272,7 @@ import {
   Award,
   BarChart3,
   Table2,
+  FileSpreadsheet,
   PenTool,
   Check,
   RotateCcw,
@@ -395,9 +403,9 @@ const STUDIO_TOOLS: StudioTool[] = [
     hoverBorder: "hover:border-purple-300 dark:hover:border-[#4b3a55]",
   },
   {
-    id: "data_table",
-    name: "Cheat Sheet",
-    icon: Table2,
+    id: "cheatsheet",
+    name: "CheatSheet",
+    icon: FileSpreadsheet,
     iconColor: "text-sky-600 dark:text-[#38bdf8]",
     textColor: "text-sky-950 dark:text-[#e0f2fe]",
     cardBg: "bg-sky-50/70 dark:bg-[#1a252f]",
@@ -456,7 +464,8 @@ export function MobileLearnWorkspace({
     quiz: t("toolsQuiz"),
     flashcards: t("toolsFlashcards") || (language === "id" ? "Kartu Tanya-Jawab" : "Flashcards"),
     infographic: t("toolsInfographic"),
-    data_table: t("toolsDataTable"),
+    cheatsheet: t("toolsCheatSheet") || "CheatSheet",
+    data_table: t("toolsCheatSheet") || t("toolsDataTable") || "CheatSheet",
   };
 
   // Live notebook data from local Dexie
@@ -530,6 +539,7 @@ export function MobileLearnWorkspace({
   const [isCreatePresentationOpen, setIsCreatePresentationOpen] = useState(false);
   const [isCreateInfographicOpen, setIsCreateInfographicOpen] = useState(false);
   const [isCreateReportSheetOpen, setIsCreateReportSheetOpen] = useState(false);
+  const [isCreateCheatSheetOpen, setIsCreateCheatSheetOpen] = useState(false);
   const [modelSelectionCategory, setModelSelectionCategory] = useState<"llm" | "voice" | "image">("voice");
   const [isModelSelectionSheetOpen, setIsModelSelectionSheetOpen] = useState(false);
   const [generatingArtifacts, setGeneratingArtifacts] = useState<GeneratingArtifactStatus[]>([]);
@@ -1316,6 +1326,8 @@ export function MobileLearnWorkspace({
       art.type === "slides" ||
       art.type === "infographic" ||
       art.type === "report" ||
+      art.type === "cheatsheet" ||
+      art.type === "data_table" ||
       art.data?.imageUrl ||
       art.data?.questions ||
       art.data?.cards ||
@@ -1670,6 +1682,10 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
       setIsCreateReportSheetOpen(true);
       return;
     }
+    if (toolId === "cheatsheet" || toolId === "data_table") {
+      setIsCreateCheatSheetOpen(true);
+      return;
+    }
     // Other tools: strictly no-op as requested
     return;
   };
@@ -2018,6 +2034,81 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
           ? `Gagal membuat laporan: ${err?.message || "Terjadi kesalahan"}`
           : `Failed to create report: ${err?.message || "An error occurred"}`
       );
+    }
+  };
+
+  const handleGenerateCheatSheet = async (options: {
+    selectedSourceIds: string[];
+    coverageMode: "short" | "auto" | "long";
+    topicFocus?: string;
+  }) => {
+    if (!learnId) return;
+
+    const selectedSources = (sources || []).filter((s) => options.selectedSourceIds.includes(s.id));
+    if (selectedSources.length === 0) return;
+
+    const targetLang = language === "id" ? "id" : "en";
+    const isIndo = targetLang === "id";
+    const title = options.topicFocus?.trim()
+      ? (isIndo ? `CheatSheet: ${options.topicFocus.trim()}` : `CheatSheet: ${options.topicFocus.trim()}`)
+      : (isIndo ? "Lembar Contekan Pintar" : "Smart CheatSheet");
+
+    const artId = await localDb.createArtifact({
+      learnId,
+      title: isIndo ? "Menyusun Lembar Contekan..." : "Creating CheatSheet...",
+      type: "cheatsheet",
+      status: "generating",
+      sourcesCount: selectedSources.length,
+      content: "",
+    });
+
+    setIsStudioSheetOpen(true);
+
+    try {
+      const result = await generateCheatSheetArtifact({
+        artifactId: artId,
+        learnId,
+        sources: selectedSources,
+        coverageMode: options.coverageMode,
+        topicFocus: options.topicFocus,
+        language: targetLang,
+      });
+
+      await localDb.updateArtifact(artId, {
+        title: result.title || title,
+        data: result.data,
+        content: JSON.stringify(result.data),
+        status: "completed",
+      });
+
+      toast.success(
+        isIndo ? "Lembar contekan berhasil dibuat!" : "CheatSheet created successfully!"
+      );
+
+      const fullArt = await localDb.getArtifact(artId);
+      if (fullArt) {
+        setIsStudioSheetOpen(false);
+        setSelectedReaderArtifact(fullArt);
+        setIsReaderOpen(true);
+      }
+    } catch (err: any) {
+      console.error("Failed to generate cheatsheet on mobile:", err);
+      await localDb.updateArtifact(artId, {
+        title,
+        status: "error",
+        error: err?.message || "Generation failed",
+      });
+      toast.error(
+        language === "id"
+          ? `Gagal membuat lembar contekan: ${err?.message || "Terjadi kesalahan"}`
+          : `Failed to create cheatsheet: ${err?.message || "An error occurred"}`
+      );
+      const fullArt = await localDb.getArtifact(artId);
+      if (fullArt) {
+        setIsStudioSheetOpen(false);
+        setSelectedReaderArtifact(fullArt);
+        setIsReaderOpen(true);
+      }
     }
   };
 
@@ -2970,6 +3061,14 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
         onClose={() => setIsCreateReportSheetOpen(false)}
         sources={sources || []}
         onGenerate={handleGenerateReport}
+      />
+
+      {/* Create CheatSheet Bottom Sheet */}
+      <CreateCheatSheetSheet
+        open={isCreateCheatSheetOpen}
+        onClose={() => setIsCreateCheatSheetOpen(false)}
+        sources={sources || []}
+        onGenerate={handleGenerateCheatSheet}
       />
 
       {/* Interactive Full-Screen Reader Overlay */}

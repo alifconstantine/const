@@ -13,6 +13,7 @@ import {
   Plus,
   SquarePen,
   PenTool,
+  FileSpreadsheet,
   Table2,
 } from "lucide-react";
 import { ScrollArea } from "@const/ui";
@@ -111,9 +112,9 @@ export const STUDIO_TOOLS: StudioTool[] = [
     hoverBorder: "hover:border-purple-300 dark:hover:border-[#4b3a55]",
   },
   {
-    id: "data_table",
-    translationKey: "toolsDataTable",
-    icon: Table2,
+    id: "cheatsheet",
+    translationKey: "toolsCheatSheet",
+    icon: FileSpreadsheet,
     iconColor: "text-sky-600 dark:text-[#38bdf8]",
     textColor: "text-sky-950 dark:text-[#e0f2fe]",
     cardBg: "bg-sky-50/70 dark:bg-[#1a252f]",

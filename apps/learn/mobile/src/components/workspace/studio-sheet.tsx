@@ -22,6 +22,7 @@ import {
   BarChart3,
   BookOpen,
   Table2,
+  FileSpreadsheet,
 } from "lucide-react";
 import {
   cn,
@@ -123,7 +124,8 @@ export function StudioSheet({
       case "flashcard":
         return BookOpen;
       case "data_table":
-        return Table2;
+      case "cheatsheet":
+        return FileSpreadsheet;
       default:
         return SquarePen;
     }

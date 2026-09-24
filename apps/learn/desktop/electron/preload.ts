@@ -164,6 +164,10 @@ contextBridge.exposeInMainWorld("electron", {
     checkStatus: (payload: { learnId: string; artifactId: string }) =>
       ipcRenderer.invoke("presentation:check-status", payload),
   },
+  cheatsheet: {
+    exportPdf: (payload: { title: string; htmlContent: string }) =>
+      ipcRenderer.invoke("cheatsheet:export-pdf", payload),
+  },
   minimize: () => ipcRenderer.send("window:minimize"),
   maximize: () => ipcRenderer.send("window:maximize"),
   close: () => ipcRenderer.send("window:close"),

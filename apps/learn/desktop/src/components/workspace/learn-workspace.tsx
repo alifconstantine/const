@@ -49,6 +49,7 @@ import { CreateVideoSummaryDialog } from "./create-video-summary-dialog";
 import { CreatePresentationDialog } from "./create-presentation-dialog";
 import { CreateInfographicDialog } from "./create-infographic-dialog";
 import { CreateReportDialog } from "./create-report-dialog";
+import { CreateCheatSheetDialog } from "./create-cheatsheet-dialog";
 import { WorkspaceTitle } from "./workspace-title";
 import { SettingsView } from "../settings/settings-view";
 import { ErrorBoundary } from "../ui/error-boundary";
@@ -61,6 +62,7 @@ import {
   generatePresentationArtifact,
   generateInfographicArtifact,
   generateReportArtifact,
+  generateCheatSheetArtifact,
 } from "../../lib/studio/generator";
 import type { FileMutationRecord } from "@const/agent";
 import type { LocalArtifact } from "../../lib/db";
@@ -143,6 +145,7 @@ export function LearnWorkspace({
   const [isCreatePresentationOpen, setIsCreatePresentationOpen] = useState(false);
   const [isCreateInfographicOpen, setIsCreateInfographicOpen] = useState(false);
   const [isCreateReportOpen, setIsCreateReportOpen] = useState(false);
+  const [isCreateCheatSheetOpen, setIsCreateCheatSheetOpen] = useState(false);
   const [generatingArtifacts, setGeneratingArtifacts] = useState<GeneratingArtifactStatus[]>([]);
 
   // Right Pane: Dual Studio & Preview/Review state
@@ -1000,6 +1003,79 @@ export function LearnWorkspace({
     }
   };
 
+  const handleGenerateCheatSheet = async (params: {
+    selectedSourceIds: string[];
+    coverageMode: "short" | "auto" | "long";
+    topicFocus?: string;
+  }) => {
+    if (!learnId) return;
+
+    const selectedSources = (sources || []).filter((s) =>
+      params.selectedSourceIds.includes(s.id)
+    );
+    if (selectedSources.length === 0) return;
+
+    const isIndo = language === "id";
+    const targetLang: "id" | "en" = isIndo ? "id" : "en";
+    const title = params.topicFocus?.trim()
+      ? (isIndo ? `CheatSheet: ${params.topicFocus.trim()}` : `CheatSheet: ${params.topicFocus.trim()}`)
+      : (isIndo ? "Lembar Contekan Pintar" : "Smart CheatSheet");
+
+    const artId = await localDb.createArtifact({
+      learnId,
+      title: isIndo ? "Menyusun Lembar Contekan..." : "Creating CheatSheet...",
+      type: "cheatsheet",
+      status: "generating",
+      sourcesCount: selectedSources.length,
+      content: "",
+    });
+
+    try {
+      const result = await generateCheatSheetArtifact({
+        artifactId: artId,
+        learnId,
+        sources: selectedSources,
+        coverageMode: params.coverageMode,
+        topicFocus: params.topicFocus,
+        language: targetLang,
+      });
+
+      await localDb.updateArtifact(artId, {
+        title: result.title || title,
+        data: result.data,
+        content: JSON.stringify(result.data),
+        status: "completed",
+      });
+
+      toast.success(
+        isIndo
+          ? "Lembar contekan berhasil dibuat!"
+          : "CheatSheet created successfully!"
+      );
+
+      const fullArt = await localDb.getArtifact(artId);
+      if (fullArt) {
+        handleOpenStudioArtifact(fullArt);
+      }
+    } catch (err: any) {
+      console.error("Failed to generate cheatsheet:", err);
+      await localDb.updateArtifact(artId, {
+        title,
+        status: "error",
+        error: err?.message || "Generation failed",
+      });
+      toast.error(
+        isIndo
+          ? `Gagal menyusun lembar contekan: ${err?.message || "Terjadi kesalahan"}`
+          : `Failed to create cheatsheet: ${err?.message || "An error occurred"}`
+      );
+      const fullArt = await localDb.getArtifact(artId);
+      if (fullArt) {
+        handleOpenStudioArtifact(fullArt);
+      }
+    }
+  };
+
   const handleSelectStudioTool = (toolId: string) => {
     if (toolId === "browser") {
       handleOpenBrowser();
@@ -1026,6 +1102,8 @@ export function LearnWorkspace({
       setIsCreateInfographicOpen(true);
     } else if (toolId === "report") {
       setIsCreateReportOpen(true);
+    } else if (toolId === "cheatsheet" || toolId === "data_table") {
+      setIsCreateCheatSheetOpen(true);
     } else {
       return;
     }
@@ -1041,6 +1119,8 @@ export function LearnWorkspace({
       art.type === "slides" ||
       art.type === "infographic" ||
       art.type === "report" ||
+      art.type === "cheatsheet" ||
+      art.type === "data_table" ||
       art.data?.questions ||
       art.data?.cards ||
       art.data?.root ||
@@ -1858,6 +1938,14 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
         onOpenChange={setIsCreateReportOpen}
         sources={sources || []}
         onGenerate={handleGenerateReport}
+      />
+
+      {/* Dedicated Create CheatSheet Dialog */}
+      <CreateCheatSheetDialog
+        open={isCreateCheatSheetOpen}
+        onOpenChange={setIsCreateCheatSheetOpen}
+        sources={sources || []}
+        onGenerate={handleGenerateCheatSheet}
       />
 
       {/* Settings Modal / Overlay */}

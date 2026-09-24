@@ -22,6 +22,7 @@ import {
   Video,
   BarChart3,
   Table2,
+  FileSpreadsheet,
   BookOpen,
   Loader2,
   Sparkles,
@@ -51,11 +52,12 @@ import { VideoSummaryViewer } from "./video-summary-viewer";
 import { PresentationViewer } from "./presentation-viewer";
 import { InfographicViewer } from "./infographic-viewer";
 import { ReportViewer } from "./report-viewer";
+import { CheatSheetViewer } from "./cheatsheet-viewer";
 import { STUDIO_TOOLS } from "../workspace/studio-panel";
 import { useI18n } from "../../lib/i18n";
 import type { RightPaneTab, RightPaneTabType, BrowserSelectedElement } from "./types";
 import type { FileMutationRecord } from "@const/agent";
-import type { LocalArtifact, AudioSummaryData, VideoSummaryData, SlideDeckData, InfographicData, ReportData } from "../../lib/db";
+import { localDb, type LocalArtifact, type AudioSummaryData, type VideoSummaryData, type SlideDeckData, type InfographicData, type ReportData, type CheatSheetData } from "../../lib/db";
 
 export interface GeneratingArtifactStatus {
   id: string;
@@ -183,7 +185,8 @@ export function RightPane({
       case "flashcards":
         return BookOpen;
       case "data_table":
-        return Table2;
+      case "cheatsheet":
+        return FileSpreadsheet;
       default:
         return SquarePen;
     }
@@ -391,6 +394,74 @@ export function RightPane({
               onToggleExpand={onToggleCollapse}
               isExpanded={!isCollapsed}
               onSelectStudioTool={onSelectStudioTool}
+            />
+          );
+        }
+      }
+      if (
+        tab.artifact?.type === "cheatsheet" ||
+        tab.artifact?.type === "data_table"
+      ) {
+        const cheatsheetData =
+          (tab.artifact.data as CheatSheetData) ||
+          (() => {
+            try {
+              return typeof tab.artifact.content === "string"
+                ? JSON.parse(tab.artifact.content)
+                : null;
+            } catch {
+              return null;
+            }
+          })() || {
+            id: tab.artifact.id,
+            learnId: tab.artifact.learnId,
+            title: tab.artifact.title || "CheatSheet",
+            cards: [],
+          };
+        if (cheatsheetData) {
+          return (
+            <CheatSheetViewer
+              artifact={tab.artifact}
+              data={{
+                ...cheatsheetData,
+                id: tab.artifact.id || cheatsheetData.id,
+                learnId: tab.artifact.learnId || cheatsheetData.learnId,
+              }}
+              onExplainInChat={onExplainInChat}
+              onExportAsNote={async (csData) => {
+                if (!tab.artifact?.learnId) return;
+                const isIndo = language === "id";
+                const noteTitle = `${csData.title || "CheatSheet"} (${isIndo ? "Catatan" : "Note"})`;
+                const markdownLines = [
+                  `# ${csData.title || "CheatSheet"}\n`,
+                  csData.cards
+                    .map(
+                      (c) =>
+                        `## ${c.title}${c.badge ? ` [${c.badge}]` : ""}\n\n${c.content}`
+                    )
+                    .join("\n\n---\n\n"),
+                ].join("\n");
+
+                const artId = await localDb.createArtifact({
+                  learnId: tab.artifact.learnId,
+                  title: noteTitle,
+                  type: "note",
+                  status: "completed",
+                  content: markdownLines,
+                  sourcesCount: csData.sourceCount || 0,
+                });
+                toast.success(
+                  isIndo
+                    ? "Berhasil diekspor ke Catatan!"
+                    : "Exported to Notes successfully!"
+                );
+                if (onOpenArtifact) {
+                  const noteArt = await localDb.getArtifact(artId);
+                  if (noteArt) onOpenArtifact(noteArt);
+                }
+              }}
+              onToggleExpand={onToggleCollapse}
+              isExpanded={!isCollapsed}
             />
           );
         }

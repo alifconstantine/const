@@ -1401,7 +1401,10 @@ app.on("second-instance", (_event, commandLine) => {
         const allModels = [...DEFAULT_MODELS, ...(config.customModels || [])];
         const modelDef = allModels.find((m) => m.id === model || m.displayName === model);
         const providerKey = modelDef?.provider || config.activeProvider || "const";
-        const providerCfg = config.providers[providerKey] || config.providers["const"];
+        const normalizedKey =
+          providerKey === "const-router" || providerKey === "const-engine" ? "const" : providerKey;
+        const providerCfg =
+          config.providers[providerKey] || config.providers[normalizedKey] || config.providers["const"];
 
         const baseUrl =
           modelDef?.baseUrl ||
@@ -1411,13 +1414,34 @@ app.on("second-instance", (_event, commandLine) => {
           "https://router.const.web.id/v1";
 
         let apiKey = providerCfg?.apiKey || "";
-        if (!apiKey && (providerKey === "const" || providerKey === "const-engine")) {
+
+        // Check customProviders if apiKey is empty in provider config
+        if (!apiKey && Array.isArray((config as any).customProviders)) {
+          const customProv = (config as any).customProviders.find(
+            (cp: any) =>
+              cp.apiKey &&
+              (cp.id === providerKey ||
+                cp.baseUrl?.replace(/\/+$/, "") === baseUrl.replace(/\/+$/, "") ||
+                (baseUrl.includes("router.const.web.id") && cp.apiKey.startsWith("sk-const")))
+          );
+          if (customProv?.apiKey) {
+            apiKey = customProv.apiKey;
+          }
+        }
+
+        if (
+          !apiKey &&
+          (providerKey === "const" ||
+            providerKey === "const-engine" ||
+            providerKey === "const-router" ||
+            baseUrl.includes("router.const.web.id"))
+        ) {
           apiKey =
             payload.authToken ||
             lastAuthToken ||
             process.env.CONST_ROUTER_API_KEY ||
             process.env.CONST_ENGINE_API_KEY ||
-            "const-local-dev-key";
+            "";
         }
 
         const endpoint = baseUrl.endsWith("/chat/completions")
@@ -1462,7 +1486,15 @@ app.on("second-instance", (_event, commandLine) => {
           if (inactivityTimer) clearTimeout(inactivityTimer);
           clearTimeout(hardTimeoutId);
           const errText = await res.text().catch(() => "");
-          return { success: false, error: `HTTP ${res.status}: ${errText}` };
+          let parsedError = "";
+          try {
+            const errJson = JSON.parse(errText);
+            parsedError = errJson?.error?.message || errJson?.message || "";
+          } catch {}
+          return {
+            success: false,
+            error: parsedError || `HTTP ${res.status}: ${errText.slice(0, 300)}`,
+          };
         }
 
         if (!res.body) {
@@ -2382,6 +2414,72 @@ app.on("second-instance", (_event, commandLine) => {
         };
       } catch (err: any) {
         return { success: false, error: err.message };
+      }
+    }
+  );
+
+  // CheatSheet Export to PDF IPC Handler
+  ipcMain.handle(
+    "cheatsheet:export-pdf",
+    async (_event, { title, htmlContent }: { title: string; htmlContent: string }) => {
+      let printWin: BrowserWindow | null = null;
+      try {
+        const sanitized = (title || "cheatsheet")
+          .replace(/[^a-zA-Z0-9_\-\s]/g, "")
+          .trim()
+          .replace(/\s+/g, "_");
+        const defaultFileName = `${sanitized || "cheatsheet"}.pdf`;
+
+        const { canceled, filePath } = await dialog.showSaveDialog({
+          title: "Simpan Lembar Contekan (PDF)",
+          defaultPath: defaultFileName,
+          filters: [{ name: "PDF Document", extensions: ["pdf"] }],
+        });
+
+        if (canceled || !filePath) {
+          return { success: false, canceled: true };
+        }
+
+        printWin = new BrowserWindow({
+          show: false,
+          width: 1200,
+          height: 1600,
+          webPreferences: {
+            offscreen: true,
+            webSecurity: false,
+          },
+        });
+
+        await printWin.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(htmlContent)}`);
+        await new Promise((r) => setTimeout(r, 600));
+
+        const pdfBuffer = await printWin.webContents.printToPDF({
+          printBackground: true,
+          landscape: false,
+          pageSize: "A4",
+          margins: {
+            top: 0.4,
+            bottom: 0.4,
+            left: 0.4,
+            right: 0.4,
+          },
+        });
+
+        fs.writeFileSync(filePath, pdfBuffer);
+
+        return {
+          success: true,
+          filePath,
+          sizeBytes: pdfBuffer.length,
+        };
+      } catch (err: any) {
+        console.error("[Electron CheatSheet] export-pdf error:", err);
+        return { success: false, error: err?.message || "Failed to export PDF" };
+      } finally {
+        if (printWin) {
+          printWin.destroy();
+          printWin = null;
+        }
       }
     }
   );

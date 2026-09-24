@@ -318,13 +318,36 @@ export interface ReportData {
   updatedAt?: number;
 }
 
+export interface CheatSheetCard {
+  id: string;
+  title: string;
+  badge?: string;
+  content: string; // Markdown supporting KaTeX $...$, code blocks, lists, tables
+  span?: "normal" | "wide";
+}
+
+export interface CheatSheetData {
+  id?: string;
+  learnId?: string;
+  title: string;
+  topic?: string;
+  coverageMode: "short" | "auto" | "long";
+  sourceCount?: number;
+  sourceTitles?: string[];
+  sourceIds?: string[];
+  cards: CheatSheetCard[];
+  summaryMarkdown?: string;
+  createdAt?: number;
+  updatedAt?: number;
+}
+
 export interface LocalArtifact {
   id: string;
   learnId?: string;
   title: string;
   type: string;
   content?: string;
-  data?: QuizData | FlashcardData | MindMapData | SlideDeckData | AudioSummaryData | VideoSummaryData | InfographicData | ReportData | any;
+  data?: QuizData | FlashcardData | MindMapData | SlideDeckData | AudioSummaryData | VideoSummaryData | InfographicData | ReportData | CheatSheetData | any;
   fileUrl?: string;
   isZip?: boolean;
   status?: "generating" | "completed" | "error";

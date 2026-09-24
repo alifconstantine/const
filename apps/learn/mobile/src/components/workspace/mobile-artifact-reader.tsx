@@ -24,13 +24,14 @@ import {
 } from "lucide-react";
 import { cn, toast } from "@const/ui";
 import { useI18n } from "../../lib/i18n";
-import { localDb, type LocalArtifact, type QuizData, type QuizQuestion, type FlashcardData, type FlashcardItem, type AudioSummaryData, type VideoSummaryData, type SlideDeckData, type InfographicData, type ReportData } from "../../lib/db";
+import { localDb, type LocalArtifact, type QuizData, type QuizQuestion, type FlashcardData, type FlashcardItem, type AudioSummaryData, type VideoSummaryData, type SlideDeckData, type InfographicData, type ReportData, type CheatSheetData } from "../../lib/db";
 import { getStoredVoiceConfig, synthesizeSpeechChunked } from "../../lib/voice";
 import { MobileMindMapViewer } from "./mobile-mind-map-viewer";
 import { VideoSummarySheet } from "./video-summary-sheet";
 import { MobilePresentationViewer } from "./mobile-presentation-viewer";
 import { MobileInfographicViewer } from "./mobile-infographic-viewer";
 import { MobileReportViewer } from "./mobile-report-viewer";
+import { MobileCheatSheetViewer } from "./mobile-cheatsheet-viewer";
 
 export interface MobileArtifactReaderProps {
   open: boolean;
@@ -183,6 +184,39 @@ export function MobileArtifactReader({
       <MobileInfographicViewer
         artifact={artifact}
         data={infographicData}
+        onClose={onClose}
+        onExplainInChat={onExplainInChat}
+      />
+    );
+  }
+
+  const isCheatSheet =
+    artifact.type === "cheatsheet" ||
+    artifact.type === "data_table" ||
+    Boolean((artifact.data as CheatSheetData)?.cards);
+  const cheatSheetData = isCheatSheet
+    ? (artifact.data as CheatSheetData) ||
+      (() => {
+        try {
+          return typeof artifact.content === "string"
+            ? JSON.parse(artifact.content)
+            : null;
+        } catch {
+          return null;
+        }
+      })() || {
+        id: artifact.id,
+        learnId: artifact.learnId,
+        title: artifact.title || "CheatSheet",
+        cards: [],
+      }
+    : null;
+
+  if (isCheatSheet && cheatSheetData) {
+    return (
+      <MobileCheatSheetViewer
+        artifact={artifact}
+        data={cheatSheetData}
         onClose={onClose}
         onExplainInChat={onExplainInChat}
       />
