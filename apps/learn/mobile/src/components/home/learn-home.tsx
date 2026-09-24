@@ -23,6 +23,7 @@ import {
   Plus,
   ChevronRight,
   ArrowLeft,
+  Folder,
   FolderInput,
   FolderMinus,
   FolderPlus,
@@ -50,6 +51,7 @@ import {
   BarChart3,
   Table2,
   Layers,
+  Sparkles,
 } from "lucide-react";
 
 import { LearnCard, LearnItem } from "./learn-card";
@@ -199,13 +201,13 @@ export function LearnHome({
     [t]
   );
 
-  const tabs: { key: TabKey; label: string }[] = useMemo(
+  const tabs: { key: TabKey; label: string; icon: React.ElementType }[] = useMemo(
     () => [
-      { key: "all", label: t("tabAll") },
-      { key: "learns", label: t("learns") },
-      { key: "sources", label: t("sources") },
-      { key: "collections", label: t("collections") },
-      { key: "artifact", label: t("artifacts") },
+      { key: "all", label: t("tabAll"), icon: Layers },
+      { key: "learns", label: t("learns"), icon: BookOpen },
+      { key: "sources", label: t("sources"), icon: FileText },
+      { key: "collections", label: t("collections"), icon: Folder },
+      { key: "artifact", label: t("artifacts"), icon: Sparkles },
     ],
     [t]
   );
@@ -264,19 +266,13 @@ export function LearnHome({
     }
   };
 
-  // Floating pill active indicator state
-  const [indicatorStyle, setIndicatorStyle] = useState({ left: 0, width: 0, opacity: 0 });
+  // Scroll active tab chip smoothly into view
   const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
-  const navRef = useRef<HTMLElement | null>(null);
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     const currentTab = tabRefs.current[activeTab];
     if (currentTab) {
-      setIndicatorStyle({
-        left: currentTab.offsetLeft,
-        width: currentTab.offsetWidth,
-        opacity: 1,
-      });
+      currentTab.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
     }
   }, [activeTab]);
 
@@ -558,8 +554,9 @@ export function LearnHome({
     return learns.reduce((acc, curr) => acc + (curr.sourcesCount || 0), 0);
   }, [learns, rawSourcesCount]);
 
-  const getItemCountForActiveTab = () => {
-    switch (activeTab) {
+  const getItemCountForActiveTab = (key?: TabKey) => {
+    const target = key || activeTab;
+    switch (target) {
       case "all":
         return learns.length + collections.length;
       case "learns":
@@ -567,7 +564,7 @@ export function LearnHome({
       case "sources":
         return totalSourcesCount;
       case "collections":
-        return activeCollectionId ? collectionLearns.length : collections.length;
+        return activeCollectionId && target === activeTab ? collectionLearns.length : collections.length;
       case "artifact":
         return artifacts.length;
       default:
@@ -769,28 +766,16 @@ export function LearnHome({
   return (
     <div className="w-full flex-1 flex flex-col bg-background text-foreground overflow-y-auto overflow-x-hidden min-h-0">
       {/* -------------------------------------------------------------
-          FLOATING PILL NAVMENU: (All, Learns, Sources, Collections, Artifact)
-          with Smooth Sliding Indicator Animation
+          TOP BAR: Edge-to-Edge Filter Chips (Top) + Search Row (Bottom)
+          Borderless & Clean Minimalist Design
           ------------------------------------------------------------- */}
-      <div className="sticky top-0 z-30 w-full px-3 py-2 flex items-center justify-center select-none bg-background/90 backdrop-blur-md">
-        <nav
-          ref={navRef}
-          aria-label="Navigation Tabs"
-          className="relative inline-flex items-center p-1 rounded-full bg-secondary/80 border border-border/80 overflow-x-auto no-scrollbar max-w-full"
-        >
-          {/* Animated Sliding Pill Indicator */}
-          <div
-            className="absolute top-1 bottom-1 rounded-full bg-background border border-border/60 shadow-2xs transition-all duration-300 pointer-events-none"
-            style={{
-              left: `${indicatorStyle.left}px`,
-              width: `${indicatorStyle.width}px`,
-              opacity: indicatorStyle.opacity,
-              transitionTimingFunction: "cubic-bezier(0.25, 1, 0.5, 1)",
-            }}
-          />
-
+      <div className="sticky top-0 z-30 w-full bg-background/95 backdrop-blur-md select-none pt-2 pb-2.5 space-y-2.5">
+        {/* Row 1: Horizontal Scrollable Filter Chips (Menu di Atas, Tanpa Scrollbar & Tanpa Garis) */}
+        <div className="w-full overflow-x-auto no-scrollbar [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] px-4 flex items-center gap-1.5 sm:gap-2">
           {tabs.map((tab) => {
             const isActive = activeTab === tab.key;
+            const count = getItemCountForActiveTab(tab.key);
+            const Icon = tab.icon;
             return (
               <button
                 key={tab.key}
@@ -802,26 +787,42 @@ export function LearnHome({
                   setActiveTab(tab.key);
                   setActiveCollectionId(null);
                 }}
-                className={`relative z-10 px-3.5 py-1.5 rounded-full text-xs font-medium tracking-tight whitespace-nowrap transition-colors duration-200 cursor-pointer select-none ${
+                className={cn(
+                  "inline-flex items-center gap-1.5 h-8 px-3.5 rounded-full text-xs font-medium tracking-tight whitespace-nowrap transition-all duration-200 cursor-pointer shrink-0 select-none active:scale-95",
                   isActive
-                    ? "text-foreground font-semibold"
-                    : "text-muted-foreground hover:text-foreground active:scale-95"
-                }`}
+                    ? "bg-foreground text-background font-semibold shadow-xs"
+                    : "bg-secondary/60 hover:bg-secondary text-muted-foreground hover:text-foreground"
+                )}
               >
-                {tab.label}
+                {Icon && (
+                  <Icon
+                    className={cn(
+                      "h-3.5 w-3.5 shrink-0",
+                      isActive ? "text-background" : "text-muted-foreground"
+                    )}
+                  />
+                )}
+                <span>{tab.label}</span>
+                {count > 0 && (
+                  <span
+                    className={cn(
+                      "text-[10px] font-mono px-1.5 py-0.5 rounded-full leading-none font-semibold",
+                      isActive
+                        ? "bg-background/25 text-background"
+                        : "bg-background/40 text-muted-foreground"
+                    )}
+                  >
+                    {count}
+                  </span>
+                )}
               </button>
             );
           })}
-        </nav>
-      </div>
+        </div>
 
-      {/* -------------------------------------------------------------
-          MAIN CONTENT AREA (Mobile)
-          ------------------------------------------------------------- */}
-      <main className="flex-1 w-full px-4 py-3 space-y-4 pb-28">
-        {/* Search & Sort on One Single Line (No List) */}
-        <div className="flex items-center gap-2 w-full">
-          {/* Search Input */}
+        {/* Row 2: Search & Sort on One Single Line (Di Bawah Menu, Tanpa Garis) */}
+        <div className="flex items-center gap-2 w-full px-4">
+          {/* Search Input (Borderless Soft Surface) */}
           <div className="relative flex-1 flex items-center">
             <Search className="absolute left-3.5 h-4 w-4 text-muted-foreground pointer-events-none" />
             <Input
@@ -839,7 +840,7 @@ export function LearnHome({
                   ? t("searchArtifacts")
                   : t("searchNotebooksAndCollections")
               }
-              className="h-10 w-full pl-10 pr-9 text-xs sm:text-sm rounded-xl bg-card border border-border/80 text-foreground placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring shadow-2xs"
+              className="h-10 w-full pl-10 pr-9 text-xs sm:text-sm rounded-xl bg-secondary/60 border-none text-foreground placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring shadow-none"
             />
             {searchQuery ? (
               <button
@@ -858,11 +859,11 @@ export function LearnHome({
             <DropdownMenuTrigger asChild>
               <button
                 type="button"
-                className="h-10 px-3 rounded-xl flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary bg-card border border-border/80 active:scale-95 transition-all duration-200 cursor-pointer shrink-0 shadow-2xs"
+                className="h-10 px-3 rounded-xl flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground hover:bg-secondary bg-secondary/60 border-none active:scale-95 transition-all duration-200 cursor-pointer shrink-0"
                 title={t("sort")}
               >
                 <ArrowUpDown className="h-3.5 w-3.5" />
-                <span>{sortLabels[sortOption]}</span>
+                <span className="hidden sm:inline">{sortLabels[sortOption]}</span>
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-36 p-1 border-border bg-popover text-popover-foreground shadow-md">
@@ -888,10 +889,10 @@ export function LearnHome({
                 setIsSelectionMode(true);
               }
             }}
-            className={`h-10 px-3 rounded-xl flex items-center gap-1.5 text-xs border active:scale-95 transition-all duration-200 cursor-pointer shrink-0 shadow-2xs ${
+            className={`h-10 px-3 rounded-xl flex items-center gap-1.5 text-xs active:scale-95 transition-all duration-200 cursor-pointer shrink-0 ${
               isSelectionMode
-                ? "bg-primary/15 border-primary/40 text-primary"
-                : "text-muted-foreground hover:text-foreground hover:bg-secondary bg-card border-border/80"
+                ? "bg-primary/15 text-primary"
+                : "text-muted-foreground hover:text-foreground hover:bg-secondary bg-secondary/60 border-none"
             }`}
             title={isSelectionMode ? t("cancelSelect") : t("select")}
           >
@@ -899,7 +900,12 @@ export function LearnHome({
             <span className="hidden sm:inline">{isSelectionMode ? t("cancelSelect") : t("select")}</span>
           </button>
         </div>
+      </div>
 
+      {/* -------------------------------------------------------------
+          MAIN CONTENT AREA (Mobile)
+          ------------------------------------------------------------- */}
+      <main className="flex-1 w-full px-4 py-3 space-y-4 pb-28">
         {/* Tab Content with Smooth Transition */}
         <div key={activeTab + (activeCollectionId || "")} className="animate-in fade-in duration-200 space-y-4">
 
@@ -1698,6 +1704,16 @@ export function LearnHome({
             >
               <Plus className="h-4 w-4 stroke-[2.5]" />
               <span>{t("newSources")}</span>
+            </button>
+          ) : activeTab === "collections" && !activeCollectionId ? (
+            <button
+              type="button"
+              onClick={() => setIsCreateCollectionOpen(true)}
+              className="h-12 px-5 rounded-full bg-foreground text-background hover:opacity-95 active:scale-95 transition-all duration-200 flex items-center gap-2 font-medium text-xs border border-background/20 cursor-pointer select-none shadow-lg"
+              aria-label={t("newCollection")}
+            >
+              <Plus className="h-4 w-4 stroke-[2.5]" />
+              <span>{t("newCollection")}</span>
             </button>
           ) : (
             <button
