@@ -83,10 +83,10 @@ export function ReviewTab({
             <Layers className="w-4 h-4 text-primary" />
             <span className="text-[13px]">{t("review") || "Review"}</span>
           </div>
-          <span className="px-2 py-0.5 rounded bg-muted text-muted-foreground text-[11px] font-mono border border-border">
+          <span className="px-2 py-0.5 rounded bg-muted text-muted-foreground text-[11px] font-sans tabular-nums border border-border">
             {mutations.length} {mutations.length === 1 ? "file" : "files"}
           </span>
-          <div className="flex items-center gap-1 font-mono text-xs">
+          <div className="flex items-center gap-1 font-sans tabular-nums text-xs">
             <span className="text-emerald-600 dark:text-emerald-400">+{totalStats.added}</span>
             <span className="text-red-600 dark:text-red-400">-{totalStats.removed}</span>
           </div>
@@ -161,7 +161,7 @@ export function ReviewTab({
                     {fileName}
                   </span>
                   {dirPath && (
-                    <span className="font-mono text-[11px] text-muted-foreground truncate max-w-[180px]" title={rawPath}>
+                    <span className="font-sans text-[11px] text-muted-foreground truncate max-w-[180px]" title={rawPath}>
                       {dirPath}
                     </span>
                   )}
@@ -169,7 +169,7 @@ export function ReviewTab({
 
                 <div className="flex items-center gap-2 shrink-0">
                   {/* Diff Stats */}
-                  <div className="flex items-center gap-1 font-mono text-xs">
+                  <div className="flex items-center gap-1 font-sans tabular-nums text-xs">
                     <span className="text-emerald-600 dark:text-emerald-400">+{stats.added}</span>
                     <span className="text-red-600 dark:text-red-400">-{stats.removed}</span>
                   </div>

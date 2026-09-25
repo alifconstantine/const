@@ -259,7 +259,7 @@ export function SettingsView({
                 <span className="font-serif text-base font-normal tracking-tight text-foreground">
                   Const
                 </span>
-                <span className="text-[10px] font-mono tracking-wider uppercase px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                <span className="text-[10px] font-sans font-medium tracking-wider uppercase px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
                   Learn
                 </span>
               </div>
@@ -326,7 +326,7 @@ export function SettingsView({
                   {item.id === "usage" && (
                     <span
                       className={cn(
-                        "text-[10px] font-mono px-1.5 py-0.5 rounded-full",
+                        "text-[10px] font-sans tabular-nums px-1.5 py-0.5 rounded-full",
                         isActive
                           ? "bg-secondary text-foreground"
                           : "text-muted-foreground"
@@ -584,10 +584,10 @@ export function SettingsView({
                       Composio MCP Tool Calls
                     </span>
                     <div className="flex items-baseline gap-2 mt-1">
-                      <span className="text-3xl font-semibold tracking-tight text-foreground font-mono">
+                      <span className="text-3xl font-semibold tracking-tight text-foreground font-sans tabular-nums">
                         {usedCount}
                       </span>
-                      <span className="text-sm font-medium text-muted-foreground font-mono">
+                      <span className="text-sm font-medium text-muted-foreground font-sans tabular-nums">
                         / {limitCount} {t("toolCallsUsed").toLowerCase()}
                       </span>
                     </div>
@@ -600,7 +600,7 @@ export function SettingsView({
                       </span>
                       <span
                         className={cn(
-                          "text-xl font-semibold font-mono",
+                          "text-xl font-semibold font-sans tabular-nums",
                           isExceeded
                             ? "text-rose-500"
                             : isWarning
@@ -629,7 +629,7 @@ export function SettingsView({
                       style={{ width: `${usagePercent}%` }}
                     />
                   </div>
-                  <div className="flex items-center justify-between text-[11px] text-muted-foreground font-mono">
+                  <div className="flex items-center justify-between text-[11px] text-muted-foreground font-sans tabular-nums">
                     <span>0 call</span>
                     <span>{usagePercent}% kuota terpakai</span>
                     <span>{limitCount} calls</span>
@@ -647,7 +647,7 @@ export function SettingsView({
                       </strong>
                     </span>
                   </div>
-                  <span className="text-[11px] text-muted-foreground font-mono">
+                  <span className="text-[11px] text-muted-foreground font-sans tabular-nums">
                     Reset: {resetDateFormatted}
                   </span>
                 </div>
@@ -660,7 +660,7 @@ export function SettingsView({
                   <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                     {t("recentActivity")}
                   </span>
-                  <span className="text-[11px] font-mono text-muted-foreground">
+                  <span className="text-[11px] font-sans tabular-nums text-muted-foreground">
                     {(usage.recentCalls || []).length} aktivitas
                   </span>
                 </div>
@@ -683,11 +683,11 @@ export function SettingsView({
                               call.success ? "bg-emerald-500" : "bg-rose-500"
                             )}
                           />
-                          <span className="font-mono text-xs text-foreground truncate">
+                          <span className="font-sans text-xs text-foreground truncate">
                             {call.toolSlug}
                           </span>
                         </div>
-                        <span className="text-[11px] font-mono text-muted-foreground shrink-0">
+                        <span className="text-[11px] font-sans tabular-nums text-muted-foreground shrink-0">
                           {new Date(call.timestamp).toLocaleTimeString([], {
                             hour: "2-digit",
                             minute: "2-digit",
@@ -793,7 +793,7 @@ export function SettingsView({
                       <p className="text-xs text-muted-foreground leading-relaxed">
                         {language === "id" ? model.descId : model.descEn}
                       </p>
-                      <div className="flex items-center gap-3 pt-1 text-[11px] font-mono text-muted-foreground">
+                      <div className="flex items-center gap-3 pt-1 text-[11px] font-sans tabular-nums text-muted-foreground">
                         <span>{model.contextWindow}</span>
                         <span>•</span>
                         <span>{model.maxOutput}</span>

@@ -330,7 +330,7 @@ export function MobileReportViewer({
             <div className="space-y-1.5">
               {data.sourceTitles?.map((title, i) => (
                 <div key={i} className="p-2.5 rounded-xl bg-[#1a1a1a] text-xs text-white flex items-center gap-2">
-                  <span className="text-[10px] font-mono text-[#888888]">[{i + 1}]</span>
+                  <span className="text-[10px] font-sans tabular-nums text-[#888888]">[{i + 1}]</span>
                   <span className="truncate">{title}</span>
                 </div>
               ))}

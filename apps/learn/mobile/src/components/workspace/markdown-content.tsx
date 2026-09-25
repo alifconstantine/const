@@ -172,7 +172,7 @@ function TokenRenderer({
           <ol className={cn("space-y-1.5 my-2 pl-0.5 text-foreground dark:text-white", isNested && "my-1 pl-2 space-y-1")}>
             {list.items.map((item: Tokens.ListItem, idx: number) => (
               <li key={idx} className="flex items-start gap-2 leading-[1.6]">
-                <span className="select-none font-mono text-[11px] text-muted-foreground pt-0.5 w-4 text-right shrink-0">
+                <span className="select-none font-sans tabular-nums text-[11.5px] text-muted-foreground pt-0.5 w-4 text-right shrink-0">
                   {start + idx}.
                 </span>
                 <div className="flex-1 min-w-0">
@@ -398,8 +398,8 @@ function TableBlock({
       >
         <div className="flex items-center justify-between px-3 py-1.5 bg-muted/40 border-b border-border/60 gap-1">
           <div className="flex items-center gap-1.5">
-            <span className="text-[11px] font-mono text-muted-foreground">Table</span>
-            <span className="text-[10px] text-muted-foreground/80 font-mono">
+            <span className="text-[11px] font-sans text-muted-foreground">Table</span>
+            <span className="text-[10px] text-muted-foreground/80 font-sans tabular-nums">
               ({rows.length} rows)
             </span>
           </div>

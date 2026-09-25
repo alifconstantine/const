@@ -390,7 +390,7 @@ export function PresentationViewer({
 
           <span
             className={cn(
-              "text-[10px] font-mono font-medium px-1.5 py-0.5 rounded-full border shrink-0",
+              "text-[10px] font-sans font-medium px-1.5 py-0.5 rounded-full border shrink-0",
               provider === "native" && "bg-blue-500/10 text-blue-400 border-blue-500/20",
               provider === "canva" && "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
               provider === "slides" && "bg-amber-500/10 text-amber-400 border-amber-500/20"
@@ -423,7 +423,7 @@ export function PresentationViewer({
           )}
 
           {provider === "native" && pdfUrl && !isRenderingPdf && (
-            <span className="hidden md:inline-flex items-center gap-1 text-[10px] text-emerald-400/90 font-mono">
+            <span className="hidden md:inline-flex items-center gap-1 text-[10px] text-emerald-400/90 font-sans font-medium">
               <CheckCircle2 className="h-3 w-3 text-emerald-400" />
               PDF Ready
             </span>
@@ -611,7 +611,7 @@ export function PresentationViewer({
                       <ChevronLeft className="h-4 w-4" />
                     </button>
 
-                    <span className="font-mono text-[11px] text-foreground/90 font-medium px-1 select-none">
+                    <span className="font-sans tabular-nums text-[11px] text-foreground/90 font-medium px-1 select-none">
                       {currentSlideIndex + 1} / {slides.length}
                     </span>
 
@@ -819,7 +819,7 @@ export function PresentationViewer({
                           alt={`Canva slide ${idx + 1}`}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                         />
-                        <span className="absolute bottom-1.5 left-1.5 bg-black/70 text-white text-[10px] font-mono px-1.5 py-0.5 rounded">
+                        <span className="absolute bottom-1.5 left-1.5 bg-black/70 text-white text-[10px] font-sans tabular-nums px-1.5 py-0.5 rounded">
                           Slide #{idx + 1}
                         </span>
                       </div>

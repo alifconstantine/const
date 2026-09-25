@@ -264,7 +264,7 @@ export function CreatePresentationSheet({
                         <span className="text-xs font-semibold text-foreground">
                           {p.name}
                         </span>
-                        <span className="text-[9px] font-mono px-1.5 py-0.2 rounded-full bg-white/5 border border-white/10 text-muted-foreground">
+                        <span className="text-[9px] font-sans px-1.5 py-0.2 rounded-full bg-white/5 border border-white/10 text-muted-foreground">
                           {p.badge}
                         </span>
                       </div>
@@ -340,7 +340,7 @@ export function CreatePresentationSheet({
                   max={25}
                   value={customCount}
                   onChange={(e) => setCustomCount(Math.max(3, Math.min(25, Number(e.target.value) || 10)))}
-                  className="w-16 px-2 py-1 rounded-lg bg-[#141414] border border-[#333333] text-foreground text-xs text-center font-mono font-bold focus:outline-none focus:border-amber-500"
+                  className="w-16 px-2 py-1 rounded-lg bg-[#141414] border border-[#333333] text-foreground text-xs text-center font-sans tabular-nums font-bold focus:outline-none focus:border-amber-500"
                 />
               </div>
             )}

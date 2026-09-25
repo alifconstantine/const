@@ -320,7 +320,7 @@ export function AudioSummaryViewer({
                     {isIndo ? "File audio belum siap atau gagal disintesis" : "Audio file is not ready or failed to synthesize"}
                   </p>
                   {audioError && (
-                    <p className="text-[11px] text-amber-300/80 mt-0.5 font-mono">
+                    <p className="text-[11px] text-amber-300/80 mt-0.5 font-sans">
                       {audioError}
                     </p>
                   )}
@@ -361,7 +361,7 @@ export function AudioSummaryViewer({
                 disabled={!audioSrc}
                 className="w-full h-1.5 bg-secondary rounded-lg appearance-none cursor-pointer accent-indigo-600 disabled:opacity-40"
               />
-              <div className="flex items-center justify-between text-[10.5px] font-mono text-muted-foreground">
+              <div className="flex items-center justify-between text-[10.5px] font-sans tabular-nums text-muted-foreground">
                 <span>{formatTime(currentTime)}</span>
                 <span>{formatTime(duration)}</span>
               </div>

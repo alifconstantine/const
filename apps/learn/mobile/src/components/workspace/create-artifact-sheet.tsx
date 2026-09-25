@@ -221,7 +221,7 @@ export function CreateArtifactSheet({
                   type="button"
                   onClick={() => setCountMode("5")}
                   className={cn(
-                    "flex-1 py-1.5 rounded-lg border text-center font-mono font-medium transition-all text-xs cursor-pointer",
+                    "flex-1 py-1.5 rounded-lg border text-center font-sans tabular-nums font-medium transition-all text-xs cursor-pointer",
                     countMode === "5"
                       ? "bg-card border-border text-foreground shadow-xs font-semibold"
                       : "bg-secondary/60 border-border text-muted-foreground hover:text-foreground"
@@ -233,7 +233,7 @@ export function CreateArtifactSheet({
                   type="button"
                   onClick={() => setCountMode("10")}
                   className={cn(
-                    "flex-1 py-1.5 rounded-lg border text-center font-mono font-medium transition-all text-xs cursor-pointer",
+                    "flex-1 py-1.5 rounded-lg border text-center font-sans tabular-nums font-medium transition-all text-xs cursor-pointer",
                     countMode === "10"
                       ? "bg-card border-border text-foreground shadow-xs font-semibold"
                       : "bg-secondary/60 border-border text-muted-foreground hover:text-foreground"
@@ -271,7 +271,7 @@ export function CreateArtifactSheet({
                       else if (Number(customCount) > 50) setCustomCount(50);
                     }}
                     placeholder="1-50"
-                    className="w-full px-2.5 py-1.5 rounded-lg bg-secondary/60 border border-border text-foreground font-mono text-xs focus:outline-none focus:border-foreground/30 text-center"
+                    className="w-full px-2.5 py-1.5 rounded-lg bg-secondary/60 border border-border text-foreground font-sans tabular-nums text-xs focus:outline-none focus:border-foreground/30 text-center"
                   />
                 </div>
               )}

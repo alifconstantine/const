@@ -72,7 +72,7 @@ export function Navbar({ user, onSignOut, onSwitchAccount }: NavbarProps) {
           <span className="font-serif text-lg font-normal tracking-tight text-foreground">
             Const
           </span>
-          <span className="text-[10px] font-mono tracking-wider uppercase px-2 py-0.5 rounded-full bg-secondary text-muted-foreground border border-border/50">
+          <span className="text-[10px] font-sans font-medium tracking-wider uppercase px-2 py-0.5 rounded-full bg-secondary text-muted-foreground border border-border/50">
             Learn
           </span>
         </div>

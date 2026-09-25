@@ -1488,7 +1488,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
 
           {learn?.projectPath && (
             <span
-              className="hidden md:inline-flex items-center text-[11px] font-mono px-2.5 py-0.5 rounded-full bg-muted text-muted-foreground border border-border/40 max-w-[220px] truncate"
+              className="hidden md:inline-flex items-center text-[11px] font-sans px-2.5 py-0.5 rounded-full bg-muted text-muted-foreground border border-border/40 max-w-[220px] truncate"
               title={learn.projectPath}
             >
               📁 {learn.projectPath.split(/[\\/]/).filter(Boolean).pop()}

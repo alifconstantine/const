@@ -425,10 +425,10 @@ export function MobileSettingsView({
                     Composio MCP Tool Calls
                   </span>
                   <div className="flex items-baseline gap-1.5 mt-0.5">
-                    <span className="text-2xl font-semibold font-mono tracking-tight text-foreground">
+                    <span className="text-2xl font-semibold font-sans tabular-nums tracking-tight text-foreground">
                       {usedCount}
                     </span>
-                    <span className="text-xs text-muted-foreground font-mono">
+                    <span className="text-xs text-muted-foreground font-sans tabular-nums">
                       / {limitCount} {t("toolCallsUsed").toLowerCase()}
                     </span>
                   </div>
@@ -439,7 +439,7 @@ export function MobileSettingsView({
                   </span>
                   <span
                     className={cn(
-                      "text-lg font-semibold font-mono",
+                      "text-lg font-semibold font-sans tabular-nums",
                       isExceeded
                         ? "text-rose-500"
                         : isWarning
@@ -467,7 +467,7 @@ export function MobileSettingsView({
                     style={{ width: `${usagePercent}%` }}
                   />
                 </div>
-                <div className="flex items-center justify-between text-[10px] text-muted-foreground font-mono">
+                <div className="flex items-center justify-between text-[10px] text-muted-foreground font-sans tabular-nums">
                   <span>0</span>
                   <span>{usagePercent}% terpakai</span>
                   <span>{limitCount}</span>
@@ -485,7 +485,7 @@ export function MobileSettingsView({
                     </strong>
                   </span>
                 </div>
-                <span className="text-[10px] font-mono text-muted-foreground">
+                <span className="text-[10px] font-sans tabular-nums text-muted-foreground">
                   {resetDateFormatted}
                 </span>
               </div>
@@ -499,7 +499,7 @@ export function MobileSettingsView({
                 <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                   {t("recentActivity")}
                 </span>
-                <span className="text-[10px] font-mono text-muted-foreground">
+                <span className="text-[10px] font-sans tabular-nums text-muted-foreground">
                   {(usage.recentCalls || []).length} riwayat
                 </span>
               </div>
@@ -522,11 +522,11 @@ export function MobileSettingsView({
                             call.success ? "bg-emerald-500" : "bg-rose-500"
                           )}
                         />
-                        <span className="font-mono text-xs text-foreground truncate">
+                        <span className="font-sans text-xs text-foreground truncate">
                           {call.toolSlug}
                         </span>
                       </div>
-                      <span className="text-[10px] font-mono text-muted-foreground shrink-0">
+                      <span className="text-[10px] font-sans tabular-nums text-muted-foreground shrink-0">
                         {new Date(call.timestamp).toLocaleTimeString([], {
                           hour: "2-digit",
                           minute: "2-digit",
@@ -620,7 +620,7 @@ export function MobileSettingsView({
                     <p className="text-[11px] text-muted-foreground leading-relaxed line-clamp-2">
                       {language === "id" ? model.descId : model.descEn}
                     </p>
-                    <div className="flex items-center gap-2 text-[10px] font-mono text-muted-foreground pt-0.5">
+                    <div className="flex items-center gap-2 text-[10px] font-sans tabular-nums text-muted-foreground pt-0.5">
                       <span>{model.contextWindow}</span>
                       <span>•</span>
                       <span>{model.maxOutput}</span>

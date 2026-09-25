@@ -90,7 +90,7 @@ export function Navbar({
         <span className="font-serif text-2xl font-medium tracking-tight text-foreground">
           Const
         </span>
-        <span className="text-[11px] font-mono tracking-wider uppercase px-2 py-0.5 rounded-full bg-secondary text-muted-foreground border border-border/50">
+        <span className="text-[11px] font-sans font-medium tracking-wider uppercase px-2 py-0.5 rounded-full bg-secondary text-muted-foreground border border-border/50">
           Learn
         </span>
       </div>

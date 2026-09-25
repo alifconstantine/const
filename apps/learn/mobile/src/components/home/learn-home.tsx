@@ -779,7 +779,7 @@ export function LearnHome({
                 {count > 0 && (
                   <span
                     className={cn(
-                      "text-[10px] font-mono px-1.5 py-0.5 rounded-full leading-none font-semibold",
+                      "text-[10px] font-sans tabular-nums px-1.5 py-0.5 rounded-full leading-none font-semibold",
                       isActive
                         ? "bg-background/25 text-background"
                         : "bg-background/40 text-muted-foreground"
@@ -1386,7 +1386,7 @@ export function LearnHome({
                           >
                             <CatIcon className="h-3.5 w-3.5 text-muted-foreground" />
                             <span className="flex-1">{cat.label}</span>
-                            <span className="text-[10px] text-muted-foreground font-mono">({cat.count})</span>
+                            <span className="text-[10px] text-muted-foreground font-sans tabular-nums">({cat.count})</span>
                             {isSelected && <Check className="h-3.5 w-3.5 ml-1 text-primary" />}
                           </DropdownMenuItem>
                         );

@@ -538,7 +538,7 @@ export function AddSourceDialog({
                         <div className="min-w-0 flex-1">
                           <p className="text-xs font-medium text-foreground truncate">{res.title}</p>
                           <p className="text-[11px] text-muted-foreground/80 line-clamp-2 mt-0.5">{res.snippet}</p>
-                          <p className="text-[10px] text-primary/70 font-mono mt-1 truncate">{res.url}</p>
+                          <p className="text-[10px] text-primary/70 font-sans mt-1 truncate">{res.url}</p>
                         </div>
                         <button
                           type="button"
@@ -723,7 +723,7 @@ export function AddSourceDialog({
                         onChange={(e) => setMaxPages(parseInt(e.target.value, 10))}
                         className="w-28 accent-primary"
                       />
-                      <span className="font-mono text-xs font-semibold text-foreground">{maxPages}</span>
+                      <span className="font-sans tabular-nums text-xs font-semibold text-foreground">{maxPages}</span>
                     </div>
                   </div>
                 )}

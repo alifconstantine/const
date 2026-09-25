@@ -464,7 +464,7 @@ export function MobileMindMapViewer({ data, onClose }: MobileMindMapViewerProps)
 
           {hasChildren && (
             <div className="flex items-center gap-1.5 shrink-0 text-muted-foreground pt-0.5">
-              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-secondary font-mono">
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-secondary font-sans tabular-nums">
                 {node.children?.length}
               </span>
               <ChevronDown

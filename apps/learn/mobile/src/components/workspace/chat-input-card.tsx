@@ -407,7 +407,7 @@ export function ChatInputCard({
                 ) : isVideo && att.url ? (
                   <div className="w-full h-full rounded-xl overflow-hidden bg-black relative flex items-center justify-center">
                     <Video className="w-5 h-5 text-muted-foreground" />
-                    <span className="absolute bottom-1 right-1 text-[7px] font-mono bg-black/70 text-white px-1 rounded uppercase font-bold">
+                    <span className="absolute bottom-1 right-1 text-[7px] font-sans bg-black/70 text-white px-1 rounded uppercase font-bold">
                       VID
                     </span>
                     <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-1 pt-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -419,7 +419,7 @@ export function ChatInputCard({
                 ) : (
                   <div className="w-full h-full p-1.5 flex flex-col justify-between rounded-xl bg-secondary/80 text-left">
                     <div className="flex items-center justify-between">
-                      <span className="text-[8px] font-bold text-muted-foreground font-mono uppercase">
+                      <span className="text-[8px] font-bold text-muted-foreground font-sans uppercase">
                         {ext}
                       </span>
                       <FileText className="w-3 h-3 text-foreground shrink-0" />
@@ -431,7 +431,7 @@ export function ChatInputCard({
                         </span>
                       </ScrollArea>
                     </div>
-                    <span className="text-[7.5px] text-muted-foreground font-mono block truncate">
+                    <span className="text-[7.5px] text-muted-foreground font-sans tabular-nums block truncate">
                       {formatFileSize(att.size)}
                     </span>
                   </div>
@@ -467,7 +467,7 @@ export function ChatInputCard({
               title={t("addMediaWithCount", { count: attachments.length, max: MAX_ATTACHMENTS })}
             >
               <Plus className="w-4 h-4 text-muted-foreground" />
-              <span className="font-mono text-[8px] text-muted-foreground">
+              <span className="font-sans tabular-nums text-[8px] text-muted-foreground">
                 {attachments.length}/{MAX_ATTACHMENTS}
               </span>
             </button>

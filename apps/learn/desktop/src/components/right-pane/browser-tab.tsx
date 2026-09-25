@@ -642,7 +642,7 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
               value={addressBarInput}
               onChange={(e) => setAddressBarInput(e.target.value)}
               placeholder={language === "id" ? "Ketik URL atau cari di Google..." : "Enter web address or search..."}
-              className="flex-1 bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground/50 text-xs font-mono select-text truncate"
+              className="flex-1 bg-transparent border-none outline-none text-foreground placeholder:text-muted-foreground/50 text-xs font-sans select-text truncate"
             />
             {addressBarInput && (
               <button
@@ -814,7 +814,7 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
                     type="button"
                     onClick={handleZoomReset}
                     disabled={!currentUrl || zoomLevel === 100}
-                    className="text-[10px] px-1.5 py-0.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground cursor-pointer disabled:opacity-40 font-mono"
+                    className="text-[10px] px-1.5 py-0.5 rounded hover:bg-muted text-muted-foreground hover:text-foreground cursor-pointer disabled:opacity-40 font-sans tabular-nums"
                     title="Reset zoom"
                   >
                     100%

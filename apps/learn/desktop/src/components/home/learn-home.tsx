@@ -1565,7 +1565,7 @@ export function LearnHome({
                       <h1 className="font-serif text-2xl sm:text-3xl font-normal tracking-tight text-foreground">
                         {t("artifacts")}
                       </h1>
-                      <span className="text-xs px-2.5 py-0.5 rounded-full bg-secondary text-muted-foreground font-mono">
+                      <span className="text-xs px-2.5 py-0.5 rounded-full bg-secondary text-muted-foreground font-sans tabular-nums">
                         {filteredArtifacts.length}
                       </span>
                     </div>
@@ -1623,12 +1623,12 @@ export function LearnHome({
                             >
                               <ActiveCatIcon className="w-3.5 h-3.5 text-muted-foreground" />
                               <span>{activeCat?.label}</span>
-                              <span className="text-[10px] opacity-70 font-mono">({activeCat?.count})</span>
+                              <span className="text-[10px] opacity-70 font-sans tabular-nums">({activeCat?.count})</span>
                               <ChevronDown className="w-3.5 h-3.5 ml-0.5 opacity-70" />
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-52 p-1.5 shadow-md">
-                            <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground/70 px-2 py-1 font-medium">
+                            <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground/70 px-2 py-1 font-medium font-sans">
                               {language === "id" ? "Kategori Artefak" : "Artifact Categories"}
                             </DropdownMenuLabel>
                             {artifactCategories.map((cat) => {
@@ -1637,12 +1637,12 @@ export function LearnHome({
                               return (
                                 <DropdownMenuItem
                                   key={cat.id}
-                                  className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2"
+                                  className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2 font-sans"
                                   onClick={() => setArtifactCategory(cat.id)}
                                 >
                                   <CatIcon className="h-3.5 w-3.5 text-muted-foreground" />
                                   <span className="flex-1">{cat.label}</span>
-                                  <span className="text-[10px] text-muted-foreground font-mono">({cat.count})</span>
+                                  <span className="text-[10px] text-muted-foreground font-sans tabular-nums">({cat.count})</span>
                                   {isSelected && <Check className="h-3.5 w-3.5 ml-1 text-primary" />}
                                 </DropdownMenuItem>
                               );
@@ -1741,7 +1741,7 @@ export function LearnHome({
                               )}
                             </div>
 
-                            <div className="flex items-center justify-between text-xs text-muted-foreground pt-2.5 border-t border-border/40 font-mono text-[10px]">
+                            <div className="flex items-center justify-between text-xs text-muted-foreground pt-2.5 border-t border-border/40 font-sans text-[10px]">
                               <span>
                                 {new Intl.DateTimeFormat(language === "id" ? "id-ID" : "en-US", {
                                   day: "numeric",
@@ -1806,7 +1806,7 @@ export function LearnHome({
                               </div>
                             </div>
 
-                            <div className="flex items-center gap-3 shrink-0 text-xs text-muted-foreground font-mono">
+                            <div className="flex items-center gap-3 shrink-0 text-xs text-muted-foreground font-sans">
                               <span className="text-[11px] hidden sm:inline">
                                 {new Intl.DateTimeFormat(language === "id" ? "id-ID" : "en-US", {
                                   day: "numeric",

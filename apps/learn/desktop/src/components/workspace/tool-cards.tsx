@@ -93,18 +93,18 @@ export function SocraticQuestionCard({ toolCall, onAnswer }: SocraticQuestionCar
           <span className="font-semibold text-foreground tracking-tight">
             {t("socraticQuestion")}
           </span>
-          <span className="text-[10px] px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-400 font-mono">
+          <span className="text-[10px] px-2 py-0.5 rounded-full bg-sky-500/15 text-sky-400 font-sans font-medium">
             {t("inquiry")}
           </span>
         </div>
 
         {isCompleted ? (
-          <span className="inline-flex items-center gap-1 text-[11px] text-emerald-400 font-mono">
+          <span className="inline-flex items-center gap-1 text-[11px] text-emerald-400 font-sans font-medium">
             <CheckCircle2 className="h-3.5 w-3.5" />
             {t("answered")}
           </span>
         ) : (
-          <span className="inline-flex items-center gap-1 text-[11px] text-sky-400 font-mono animate-pulse">
+          <span className="inline-flex items-center gap-1 text-[11px] text-sky-400 font-sans font-medium animate-pulse">
             <Loader2 className="h-3 w-3 animate-spin" />
             {t("waitingForChoice")}
           </span>
@@ -147,7 +147,7 @@ export function SocraticQuestionCard({ toolCall, onAnswer }: SocraticQuestionCar
               }`}
             >
               <div className="flex items-center gap-2.5">
-                <span className="w-5 h-5 rounded-full bg-muted/80 text-muted-foreground group-hover:bg-sky-500 group-hover:text-white flex items-center justify-center text-[10px] font-mono transition-colors">
+                <span className="w-5 h-5 rounded-full bg-muted/80 text-muted-foreground group-hover:bg-sky-500 group-hover:text-white flex items-center justify-center text-[10px] font-sans tabular-nums font-medium transition-colors">
                   {idx + 1}
                 </span>
                 <span>{opt}</span>
@@ -243,30 +243,30 @@ export function PythonRunnerCard({ toolCall, isExpanded, onToggle }: PythonRunne
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="w-5 h-5 rounded-md bg-yellow-500/15 text-yellow-500 flex items-center justify-center font-mono text-[10px] font-bold">
+          <div className="w-5 h-5 rounded-md bg-yellow-500/15 text-yellow-500 flex items-center justify-center font-sans text-[10px] font-bold">
             Py
           </div>
-          <span className="font-mono font-medium text-foreground">
+          <span className="font-sans font-semibold text-foreground">
             Python Engine
           </span>
-          <span className="text-[10px] text-muted-foreground font-mono truncate max-w-[200px] sm:max-w-xs">
+          <span className="text-[10px] text-muted-foreground font-sans truncate max-w-[200px] sm:max-w-xs">
             {code ? code.split("\n")[0]?.slice(0, 35) + "..." : t("calculation")}
           </span>
         </div>
 
         <div className="flex items-center gap-2">
           {toolCall.status === "running" ? (
-            <span className="inline-flex items-center gap-1 text-[11px] text-accent font-mono">
+            <span className="inline-flex items-center gap-1 text-[11px] text-accent font-sans font-medium">
               <Loader2 className="h-3 w-3 animate-spin" />
               {t("calculating")}
             </span>
           ) : toolCall.status === "completed" ? (
-            <span className="inline-flex items-center gap-1 text-[11px] text-emerald-500 font-mono">
+            <span className="inline-flex items-center gap-1 text-[11px] text-emerald-500 font-sans font-medium">
               <CheckCircle2 className="h-3 w-3" />
               {t("completed")}
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1 text-[11px] text-destructive font-mono">
+            <span className="inline-flex items-center gap-1 text-[11px] text-destructive font-sans font-medium">
               <AlertCircle className="h-3 w-3" />
               {t("failed")}
             </span>
@@ -295,7 +295,7 @@ export function PythonRunnerCard({ toolCall, isExpanded, onToggle }: PythonRunne
                 className="p-2.5 rounded-xl bg-background/80 border border-border/40 space-y-2"
               >
                 <div className="flex items-center justify-between text-[11px]">
-                  <span className="font-mono text-foreground/90 flex items-center gap-1.5">
+                  <span className="font-sans text-foreground/90 flex items-center gap-1.5">
                     <Sparkles className="h-3 w-3 text-yellow-400" />
                     {t("generatedChart")} <strong>{fileName}</strong>
                   </span>
@@ -326,13 +326,13 @@ export function PythonRunnerCard({ toolCall, isExpanded, onToggle }: PythonRunne
 
       {/* Expanded Code & Output Details */}
       {isExpanded && (
-        <div className="mt-2.5 pt-2.5 border-t border-border/40 space-y-2 font-mono text-[11px]">
+        <div className="mt-2.5 pt-2.5 border-t border-border/40 space-y-2 font-sans text-[11px]">
           {code && (
             <div>
               <div className="text-muted-foreground text-[10px] mb-1">
                 {t("pythonCodeExecuted")}
               </div>
-              <pre className="p-2.5 rounded-xl bg-background/80 border border-border/30 overflow-x-auto text-yellow-300/90 whitespace-pre max-h-48 overflow-y-auto">
+              <pre className="p-2.5 rounded-xl bg-background/80 border border-border/30 overflow-x-auto text-yellow-300/90 whitespace-pre max-h-48 overflow-y-auto font-mono">
                 {code}
               </pre>
             </div>
@@ -390,7 +390,7 @@ export function TodoWriteCard({ toolCall, isExpanded, onToggle }: TodoWriteCardP
             <ListTodo className="h-3.5 w-3.5" />
           </div>
           <span className="font-semibold text-foreground">{title}</span>
-          <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-400 font-mono">
+          <span className="text-[10px] px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-400 font-sans tabular-nums font-medium">
             {t("tasksCompleted", { completed: completedCount, total: tasks.length })}
           </span>
         </div>
@@ -481,11 +481,11 @@ export function GenericToolCard({ toolCall, isExpanded, onToggle }: GenericToolC
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           {getToolIcon(toolCall.name)}
-          <span className="font-mono font-medium text-foreground">
+          <span className="font-sans font-semibold text-foreground">
             {toolCall.name}
           </span>
           <span
-            className="text-[10px] text-muted-foreground font-mono truncate max-w-[200px] sm:max-w-xs"
+            className="text-[10px] text-muted-foreground font-sans truncate max-w-[200px] sm:max-w-xs"
             title={JSON.stringify(toolCall.args)}
           >
             ({getArgSummary(toolCall.args)})
@@ -494,17 +494,17 @@ export function GenericToolCard({ toolCall, isExpanded, onToggle }: GenericToolC
 
         <div className="flex items-center gap-2">
           {toolCall.status === "running" ? (
-            <span className="inline-flex items-center gap-1 text-[11px] text-accent font-mono">
+            <span className="inline-flex items-center gap-1 text-[11px] text-accent font-sans font-medium">
               <Loader2 className="h-3 w-3 animate-spin" />
               {t("running")}
             </span>
           ) : toolCall.status === "completed" ? (
-            <span className="inline-flex items-center gap-1 text-[11px] text-emerald-500 font-mono">
+            <span className="inline-flex items-center gap-1 text-[11px] text-emerald-500 font-sans font-medium">
               <CheckCircle2 className="h-3 w-3" />
               {t("completed")}
             </span>
           ) : (
-            <span className="inline-flex items-center gap-1 text-[11px] text-destructive font-mono">
+            <span className="inline-flex items-center gap-1 text-[11px] text-destructive font-sans font-medium">
               <AlertCircle className="h-3 w-3" />
               {t("failed")}
             </span>
@@ -522,9 +522,9 @@ export function GenericToolCard({ toolCall, isExpanded, onToggle }: GenericToolC
 
       {/* Expanded Details */}
       {isExpanded && (
-        <div className="mt-2.5 pt-2.5 border-t border-border/40 space-y-1.5 font-mono text-[11px]">
+        <div className="mt-2.5 pt-2.5 border-t border-border/40 space-y-1.5 font-sans text-[11px]">
           <div className="text-muted-foreground text-[10px]">{t("inputParams")}</div>
-          <pre className="p-2.5 rounded-xl bg-background/80 border border-border/30 overflow-x-auto text-foreground/90">
+          <pre className="p-2.5 rounded-xl bg-background/80 border border-border/30 overflow-x-auto text-foreground/90 font-mono">
             {JSON.stringify(toolCall.args, null, 2)}
           </pre>
 
@@ -533,7 +533,7 @@ export function GenericToolCard({ toolCall, isExpanded, onToggle }: GenericToolC
               <div className="text-muted-foreground text-[10px] mt-2">
                 {t("executionResult")}
               </div>
-              <pre className="p-2.5 rounded-xl bg-background/80 border border-border/30 overflow-x-auto text-emerald-500/90 whitespace-pre-wrap max-h-60 overflow-y-auto">
+              <pre className="p-2.5 rounded-xl bg-background/80 border border-border/30 overflow-x-auto text-emerald-500/90 whitespace-pre-wrap max-h-60 overflow-y-auto font-mono">
                 {typeof toolCall.result === "string"
                   ? toolCall.result
                   : JSON.stringify(toolCall.result, null, 2)}

@@ -611,12 +611,12 @@ function ConnectorToolTraceItem({
             </span>
           )}
           {tag && !pageCount && (
-            <span className="text-[10px] px-1.5 py-0.2 rounded bg-secondary text-muted-foreground border border-border/50 font-mono shrink-0">
+            <span className="text-[10px] px-1.5 py-0.2 rounded bg-secondary text-muted-foreground border border-border/50 font-sans shrink-0">
               {tag}
             </span>
           )}
           {summaryText && (
-            <span className="text-[11px] text-muted-foreground/80 truncate font-mono hidden xs:inline-block max-w-[110px] sm:max-w-[200px]">
+            <span className="text-[11px] text-muted-foreground/80 truncate font-sans hidden xs:inline-block max-w-[110px] sm:max-w-[200px]">
               "{summaryText}"
             </span>
           )}
@@ -660,22 +660,22 @@ function ConnectorToolTraceItem({
 
           {/* Status Indicator */}
           {isRunning ? (
-            <span className="flex items-center gap-1 text-amber-500 text-[11px] font-mono">
+            <span className="flex items-center gap-1 text-amber-500 text-[11px] font-sans font-medium">
               <Loader2 className="w-3 h-3 animate-spin" />
               <span>{t("working")}</span>
             </span>
           ) : isError ? (
-            <span className="flex items-center gap-1 text-destructive text-[11px] font-mono">
+            <span className="flex items-center gap-1 text-destructive text-[11px] font-sans font-medium">
               <AlertCircle className="w-3 h-3" />
               <span>{t("failed")}</span>
             </span>
           ) : isPartialSuccess ? (
-            <span className="flex items-center gap-1 text-amber-400 text-[11px] font-mono">
+            <span className="flex items-center gap-1 text-amber-400 text-[11px] font-sans font-medium">
               <AlertCircle className="w-3 h-3" />
               <span>{t("notConnected")}</span>
             </span>
           ) : (
-            <span className="flex items-center gap-1 text-emerald-500 text-[11px] font-mono">
+            <span className="flex items-center gap-1 text-emerald-500 text-[11px] font-sans tabular-nums font-medium">
               <Check className="w-3 h-3" />
               <span>{tool.durationMs ? `${tool.durationMs}ms` : t("completed")}</span>
             </span>
@@ -745,7 +745,7 @@ function ConnectorToolTraceItem({
                 <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                 <div className="space-y-1 min-w-0 flex-1">
                   <div className="font-semibold text-xs">{t("executionFailed")}</div>
-                  <div className="text-[11.5px] leading-relaxed opacity-90 font-mono whitespace-pre-wrap break-all">
+                  <div className="text-[11.5px] leading-relaxed opacity-90 font-sans whitespace-pre-wrap break-all">
                     {resultMessage || (typeof tool.result === "string" ? tool.result : t("unknownError"))}
                   </div>
                 </div>
@@ -808,7 +808,7 @@ function ConnectorToolTraceItem({
                           className="h-16 w-auto object-cover group-hover:scale-105 transition-transform duration-200"
                           loading="lazy"
                         />
-                        <span className="absolute bottom-0.5 right-0.5 bg-black/70 text-white text-[9px] px-1 rounded font-mono">
+                        <span className="absolute bottom-0.5 right-0.5 bg-black/70 text-white text-[9px] px-1 rounded font-sans tabular-nums">
                           {tIdx + 1}
                         </span>
                       </div>
@@ -821,7 +821,7 @@ function ConnectorToolTraceItem({
             {/* Input Parameters Preview */}
             {tool.args && (
               <div className="pt-1.5 border-t border-border/30">
-                <div className="text-[10px] text-muted-foreground font-mono uppercase mb-1">
+                <div className="text-[10px] text-muted-foreground font-sans font-medium uppercase mb-1">
                   {t("inputParams")}
                 </div>
                 <ScrollArea className="max-h-48 w-full rounded-lg bg-black/20 dark:bg-black/40 border border-border/30">
@@ -1064,7 +1064,7 @@ function GrepSearchCard({ tool }: { tool: TraceStep }) {
         </span>
         <div className="ml-auto flex items-center gap-1.5 shrink-0">
           {resultCount && (
-            <span className="text-muted-foreground text-xs font-mono">{resultCount}</span>
+            <span className="text-muted-foreground text-xs font-sans tabular-nums">{resultCount}</span>
           )}
           {hasResult && (
             <ChevronDown
@@ -1142,7 +1142,7 @@ function FileReadCard({ tool }: { tool: TraceStep }) {
             {fileName}
           </span>
           {lineRange && (
-            <span className="text-xs text-muted-foreground shrink-0 font-mono">{lineRange}</span>
+            <span className="text-xs text-muted-foreground shrink-0 font-sans tabular-nums">{lineRange}</span>
           )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -1302,11 +1302,11 @@ function PythonRunnerTraceItem({ tool }: { tool: TraceStep }) {
 
       {(code || rawResult) && (
         <SmoothCollapse isOpen={isOpen}>
-          <div className="mt-1 p-2 rounded-xl bg-secondary/80 border border-border text-xs font-mono select-text space-y-1.5">
+          <div className="mt-1 p-2 rounded-xl bg-secondary/80 border border-border text-xs font-sans select-text space-y-1.5">
             {code && (
               <div>
                 <div className="text-[10px] text-muted-foreground mb-0.5">Script:</div>
-                <ScrollArea className="max-h-36 w-full rounded-md bg-card border border-border p-2 text-amber-500 text-[11px]">
+                <ScrollArea className="max-h-36 w-full rounded-md bg-card border border-border p-2 text-amber-500 text-[11px] font-mono">
                   <pre className="whitespace-pre">{code}</pre>
                 </ScrollArea>
               </div>
@@ -1314,7 +1314,7 @@ function PythonRunnerTraceItem({ tool }: { tool: TraceStep }) {
             {rawResult && (
               <div>
                 <div className="text-[10px] text-muted-foreground mb-0.5">Output:</div>
-                <ScrollArea className="max-h-36 w-full rounded-md bg-card border border-border p-2 text-emerald-500 text-[11px]">
+                <ScrollArea className="max-h-36 w-full rounded-md bg-card border border-border p-2 text-emerald-500 text-[11px] font-mono">
                   <pre className="whitespace-pre-wrap">{rawResult}</pre>
                 </ScrollArea>
               </div>
@@ -1344,7 +1344,7 @@ function GenericToolItem({ tool }: { tool: TraceStep }) {
       <Layers className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
       <span className="capitalize shrink-0">{tool.name}</span>
       {targetArg && (
-        <span className="text-foreground truncate font-mono text-xs">
+        <span className="text-foreground truncate font-sans text-xs">
           {typeof targetArg === "string" ? targetArg : JSON.stringify(targetArg)}
         </span>
       )}

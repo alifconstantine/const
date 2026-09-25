@@ -629,7 +629,7 @@ function GrepSearchCard({ tool }: { tool: TraceStep | DisplayToolCall }) {
         </span>
         <div className="ml-auto flex items-center gap-1.5 shrink-0">
           {resultCount && (
-            <span className="text-muted-foreground text-xs font-mono">{resultCount}</span>
+            <span className="text-muted-foreground text-xs font-sans tabular-nums">{resultCount}</span>
           )}
           {hasResult && (
             <ChevronDown
@@ -706,7 +706,7 @@ function FileReadCard({ tool }: { tool: TraceStep | DisplayToolCall }) {
             {fileName}
           </span>
           {lineRange && (
-            <span className="text-xs text-muted-foreground shrink-0 font-mono">{lineRange}</span>
+            <span className="text-xs text-muted-foreground shrink-0 font-sans tabular-nums">{lineRange}</span>
           )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -806,7 +806,7 @@ function FileMutationCard({
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {(added > 0 || removed > 0) && (
-            <div className="flex items-center gap-1.5 font-mono text-xs">
+            <div className="flex items-center gap-1.5 font-sans tabular-nums text-xs">
               {added > 0 && <span className="text-emerald-500">+{added}</span>}
               {removed > 0 && <span className="text-destructive">-{removed}</span>}
             </div>
@@ -995,7 +995,7 @@ function AskedQuestionsTraceItem({
                             )}
                           >
                             <div className="flex items-center gap-2">
-                              <span className="w-4 h-4 rounded-full bg-muted text-muted-foreground flex items-center justify-center text-[9px] font-mono">
+                              <span className="w-4 h-4 rounded-full bg-muted text-muted-foreground flex items-center justify-center text-[9px] font-sans tabular-nums">
                                 {oIdx + 1}
                               </span>
                               <span>{opt}</span>
@@ -1092,7 +1092,7 @@ function PythonRunnerTraceItem({ tool }: { tool: TraceStep | DisplayToolCall }) 
       >
         <div className="flex items-center gap-2 min-w-0 pr-2">
           <FileIcon filename="script.py" />
-          <span className="font-mono text-xs text-foreground truncate">
+          <span className="font-sans text-xs text-foreground truncate">
             {code ? code.split("\n")[0]?.slice(0, 35) + "..." : "Python calculation"}
           </span>
         </div>
@@ -1366,12 +1366,12 @@ function ConnectorToolTraceItem({
             </span>
           )}
           {tag && !pageCount && (
-            <span className="text-[10px] px-1.5 py-0.2 rounded bg-secondary text-muted-foreground border border-border/50 font-mono shrink-0">
+            <span className="text-[10px] px-1.5 py-0.2 rounded bg-secondary text-muted-foreground border border-border/50 font-sans shrink-0">
               {tag}
             </span>
           )}
           {summaryText && (
-            <span className="text-[11px] text-muted-foreground/80 truncate font-mono hidden sm:inline-block max-w-[220px]">
+            <span className="text-[11px] text-muted-foreground/80 truncate font-sans hidden sm:inline-block max-w-[220px]">
               "{summaryText}"
             </span>
           )}
@@ -1397,22 +1397,22 @@ function ConnectorToolTraceItem({
 
           {/* Status Indicator */}
           {isRunning ? (
-            <span className="flex items-center gap-1 text-amber-500 text-[11px] font-mono">
+            <span className="flex items-center gap-1 text-amber-500 text-[11px] font-sans">
               <Loader2 className="w-3 h-3 animate-spin" />
               <span>{t("working")}</span>
             </span>
           ) : isError ? (
-            <span className="flex items-center gap-1 text-destructive text-[11px] font-mono">
+            <span className="flex items-center gap-1 text-destructive text-[11px] font-sans">
               <AlertCircle className="w-3 h-3" />
               <span>{t("failed")}</span>
             </span>
           ) : isPartialSuccess ? (
-            <span className="flex items-center gap-1 text-amber-400 text-[11px] font-mono">
+            <span className="flex items-center gap-1 text-amber-400 text-[11px] font-sans">
               <AlertCircle className="w-3 h-3" />
               <span>{t("notConnected")}</span>
             </span>
           ) : (
-            <span className="flex items-center gap-1 text-emerald-500 text-[11px] font-mono">
+            <span className="flex items-center gap-1 text-emerald-500 text-[11px] font-sans tabular-nums">
               <Check className="w-3 h-3" />
               <span>{tool.durationMs ? `${tool.durationMs}ms` : t("completed")}</span>
             </span>
@@ -1462,7 +1462,7 @@ function ConnectorToolTraceItem({
                 <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                 <div className="space-y-1 min-w-0 flex-1">
                   <div className="font-semibold text-xs">{t("executionFailed")}</div>
-                  <div className="text-[11.5px] leading-relaxed opacity-90 font-mono whitespace-pre-wrap break-all">
+                  <div className="text-[11.5px] leading-relaxed opacity-90 font-sans whitespace-pre-wrap break-all">
                     {resultMessage || (typeof tool.result === "string" ? tool.result : t("unknownError"))}
                   </div>
                 </div>
@@ -1525,7 +1525,7 @@ function ConnectorToolTraceItem({
                           className="h-16 w-auto object-cover group-hover:scale-105 transition-transform duration-200"
                           loading="lazy"
                         />
-                        <span className="absolute bottom-0.5 right-0.5 bg-black/70 text-white text-[9px] px-1 rounded font-mono">
+                        <span className="absolute bottom-0.5 right-0.5 bg-black/70 text-white text-[9px] px-1 rounded font-sans tabular-nums">
                           {tIdx + 1}
                         </span>
                       </div>
@@ -1538,7 +1538,7 @@ function ConnectorToolTraceItem({
             {/* Input Parameters Preview */}
             {tool.args && (
               <div className="pt-1.5 border-t border-border/30">
-                <div className="text-[10px] text-muted-foreground font-mono uppercase mb-1">
+                <div className="text-[10px] text-muted-foreground font-sans uppercase mb-1">
                   {t("inputParams")}
                 </div>
                 <ScrollArea className="max-h-48 w-full rounded-lg bg-black/20 dark:bg-black/40 border border-border/30">
@@ -1788,8 +1788,8 @@ export function MutationsSummaryCard({
               ? t("fileChangedSingle")
               : t("filesChanged", { count: mutations.length })}
           </span>
-          <span className="font-mono text-xs text-emerald-500 font-medium">+{totalAdded}</span>
-          <span className="font-mono text-xs text-destructive font-medium">-{totalRemoved}</span>
+          <span className="font-sans tabular-nums text-xs text-emerald-500 font-medium">+{totalAdded}</span>
+          <span className="font-sans tabular-nums text-xs text-destructive font-medium">-{totalRemoved}</span>
           <ChevronRight
             className={cn(
               "w-3.5 h-3.5 text-muted-foreground/60 transition-transform duration-200 ease-out",
@@ -1870,14 +1870,14 @@ function MutationRowItem({
           {fileName}
         </span>
         {dirPath && (
-          <span className="text-[11px] text-muted-foreground/60 font-mono truncate max-w-[240px]">
+          <span className="text-[11px] text-muted-foreground/60 font-sans truncate max-w-[240px]">
             /{dirPath}
           </span>
         )}
       </div>
 
       <div className="shrink-0 ml-2 flex items-center gap-2">
-        <div className="flex items-center gap-1.5 font-mono text-xs">
+        <div className="flex items-center gap-1.5 font-sans tabular-nums text-xs">
           <span className="text-emerald-500">+{fileStats.added}</span>
           <span className="text-destructive">-{fileStats.removed}</span>
         </div>

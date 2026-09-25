@@ -119,17 +119,17 @@ export function SourcePreviewDialog({
               <div className="min-w-0 flex-1">
                 {/* Meta pills row */}
                 <div className="flex items-center gap-1.5 flex-wrap mb-1">
-                  <span className="text-[10.5px] font-mono uppercase px-2 py-0.5 rounded-full bg-secondary border border-border/60 text-muted-foreground">
+                  <span className="text-[10.5px] font-sans font-medium uppercase px-2 py-0.5 rounded-full bg-secondary border border-border/60 text-muted-foreground">
                     {getSourceCategoryLabel(source)}
                   </span>
                   {source.subpagesCount && source.subpagesCount > 1 ? (
-                    <span className="text-[10.5px] font-mono px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-primary flex items-center gap-1">
+                    <span className="text-[10.5px] font-sans tabular-nums px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-primary flex items-center gap-1">
                       <Layers className="w-3 h-3" />
                       {source.subpagesCount} pages
                     </span>
                   ) : null}
                   {source.size ? (
-                    <span className="text-[10.5px] font-mono text-muted-foreground/80 px-1.5 py-0.5">
+                    <span className="text-[10.5px] font-sans tabular-nums text-muted-foreground/80 px-1.5 py-0.5">
                       {formatFileSize(source.size)}
                     </span>
                   ) : null}
@@ -152,7 +152,7 @@ export function SourcePreviewDialog({
                         openExternalUrl(source.url);
                       }
                     }}
-                    className="text-xs text-primary hover:underline inline-flex items-center gap-1 mt-1 max-w-full truncate group font-mono text-left cursor-pointer"
+                    className="text-xs text-primary hover:underline inline-flex items-center gap-1 mt-1 max-w-full truncate group font-sans text-left cursor-pointer"
                     title={source.url}
                   >
                     <span className="truncate">{source.url}</span>
@@ -254,7 +254,7 @@ export function SourcePreviewDialog({
 
             {/* Reading stats */}
             {contentString ? (
-              <div className="flex items-center gap-3 text-muted-foreground text-[11px] font-mono">
+              <div className="flex items-center gap-3 text-muted-foreground text-[11px] font-sans tabular-nums">
                 <span className="inline-flex items-center gap-1">
                   <Clock className="w-3 h-3 opacity-70" />
                   {t("readingTime", { min: stats.readingMinutes })}

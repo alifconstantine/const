@@ -293,7 +293,7 @@ export function VideoSummaryViewer({
             {data.title || (isIndo ? "Ringkasan Video" : "Video Summary")}
           </h2>
           {duration > 0 && (
-            <span className="hidden sm:inline-flex px-2 py-0.5 rounded-md bg-[#222222] border border-[#333333] text-[11px] font-mono text-[#969696] shrink-0 tabular-nums">
+            <span className="hidden sm:inline-flex px-2 py-0.5 rounded-md bg-[#222222] border border-[#333333] text-[11px] font-sans text-[#969696] shrink-0 tabular-nums">
               {formatSeconds(duration)}
             </span>
           )}
@@ -380,7 +380,7 @@ export function VideoSummaryViewer({
                 : "HyperFrames is compiling motion graphics and narration audio into a high-quality 1080p video."}
             </p>
             {renderProgress ? (
-              <div className="px-3 py-1 rounded-full bg-[#202020] border border-[#333333] text-[11px] text-blue-400 font-mono max-w-sm truncate mb-3">
+              <div className="px-3 py-1 rounded-full bg-[#202020] border border-[#333333] text-[11px] text-blue-400 font-sans tabular-nums max-w-sm truncate mb-3">
                 {renderProgress}
               </div>
             ) : null}
@@ -407,7 +407,7 @@ export function VideoSummaryViewer({
                 ? "Terjadi kendala saat HyperFrames mengompilasi video. Naskah audio dan tata letak grafis tetap aman tersimpan."
                 : "An issue occurred while HyperFrames was compiling the video. Narration audio and layout remain safely stored."}
             </p>
-            <div className="w-full max-w-md p-2.5 rounded-lg bg-[#202020] border border-[#303030] text-left text-[11px] text-[#f87171] font-mono mb-4 max-h-24 overflow-y-auto select-text break-words">
+            <div className="w-full max-w-md p-2.5 rounded-lg bg-[#202020] border border-[#303030] text-left text-[11px] text-[#f87171] font-sans mb-4 max-h-24 overflow-y-auto select-text break-words">
               {renderError}
             </div>
             <button

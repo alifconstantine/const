@@ -462,7 +462,7 @@ export function MobileCheatSheetViewer({
                   {card.badge && (
                     <span
                       className={cn(
-                        "text-[9.5px] uppercase font-mono tracking-wider px-2 py-0.5 rounded-full border shrink-0 font-medium",
+                        "text-[9.5px] uppercase font-sans tracking-wider px-2 py-0.5 rounded-full border shrink-0 font-medium",
                         getBadgeStyle(card.badge)
                       )}
                     >
@@ -478,7 +478,7 @@ export function MobileCheatSheetViewer({
 
                 {/* Footer Action Strip */}
                 <div className="mt-3 pt-2.5 border-t border-border/40 flex items-center justify-between">
-                  <span className="text-[10px] text-muted-foreground/60 font-mono">
+                  <span className="text-[10px] text-muted-foreground/60 font-sans tabular-nums">
                     #{card.id}
                   </span>
 

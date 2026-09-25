@@ -63,7 +63,7 @@ export function FileDiffTab({ tab, onRollbackFile }: FileDiffTabProps) {
               e.currentTarget.scrollLeft += e.deltaY;
             }
           }}
-          className="flex items-center gap-1.5 min-w-0 flex-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden font-mono text-[11.5px] pr-3 select-none"
+          className="flex items-center gap-1.5 min-w-0 flex-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden font-sans text-[11.5px] pr-3 select-none"
         >
           {hasLeadingEllipsis && (
             <>
@@ -93,7 +93,7 @@ export function FileDiffTab({ tab, onRollbackFile }: FileDiffTabProps) {
         {/* Right Action Buttons */}
         <div className="flex items-center gap-2 shrink-0">
           {/* Diff Stats Badge */}
-          <div className="flex items-center gap-1 font-mono text-xs px-2 py-0.5 rounded bg-muted/70 border border-border">
+          <div className="flex items-center gap-1 font-sans tabular-nums text-xs px-2 py-0.5 rounded bg-muted/70 border border-border">
             <span className="text-emerald-600 dark:text-emerald-400">+{stats.added}</span>
             <span className="text-red-600 dark:text-red-400">-{stats.removed}</span>
           </div>

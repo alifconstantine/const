@@ -180,7 +180,7 @@ export function HistoryPanel({
               if (groupItems.length === 0) return null;
               return (
                 <div key={groupTitle} className="space-y-1">
-                  <div className="px-2 py-1 text-[10px] font-mono uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1.5">
+                  <div className="px-2 py-1 text-[10px] font-sans uppercase tracking-wider text-muted-foreground font-semibold flex items-center gap-1.5">
                     {groupTitle === (language === "id" ? "Disematkan" : "Pinned") && (
                       <Pin className="h-3 w-3 text-amber-500 fill-amber-500" />
                     )}

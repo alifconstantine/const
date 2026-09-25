@@ -280,7 +280,7 @@ export function CreatePresentationDialog({
                         <div>
                           <div className="flex items-center justify-between mb-2">
                             <Icon className={cn("h-4 w-4", p.color)} />
-                            <span className="text-[9px] font-mono uppercase px-1.5 py-0.5 rounded bg-[#2e2e2e] text-[#aaa]">
+                            <span className="text-[9px] font-sans uppercase px-1.5 py-0.5 rounded bg-[#2e2e2e] text-[#aaa]">
                               {p.badge}
                             </span>
                           </div>

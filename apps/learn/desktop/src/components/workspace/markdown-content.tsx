@@ -478,7 +478,7 @@ function TableBlock({
                 <span className="text-sm font-medium text-foreground">
                   {t("dataTable")}
                 </span>
-                <span className="text-xs text-muted-foreground font-mono">
+                <span className="text-xs text-muted-foreground font-sans tabular-nums">
                   {t("tableRowsCols", { rows: rows.length, cols: header.length })}
                 </span>
               </div>

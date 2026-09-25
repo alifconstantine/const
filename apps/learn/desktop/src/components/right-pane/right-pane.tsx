@@ -662,7 +662,7 @@ export function RightPane({
                   <Layers className="w-3.5 h-3.5" />
                   <span>{t("review") || "Review"}</span>
                   {mutations.length > 0 && (
-                    <span className="px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-mono text-[10px] font-semibold ml-0.5">
+                    <span className="px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-sans tabular-nums text-[10px] font-semibold ml-0.5">
                       {mutations.length}
                     </span>
                   )}

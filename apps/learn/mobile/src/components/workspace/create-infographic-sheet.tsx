@@ -462,7 +462,7 @@ export function CreateInfographicSheet({
                   onClick={() => setIsModelDropdownOpen(!isModelDropdownOpen)}
                   className="w-full h-10 px-3 rounded-xl bg-[#202227] border border-[#30333d] flex items-center justify-between text-xs font-medium text-foreground cursor-pointer"
                 >
-                  <span className="truncate font-mono">
+                  <span className="truncate font-sans">
                     {selectedModelId || (isIndo ? "Pilih model..." : "Select model...")}
                   </span>
                   <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
@@ -490,7 +490,7 @@ export function CreateInfographicSheet({
                           )}
                         >
                           <div className="truncate min-w-0 mr-2">
-                            <div className="font-mono text-xs truncate">{model.name || model.id}</div>
+                            <div className="font-sans text-xs truncate">{model.name || model.id}</div>
                             <div className="text-[9px] text-muted-foreground truncate">{provider.name}</div>
                           </div>
                           {isSelected && <Check className="h-3 w-3 shrink-0" />}

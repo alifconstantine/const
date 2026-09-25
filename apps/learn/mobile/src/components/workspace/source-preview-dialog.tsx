@@ -116,17 +116,17 @@ export function SourcePreviewDialog({
               <div className="min-w-0 flex-1">
                 {/* Meta pills */}
                 <div className="flex items-center gap-1.5 flex-wrap mb-1">
-                  <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded-full bg-secondary border border-border text-muted-foreground">
+                  <span className="text-[10px] font-sans font-medium uppercase px-2 py-0.5 rounded-full bg-secondary border border-border text-muted-foreground">
                     {getSourceCategoryLabel(source)}
                   </span>
                   {source.subpagesCount && source.subpagesCount > 1 ? (
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-primary flex items-center gap-1">
+                    <span className="text-[10px] font-sans tabular-nums px-2 py-0.5 rounded-full bg-primary/10 border border-primary/20 text-primary flex items-center gap-1">
                       <Layers className="w-2.5 h-2.5" />
                       {source.subpagesCount} pgs
                     </span>
                   ) : null}
                   {source.size ? (
-                    <span className="text-[10px] font-mono text-muted-foreground/80 px-1 py-0.5">
+                    <span className="text-[10px] font-sans tabular-nums text-muted-foreground/80 px-1 py-0.5">
                       {formatFileSize(source.size)}
                     </span>
                   ) : null}
@@ -143,7 +143,7 @@ export function SourcePreviewDialog({
                     href={source.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="text-[11px] text-primary hover:underline inline-flex items-center gap-1 mt-0.5 max-w-full truncate font-mono"
+                    className="text-[11px] text-primary hover:underline inline-flex items-center gap-1 mt-0.5 max-w-full truncate font-sans"
                     title={source.url}
                   >
                     <span className="truncate">{source.url.replace(/^https?:\/\//, "")}</span>
@@ -232,7 +232,7 @@ export function SourcePreviewDialog({
 
             {/* Reading stats */}
             {contentString ? (
-              <div className="flex items-center gap-2 text-muted-foreground text-[10.5px] font-mono">
+              <div className="flex items-center gap-2 text-muted-foreground text-[10.5px] font-sans tabular-nums">
                 <span className="inline-flex items-center gap-1">
                   <Clock className="w-2.5 h-2.5 opacity-70" />
                   {t("readingTime", { min: stats.readingMinutes })}

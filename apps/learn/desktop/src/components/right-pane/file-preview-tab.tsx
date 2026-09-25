@@ -64,7 +64,7 @@ export function FilePreviewTab({ tab }: FilePreviewTabProps) {
               e.currentTarget.scrollLeft += e.deltaY;
             }
           }}
-          className="flex items-center gap-1.5 min-w-0 flex-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden font-mono text-[11.5px] pr-3 select-none"
+          className="flex items-center gap-1.5 min-w-0 flex-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden font-sans text-[11.5px] pr-3 select-none"
         >
           {hasLeadingEllipsis && (
             <>

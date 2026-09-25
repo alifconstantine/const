@@ -1899,11 +1899,11 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
                         {provider.name || (isIndo ? "Penyedia Gambar Baru" : "New Image Provider")}
                       </span>
                       {provider.baseUrl && (
-                        <span className="px-2 py-0.5 rounded-md bg-secondary text-muted-foreground text-[10.5px] font-mono border border-border/70 truncate max-w-[200px] shrink-0">
+                        <span className="px-2 py-0.5 rounded-md bg-secondary text-muted-foreground text-[10.5px] font-sans border border-border/70 truncate max-w-[200px] shrink-0">
                           {provider.baseUrl.replace(/^https?:\/\//, "")}
                         </span>
                       )}
-                      <span className="px-2 py-0.5 rounded-md bg-secondary text-muted-foreground text-[10.5px] font-sans border border-border/70 shrink-0">
+                      <span className="px-2 py-0.5 rounded-md bg-secondary text-muted-foreground text-[10.5px] font-sans tabular-nums border border-border/70 shrink-0">
                         {provider.models.length} {isIndo ? "model" : "models"}
                       </span>
                       {isActiveProvider && (
@@ -1976,7 +1976,7 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
                           <label className="text-xs font-medium text-foreground block">
                             Base URL
                           </label>
-                          <span className="text-[10.5px] text-muted-foreground font-mono">
+                          <span className="text-[10.5px] text-muted-foreground font-sans">
                             {editImageFormData.protocol === "openrouter"
                               ? "/images"
                               : editImageFormData.protocol === "openai-generations"
@@ -1995,7 +1995,7 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
                               ? "https://openrouter.ai/api/v1"
                               : "https://api.openai.com/v1"
                           }
-                          className="w-full px-3.5 py-2 rounded-xl bg-secondary/30 border border-border text-xs text-foreground font-mono outline-none ring-0 focus:outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/40 transition-colors"
+                          className="w-full px-3.5 py-2 rounded-xl bg-secondary/30 border border-border text-xs text-foreground font-sans outline-none ring-0 focus:outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/40 transition-colors"
                         />
                       </div>
 
@@ -2005,7 +2005,7 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
                           <label className="text-xs font-medium text-foreground block">
                             {isIndo ? "Protokol API" : "API protocol"}
                           </label>
-                          <span className="text-[10.5px] text-muted-foreground font-mono">
+                          <span className="text-[10.5px] text-muted-foreground font-sans">
                             {editImageFormData.protocol === "openrouter"
                               ? "POST /images"
                               : editImageFormData.protocol === "openai-generations"
@@ -2052,7 +2052,7 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
                               setEditImageFormData({ ...editImageFormData, apiKey: e.target.value })
                             }
                             placeholder="sk-..."
-                            className="w-full px-3.5 py-2 pr-10 rounded-xl bg-secondary/30 border border-border text-xs text-foreground font-mono placeholder:text-muted-foreground/60 outline-none ring-0 focus:outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/40 transition-colors"
+                            className="w-full px-3.5 py-2 pr-10 rounded-xl bg-secondary/30 border border-border text-xs text-foreground font-sans placeholder:text-muted-foreground/60 outline-none ring-0 focus:outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/40 transition-colors"
                           />
                           <button
                             type="button"
@@ -2114,7 +2114,7 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
                                         {model.name}
                                       </div>
                                       {model.name !== model.id && (
-                                        <div className="text-[10px] text-muted-foreground font-mono truncate">
+                                        <div className="text-[10px] text-muted-foreground font-sans truncate">
                                           {model.id}
                                         </div>
                                       )}
@@ -2189,7 +2189,7 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
                                   value={newImageModelId}
                                   onChange={(e) => setNewImageModelId(e.target.value)}
                                   placeholder="e.g. flux-1-schnell, dall-e-3, recraft-v3"
-                                  className="w-full px-3 py-1.5 rounded-xl bg-background border border-border text-xs text-foreground font-mono outline-none focus:ring-1 focus:ring-foreground/20"
+                                  className="w-full px-3 py-1.5 rounded-xl bg-background border border-border text-xs text-foreground font-sans outline-none focus:ring-1 focus:ring-foreground/20"
                                 />
                               </div>
                               <div className="space-y-1">

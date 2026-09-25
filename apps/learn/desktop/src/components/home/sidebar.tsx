@@ -105,7 +105,7 @@ export function Sidebar({
               <span className="font-serif text-base font-normal tracking-tight text-foreground">
                 Const
               </span>
-              <span className="text-[10px] font-mono tracking-wider uppercase px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+              <span className="text-[10px] font-sans font-medium tracking-wider uppercase px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
                 Learn
               </span>
             </div>
@@ -174,7 +174,7 @@ export function Sidebar({
                 {typeof item.count === "number" && item.count > 0 && (
                   <span
                     className={cn(
-                      "text-[10px] font-mono px-1.5 py-0.5 rounded-full",
+                      "text-[10px] font-sans tabular-nums px-1.5 py-0.5 rounded-full",
                       isActive
                         ? "bg-secondary text-foreground"
                         : "text-muted-foreground"

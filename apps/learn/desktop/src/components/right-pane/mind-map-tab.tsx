@@ -207,7 +207,7 @@ export function MindMapTab({
           </button>
         </div>
 
-        <div className="text-[11px] text-muted-foreground/60 font-mono">
+        <div className="text-[11px] text-muted-foreground/60 font-sans">
           Interactive Canvas • Const Studio
         </div>
       </div>

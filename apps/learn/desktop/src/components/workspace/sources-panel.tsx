@@ -177,7 +177,7 @@ export function SourcesPanel({
         <div className="flex items-center gap-2">
           <span className="text-sm font-semibold tracking-tight text-foreground">{t("sourcesPanelTitle")}</span>
           {displayCount > 0 && (
-            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border/40">
+            <span className="text-[10px] font-sans tabular-nums px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border/40">
               {displayCount}
             </span>
           )}
@@ -392,7 +392,7 @@ export function SourcesPanel({
                         >
                           {source.title}
                         </p>
-                        <p className="text-[10px] text-muted-foreground/70 font-mono mt-0.5 truncate flex items-center gap-1">
+                        <p className="text-[10px] text-muted-foreground/70 font-sans tabular-nums mt-0.5 truncate flex items-center gap-1">
                           <span className="capitalize font-medium text-foreground/80">
                             {getSourceCategoryLabel(source)}
                           </span>

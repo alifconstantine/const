@@ -294,7 +294,7 @@ export function SourcesSheet({
                           >
                             {source.title}
                           </p>
-                          <p className="text-[10px] text-muted-foreground font-mono mt-0.5 truncate flex items-center gap-1">
+                          <p className="text-[10px] text-muted-foreground font-sans tabular-nums mt-0.5 truncate flex items-center gap-1">
                             <span className="capitalize font-medium text-foreground/80">
                               {getSourceCategoryLabel(source)}
                             </span>

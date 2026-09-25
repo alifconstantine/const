@@ -250,7 +250,7 @@ export function ReportViewer({
                       key={i}
                       className="px-2 py-1.5 rounded-lg bg-[#1a1a1a] text-xs text-white truncate flex items-center gap-2"
                     >
-                      <span className="text-[10px] font-mono text-[#888888]">[{i + 1}]</span>
+                      <span className="text-[10px] font-sans tabular-nums text-[#888888]">[{i + 1}]</span>
                       <span className="truncate">{title}</span>
                     </div>
                   ))}
@@ -335,7 +335,7 @@ export function ReportViewer({
                             : "text-[#909090] hover:bg-[#1f1f1f] hover:text-[#d4d4d4]"
                         )}
                       >
-                        <span className="font-mono text-[11px] text-[#707070] shrink-0 mt-0.5">
+                        <span className="font-sans tabular-nums text-[11px] text-[#707070] shrink-0 mt-0.5">
                           {idx + 1}.
                         </span>
                         <span className="leading-snug line-clamp-2">
@@ -358,7 +358,7 @@ export function ReportViewer({
                             : "text-[#909090] hover:bg-[#1f1f1f] hover:text-[#d4d4d4]"
                         )}
                       >
-                        <span className="font-mono text-[11px] text-[#707070] shrink-0 mt-0.5">
+                        <span className="font-sans tabular-nums text-[11px] text-[#707070] shrink-0 mt-0.5">
                           {idx + 1}.
                         </span>
                         <span className="leading-snug line-clamp-2">{sec.title}</span>
@@ -527,7 +527,7 @@ export function ReportViewer({
                               key={i}
                               className="px-2.5 py-1.5 rounded-lg bg-[#18181a] text-xs text-white truncate flex items-center gap-2"
                             >
-                              <span className="text-[10px] font-mono text-[#888888]">[{i + 1}]</span>
+                              <span className="text-[10px] font-sans tabular-nums text-[#888888]">[{i + 1}]</span>
                               <span className="truncate">{title}</span>
                             </div>
                           ))}

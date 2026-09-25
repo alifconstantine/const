@@ -50,7 +50,7 @@ export function RecentlyViewedCard({ learn, onClick }: RecentlyViewedCardProps) 
         <div className="w-8 h-8 rounded-lg bg-secondary/80 border border-border/60 flex items-center justify-center shrink-0 group-hover:scale-105 transition-transform text-foreground">
           <LearnIcon icon={learn.emoji} className="w-4 h-4 text-foreground/90" />
         </div>
-        <span className="text-[10px] font-mono text-muted-foreground shrink-0">
+        <span className="text-[10px] font-sans text-muted-foreground shrink-0">
           {relativeTime}
         </span>
       </div>

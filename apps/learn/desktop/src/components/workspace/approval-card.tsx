@@ -215,7 +215,7 @@ export function ApprovalCard({
                     : "bg-transparent hover:bg-secondary/40 border-transparent text-muted-foreground"
                 )}
               >
-                <span className="font-mono text-xs text-muted-foreground/80 font-medium shrink-0">
+                <span className="font-sans tabular-nums text-xs text-muted-foreground/80 font-medium shrink-0">
                   {idx + 1}.
                 </span>
                 <span className="text-xs leading-snug truncate">

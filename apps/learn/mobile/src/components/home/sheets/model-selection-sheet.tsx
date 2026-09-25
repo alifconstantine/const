@@ -1917,7 +1917,7 @@ export function ModelSelectionSheet({
                               <label className="text-[11px] font-medium text-foreground block">
                                 Base URL
                               </label>
-                              <span className="text-[10px] text-muted-foreground font-mono">
+                              <span className="text-[10px] text-muted-foreground font-sans">
                                 {editImageFormData.protocol === "openrouter"
                                   ? "/images"
                                   : editImageFormData.protocol === "openai-generations"
@@ -1936,7 +1936,7 @@ export function ModelSelectionSheet({
                                   ? "https://openrouter.ai/api/v1"
                                   : "https://api.openai.com/v1"
                               }
-                              className="w-full px-3 py-1.5 rounded-xl bg-secondary/30 border border-border text-xs font-mono text-foreground outline-none focus:ring-1 focus:ring-foreground/20"
+                              className="w-full px-3 py-1.5 rounded-xl bg-secondary/30 border border-border text-xs font-sans text-foreground outline-none focus:ring-1 focus:ring-foreground/20"
                             />
                           </div>
 
@@ -1946,7 +1946,7 @@ export function ModelSelectionSheet({
                               <label className="text-[11px] font-medium text-foreground block">
                                 {isIndo ? "Protokol API" : "API Protocol"}
                               </label>
-                              <span className="text-[10px] text-muted-foreground font-mono">
+                              <span className="text-[10px] text-muted-foreground font-sans">
                                 {editImageFormData.protocol === "openrouter"
                                   ? "POST /images"
                                   : editImageFormData.protocol === "openai-generations"
@@ -1993,7 +1993,7 @@ export function ModelSelectionSheet({
                                   setEditImageFormData({ ...editImageFormData, apiKey: e.target.value })
                                 }
                                 placeholder="sk-..."
-                                className="w-full px-3 py-1.5 pr-8 rounded-xl bg-secondary/30 border border-border text-xs font-mono text-foreground outline-none focus:ring-1 focus:ring-foreground/20"
+                                className="w-full px-3 py-1.5 pr-8 rounded-xl bg-secondary/30 border border-border text-xs font-sans text-foreground outline-none focus:ring-1 focus:ring-foreground/20"
                               />
                               <button
                                 type="button"
@@ -2050,7 +2050,7 @@ export function ModelSelectionSheet({
                                           {model.name}
                                         </div>
                                         {model.name !== model.id && (
-                                          <div className="text-[10px] text-muted-foreground font-mono truncate">
+                                          <div className="text-[10px] text-muted-foreground font-sans truncate">
                                             {model.id}
                                           </div>
                                         )}
@@ -2118,7 +2118,7 @@ export function ModelSelectionSheet({
                                     value={newImageModelId}
                                     onChange={(e) => setNewImageModelId(e.target.value)}
                                     placeholder="Model ID (e.g. flux-1-schnell, dall-e-3)"
-                                    className="w-full px-2.5 py-1.5 rounded-lg bg-background border border-border text-xs font-mono text-foreground outline-none focus:ring-1 focus:ring-foreground/20"
+                                    className="w-full px-2.5 py-1.5 rounded-lg bg-background border border-border text-xs font-sans text-foreground outline-none focus:ring-1 focus:ring-foreground/20"
                                   />
                                   <input
                                     type="text"

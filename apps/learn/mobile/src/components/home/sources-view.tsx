@@ -302,7 +302,7 @@ export function SourcesView({
 
               {source.url && (
                 <p
-                  className="text-[11px] text-muted-foreground truncate font-mono mt-0.5"
+                  className="text-[11px] text-muted-foreground truncate font-sans mt-0.5"
                   title={source.url}
                 >
                   {source.url.replace(/^https?:\/\//, "")}
@@ -378,14 +378,14 @@ export function SourcesView({
               </button>
             )}
 
-            <span className="font-mono uppercase text-[10px] opacity-80 shrink-0">
+            <span className="font-sans tabular-nums uppercase text-[10px] opacity-80 shrink-0">
               {source.type}
               {source.size ? ` • ${formatFileSize(source.size)}` : ""}
             </span>
           </div>
 
           {dateFormatted && (
-            <span className="text-[10px] text-muted-foreground/80 shrink-0 font-mono">
+            <span className="text-[10px] text-muted-foreground/80 shrink-0 font-sans tabular-nums">
               {dateFormatted}
             </span>
           )}
@@ -533,7 +533,7 @@ export function SourcesView({
                   <span className="font-semibold text-foreground truncate max-w-[180px] sm:max-w-xs">
                     {workspace.title}
                   </span>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-secondary border border-border/60 text-muted-foreground">
+                  <span className="text-[10px] font-sans tabular-nums px-2 py-0.5 rounded-full bg-secondary border border-border/60 text-muted-foreground">
                     {wsSources.length}
                   </span>
                 </div>

@@ -2271,7 +2271,7 @@ export function ChatPanel({
                         <div className="truncate text-[11.5px] font-medium text-foreground">
                           {source.title}
                         </div>
-                        <div className="text-[9.5px] text-muted-foreground/70 font-mono flex items-center gap-1">
+                        <div className="text-[9.5px] text-muted-foreground/70 font-sans flex items-center gap-1">
                           <span className="capitalize">{source.type}</span>
                           {source.size ? `• ${formatFileSize(source.size)}` : null}
                         </div>
@@ -2382,7 +2382,7 @@ export function ChatPanel({
                 {t("contextUsed") || "of context used"}
               </span>
             </div>
-            <span className="font-mono text-xs font-semibold text-foreground/90">
+            <span className="font-sans tabular-nums text-xs font-semibold text-foreground/90">
               ~{formatTokenDisplay(usedTokens)} / {formatTokenDisplay(totalTokens)}
             </span>
           </div>
@@ -2442,11 +2442,11 @@ export function ChatPanel({
             <div className="flex items-center justify-between text-xs">
               <div className="flex items-center gap-2.5 min-w-0">
                 <span className="w-2.5 h-2.5 rounded-[2px] bg-zinc-400 dark:bg-zinc-400 shrink-0" />
-                <span className="text-foreground/90 font-medium truncate">
+                <span className="text-foreground/90 font-medium truncate font-sans">
                   {t("systemPrompt") || "System prompt"}
                 </span>
               </div>
-              <span className="font-mono text-xs font-medium text-foreground/80 shrink-0 ml-2">
+              <span className="font-sans tabular-nums text-xs font-medium text-foreground/80 shrink-0 ml-2">
                 ~{formatTokenDisplay(contextUsage.systemPromptTokens)}
               </span>
             </div>
@@ -2456,11 +2456,11 @@ export function ChatPanel({
               <div className="flex items-center justify-between text-xs">
                 <div className="flex items-center gap-2.5 min-w-0">
                   <span className="w-2.5 h-2.5 rounded-[2px] bg-purple-500 dark:bg-purple-400 shrink-0" />
-                  <span className="text-foreground/90 font-medium truncate">
+                  <span className="text-foreground/90 font-medium truncate font-sans">
                     {t("toolDefinitions") || "Tool definitions"}
                   </span>
                 </div>
-                <span className="font-mono text-xs font-medium text-foreground/80 shrink-0 ml-2">
+                <span className="font-sans tabular-nums text-xs font-medium text-foreground/80 shrink-0 ml-2">
                   ~{formatTokenDisplay(contextUsage.toolDefinitionsTokens)}
                 </span>
               </div>
@@ -2471,11 +2471,11 @@ export function ChatPanel({
               <div className="flex items-center justify-between text-xs">
                 <div className="flex items-center gap-2.5 min-w-0">
                   <span className="w-2.5 h-2.5 rounded-[2px] bg-emerald-500 shrink-0" />
-                  <span className="text-foreground/90 font-medium truncate">
+                  <span className="text-foreground/90 font-medium truncate font-sans">
                     {t("learningSources") || "Learning sources"}
                   </span>
                 </div>
-                <span className="font-mono text-xs font-medium text-foreground/80 shrink-0 ml-2">
+                <span className="font-sans tabular-nums text-xs font-medium text-foreground/80 shrink-0 ml-2">
                   ~{formatTokenDisplay(contextUsage.sourcesTokens)}
                 </span>
               </div>
@@ -2485,11 +2485,11 @@ export function ChatPanel({
             <div className="flex items-center justify-between text-xs">
               <div className="flex items-center gap-2.5 min-w-0">
                 <span className="w-2.5 h-2.5 rounded-[2px] bg-blue-500 dark:bg-blue-400 shrink-0" />
-                <span className="text-foreground/90 font-medium truncate">
+                <span className="text-foreground/90 font-medium truncate font-sans">
                   {t("messages") || "Messages"}
                 </span>
               </div>
-              <span className="font-mono text-xs font-medium text-foreground/80 shrink-0 ml-2">
+              <span className="font-sans tabular-nums text-xs font-medium text-foreground/80 shrink-0 ml-2">
                 ~{formatTokenDisplay(contextUsage.messagesTokens)}
               </span>
             </div>
@@ -2499,11 +2499,11 @@ export function ChatPanel({
               <div className="flex items-center justify-between text-xs">
                 <div className="flex items-center gap-2.5 min-w-0">
                   <span className="w-2.5 h-2.5 rounded-[2px] bg-pink-500 shrink-0" />
-                  <span className="text-foreground/90 font-medium truncate">
+                  <span className="text-foreground/90 font-medium truncate font-sans">
                     {t("currentInput") || "Current input"}
                   </span>
                 </div>
-                <span className="font-mono text-xs font-medium text-foreground/80 shrink-0 ml-2">
+                <span className="font-sans tabular-nums text-xs font-medium text-foreground/80 shrink-0 ml-2">
                   ~{formatTokenDisplay(contextUsage.draftInputTokens)}
                 </span>
               </div>
@@ -3016,7 +3016,7 @@ export function ChatPanel({
                             autoPlay
                             loop
                           />
-                          <span className="absolute bottom-1 right-1 text-[8px] font-bold text-white bg-black/60 px-1 py-0.5 rounded uppercase tracking-wider font-mono">
+                          <span className="absolute bottom-1 right-1 text-[8px] font-bold text-white bg-black/60 px-1 py-0.5 rounded uppercase tracking-wider font-sans">
                             Video
                           </span>
                           <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-1 pt-3 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -3028,7 +3028,7 @@ export function ChatPanel({
                       ) : (
                         <div className="w-full h-full p-2 flex flex-col justify-between items-start text-left bg-muted/40 rounded-xl">
                           <div className="flex items-center justify-between w-full">
-                            <span className="text-[9px] font-bold text-muted-foreground tracking-wider uppercase font-mono">
+                            <span className="text-[9px] font-bold text-muted-foreground tracking-wider uppercase font-sans">
                               {ext}
                             </span>
                             <FileText className="w-3.5 h-3.5 text-primary shrink-0" />
@@ -3042,7 +3042,7 @@ export function ChatPanel({
                             </ScrollArea>
                           </div>
                           <div className="w-full flex items-center justify-between">
-                            <span className="text-[8.5px] text-muted-foreground font-mono truncate">
+                            <span className="text-[8.5px] text-muted-foreground font-sans truncate">
                               {formatFileSize(file.size)}
                             </span>
                           </div>
@@ -3084,7 +3084,7 @@ export function ChatPanel({
               title={t("addMediaWithCount", { count: attachments.length, max: MAX_ATTACHMENTS })}
             >
               <Plus className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
-              <span className="font-mono text-[9px] text-muted-foreground/80">
+              <span className="font-sans tabular-nums text-[9px] text-muted-foreground/80">
                 {attachments.length}/{MAX_ATTACHMENTS}
               </span>
             </button>
@@ -3194,7 +3194,7 @@ export function ChatPanel({
                         <Cpu className="h-3.5 w-3.5 text-muted-foreground" />
                         <span>{t("contextUsed") || "Context"}</span>
                       </span>
-                      <span className="font-mono text-[11px] font-medium text-foreground">
+                      <span className="font-sans tabular-nums text-[11px] font-medium text-foreground">
                         {contextUsage.percentUsed} (~{formatTokenDisplay(contextUsage.usedTokens)})
                       </span>
                     </div>
@@ -3560,14 +3560,14 @@ export function ChatPanel({
                                     muted
                                     playsInline
                                   />
-                                  <span className="absolute bottom-1 right-1 text-[8px] font-bold text-white bg-black/60 px-1 py-0.5 rounded uppercase tracking-wider font-mono">
+                                  <span className="absolute bottom-1 right-1 text-[8px] font-bold text-white bg-black/60 px-1 py-0.5 rounded uppercase tracking-wider font-sans">
                                     Video
                                   </span>
                                 </div>
                               ) : (
                                 <div className="w-full h-full flex flex-col justify-between items-start text-left">
                                   <div className="flex items-center justify-between w-full">
-                                    <span className="text-[9px] font-bold text-muted-foreground uppercase font-mono">
+                                    <span className="text-[9px] font-bold text-muted-foreground uppercase font-sans">
                                       {ext}
                                     </span>
                                     <FileText className="w-3.5 h-3.5 text-primary shrink-0" />
@@ -3580,7 +3580,7 @@ export function ChatPanel({
                                     </ScrollArea>
                                   </div>
                                   <div className="w-full">
-                                    <span className="text-[8.5px] text-muted-foreground font-mono block truncate">
+                                    <span className="text-[8.5px] text-muted-foreground font-sans tabular-nums block truncate">
                                       {formatFileSize(att.size)}
                                     </span>
                                   </div>
@@ -3601,7 +3601,7 @@ export function ChatPanel({
                     {/* User hover action bar: Timestamp, Copy, Edit */}
                     <div className="flex items-center gap-2 pt-1.5 pr-1 opacity-0 group-hover:opacity-100 transition-opacity text-xs text-muted-foreground select-none font-sans">
                       {msg.createdAt && (
-                        <span className="text-[11px] font-mono text-muted-foreground/70">
+                        <span className="text-[11px] font-sans tabular-nums text-muted-foreground/70">
                           {formatMessageTimestamp(msg.createdAt)}
                         </span>
                       )}
@@ -3694,7 +3694,7 @@ export function ChatPanel({
                         )}
                       </button>
                       {msg.createdAt && (
-                        <span className="text-[11px] font-mono text-muted-foreground/70">
+                        <span className="text-[11px] font-sans tabular-nums text-muted-foreground/70">
                           {formatMessageTimestamp(msg.createdAt)}
                         </span>
                       )}

@@ -304,7 +304,7 @@ export function SourcesView({
 
             {source.url && (
               <p
-                className="text-[11px] text-muted-foreground truncate font-mono mt-0.5 max-w-sm sm:max-w-md"
+                className="text-[11px] text-muted-foreground truncate font-sans mt-0.5 max-w-sm sm:max-w-md"
                 title={source.url}
               >
                 {source.url.replace(/^https?:\/\//, "")}
@@ -332,7 +332,7 @@ export function SourcesView({
           )}
 
           {/* Type / Size Info */}
-          <span className="text-[11px] font-mono text-muted-foreground uppercase hidden md:inline shrink-0">
+          <span className="text-[11px] font-sans text-muted-foreground uppercase hidden md:inline shrink-0">
             {source.type}
             {source.size ? ` • ${formatFileSize(source.size)}` : ""}
           </span>
@@ -414,7 +414,7 @@ export function SourcesView({
               <h1 className="font-serif text-2xl sm:text-3xl font-normal tracking-tight text-foreground">
                 {t("sourcesViewTitle")}
               </h1>
-              <span className="text-xs px-2.5 py-0.5 rounded-full bg-secondary text-muted-foreground font-mono">
+              <span className="text-xs px-2.5 py-0.5 rounded-full bg-secondary text-muted-foreground font-sans tabular-nums">
                 {filteredSources.length}
               </span>
             </div>
@@ -526,7 +526,7 @@ export function SourcesView({
                 >
                   <LearnIcon icon={ws.emoji} className="w-3.5 h-3.5 shrink-0" />
                   <span className="max-w-[120px] truncate">{ws.title}</span>
-                  <span className="text-[10px] opacity-70 font-mono">
+                  <span className="text-[10px] opacity-70 font-sans tabular-nums">
                     {ws.sourcesInDb}
                   </span>
                 </button>
@@ -590,7 +590,7 @@ export function SourcesView({
                   <span className="font-medium text-foreground">
                     {workspace.title}
                   </span>
-                  <span className="text-[11px] font-mono px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
+                  <span className="text-[11px] font-sans tabular-nums px-2 py-0.5 rounded-full bg-secondary text-muted-foreground">
                     {wsSources.length}
                   </span>
                 </div>

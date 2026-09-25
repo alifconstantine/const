@@ -173,7 +173,7 @@ export function InfographicViewer({
               {data.modelUsed && (
                 <>
                   <span>·</span>
-                  <span className="font-mono truncate">{data.modelUsed}</span>
+                  <span className="font-sans truncate">{data.modelUsed}</span>
                 </>
               )}
             </div>
@@ -193,7 +193,7 @@ export function InfographicViewer({
             >
               <ZoomOut className="h-3.5 w-3.5" />
             </button>
-            <span className="text-[10px] font-mono px-1.5 text-muted-foreground min-w-10 text-center">
+            <span className="text-[10px] font-sans tabular-nums px-1.5 text-muted-foreground min-w-10 text-center">
               {Math.round(zoomLevel * 100)}%
             </span>
             <button
@@ -306,7 +306,7 @@ export function InfographicViewer({
             <Info className="h-3.5 w-3.5 text-primary" />
             <span>{isIndo ? "Intisari & Poin Materi Infografis" : "Infographic Insights & Key Takeaways"}</span>
             {data.keyPoints && data.keyPoints.length > 0 && (
-              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-secondary text-muted-foreground font-mono">
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-secondary text-muted-foreground font-sans tabular-nums">
                 {data.keyPoints.length}
               </span>
             )}

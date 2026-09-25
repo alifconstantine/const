@@ -237,7 +237,7 @@ export function MobilePresentationViewer({
               </span>
               <span
                 className={cn(
-                  "text-[9px] font-mono font-medium px-1.5 py-0.2 rounded-full border shrink-0",
+                  "text-[9px] font-sans font-medium px-1.5 py-0.2 rounded-full border shrink-0",
                   provider === "native" && "bg-blue-500/10 text-blue-400 border-blue-500/20",
                   provider === "canva" && "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
                   provider === "slides" && "bg-amber-500/10 text-amber-400 border-amber-500/20"
@@ -401,7 +401,7 @@ export function MobilePresentationViewer({
                       <ChevronLeft className="h-3.5 w-3.5" />
                     </button>
 
-                    <span className="font-mono text-[10px] text-foreground font-medium px-1">
+                    <span className="font-sans tabular-nums text-[10px] text-foreground font-medium px-1">
                       {currentSlideIndex + 1}/{slides.length}
                     </span>
 
@@ -586,7 +586,7 @@ export function MobilePresentationViewer({
                       className="aspect-[16/9] rounded-xl overflow-hidden border border-[#2b2b2b] bg-[#161616] relative"
                     >
                       <img src={th.url} alt={`Slide ${idx + 1}`} className="w-full h-full object-cover" />
-                      <span className="absolute bottom-1 left-1 bg-black/70 text-white text-[9px] font-mono px-1 rounded">
+                      <span className="absolute bottom-1 left-1 bg-black/70 text-white text-[9px] font-sans tabular-nums px-1 rounded">
                         #{idx + 1}
                       </span>
                     </div>

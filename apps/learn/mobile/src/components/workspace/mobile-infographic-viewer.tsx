@@ -166,7 +166,7 @@ export function MobileInfographicViewer({
               {data.modelUsed && (
                 <>
                   <span>·</span>
-                  <span className="font-mono truncate">{data.modelUsed}</span>
+                  <span className="font-sans truncate">{data.modelUsed}</span>
                 </>
               )}
             </div>
@@ -248,7 +248,7 @@ export function MobileInfographicViewer({
             <Info className="h-3.5 w-3.5 text-primary" />
             <span>{isIndo ? "Intisari & Poin Materi" : "Insights & Key Takeaways"}</span>
             {data.keyPoints && (
-              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-secondary text-muted-foreground font-mono">
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-secondary text-muted-foreground font-sans tabular-nums">
                 {data.keyPoints.length}
               </span>
             )}

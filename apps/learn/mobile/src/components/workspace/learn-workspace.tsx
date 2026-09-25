@@ -2533,7 +2533,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
                           {t("contextUsed") || "of context used"}
                         </span>
                       </div>
-                      <span className="font-mono text-xs font-semibold text-foreground/90">
+                      <span className="font-sans tabular-nums text-xs font-semibold text-foreground/90">
                         ~{formatTokenDisplay(contextUsage.usedTokens)} / {formatTokenDisplay(contextUsage.totalTokens)}
                       </span>
                     </div>
@@ -2597,7 +2597,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
                             {t("systemPrompt") || "System prompt"}
                           </span>
                         </div>
-                        <span className="font-mono text-xs font-medium text-foreground/80 shrink-0 ml-2">
+                        <span className="font-sans tabular-nums text-xs font-medium text-foreground/80 shrink-0 ml-2">
                           ~{formatTokenDisplay(contextUsage.systemPromptTokens)}
                         </span>
                       </div>
@@ -2611,7 +2611,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
                               {t("toolDefinitions") || "Tool definitions"}
                             </span>
                           </div>
-                          <span className="font-mono text-xs font-medium text-foreground/80 shrink-0 ml-2">
+                          <span className="font-sans tabular-nums text-xs font-medium text-foreground/80 shrink-0 ml-2">
                             ~{formatTokenDisplay(contextUsage.toolDefinitionsTokens)}
                           </span>
                         </div>
@@ -2626,7 +2626,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
                               {t("learningSources") || "Learning sources"}
                             </span>
                           </div>
-                          <span className="font-mono text-xs font-medium text-foreground/80 shrink-0 ml-2">
+                          <span className="font-sans tabular-nums text-xs font-medium text-foreground/80 shrink-0 ml-2">
                             ~{formatTokenDisplay(contextUsage.sourcesTokens)}
                           </span>
                         </div>
@@ -2640,7 +2640,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
                             {t("messages") || "Messages"}
                           </span>
                         </div>
-                        <span className="font-mono text-xs font-medium text-foreground/80 shrink-0 ml-2">
+                        <span className="font-sans tabular-nums text-xs font-medium text-foreground/80 shrink-0 ml-2">
                           ~{formatTokenDisplay(contextUsage.messagesTokens)}
                         </span>
                       </div>
@@ -2654,7 +2654,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
                               {t("currentInput") || "Current input"}
                             </span>
                           </div>
-                          <span className="font-mono text-xs font-medium text-foreground/80 shrink-0 ml-2">
+                          <span className="font-sans tabular-nums text-xs font-medium text-foreground/80 shrink-0 ml-2">
                             ~{formatTokenDisplay(contextUsage.draftInputTokens)}
                           </span>
                         </div>
@@ -3050,14 +3050,14 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
                                 ) : isVideo && att.url ? (
                                   <div className="w-full h-full rounded-xl overflow-hidden bg-black relative flex items-center justify-center">
                                     <Video className="w-5 h-5 text-muted-foreground" />
-                                    <span className="absolute bottom-1 right-1 text-[7px] font-mono bg-black/70 text-white px-1 rounded uppercase font-bold">
+                                    <span className="absolute bottom-1 right-1 text-[7px] font-sans bg-black/70 text-white px-1 rounded uppercase font-bold">
                                       VID
                                     </span>
                                   </div>
                                 ) : (
                                   <div className="w-full h-full p-1.5 flex flex-col justify-between rounded-xl bg-secondary/80 text-left">
                                     <div className="flex items-center justify-between">
-                                      <span className="text-[8px] font-bold text-muted-foreground font-mono uppercase">
+                                      <span className="text-[8px] font-bold text-muted-foreground font-sans uppercase">
                                         {ext}
                                       </span>
                                       <FileText className="w-3 h-3 text-foreground shrink-0" />
@@ -3069,7 +3069,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
                                         </span>
                                       </ScrollArea>
                                     </div>
-                                    <span className="text-[7.5px] text-muted-foreground font-mono block truncate">
+                                    <span className="text-[7.5px] text-muted-foreground font-sans tabular-nums block truncate">
                                       {formatFileSize(att.size)}
                                     </span>
                                   </div>
@@ -3119,7 +3119,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
                       })()}
 
                       {/* User Message Action Bar: Timestamp, Copy, Edit - Always visible */}
-                      <div className="flex items-center gap-2 pt-1 pr-1 text-[10.5px] font-mono text-muted-foreground select-none">
+                      <div className="flex items-center gap-2 pt-1 pr-1 text-[10.5px] font-sans tabular-nums text-muted-foreground select-none">
                         {msg.createdAt && <span>{formatTimestamp(msg.createdAt)}</span>}
                         <button
                           type="button"
@@ -3179,7 +3179,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
 
                     {/* Assistant Action Bar: Timestamp & Copy - Always visible */}
                     {!msg.isStreaming && msg.content && (
-                      <div className="flex items-center gap-2 pt-0.5 pl-0.5 text-[10.5px] font-mono text-muted-foreground select-none">
+                      <div className="flex items-center gap-2 pt-0.5 pl-0.5 text-[10.5px] font-sans tabular-nums text-muted-foreground select-none">
                         {msg.createdAt && <span>{formatTimestamp(msg.createdAt)}</span>}
                         <button
                           type="button"

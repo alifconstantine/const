@@ -527,7 +527,7 @@ export function McpToolsView() {
           <h1 className="font-serif text-2xl sm:text-3xl font-normal tracking-tight text-foreground">
             {isIndo ? "Connectors & Integrasi MCP" : "Connectors & MCP Integrations"}
           </h1>
-          <span className="text-xs px-2.5 py-0.5 rounded-full bg-secondary text-muted-foreground font-mono">
+          <span className="text-xs px-2.5 py-0.5 rounded-full bg-secondary text-muted-foreground font-sans tabular-nums">
             {mainTab === "apps" ? `${connectedIds.length} ${isIndo ? "Aktif" : "Active"}` : `${mcpConfig.servers.length} Installed`}
           </span>
         </div>
@@ -591,7 +591,7 @@ export function McpToolsView() {
             <Code2 className="w-3.5 h-3.5" />
             <span>{isIndo ? "Custom MCP" : "Custom MCP"}</span>
             {mcpConfig.servers.length > 0 && (
-              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-secondary font-mono">
+              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-secondary font-sans tabular-nums">
                 {mcpConfig.servers.length}
               </span>
             )}
@@ -649,7 +649,7 @@ export function McpToolsView() {
                         <h4 className="text-sm font-semibold text-foreground group-hover:text-primary transition-colors">
                           {connector.name}
                         </h4>
-                        <span className="text-[10.5px] px-1.5 py-0.2 rounded bg-secondary text-muted-foreground font-mono">
+                        <span className="text-[10.5px] px-1.5 py-0.2 rounded bg-secondary text-muted-foreground font-sans">
                           {connector.authType}
                         </span>
                       </div>
@@ -727,7 +727,7 @@ export function McpToolsView() {
                   <h2 className="text-xl font-semibold text-foreground tracking-tight">
                     {selectedConnector.name}
                   </h2>
-                  <span className="px-2 py-0.5 rounded-md bg-secondary text-muted-foreground text-xs font-mono border border-border/70">
+                  <span className="px-2 py-0.5 rounded-md bg-secondary text-muted-foreground text-xs font-sans border border-border/70">
                     {selectedConnector.authType}
                   </span>
                   <span className="px-2 py-0.5 rounded-md bg-secondary text-muted-foreground text-xs font-medium border border-border/70">
@@ -817,7 +817,7 @@ export function McpToolsView() {
                         className="p-3 rounded-xl bg-secondary/30 border border-border hover:bg-secondary/60 transition-colors cursor-pointer flex items-center justify-between gap-3 group"
                         title="Click to copy prompt"
                       >
-                        <p className="text-xs text-foreground/90 font-mono select-none">
+                        <p className="text-xs text-foreground/90 font-sans select-none">
                           {prompt}
                         </p>
                         <button type="button" className="p-1 rounded text-muted-foreground hover:text-foreground shrink-0">
@@ -944,7 +944,7 @@ export function McpToolsView() {
                 <span className="text-xs font-semibold text-foreground tracking-tight">
                   Installed
                 </span>
-                <span className="text-xs text-muted-foreground font-mono">
+                <span className="text-xs text-muted-foreground font-sans tabular-nums">
                   {mcpConfig.servers.length}
                 </span>
               </div>
@@ -1005,12 +1005,12 @@ export function McpToolsView() {
                                 {server.name}
                               </span>
                               {server.scope && (
-                                <span className="text-[10px] px-1.5 py-0.2 rounded bg-secondary text-muted-foreground font-mono uppercase border border-border/60">
+                                <span className="text-[10px] px-1.5 py-0.2 rounded bg-secondary text-muted-foreground font-sans uppercase border border-border/60">
                                   {server.scope}
                                 </span>
                               )}
                             </div>
-                            <p className="text-xs text-muted-foreground font-mono truncate max-w-sm sm:max-w-xl">
+                            <p className="text-xs text-muted-foreground font-sans truncate max-w-sm sm:max-w-xl">
                               {detailText}
                             </p>
                           </div>
@@ -1326,8 +1326,8 @@ export function McpToolsView() {
 
               <div className="rounded-3xl border border-border bg-card/80 overflow-hidden shadow-xs">
                 <div className="px-4 py-2.5 border-b border-border/60 bg-secondary/30 flex items-center justify-between">
-                  <span className="text-xs font-mono text-muted-foreground">mcpServers Configuration</span>
-                  <span className="text-[11px] font-mono text-muted-foreground">
+                  <span className="text-xs font-sans text-muted-foreground">mcpServers Configuration</span>
+                  <span className="text-[11px] font-sans tabular-nums text-muted-foreground">
                     {mcpConfig.servers.length} servers
                   </span>
                 </div>

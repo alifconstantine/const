@@ -259,7 +259,7 @@ export function CreateStudioArtifactDialog({
                           else if (Number(customCount) > 50) setCustomCount(50);
                         }}
                         placeholder="1-50"
-                        className="w-20 h-8 px-2.5 rounded-lg bg-[#222222] border border-[#2b2b2b] text-white font-mono text-xs focus:outline-none focus:border-[#444444] transition-colors text-center"
+                        className="w-20 h-8 px-2.5 rounded-lg bg-[#222222] border border-[#2b2b2b] text-white font-sans tabular-nums text-xs focus:outline-none focus:border-[#444444] transition-colors text-center"
                       />
                       <span className="text-[11px] text-[#777777]">
                         {artifactType === "quiz"

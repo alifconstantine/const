@@ -313,7 +313,7 @@ export function MobileSettingsSheet({
               <h2 className="text-sm font-semibold text-foreground tracking-tight">
                 {t("settings")}
               </h2>
-              <span className="text-[10px] font-mono uppercase px-1.5 py-0.5 rounded bg-secondary text-muted-foreground border border-border/50">
+              <span className="text-[10px] font-sans font-medium uppercase px-1.5 py-0.5 rounded bg-secondary text-muted-foreground border border-border/50">
                 Mobile
               </span>
             </div>
@@ -640,7 +640,7 @@ export function MobileSettingsSheet({
                           {isIndo ? model.descId : model.descEn}
                         </p>
 
-                        <div className="flex items-center gap-2 pt-0.5 text-[10px] font-mono text-muted-foreground">
+                        <div className="flex items-center gap-2 pt-0.5 text-[10px] font-sans tabular-nums text-muted-foreground">
                           <span>{model.contextWindow}</span>
                           <span>•</span>
                           <span>{model.maxOutput}</span>
@@ -683,10 +683,10 @@ export function MobileSettingsSheet({
                       {statusBadge}
                     </div>
                     <div className="flex items-baseline gap-1.5 mt-1">
-                      <span className="text-2xl font-bold font-mono tracking-tight text-foreground">
+                      <span className="text-2xl font-bold font-sans tabular-nums tracking-tight text-foreground">
                         {usedCount}
                       </span>
-                      <span className="text-xs text-muted-foreground font-mono">
+                      <span className="text-xs text-muted-foreground font-sans tabular-nums">
                         / {limitCount} {t("toolCallsUsed").toLowerCase()}
                       </span>
                     </div>
@@ -697,7 +697,7 @@ export function MobileSettingsSheet({
                     </span>
                     <span
                       className={cn(
-                        "text-lg font-bold font-mono",
+                        "text-lg font-bold font-sans tabular-nums",
                         isExceeded
                           ? "text-rose-500"
                           : isWarning
@@ -725,7 +725,7 @@ export function MobileSettingsSheet({
                       style={{ width: `${usagePercent}%` }}
                     />
                   </div>
-                  <div className="flex items-center justify-between text-[10px] text-muted-foreground font-mono">
+                  <div className="flex items-center justify-between text-[10px] text-muted-foreground font-sans tabular-nums">
                     <span>0 call</span>
                     <span>{usagePercent}% {isIndo ? "kuota terpakai" : "quota used"}</span>
                     <span>{limitCount} calls</span>
@@ -743,7 +743,7 @@ export function MobileSettingsSheet({
                       </strong>
                     </span>
                   </div>
-                  <span className="text-[10px] font-mono text-muted-foreground">
+                  <span className="text-[10px] font-sans tabular-nums text-muted-foreground">
                     Reset: {resetDateFormatted}
                   </span>
                 </div>
@@ -755,7 +755,7 @@ export function MobileSettingsSheet({
                   <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
                     {t("recentActivity")}
                   </span>
-                  <span className="text-[10px] font-mono text-muted-foreground">
+                  <span className="text-[10px] font-sans tabular-nums text-muted-foreground">
                     {(composioUsage.recentCalls || []).length} {isIndo ? "aktivitas" : "activity"}
                   </span>
                 </div>
@@ -778,11 +778,11 @@ export function MobileSettingsSheet({
                               call.success ? "bg-emerald-500" : "bg-rose-500"
                             )}
                           />
-                          <span className="font-mono text-xs text-foreground truncate">
+                          <span className="font-sans text-xs text-foreground truncate">
                             {call.toolSlug}
                           </span>
                         </div>
-                        <span className="text-[10px] font-mono text-muted-foreground shrink-0">
+                        <span className="text-[10px] font-sans tabular-nums text-muted-foreground shrink-0">
                           {new Date(call.timestamp).toLocaleTimeString([], {
                             hour: "2-digit",
                             minute: "2-digit",
@@ -812,7 +812,7 @@ export function MobileSettingsSheet({
                       {isIndo ? "Penyimpanan Database Lokal" : "Local Database Storage"}
                     </h3>
                   </div>
-                  <span className="text-[10px] font-mono text-muted-foreground">
+                  <span className="text-[10px] font-sans text-muted-foreground">
                     Dexie.js (ACID)
                   </span>
                 </div>
@@ -822,7 +822,7 @@ export function MobileSettingsSheet({
                     <span className="text-muted-foreground text-[11px]">
                       {isIndo ? "Buku Catatan" : "Notebooks"}
                     </span>
-                    <span className="font-semibold text-foreground font-mono">
+                    <span className="font-semibold text-foreground font-sans tabular-nums">
                       {dbStats?.learnsCount ?? 0}
                     </span>
                   </div>
@@ -831,7 +831,7 @@ export function MobileSettingsSheet({
                     <span className="text-muted-foreground text-[11px]">
                       {isIndo ? "Sumber Belajar" : "Sources"}
                     </span>
-                    <span className="font-semibold text-foreground font-mono">
+                    <span className="font-semibold text-foreground font-sans tabular-nums">
                       {dbStats?.sourcesCount ?? 0}
                     </span>
                   </div>
@@ -840,7 +840,7 @@ export function MobileSettingsSheet({
                     <span className="text-muted-foreground text-[11px]">
                       {isIndo ? "Sesi Diskusi" : "Chat Sessions"}
                     </span>
-                    <span className="font-semibold text-foreground font-mono">
+                    <span className="font-semibold text-foreground font-sans tabular-nums">
                       {dbStats?.sessionsCount ?? 0}
                     </span>
                   </div>
@@ -849,7 +849,7 @@ export function MobileSettingsSheet({
                     <span className="text-muted-foreground text-[11px]">
                       {isIndo ? "Hasil Studio" : "Studio Artifacts"}
                     </span>
-                    <span className="font-semibold text-foreground font-mono">
+                    <span className="font-semibold text-foreground font-sans tabular-nums">
                       {dbStats?.artifactsCount ?? 0}
                     </span>
                   </div>
@@ -868,7 +868,7 @@ export function MobileSettingsSheet({
 
         {/* Footer */}
         <div className="p-3.5 border-t border-border bg-secondary/30 flex items-center justify-between text-[11px] text-muted-foreground shrink-0">
-          <span className="font-mono text-[10px]">Const Learn Mobile v0.0.1</span>
+          <span className="font-sans text-[10px]">Const Learn Mobile v0.0.1</span>
           <button
             type="button"
             onClick={onClose}
