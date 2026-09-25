@@ -3845,28 +3845,28 @@ export function ChatPanel({
                 side="top"
                 align="center"
                 sideOffset={8}
-                className="w-72 sm:w-80 p-3.5 rounded-xl bg-popover/95 backdrop-blur-md border border-border/80 shadow-2xl text-xs z-50 font-sans"
+                className="w-72 sm:w-80 p-3.5 rounded-xl bg-popover/95 backdrop-blur-md border border-border/80 shadow-2xl z-50 font-sans"
               >
                 <div className="flex items-center gap-2 mb-3">
                   <Gauge className="w-4 h-4 text-muted-foreground shrink-0" />
-                  <span className="font-semibold text-xs text-foreground">Session statistics</span>
+                  <span className="font-medium text-[13px] text-foreground">Session statistics</span>
                 </div>
-                <div className="space-y-2 text-xs">
+                <div className="space-y-2 text-[12.5px] font-sans">
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">LLM time</span>
-                    <span className="font-mono tabular-nums text-foreground">{formatDurationDisplay(conversationMetrics.llmDurationMs)}</span>
+                    <span className="tabular-nums text-foreground">{formatDurationDisplay(conversationMetrics.llmDurationMs)}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Tool time</span>
-                    <span className="font-mono tabular-nums text-foreground">{formatDurationDisplay(conversationMetrics.toolDurationMs)}</span>
+                    <span className="tabular-nums text-foreground">{formatDurationDisplay(conversationMetrics.toolDurationMs)}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Avg time to first token (TTFT)</span>
-                    <span className="font-mono tabular-nums text-foreground">{conversationMetrics.ttftSeconds.toFixed(1)}s</span>
+                    <span className="tabular-nums text-foreground">{conversationMetrics.ttftSeconds.toFixed(1)}s</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Tokens per second (TPS)</span>
-                    <span className="font-mono tabular-nums text-foreground">{conversationMetrics.tokPerSec} tok/s</span>
+                    <span className="tabular-nums text-foreground">{conversationMetrics.tokPerSec} tok/s</span>
                   </div>
                 </div>
               </PopoverContent>
@@ -3890,34 +3890,34 @@ export function ChatPanel({
                 side="top"
                 align="center"
                 sideOffset={8}
-                className="w-72 sm:w-80 p-3.5 rounded-xl bg-popover/95 backdrop-blur-md border border-border/80 shadow-2xl text-xs z-50 font-sans"
+                className="w-72 sm:w-80 p-3.5 rounded-xl bg-popover/95 backdrop-blur-md border border-border/80 shadow-2xl z-50 font-sans"
               >
                 <div className="flex items-center justify-between mb-2.5">
                   <div className="flex items-center gap-2">
                     <Database className="w-4 h-4 text-muted-foreground shrink-0" />
-                    <span className="font-semibold text-xs text-foreground">Token usage</span>
+                    <span className="font-medium text-[13px] text-foreground">Token usage</span>
                   </div>
-                  <span className="font-mono tabular-nums font-medium text-foreground text-xs">
+                  <span className="tabular-nums font-medium text-foreground text-[13px]">
                     {conversationMetrics.totalTokens.toLocaleString()} tok
                   </span>
                 </div>
                 <div className="my-2 border-t border-border/60" />
-                <div className="space-y-2 text-xs">
+                <div className="space-y-2 text-[12.5px] font-sans">
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Cache hit</span>
-                    <span className="font-mono tabular-nums text-foreground">{conversationMetrics.cacheHitRate}%</span>
+                    <span className="tabular-nums text-foreground">{conversationMetrics.cacheHitRate}%</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Uncached input</span>
-                    <span className="font-mono tabular-nums text-foreground">{conversationMetrics.uncachedInputTokens.toLocaleString()} tok</span>
+                    <span className="tabular-nums text-foreground">{conversationMetrics.uncachedInputTokens.toLocaleString()} tok</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Cached input</span>
-                    <span className="font-mono tabular-nums text-foreground">{conversationMetrics.cachedInputTokens.toLocaleString()} tok</span>
+                    <span className="tabular-nums text-foreground">{conversationMetrics.cachedInputTokens.toLocaleString()} tok</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Output</span>
-                    <span className="font-mono tabular-nums text-foreground">{conversationMetrics.outputTokens.toLocaleString()} tok</span>
+                    <span className="tabular-nums text-foreground">{conversationMetrics.outputTokens.toLocaleString()} tok</span>
                   </div>
                 </div>
               </PopoverContent>
