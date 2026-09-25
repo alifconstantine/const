@@ -1,4 +1,4 @@
-﻿{
+{
 	"name": "@const/protocol",
 	"version": "0.84.2",
 	"description": "Transport-neutral CBOR protocol for remote pi sessions",
@@ -17,7 +17,7 @@
 	],
 	"scripts": {
 		"clean": "shx rm -rf dist",
-		"build": "tsgo -p tsconfig.build.json",
+		"build": "tsc -p tsconfig.build.json",
 		"test": "vitest --run",
 		"prepublishOnly": "npm run clean && npm run build"
 	},

@@ -27,7 +27,7 @@
 	"scripts": {
 		"clean": "shx rm -rf dist",
 		"test": "vitest --run",
-		"typecheck": "tsgo -p tsconfig.test.json",
+		"typecheck": "tsc -p tsconfig.test.json",
 		"prepublishOnly": "npm run clean && npm run build"
 	},
 	"keywords": [

@@ -2023,8 +2023,45 @@ async function loadModelsDevData(): Promise<Model<any>[]> {
 		}
 
 		// Process Kimi For Coding models
-		if (data["kimi-for-coding"]?.models) {
-			const kimiModels = data["kimi-for-coding"].models as Record<string, ModelsDevModel>;
+		const rawKimiModels = data["kimi-for-coding"]?.models;
+		const kimiModels = (rawKimiModels || {
+			k3: {
+				name: "Kimi K3",
+				tool_call: true,
+				reasoning: true,
+				modalities: { input: ["text", "image"] },
+				cost: { input: 3, output: 15, cache_read: 0.3, cache_write: 0 },
+				limit: { context: 1048576, output: 131072 },
+				reasoning_options: ["low", "high", "max"],
+			},
+			"k3-256k": {
+				name: "Kimi K3-256K",
+				tool_call: true,
+				reasoning: true,
+				modalities: { input: ["text", "image"] },
+				cost: { input: 0, output: 0, cache_read: 0, cache_write: 0 },
+				limit: { context: 262144, output: 131072 },
+				reasoning_options: ["low", "high", "max"],
+			},
+			"kimi-for-coding": {
+				name: "Kimi K2.7 Code",
+				tool_call: true,
+				reasoning: true,
+				modalities: { input: ["text", "image"] },
+				cost: { input: 0.95, output: 4, cache_read: 0.19, cache_write: 0 },
+				limit: { context: 262144, output: 32768 },
+			},
+			"kimi-for-coding-highspeed": {
+				name: "Kimi For Coding HighSpeed",
+				tool_call: true,
+				reasoning: true,
+				modalities: { input: ["text", "image"] },
+				cost: { input: 1.9, output: 8, cache_read: 0.38, cache_write: 0 },
+				limit: { context: 262144, output: 32768 },
+			},
+		}) as Record<string, ModelsDevModel>;
+
+		if (kimiModels) {
 			const hasCanonicalModel = Object.prototype.hasOwnProperty.call(kimiModels, "kimi-for-coding");
 
 			const kimiAliases = new Set(["k2p5", "k2p6", "k2p7"]);

@@ -52,14 +52,14 @@
 		"README.md"
 	],
 	"scripts": {
-		"clean": "shx rm -rf dist",
+		"clean": "node -e \"const fs=require('node:fs'); fs.rmSync('dist',{recursive:true,force:true});\"",
 		"generate-models": "node scripts/generate-models.ts --strict",
 		"hydrate-model-data": "node scripts/generate-models.ts --strict --data-only",
 		"generate-model-catalog": "node scripts/generate-models.ts --strict --json-only --json-output ../../.artifacts/model-catalog",
 		"generate-image-models": "node scripts/generate-image-models.ts --strict",
 		"check:model-data": "node scripts/check-model-data.ts",
 		"build": "npm run generate-models && npm run build:offline",
-		"build:offline": "npm run check:model-data && tsgo -p tsconfig.build.json && shx rm -rf dist/providers/data && shx cp -r src/providers/data dist/providers/data",
+		"build:offline": "npm run check:model-data && tsc -p tsconfig.build.json && node -e \"const fs=require('node:fs'); fs.rmSync('dist/providers/data',{recursive:true,force:true}); fs.cpSync('src/providers/data','dist/providers/data',{recursive:true});\"",
 		"test": "vitest --run",
 		"prepublishOnly": "npm run clean && npm run build"
 	},

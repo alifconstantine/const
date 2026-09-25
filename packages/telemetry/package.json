@@ -1,4 +1,4 @@
-﻿{
+{
 	"name": "@const/telemetry",
 	"version": "0.84.2",
 	"description": "Vendor-neutral telemetry contracts and typed schema utilities for pi",
@@ -20,8 +20,8 @@
 		"README.md"
 	],
 	"scripts": {
-		"clean": "shx rm -rf dist",
-		"build": "tsgo -p tsconfig.build.json",
+		"clean": "node -e \"const fs=require('node:fs'); fs.rmSync('dist',{recursive:true,force:true});\"",
+		"build": "tsc -p tsconfig.build.json",
 		"test": "vitest --run",
 		"prepublishOnly": "npm run clean && npm run build"
 	},
