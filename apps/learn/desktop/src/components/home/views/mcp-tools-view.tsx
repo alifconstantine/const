@@ -71,7 +71,6 @@ import {
 type MainTab = "apps" | "custom_mcp";
 type CustomMcpSubTab = "servers" | "json";
 type FormMode = "form" | "json";
-type CategoryFilter = "All" | "Featured" | "Productivity" | "Creativity" | "Education" | "Developer";
 
 interface ServerFormData {
   id?: string;
@@ -138,7 +137,6 @@ export function McpToolsView() {
   }, [mainTab, language]);
 
   // Apps & Tools State
-  const [selectedCategory, setSelectedCategory] = useState<CategoryFilter>("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedConnector, setSelectedConnector] = useState<ConnectorMetadata | null>(null);
   const [connectedIds, setConnectedIds] = useState<string[]>(() => getConnectedConnectorIds());
@@ -149,6 +147,36 @@ export function McpToolsView() {
   const [customMcpSubTab, setCustomMcpSubTab] = useState<CustomMcpSubTab>("servers");
   const [mcpConfig, setMcpConfig] = useState<McpConfigurationState>(() => getStoredMcpConfig());
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Sliding tab indicator for Custom MCP sub-tabs (Servers | JSON Config)
+  const serversSubTabRef = useRef<HTMLButtonElement>(null);
+  const jsonSubTabRef = useRef<HTMLButtonElement>(null);
+  const [subIndicatorStyle, setSubIndicatorStyle] = useState<{ left: number; width: number }>({
+    left: 0,
+    width: 0,
+  });
+
+  useEffect(() => {
+    const updateSubIndicator = () => {
+      let activeEl: HTMLButtonElement | null = null;
+      if (customMcpSubTab === "servers") activeEl = serversSubTabRef.current;
+      else if (customMcpSubTab === "json") activeEl = jsonSubTabRef.current;
+
+      if (activeEl) {
+        setSubIndicatorStyle({
+          left: activeEl.offsetLeft,
+          width: activeEl.offsetWidth,
+        });
+      }
+    };
+    updateSubIndicator();
+    const timer = setTimeout(updateSubIndicator, 50);
+    window.addEventListener("resize", updateSubIndicator);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("resize", updateSubIndicator);
+    };
+  }, [customMcpSubTab, mainTab, language]);
 
   // Form / Editor View State (Image 3)
   const [isEditingServer, setIsEditingServer] = useState(false);
@@ -227,7 +255,6 @@ export function McpToolsView() {
   const filteredConnectors = useMemo(() => {
     return AVAILABLE_CONNECTORS.filter((c) => {
       if (c.id === "cloud-sandbox") return false;
-      const matchCat = selectedCategory === "All" || c.category === selectedCategory;
       const q = searchQuery.toLowerCase().trim();
       const matchSearch =
         !q ||
@@ -235,9 +262,9 @@ export function McpToolsView() {
         c.description.toLowerCase().includes(q) ||
         c.tagline.toLowerCase().includes(q) ||
         c.skills.some((s) => s.toLowerCase().includes(q));
-      return matchCat && matchSearch;
+      return matchSearch;
     });
-  }, [searchQuery, selectedCategory]);
+  }, [searchQuery]);
 
   // Connect / Authorize Handler for Apps & Tools
   const handleToggleConnect = async (connector: ConnectorMetadata, e?: React.MouseEvent) => {
@@ -622,9 +649,9 @@ export function McpToolsView() {
       {/* =================================================================== */}
       {mainTab === "apps" && !selectedConnector && (
         <div className="space-y-6">
-          {/* Search & Category Pills */}
+          {/* Search Bar (Category menu pills hidden) */}
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="relative flex-1 max-w-sm">
+            <div className="relative flex-1 max-w-md">
               <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
@@ -633,27 +660,6 @@ export function McpToolsView() {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-9 pr-4 py-2 text-xs rounded-xl bg-secondary/40 border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/40 transition-colors"
               />
-            </div>
-
-            {/* Category Filters */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
-              {(["All", "Featured", "Productivity", "Creativity", "Education", "Developer"] as CategoryFilter[]).map(
-                (cat) => (
-                  <button
-                    key={cat}
-                    type="button"
-                    onClick={() => setSelectedCategory(cat)}
-                    className={cn(
-                      "px-3 py-1 rounded-lg text-xs font-medium whitespace-nowrap transition-colors cursor-pointer",
-                      selectedCategory === cat
-                        ? "bg-foreground text-background"
-                        : "bg-secondary/40 text-muted-foreground hover:text-foreground hover:bg-secondary border border-border/60"
-                    )}
-                  >
-                    {cat}
-                  </button>
-                )
-              )}
             </div>
           </div>
 
@@ -910,15 +916,26 @@ export function McpToolsView() {
           {/* Sub Toolbar inside Custom MCP: Switcher (Servers | JSON Config) + Add Server Button */}
           {!isEditingServer && (
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              {/* Left: Sub-tabs [Servers] [JSON Config] */}
-              <div className="flex items-center p-0.5 rounded-xl bg-secondary/60 border border-border w-fit">
+              {/* Left: Sub-tabs [Servers] [JSON Config] matching mainTab switcher */}
+              <div className="relative flex items-center h-9 p-0.5 rounded-xl bg-muted/70 border border-border w-fit shrink-0">
+                <div
+                  className="absolute top-0.5 bottom-0.5 left-0 rounded-lg bg-background shadow-2xs pointer-events-none transition-all duration-300"
+                  style={{
+                    transform: `translateX(${subIndicatorStyle.left}px)`,
+                    width: `${subIndicatorStyle.width}px`,
+                    opacity: subIndicatorStyle.width > 0 ? 1 : 0,
+                    transitionTimingFunction: "cubic-bezier(0.16, 1, 0.3, 1)",
+                  }}
+                />
+
                 <button
+                  ref={serversSubTabRef}
                   type="button"
                   onClick={() => setCustomMcpSubTab("servers")}
                   className={cn(
-                    "px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5",
+                    "relative z-10 px-4 h-full rounded-lg text-xs font-medium transition-colors duration-200 cursor-pointer select-none flex items-center justify-center gap-1.5 whitespace-nowrap",
                     customMcpSubTab === "servers"
-                      ? "bg-card text-foreground shadow-xs font-semibold"
+                      ? "text-foreground font-semibold"
                       : "text-muted-foreground hover:text-foreground"
                   )}
                 >
@@ -926,12 +943,13 @@ export function McpToolsView() {
                   <span>Servers</span>
                 </button>
                 <button
+                  ref={jsonSubTabRef}
                   type="button"
                   onClick={() => setCustomMcpSubTab("json")}
                   className={cn(
-                    "px-3.5 py-1.5 rounded-lg text-xs font-medium transition-all cursor-pointer flex items-center gap-1.5",
+                    "relative z-10 px-4 h-full rounded-lg text-xs font-medium transition-colors duration-200 cursor-pointer select-none flex items-center justify-center gap-1.5 whitespace-nowrap",
                     customMcpSubTab === "json"
-                      ? "bg-card text-foreground shadow-xs font-semibold"
+                      ? "text-foreground font-semibold"
                       : "text-muted-foreground hover:text-foreground"
                   )}
                 >

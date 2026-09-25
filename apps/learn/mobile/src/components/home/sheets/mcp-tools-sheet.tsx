@@ -70,7 +70,6 @@ import {
 type MainTab = "apps" | "custom_mcp";
 type CustomMcpSubTab = "servers" | "json";
 type FormMode = "form" | "json";
-type CategoryFilter = "All" | "Featured" | "Productivity" | "Creativity" | "Education" | "Developer";
 
 interface ServerFormData {
   id?: string;
@@ -139,7 +138,6 @@ export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
   }, [mainTab, open, language]);
 
   // Apps & Tools State
-  const [selectedCategory, setSelectedCategory] = useState<CategoryFilter>("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedConnector, setSelectedConnector] = useState<ConnectorMetadata | null>(null);
   const [connectedIds, setConnectedIds] = useState<string[]>(() => getConnectedConnectorIds());
@@ -150,6 +148,33 @@ export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
   const [customMcpSubTab, setCustomMcpSubTab] = useState<CustomMcpSubTab>("servers");
   const [mcpConfig, setMcpConfig] = useState<McpConfigurationState>(() => getStoredMcpConfig());
   const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Sliding tab indicator for Custom MCP sub-tabs (Servers | JSON)
+  const serversSubTabRef = useRef<HTMLButtonElement>(null);
+  const jsonSubTabRef = useRef<HTMLButtonElement>(null);
+  const [subIndicatorStyle, setSubIndicatorStyle] = useState<{ left: number; width: number }>({
+    left: 0,
+    width: 0,
+  });
+
+  useEffect(() => {
+    if (!open) return;
+    const updateSubIndicator = () => {
+      let activeEl: HTMLButtonElement | null = null;
+      if (customMcpSubTab === "servers") activeEl = serversSubTabRef.current;
+      else if (customMcpSubTab === "json") activeEl = jsonSubTabRef.current;
+
+      if (activeEl) {
+        setSubIndicatorStyle({
+          left: activeEl.offsetLeft,
+          width: activeEl.offsetWidth,
+        });
+      }
+    };
+    updateSubIndicator();
+    const timer = setTimeout(updateSubIndicator, 50);
+    return () => clearTimeout(timer);
+  }, [customMcpSubTab, mainTab, open, language]);
 
   // Form / Editor View State (Image 3)
   const [isEditingServer, setIsEditingServer] = useState(false);
@@ -239,7 +264,6 @@ export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
   const filteredConnectors = useMemo(() => {
     return AVAILABLE_CONNECTORS.filter((c) => {
       if (c.id === "cloud-sandbox") return false;
-      const matchCat = selectedCategory === "All" || c.category === selectedCategory;
       const q = searchQuery.toLowerCase().trim();
       const matchSearch =
         !q ||
@@ -247,9 +271,9 @@ export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
         c.description.toLowerCase().includes(q) ||
         c.tagline.toLowerCase().includes(q) ||
         c.skills.some((s) => s.toLowerCase().includes(q));
-      return matchCat && matchSearch;
+      return matchSearch;
     });
-  }, [searchQuery, selectedCategory]);
+  }, [searchQuery]);
 
   // Connect / Authorize Handler for Apps & Tools
   const handleToggleConnect = async (connector: ConnectorMetadata, e?: React.MouseEvent) => {
@@ -653,7 +677,7 @@ export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
           {/* ============================================================= */}
           {mainTab === "apps" && !selectedConnector && (
             <div className="space-y-4">
-              {/* Search & Category Pills */}
+              {/* Search Bar (Category menu pills hidden) */}
               <div className="space-y-2.5">
                 <div className="relative w-full">
                   <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
@@ -664,27 +688,6 @@ export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full pl-9 pr-4 py-2 text-xs rounded-xl bg-secondary/40 border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/40 transition-colors"
                   />
-                </div>
-
-                {/* Category Filters */}
-                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-                  {(["All", "Featured", "Productivity", "Creativity", "Education", "Developer"] as CategoryFilter[]).map(
-                    (cat) => (
-                      <button
-                        key={cat}
-                        type="button"
-                        onClick={() => setSelectedCategory(cat)}
-                        className={cn(
-                          "px-3 py-1 rounded-lg text-xs font-medium whitespace-nowrap transition-colors cursor-pointer",
-                          selectedCategory === cat
-                            ? "bg-foreground text-background"
-                            : "bg-secondary/40 text-muted-foreground hover:text-foreground hover:bg-secondary border border-border/60"
-                        )}
-                      >
-                        {cat}
-                      </button>
-                    )
-                  )}
                 </div>
               </div>
 
@@ -907,44 +910,56 @@ export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
           {/* ============================================================= */}
           {mainTab === "custom_mcp" && (
             <div className="space-y-4">
-              {/* Sub-toolbar inside Custom MCP: Switcher (Servers | JSON Config) + Add Server */}
+              {/* Sub-toolbar inside Custom MCP: Switcher (Servers | JSON) + Add Server */}
               {!isEditingServer && (
-                <div className="flex items-center justify-between gap-3">
-                  <div className="flex items-center p-0.5 rounded-xl bg-secondary/60 border border-border">
+                <div className="flex items-center justify-between gap-2 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+                  <div className="relative flex items-center h-9 p-0.5 rounded-xl bg-muted/70 border border-border w-fit shrink-0">
+                    <div
+                      className="absolute top-0.5 bottom-0.5 left-0 rounded-lg bg-background shadow-2xs pointer-events-none transition-all duration-300"
+                      style={{
+                        transform: `translateX(${subIndicatorStyle.left}px)`,
+                        width: `${subIndicatorStyle.width}px`,
+                        opacity: subIndicatorStyle.width > 0 ? 1 : 0,
+                        transitionTimingFunction: "cubic-bezier(0.16, 1, 0.3, 1)",
+                      }}
+                    />
+
                     <button
+                      ref={serversSubTabRef}
                       type="button"
                       onClick={() => setCustomMcpSubTab("servers")}
                       className={cn(
-                        "px-3 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer flex items-center gap-1",
+                        "relative z-10 px-3.5 h-full rounded-lg text-xs font-medium transition-colors duration-200 cursor-pointer select-none flex items-center justify-center gap-1.5 whitespace-nowrap",
                         customMcpSubTab === "servers"
-                          ? "bg-card text-foreground shadow-xs font-semibold"
+                          ? "text-foreground font-semibold"
                           : "text-muted-foreground hover:text-foreground"
                       )}
                     >
-                      <Server className="w-3 h-3" />
+                      <Server className="w-3.5 h-3.5" />
                       <span>Servers</span>
                     </button>
                     <button
+                      ref={jsonSubTabRef}
                       type="button"
                       onClick={() => setCustomMcpSubTab("json")}
                       className={cn(
-                        "px-3 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer flex items-center gap-1",
+                        "relative z-10 px-3.5 h-full rounded-lg text-xs font-medium transition-colors duration-200 cursor-pointer select-none flex items-center justify-center gap-1.5 whitespace-nowrap",
                         customMcpSubTab === "json"
-                          ? "bg-card text-foreground shadow-xs font-semibold"
+                          ? "text-foreground font-semibold"
                           : "text-muted-foreground hover:text-foreground"
                       )}
                     >
-                      <Code2 className="w-3 h-3" />
-                      <span>JSON Config</span>
+                      <Code2 className="w-3.5 h-3.5" />
+                      <span>JSON</span>
                     </button>
                   </div>
 
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5 shrink-0">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <button
                           type="button"
-                          className="h-7 w-7 rounded-lg border border-border bg-card/60 hover:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
+                          className="h-8 w-8 rounded-xl border border-border bg-card/60 hover:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer shrink-0"
                           title="Options"
                         >
                           <MoreHorizontal className="w-3.5 h-3.5" />
@@ -984,7 +999,7 @@ export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
                       type="button"
                       onClick={handleRefresh}
                       disabled={isRefreshing}
-                      className="h-7 w-7 rounded-lg border border-border bg-card/60 hover:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
+                      className="h-8 w-8 rounded-xl border border-border bg-card/60 hover:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer shrink-0"
                       title="Refresh"
                     >
                       <RotateCcw className={cn("w-3.5 h-3.5", isRefreshing && "animate-spin text-primary")} />
@@ -993,9 +1008,9 @@ export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
                     <button
                       type="button"
                       onClick={handleOpenNewServer}
-                      className="h-7 px-3 rounded-lg bg-foreground text-background hover:opacity-90 font-medium text-xs flex items-center gap-1 shadow-xs cursor-pointer"
+                      className="h-8 px-3 rounded-xl bg-foreground text-background hover:opacity-90 font-medium text-xs flex items-center gap-1.5 shadow-xs cursor-pointer shrink-0 whitespace-nowrap"
                     >
-                      <Plus className="w-3 h-3" />
+                      <Plus className="w-3.5 h-3.5" />
                       <span>Add server</span>
                     </button>
                   </div>
