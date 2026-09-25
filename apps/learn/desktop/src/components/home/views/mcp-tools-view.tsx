@@ -13,7 +13,6 @@ import {
   Monitor,
   RotateCcw,
   Cable,
-  MoreHorizontal,
   ExternalLink,
   Search,
   ArrowLeft,
@@ -21,15 +20,8 @@ import {
   Sparkles,
   Unlink2,
   Link2,
-  Upload,
-  Download,
 } from "lucide-react";
 import {
-  DropdownMenu,
-  DropdownMenuTrigger,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
   Select,
   SelectTrigger,
   SelectValue,
@@ -38,12 +30,6 @@ import {
   Switch,
   Button,
   Input,
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
   BrandLogo,
   AVAILABLE_CONNECTORS,
   type ConnectorMetadata,
@@ -190,10 +176,6 @@ export function McpToolsView() {
   // Full JSON Config inside Custom MCP
   const [fullJsonText, setFullJsonText] = useState("");
   const [isCopiedFullJson, setIsCopiedFullJson] = useState(false);
-
-  // Import Dialog State
-  const [isImportDialogOpen, setIsImportDialogOpen] = useState(false);
-  const [importJsonInput, setImportJsonInput] = useState("");
 
   useEffect(() => {
     const handleUpdate = () => {
@@ -511,13 +493,6 @@ export function McpToolsView() {
     toast.success(isIndo ? "Server dihapus." : "Server deleted.");
   };
 
-  const handleResetAllServers = () => {
-    const emptyConfig: McpConfigurationState = { servers: [] };
-    setMcpConfig(emptyConfig);
-    saveStoredMcpConfig(emptyConfig);
-    toast.success(isIndo ? "Semua server MCP dibersihkan." : "All MCP servers cleared.");
-  };
-
   const handleSaveFullJson = () => {
     try {
       const imported = importMcpJson(fullJsonText);
@@ -540,26 +515,6 @@ export function McpToolsView() {
     setIsCopiedFullJson(true);
     toast.success(isIndo ? "Konfigurasi disalin ke clipboard!" : "Configuration copied to clipboard!");
     setTimeout(() => setIsCopiedFullJson(false), 2000);
-  };
-
-  const handleExecuteImport = () => {
-    if (!importJsonInput.trim()) return;
-    try {
-      const imported = importMcpJson(importJsonInput);
-      setMcpConfig(imported);
-      saveStoredMcpConfig(imported);
-      setIsImportDialogOpen(false);
-      setImportJsonInput("");
-      toast.success(
-        isIndo
-          ? `Berhasil mengimpor ${imported.servers.length} server MCP.`
-          : `Successfully imported ${imported.servers.length} MCP servers.`
-      );
-    } catch (err: any) {
-      toast.error(
-        isIndo ? `Gagal mengimpor JSON: ${err?.message || ""}` : `Failed to import JSON: ${err?.message || ""}`
-      );
-    }
   };
 
   return (
@@ -960,46 +915,6 @@ export function McpToolsView() {
 
               {/* Right: Refresh & + Add server */}
               <div className="flex items-center gap-2 self-start sm:self-auto">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button
-                      type="button"
-                      className="h-8 w-8 rounded-xl border border-border bg-card/60 hover:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
-                      title={isIndo ? "Opsi" : "Options"}
-                    >
-                      <MoreHorizontal className="w-4 h-4" />
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-48 bg-card border-border text-foreground p-1 rounded-xl shadow-xl">
-                    <DropdownMenuItem
-                      onClick={() => setIsImportDialogOpen(true)}
-                      className="text-xs px-3 py-2 rounded-lg cursor-pointer hover:bg-secondary flex items-center gap-2"
-                    >
-                      <Upload className="w-3.5 h-3.5 text-muted-foreground" />
-                      <span>{isIndo ? "Impor dari JSON" : "Import from JSON"}</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      onClick={handleCopyFullJson}
-                      className="text-xs px-3 py-2 rounded-lg cursor-pointer hover:bg-secondary flex items-center gap-2"
-                    >
-                      <Download className="w-3.5 h-3.5 text-muted-foreground" />
-                      <span>{isIndo ? "Salin mcpServers.json" : "Copy mcpServers.json"}</span>
-                    </DropdownMenuItem>
-                    {mcpConfig.servers.length > 0 && (
-                      <>
-                        <DropdownMenuSeparator className="my-1 bg-border/60" />
-                        <DropdownMenuItem
-                          onClick={handleResetAllServers}
-                          className="text-xs px-3 py-2 rounded-lg cursor-pointer text-destructive hover:bg-destructive/10 flex items-center gap-2"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                          <span>{isIndo ? "Hapus Semua Server" : "Clear All Servers"}</span>
-                        </DropdownMenuItem>
-                      </>
-                    )}
-                  </DropdownMenuContent>
-                </DropdownMenu>
-
                 <button
                   type="button"
                   onClick={handleRefresh}
@@ -1429,55 +1344,6 @@ export function McpToolsView() {
         </div>
       )}
 
-      {/* =================================================================== */}
-      {/* QUICK IMPORT JSON DIALOG                                            */}
-      {/* =================================================================== */}
-      <Dialog open={isImportDialogOpen} onOpenChange={setIsImportDialogOpen}>
-        <DialogContent className="max-w-lg bg-card border-border text-foreground rounded-3xl p-6">
-          <DialogHeader>
-            <DialogTitle className="text-base font-semibold">
-              {isIndo ? "Impor Konfigurasi mcpServers" : "Import mcpServers Configuration"}
-            </DialogTitle>
-            <DialogDescription className="text-xs text-muted-foreground">
-              {isIndo
-                ? "Tempelkan potongan JSON mcpServers dari Claude Desktop atau Antigravity."
-                : "Paste your mcpServers JSON configuration from Claude Desktop or Antigravity."}
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="py-2">
-            <textarea
-              value={importJsonInput}
-              onChange={(e) => setImportJsonInput(e.target.value)}
-              placeholder='{\n  "mcpServers": {\n    "my-server": {\n      "url": "https://mcp.example.com/mcp"\n    }\n  }\n}'
-              rows={8}
-              spellCheck={false}
-              className="w-full p-3 rounded-2xl bg-secondary/40 border border-border text-xs font-mono text-foreground focus:outline-none focus:border-foreground/30 resize-none leading-relaxed"
-            />
-          </div>
-
-          <DialogFooter className="flex items-center justify-end gap-2 pt-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setIsImportDialogOpen(false);
-                setImportJsonInput("");
-              }}
-              className="rounded-xl text-xs h-8 cursor-pointer"
-            >
-              {isIndo ? "Batal" : "Cancel"}
-            </Button>
-            <Button
-              size="sm"
-              onClick={handleExecuteImport}
-              className="rounded-xl text-xs h-8 cursor-pointer bg-foreground text-background hover:opacity-90"
-            >
-              {isIndo ? "Terapkan Impor" : "Import"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }
