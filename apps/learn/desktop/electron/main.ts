@@ -479,8 +479,8 @@ app.on("second-instance", (_event, commandLine) => {
       titleBarOverlay: isMac
         ? false
         : {
-            color: isDark ? "#161616" : "#f3f3f3",
-            symbolColor: isDark ? "#a1a1aa" : "#52525b",
+            color: isDark ? "#161616" : "#ffffff",
+            symbolColor: isDark ? "#a1a1aa" : "#3f3f46",
             height: 36,
           },
       show: true,
@@ -506,8 +506,8 @@ app.on("second-instance", (_event, commandLine) => {
         if (process.platform === "win32") {
           try {
             win.setTitleBarOverlay?.({
-              color: dark ? "#161616" : "#f3f3f3",
-              symbolColor: dark ? "#a1a1aa" : "#52525b",
+              color: dark ? "#161616" : "#ffffff",
+              symbolColor: dark ? "#a1a1aa" : "#3f3f46",
               height: 36,
             });
           } catch {}
@@ -625,7 +625,14 @@ app.on("second-instance", (_event, commandLine) => {
     (_event, options: { color?: string; symbolColor?: string; height?: number }) => {
       try {
         if (win && !win.isDestroyed() && process.platform === "win32") {
-          win.setTitleBarOverlay?.(options);
+          const isDark = options?.color === "#161616";
+          nativeTheme.themeSource = isDark ? "dark" : "light";
+          win.setBackgroundColor(isDark ? "#161616" : "#ffffff");
+          win.setTitleBarOverlay?.({
+            color: options?.color || (isDark ? "#161616" : "#ffffff"),
+            symbolColor: options?.symbolColor || (isDark ? "#a1a1aa" : "#3f3f46"),
+            height: options?.height || 36,
+          });
         }
       } catch (err) {
         console.error("[Electron Main] Failed to setTitleBarOverlay:", err);
