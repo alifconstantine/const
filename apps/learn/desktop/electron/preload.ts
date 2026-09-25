@@ -66,6 +66,8 @@ contextBridge.exposeInMainWorld("electron", {
       approved?: boolean;
       feedback?: string;
     }) => ipcRenderer.invoke("agent:respond-approval", payload),
+    updateMode: (payload: { mode: "ask_before_changes" | "full_access"; learnId?: string }) =>
+      ipcRenderer.invoke("agent:update-mode", payload),
     generateTitle: (prompt: string, authToken?: string) =>
       ipcRenderer.invoke("agent:generate-title", prompt, authToken),
     generateCompletion: (payload: {

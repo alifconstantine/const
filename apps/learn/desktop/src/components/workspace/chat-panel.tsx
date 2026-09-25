@@ -414,6 +414,13 @@ export function ChatPanel({
     }
   };
 
+  // Auto-resolve pending approval if mode is switched to full_access dynamically
+  useEffect(() => {
+    if (permissionMode === "full_access" && activeApproval && !isRespondingApproval) {
+      handleRespondApproval("allow_once");
+    }
+  }, [permissionMode, activeApproval, isRespondingApproval]);
+
   const SINGLE_LINE_HEIGHT = 28;
   const MIN_MULTILINE_HEIGHT = 48;
   const MAX_MULTILINE_HEIGHT = 220;

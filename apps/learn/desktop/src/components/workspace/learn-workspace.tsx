@@ -1554,6 +1554,10 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
                 onClick={async () => {
                   if (learnId) {
                     await localDb.updateLearn(learnId, { permissionMode: "ask_before_changes" });
+                    await window.electron?.agent?.updateMode?.({
+                      mode: "ask_before_changes",
+                      learnId,
+                    });
                   }
                 }}
               >
@@ -1577,6 +1581,10 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
                 onClick={async () => {
                   if (learnId) {
                     await localDb.updateLearn(learnId, { permissionMode: "full_access" });
+                    await window.electron?.agent?.updateMode?.({
+                      mode: "full_access",
+                      learnId,
+                    });
                   }
                 }}
               >

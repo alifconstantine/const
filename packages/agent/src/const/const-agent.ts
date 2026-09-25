@@ -10,7 +10,15 @@ import type {
   ApprovalRequestData,
   ApprovalResponseData,
 } from "./types.js";
-import { CONST_DEFAULT_TOOLS, CONST_LEARN_TOOLS, executeNativeTool, extractCommandArg } from "./tools.js";
+import {
+  CONST_DEFAULT_TOOLS,
+  CONST_LEARN_TOOLS,
+  executeNativeTool,
+  extractCommandArg,
+  extractPathArg,
+  resolveSafePath,
+  isPathWithinWorkspace,
+} from "./tools.js";
 
 function parseToolArguments(rawArgs: any): Record<string, any> {
   if (!rawArgs) return {};
@@ -559,6 +567,35 @@ export class ConstAgent {
       workspacePath: process.cwd(),
       ...config,
     };
+    if (config.initialAllowedTools) {
+      for (const item of config.initialAllowedTools) {
+        if (item) this.sessionAllowedTools.add(item);
+      }
+    }
+  }
+
+  public get sessionAllowedToolsSet(): Set<string> {
+    return new Set(this.sessionAllowedTools);
+  }
+
+  public get mode(): "ask_before_changes" | "full_access" {
+    return this.config.mode || "ask_before_changes";
+  }
+
+  public updateMode(newMode: "ask_before_changes" | "full_access"): void {
+    this.config.mode = newMode;
+    if (newMode === "full_access") {
+      // Auto-resolve any pending approvals immediately so execution proceeds
+      for (const [id, resolver] of this.pendingApprovals.entries()) {
+        try {
+          resolver({
+            approvalId: id,
+            decision: "allow_once",
+          });
+        } catch {}
+      }
+      this.pendingApprovals.clear();
+    }
   }
 
   public get isCancelled(): boolean {
@@ -1210,7 +1247,7 @@ export class ConstAgent {
             args: parsedArgs,
           });
 
-          // Check for Approval in "ask_before_changes" mode for terminal / shell execution
+          // Check for Approval in "ask_before_changes" mode for terminal / shell execution, python execution, and file mutations
           const toolLower = tc.function.name.toLowerCase();
           const isTerminalTool =
             toolLower === "bash" ||
@@ -1221,21 +1258,80 @@ export class ConstAgent {
             toolLower === "run_command" ||
             toolLower === "runcommand";
 
-          const cmd = isTerminalTool ? extractCommandArg(parsedArgs) : undefined;
-          const rawCwd = parsedArgs.cwd || parsedArgs.working_directory || parsedArgs.workdir || parsedArgs.path;
-          const targetCwd = rawCwd ? path.resolve(workspacePath, rawCwd) : workspacePath;
+          const isPythonTool =
+            toolLower === "run_python" ||
+            toolLower === "python" ||
+            toolLower === "py" ||
+            toolLower === "runpython" ||
+            toolLower === "pythoneval";
+
+          const isFileMutationTool =
+            toolLower === "write" ||
+            toolLower === "writefile" ||
+            toolLower === "edit" ||
+            toolLower === "editfile" ||
+            toolLower === "replaceinfile" ||
+            toolLower === "applypatch" ||
+            toolLower === "patch" ||
+            toolLower === "mkdir" ||
+            toolLower === "makedir";
+
+          const isActionTool = isTerminalTool || isPythonTool || isFileMutationTool;
+
+          let cmd = isTerminalTool ? extractCommandArg(parsedArgs) : undefined;
+          let targetCwd = workspacePath;
+          let description = "";
+          let isOutside = false;
+          let targetFilePath = "";
+
+          if (isTerminalTool) {
+            const rawCwd = parsedArgs.cwd || parsedArgs.working_directory || parsedArgs.workdir || parsedArgs.path;
+            targetCwd = rawCwd ? path.resolve(workspacePath, rawCwd) : workspacePath;
+            description = `Execute terminal command: ${cmd || tc.function.name}`;
+          } else if (isPythonTool) {
+            const pyCode =
+              (typeof parsedArgs.code === "string" ? parsedArgs.code : "") ||
+              (typeof parsedArgs.script === "string" ? parsedArgs.script : "") ||
+              (typeof parsedArgs.python_code === "string" ? parsedArgs.python_code : "");
+            cmd = pyCode ? (pyCode.length > 80 ? pyCode.slice(0, 77) + "..." : pyCode) : "run_python";
+            targetCwd = workspacePath;
+            description = `Execute Python script: ${cmd}`;
+          } else if (isFileMutationTool) {
+            targetFilePath = extractPathArg(parsedArgs) || "";
+            const resolvedPath = resolveSafePath(targetFilePath, workspacePath);
+            isOutside = !isPathWithinWorkspace(resolvedPath, workspacePath);
+            cmd = `${tc.function.name}: ${targetFilePath || "file"}`;
+            targetCwd = workspacePath;
+            description = `Modify file: ${targetFilePath || tc.function.name}`;
+          }
 
           const isAlreadyAllowed =
             this.sessionAllowedTools.has(toolLower) ||
+            (isFileMutationTool && this.sessionAllowedTools.has("file_mutations") && !isOutside) ||
+            Boolean(
+              targetFilePath &&
+                (this.sessionAllowedTools.has(`file:${targetFilePath}`) ||
+                  this.sessionAllowedTools.has(`file:${resolveSafePath(targetFilePath, workspacePath)}`))
+            ) ||
             Boolean(cmd && this.sessionAllowedTools.has(`cmd:${cmd.trim()}`));
 
-          if (this.config.mode === "ask_before_changes" && isTerminalTool && !isAlreadyAllowed) {
+          // Workspace-write model (aligned with DeepSeek Harness):
+          // In "ask_before_changes", file mutations INSIDE workspace proceed without interruption.
+          // Terminal executions, Python executions, and out-of-workspace writes require approval.
+          const requiresApproval =
+            isTerminalTool ||
+            isPythonTool ||
+            (isFileMutationTool && isOutside);
+
+          let approvedThisTurn = false;
+
+          if (this.config.mode === "ask_before_changes" && requiresApproval && !isAlreadyAllowed) {
             const approvalId = `appr_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
             onEvent({
               type: "status",
               status: "waiting_approval",
-              message: `Waiting for approval to execute: ${cmd || tc.function.name}`,
+              message: `Waiting for approval: ${description || cmd || tc.function.name}`,
             });
 
             const approvalReq: ApprovalRequestData = {
@@ -1245,7 +1341,7 @@ export class ConstAgent {
               args: parsedArgs,
               command: cmd,
               cwd: targetCwd,
-              description: `Execute terminal command: ${cmd || tc.function.name}`,
+              description,
               createdAt: Date.now(),
             };
 
@@ -1285,16 +1381,37 @@ export class ConstAgent {
               userResponse.decision === "allow_conversation" ||
               userResponse.decision === "allow_project"
             ) {
-              if (cmd && cmd.trim()) {
+              approvedThisTurn = true;
+              if (isFileMutationTool) {
+                this.sessionAllowedTools.add(toolLower);
+                if (targetFilePath) {
+                  this.sessionAllowedTools.add(`file:${targetFilePath}`);
+                  this.sessionAllowedTools.add(`file:${resolveSafePath(targetFilePath, workspacePath)}`);
+                }
+                if (!isOutside) {
+                  this.sessionAllowedTools.add("file_mutations");
+                }
+              } else if (isPythonTool) {
+                this.sessionAllowedTools.add(toolLower);
+                if (cmd && cmd.trim()) this.sessionAllowedTools.add(`cmd:${cmd.trim()}`);
+              } else if (cmd && cmd.trim()) {
                 this.sessionAllowedTools.add(`cmd:${cmd.trim()}`);
+                this.sessionAllowedTools.add(toolLower);
               } else {
                 this.sessionAllowedTools.add(toolLower);
               }
+            } else if (userResponse.decision === "allow_once") {
+              approvedThisTurn = true;
             } else if (userResponse.decision === "deny") {
               const feedbackText = userResponse.feedback?.trim();
+              const actionSubject = isFileMutationTool
+                ? `file mutation: '${targetFilePath || "file"}'`
+                : isPythonTool
+                ? `Python execution`
+                : `command: '${cmd}'`;
               const rejectionMessage = feedbackText
-                ? `[ACTION REJECTED BY USER]: The user denied permission to execute command: '${cmd}'. User instruction / feedback: "${feedbackText}". Adapt your plan immediately based on this instruction and proceed without running that command.`
-                : `[ACTION REJECTED BY USER]: The user denied permission to execute command: '${cmd}'. Do NOT execute this command. Choose a different approach or explain the options clearly.`;
+                ? `[ACTION REJECTED BY USER]: The user denied permission to execute ${actionSubject}. User instruction / feedback: "${feedbackText}". Adapt your plan immediately based on this instruction and proceed without running that action.`
+                : `[ACTION REJECTED BY USER]: The user denied permission to execute ${actionSubject}. Do NOT execute this action. Choose a different approach or explain the options clearly.`;
 
               onEvent({
                 type: "tool_result",
@@ -1320,7 +1437,12 @@ export class ConstAgent {
 
               continue;
             } else if (userResponse.decision === "skip") {
-              const skipMessage = `[ACTION SKIPPED BY USER]: The user skipped execution of command: '${cmd}'. Proceed with other tasks or ask the user how to continue.`;
+              const actionSubject = isFileMutationTool
+                ? `file mutation: '${targetFilePath || "file"}'`
+                : isPythonTool
+                ? `Python execution`
+                : `command: '${cmd}'`;
+              const skipMessage = `[ACTION SKIPPED BY USER]: The user skipped execution of ${actionSubject}. Proceed with other tasks or ask the user how to continue.`;
 
               onEvent({
                 type: "tool_result",
@@ -1346,8 +1468,12 @@ export class ConstAgent {
 
               continue;
             }
-            // If "allow_once", proceed below to executeNativeTool!
           }
+
+          const allowOutsideWorkspace =
+            this.config.mode === "full_access" ||
+            isAlreadyAllowed ||
+            approvedThisTurn;
 
           const { result, isError } = await executeNativeTool(
             tc.function.name,
@@ -1356,6 +1482,7 @@ export class ConstAgent {
             {
               signal,
               stepIndex: currentTurn,
+              allowOutsideWorkspace,
               onFileMutation: (record) => {
                 onEvent({ type: "file_mutation", record });
               },

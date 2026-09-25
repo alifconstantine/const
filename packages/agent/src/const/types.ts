@@ -140,6 +140,7 @@ export interface AgentConfig {
   workspacePath?: string;
   maxTurns?: number;
   mode?: "ask_before_changes" | "full_access";
+  initialAllowedTools?: Set<string> | string[];
   thinkingLevel?: ThinkingLevel | string;
   maxTokens?: number;
   maxOutputTokens?: number;

@@ -87,6 +87,10 @@ declare global {
           approved?: boolean;
           feedback?: string;
         }) => Promise<{ success: boolean; resolved?: boolean; error?: string }>;
+        updateMode?: (payload: {
+          mode: "ask_before_changes" | "full_access";
+          learnId?: string;
+        }) => Promise<{ success: boolean }>;
         generateTitle?: (prompt: string, authToken?: string) => Promise<string | null>;
         generateCompletion?: (payload: {
           messages: { role: string; content: string }[];

@@ -14,6 +14,7 @@ export interface ExecuteToolOptions {
   askUser?: (questions: QuestionItem[]) => Promise<any>;
   onTaskStarted?: (task: BackgroundTaskItem) => void;
   onTaskStopped?: (taskId: string, code: number | null) => void;
+  allowOutsideWorkspace?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -2382,7 +2383,7 @@ export async function executeComposioTool(
 }
 
 // Helper argument extractors
-function extractPathArg(args: Record<string, any>): string {
+export function extractPathArg(args: Record<string, any>): string {
   const val =
     args.path ??
     args.file_path ??
@@ -3076,6 +3077,12 @@ export async function executeNativeTool(
         };
       }
       const filePath = resolveSafePath(rawPath, workspacePath);
+      if (!options?.allowOutsideWorkspace && !isPathWithinWorkspace(filePath, workspacePath) && !isAllowedInternalPath(filePath)) {
+        return {
+          result: `[SANDBOX DENIED]: Access denied. Cannot write to file outside workspace directory: '${filePath}'.`,
+          isError: true,
+        };
+      }
       const content = extractContentArg(args);
 
       // Auto-create parent directories (Pi standard)
@@ -3134,6 +3141,12 @@ export async function executeNativeTool(
         };
       }
       const filePath = resolveSafePath(rawPath, workspacePath);
+      if (!options?.allowOutsideWorkspace && !isPathWithinWorkspace(filePath, workspacePath) && !isAllowedInternalPath(filePath)) {
+        return {
+          result: `[SANDBOX DENIED]: Access denied. Cannot edit file outside workspace directory: '${filePath}'.`,
+          isError: true,
+        };
+      }
 
       const oldContent =
         args.old_content ??
@@ -3395,6 +3408,12 @@ export async function executeNativeTool(
         };
       }
       const dirPath = resolveSafePath(rawPath, workspacePath);
+      if (!options?.allowOutsideWorkspace && !isPathWithinWorkspace(dirPath, workspacePath) && !isAllowedInternalPath(dirPath)) {
+        return {
+          result: `[SANDBOX DENIED]: Access denied. Cannot create directory outside workspace directory: '${dirPath}'.`,
+          isError: true,
+        };
+      }
 
       await fs.mkdir(dirPath, { recursive: true });
       const displayPath = path.isAbsolute(rawPath) ? dirPath : path.relative(workspacePath, dirPath);
@@ -3775,6 +3794,12 @@ export async function executeNativeTool(
       }
 
       const filePath = resolveSafePath(rawPath, workspacePath);
+      if (!options?.allowOutsideWorkspace && !isPathWithinWorkspace(filePath, workspacePath) && !isAllowedInternalPath(filePath)) {
+        return {
+          result: `[SANDBOX DENIED]: Access denied. Cannot apply patch to file outside workspace directory: '${filePath}'.`,
+          isError: true,
+        };
+      }
       if (!fsSync.existsSync(filePath)) {
         return {
           result: `File not found to patch: '${filePath}'`,

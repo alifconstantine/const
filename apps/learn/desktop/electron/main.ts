@@ -989,7 +989,21 @@ app.on("second-instance", (_event, commandLine) => {
   // Agent & Execution IPC Handlers (Router AI & Learn Preset Integration)
   // ---------------------------------------------------------------------------
   let activeAgent: any = null;
+  const sessionAllowedMap = new Map<string, Set<string>>();
+  let currentSessionMode: "ask_before_changes" | "full_access" = "ask_before_changes";
   const pendingQuestions = new Map<string, (answer: any) => void>();
+
+  ipcMain.handle(
+    "agent:update-mode",
+    async (_event, { mode, learnId }: { mode: "ask_before_changes" | "full_access"; learnId?: string }) => {
+      currentSessionMode = mode;
+      if (activeAgent && typeof activeAgent.updateMode === "function") {
+        activeAgent.updateMode(mode);
+        return { success: true };
+      }
+      return { success: true, pending: true };
+    }
+  );
 
   ipcMain.handle(
     "agent:answer-question",
@@ -1278,6 +1292,9 @@ app.on("second-instance", (_event, commandLine) => {
 
       const agentTools = [...CONST_LEARN_TOOLS, ...activeComposioTools];
 
+      const sessionKey = payload.learnId || "default";
+      const initialAllowedTools = sessionAllowedMap.get(sessionKey);
+
       activeAgent = createConstAgent({
         baseUrl,
         apiKey,
@@ -1286,7 +1303,8 @@ app.on("second-instance", (_event, commandLine) => {
         preset: "learn",
         tools: agentTools,
         systemPrompt: effectiveSystemPrompt,
-        mode: payload.mode || "ask_before_changes",
+        mode: payload.mode || currentSessionMode || "ask_before_changes",
+        initialAllowedTools,
         thinkingLevel: payload.thinkingLevel as any,
         maxOutputTokens: payload.maxOutputTokens ?? (modelDef as any)?.maxOutputTokens,
         onAskQuestion: (toolCallId, questionData) => {
@@ -1319,6 +1337,12 @@ app.on("second-instance", (_event, commandLine) => {
       } catch (err: any) {
         return { success: false, error: err.message };
       } finally {
+        if (activeAgent) {
+          const updatedAllowed = activeAgent.sessionAllowedToolsSet;
+          if (updatedAllowed && updatedAllowed.size > 0) {
+            sessionAllowedMap.set(sessionKey, updatedAllowed);
+          }
+        }
         activeAgent = null;
       }
     }

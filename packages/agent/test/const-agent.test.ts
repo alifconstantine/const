@@ -2,7 +2,8 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import * as fs from "node:fs/promises";
 import * as path from "node:path";
 import * as os from "node:os";
-import { executeNativeTool, CONST_DEFAULT_TOOLS } from "../src/const/tools.js";
+import { executeNativeTool, CONST_DEFAULT_TOOLS, isPathWithinWorkspace } from "../src/const/tools.js";
+import { createConstAgent } from "../src/const/const-agent.js";
 
 describe("Const Agent Native Tools & Self-Healing Engine", () => {
   let tempDir: string;
@@ -226,15 +227,25 @@ describe("Const Agent Native Tools & Self-Healing Engine", () => {
       expect(readRes.isError).toBe(false);
       expect(readRes.result).toContain("external project data");
 
-      // 2. Writing foreign file outside workspace is allowed
+      // 2. Writing foreign file outside workspace is denied by default (sandbox safety)
       const writePath = path.join(foreignDir, "written.txt");
-      const writeRes = await executeNativeTool(
+      const writeDeniedRes = await executeNativeTool(
         "write",
         { path: writePath, content: "written outside workspace" },
         tempDir
       );
-      expect(writeRes.isError).toBe(false);
-      expect(writeRes.result).toContain("File written successfully");
+      expect(writeDeniedRes.isError).toBe(true);
+      expect(writeDeniedRes.result).toContain("[SANDBOX DENIED]");
+
+      // Writing foreign file is allowed when allowOutsideWorkspace option is enabled
+      const writeAllowedRes = await executeNativeTool(
+        "write",
+        { path: writePath, content: "written outside workspace" },
+        tempDir,
+        { allowOutsideWorkspace: true }
+      );
+      expect(writeAllowedRes.isError).toBe(false);
+      expect(writeAllowedRes.result).toContain("File written successfully");
 
       // 3. Listing directory outside workspace is allowed
       const lsRes = await executeNativeTool("ls", { path: foreignDir }, tempDir);
@@ -311,3 +322,71 @@ describe("Const Agent Native Tools & Self-Healing Engine", () => {
     expect(res.result).toContain("total characters");
   });
 });
+
+describe("Permission Modes & Workspace-Write Security", () => {
+  let wsDir: string;
+
+  beforeAll(async () => {
+    wsDir = await fs.mkdtemp(path.join(os.tmpdir(), "const-perm-test-"));
+  });
+
+  afterAll(async () => {
+    try {
+      await fs.rm(wsDir, { recursive: true, force: true });
+    } catch {}
+  });
+
+  it("correctly checks if paths are within workspace or escaping", () => {
+    // Normal files and directories inside workspace
+    expect(isPathWithinWorkspace(path.join(wsDir, "src", "index.ts"), wsDir)).toBe(true);
+    expect(isPathWithinWorkspace(path.join(wsDir, "notes.md"), wsDir)).toBe(true);
+    expect(isPathWithinWorkspace(wsDir, wsDir)).toBe(true);
+
+    // Path traversal or foreign directories
+    expect(isPathWithinWorkspace(path.resolve(wsDir, "../outside.txt"), wsDir)).toBe(false);
+    expect(isPathWithinWorkspace(path.resolve(wsDir, "..", "..", "secrets.json"), wsDir)).toBe(false);
+    expect(isPathWithinWorkspace(os.tmpdir(), wsDir)).toBe(false);
+  });
+
+  it("ConstAgent supports initialAllowedTools and maintains session permissions", () => {
+    const agent = createConstAgent({
+      apiKey: "test",
+      model: "test-model",
+      workspacePath: wsDir,
+      mode: "ask_before_changes",
+      initialAllowedTools: ["bash", "file:notes.txt"],
+    });
+
+    const set = agent.sessionAllowedToolsSet;
+    expect(set.has("bash")).toBe(true);
+    expect(set.has("file:notes.txt")).toBe(true);
+    expect(set.has("run_python")).toBe(false);
+  });
+
+  it("ConstAgent dynamically updates mode and auto-resolves pending approvals on full_access", () => {
+    const agent = createConstAgent({
+      apiKey: "test",
+      model: "test-model",
+      workspacePath: wsDir,
+      mode: "ask_before_changes",
+    });
+
+    expect(agent.mode).toBe("ask_before_changes");
+
+    let resolvedDecision: string | null = null;
+    (agent as any).pendingApprovals.set("test_appr_1", (res: any) => {
+      resolvedDecision = res.decision;
+    });
+
+    // Switch to full access
+    agent.updateMode("full_access");
+    expect(agent.mode).toBe("full_access");
+    expect(resolvedDecision).toBe("allow_once");
+    expect((agent as any).pendingApprovals.size).toBe(0);
+
+    // Switch back to ask before changes
+    agent.updateMode("ask_before_changes");
+    expect(agent.mode).toBe("ask_before_changes");
+  });
+});
+

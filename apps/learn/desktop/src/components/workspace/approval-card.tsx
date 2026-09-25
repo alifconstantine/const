@@ -17,6 +17,26 @@ type OptionItem = {
 };
 
 function deriveApprovalTitle(command?: string, toolName?: string): string {
+  const tLower = (toolName || "").toLowerCase();
+  if (tLower === "run_python" || tLower === "python" || tLower === "py" || tLower === "runpython") {
+    return "Allow executing Python script?";
+  }
+  if (tLower === "write" || tLower === "writefile") {
+    const rawP = command || "";
+    const fileName = rawP.replace(/^write:\s*/, "").split(/[\/\\]/).pop();
+    return fileName ? `Allow creating ${fileName}?` : "Allow writing file?";
+  }
+  if (tLower === "edit" || tLower === "editfile" || tLower === "replaceinfile") {
+    const rawP = command || "";
+    const fileName = rawP.replace(/^edit:\s*/, "").split(/[\/\\]/).pop();
+    return fileName ? `Allow editing ${fileName}?` : "Allow modifying file?";
+  }
+  if (tLower === "applypatch" || tLower === "patch") {
+    const rawP = command || "";
+    const fileName = rawP.replace(/^applypatch:\s*/, "").split(/[\/\\]/).pop();
+    return fileName ? `Allow patching ${fileName}?` : "Allow modifying file?";
+  }
+
   if (!command) {
     return `Allow executing ${toolName || "action"}?`;
   }
@@ -178,7 +198,7 @@ export function ApprovalCard({
     >
       {/* 1. Header Row */}
       <div className="flex items-center justify-between pb-1.5 min-w-0">
-        <div className="flex items-center gap-2.5 min-w-0 flex-1 pr-3">
+        <div className="flex items-center gap-2 min-w-0 flex-1 pr-3 flex-wrap">
           <span className="px-2 py-0.5 rounded-md bg-primary/10 text-primary font-medium text-[11px] shrink-0 border border-primary/20">
             {request.toolName || "Terminal"}
           </span>
