@@ -208,7 +208,6 @@ export function SourcesSheet({
                     onClick={onToggleResearchSpeed}
                     className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-secondary hover:bg-secondary/80 text-[10px] font-sans text-muted-foreground hover:text-foreground transition-colors cursor-pointer border border-border/70"
                   >
-                    <Search className="h-2.5 w-2.5" />
                     <span>
                       {researchSpeed === "Fast Research" ? t("speedFast") : t("speedDeep")}
                     </span>

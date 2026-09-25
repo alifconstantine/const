@@ -160,7 +160,7 @@ export const translations = {
     hidePanel: "Hide Panel",
 
     // Workspace: Add Source Dialog
-    addSourceDialogTitle: "Create Audio & Video Summaries from",
+    addSourceDialogTitle: "Add research materials &",
     addSourceDialogHighlight: "sources",
     orDropFiles: "or drop your files here",
     supportedFormats: "pdf, images, documents, audio, and more",
@@ -810,8 +810,8 @@ export const translations = {
     hidePanel: "Sembunyikan Panel",
 
     // Workspace: Add Source Dialog
-    addSourceDialogTitle: "Buat Ringkasan Audio dan Video dari",
-    addSourceDialogHighlight: "situs",
+    addSourceDialogTitle: "Tambahkan materi riset &",
+    addSourceDialogHighlight: "sumber belajar",
     orDropFiles: "atau lepaskan file Anda",
     supportedFormats: "pdf, gambar, dokumen, audio, dan banyak lagi",
     uploadFile: "Upload file",

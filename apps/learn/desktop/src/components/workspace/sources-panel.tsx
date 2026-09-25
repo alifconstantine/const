@@ -27,11 +27,18 @@ import { useI18n } from "../../lib/i18n";
 import { SourceIcon, getSourceCategoryLabel } from "./source-icon";
 import { SourcePreviewDialog } from "./source-preview-dialog";
 
+export interface InitialSearchConfig {
+  query: string;
+  scope?: "web" | "journal";
+  speed?: "fast" | "deep";
+  autoSearch?: boolean;
+}
+
 interface SourcesPanelProps {
   learnId?: string;
   sourcesCount?: number;
   width?: number;
-  onAddSource: () => void;
+  onAddSource: (initialSearch?: InitialSearchConfig) => void;
   onSelectSource?: (sourceType: string) => void;
   onDropFiles?: (files: File[]) => void;
   onToggleCollapse?: () => void;
@@ -65,6 +72,15 @@ export function SourcesPanel({
   const [researchSpeed, setResearchSpeed] = useState("Fast");
   const [isDraggingOver, setIsDraggingOver] = useState(false);
   const [selectedSourceForPreview, setSelectedSourceForPreview] = useState<LocalSource | null>(null);
+
+  const handleTriggerSearch = () => {
+    onAddSource({
+      query: searchQuery.trim(),
+      scope: webScope.toLowerCase() === "journal" ? "journal" : "web",
+      speed: researchSpeed.toLowerCase() === "deep" ? "deep" : "fast",
+      autoSearch: Boolean(searchQuery.trim()),
+    });
+  };
 
   // Query sources live from Dexie database
   const sources =
@@ -139,7 +155,7 @@ export function SourcesPanel({
 
           <button
             type="button"
-            onClick={onAddSource}
+            onClick={() => onAddSource()}
             className="h-8 w-8 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer mt-1"
             title={t("addSource")}
             aria-label={t("addSource")}
@@ -182,7 +198,7 @@ export function SourcesPanel({
       {/* "+ Add source" Button */}
       <button
         type="button"
-        onClick={onAddSource}
+        onClick={() => onAddSource()}
         className="w-full py-2.5 px-4 rounded-full bg-secondary/80 hover:bg-secondary border border-border/70 hover:border-border text-xs font-medium text-foreground flex items-center justify-center gap-2 transition-all cursor-pointer mb-3 shrink-0 shadow-2xs hover:shadow-xs active:scale-[0.99] group"
       >
         <Plus className="h-3.5 w-3.5 stroke-[2.5] text-muted-foreground group-hover:text-foreground transition-colors" />
@@ -196,6 +212,9 @@ export function SourcesPanel({
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") handleTriggerSearch();
+            }}
             placeholder={t("searchWebSources")}
             className="w-full bg-transparent text-xs text-foreground placeholder:text-muted-foreground/60 outline-none pr-6 pl-1 py-0.5"
           />
@@ -256,7 +275,6 @@ export function SourcesPanel({
                   type="button"
                   className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-background/80 hover:bg-background text-[10.5px] font-medium text-muted-foreground hover:text-foreground transition-all cursor-pointer border border-border/50 shadow-2xs"
                 >
-                  <Search className="h-2.5 w-2.5 text-muted-foreground/80" />
                   <span>{researchSpeed === "Deep" ? t("speedDeep") : t("speedFast")}</span>
                   <ChevronDown className="h-2.5 w-2.5 opacity-60" />
                 </button>
@@ -282,8 +300,10 @@ export function SourcesPanel({
 
           <button
             type="button"
-            className="h-6 w-6 rounded-full bg-background hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-all cursor-pointer border border-border/50 shadow-2xs shrink-0"
+            onClick={handleTriggerSearch}
+            className="h-6 w-6 rounded-full bg-primary/10 hover:bg-primary/20 text-primary flex items-center justify-center transition-all cursor-pointer border border-primary/20 shadow-2xs shrink-0"
             aria-label={t("search")}
+            title="Search web or journals"
           >
             <Search className="h-3 w-3" />
           </button>
@@ -315,11 +335,21 @@ export function SourcesPanel({
           {/* Scrollable list of source cards */}
           {filteredSources.length === 0 ? (
             <div className="flex-1 flex flex-col items-center justify-center text-center p-4 text-muted-foreground">
-              <p className="text-xs">No sources matching &quot;{searchQuery}&quot;</p>
+              <p className="text-xs">No local sources matching &quot;{searchQuery}&quot;</p>
+              {searchQuery.trim() && (
+                <button
+                  type="button"
+                  onClick={handleTriggerSearch}
+                  className="mt-2.5 px-3 py-1.5 rounded-full bg-primary/10 hover:bg-primary/20 text-primary text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5"
+                >
+                  <Search className="h-3 w-3" />
+                  <span>Search &quot;{searchQuery.slice(0, 18)}&quot; on {webScope}</span>
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => setSearchQuery("")}
-                className="mt-2 text-[11px] text-primary hover:underline cursor-pointer"
+                className="mt-2 text-[11px] text-muted-foreground hover:underline cursor-pointer"
               >
                 Clear filter
               </button>
@@ -395,7 +425,7 @@ export function SourcesPanel({
         ) : (
           /* Empty State / Interactive Dropzone */
           <div
-            onClick={onAddSource}
+            onClick={() => onAddSource()}
             className={`flex-1 flex flex-col items-center justify-center text-center p-6 rounded-2xl border-2 border-dashed transition-all duration-200 cursor-pointer group ${
               isDraggingOver
                 ? "border-primary bg-primary/5 scale-[0.99]"

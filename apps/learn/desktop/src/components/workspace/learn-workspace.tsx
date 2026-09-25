@@ -132,6 +132,12 @@ export function LearnWorkspace({
 
   // Dialog & Panel states
   const [isAddSourceOpen, setIsAddSourceOpen] = useState(initialSourceModalOpen);
+  const [addSourceInitialSearch, setAddSourceInitialSearch] = useState<{
+    query: string;
+    scope?: "web" | "journal";
+    speed?: "fast" | "deep";
+    autoSearch?: boolean;
+  } | undefined>(undefined);
   const [isSourcesCollapsed, setIsSourcesCollapsed] = useState(false);
   const [isStudioCollapsed, setIsStudioCollapsed] = useState(false);
   const [pendingStudioPrompt, setPendingStudioPrompt] = useState<string | null>(null);
@@ -1747,7 +1753,10 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
           learnId={learnId}
           sourcesCount={learn?.sourcesCount || 0}
           width={sourcesWidth}
-          onAddSource={() => setIsAddSourceOpen(true)}
+          onAddSource={(initialConfig) => {
+            setAddSourceInitialSearch(initialConfig);
+            setIsAddSourceOpen(true);
+          }}
           onSelectSource={handleSelectSource}
           onDropFiles={handleDropFiles}
           onOpenBrowser={handleOpenBrowser}
@@ -1866,8 +1875,12 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
       {/* Add Source Pop-up Modal */}
       <AddSourceDialog
         open={isAddSourceOpen}
-        onOpenChange={setIsAddSourceOpen}
+        onOpenChange={(open) => {
+          setIsAddSourceOpen(open);
+          if (!open) setAddSourceInitialSearch(undefined);
+        }}
         learnId={learnId}
+        initialSearch={addSourceInitialSearch}
         onSelectSource={handleSelectSource}
       />
 

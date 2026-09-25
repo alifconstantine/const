@@ -620,6 +620,12 @@ export function MobileLearnWorkspace({
   const [isContextDropdownOpen, setIsContextDropdownOpen] = useState(false);
   const [searchModelQuery, setSearchModelQuery] = useState("");
   const [isAddSourceOpen, setIsAddSourceOpen] = useState(initialSourceModalOpen);
+  const [addSourceInitialSearch, setAddSourceInitialSearch] = useState<{
+    query: string;
+    scope?: "web" | "journal";
+    speed?: "fast" | "deep";
+    autoSearch?: boolean;
+  } | undefined>(undefined);
 
   // Note Direct Editor State (Image 3)
   const [selectedNoteArtifact, setSelectedNoteArtifact] = useState<LocalArtifact | null>(null);
@@ -1853,11 +1859,13 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
   const handleTriggerWebSearch = () => {
     if (!searchQuery.trim()) return;
     setIsSourcesSheetOpen(false);
-    handleSend(
-      language === "id"
-        ? `Tolong cari referensi web mendalam (${webScope}, ${researchSpeed}) tentang: ${searchQuery}`
-        : `Please perform deep research (${webScope}, ${researchSpeed}) on the web regarding: ${searchQuery}`
-    );
+    setAddSourceInitialSearch({
+      query: searchQuery.trim(),
+      scope: webScope.toLowerCase() === "journal" ? "journal" : "web",
+      speed: researchSpeed.includes("Deep") ? "deep" : "fast",
+      autoSearch: true,
+    });
+    setIsAddSourceOpen(true);
     setSearchQuery("");
   };
 
@@ -3526,8 +3534,12 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
       {/* Add Source Pop-up Modal */}
       <AddSourceDialog
         open={isAddSourceOpen}
-        onOpenChange={setIsAddSourceOpen}
+        onOpenChange={(open) => {
+          setIsAddSourceOpen(open);
+          if (!open) setAddSourceInitialSearch(undefined);
+        }}
         learnId={learnId}
+        initialSearch={addSourceInitialSearch}
         onSelectSource={(sourceType) => {
           setIsAddSourceOpen(false);
         }}

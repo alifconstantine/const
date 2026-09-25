@@ -6,6 +6,7 @@
 
 import * as pdfjsLib from "pdfjs-dist";
 import mammoth from "mammoth";
+import JSZip from "jszip";
 
 // Set pdfjs worker source if in browser environment
 if (typeof window !== "undefined") {
@@ -21,6 +22,18 @@ export interface ParsedDocument {
   pageCount?: number;
   size: number;
   type: "file" | "text";
+}
+
+function decodeXmlEntities(text: string): string {
+  return text
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+    .replace(/&#([0-9]+);/g, (_, dec) => String.fromCharCode(parseInt(dec, 10)));
 }
 
 /**
@@ -110,20 +123,151 @@ export async function parseDocxBuffer(
 }
 
 /**
- * Unified entry point to parse any supported uploaded file (PDF, Word, Text, Markdown, Code).
+ * Extract clean text and slide structure from a PowerPoint (.pptx) file buffer.
+ */
+export async function parsePptxBuffer(
+  buffer: ArrayBuffer,
+  fileName: string
+): Promise<ParsedDocument> {
+  try {
+    const zip = await JSZip.loadAsync(buffer);
+    const slideEntries: Array<{ name: string; slideNum: number }> = [];
+
+    // Find all slide XML files: ppt/slides/slide{number}.xml
+    zip.forEach((relativePath) => {
+      const match = relativePath.match(/^ppt\/slides\/slide(\d+)\.xml$/i);
+      if (match && match[1]) {
+        slideEntries.push({
+          name: relativePath,
+          slideNum: parseInt(match[1], 10),
+        });
+      }
+    });
+
+    // Sort slides numerically (Slide 1, Slide 2, ..., Slide 10)
+    slideEntries.sort((a, b) => a.slideNum - b.slideNum);
+
+    const slideTexts: string[] = [];
+
+    for (const entry of slideEntries) {
+      try {
+        const file = zip.file(entry.name);
+        if (!file) continue;
+        const xml = await file.async("text");
+
+        // Extract paragraphs and text runs (<a:p> and <a:t>)
+        const paragraphRegex = /<a:p[\s>][\s\S]*?<\/a:p>/gi;
+        const paragraphs: string[] = [];
+        let pMatch: RegExpExecArray | null;
+
+        while ((pMatch = paragraphRegex.exec(xml)) !== null) {
+          const pContent = pMatch[0];
+          const textRegex = /<a:t[\s>]([\s\S]*?)<\/a:t>/gi;
+          const textRuns: string[] = [];
+          let tMatch: RegExpExecArray | null;
+          while ((tMatch = textRegex.exec(pContent)) !== null) {
+            if (tMatch[1]) {
+              textRuns.push(decodeXmlEntities(tMatch[1].replace(/<[^>]*>/g, "")));
+            }
+          }
+          const pText = textRuns.join("").trim();
+          if (pText) {
+            paragraphs.push(pText);
+          }
+        }
+
+        // If no structured paragraphs matched, fallback to simple <a:t> extraction
+        if (paragraphs.length === 0) {
+          const textRegex = /<a:t[\s>]([\s\S]*?)<\/a:t>/gi;
+          let tMatch: RegExpExecArray | null;
+          while ((tMatch = textRegex.exec(xml)) !== null) {
+            if (tMatch[1]) {
+              const cleaned = decodeXmlEntities(tMatch[1].replace(/<[^>]*>/g, "")).trim();
+              if (cleaned) paragraphs.push(cleaned);
+            }
+          }
+        }
+
+        // Check if there are presenter notes for this slide (ppt/notesSlides/notesSlide{n}.xml)
+        let noteText = "";
+        const notesFile = zip.file(`ppt/notesSlides/notesSlide${entry.slideNum}.xml`);
+        if (notesFile) {
+          try {
+            const notesXml = await notesFile.async("text");
+            const noteRuns: string[] = [];
+            const nRegex = /<a:t[\s>]([\s\S]*?)<\/a:t>/gi;
+            let nMatch: RegExpExecArray | null;
+            while ((nMatch = nRegex.exec(notesXml)) !== null) {
+              if (nMatch[1]) {
+                const cleanNote = decodeXmlEntities(nMatch[1].replace(/<[^>]*>/g, "")).trim();
+                if (cleanNote && cleanNote !== String(entry.slideNum)) {
+                  noteRuns.push(cleanNote);
+                }
+              }
+            }
+            if (noteRuns.length > 0) {
+              noteText = `\n[Notes: ${noteRuns.join(" ")}]`;
+            }
+          } catch {}
+        }
+
+        if (paragraphs.length > 0 || noteText) {
+          slideTexts.push(`--- Slide ${entry.slideNum} ---\n${paragraphs.join("\n")}${noteText}`);
+        }
+      } catch (slideErr) {
+        console.warn(`Failed to parse slide ${entry.slideNum}:`, slideErr);
+      }
+    }
+
+    const fullContent = slideTexts.join("\n\n");
+    return {
+      title: fileName,
+      content: fullContent || "[Presentasi PowerPoint tidak memuat teks yang dapat dibaca]",
+      pageCount: slideEntries.length,
+      size: buffer.byteLength,
+      type: "file",
+    };
+  } catch (err: any) {
+    throw new Error(`Gagal membaca berkas PowerPoint (.pptx): ${err.message || String(err)}`);
+  }
+}
+
+/**
+ * Unified entry point to parse any supported uploaded file (PDF, PPTX, DOCX, Text, Markdown, Code).
  */
 export async function parseUploadedFile(file: File): Promise<ParsedDocument> {
   const fileName = file.name;
   const lowerName = fileName.toLowerCase();
   const size = file.size;
 
-  // 1. PDF
+  // 1. Tolak format legacy binary .doc dan .ppt
+  if (lowerName.endsWith(".doc") && !lowerName.endsWith(".docx")) {
+    throw new Error(
+      "Format .doc (Word 97-2003 lama) tidak dapat diunggah. Silakan simpan sebagai format modern .docx atau ekspor ke PDF terlebih dahulu."
+    );
+  }
+  if (lowerName.endsWith(".ppt") && !lowerName.endsWith(".pptx")) {
+    throw new Error(
+      "Format .ppt (PowerPoint 97-2003 lama) tidak dapat diunggah. Silakan simpan sebagai format modern .pptx atau ekspor ke PDF terlebih dahulu."
+    );
+  }
+
+  // 2. PDF
   if (lowerName.endsWith(".pdf") || file.type === "application/pdf") {
     const buffer = await file.arrayBuffer();
     return await parsePdfBuffer(buffer, fileName);
   }
 
-  // 2. DOCX / DOC
+  // 3. PPTX (PowerPoint modern)
+  if (
+    lowerName.endsWith(".pptx") ||
+    file.type === "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+  ) {
+    const buffer = await file.arrayBuffer();
+    return await parsePptxBuffer(buffer, fileName);
+  }
+
+  // 4. DOCX (Word modern)
   if (
     lowerName.endsWith(".docx") ||
     file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
@@ -132,7 +276,7 @@ export async function parseUploadedFile(file: File): Promise<ParsedDocument> {
     return await parseDocxBuffer(buffer, fileName);
   }
 
-  // 3. Plain Text / Markdown / Code files
+  // 5. Plain Text / Markdown / Code files
   try {
     const text = await file.text();
     return {
