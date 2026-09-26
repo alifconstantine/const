@@ -105,12 +105,17 @@ export function CollectionCard({
 
         <div className="flex items-center gap-3 shrink-0 text-xs text-muted-foreground">
           {createdDateText && (
-            <span className="hidden sm:inline text-muted-foreground/75" title={t("createdDate", { date: createdDateText })}>
+            <span className="hidden sm:inline text-muted-foreground/75 whitespace-nowrap truncate" title={t("createdDate", { date: createdDateText })}>
               {t("createdDate", { date: createdDateText })}
             </span>
           )}
-          {createdDateText && <span className="hidden sm:inline text-border/80">•</span>}
-          <span>{itemCountText}</span>
+          <div
+            className="hidden sm:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-secondary/80 border border-border/50 text-[11px] font-medium text-muted-foreground shrink-0 whitespace-nowrap"
+            title={itemCountText}
+          >
+            <FolderOpen className="w-3 h-3 text-muted-foreground/75" />
+            <span>{itemCountText}</span>
+          </div>
 
           {!isSelectionMode && (
             <DropdownMenu>
@@ -231,17 +236,23 @@ export function CollectionCard({
       </div>
 
       {/* Bottom */}
-      <div className="text-[11px] font-normal text-muted-foreground flex items-center justify-between pt-2 border-t border-border/40 mt-auto">
-        <div className="flex items-center gap-1.5 min-w-0">
-          <span className="shrink-0">{itemCountText}</span>
-          {createdDateText && (
-            <>
-              <span className="text-border/80">•</span>
-              <span className="text-[10px] text-muted-foreground/75 truncate" title={t("createdDate", { date: createdDateText })}>
-                {createdDateText}
-              </span>
-            </>
-          )}
+      <div className="pt-2.5 border-t border-border/40 flex items-center justify-between gap-2 mt-auto">
+        {createdDateText ? (
+          <span
+            className="text-[11px] font-normal text-muted-foreground whitespace-nowrap truncate select-none"
+            title={t("createdDate", { date: createdDateText })}
+          >
+            {createdDateText}
+          </span>
+        ) : (
+          <span />
+        )}
+        <div
+          className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-secondary/80 border border-border/50 text-[11px] font-medium text-muted-foreground group-hover:border-foreground/20 group-hover:text-foreground/90 transition-colors shrink-0 whitespace-nowrap select-none"
+          title={itemCountText}
+        >
+          <FolderOpen className="w-3 h-3 shrink-0 text-muted-foreground/75 group-hover:text-foreground/80 transition-colors" />
+          <span>{itemCountText}</span>
         </div>
       </div>
     </div>

@@ -7,7 +7,7 @@ import {
   DropdownMenuSeparator,
   Checkbox,
 } from "@const/ui";
-import { MoreVertical, FolderPlus, FolderMinus, Edit3, Trash2, ExternalLink } from "lucide-react";
+import { MoreVertical, FolderPlus, FolderMinus, Edit3, Trash2, ExternalLink, FileText } from "lucide-react";
 import { LocalLearn } from "../../lib/db";
 import { useI18n } from "../../lib/i18n";
 import { LearnIcon } from "./learn-icon";
@@ -27,17 +27,31 @@ interface LearnCardProps {
   onDelete?: (learn: LearnItem) => void;
 }
 
-function formatDate(timestamp: number, language: "en" | "id"): string {
+function formatCardDate(timestamp: number, language: "en" | "id", t: (key: any, params?: any) => string): string {
+  const now = Date.now();
+  const diff = now - timestamp;
+  const seconds = Math.floor(diff / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+
+  if (seconds < 60) return t("relativeJustNow");
+  if (minutes < 60) return t("relativeMinutesAgo", { minutes });
+  if (hours < 24) return t("relativeHoursAgo", { hours });
+  if (days === 1) return t("relativeYesterday");
+  if (days < 7) return t("relativeDaysAgo", { days });
+
+  const date = new Date(timestamp);
+  const isCurrentYear = date.getFullYear() === new Date().getFullYear();
   const locale = language === "id" ? "id-ID" : "en-US";
   try {
     return new Intl.DateTimeFormat(locale, {
       day: "numeric",
       month: "short",
-      year: "numeric",
-    }).format(new Date(timestamp));
+      ...(isCurrentYear ? {} : { year: "numeric" }),
+    }).format(date);
   } catch {
-    const d = new Date(timestamp);
-    return `${d.getDate()} ${d.getMonth() + 1} ${d.getFullYear()}`;
+    return `${date.getDate()} ${date.getMonth() + 1}${isCurrentYear ? "" : ` ${date.getFullYear()}`}`;
   }
 }
 
@@ -54,7 +68,11 @@ export function LearnCard({
   onDelete,
 }: LearnCardProps) {
   const { t, language } = useI18n();
-  const formattedDate = formatDate(learn.updatedAt, language);
+  const formattedDate = formatCardDate(learn.updatedAt || learn.createdAt, language, t);
+  const fullDateTooltip = new Date(learn.updatedAt || learn.createdAt).toLocaleString(
+    language === "id" ? "id-ID" : "en-US",
+    { dateStyle: "medium", timeStyle: "short" }
+  );
   const count = learn.sourcesCount ?? 0;
   const sourcesText = count === 1 ? t("sourcesCountSingle") : t("sourcesCount", { count });
 
@@ -103,10 +121,20 @@ export function LearnCard({
           </div>
         </div>
 
-        <div className="flex items-center gap-4 shrink-0 text-xs text-muted-foreground">
-          <span className="hidden sm:inline">
-            {formattedDate} • {sourcesText}
+        <div className="flex items-center gap-3 shrink-0 text-xs text-muted-foreground">
+          <span
+            className="hidden sm:inline text-muted-foreground/80 whitespace-nowrap truncate"
+            title={fullDateTooltip}
+          >
+            {formattedDate}
           </span>
+          <div
+            className="hidden sm:inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-secondary/80 border border-border/50 text-[11px] font-medium text-muted-foreground shrink-0 whitespace-nowrap"
+            title={sourcesText}
+          >
+            <FileText className="w-3 h-3 text-muted-foreground/75" />
+            <span>{sourcesText}</span>
+          </div>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -256,11 +284,22 @@ export function LearnCard({
         )}
       </div>
 
-      {/* Bottom: Date & Source count */}
-      <div className="text-[11px] font-normal text-muted-foreground flex items-center gap-1.5 pt-1">
-        <span>{formattedDate}</span>
-        <span>•</span>
-        <span>{sourcesText}</span>
+      {/* Bottom: Date & Source count pill */}
+      <div className="pt-2.5 border-t border-border/40 flex items-center justify-between gap-2 mt-auto">
+        <span
+          className="text-[11px] font-normal text-muted-foreground whitespace-nowrap truncate select-none"
+          title={fullDateTooltip}
+        >
+          {formattedDate}
+        </span>
+
+        <div
+          className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-secondary/80 border border-border/50 text-[11px] font-medium text-muted-foreground group-hover:border-foreground/20 group-hover:text-foreground/90 transition-colors shrink-0 whitespace-nowrap select-none"
+          title={sourcesText}
+        >
+          <FileText className="w-3 h-3 shrink-0 text-muted-foreground/75 group-hover:text-foreground/80 transition-colors" />
+          <span>{sourcesText}</span>
+        </div>
       </div>
     </div>
   );

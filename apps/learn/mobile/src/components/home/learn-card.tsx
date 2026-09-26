@@ -7,7 +7,7 @@ import {
   DropdownMenuSeparator,
   Checkbox,
 } from "@const/ui";
-import { MoreVertical, FolderPlus, FolderMinus, Edit3, Trash2, ExternalLink } from "lucide-react";
+import { MoreVertical, FolderPlus, FolderMinus, Edit3, Trash2, ExternalLink, FileText } from "lucide-react";
 import { LocalLearn } from "../../lib/db";
 import { useI18n } from "../../lib/i18n";
 import { LearnIcon } from "./learn-icon";
@@ -27,16 +27,31 @@ interface LearnCardProps {
   onDelete?: (learn: LearnItem) => void;
 }
 
-function formatDate(timestamp: number, language: string): string {
+function formatCardDate(timestamp: number, language: string, t: (key: any, params?: any) => string): string {
+  const now = Date.now();
+  const diff = now - timestamp;
+  const seconds = Math.floor(diff / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+
+  if (seconds < 60) return t("relativeJustNow");
+  if (minutes < 60) return t("relativeMinutesAgo", { minutes });
+  if (hours < 24) return t("relativeHoursAgo", { hours });
+  if (days === 1) return t("relativeYesterday");
+  if (days < 7) return t("relativeDaysAgo", { days });
+
+  const date = new Date(timestamp);
+  const isCurrentYear = date.getFullYear() === new Date().getFullYear();
+  const locale = language === "id" ? "id-ID" : "en-US";
   try {
-    return new Intl.DateTimeFormat(language === "id" ? "id-ID" : "en-US", {
+    return new Intl.DateTimeFormat(locale, {
       month: "short",
       day: "numeric",
-      year: "numeric",
-    }).format(new Date(timestamp));
+      ...(isCurrentYear ? {} : { year: "numeric" }),
+    }).format(date);
   } catch {
-    const d = new Date(timestamp);
-    return `${d.toLocaleDateString(language === "id" ? "id-ID" : "en-US")}`;
+    return `${date.getDate()} ${date.getMonth() + 1}${isCurrentYear ? "" : ` ${date.getFullYear()}`}`;
   }
 }
 
@@ -53,7 +68,7 @@ export function LearnCard({
   onDelete,
 }: LearnCardProps) {
   const { t, language } = useI18n();
-  const formattedDate = formatDate(learn.updatedAt, language);
+  const formattedDate = formatCardDate(learn.updatedAt || learn.createdAt, language, t);
   const count = learn.sourcesCount ?? 0;
   const sourcesText =
     count === 1
@@ -99,9 +114,15 @@ export function LearnCard({
             <h4 className="text-sm font-medium text-foreground truncate leading-snug">
               {learn.title}
             </h4>
-            <span className="text-xs text-muted-foreground mt-0.5 block">
-              {sourcesText} • {formattedDate}
-            </span>
+            <div className="flex items-center gap-2 mt-1">
+              <span className="text-xs text-muted-foreground whitespace-nowrap truncate">
+                {formattedDate}
+              </span>
+              <div className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-secondary/80 border border-border/50 text-[10px] font-medium text-muted-foreground shrink-0 whitespace-nowrap">
+                <FileText className="w-2.5 h-2.5 text-muted-foreground/75" />
+                <span>{sourcesText}</span>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -249,8 +270,17 @@ export function LearnCard({
       </div>
 
       {/* Bottom */}
-      <div className="text-[10px] text-muted-foreground truncate pt-1">
-        <span>{formattedDate}</span>
+      <div className="pt-2 border-t border-border/40 flex items-center justify-between gap-1.5 mt-auto">
+        <span className="text-[10px] text-muted-foreground whitespace-nowrap truncate select-none">
+          {formattedDate}
+        </span>
+        <div
+          className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-secondary/80 border border-border/50 text-[10px] font-medium text-muted-foreground shrink-0 whitespace-nowrap select-none"
+          title={sourcesText}
+        >
+          <FileText className="w-2.5 h-2.5 text-muted-foreground/75" />
+          <span>{sourcesText}</span>
+        </div>
       </div>
     </div>
   );
