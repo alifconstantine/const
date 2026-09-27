@@ -1741,7 +1741,7 @@ export function LearnHome({
                               )}
                             </div>
 
-                            <div className="flex items-center justify-between text-xs text-muted-foreground pt-2.5 border-t border-border/40 font-sans text-[10px]">
+                            <div className="flex items-center justify-between text-xs text-muted-foreground pt-2.5 font-sans text-[10px]">
                               <span>
                                 {new Intl.DateTimeFormat(language === "id" ? "id-ID" : "en-US", {
                                   day: "numeric",

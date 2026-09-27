@@ -285,7 +285,7 @@ export function LearnCard({
       </div>
 
       {/* Bottom: Date & Source count pill */}
-      <div className="pt-2.5 border-t border-border/40 flex items-center justify-between gap-2 mt-auto">
+      <div className="pt-2.5 flex items-center justify-between gap-2 mt-auto">
         <span
           className="text-[11px] font-normal text-muted-foreground whitespace-nowrap truncate select-none"
           title={fullDateTooltip}

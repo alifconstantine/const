@@ -221,7 +221,7 @@ export function CollectionCard({
       </div>
 
       {/* Bottom */}
-      <div className="text-[10px] text-muted-foreground truncate pt-1.5 flex items-center justify-between border-t border-border/40 mt-auto">
+      <div className="text-[10px] text-muted-foreground truncate pt-1.5 flex items-center justify-between mt-auto">
         <div className="flex items-center gap-1.5 truncate">
           <span>{itemCountText}</span>
           {createdDateText && (

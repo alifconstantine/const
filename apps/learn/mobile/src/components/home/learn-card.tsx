@@ -270,7 +270,7 @@ export function LearnCard({
       </div>
 
       {/* Bottom */}
-      <div className="pt-2 border-t border-border/40 flex items-center justify-between gap-1.5 mt-auto">
+      <div className="pt-2 flex items-center justify-between gap-1.5 mt-auto">
         <span className="text-[10px] text-muted-foreground whitespace-nowrap truncate select-none">
           {formattedDate}
         </span>
