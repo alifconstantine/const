@@ -12,6 +12,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  toast,
 } from "@const/ui";
 import { BookOpen, Folder } from "lucide-react";
 import { useI18n } from "../../../lib/i18n";
@@ -85,6 +86,7 @@ export function CreateLearnDialog({
       onOpenChange(false);
     } catch (err) {
       console.error("Failed to save learn:", err);
+      toast.error(t("failedSaveLearn"));
     } finally {
       setIsSubmitting(false);
     }

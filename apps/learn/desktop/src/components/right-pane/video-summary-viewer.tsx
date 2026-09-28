@@ -42,7 +42,7 @@ export function VideoSummaryViewer({
   onToggleExpand: _onToggleExpand,
   isExpanded: _isExpanded = false,
 }: VideoSummaryViewerProps) {
-  const { language } = useI18n();
+  const { t, language } = useI18n();
   const isIndo = language === "id";
 
   const scenes = data.scenes || [];
@@ -60,7 +60,7 @@ export function VideoSummaryViewer({
   );
   const [renderError, setRenderError] = useState<string | null>(
     data.renderingStatus === "error"
-      ? data.renderingError || (isIndo ? "Gagal merender video MP4" : "Failed to render MP4 video")
+      ? data.renderingError || t("failedRenderVideoMp4")
       : null
   );
   const [renderProgress, setRenderProgress] = useState<string>("");
@@ -84,14 +84,14 @@ export function VideoSummaryViewer({
       setRenderError(null);
     } else if (data.renderingStatus === "error") {
       setRenderError(
-        data.renderingError || (isIndo ? "Gagal merender video MP4" : "Failed to render MP4 video")
+        data.renderingError || t("failedRenderVideoMp4")
       );
       setIsRenderingMp4(false);
     } else if (data.renderingStatus === "rendering") {
       setIsRenderingMp4(true);
       setRenderError(null);
     }
-  }, [data.mp4Url, data.mp4Path, data.renderingStatus, data.renderingError, isIndo]);
+  }, [data.mp4Url, data.mp4Path, data.renderingStatus, data.renderingError, t]);
 
   // Auto-heal & Background disk check: Check if video.mp4 already exists on disk
   useEffect(() => {
@@ -246,7 +246,7 @@ export function VideoSummaryViewer({
       document.body.removeChild(a);
       toast.success(isIndo ? "Pengunduhan video MP4 dimulai!" : "MP4 video download started!");
     } catch {
-      toast.error(isIndo ? "Gagal mengunduh video" : "Failed to download video");
+      toast.error(t("failedDownloadVideo"));
     }
   };
 
@@ -270,7 +270,7 @@ export function VideoSummaryViewer({
           : "HyperFrames composition downloaded!"
       );
     } catch (err: any) {
-      toast.error(err?.message || "Failed to export HTML");
+      toast.error(err?.message || t("failedExportHtml"));
     } finally {
       setIsExporting(false);
     }

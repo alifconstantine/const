@@ -170,7 +170,7 @@ export function VideoSummarySheet({
   data,
   onExplainInChat: _onExplainInChat,
 }: VideoSummarySheetProps) {
-  const { language } = useI18n();
+  const { t, language } = useI18n();
   const isIndo = language === "id";
 
   const [isPlaying, setIsPlaying] = useState(false);
@@ -400,7 +400,7 @@ export function VideoSummarySheet({
           : "HyperFrames composition downloaded!"
       );
     } catch (err: any) {
-      toast.error(err?.message || "Failed to download HTML");
+      toast.error(err?.message || t("failedExportHtml"));
     }
   };
 
@@ -409,7 +409,7 @@ export function VideoSummarySheet({
     if (isRenderingCloud) return;
     const targetHtml = compositionHtml || data.hyperframesHtml;
     if (!targetHtml) {
-      toast.error(isIndo ? "Komposisi HyperFrames tidak tersedia" : "No HyperFrames composition");
+      toast.error(t("noHyperframesComposition"));
       return;
     }
 
@@ -443,12 +443,12 @@ export function VideoSummarySheet({
         );
       } else {
         toast.error(
-          res.error || (isIndo ? "Gagal merender MP4 di Cloud" : "Failed to render MP4 in Cloud")
+          res.error || t("failedRenderVideoMp4")
         );
       }
     } catch (err: any) {
       console.error("[MobileVideo] Cloud render error:", err);
-      toast.error(err?.message || "Cloud render error");
+      toast.error(err?.message || t("cloudRenderError"));
     } finally {
       setIsRenderingCloud(false);
     }

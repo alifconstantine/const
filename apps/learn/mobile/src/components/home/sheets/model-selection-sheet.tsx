@@ -83,7 +83,7 @@ export function ModelSelectionSheet({
   onModelSelected,
   initialCategory = "llm",
 }: ModelSelectionSheetProps) {
-  const { language } = useI18n();
+  const { t, language } = useI18n();
   const isIndo = language === "id";
 
   const [activeCategory, setActiveCategory] = useState<ModelCategory>(initialCategory);
@@ -176,7 +176,7 @@ export function ModelSelectionSheet({
   const handleApplyProviderEdit = () => {
     if (!editFormData) return;
     if (!editFormData.name.trim() || !editFormData.baseUrl.trim()) {
-      toast.error(isIndo ? "Nama dan Base URL wajib diisi." : "Name and Base URL are required.");
+      toast.error(t("nameAndBaseUrlRequired"));
       return;
     }
 
@@ -206,7 +206,7 @@ export function ModelSelectionSheet({
   const handleDeleteProvider = (providerId: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
     if (providerId === "const-router") {
-      toast.error(isIndo ? "Const Router tidak dapat dihapus." : "Const Router cannot be deleted.");
+      toast.error(t("constRouterCannotDelete"));
       return;
     }
     const updated = aiConfig.providers.filter((p) => p.id !== providerId);
@@ -237,7 +237,7 @@ export function ModelSelectionSheet({
           : `Fetched ${res.models.length} models.`
       );
     } else {
-      toast.error(res.error || (isIndo ? "Gagal mengambil model." : "Failed to fetch models."));
+      toast.error(res.error || t("failedFetchModels"));
     }
   };
 
@@ -269,7 +269,7 @@ export function ModelSelectionSheet({
     if (!editFormData || !newModelId.trim()) return;
     const trimmedId = newModelId.trim();
     if (editFormData.models.some((m) => m.id === trimmedId)) {
-      toast.error(isIndo ? "Model ID sudah ada." : "Model ID already exists.");
+      toast.error(t("modelIdExists"));
       return;
     }
     const newModel: AiModel = {
@@ -326,7 +326,7 @@ export function ModelSelectionSheet({
   const handleTestConnection = async () => {
     if (!editFormData) return;
     if (!editFormData.baseUrl.trim()) {
-      toast.error(isIndo ? "Base URL wajib diisi untuk menguji koneksi." : "Base URL is required to test connection.");
+      toast.error(t("baseUrlRequiredToTest"));
       return;
     }
     setIsTestingConnection(true);
@@ -341,7 +341,7 @@ export function ModelSelectionSheet({
       );
     } else {
       toast.error(
-        res.error || (isIndo ? "Gagal terhubung ke penyedia." : "Connection to provider failed.")
+        res.error || t("failedConnectProvider")
       );
     }
   };
@@ -447,7 +447,7 @@ export function ModelSelectionSheet({
   const handleApplyVoiceProviderEdit = () => {
     if (!editVoiceFormData) return;
     if (!editVoiceFormData.name.trim() || !editVoiceFormData.baseUrl.trim()) {
-      toast.error(isIndo ? "Nama dan Base URL wajib diisi." : "Name and Base URL are required.");
+      toast.error(t("nameAndBaseUrlRequired"));
       return;
     }
     let updated = voiceConfig.providers.map((p) =>
@@ -479,7 +479,7 @@ export function ModelSelectionSheet({
   const handleDeleteVoiceProvider = (providerId: string, e?: React.MouseEvent) => {
     e?.stopPropagation();
     if (providerId === "inworld") {
-      toast.error(isIndo ? "Inworld TTS tidak dapat dihapus." : "Inworld TTS cannot be deleted.");
+      toast.error(t("inworldTtsCannotDelete"));
       return;
     }
     const updated = voiceConfig.providers.filter((p) => p.id !== providerId);
@@ -499,7 +499,7 @@ export function ModelSelectionSheet({
     const target = providerToTest || editVoiceFormData;
     if (!target) return;
     if (!target.baseUrl.trim()) {
-      toast.error(isIndo ? "Base URL wajib diisi untuk menguji koneksi." : "Base URL is required to test connection.");
+      toast.error(t("baseUrlRequiredToTest"));
       return;
     }
     setIsTestingVoiceConnection(true);
@@ -514,7 +514,7 @@ export function ModelSelectionSheet({
       );
     } else {
       toast.error(
-        res.error || (isIndo ? "Gagal terhubung ke endpoint suara." : "Failed to connect to voice endpoint.")
+        res.error || t("failedConnectProvider")
       );
     }
   };
@@ -546,7 +546,7 @@ export function ModelSelectionSheet({
   const handleFetchVoiceList = async (apiKey?: string) => {
     const key = (apiKey || editVoiceFormData?.apiKey || "").trim();
     if (!key) {
-      toast.error(isIndo ? "Inworld API Key wajib diisi." : "Inworld API Key is required.");
+      toast.error(t("inworldApiKeyRequired"));
       return;
     }
     setIsFetchingVoices(true);
@@ -561,14 +561,14 @@ export function ModelSelectionSheet({
           : `Loaded ${res.voices.length} voice characters.`
       );
     } else {
-      toast.error(res.error || (isIndo ? "Gagal memuat suara." : "Failed to load voices."));
+      toast.error(res.error || t("failedLoadVoices"));
     }
   };
 
   const handleFetchVoiceModelsList = async (apiKey?: string) => {
     const key = (apiKey || editVoiceFormData?.apiKey || "").trim();
     if (!key) {
-      toast.error(isIndo ? "Inworld API Key wajib diisi." : "Inworld API Key is required.");
+      toast.error(t("inworldApiKeyRequired"));
       return;
     }
     setIsFetchingVoiceModels(true);
@@ -583,7 +583,7 @@ export function ModelSelectionSheet({
           : `Successfully updated voice models.`
       );
     } else {
-      toast.error(res.error || (isIndo ? "Gagal memuat model suara." : "Failed to load voice models."));
+      toast.error(res.error || t("failedLoadVoiceModels"));
     }
   };
 
@@ -611,7 +611,7 @@ export function ModelSelectionSheet({
       }, 100);
       toast.success(isIndo ? "Memutar audio..." : "Playing audio...");
     } else {
-      toast.error(res.error || (isIndo ? "Gagal sintesis suara." : "Failed to synthesize audio."));
+      toast.error(res.error || t("failedSynthesizeAudio"));
     }
   };
 
@@ -664,7 +664,7 @@ export function ModelSelectionSheet({
   const handleApplyImageProviderEdit = () => {
     if (!editImageFormData) return;
     if (!editImageFormData.name.trim() || !editImageFormData.baseUrl.trim()) {
-      toast.error(isIndo ? "Nama Provider dan Base URL wajib diisi." : "Provider Name and Base URL are required.");
+      toast.error(t("providerNameAndBaseUrlRequired"));
       return;
     }
 
@@ -735,7 +735,7 @@ export function ModelSelectionSheet({
     const target = targetProvider || editImageFormData;
     if (!target) return;
     if (!target.baseUrl.trim()) {
-      toast.error(isIndo ? "Base URL wajib diisi untuk menguji koneksi." : "Base URL is required to test connection.");
+      toast.error(t("baseUrlRequiredToTest"));
       return;
     }
     setIsTestingImageConnection(true);
@@ -750,7 +750,7 @@ export function ModelSelectionSheet({
       );
     } else {
       toast.error(
-        res.error || (isIndo ? "Gagal terhubung ke endpoint gambar." : "Failed to connect to image endpoint.")
+        res.error || t("failedConnectProvider")
       );
     }
   };
@@ -792,11 +792,11 @@ export function ModelSelectionSheet({
     if (!editImageFormData) return;
     const cleanId = newImageModelId.trim();
     if (!cleanId) {
-      toast.error(isIndo ? "Model ID wajib diisi." : "Model ID is required.");
+      toast.error(t("modelIdRequired"));
       return;
     }
     if (editImageFormData.models.some((m) => m.id === cleanId)) {
-      toast.error(isIndo ? "Model ID sudah ada." : "Model ID already exists.");
+      toast.error(t("modelIdExists"));
       return;
     }
 

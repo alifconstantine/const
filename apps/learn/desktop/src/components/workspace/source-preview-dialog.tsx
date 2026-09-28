@@ -92,7 +92,7 @@ export function SourcePreviewDialog({
       toast.success(t("contentCopied"));
       setTimeout(() => setHasCopied(false), 2000);
     } catch {
-      toast.error("Failed to copy content");
+      toast.error(t("failedCopyContent"));
     }
   };
 

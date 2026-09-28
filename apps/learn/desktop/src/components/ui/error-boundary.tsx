@@ -1,5 +1,6 @@
 import React, { Component, type ErrorInfo, type ReactNode } from "react";
 import { AlertTriangle, RotateCcw } from "lucide-react";
+import { translations, type Language } from "../../lib/i18n";
 
 export interface ErrorBoundaryProps {
   children: ReactNode;
@@ -39,16 +40,24 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
         return this.props.fallback;
       }
 
+      let lang: Language = "id";
+      try {
+        const stored = localStorage.getItem("const_learn_language");
+        if (stored === "en" || stored === "id") lang = stored;
+      } catch {}
+
+      const t = translations[lang] || translations.en;
+
       return (
         <div className="w-full h-full min-h-[160px] flex flex-col items-center justify-center p-6 text-center bg-card/60 rounded-xl border border-destructive/30 font-sans select-none animate-in fade-in-0 duration-200">
           <div className="w-10 h-10 rounded-full bg-destructive/15 text-destructive flex items-center justify-center mb-3">
             <AlertTriangle className="w-5 h-5" />
           </div>
           <h3 className="text-sm font-semibold text-foreground mb-1">
-            {this.props.title || "Terjadi kendala pada tampilan"}
+            {this.props.title || t.errorBoundaryTitle}
           </h3>
           <p className="text-xs text-muted-foreground max-w-sm mb-2 leading-relaxed">
-            {this.props.description || "Komponen ini mengalami error saat proses rendering."}
+            {this.props.description || t.errorBoundaryDesc}
           </p>
           {this.state.error?.message && (
             <p className="text-[11px] text-destructive/90 font-mono max-w-sm mb-4 break-words bg-destructive/10 px-2.5 py-1.5 rounded-lg border border-destructive/20 text-left">
@@ -61,7 +70,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
             className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-secondary hover:bg-secondary/80 text-foreground text-xs font-medium transition-colors border border-border/60 cursor-pointer shadow-2xs"
           >
             <RotateCcw className="w-3.5 h-3.5" />
-            <span>Muat ulang komponen</span>
+            <span>{t.errorBoundaryReload}</span>
           </button>
         </div>
       );

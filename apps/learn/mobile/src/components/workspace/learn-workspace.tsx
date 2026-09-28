@@ -686,7 +686,7 @@ export function MobileLearnWorkspace({
             const content =
               m.content ||
               (savedRawError
-                ? `${t("failedToCallRouter") || (language === "id" ? "Gagal memanggil Const Router" : "Failed to call Const Router")}: ${savedRawError}`
+                ? t("callConstFailed", { error: savedRawError })
                 : "");
             return {
               id: m.id,
@@ -1246,12 +1246,7 @@ export function MobileLearnWorkspace({
         onError: async (err) => {
           const finalDuration = Date.now() - now;
           const rawErr = err?.message || String(err);
-          const errorPrefix =
-            t("failedToCallRouter") ||
-            (language === "id"
-              ? "Gagal memanggil Const Router"
-              : "Failed to call Const Router");
-          const errorText = `${errorPrefix}: ${rawErr}`;
+          const errorText = t("callConstFailed", { error: rawErr });
           setMessages((prev) =>
             prev.map((msg) =>
               msg.id === assistantMsgId
@@ -1371,11 +1366,7 @@ export function MobileLearnWorkspace({
       );
     } catch (err) {
       console.error("Failed to convert note to source:", err);
-      toast.error(
-        language === "id"
-          ? "Gagal mengonversikan catatan menjadi sumber."
-          : "Failed to convert note to source."
-      );
+      toast.error(t("failedConvertNoteToSource"));
     }
   };
 
@@ -1406,11 +1397,7 @@ export function MobileLearnWorkspace({
     const sourcesCount = activeSources.length;
 
     if (sourcesCount === 0) {
-      toast.error(
-        language === "id"
-          ? "Tambahkan sumber materi terlebih dahulu untuk menghasilkan catatan AI."
-          : "Add sources to the notebook first to generate an AI note."
-      );
+      toast.error(t("addSourcesFirstForNote"));
       return;
     }
 
@@ -1477,9 +1464,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
             error: err.message,
           });
           toast.error(
-            language === "id"
-              ? "Gagal menghasilkan ringkasan AI: " + err.message
-              : "Failed to generate AI note: " + err.message
+            t("failedCreateMaterial", { error: err.message || t("errorOccurred") })
           );
         },
       });
@@ -1659,9 +1644,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
         error: err?.message || "Generation failed",
       });
       toast.error(
-        language === "id"
-          ? `Gagal membuat materi: ${err?.message || "Terjadi kesalahan"}`
-          : `Failed to create material: ${err?.message || "An error occurred"}`
+        t("failedCreateMaterial", { error: err?.message || t("errorOccurred") })
       );
     }
   };
@@ -1728,9 +1711,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
         error: err?.message || "Generation failed",
       });
       toast.error(
-        language === "id"
-          ? `Gagal membuat presentasi: ${err?.message || "Terjadi kesalahan"}`
-          : `Failed to create presentation: ${err?.message || "An error occurred"}`
+        t("failedCreatePresentation", { error: err?.message || t("errorOccurred") })
       );
     }
   };
@@ -1807,9 +1788,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
         error: err?.message || "Generation failed",
       });
       toast.error(
-        isIndo
-          ? `Gagal membuat infografis: ${err?.message || "Terjadi kesalahan"}`
-          : `Failed to create infographic: ${err?.message || "An error occurred"}`
+        t("failedCreateInfographic", { error: err?.message || t("errorOccurred") })
       );
     }
   };
@@ -1884,9 +1863,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
         error: err?.message || "Generation failed",
       });
       toast.error(
-        isIndo
-          ? `Gagal membuat laporan: ${err?.message || "Terjadi kesalahan"}`
-          : `Failed to create report: ${err?.message || "An error occurred"}`
+        t("failedCreateReport", { error: err?.message || t("errorOccurred") })
       );
     }
   };
@@ -1953,9 +1930,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
         error: err?.message || "Generation failed",
       });
       toast.error(
-        language === "id"
-          ? `Gagal membuat lembar contekan: ${err?.message || "Terjadi kesalahan"}`
-          : `Failed to create cheatsheet: ${err?.message || "An error occurred"}`
+        t("failedCreateCheatSheet", { error: err?.message || t("errorOccurred") })
       );
       const fullArt = await localDb.getArtifact(artId);
       if (fullArt) {

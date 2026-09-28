@@ -12,6 +12,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  toast,
 } from "@const/ui";
 import { BookOpen, Check, Folder, FolderOpen, Hand, ShieldAlert, X } from "lucide-react";
 import { useI18n } from "../../../lib/i18n";
@@ -49,6 +50,7 @@ export function CreateLearnDialog({
   initialData,
   onSubmit,
 }: CreateLearnDialogProps) {
+  const { t } = useI18n();
   const getInitialIcon = (raw?: string) => {
     if (!raw) return "book";
     return LEGACY_EMOJI_TO_LEARN_ICON[raw] || raw;
@@ -102,12 +104,12 @@ export function CreateLearnDialog({
       onOpenChange(false);
     } catch (err) {
       console.error("Failed to save learn:", err);
+      toast.error(t("failedSaveLearn"));
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const { t } = useI18n();
   const isEdit = !!initialData;
 
   return (

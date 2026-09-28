@@ -7,6 +7,7 @@ import {
   DialogFooter,
   Button,
   Input,
+  toast,
 } from "@const/ui";
 import { FolderPlus } from "lucide-react";
 import { useI18n } from "../../../lib/i18n";
@@ -70,6 +71,7 @@ export function CreateCollectionDialog({
       onOpenChange(false);
     } catch (err) {
       console.error("Failed to save collection:", err);
+      toast.error(t("failedSaveCollection"));
     } finally {
       setIsSubmitting(false);
     }

@@ -41,7 +41,7 @@ export function MobilePresentationViewer({
   onClose,
   onExplainInChat,
 }: MobilePresentationViewerProps) {
-  const { language } = useI18n();
+  const { t, language } = useI18n();
   const isIndo = language === "id";
 
   const provider = data.provider || "native";
@@ -149,7 +149,7 @@ export function MobilePresentationViewer({
 
   const handleExportCanva = async (format: "pdf" | "pptx") => {
     if (!data.canvaDesignId) {
-      toast.error(isIndo ? "ID Desain Canva tidak ditemukan." : "Canva Design ID not found.");
+      toast.error(t("canvaDesignNotFound"));
       return;
     }
     setIsExportingCanva(true);
@@ -181,11 +181,7 @@ export function MobilePresentationViewer({
       }
     } catch (err: any) {
       console.error("Canva export error:", err);
-      toast.error(
-        isIndo
-          ? `Gagal mengekspor dari Canva: ${err.message || "Unknown error"}`
-          : `Failed to export Canva: ${err.message || "Unknown error"}`
-      );
+      toast.error(t("failedExportCanva", { error: err.message || "Unknown error" }));
     } finally {
       setIsExportingCanva(false);
     }

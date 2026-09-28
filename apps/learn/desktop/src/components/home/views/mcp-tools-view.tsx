@@ -86,7 +86,7 @@ const DEFAULT_SERVER_FORM: ServerFormData = {
 };
 
 export function McpToolsView() {
-  const { language } = useI18n();
+  const { t, language } = useI18n();
   const isIndo = language === "id";
 
   // Two Main Tabs: Apps & Tools (First) and Custom MCP (Second)
@@ -271,7 +271,7 @@ export function McpToolsView() {
         }
       }
     } catch (err: any) {
-      toast.error(err?.message || "Gagal mengubah status koneksi.");
+      toast.error(err?.message || t("failedChangeConnectionStatus"));
     } finally {
       setIsConnectingId(null);
     }
@@ -355,7 +355,7 @@ export function McpToolsView() {
       try {
         const parsed = JSON.parse(singleJsonText);
         if (!parsed.name && !formData.name) {
-          toast.error(isIndo ? "Name wajib diisi." : "Name is required.");
+          toast.error(t("mcpServerNameRequired"));
           return;
         }
 
@@ -400,7 +400,7 @@ export function McpToolsView() {
         return;
       } catch (err: any) {
         toast.error(
-          isIndo ? `Format JSON tidak valid: ${err?.message || ""}` : `Invalid JSON syntax: ${err?.message || ""}`
+          t("mcpInvalidJson", { error: err?.message || "" })
         );
         return;
       }
@@ -408,17 +408,17 @@ export function McpToolsView() {
 
     // Form mode validation
     if (!formData.name.trim()) {
-      toast.error(isIndo ? "Nama server wajib diisi." : "Server name is required.");
+      toast.error(t("mcpServerNameRequired"));
       return;
     }
 
     if (formData.transport === "stdio" && !formData.command.trim()) {
-      toast.error(isIndo ? "Command wajib diisi untuk stdio." : "Command is required for stdio.");
+      toast.error(t("mcpCommandRequired"));
       return;
     }
 
     if ((formData.transport === "http" || formData.transport === "sse") && !formData.url.trim()) {
-      toast.error(isIndo ? "URL wajib diisi untuk HTTP/SSE." : "URL is required for HTTP/SSE.");
+      toast.error(t("mcpUrlRequired"));
       return;
     }
 
@@ -427,7 +427,7 @@ export function McpToolsView() {
       try {
         parsedHeaders = JSON.parse(formData.headersText);
       } catch {
-        toast.error(isIndo ? "Format Headers JSON tidak valid." : "Invalid Headers JSON syntax.");
+        toast.error(t("invalidHeadersJson"));
         return;
       }
     }
@@ -437,7 +437,7 @@ export function McpToolsView() {
       try {
         parsedEnv = JSON.parse(formData.envText);
       } catch {
-        toast.error(isIndo ? "Format Environment variables JSON tidak valid." : "Invalid Environment variables JSON syntax.");
+        toast.error(t("invalidEnvJson"));
         return;
       }
     }
@@ -505,7 +505,7 @@ export function McpToolsView() {
       );
     } catch (err: any) {
       toast.error(
-        isIndo ? `Format JSON tidak valid: ${err?.message || ""}` : `Invalid JSON syntax: ${err?.message || ""}`
+        t("failedSaveMcp") + (err?.message ? `: ${err.message}` : "")
       );
     }
   };

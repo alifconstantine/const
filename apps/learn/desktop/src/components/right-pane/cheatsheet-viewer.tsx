@@ -337,7 +337,7 @@ export function CheatSheetViewer({
               : `PDF saved successfully!`
           );
         } else if (!res?.canceled) {
-          toast.error(res?.error || (isIndo ? "Gagal mengekspor PDF." : "Failed to export PDF."));
+          toast.error(res?.error || t("failedExportPdfGeneric"));
         }
       } else {
         const printWindow = window.open("", "_blank");
@@ -363,7 +363,7 @@ export function CheatSheetViewer({
       }
     } catch (err: any) {
       console.error("PDF export error:", err);
-      toast.error(isIndo ? `Gagal mengekspor PDF: ${err.message}` : `Failed to export PDF: ${err.message}`);
+      toast.error(t("failedExportPdf", { error: err.message || t("errorOccurred") }));
     } finally {
       setIsDownloadingPdf(false);
     }
@@ -519,13 +519,10 @@ export function CheatSheetViewer({
               </div>
               <div className="space-y-1.5">
                 <h3 className="text-sm font-semibold text-white">
-                  {isIndo ? "Gagal Menyusun Lembar Contekan" : "Failed to Create CheatSheet"}
+                  {t("failedCreateCheatSheetTitle")}
                 </h3>
                 <p className="text-xs text-[#969696] leading-relaxed">
-                  {artifact?.error ||
-                    (isIndo
-                      ? "Server AI sedang tidak dapat dijangkau atau terjadi gangguan koneksi."
-                      : "The AI server is unreachable or an error occurred during generation.")}
+                  {artifact?.error || t("aiServerUnreachableOrError")}
                 </p>
               </div>
             </div>

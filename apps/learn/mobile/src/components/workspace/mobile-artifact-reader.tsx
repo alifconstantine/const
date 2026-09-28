@@ -859,7 +859,7 @@ function MobileAudioSummaryBody({
 
   const handleRetryAudioSynthesis = async () => {
     if (!data.script?.trim()) {
-      toast.error(isIndo ? "Naskah tidak ditemukan." : "Script not found.");
+      toast.error(t("scriptNotFound"));
       return;
     }
 
@@ -869,11 +869,7 @@ function MobileAudioSummaryBody({
       voiceConfig.providers[0];
 
     if (!provider || !provider.apiKey?.trim()) {
-      toast.error(
-        isIndo
-          ? "API Key Inworld belum dikonfigurasi di menu Pengaturan Model."
-          : "Inworld API Key is not configured in Models settings."
-      );
+      toast.error(t("inworldApiKeyRequired"));
       return;
     }
 
@@ -920,20 +916,12 @@ function MobileAudioSummaryBody({
       } else {
         const errMsg = synthRes.error || "Synthesis failed";
         setAudioError(errMsg);
-        toast.error(
-          isIndo
-            ? `Gagal mensintesis audio: ${errMsg}`
-            : `Failed to synthesize audio: ${errMsg}`
-        );
+        toast.error(t("failedGenerateAudio", { error: errMsg }));
       }
     } catch (err: any) {
       const errMsg = err?.message || "Synthesis error";
       setAudioError(errMsg);
-      toast.error(
-        isIndo
-          ? `Terjadi kesalahan saat sintesis: ${errMsg}`
-          : `An error occurred during synthesis: ${errMsg}`
-      );
+      toast.error(t("failedGenerateAudio", { error: errMsg }));
     } finally {
       setIsSynthesizing(false);
     }

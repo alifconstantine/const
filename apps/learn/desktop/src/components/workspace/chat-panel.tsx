@@ -1790,9 +1790,7 @@ export function ChatPanel({
           );
         }
       } catch (err: any) {
-        const errorContent = language === "id"
-          ? `Terjadi kendala koneksi ke Agent: ${err.message}`
-          : `Agent connection error: ${err.message}`;
+        const errorContent = t("agentConnectionError", { error: err.message || t("errorOccurred") });
         setMessages((prev) =>
           prev.map((msg) =>
             msg.id === assistantMsgId
@@ -1926,9 +1924,7 @@ export function ChatPanel({
           });
         }
       } catch (err: any) {
-        const errorText = language === "id"
-          ? `Gagal memanggil Const: ${err.message}`
-          : `Failed to call Const: ${err.message}`;
+        const errorText = t("callConstFailed", { error: err.message || t("errorOccurred") });
         setMessages((prev) =>
           prev.map((msg) =>
             msg.id === assistantMsgId
@@ -2004,11 +2000,7 @@ export function ChatPanel({
     const electron = (window as any).electron;
     const rollbackFn = electron?.agent?.rollbackFile || electron?.rollbackFile;
     if (!rollbackFn) {
-      toast.error(
-        language === "id"
-          ? "Rollback hanya tersedia di aplikasi desktop"
-          : "Rollback is only available in the desktop app"
-      );
+      toast.error(t("rollbackOnlyDesktop"));
       return;
     }
     try {
@@ -2037,10 +2029,10 @@ export function ChatPanel({
           return next;
         });
       } else {
-        toast.error(res.message || (language === "id" ? "Gagal me-rollback berkas" : "Failed to rollback file"));
+        toast.error(res.message || t("rollbackFailed"));
       }
     } catch (err: any) {
-      toast.error(err.message || "Rollback error");
+      toast.error(err.message || t("rollbackError"));
     }
   };
 
@@ -2048,11 +2040,7 @@ export function ChatPanel({
     const electron = (window as any).electron;
     const rollbackFn = electron?.agent?.rollbackFile || electron?.rollbackFile;
     if (!rollbackFn) {
-      toast.error(
-        language === "id"
-          ? "Rollback hanya tersedia di aplikasi desktop"
-          : "Rollback is only available in the desktop app"
-      );
+      toast.error(t("rollbackOnlyDesktop"));
       return;
     }
     const unrolled = records.filter((r) => !r.rolledBack);

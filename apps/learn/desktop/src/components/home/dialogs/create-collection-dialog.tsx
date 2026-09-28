@@ -7,6 +7,7 @@ import {
   DialogFooter,
   Button,
   Input,
+  toast,
 } from "@const/ui";
 import { FolderPlus } from "lucide-react";
 import { useI18n } from "../../../lib/i18n";
@@ -35,6 +36,7 @@ export function CreateCollectionDialog({
   initialData,
   onSubmit,
 }: CreateCollectionDialogProps) {
+  const { t } = useI18n();
   const resolveIconId = (emoji?: string) => {
     if (!emoji) return "folder";
     return LEGACY_EMOJI_TO_ICON[emoji] || emoji;
@@ -68,12 +70,12 @@ export function CreateCollectionDialog({
       onOpenChange(false);
     } catch (err) {
       console.error("Failed to save collection:", err);
+      toast.error(t("failedSaveCollection"));
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const { t } = useI18n();
   const isEdit = !!initialData;
 
   return (

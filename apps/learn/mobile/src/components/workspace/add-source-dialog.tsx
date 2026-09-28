@@ -103,7 +103,7 @@ export function AddSourceDialog({
             }
           })
           .catch((err: any) => {
-            toast.error(err.message || "Failed to search web sources.");
+            toast.error(err.message || t("failedSearchWebSources"));
           })
           .finally(() => {
             setIsSearching(false);
@@ -157,7 +157,7 @@ export function AddSourceDialog({
         toast.info("No results found for your query.");
       }
     } catch (err: any) {
-      toast.error(err.message || "Failed to search web sources.");
+      toast.error(err.message || t("failedSearchWebSources"));
     } finally {
       setIsSearching(false);
     }
@@ -167,7 +167,7 @@ export function AddSourceDialog({
   const handleAddSearchResult = async (item: SearchSourceResult) => {
     if (!learnId) return;
     if (currentSourcesCount >= MAX_SOURCES) {
-      toast.error(`Batas maksimum ${MAX_SOURCES} sumber tercapai. Hapus beberapa sumber untuk menambahkan sumber baru.`);
+      toast.error(t("maxSourcesReached", { count: MAX_SOURCES }));
       return;
     }
     try {
@@ -190,7 +190,7 @@ export function AddSourceDialog({
       onSourceAdded?.(sourceId);
       toast.success(`Added source: ${item.title.slice(0, 35)}...`);
     } catch (err: any) {
-      toast.error(err.message || "Failed to add source.");
+      toast.error(err.message || t("failedAddSource"));
     }
   };
 
@@ -198,7 +198,7 @@ export function AddSourceDialog({
   const handleIngestUrl = async () => {
     if (!learnId || !urlInput.trim()) return;
     if (currentSourcesCount >= MAX_SOURCES) {
-      toast.error(`Batas maksimum ${MAX_SOURCES} sumber tercapai. Hapus beberapa sumber untuk menambahkan sumber baru.`);
+      toast.error(t("maxSourcesReached", { count: MAX_SOURCES }));
       return;
     }
     setIsLoading(true);
@@ -233,7 +233,7 @@ export function AddSourceDialog({
       );
       handleClose();
     } catch (err: any) {
-      toast.error(err.message || "Failed to fetch web content.");
+      toast.error(err.message || t("failedFetchWebContent"));
     } finally {
       setIsLoading(false);
       setStatusMessage("");
@@ -244,7 +244,7 @@ export function AddSourceDialog({
   const handleIngestYouTube = async () => {
     if (!learnId || !youtubeInput.trim()) return;
     if (currentSourcesCount >= MAX_SOURCES) {
-      toast.error(`Batas maksimum ${MAX_SOURCES} sumber tercapai. Hapus beberapa sumber untuk menambahkan sumber baru.`);
+      toast.error(t("maxSourcesReached", { count: MAX_SOURCES }));
       return;
     }
     setIsLoading(true);
@@ -266,7 +266,7 @@ export function AddSourceDialog({
       toast.success(`Extracted ${result.lineCount} caption lines from YouTube!`);
       handleClose();
     } catch (err: any) {
-      toast.error(err.message || "Failed to extract YouTube transcript.");
+      toast.error(err.message || t("failedExtractYouTube"));
     } finally {
       setIsLoading(false);
       setStatusMessage("");
@@ -279,7 +279,7 @@ export function AddSourceDialog({
 
     const remainingSlots = MAX_SOURCES - currentSourcesCount;
     if (remainingSlots <= 0) {
-      toast.error(`Batas maksimum ${MAX_SOURCES} sumber tercapai. Hapus beberapa sumber sebelum menambahkan berkas baru.`);
+      toast.error(t("maxSourcesReachedFiles", { count: MAX_SOURCES }));
       return;
     }
 
@@ -312,7 +312,7 @@ export function AddSourceDialog({
       toast.success(`Successfully parsed ${addedCount} document(s)!`);
       handleClose();
     } catch (err: any) {
-      toast.error(err.message || "Failed to parse uploaded document.");
+      toast.error(err.message || t("failedParseDocument"));
     } finally {
       setIsLoading(false);
       setStatusMessage("");
@@ -330,7 +330,7 @@ export function AddSourceDialog({
   const handleIngestPaste = async () => {
     if (!learnId || !pasteContent.trim()) return;
     if (currentSourcesCount >= MAX_SOURCES) {
-      toast.error(`Batas maksimum ${MAX_SOURCES} sumber tercapai. Hapus beberapa sumber untuk menambahkan teks baru.`);
+      toast.error(t("maxSourcesReachedText", { count: MAX_SOURCES }));
       return;
     }
     try {
@@ -348,7 +348,7 @@ export function AddSourceDialog({
       toast.success("Text source added!");
       handleClose();
     } catch (err: any) {
-      toast.error(err.message || "Failed to save text.");
+      toast.error(err.message || t("failedSaveText"));
     }
   };
 

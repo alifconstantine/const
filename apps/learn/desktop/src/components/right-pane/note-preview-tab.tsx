@@ -408,7 +408,7 @@ export function NotePreviewTab({
             : "Note converted to source successfully!"
         );
       } catch (err: any) {
-        toast.error(err.message);
+        toast.error(err.message || t("failedConvertNoteToSource"));
       }
     }
   };

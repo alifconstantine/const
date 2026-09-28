@@ -323,7 +323,7 @@ export function MobileCheatSheetViewer({
       }
     } catch (err: any) {
       console.error("PDF export error:", err);
-      toast.error(isIndo ? `Gagal mengekspor PDF: ${err.message}` : `Failed to export PDF: ${err.message}`);
+      toast.error(t("failedExportPdf", { error: err.message || "" }));
     }
   };
 

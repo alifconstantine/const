@@ -7,6 +7,7 @@ import {
   DialogDescription,
   DialogFooter,
   Button,
+  toast,
 } from "@const/ui";
 import { AlertTriangle } from "lucide-react";
 import { useI18n } from "../../../lib/i18n";
@@ -36,6 +37,7 @@ export function DeleteConfirmDialog({
       onOpenChange(false);
     } catch (err) {
       console.error("Failed to delete item:", err);
+      toast.error(t("failedDeleteNotebook"));
     } finally {
       setIsDeleting(false);
     }

@@ -45,7 +45,7 @@ export function PresentationViewer({
   onToggleExpand: _onToggleExpand,
   isExpanded: _isExpanded = false,
 }: PresentationViewerProps) {
-  const { language } = useI18n();
+  const { t, language } = useI18n();
   const isIndo = language === "id";
 
   const provider = data.provider || "native";
@@ -70,7 +70,7 @@ export function PresentationViewer({
   );
   const [renderError, setRenderError] = useState<string | null>(
     data.renderingStatus === "error"
-      ? data.renderingError || (isIndo ? "Gagal merender PDF" : "Failed to render PDF")
+      ? data.renderingError || t("failedRenderPdf")
       : null
   );
 
@@ -107,11 +107,11 @@ export function PresentationViewer({
       setRenderError(null);
     } else if (data.renderingStatus === "error") {
       setRenderError(
-        data.renderingError || (isIndo ? "Gagal merender PDF" : "Failed to render PDF")
+        data.renderingError || t("failedRenderPdf")
       );
       setIsRenderingPdf(false);
     }
-  }, [data.pdfUrl, data.pdfPath, data.renderingStatus, data.renderingError, isIndo]);
+  }, [data.pdfUrl, data.pdfPath, data.renderingStatus, data.renderingError, t]);
 
   // Check disk for rendered PDF via Electron IPC
   useEffect(() => {
@@ -227,7 +227,7 @@ export function PresentationViewer({
 
   const handleDownloadPdf = () => {
     if (!pdfUrl) {
-      toast.error(isIndo ? "PDF sedang diproses, silakan tunggu sejenak." : "PDF is still rendering, please wait.");
+      toast.error(t("pdfRenderingWait"));
       return;
     }
     const a = document.createElement("a");
@@ -242,7 +242,7 @@ export function PresentationViewer({
   const handleTriggerPdfExport = async () => {
     const electron = (window as any).electron;
     if (!electron?.presentation?.exportPdf) {
-      toast.error(isIndo ? "Fitur ekspor PDF membutuhkan aplikasi desktop." : "PDF export requires desktop app.");
+      toast.error(t("pdfExportRequiresDesktop"));
       return;
     }
 
@@ -271,7 +271,7 @@ export function PresentationViewer({
       console.error("PDF export error:", err);
       setIsRenderingPdf(false);
       setRenderError(err?.message || "PDF Export failed");
-      toast.error(isIndo ? `Gagal mengekspor PDF: ${err.message}` : `Failed to export PDF: ${err.message}`);
+      toast.error(t("failedExportPdf", { error: err.message || t("errorOccurred") }));
     }
   };
 
@@ -280,7 +280,7 @@ export function PresentationViewer({
 
   const handleExportCanva = async (format: "pdf" | "pptx") => {
     if (!data.canvaDesignId) {
-      toast.error(isIndo ? "ID Desain Canva tidak ditemukan." : "Canva Design ID not found.");
+      toast.error(t("canvaDesignNotFound"));
       return;
     }
     setIsExportingCanva(true);
@@ -312,11 +312,7 @@ export function PresentationViewer({
       }
     } catch (err: any) {
       console.error("Canva export error:", err);
-      toast.error(
-        isIndo
-          ? `Gagal mengekspor dari Canva: ${err.message || "Unknown error"}`
-          : `Failed to export Canva: ${err.message || "Unknown error"}`
-      );
+      toast.error(t("failedExportCanva", { error: err.message || t("errorOccurred") }));
     } finally {
       setIsExportingCanva(false);
     }

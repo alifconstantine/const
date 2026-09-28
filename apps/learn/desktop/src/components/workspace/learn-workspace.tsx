@@ -680,9 +680,7 @@ export function LearnWorkspace({
         error: err?.message || "Generation failed",
       });
       toast.error(
-        isIndo
-          ? `Gagal membuat materi: ${err?.message || "Terjadi kesalahan"}`
-          : `Failed to create material: ${err?.message || "An error occurred"}`
+        t("failedCreateMaterial", { error: err?.message || t("errorOccurred") })
       );
     }
   };
@@ -768,9 +766,7 @@ export function LearnWorkspace({
         error: err?.message || "Generation failed",
       });
       toast.error(
-        isIndo
-          ? `Gagal membuat ringkasan video: ${err?.message || "Terjadi kesalahan"}`
-          : `Failed to create video summary: ${err?.message || "An error occurred"}`
+        t("failedCreateVideoSummary", { error: err?.message || t("errorOccurred") })
       );
     }
   };
@@ -845,9 +841,7 @@ export function LearnWorkspace({
         error: err?.message || "Generation failed",
       });
       toast.error(
-        isIndo
-          ? `Gagal menyusun presentasi: ${err?.message || "Terjadi kesalahan"}`
-          : `Failed to create presentation: ${err?.message || "An error occurred"}`
+        t("failedCreatePresentation", { error: err?.message || t("errorOccurred") })
       );
     }
   };
@@ -922,9 +916,7 @@ export function LearnWorkspace({
         error: err?.message || "Generation failed",
       });
       toast.error(
-        isIndo
-          ? `Gagal membuat infografis: ${err?.message || "Terjadi kesalahan"}`
-          : `Failed to create infographic: ${err?.message || "An error occurred"}`
+        t("failedCreateInfographic", { error: err?.message || t("errorOccurred") })
       );
     }
   };
@@ -1001,9 +993,7 @@ export function LearnWorkspace({
         error: err?.message || "Generation failed",
       });
       toast.error(
-        isIndo
-          ? `Gagal menyusun laporan: ${err?.message || "Terjadi kesalahan"}`
-          : `Failed to create report: ${err?.message || "An error occurred"}`
+        t("failedCreateReport", { error: err?.message || t("errorOccurred") })
       );
     }
   };
@@ -1070,9 +1060,7 @@ export function LearnWorkspace({
         error: err?.message || "Generation failed",
       });
       toast.error(
-        isIndo
-          ? `Gagal menyusun lembar contekan: ${err?.message || "Terjadi kesalahan"}`
-          : `Failed to create cheatsheet: ${err?.message || "An error occurred"}`
+        t("failedCreateCheatSheet", { error: err?.message || t("errorOccurred") })
       );
       const fullArt = await localDb.getArtifact(artId);
       if (fullArt) {
@@ -1200,11 +1188,7 @@ export function LearnWorkspace({
       );
     } catch (err) {
       console.error("Failed to convert note to source:", err);
-      toast.error(
-        language === "id"
-          ? "Gagal mengonversikan catatan menjadi sumber."
-          : "Failed to convert note to source."
-      );
+      toast.error(t("failedConvertNoteToSource"));
     }
   };
 
@@ -1274,11 +1258,7 @@ export function LearnWorkspace({
     const sourcesCount = activeSources.length;
 
     if (sourcesCount === 0) {
-      toast.error(
-        language === "id"
-          ? "Tambahkan sumber materi terlebih dahulu untuk menghasilkan catatan AI."
-          : "Add sources to the notebook first to generate an AI note."
-      );
+      toast.error(t("addSourcesFirstForNote"));
       return;
     }
 
@@ -1345,9 +1325,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
             error: err.message,
           });
           toast.error(
-            language === "id"
-              ? "Gagal menghasilkan ringkasan AI: " + err.message
-              : "Failed to generate AI note: " + err.message
+            t("failedCreateMaterial", { error: err?.message || t("errorOccurred") })
           );
         },
       });
@@ -1858,14 +1836,14 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
 
         {/* Right Column: Dual Studio & Preview RightPane */}
         <ErrorBoundary
-          title="Panel samping mengalami kendala"
-          description="Terjadi kesalahan pada panel Studio/Preview."
+          title={t("errorBoundaryStudioTitle")}
+          description={t("errorBoundaryStudioDesc")}
           fallback={
             <div
               style={{ width: isStudioCollapsed ? 48 : (studioWidth || 400) }}
               className="h-full shrink-0 flex flex-col justify-center items-center p-6 bg-card rounded-2xl border border-destructive/30 text-center select-none"
             >
-              <p className="text-xs text-muted-foreground">Terjadi kesalahan pada panel Studio.</p>
+              <p className="text-xs text-muted-foreground">{t("errorBoundaryStudioDesc")}</p>
             </div>
           }
         >
