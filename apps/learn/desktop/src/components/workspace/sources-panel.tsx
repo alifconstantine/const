@@ -8,8 +8,6 @@ import {
   ChevronDown,
   Trash2,
   BookOpen,
-  HardDrive,
-  Clipboard,
   X,
   Check,
 } from "lucide-react";
@@ -136,74 +134,86 @@ export function SourcesPanel({
           !isResizing && "transition-[width] duration-300 ease-[cubic-bezier(0.2,0,0,1)]"
         )}
       >
-        {/* Collapsed Rail View */}
-        <div
-          className={cn(
-            "w-12 h-full flex flex-col items-center py-3 bg-card text-muted-foreground select-none absolute top-0 left-0 z-10 transition-opacity duration-200",
-            isCollapsed ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
-          )}
+      {/* Global Persistent Toggle Button (Stationary in top-left corner, zero jitter) */}
+      {onToggleCollapse && (
+        <button
+          type="button"
+          onClick={onToggleCollapse}
+          className="absolute top-2 left-2 z-30 h-8 w-8 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer active:scale-95"
+          title={isCollapsed ? (t("openSourcesPanel") || "Expand Panel") : (t("hidePanel") || "Collapse panel")}
+          aria-label={t("sourcesPanelTitle")}
         >
-          <button
-            type="button"
-            onClick={onToggleCollapse}
-            className="h-8 w-8 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
-            title={t("openSourcesPanel")}
-            aria-label={t("sourcesPanelTitle")}
-          >
-            <PanelLeft className="h-4 w-4" />
-          </button>
+          <PanelLeft className="h-4 w-4" />
+        </button>
+      )}
 
-          <button
-            type="button"
-            onClick={() => onAddSource()}
-            className="h-8 w-8 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer mt-1"
-            title={t("addSource")}
-            aria-label={t("addSource")}
-          >
-            <Plus className="h-4 w-4" />
-          </button>
-        </div>
-
-        {/* Expanded Content View */}
-        <div
-          style={{ width: `${width || 330}px`, minWidth: `${width || 330}px` }}
-          className={cn(
-            "h-full flex flex-col p-3 sm:p-3.5 transition-opacity duration-200",
-            isCollapsed ? "opacity-0 pointer-events-none" : "opacity-100 pointer-events-auto"
-          )}
+      {/* Collapsed Rail View (Staggered dissolve to prevent icon collision) */}
+      <div
+        className={cn(
+          "w-12 h-full flex flex-col items-center pt-12 pb-3 bg-card text-muted-foreground select-none font-sans absolute top-0 left-0 z-10 origin-top-left transition-all ease-out",
+          isCollapsed
+            ? "opacity-100 scale-100 pointer-events-auto duration-200 delay-100"
+            : "opacity-0 scale-95 pointer-events-none duration-150 delay-0"
+        )}
+      >
+        <button
+          type="button"
+          onClick={() => {
+            onAddSource();
+            if (isCollapsed) onToggleCollapse?.();
+          }}
+          className="h-8 w-8 rounded-full hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer mt-1"
+          title={t("addSource")}
+          aria-label={t("addSource")}
         >
-          {/* Header */}
-      <div className="flex items-center justify-between mb-3 px-1">
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold tracking-tight text-foreground">{t("sourcesPanelTitle")}</span>
-          {displayCount > 0 && (
-            <span className="text-[10px] font-sans tabular-nums px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border/40">
-              {displayCount}
-            </span>
-          )}
-        </div>
+          <Plus className="h-4 w-4" />
+        </button>
 
-        {onToggleCollapse && (
-          <button
-            type="button"
-            onClick={onToggleCollapse}
-            className="h-7 w-7 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
-            title={t("hidePanel")}
+        {displayCount > 0 && (
+          <span
+            className="text-[10px] font-sans font-medium tabular-nums px-1.5 py-0.5 rounded-full bg-muted text-muted-foreground border border-border/40 mt-2"
+            title={`${displayCount} ${t("sourcesPanelTitle")}`}
           >
-            <PanelLeft className="h-4 w-4" />
-          </button>
+            {displayCount}
+          </span>
         )}
       </div>
 
-      {/* "+ Add source" Button */}
-      <button
-        type="button"
-        onClick={() => onAddSource()}
-        className="w-full py-2.5 px-4 rounded-full bg-secondary/80 hover:bg-secondary border border-border/70 hover:border-border text-xs font-medium text-foreground flex items-center justify-center gap-2 transition-all cursor-pointer mb-3 shrink-0 shadow-2xs hover:shadow-xs active:scale-[0.99] group"
+      {/* Expanded Content View (Staggered dissolve to prevent icon collision) */}
+      <div
+        style={{ width: `${width || 330}px`, minWidth: `${width || 330}px` }}
+        className={cn(
+          "h-full flex flex-col absolute top-0 left-0 origin-top-left transition-all ease-out",
+          isCollapsed
+            ? "opacity-0 scale-[0.98] pointer-events-none duration-150 delay-0"
+            : "opacity-100 scale-100 pointer-events-auto duration-200 delay-100"
+        )}
       >
-        <Plus className="h-3.5 w-3.5 stroke-[2.5] text-muted-foreground group-hover:text-foreground transition-colors" />
-        <span>{t("addSource")}</span>
-      </button>
+        {/* Header (aligned with h-12 height of Chat and Studio headers) */}
+        <div className="h-12 pl-12 pr-3 flex items-center justify-between shrink-0 select-none">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-sm font-semibold tracking-tight text-foreground truncate">
+              {t("sourcesPanelTitle")}
+            </span>
+            {displayCount > 0 && (
+              <span className="text-[10px] font-sans tabular-nums px-2 py-0.5 rounded-full bg-muted text-muted-foreground border border-border/40 shrink-0">
+                {displayCount}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Content Body */}
+        <div className="flex-1 flex flex-col px-3 pb-3 sm:px-3.5 sm:pb-3.5 min-h-0 overflow-hidden">
+          {/* "+ Add source" Button */}
+          <button
+            type="button"
+            onClick={() => onAddSource()}
+            className="w-full py-2.5 px-4 rounded-full bg-secondary/80 hover:bg-secondary border border-border/70 hover:border-border text-xs font-medium text-foreground flex items-center justify-center gap-2 transition-all cursor-pointer mb-3 shrink-0 shadow-2xs hover:shadow-xs active:scale-[0.99] group"
+          >
+            <Plus className="h-3.5 w-3.5 stroke-[2.5] text-muted-foreground group-hover:text-foreground transition-colors" />
+            <span>{t("addSource")}</span>
+          </button>
 
       {/* Search & Web Research Box */}
       <div className="w-full bg-muted/40 hover:bg-muted/50 focus-within:bg-muted/60 rounded-2xl p-2.5 sm:p-3 border border-border/60 focus-within:border-primary/40 focus-within:ring-1 focus-within:ring-primary/20 transition-all text-left mb-3 shrink-0">
@@ -461,6 +471,7 @@ export function SourcesPanel({
           </div>
         )}
         </div>
+      </div>
       </aside>
 
       {/* Source Detail Modal */}

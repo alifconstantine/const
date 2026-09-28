@@ -1781,7 +1781,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
             setSourcesWidth(getResponsiveWidths().sources);
           }}
           className={cn(
-            "w-1.5 hover:w-2 -mx-1 sm:-mx-1.5 h-full cursor-col-resize z-20 group flex items-center justify-center transition-all select-none shrink-0",
+            "w-1.5 hover:w-2 -mx-1 sm:-mx-1.5 h-full cursor-col-resize z-20 group flex items-center justify-center transition-all duration-200 ease-out select-none shrink-0",
             isSourcesCollapsed ? "w-0 opacity-0 pointer-events-none -mx-0 overflow-hidden" : "opacity-100"
           )}
           title="Drag to resize / Double-click to reset"
@@ -1818,7 +1818,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
             setStudioWidth(getResponsiveWidths().studio);
           }}
           className={cn(
-            "w-1.5 hover:w-2 -mx-1 sm:-mx-1.5 h-full cursor-col-resize z-20 group flex items-center justify-center transition-all select-none shrink-0",
+            "w-1.5 hover:w-2 -mx-1 sm:-mx-1.5 h-full cursor-col-resize z-20 group flex items-center justify-center transition-all duration-200 ease-out select-none shrink-0",
             isStudioCollapsed ? "w-0 opacity-0 pointer-events-none -mx-0 overflow-hidden" : "opacity-100"
           )}
           title="Drag to resize / Double-click to reset"
