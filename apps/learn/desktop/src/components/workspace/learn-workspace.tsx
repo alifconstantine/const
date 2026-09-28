@@ -156,15 +156,12 @@ export function LearnWorkspace({
 
   // Right Pane: Dual Studio & Preview/Review state
   const [rightPaneMode, setRightPaneMode] = useState<"studio" | "preview">("studio");
-  const [activeNoteArtifactId, setActiveNoteArtifactId] = useState<string | null>(null);
   const [rightPaneTabs, setRightPaneTabs] = useState<RightPaneTab[]>([
     { id: "review", type: "review", title: "Review" },
   ]);
   const [activeRightPaneTabId, setActiveRightPaneTabId] = useState<string>("review");
   const [isOpeningNewTab, setIsOpeningNewTab] = useState(false);
   const [sessionMutations, setSessionMutations] = useState<FileMutationRecord[]>([]);
-
-  const activeNoteArtifact = (artifacts || []).find((a) => a.id === activeNoteArtifactId) || null;
 
   const handleOpenFileDiff = (mutation: FileMutationRecord) => {
     setIsStudioCollapsed(false);
@@ -269,6 +266,8 @@ export function LearnWorkspace({
       };
       setRightPaneTabs((prev) => [...prev, previewTab]);
       setActiveRightPaneTabId(previewTab.id);
+    } else if (type === "note_preview") {
+      handleAddNote();
     }
   };
 
@@ -1142,10 +1141,32 @@ export function LearnWorkspace({
 
     if (art.type === "note") {
       setIsStudioCollapsed(false);
-      setRightPaneMode("studio");
-      setActiveNoteArtifactId(art.id);
+      setRightPaneMode("preview");
+      setIsOpeningNewTab(false);
 
-      // Auto-widen studio/preview width comfortably (matching Image 3)
+      const tabId = `note_${art.id}`;
+      const existingTab = rightPaneTabs.find(
+        (t) =>
+          t.id === tabId ||
+          (t.type === "note_preview" &&
+            (t.artifactId === art.id || t.artifact?.id === art.id))
+      );
+
+      if (existingTab) {
+        setActiveRightPaneTabId(existingTab.id);
+      } else {
+        const newTab: RightPaneTab = {
+          id: tabId,
+          type: "note_preview",
+          title: art.title || (language === "id" ? "Catatan Baru" : "New Note"),
+          artifactId: art.id,
+          artifact: art,
+        };
+        setRightPaneTabs((prev) => [...prev, newTab]);
+        setActiveRightPaneTabId(tabId);
+      }
+
+      // Auto-widen studio/preview width comfortably
       const windowWidth = typeof window !== "undefined" ? window.innerWidth : 1280;
       const targetPreviewWidth = clampStudioWidth(
         Math.max(
@@ -1160,10 +1181,6 @@ export function LearnWorkspace({
       }
       return;
     }
-  };
-
-  const handleCloseNote = () => {
-    setActiveNoteArtifactId(null);
   };
 
   const handleConvertToSource = async (art: any) => {
@@ -1193,15 +1210,13 @@ export function LearnWorkspace({
 
   const handleDeleteArtifact = async (artId: string) => {
     await localDb.deleteArtifact(artId);
-    if (activeNoteArtifactId === artId) {
-      setActiveNoteArtifactId(null);
-    }
     setRightPaneTabs((prev) =>
       prev.filter(
         (t) =>
           !(t.type === "studio_preview" && t.artifact?.id === artId) &&
           t.artifactId !== artId &&
-          t.id !== `note_${artId}`
+          t.id !== `note_${artId}` &&
+          t.id !== `studio_${artId}`
       )
     );
   };
@@ -1219,9 +1234,24 @@ export function LearnWorkspace({
       sourcesCount: 0,
     });
 
-    setActiveNoteArtifactId(artId);
+    const fullArt = await localDb.getArtifact(artId);
+    if (!fullArt) return;
+
     setIsStudioCollapsed(false);
-    setRightPaneMode("studio");
+    setRightPaneMode("preview");
+    setIsOpeningNewTab(false);
+
+    const tabId = `note_${artId}`;
+    const newTab: RightPaneTab = {
+      id: tabId,
+      type: "note_preview",
+      title: defaultTitle,
+      artifactId: artId,
+      artifact: fullArt,
+    };
+    setRightPaneTabs((prev) => [...prev, newTab]);
+    setActiveRightPaneTabId(tabId);
+
     const windowWidth = typeof window !== "undefined" ? window.innerWidth : 1280;
     const targetPreviewWidth = clampStudioWidth(
       Math.max(
@@ -1867,8 +1897,6 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
             onAddNote={handleAddNote}
             onOpenArtifact={handleOpenArtifact}
             onDeleteArtifact={handleDeleteArtifact}
-            activeNoteArtifact={activeNoteArtifact}
-            onCloseNote={handleCloseNote}
             onConvertToSource={handleConvertToSource}
             onGenerateNote={handleGenerateNote}
             artifacts={artifacts || []}

@@ -3,6 +3,7 @@ import {
   Layers,
   FileText,
   Globe,
+  SquarePen,
 } from "lucide-react";
 import type { RightPaneTabType } from "./types";
 import { useI18n } from "../../lib/i18n";
@@ -22,6 +23,15 @@ export function OpenTabView({ onSelectTabType }: OpenTabViewProps) {
   const { language } = useI18n();
 
   const tabOptions: TabOption[] = [
+    {
+      type: "note_preview",
+      title: language === "id" ? "Catatan Baru" : "New Note",
+      description:
+        language === "id"
+          ? "Tulis atau rangkum materi baru"
+          : "Write or summarize new study note",
+      icon: SquarePen,
+    },
     {
       type: "review",
       title: language === "id" ? "Tinjau Perubahan" : "Review Changes",
@@ -66,7 +76,7 @@ export function OpenTabView({ onSelectTabType }: OpenTabViewProps) {
       </div>
 
       {/* Grid of Tab Options */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 w-full max-w-[440px]">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full max-w-[560px]">
         {tabOptions.map((opt) => {
           const Icon = opt.icon;
           return (

@@ -363,7 +363,7 @@ export function TabHeader({
                   }`}
                 />
               )}
-              <span className="truncate max-w-[130px] pointer-events-none">{tab.title}</span>
+              <span className="truncate max-w-[130px] pointer-events-none">{tab.title || (tab.type === "note_preview" ? "Catatan" : "Tab")}</span>
 
               {tab.isAudible && (
                 <button

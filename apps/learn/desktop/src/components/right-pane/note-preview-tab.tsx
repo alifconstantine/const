@@ -12,11 +12,14 @@ import {
   Minus,
   RemoveFormatting,
   Trash2,
-  PanelRight,
-  ChevronRight,
   ChevronDown,
   Wand2,
   Loader2,
+  SquarePen,
+  BookmarkPlus,
+  Copy,
+  Check,
+  Download,
 } from "lucide-react";
 import {
   cn,
@@ -240,6 +243,7 @@ export function NotePreviewTab({
   onGenerateNote,
   onToggleCollapse,
   onUpdateTab,
+  onDownloadArtifact,
 }: NotePreviewTabProps) {
   const { t, language } = useI18n();
   const artifact: LocalArtifact | undefined = propArtifact || tab?.artifact;
@@ -249,10 +253,30 @@ export function NotePreviewTab({
   );
   const [isSaving, setIsSaving] = useState(false);
 
+  const titleTextareaRef = useRef<HTMLTextAreaElement>(null);
   const editorRef = useRef<HTMLDivElement>(null);
   const isInitializedRef = useRef(false);
   const currentArtifactIdRef = useRef<string | null>(null);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const titleDebounceTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const adjustTitleHeight = () => {
+    if (titleTextareaRef.current) {
+      titleTextareaRef.current.style.height = "auto";
+      titleTextareaRef.current.style.height = `${titleTextareaRef.current.scrollHeight}px`;
+    }
+  };
+
+  useEffect(() => {
+    adjustTitleHeight();
+  }, [title]);
+
+  useEffect(() => {
+    return () => {
+      if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+      if (titleDebounceTimerRef.current) clearTimeout(titleDebounceTimerRef.current);
+    };
+  }, []);
 
   // Initialize and synchronize HTML content into contentEditable without cursor jumps
   useEffect(() => {
@@ -272,7 +296,8 @@ export function NotePreviewTab({
         }
       }
     }
-    if (artifact?.title) {
+    // Only sync title if user is not actively typing in the title textarea
+    if (artifact?.title && document.activeElement !== titleTextareaRef.current) {
       setTitle(artifact.title);
     }
   }, [artifact?.id, artifact?.title, artifact?.content, artifact?.status, tab?.artifactId]);
@@ -311,24 +336,54 @@ export function NotePreviewTab({
     }, 450);
   };
 
-  const handleTitleChange = async (newTitle: string) => {
+  const handleTitleChange = (newTitle: string) => {
     setTitle(newTitle);
+    setIsSaving(true);
+
+    if (titleDebounceTimerRef.current) clearTimeout(titleDebounceTimerRef.current);
+    titleDebounceTimerRef.current = setTimeout(async () => {
+      const artId = artifact?.id || tab?.artifactId;
+      if (artId) {
+        try {
+          await localDb.updateArtifact(artId, {
+            title: newTitle || (language === "id" ? "Catatan Baru" : "New Note"),
+          });
+        } catch (err) {
+          console.error("Failed to save note title:", err);
+        }
+      }
+      if (tab && onUpdateTab) {
+        onUpdateTab(tab.id, {
+          title: newTitle,
+          artifact: artifact ? { ...artifact, title: newTitle } : undefined,
+        });
+      }
+      setIsSaving(false);
+    }, 450);
+  };
+
+  const handleTitleBlur = async () => {
+    if (titleDebounceTimerRef.current) {
+      clearTimeout(titleDebounceTimerRef.current);
+      titleDebounceTimerRef.current = null;
+    }
     const artId = artifact?.id || tab?.artifactId;
     if (artId) {
       try {
         await localDb.updateArtifact(artId, {
-          title: newTitle || (language === "id" ? "Catatan Baru" : "New Note"),
+          title: title || (language === "id" ? "Catatan Baru" : "New Note"),
         });
       } catch (err) {
-        console.error("Failed to save note title:", err);
+        console.error("Failed to save note title on blur:", err);
       }
     }
     if (tab && onUpdateTab) {
       onUpdateTab(tab.id, {
-        title: newTitle,
-        artifact: artifact ? { ...artifact, title: newTitle } : undefined,
+        title,
+        artifact: artifact ? { ...artifact, title } : undefined,
       });
     }
+    setIsSaving(false);
   };
 
   const handleConvertToSource = async () => {
@@ -365,6 +420,39 @@ export function NotePreviewTab({
     } else if (onClose) {
       onClose();
     }
+  };
+
+  const [copied, setCopied] = useState(false);
+  const handleCopy = () => {
+    const md = editorRef.current ? htmlToMarkdown(editorRef.current) : (artifact?.content || "");
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(md);
+      setCopied(true);
+      toast.success(
+        language === "id"
+          ? "Catatan disalin ke clipboard"
+          : "Note copied to clipboard"
+      );
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const handleDownload = () => {
+    const md = editorRef.current ? htmlToMarkdown(editorRef.current) : (artifact?.content || "");
+    if (onDownloadArtifact && artifact) {
+      onDownloadArtifact({ ...artifact, title, content: md });
+      return;
+    }
+    const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${(title || "Note").replace(/[/\\?%*:|"<>]/g, "_")}.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast.success(language === "id" ? "Catatan diunduh" : "Note downloaded");
   };
 
   /**
@@ -450,50 +538,95 @@ export function NotePreviewTab({
 
   return (
     <div className="flex-1 w-full h-full flex flex-col overflow-hidden bg-background select-none font-sans">
-      {/* Top Breadcrumb Header (Image 3: Studio > Catatan) */}
-      <div className="h-11 px-4 border-b border-border flex items-center justify-between shrink-0 bg-card text-xs">
-        {/* Left: Studio > Catatan */}
-        <div className="flex items-center gap-1.5 min-w-0">
-          <button
-            type="button"
-            onClick={onClose}
-            className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-          >
-            {t("studio") || "Studio"}
-          </button>
-          <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/60 shrink-0" />
-          <span className="text-xs font-medium text-foreground truncate">
-            {language === "id" ? "Catatan" : "Note"}
+      {/* Top Header for Preview Tab */}
+      <div className="h-10 px-4 border-b border-border flex items-center justify-between shrink-0 bg-card text-xs">
+        {/* Left: Context info & save status */}
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="h-6 w-6 rounded-md bg-secondary text-foreground flex items-center justify-center shrink-0">
+            <SquarePen className="h-3.5 w-3.5" />
+          </div>
+          <span className="text-xs font-semibold text-foreground truncate">
+            {language === "id" ? "Catatan Studi" : "Study Note"}
           </span>
+          {isSaving ? (
+            <span className="text-[11px] text-muted-foreground animate-pulse ml-1">
+              {language === "id" ? "Menyimpan..." : "Saving..."}
+            </span>
+          ) : (
+            <span className="text-[11px] text-muted-foreground/70 ml-1">
+              {language === "id" ? "Tersimpan" : "Saved"}
+            </span>
+          )}
         </div>
 
-        {/* Right: Trash / Delete icon (Clear of persistent toggle button) */}
-        <div className="flex items-center gap-1 pr-9">
+        {/* Right: Action Buttons */}
+        <div className="flex items-center gap-1">
+          <button
+            type="button"
+            onClick={handleConvertToSource}
+            className="h-7 px-2.5 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground flex items-center gap-1.5 transition-colors cursor-pointer text-xs"
+            title={language === "id" ? "Jadikan sumber materi notebook" : "Add as notebook source"}
+          >
+            <BookmarkPlus className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline font-medium">{language === "id" ? "Jadikan Sumber" : "Add to Sources"}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleCopy}
+            className="h-7 w-7 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
+            title={language === "id" ? "Salin catatan" : "Copy note"}
+          >
+            {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
+          </button>
+
+          <button
+            type="button"
+            onClick={handleDownload}
+            className="h-7 w-7 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
+            title={language === "id" ? "Unduh .md" : "Download .md"}
+          >
+            <Download className="h-3.5 w-3.5" />
+          </button>
+
           <button
             type="button"
             onClick={handleDelete}
-            className="h-7 w-7 rounded-lg hover:bg-muted text-muted-foreground hover:text-destructive flex items-center justify-center transition-colors cursor-pointer"
+            className="h-7 w-7 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive flex items-center justify-center transition-colors cursor-pointer"
             title={language === "id" ? "Hapus catatan" : "Delete note"}
           >
-            <Trash2 className="h-4 w-4" />
+            <Trash2 className="h-3.5 w-3.5" />
           </button>
         </div>
       </div>
 
-      {/* Note Title Input (Image 3: Seamless borderless) */}
-      <div className="px-5 pt-4 pb-1 shrink-0">
-        <input
-          type="text"
+      {/* Note Title Input with balanced, equal top/bottom padding and zero clipping */}
+      <div className="px-5 py-3 shrink-0 bg-background">
+        <textarea
+          ref={titleTextareaRef}
+          rows={1}
           value={title}
-          onChange={(e) => handleTitleChange(e.target.value)}
+          onChange={(e) => {
+            handleTitleChange(e.target.value);
+            adjustTitleHeight();
+          }}
+          onBlur={handleTitleBlur}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              editorRef.current?.focus();
+            }
+          }}
           placeholder={language === "id" ? "Catatan Baru" : "New Note"}
-          style={{ outline: "none", border: "none", boxShadow: "none" }}
-          className="text-xl sm:text-2xl font-bold text-foreground bg-transparent border-none outline-none focus:outline-none focus:ring-0 focus-visible:outline-none ring-0 w-full placeholder:text-muted-foreground/50 tracking-tight"
+          spellCheck={false}
+          autoComplete="off"
+          autoCorrect="off"
+          className="w-full resize-none overflow-hidden text-xl sm:text-2xl font-bold tracking-tight text-foreground bg-transparent border-none outline-none focus:outline-none focus:ring-0 focus-visible:outline-none ring-0 placeholder:text-muted-foreground/40 leading-snug py-1 block"
         />
       </div>
 
-      {/* Rich Text Formatting Toolbar (Image 3) */}
-      <div className="px-4 py-1.5 flex items-center gap-0.5 border-b border-border text-muted-foreground flex-wrap shrink-0 select-none bg-card">
+      {/* Rich Text Formatting Toolbar with clean border-y framing */}
+      <div className="px-4 py-1.5 flex items-center gap-0.5 border-y border-border text-muted-foreground flex-wrap shrink-0 select-none bg-card/60 backdrop-blur-xs">
         {/* Undo */}
         <button
           type="button"
@@ -645,7 +778,7 @@ export function NotePreviewTab({
         </button>
       </div>
 
-      {/* Clean, Borderless WYSIWYG Editor Area (Live rendered markdown, no yellow block!) */}
+      {/* Clean, Borderless WYSIWYG Editor Area */}
       <ScrollArea className="flex-1 min-h-0 w-full select-text" viewportClassName="px-5 py-4 flex flex-col">
         <div
           ref={editorRef}
@@ -665,7 +798,7 @@ export function NotePreviewTab({
           className={cn(
             "w-full flex-1 min-h-[400px] bg-transparent text-foreground text-sm leading-relaxed font-sans",
             "border-none outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 ring-0 shadow-none",
-            "empty:before:content-[attr(data-placeholder)] empty:before:text-muted-foreground/50 empty:before:pointer-events-none empty:before:block",
+            "empty:before:content-[attr(data-placeholder)] empty:before:text-muted-foreground/40 empty:before:pointer-events-none empty:before:block",
             "[&_h1]:text-2xl [&_h1]:font-bold [&_h1]:text-foreground [&_h1]:mt-4 [&_h1]:mb-2 [&_h1]:tracking-tight",
             "[&_h2]:text-xl [&_h2]:font-bold [&_h2]:text-foreground [&_h2]:mt-3 [&_h2]:mb-1.5 [&_h2]:tracking-tight",
             "[&_h3]:text-lg [&_h3]:font-semibold [&_h3]:text-foreground [&_h3]:mt-2.5 [&_h3]:mb-1",

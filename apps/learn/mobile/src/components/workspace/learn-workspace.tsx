@@ -125,184 +125,6 @@ async function parseUploadedMedia(files: FileList | File[]): Promise<AttachedMed
   return newItems;
 }
 
-function markdownToHtml(md: string): string {
-  if (!md || !md.trim()) return "";
-  try {
-    const raw = marked.parse(md, { gfm: true, breaks: true });
-    return typeof raw === "string" ? raw : "";
-  } catch {
-    return md;
-  }
-}
-
-function serializeTableCell(cell: HTMLElement): string {
-  function serializeInline(node: Node): string {
-    if (node.nodeType === Node.TEXT_NODE) {
-      return (node.textContent || "").replace(/\|/g, "\\|");
-    }
-    if (node.nodeType !== Node.ELEMENT_NODE) return "";
-    const el = node as HTMLElement;
-    const tag = el.tagName.toLowerCase();
-    const children = Array.from(el.childNodes).map(serializeInline).join("");
-    switch (tag) {
-      case "strong":
-      case "b":
-        return `**${children}**`;
-      case "em":
-      case "i":
-        return `*${children}*`;
-      case "code":
-        return `\`${children}\``;
-      case "a":
-        return `[${children}](${el.getAttribute("href") || "#"})`;
-      case "br":
-        return " ";
-      default:
-        return children;
-    }
-  }
-  return Array.from(cell.childNodes).map(serializeInline).join("").replace(/\n+/g, " ").trim();
-}
-
-function serializeTable(tableEl: HTMLElement): string {
-  const rows = Array.from(tableEl.querySelectorAll("tr"));
-  if (rows.length === 0) return "";
-
-  const tableData: string[][] = [];
-  let maxCols = 0;
-
-  rows.forEach((row) => {
-    const cells = Array.from(row.querySelectorAll("th, td"));
-    const rowData = cells.map((cell) => serializeTableCell(cell as HTMLElement));
-    if (rowData.length > maxCols) maxCols = rowData.length;
-    tableData.push(rowData);
-  });
-
-  if (maxCols === 0 || tableData.length === 0 || !tableData[0]) return "";
-
-  tableData.forEach((row) => {
-    while (row.length < maxCols) row.push("");
-  });
-
-  const lines: string[] = [];
-  const headerRow = tableData[0];
-  if (!headerRow) return "";
-  lines.push(`| ${headerRow.join(" | ")} |`);
-  lines.push(`| ${headerRow.map(() => "---").join(" | ")} |`);
-
-  for (let i = 1; i < tableData.length; i++) {
-    const row = tableData[i];
-    if (row) {
-      lines.push(`| ${row.join(" | ")} |`);
-    }
-  }
-
-  return `\n\n${lines.join("\n")}\n\n`;
-}
-
-function htmlToMarkdown(element: HTMLElement | null): string {
-  if (!element) return "";
-
-  const text = element.innerText || element.textContent || "";
-  if (!text.trim() && !element.querySelector("img, hr, br, table")) {
-    return "";
-  }
-
-  function serialize(node: Node): string {
-    if (node.nodeType === Node.TEXT_NODE) {
-      return node.textContent || "";
-    }
-    if (node.nodeType !== Node.ELEMENT_NODE) {
-      return "";
-    }
-
-    const el = node as HTMLElement;
-    const tag = el.tagName.toLowerCase();
-    const children = Array.from(el.childNodes).map(serialize).join("");
-
-    switch (tag) {
-      case "h1":
-        return `\n\n# ${children.trim()}\n\n`;
-      case "h2":
-        return `\n\n## ${children.trim()}\n\n`;
-      case "h3":
-        return `\n\n### ${children.trim()}\n\n`;
-      case "h4":
-        return `\n\n#### ${children.trim()}\n\n`;
-      case "h5":
-        return `\n\n##### ${children.trim()}\n\n`;
-      case "h6":
-        return `\n\n###### ${children.trim()}\n\n`;
-      case "p":
-        return children.trim() ? `\n\n${children.trim()}\n\n` : "\n";
-      case "strong":
-      case "b":
-        return children.trim() ? `**${children}**` : "";
-      case "em":
-      case "i":
-        return children.trim() ? `*${children}*` : "";
-      case "s":
-      case "strike":
-      case "del":
-        return children.trim() ? `~~${children}~~` : "";
-      case "code": {
-        if (el.parentElement?.tagName.toLowerCase() === "pre") {
-          return children;
-        }
-        return children.trim() ? `\`${children}\`` : "";
-      }
-      case "pre": {
-        const codeChild = el.querySelector("code");
-        let lang = "";
-        if (codeChild) {
-          const match = codeChild.className.match(/(?:language-|lang-)(\w+)/);
-          if (match && match[1]) lang = match[1];
-        }
-        return `\n\n\`\`\`${lang}\n${children.trim()}\n\`\`\`\n\n`;
-      }
-      case "table":
-        return serializeTable(el);
-      case "thead":
-      case "tbody":
-      case "tfoot":
-      case "tr":
-      case "th":
-      case "td":
-        return el.closest("table") ? "" : children;
-      case "ul": {
-        const items = Array.from(el.children)
-          .map((child) => `- ${serialize(child).trim()}`)
-          .join("\n");
-        return `\n\n${items}\n\n`;
-      }
-      case "ol": {
-        const items = Array.from(el.children)
-          .map((child, idx) => `${idx + 1}. ${serialize(child).trim()}`)
-          .join("\n");
-        return `\n\n${items}\n\n`;
-      }
-      case "li":
-        return children;
-      case "blockquote":
-        return `\n\n> ${children.trim().replace(/\n+/g, "\n> ")}\n\n`;
-      case "hr":
-        return `\n\n---\n\n`;
-      case "a": {
-        const href = el.getAttribute("href") || "#";
-        return `[${children.trim() || href}](${href})`;
-      }
-      case "br":
-        return "\n";
-      case "div":
-        return children.trim() ? `\n${children}\n` : "\n";
-      default:
-        return children;
-    }
-  }
-
-  const result = Array.from(element.childNodes).map(serialize).join("");
-  return result.replace(/\n{3,}/g, "\n\n").trim();
-}
 import {
   ArrowLeft,
   ArrowUp,
@@ -626,49 +448,6 @@ export function MobileLearnWorkspace({
     speed?: "fast" | "deep";
     autoSearch?: boolean;
   } | undefined>(undefined);
-
-  // Note Direct Editor State (Image 3)
-  const [selectedNoteArtifact, setSelectedNoteArtifact] = useState<LocalArtifact | null>(null);
-  const [noteContentInput, setNoteContentInput] = useState("");
-  const [noteTitleInput, setNoteTitleInput] = useState("");
-  const noteEditorRef = useRef<HTMLDivElement>(null);
-  const isNoteInitializedRef = useRef(false);
-  const currentNoteArtifactIdRef = useRef<string | null>(null);
-  const noteDebounceTimerRef = useRef<NodeJS.Timeout | null>(null);
-
-  // Sync selectedNoteArtifact with Dexie live query
-  useEffect(() => {
-    if (selectedNoteArtifact) {
-      if (selectedNoteArtifact.type !== "note") {
-        setSelectedNoteArtifact(null);
-        return;
-      }
-      const fresh = artifacts?.find((a) => a.id === selectedNoteArtifact.id);
-      if (fresh && fresh.id !== selectedNoteArtifact.id) {
-        setSelectedNoteArtifact(fresh);
-      }
-      if (
-        noteEditorRef.current &&
-        (!isNoteInitializedRef.current || currentNoteArtifactIdRef.current !== selectedNoteArtifact.id)
-      ) {
-        isNoteInitializedRef.current = true;
-        currentNoteArtifactIdRef.current = selectedNoteArtifact.id;
-        noteEditorRef.current.innerHTML = markdownToHtml(selectedNoteArtifact.content || "");
-      } else if (
-        noteEditorRef.current &&
-        selectedNoteArtifact.status === "generating" &&
-        selectedNoteArtifact.content !== undefined
-      ) {
-        noteEditorRef.current.innerHTML = markdownToHtml(selectedNoteArtifact.content);
-      }
-      if (selectedNoteArtifact.title) {
-        setNoteTitleInput(selectedNoteArtifact.title);
-      }
-    } else {
-      isNoteInitializedRef.current = false;
-      currentNoteArtifactIdRef.current = null;
-    }
-  }, [artifacts, selectedNoteArtifact?.id, selectedNoteArtifact?.title, selectedNoteArtifact?.content, selectedNoteArtifact?.status]);
 
   // Inline Message Editing State
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
@@ -1511,9 +1290,7 @@ export function MobileLearnWorkspace({
 
   const handleDownloadArtifact = (art: LocalArtifact | null) => {
     if (!art) return;
-    const content = noteEditorRef.current
-      ? htmlToMarkdown(noteEditorRef.current)
-      : (art.content || "");
+    const content = art.content || "";
     if (art.fileUrl) {
       const a = document.createElement("a");
       a.href = art.fileUrl;
@@ -1556,17 +1333,7 @@ export function MobileLearnWorkspace({
     }
 
     if (art.type === "note") {
-      setSelectedNoteArtifact(art);
-      setNoteContentInput(art.content || "");
-      setNoteTitleInput(art.title || (language === "id" ? "Catatan Baru" : "New Note"));
-      setIsStudioSheetOpen(false);
-      setTimeout(() => {
-        if (noteEditorRef.current) {
-          isNoteInitializedRef.current = true;
-          currentNoteArtifactIdRef.current = art.id;
-          noteEditorRef.current.innerHTML = markdownToHtml(art.content || "");
-        }
-      }, 0);
+      handleOpenArtifactReader(art);
       return;
     }
 
@@ -1576,9 +1343,6 @@ export function MobileLearnWorkspace({
 
   const handleDeleteArtifact = async (artId: string) => {
     await localDb.deleteArtifact(artId);
-    if (selectedNoteArtifact?.id === artId) {
-      setSelectedNoteArtifact(null);
-    }
     if (selectedReaderArtifact?.id === artId) {
       setIsReaderOpen(false);
       setSelectedReaderArtifact(null);
@@ -1590,131 +1354,13 @@ export function MobileLearnWorkspace({
     );
   };
 
-  const handleCopyNote = () => {
-    const textToCopy = noteEditorRef.current
-      ? htmlToMarkdown(noteEditorRef.current)
-      : (noteContentInput || selectedNoteArtifact?.content || "");
-    if (!textToCopy) return;
-    navigator.clipboard.writeText(textToCopy);
-    toast.success(
-      language === "id" ? "Catatan disalin ke papan klip" : "Note copied to clipboard"
-    );
-  };
-
-  const handleNoteTitleChange = (newTitle: string) => {
-    setNoteTitleInput(newTitle);
-    if (selectedNoteArtifact) {
-      localDb.updateArtifact(selectedNoteArtifact.id, {
-        title: newTitle || (language === "id" ? "Catatan Baru" : "New Note"),
-      });
-    }
-  };
-
-  const handleNoteInput = () => {
-    if (!noteEditorRef.current || !selectedNoteArtifact) return;
-    const md = htmlToMarkdown(noteEditorRef.current);
-    setNoteContentInput(md);
-
-    if (noteDebounceTimerRef.current) clearTimeout(noteDebounceTimerRef.current);
-    noteDebounceTimerRef.current = setTimeout(async () => {
-      if (selectedNoteArtifact) {
-        try {
-          await localDb.updateArtifact(selectedNoteArtifact.id, { content: md });
-        } catch (err) {
-          console.error("Failed to auto-save note:", err);
-        }
-      }
-    }, 450);
-  };
-
-  const applyNoteFormat = (action: string, param?: string) => {
-    const editor = noteEditorRef.current;
-    if (!editor) return;
-
-    editor.focus();
-
-    switch (action) {
-      case "undo":
-        document.execCommand("undo", false);
-        break;
-      case "redo":
-        document.execCommand("redo", false);
-        break;
-      case "heading": {
-        if (param === "h1") {
-          document.execCommand("formatBlock", false, "<h1>");
-        } else if (param === "h2") {
-          document.execCommand("formatBlock", false, "<h2>");
-        } else if (param === "h3") {
-          document.execCommand("formatBlock", false, "<h3>");
-        } else {
-          document.execCommand("formatBlock", false, "<p>");
-        }
-        break;
-      }
-      case "bold":
-        document.execCommand("bold", false);
-        break;
-      case "italic":
-        document.execCommand("italic", false);
-        break;
-      case "link": {
-        const url = window.prompt(
-          language === "id" ? "Masukkan URL tautan:" : "Enter link URL:",
-          "https://"
-        );
-        if (url) {
-          document.execCommand("createLink", false, url);
-        }
-        break;
-      }
-      case "code": {
-        const selection = window.getSelection();
-        if (selection && selection.rangeCount > 0 && !selection.isCollapsed) {
-          const range = selection.getRangeAt(0);
-          const selectedText = range.toString();
-          const codeEl = document.createElement("code");
-          codeEl.textContent = selectedText;
-          range.deleteContents();
-          range.insertNode(codeEl);
-          selection.removeAllRanges();
-        } else {
-          document.execCommand("formatBlock", false, "<pre>");
-        }
-        break;
-      }
-      case "bullet":
-        document.execCommand("insertUnorderedList", false);
-        break;
-      case "ordered":
-        document.execCommand("insertOrderedList", false);
-        break;
-      case "quote":
-        document.execCommand("formatBlock", false, "<blockquote>");
-        break;
-      case "rule":
-        document.execCommand("insertHorizontalRule", false);
-        break;
-      case "clear":
-        document.execCommand("removeFormat", false);
-        break;
-      default:
-        break;
-    }
-
-    handleNoteInput();
-  };
-
   const handleConvertToSource = async (art: LocalArtifact | null) => {
     if (!learnId || !art) return;
-    const md = noteEditorRef.current
-      ? htmlToMarkdown(noteEditorRef.current)
-      : (noteContentInput || art.content || "");
     try {
       await localDb.createSource({
         learnId,
-        title: noteTitleInput || art.title || (language === "id" ? "Catatan Baru" : "New Note"),
-        content: md,
+        title: art.title || (language === "id" ? "Catatan Baru" : "New Note"),
+        content: art.content || "",
         type: "text",
         includedInChat: true,
       });
@@ -1746,9 +1392,9 @@ export function MobileLearnWorkspace({
       sourcesCount: 0,
     });
 
-    const created = await db.artifacts.get(artId);
+    const created = await localDb.getArtifact(artId);
     if (created) {
-      handleOpenArtifact(created);
+      handleOpenArtifactReader(created);
     }
   };
 
@@ -1801,10 +1447,6 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
           await localDb.updateArtifact(art.id, {
             content: noteContent,
           });
-          if (noteEditorRef.current) {
-            noteEditorRef.current.innerHTML = markdownToHtml(noteContent);
-          }
-          setNoteContentInput(noteContent);
         },
         onDone: async (finalContent) => {
           const contentToSave = finalContent || noteContent;
@@ -1821,12 +1463,6 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
             content: contentToSave,
             status: "completed",
           });
-
-          setNoteTitleInput(noteTitle);
-          setNoteContentInput(contentToSave);
-          if (noteEditorRef.current) {
-            noteEditorRef.current.innerHTML = markdownToHtml(contentToSave);
-          }
 
           toast.success(
             language === "id"
@@ -3526,9 +3162,15 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
       <MobileArtifactReader
         open={isReaderOpen}
         onClose={() => setIsReaderOpen(false)}
-        artifact={selectedReaderArtifact}
+        artifact={
+          (artifacts || []).find((a) => a.id === selectedReaderArtifact?.id) ||
+          selectedReaderArtifact
+        }
         onExplainInChat={handleExplainInChat}
         onSelectStudioTool={handleSelectStudioTool}
+        onDeleteArtifact={handleDeleteArtifact}
+        onConvertToSource={handleConvertToSource}
+        onGenerateNote={handleGenerateNote}
       />
 
       {/* Add Source Pop-up Modal */}
@@ -3566,315 +3208,6 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
           if (!open) setSelectedSourceForPreview(null);
         }}
       />
-
-      {/* Full-Screen Note Direct Editor Modal (Matching Image 3) */}
-      {selectedNoteArtifact && selectedNoteArtifact.type === "note" && (
-        <div
-          className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-xs flex flex-col justify-end sm:justify-center sm:items-center animate-in fade-in duration-200"
-          onClick={() => setSelectedNoteArtifact(null)}
-        >
-          <div
-            className="w-full h-[95vh] sm:h-[90vh] sm:max-w-2xl bg-card border-t sm:border border-border rounded-t-[24px] sm:rounded-2xl shadow-2xl flex flex-col overflow-hidden text-left font-sans"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Top Breadcrumb & Actions Header (Image 3) */}
-            <div className="h-12 px-3 sm:px-4 border-b border-border flex items-center justify-between shrink-0 bg-card rounded-t-[24px] sm:rounded-t-2xl">
-              <div className="flex items-center gap-1.5 min-w-0">
-                <button
-                  type="button"
-                  onClick={() => setSelectedNoteArtifact(null)}
-                  className="text-xs font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                >
-                  Studio
-                </button>
-                <ChevronRight className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                <span className="text-xs font-semibold text-foreground truncate">
-                  {language === "id" ? "Catatan" : "Note"}
-                </span>
-              </div>
-
-              {/* Top Right Action Icons */}
-              <div className="flex items-center gap-1 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => handleDeleteArtifact(selectedNoteArtifact.id)}
-                  className="h-8 w-8 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive flex items-center justify-center transition-colors cursor-pointer"
-                  title={language === "id" ? "Hapus Catatan" : "Delete Note"}
-                >
-                  <Trash2 className="h-4 w-4" />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={handleCopyNote}
-                  className="h-8 w-8 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
-                  title={language === "id" ? "Salin" : "Copy"}
-                >
-                  <Copy className="h-4 w-4" />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleDownloadArtifact(selectedNoteArtifact)}
-                  className="h-8 w-8 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
-                  title={language === "id" ? "Unduh .md" : "Download .md"}
-                >
-                  <Download className="h-4 w-4" />
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setSelectedNoteArtifact(null)}
-                  className="h-8 w-8 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
-                  title={language === "id" ? "Tutup" : "Close"}
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-
-            {/* Note Title Input (Image 3) */}
-            <div className="px-4 pt-3 pb-1 border-b border-border">
-              <input
-                type="text"
-                value={noteTitleInput}
-                onChange={(e) => handleNoteTitleChange(e.target.value)}
-                placeholder={language === "id" ? "Catatan Baru" : "New Note"}
-                className="text-lg sm:text-xl font-bold text-foreground bg-transparent border-none outline-none focus:outline-none w-full placeholder:text-muted-foreground tracking-tight"
-              />
-            </div>
-
-            {/* Formatting Toolbar (Image 3) */}
-            <div className="px-3 py-1.5 border-b border-border bg-secondary/40 flex items-center gap-0.5 overflow-x-auto no-scrollbar shrink-0 select-none">
-              <button
-                type="button"
-                onClick={() => applyNoteFormat("undo")}
-                className="h-7 w-7 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer shrink-0"
-                title="Undo (Ctrl+Z)"
-              >
-                <Undo2 className="h-3.5 w-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => applyNoteFormat("redo")}
-                className="h-7 w-7 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer shrink-0"
-                title="Redo (Ctrl+Y)"
-              >
-                <Redo2 className="h-3.5 w-3.5" />
-              </button>
-
-              <div className="w-px h-4 bg-border mx-1 shrink-0" />
-
-              {/* Headings Dropdown */}
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    type="button"
-                    className="h-7 px-2 rounded-md hover:bg-secondary text-foreground text-xs font-medium flex items-center gap-1 transition-colors cursor-pointer shrink-0"
-                  >
-                    <span>Normal</span>
-                    <ChevronDown className="h-3 w-3 opacity-60" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent
-                  align="start"
-                  className="w-36 bg-popover border-border text-popover-foreground"
-                >
-                  <DropdownMenuItem
-                    className="text-xs cursor-pointer"
-                    onClick={() => applyNoteFormat("heading", "p")}
-                  >
-                    Normal
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    className="text-xs cursor-pointer font-bold"
-                    onClick={() => applyNoteFormat("heading", "h1")}
-                  >
-                    Judul 1
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    className="text-xs cursor-pointer font-semibold"
-                    onClick={() => applyNoteFormat("heading", "h2")}
-                  >
-                    Judul 2
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    className="text-xs cursor-pointer font-medium"
-                    onClick={() => applyNoteFormat("heading", "h3")}
-                  >
-                    Judul 3
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              <div className="w-px h-4 bg-border mx-1 shrink-0" />
-
-              <button
-                type="button"
-                onClick={() => applyNoteFormat("bold")}
-                className="h-7 w-7 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer shrink-0"
-                title="Tebal"
-              >
-                <Bold className="h-3.5 w-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => applyNoteFormat("italic")}
-                className="h-7 w-7 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer shrink-0"
-                title="Miring"
-              >
-                <Italic className="h-3.5 w-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => applyNoteFormat("link")}
-                className="h-7 w-7 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer shrink-0"
-                title="Tautan"
-              >
-                <LinkIcon className="h-3.5 w-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => applyNoteFormat("code")}
-                className="h-7 w-7 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer shrink-0"
-                title="Kode"
-              >
-                <Code className="h-3.5 w-3.5" />
-              </button>
-
-              <div className="w-px h-4 bg-border mx-1 shrink-0" />
-
-              <button
-                type="button"
-                onClick={() => applyNoteFormat("bullet")}
-                className="h-7 w-7 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer shrink-0"
-                title="Daftar Butir"
-              >
-                <List className="h-3.5 w-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => applyNoteFormat("ordered")}
-                className="h-7 w-7 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer shrink-0"
-                title="Daftar Bernomor"
-              >
-                <ListOrdered className="h-3.5 w-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => applyNoteFormat("quote")}
-                className="h-7 w-7 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer shrink-0"
-                title="Kutipan"
-              >
-                <Quote className="h-3.5 w-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => applyNoteFormat("rule")}
-                className="h-7 w-7 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer shrink-0"
-                title="Garis Pemisah"
-              >
-                <Minus className="h-3.5 w-3.5" />
-              </button>
-              <button
-                type="button"
-                onClick={() => applyNoteFormat("clear")}
-                className="h-7 w-7 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer shrink-0"
-                title="Hapus Format"
-              >
-                <RemoveFormatting className="h-3.5 w-3.5" />
-              </button>
-            </div>
-
-            {/* Direct Note Editor Body (Live rendered markdown, no yellow block!) */}
-            <div className="flex-1 min-h-0 overflow-y-auto p-4 select-text">
-              <div
-                ref={noteEditorRef}
-                contentEditable
-                suppressContentEditableWarning
-                onInput={handleNoteInput}
-                data-placeholder={
-                  language === "id"
-                    ? "Tulis catatan atau tempel konten di sini..."
-                    : "Write note or paste content here..."
-                }
-                style={{
-                  outline: "none",
-                  border: "none",
-                  boxShadow: "none",
-                }}
-                className={cn(
-                  "w-full h-full min-h-[350px] bg-transparent text-foreground text-sm font-sans leading-relaxed select-text",
-                  "border-none outline-none focus:outline-none focus:ring-0 focus-visible:outline-none focus-visible:ring-0 ring-0 shadow-none",
-                  "empty:before:content-[attr(data-placeholder)] empty:before:text-muted-foreground empty:before:pointer-events-none empty:before:block",
-                  "[&_h1]:text-2xl [&_h1]:font-bold [&_h1]:text-foreground [&_h1]:mt-4 [&_h1]:mb-2 [&_h1]:tracking-tight",
-                  "[&_h2]:text-xl [&_h2]:font-bold [&_h2]:text-foreground [&_h2]:mt-3 [&_h2]:mb-1.5 [&_h2]:tracking-tight",
-                  "[&_h3]:text-lg [&_h3]:font-semibold [&_h3]:text-foreground [&_h3]:mt-2.5 [&_h3]:mb-1",
-                  "[&_p]:mb-2 [&_p]:leading-relaxed",
-                  "[&_strong]:font-bold [&_strong]:text-foreground",
-                  "[&_b]:font-bold [&_b]:text-foreground",
-                  "[&_em]:italic [&_em]:text-foreground/90",
-                  "[&_i]:italic [&_i]:text-foreground/90",
-                  "[&_a]:text-blue-400 [&_a]:underline hover:[&_a]:text-blue-300",
-                  "[&_code]:bg-secondary [&_code]:text-foreground [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:text-xs [&_code]:font-mono",
-                  "[&_pre]:bg-secondary/50 [&_pre]:border [&_pre]:border-border [&_pre]:p-3 [&_pre]:rounded-xl [&_pre]:my-2.5 [&_pre]:overflow-x-auto",
-                  "[&_ul]:list-disc [&_ul]:pl-5 [&_ul]:my-2 [&_ul]:space-y-1",
-                  "[&_ol]:list-decimal [&_ol]:pl-5 [&_ol]:my-2 [&_ol]:space-y-1",
-                  "[&_li]:leading-relaxed",
-                  "[&_blockquote]:border-l-2 [&_blockquote]:border-blue-500 [&_blockquote]:pl-3 [&_blockquote]:py-0.5 [&_blockquote]:my-2.5 [&_blockquote]:italic [&_blockquote]:text-muted-foreground",
-                  "[&_hr]:border-border [&_hr]:my-4",
-                  "[&_table]:w-full [&_table]:my-3.5 [&_table]:border-collapse [&_table]:border [&_table]:border-border [&_table]:rounded-xl [&_table]:overflow-hidden",
-                  "[&_thead]:bg-secondary/60 [&_thead]:border-b [&_thead]:border-border",
-                  "[&_th]:px-3 [&_th]:py-2 [&_th]:text-left [&_th]:text-xs [&_th]:font-semibold [&_th]:text-foreground [&_th]:border-r [&_th]:border-border last:[&_th]:border-r-0",
-                  "[&_tbody_tr]:border-b [&_tbody_tr]:border-border/60 hover:[&_tbody_tr]:bg-secondary/30",
-                  "[&_td]:px-3 [&_td]:py-1.5 [&_td]:text-xs [&_td]:text-foreground/90 [&_td]:border-r [&_td]:border-border/60 last:[&_td]:border-r-0"
-                )}
-              />
-            </div>
-
-            {/* Footer / Generate Note Button */}
-            <div className="px-4 py-2.5 border-t border-border flex items-center justify-between bg-secondary/30 shrink-0">
-              <button
-                type="button"
-                onClick={() => handleGenerateNote(selectedNoteArtifact)}
-                disabled={selectedNoteArtifact?.status === "generating"}
-                className={cn(
-                  "inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-semibold transition-all shadow-xs cursor-pointer active:scale-98",
-                  selectedNoteArtifact?.status === "generating"
-                    ? "bg-secondary text-muted-foreground cursor-not-allowed opacity-75"
-                    : "bg-foreground text-background hover:bg-foreground/90"
-                )}
-              >
-                {selectedNoteArtifact?.status === "generating" ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Wand2 className="h-4 w-4 stroke-[2]" />
-                )}
-                <span>
-                  {selectedNoteArtifact?.status === "generating"
-                    ? (language === "id" ? "Menghasilkan..." : "Generating...")
-                    : "Generate"}
-                </span>
-              </button>
-
-              <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
-                <span className="text-emerald-400 flex items-center gap-1 font-medium">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 inline-block" />
-                  {language === "id" ? "Tersimpan otomatis" : "Auto-saved"}
-                </span>
-                <span className="text-muted-foreground">•</span>
-                <span>
-                  {noteContentInput
-                    ? `${noteContentInput.length.toLocaleString()} ${
-                        language === "id" ? "karakter" : "chars"
-                      }`
-                    : "0 karakter"}
-                </span>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

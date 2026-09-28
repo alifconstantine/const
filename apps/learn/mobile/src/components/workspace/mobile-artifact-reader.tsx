@@ -32,6 +32,7 @@ import { MobilePresentationViewer } from "./mobile-presentation-viewer";
 import { MobileInfographicViewer } from "./mobile-infographic-viewer";
 import { MobileReportViewer } from "./mobile-report-viewer";
 import { MobileCheatSheetViewer } from "./mobile-cheatsheet-viewer";
+import { MobileNoteViewer } from "./mobile-note-viewer";
 
 export interface MobileArtifactReaderProps {
   open: boolean;
@@ -39,6 +40,9 @@ export interface MobileArtifactReaderProps {
   artifact: LocalArtifact | null;
   onExplainInChat: (prompt: string) => void;
   onSelectStudioTool?: (toolId: string) => void;
+  onDeleteArtifact?: (artId: string) => void;
+  onConvertToSource?: (art: LocalArtifact) => void;
+  onGenerateNote?: (art: LocalArtifact) => void;
 }
 
 export function MobileArtifactReader({
@@ -47,11 +51,27 @@ export function MobileArtifactReader({
   artifact,
   onExplainInChat,
   onSelectStudioTool,
+  onDeleteArtifact,
+  onConvertToSource,
+  onGenerateNote,
 }: MobileArtifactReaderProps) {
   const { language } = useI18n();
   const isIndo = language === "id";
 
   if (!open || !artifact) return null;
+
+  if (artifact.type === "note") {
+    return (
+      <MobileNoteViewer
+        artifact={artifact}
+        onClose={onClose}
+        onExplainInChat={onExplainInChat}
+        onDeleteArtifact={onDeleteArtifact}
+        onConvertToSource={onConvertToSource}
+        onGenerateNote={onGenerateNote}
+      />
+    );
+  }
 
   const isQuiz = artifact.type === "quiz";
   const isFlashcard = artifact.type === "flashcard" || artifact.type === "flashcards";

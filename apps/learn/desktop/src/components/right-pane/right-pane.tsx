@@ -107,8 +107,6 @@ export interface RightPaneProps {
   onOpenArtifact?: (art: any) => void;
   onSelectArtifact?: (art: LocalArtifact) => void;
   onDeleteArtifact?: (artId: string) => void;
-  activeNoteArtifact?: any | null;
-  onCloseNote?: () => void;
   onConvertToSource?: (art: any) => void;
   onGenerateNote?: (art: LocalArtifact) => void;
   onExplainInChat?: (prompt: string) => void;
@@ -143,8 +141,6 @@ export function RightPane({
   onOpenArtifact,
   onSelectArtifact,
   onDeleteArtifact,
-  activeNoteArtifact,
-  onCloseNote,
   onConvertToSource,
   onGenerateNote,
   onExplainInChat,
@@ -241,6 +237,10 @@ export function RightPane({
           tab={tab}
           onUpdateTab={onUpdateTab}
           onDownloadArtifact={onDownloadArtifact}
+          onDeleteArtifact={onDeleteArtifact}
+          onConvertToSource={onConvertToSource}
+          onGenerateNote={onGenerateNote}
+          onClose={() => onCloseTab(tab.id, {} as any)}
         />
       );
     }
@@ -571,20 +571,8 @@ export function RightPane({
             : "opacity-100 scale-100 pointer-events-auto duration-200 delay-100"
         )}
       >
-        {/* Conditional View: When Note is Active in Studio (Image 3) vs Studio/Review Overview */}
-        {mode === "studio" && activeNoteArtifact && activeNoteArtifact.type === "note" ? (
-          <NotePreviewTab
-            artifact={activeNoteArtifact}
-            onClose={onCloseNote}
-            onDeleteArtifact={onDeleteArtifact}
-            onConvertToSource={onConvertToSource}
-            onGenerateNote={onGenerateNote}
-            onToggleCollapse={onToggleCollapse}
-          />
-        ) : (
-          <>
-            {/* Top Header with 2 Menus: Studio & Review */}
-            <div
+        {/* Top Header with 2 Menus: Studio & Review */}
+        <div
               className={`h-12 pl-3 pr-12 bg-card flex items-center justify-between shrink-0 select-none ${
                 mode === "studio" ? "border-b-0" : "border-b border-border"
               }`}
@@ -1039,9 +1027,7 @@ export function RightPane({
             </div>
           </div>
         </div>
-      </>
-    )}
-  </div>
-</aside>
+      </div>
+    </aside>
   );
 }
