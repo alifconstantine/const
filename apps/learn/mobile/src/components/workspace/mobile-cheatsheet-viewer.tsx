@@ -9,7 +9,7 @@ import {
   Download,
   AlertCircle,
 } from "lucide-react";
-import { cn, toast } from "@const/ui";
+import { toast } from "@const/ui";
 import { marked } from "marked";
 import { useI18n } from "../../lib/i18n";
 import { MarkdownContent } from "./markdown-content";
@@ -327,56 +327,23 @@ export function MobileCheatSheetViewer({
     }
   };
 
-  const getBadgeStyle = (badge?: string) => {
-    if (!badge) return "bg-sky-500/10 text-sky-400 border-sky-500/20";
-    const b = badge.toUpperCase();
-    if (
-      b.includes("JEBAKAN") ||
-      b.includes("PITFALL") ||
-      b.includes("PERINGATAN") ||
-      b.includes("WARNING")
-    ) {
-      return "bg-rose-500/10 text-rose-400 border-rose-500/20";
-    }
-    if (
-      b.includes("SINTAKS") ||
-      b.includes("KODE") ||
-      b.includes("SYNTAX") ||
-      b.includes("CLI")
-    ) {
-      return "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
-    }
-    if (
-      b.includes("TIPS") ||
-      b.includes("TRIK") ||
-      b.includes("MNEMONIK") ||
-      b.includes("SHORTCUT")
-    ) {
-      return "bg-amber-500/10 text-amber-400 border-amber-500/20";
-    }
-    if (b.includes("KOMPARASI") || b.includes("PERBANDINGAN") || b.includes("VS")) {
-      return "bg-purple-500/10 text-purple-400 border-purple-500/20";
-    }
-    return "bg-sky-500/10 text-sky-400 border-sky-500/20";
-  };
-
   return (
     <div
-      className="fixed inset-0 z-50 bg-background text-foreground flex flex-col font-sans select-none animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 bg-[#161616] text-[#d4d4d4] flex flex-col font-sans select-none animate-in fade-in duration-150"
       role="dialog"
       aria-modal="true"
     >
       {/* Top Header */}
-      <header className="h-14 px-3 border-b border-border bg-card flex items-center justify-between shrink-0">
-        <div className="flex items-center gap-2.5 min-w-0 flex-1 mr-2">
-          <div className="h-8 w-8 rounded-xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-400 shrink-0">
-            <FileSpreadsheet className="h-4 w-4" />
+      <header className="h-12 px-3 border-b border-[#2e2e2e]/60 bg-[#1e1e1e] flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-2 min-w-0 flex-1 mr-2">
+          <div className="h-7 w-7 rounded-lg bg-[#252525] border border-[#383838] flex items-center justify-center text-white shrink-0">
+            <FileSpreadsheet className="h-3.5 w-3.5" />
           </div>
           <div className="min-w-0 flex-1">
-            <h1 className="text-xs font-semibold text-foreground truncate">
+            <h1 className="text-[12.5px] font-semibold text-white truncate leading-tight">
               {data.title || artifact?.title || "CheatSheet"}
             </h1>
-            <div className="text-[10px] text-muted-foreground flex items-center gap-1.5">
+            <div className="text-[9.5px] text-[#969696] flex items-center gap-1.5 mt-0.5">
               <span>{t("toolsCheatSheet")}</span>
               <span>•</span>
               <span>
@@ -387,54 +354,54 @@ export function MobileCheatSheetViewer({
           </div>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-1.5 shrink-0">
           <button
             type="button"
             onClick={handleDownloadPdf}
-            className="h-8 px-2.5 rounded-xl bg-primary text-primary-foreground text-xs font-semibold flex items-center gap-1.5 transition-transform active:scale-95 cursor-pointer shadow-xs"
+            className="h-7 px-2.5 rounded-lg bg-white text-[#161616] hover:bg-neutral-200 text-[11px] font-semibold flex items-center gap-1.5 transition-all shadow-none cursor-pointer active:scale-95"
             title={isIndo ? "Unduh PDF" : "Download PDF"}
           >
-            <Download className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">{isIndo ? "Unduh PDF" : "PDF"}</span>
+            <Download className="h-3 w-3" />
+            <span>{isIndo ? "Unduh PDF" : "PDF"}</span>
           </button>
 
           <button
             type="button"
             onClick={onClose}
-            className="h-8 w-8 rounded-full bg-secondary hover:bg-secondary/80 text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer active:scale-95 shrink-0"
+            className="h-7 w-7 rounded-lg bg-[#252525] hover:bg-[#2e2e2e] text-[#969696] hover:text-white flex items-center justify-center transition-colors cursor-pointer active:scale-95 shrink-0"
             aria-label="Tutup"
           >
-            <X className="h-4 w-4" />
+            <X className="h-3.5 w-3.5" />
           </button>
         </div>
       </header>
 
       {/* Search Bar */}
-      <div className="px-3.5 py-2.5 bg-card/50 border-b border-border/40 shrink-0">
+      <div className="px-3 py-2 bg-[#1b1b1b] border-b border-[#282828]/50 shrink-0">
         <div className="relative">
-          <Search className="h-3.5 w-3.5 absolute left-3 top-2.5 text-muted-foreground pointer-events-none" />
+          <Search className="h-3 w-3 absolute left-2.5 top-2.5 text-[#969696] pointer-events-none" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={t("cheatsheetSearchPlaceholder")}
-            className="w-full h-9 pl-8 pr-3 rounded-xl bg-secondary/60 text-xs text-foreground outline-none border border-border focus:border-sky-500/50 transition-colors placeholder:text-muted-foreground/60"
+            className="w-full h-8 pl-7 pr-3 rounded-lg bg-[#252525] text-xs text-white outline-none border border-[#383838] focus:border-[#666] transition-colors placeholder:text-[#5d5d5d]"
           />
         </div>
       </div>
 
-      {/* Cards Scroll Area */}
-      <div className="flex-1 overflow-y-auto p-3.5 space-y-3">
+      {/* Cards Scroll Area: Strict Single Column Flow */}
+      <div className="flex-1 overflow-y-auto p-3 space-y-2.5 bg-[#161616]">
         {artifact?.status === "error" || (cards.length === 0 && !searchQuery.trim()) ? (
           <div className="py-12 px-4 text-center max-w-sm mx-auto space-y-3.5">
-            <div className="h-12 w-12 rounded-2xl bg-destructive/10 border border-destructive/20 text-destructive flex items-center justify-center mx-auto">
-              <AlertCircle className="h-6 w-6" />
+            <div className="h-10 w-10 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive flex items-center justify-center mx-auto">
+              <AlertCircle className="h-5 w-5" />
             </div>
             <div className="space-y-1">
-              <h3 className="text-sm font-semibold text-foreground">
+              <h3 className="text-xs font-semibold text-white">
                 {isIndo ? "Gagal Menyusun Lembar Contekan" : "Failed to Create CheatSheet"}
               </h3>
-              <p className="text-xs text-muted-foreground leading-relaxed">
+              <p className="text-[11px] text-[#969696] leading-relaxed">
                 {artifact?.error ||
                   (isIndo
                     ? "Server AI sedang tidak dapat dijangkau (502 Bad Gateway) atau response tidak valid."
@@ -443,7 +410,7 @@ export function MobileCheatSheetViewer({
             </div>
           </div>
         ) : filteredCards.length === 0 ? (
-          <div className="py-16 text-center text-muted-foreground text-xs space-y-1">
+          <div className="py-16 text-center text-[#969696] text-xs space-y-1">
             <p>{t("cheatsheetEmptyCards")}</p>
           </div>
         ) : (
@@ -452,45 +419,40 @@ export function MobileCheatSheetViewer({
             return (
               <div
                 key={card.id}
-                className="rounded-2xl bg-card border border-border/70 p-4 transition-all duration-150 relative group"
+                className="rounded-xl bg-[#202020] border border-[#383838] p-3 transition-all relative group"
               >
-                {/* Header: Title + Badge */}
-                <div className="flex items-start justify-between gap-2.5 mb-2.5">
-                  <h3 className="text-xs font-semibold text-foreground tracking-tight leading-snug">
+                {/* Header: Title + Monochrome Badge */}
+                <div className="flex items-start justify-between gap-2 mb-1.5">
+                  <h3 className="text-xs sm:text-[13px] font-semibold text-white tracking-tight leading-snug">
                     {card.title}
                   </h3>
                   {card.badge && (
-                    <span
-                      className={cn(
-                        "text-[9.5px] uppercase font-sans tracking-wider px-2 py-0.5 rounded-full border shrink-0 font-medium",
-                        getBadgeStyle(card.badge)
-                      )}
-                    >
+                    <span className="text-[9px] font-semibold uppercase font-sans tracking-wider px-1.5 py-0.5 rounded bg-[#171717] text-[#969696] border border-[#303030] shrink-0">
                       {card.badge}
                     </span>
                   )}
                 </div>
 
                 {/* Body Content with KaTeX & Code */}
-                <div className="text-xs text-foreground/90 leading-relaxed overflow-x-auto touch-pan-x">
+                <div className="text-[11.5px] leading-relaxed text-[#eaeaea] font-sans select-text overflow-x-auto touch-pan-x [&_p]:text-[#eaeaea] [&_p]:mb-1.5 [&_p:last-child]:mb-0 [&_strong]:text-white [&_strong]:font-semibold [&_li]:text-[#e0e0e0] [&_li]:mb-0.5 [&_ul]:ml-3.5 [&_ol]:ml-3.5 [&_pre]:my-1.5">
                   <MarkdownContent content={card.content} />
                 </div>
 
                 {/* Footer Action Strip */}
-                <div className="mt-3 pt-2.5 border-t border-border/40 flex items-center justify-between">
-                  <span className="text-[10px] text-muted-foreground/60 font-sans tabular-nums">
+                <div className="mt-2.5 pt-2 border-t border-[#2e2e2e]/50 flex items-center justify-between">
+                  <span className="text-[9.5px] text-[#5d5d5d] font-sans tabular-nums font-medium">
                     #{card.id}
                   </span>
 
-                  <div className="flex items-center gap-1">
+                  <div className="flex items-center gap-1.5">
                     <button
                       type="button"
                       onClick={() => handleCopyCard(card)}
-                      className="px-2.5 py-1 rounded-lg bg-secondary/50 hover:bg-secondary text-muted-foreground hover:text-foreground text-[11px] font-medium flex items-center gap-1 transition-colors cursor-pointer active:scale-95"
+                      className="px-2 py-0.5 rounded-md bg-[#1b1b1b] hover:bg-[#282828] border border-[#2e2e2e] text-[#969696] hover:text-white text-[10.5px] font-medium flex items-center gap-1 transition-colors cursor-pointer active:scale-95"
                       title={t("cheatsheetCopySuccess")}
                     >
                       {isCopied ? (
-                        <Check className="h-3 w-3 text-emerald-400" />
+                        <Check className="h-3 w-3 text-white" />
                       ) : (
                         <Copy className="h-3 w-3" />
                       )}
@@ -509,10 +471,10 @@ export function MobileCheatSheetViewer({
                       <button
                         type="button"
                         onClick={() => handleAskTutor(card)}
-                        className="px-2.5 py-1 rounded-lg bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 text-[11px] font-medium flex items-center gap-1 transition-colors cursor-pointer active:scale-95"
+                        className="px-2 py-0.5 rounded-md bg-[#1b1b1b] hover:bg-[#282828] border border-[#2e2e2e] text-[#969696] hover:text-white text-[10.5px] font-medium flex items-center gap-1 transition-colors cursor-pointer active:scale-95"
                         title={t("cheatsheetAskTutor")}
                       >
-                        <Sparkles className="h-3 w-3 text-sky-400" />
+                        <Sparkles className="h-3 w-3 text-[#969696]" />
                         <span>{t("cheatsheetAskTutor")}</span>
                       </button>
                     )}

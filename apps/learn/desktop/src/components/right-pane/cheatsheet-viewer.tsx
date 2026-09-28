@@ -4,7 +4,6 @@ import {
   FileSpreadsheet,
   Search,
   Download,
-  SquarePen,
   Copy,
   Check,
   HelpCircle,
@@ -12,7 +11,6 @@ import {
   Minimize2,
   X,
   AlertCircle,
-  Layers,
 } from "lucide-react";
 import { cn, ScrollArea, toast } from "@const/ui";
 import { marked } from "marked";
@@ -24,7 +22,6 @@ export interface CheatSheetViewerProps {
   artifact?: LocalArtifact;
   data: CheatSheetData;
   onExplainInChat?: (prompt: string) => void;
-  onExportAsNote?: (data: CheatSheetData) => void;
   onToggleExpand?: () => void;
   isExpanded?: boolean;
   onRetry?: () => void;
@@ -266,7 +263,6 @@ export function CheatSheetViewer({
   artifact,
   data,
   onExplainInChat,
-  onExportAsNote,
   onToggleExpand: _onToggleExpand,
   isExpanded: _isExpanded = false,
 }: CheatSheetViewerProps) {
@@ -373,65 +369,44 @@ export function CheatSheetViewer({
     }
   };
 
-  const getBadgeStyle = (badge?: string) => {
-    if (!badge) return "bg-sky-500/10 text-sky-400 border-sky-500/20";
-    const b = badge.toUpperCase();
-    if (b.includes("JEBAKAN") || b.includes("PITFALL") || b.includes("PERINGATAN") || b.includes("WARNING")) {
-      return "bg-rose-500/10 text-rose-400 border-rose-500/20";
-    }
-    if (b.includes("SINTAKS") || b.includes("KODE") || b.includes("SYNTAX") || b.includes("CLI")) {
-      return "bg-emerald-500/10 text-emerald-400 border-emerald-500/20";
-    }
-    if (b.includes("TIPS") || b.includes("TRIK") || b.includes("MNEMONIK") || b.includes("SHORTCUT")) {
-      return "bg-amber-500/10 text-amber-400 border-amber-500/20";
-    }
-    if (b.includes("KOMPARASI") || b.includes("PERBANDINGAN") || b.includes("VS")) {
-      return "bg-purple-500/10 text-purple-400 border-purple-500/20";
-    }
-    return "bg-sky-500/10 text-sky-400 border-sky-500/20";
-  };
-
-  // Shared Card Renderer Component
-  const renderCard = (card: CheatSheetCard, isMaximizedMode = false) => {
+  const renderCard = (card: CheatSheetCard) => {
     const isCopied = copiedCardId === card.id;
-    const isWide = card.span === "wide";
+    const isWide =
+      card.span === "wide" ||
+      card.content.includes("|---|") ||
+      card.content.includes("|:---|");
 
     return (
       <article
         key={card.id}
         className={cn(
-          "break-inside-avoid mb-3.5 rounded-2xl border border-border/70 bg-[#202020] text-card-foreground p-3.5 sm:p-4 transition-all hover:border-border select-text flex flex-col justify-between shadow-2xs group print:bg-white print:border-gray-300 print:text-black print:shadow-none",
-          isWide && (isMaximizedMode ? "md:column-span-2" : "sm:column-span-2")
+          "rounded-2xl border border-[#383838] bg-[#202020] hover:bg-[#262626] text-card-foreground p-4 sm:p-4.5 transition-all hover:border-[#484848] select-text flex flex-col justify-between group print:bg-white print:border-gray-300 print:text-black",
+          isWide && "col-span-1 md:col-span-2"
         )}
       >
         <div>
           {/* Top Row: Badge & Action Controls */}
-          <div className="flex items-center justify-between gap-2 mb-2 print:mb-1">
+          <div className="flex items-center justify-between gap-2 mb-2.5 print:mb-1">
             {card.badge ? (
-              <span
-                className={cn(
-                  "text-[9.5px] font-bold px-2 py-0.5 rounded-full border uppercase tracking-wider print:border-gray-400 print:text-black",
-                  getBadgeStyle(card.badge)
-                )}
-              >
+              <span className="text-[9.5px] font-semibold px-2 py-0.5 rounded-md border uppercase tracking-wider bg-[#171717] text-[#969696] border-[#303030] group-hover:text-white group-hover:border-[#404040] print:border-gray-400 print:text-black transition-colors font-sans">
                 {card.badge}
               </span>
             ) : (
-              <span className="text-[9.5px] font-bold text-muted-foreground uppercase tracking-wider">
+              <span className="text-[9.5px] font-semibold text-[#969696] uppercase tracking-wider font-sans">
                 {isIndo ? "REFERENSI" : "REFERENCE"}
               </span>
             )}
 
-            <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100 transition-opacity print:hidden">
+            <div className="flex items-center gap-1 opacity-70 group-hover:opacity-100 transition-opacity print:hidden">
               {/* Copy Card Button */}
               <button
                 type="button"
                 onClick={() => handleCopyCard(card)}
-                className="h-6 w-6 rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
+                className="h-6 w-6 rounded-md hover:bg-[#303030] text-[#969696] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
                 title={isIndo ? "Salin isi kartu" : "Copy card text"}
               >
                 {isCopied ? (
-                  <Check className="h-3 w-3 text-emerald-400" />
+                  <Check className="h-3 w-3 text-white" />
                 ) : (
                   <Copy className="h-3 w-3" />
                 )}
@@ -442,7 +417,7 @@ export function CheatSheetViewer({
                 <button
                   type="button"
                   onClick={() => handleAskTutor(card)}
-                  className="h-6 w-6 rounded-md hover:bg-secondary text-muted-foreground hover:text-sky-400 flex items-center justify-center transition-colors cursor-pointer"
+                  className="h-6 w-6 rounded-md hover:bg-[#303030] text-[#969696] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
                   title={t("cheatsheetAskTutor")}
                 >
                   <HelpCircle className="h-3.5 w-3.5" />
@@ -452,37 +427,44 @@ export function CheatSheetViewer({
           </div>
 
           {/* Card Title */}
-          <h2 className="text-xs sm:text-[13px] font-semibold text-foreground tracking-tight mb-2 leading-snug print:text-black print:font-bold">
+          <h2 className="text-sm font-semibold text-white tracking-tight mb-2 leading-snug print:text-black print:font-bold">
             {card.title}
           </h2>
 
           {/* Card Body rendered with MarkdownContent */}
-          <div className="text-[12px] leading-relaxed text-foreground/90 font-sans select-text [&_p]:text-foreground [&_h1]:text-foreground [&_h2]:text-foreground [&_h3]:text-foreground [&_li]:text-foreground [&_pre]:my-2 [&_.katex-display]:my-2 print:text-black">
+          <div className="text-[12.5px] leading-relaxed text-[#eaeaea] font-sans select-text [&_p]:text-[#eaeaea] [&_p]:mb-2 [&_p:last-child]:mb-0 [&_strong]:text-white [&_strong]:font-semibold [&_h1]:text-white [&_h2]:text-white [&_h3]:text-white [&_li]:text-[#e0e0e0] [&_li]:mb-1 [&_ul]:ml-4 [&_ol]:ml-4 [&_pre]:my-2 [&_.katex-display]:my-2 print:text-black">
             <MarkdownContent content={card.content} />
           </div>
+        </div>
+
+        {/* Card Footer: Subtle ID Number */}
+        <div className="pt-2 mt-2 flex items-center justify-end">
+          <span className="text-[10px] text-[#5d5d5d] font-sans font-medium">
+            #{card.id}
+          </span>
         </div>
       </article>
     );
   };
 
   return (
-    <div className="h-full flex flex-col bg-background text-foreground font-sans select-none overflow-hidden print:bg-white print:text-black">
+    <div className="h-full flex flex-col bg-[#161616] text-[#d4d4d4] font-sans select-none overflow-hidden print:bg-white print:text-black">
       {/* Top Header Bar */}
-      <div className="px-4 py-3 border-b border-border/50 flex flex-wrap items-center justify-between gap-3 shrink-0 bg-card/60 backdrop-blur-xs print:hidden">
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div className="h-8 w-8 rounded-xl bg-sky-500/10 border border-sky-500/20 text-sky-400 flex items-center justify-center shrink-0">
+      <div className="px-4 py-3 border-b border-[#2e2e2e]/60 flex items-center justify-between gap-3 shrink-0 bg-[#222222] print:hidden">
+        <div className="flex items-center gap-3 min-w-0 flex-1 mr-2">
+          <div className="h-8 w-8 rounded-xl bg-[#252525] border border-[#383838] text-white flex items-center justify-center shrink-0">
             <FileSpreadsheet className="h-4 w-4" />
           </div>
-          <div className="min-w-0">
-            <h1 className="text-xs sm:text-sm font-semibold text-foreground tracking-tight truncate max-w-[280px] sm:max-w-md">
+          <div className="min-w-0 flex-1">
+            <h1 className="text-sm sm:text-[15px] font-semibold text-white tracking-tight leading-snug truncate">
               {data.title}
             </h1>
-            <div className="text-[10.5px] text-muted-foreground flex items-center gap-2 mt-0.5 truncate">
-              <span>{filteredCards.length} {isIndo ? "kartu referensi" : "reference cards"}</span>
+            <div className="text-[11px] text-[#969696] flex items-center gap-2 mt-0.5 truncate">
+              <span className="shrink-0 whitespace-nowrap">{filteredCards.length} {isIndo ? "kartu referensi" : "reference cards"}</span>
               {data.sourceCount ? (
                 <>
-                  <span>•</span>
-                  <span>{data.sourceCount} {isIndo ? "sumber" : "sources"}</span>
+                  <span className="text-[#5d5d5d] shrink-0">•</span>
+                  <span className="shrink-0 whitespace-nowrap">{data.sourceCount} {isIndo ? "sumber" : "sources"}</span>
                 </>
               ) : null}
             </div>
@@ -493,35 +475,22 @@ export function CheatSheetViewer({
         <div className="flex items-center gap-2 shrink-0">
           {/* Live Search */}
           <div className="relative w-36 sm:w-44">
-            <Search className="h-3 w-3 absolute left-2.5 top-2.5 text-muted-foreground pointer-events-none" />
+            <Search className="h-3 w-3 absolute left-2.5 top-2.5 text-[#969696] pointer-events-none" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={t("cheatsheetSearchPlaceholder")}
-              className="w-full h-8 pl-7 pr-2.5 rounded-lg bg-secondary/60 hover:bg-secondary text-[11px] text-foreground outline-none border border-border/70 focus:border-sky-500/50 transition-colors placeholder:text-muted-foreground/60"
+              className="w-full h-8 pl-7 pr-2.5 rounded-lg bg-[#252525] hover:bg-[#2b2b2b] text-xs text-white outline-none border border-[#383838] focus:border-[#666] transition-colors placeholder:text-[#5d5d5d]"
             />
           </div>
 
-          {/* Export to Note */}
-          {onExportAsNote && (
-            <button
-              type="button"
-              onClick={() => onExportAsNote(data)}
-              className="h-8 px-2.5 rounded-lg bg-secondary/60 hover:bg-secondary border border-border/70 text-foreground text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
-              title={t("cheatsheetExportNote")}
-            >
-              <SquarePen className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="hidden sm:inline">{t("cheatsheetExportNote")}</span>
-            </button>
-          )}
-
-          {/* Download PDF (Replaces old Print button) */}
+          {/* Download PDF */}
           <button
             type="button"
             onClick={handleDownloadPdf}
             disabled={isDownloadingPdf}
-            className="h-8 px-2.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer active:scale-95 disabled:opacity-50"
+            className="h-8 px-3 rounded-lg bg-white text-[#161616] hover:bg-neutral-200 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-none cursor-pointer active:scale-95 disabled:opacity-50"
             title={isIndo ? "Unduh Lembar Contekan sebagai PDF" : "Download CheatSheet as PDF"}
           >
             <Download className="h-3.5 w-3.5" />
@@ -532,7 +501,7 @@ export function CheatSheetViewer({
           <button
             type="button"
             onClick={() => setIsMaximized(true)}
-            className="h-8 w-8 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer ml-0.5"
+            className="h-8 w-8 rounded-lg hover:bg-[#2b2b2b] text-[#969696] hover:text-white flex items-center justify-center transition-colors cursor-pointer ml-0.5"
             title={isIndo ? "Pratinjau Penuh" : "Fullscreen Preview"}
           >
             <Maximize2 className="h-4 w-4" />
@@ -540,19 +509,19 @@ export function CheatSheetViewer({
         </div>
       </div>
 
-      {/* Scrollable Content: CSS Multi-Column Masonry */}
-      <ScrollArea className="flex-1 w-full min-h-0 print:overflow-visible">
-        <div className="p-4 sm:p-5 print:p-0">
+      {/* Scrollable Content: 2-Column Responsive CSS Grid */}
+      <ScrollArea className="flex-1 w-full min-h-0 bg-[#161616] print:overflow-visible">
+        <div className="p-4 sm:p-5 max-w-[1200px] mx-auto w-full print:p-0">
           {artifact?.status === "error" || (cards.length === 0 && !searchQuery.trim()) ? (
             <div className="py-16 text-center max-w-md mx-auto space-y-4">
               <div className="h-12 w-12 rounded-2xl bg-destructive/10 border border-destructive/20 text-destructive flex items-center justify-center mx-auto">
                 <AlertCircle className="h-6 w-6" />
               </div>
               <div className="space-y-1.5">
-                <h3 className="text-sm font-semibold text-foreground">
+                <h3 className="text-sm font-semibold text-white">
                   {isIndo ? "Gagal Menyusun Lembar Contekan" : "Failed to Create CheatSheet"}
                 </h3>
-                <p className="text-xs text-muted-foreground leading-relaxed">
+                <p className="text-xs text-[#969696] leading-relaxed">
                   {artifact?.error ||
                     (isIndo
                       ? "Server AI sedang tidak dapat dijangkau atau terjadi gangguan koneksi."
@@ -561,54 +530,54 @@ export function CheatSheetViewer({
               </div>
             </div>
           ) : filteredCards.length === 0 ? (
-            <div className="py-16 text-center text-muted-foreground space-y-2">
+            <div className="py-16 text-center text-[#969696] space-y-2">
               <Search className="h-8 w-8 mx-auto opacity-40 mb-2" />
-              <p className="text-xs font-medium text-foreground">
+              <p className="text-xs font-medium text-white">
                 {isIndo ? "Tidak ada kartu yang cocok" : "No matching cards found"}
               </p>
-              <p className="text-[11px] text-muted-foreground">
+              <p className="text-[11px] text-[#969696]">
                 {isIndo
                   ? `Tidak ada hasil untuk pencarian "${searchQuery}". Coba kata kunci lain.`
                   : `No results for "${searchQuery}". Try a different keyword.`}
               </p>
             </div>
           ) : (
-            <div className="columns-1 sm:columns-2 lg:columns-3 gap-3.5 [column-fill:_balance] print:columns-2 print:gap-4">
-              {filteredCards.map((card) => renderCard(card, false))}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 print:grid-cols-2 print:gap-4">
+              {filteredCards.map((card) => renderCard(card))}
             </div>
           )}
         </div>
       </ScrollArea>
 
-      {/* Floating Centered Fullscreen Preview Modal (Matching Infographic / Report layout) */}
+      {/* Floating Centered Fullscreen Preview Modal */}
       {isMaximized &&
         createPortal(
           <div
-            className="fixed inset-0 z-[100] bg-black/75 backdrop-blur-xs flex flex-col items-center justify-center p-3 sm:p-5 md:p-7 select-none animate-in fade-in duration-150 font-sans"
+            className="fixed inset-0 z-[100] bg-black/80 backdrop-blur-xs flex flex-col items-center justify-center p-3 sm:p-5 md:p-7 select-none animate-in fade-in duration-150 font-sans"
             role="dialog"
             aria-modal="true"
             onClick={() => setIsMaximized(false)}
           >
             {/* Centered Floating Modal Card */}
             <div
-              className="relative w-full max-w-[1280px] h-[90vh] max-h-[900px] bg-card border border-border rounded-3xl shadow-2xl flex flex-col overflow-hidden select-text animate-in zoom-in-95 duration-150"
+              className="relative w-full max-w-[1140px] h-[90vh] max-h-[900px] bg-[#1b1b1b] border border-[#383838] rounded-3xl shadow-none flex flex-col overflow-hidden select-text animate-in zoom-in-95 duration-150 outline-none focus:outline-none ring-0"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Maximized Header */}
-              <div className="h-14 px-5 border-b border-border flex items-center justify-between gap-3 shrink-0 bg-secondary/20">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="h-8 w-8 rounded-xl bg-sky-500/10 border border-sky-500/20 text-sky-400 flex items-center justify-center shrink-0">
+              <div className="h-14 px-5 border-b border-[#2e2e2e]/60 flex items-center justify-between gap-3 shrink-0 bg-[#222222]">
+                <div className="flex items-center gap-3 min-w-0 flex-1 mr-3">
+                  <div className="h-8 w-8 rounded-xl bg-[#252525] border border-[#383838] text-white flex items-center justify-center shrink-0">
                     <FileSpreadsheet className="h-4 w-4" />
                   </div>
-                  <div className="min-w-0">
-                    <h2 className="text-sm font-semibold text-foreground tracking-tight truncate max-w-md">
+                  <div className="min-w-0 flex-1">
+                    <h2 className="text-sm sm:text-base font-semibold text-white tracking-tight leading-snug truncate">
                       {data.title}
                     </h2>
-                    <div className="text-[11px] text-muted-foreground flex items-center gap-2 mt-0.5">
-                      <span>{filteredCards.length} {isIndo ? "kartu referensi" : "reference cards"}</span>
+                    <div className="text-[11px] text-[#969696] flex items-center gap-2 mt-0.5 truncate">
+                      <span className="shrink-0 whitespace-nowrap">{filteredCards.length} {isIndo ? "kartu referensi" : "reference cards"}</span>
                       {data.topic && (
                         <>
-                          <span>•</span>
+                          <span className="text-[#5d5d5d] shrink-0">•</span>
                           <span className="truncate">{data.topic}</span>
                         </>
                       )}
@@ -617,34 +586,22 @@ export function CheatSheetViewer({
                 </div>
 
                 <div className="flex items-center gap-2 shrink-0">
-                  <div className="relative w-48 sm:w-60">
-                    <Search className="h-3.5 w-3.5 absolute left-3 top-2.5 text-muted-foreground pointer-events-none" />
+                  <div className="relative w-44 sm:w-56">
+                    <Search className="h-3.5 w-3.5 absolute left-3 top-2.5 text-[#969696] pointer-events-none" />
                     <input
                       type="text"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       placeholder={t("cheatsheetSearchPlaceholder")}
-                      className="w-full h-8 pl-8 pr-3 rounded-lg bg-background text-xs text-foreground outline-none border border-border focus:border-sky-500/50 transition-colors placeholder:text-muted-foreground/60"
+                      className="w-full h-8 pl-8 pr-3 rounded-lg bg-[#252525] text-xs text-white outline-none border border-[#383838] focus:border-[#666] transition-colors placeholder:text-[#5d5d5d]"
                     />
                   </div>
-
-                  {onExportAsNote && (
-                    <button
-                      type="button"
-                      onClick={() => onExportAsNote(data)}
-                      className="h-8 px-2.5 rounded-lg bg-secondary hover:bg-secondary/80 border border-border text-foreground text-xs font-medium flex items-center gap-1.5 transition-colors cursor-pointer"
-                      title={t("cheatsheetExportNote")}
-                    >
-                      <SquarePen className="h-3.5 w-3.5 text-muted-foreground" />
-                      <span className="hidden sm:inline">{t("cheatsheetExportNote")}</span>
-                    </button>
-                  )}
 
                   <button
                     type="button"
                     onClick={handleDownloadPdf}
                     disabled={isDownloadingPdf}
-                    className="h-8 px-3 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer active:scale-95 disabled:opacity-50"
+                    className="h-8 px-3 rounded-lg bg-white text-[#161616] hover:bg-neutral-200 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-none cursor-pointer active:scale-95 disabled:opacity-50"
                     title={isIndo ? "Unduh PDF" : "Download PDF"}
                   >
                     <Download className="h-3.5 w-3.5" />
@@ -654,7 +611,7 @@ export function CheatSheetViewer({
                   <button
                     type="button"
                     onClick={() => setIsMaximized(false)}
-                    className="h-8 w-8 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer ml-1"
+                    className="h-8 w-8 rounded-lg hover:bg-[#2b2b2b] text-[#969696] hover:text-white flex items-center justify-center transition-colors cursor-pointer ml-1"
                     title={isIndo ? "Kecilkan (Kembali ke panel)" : "Restore"}
                   >
                     <Minimize2 className="h-4 w-4" />
@@ -663,7 +620,7 @@ export function CheatSheetViewer({
                   <button
                     type="button"
                     onClick={() => setIsMaximized(false)}
-                    className="h-8 w-8 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
+                    className="h-8 w-8 rounded-lg hover:bg-[#2b2b2b] text-[#969696] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
                     title="Close (Esc)"
                     aria-label="Close"
                   >
@@ -672,19 +629,19 @@ export function CheatSheetViewer({
                 </div>
               </div>
 
-              {/* Maximized Modal Body: Expansive 3 to 4 Column Masonry */}
-              <ScrollArea className="flex-1 w-full min-h-0 bg-background/50">
-                <div className="p-6">
+              {/* Maximized Modal Body: Expansive 2-Column Grid */}
+              <ScrollArea className="flex-1 w-full min-h-0 bg-[#161616]">
+                <div className="p-6 max-w-[1080px] mx-auto w-full">
                   {filteredCards.length === 0 ? (
-                    <div className="py-20 text-center text-muted-foreground space-y-2">
+                    <div className="py-20 text-center text-[#969696] space-y-2">
                       <Search className="h-10 w-10 mx-auto opacity-40 mb-2" />
-                      <p className="text-sm font-medium text-foreground">
+                      <p className="text-sm font-medium text-white">
                         {isIndo ? "Tidak ada kartu yang cocok" : "No matching cards found"}
                       </p>
                     </div>
                   ) : (
-                    <div className="columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-4 [column-fill:_balance]">
-                      {filteredCards.map((card) => renderCard(card, true))}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {filteredCards.map((card) => renderCard(card))}
                     </div>
                   )}
                 </div>

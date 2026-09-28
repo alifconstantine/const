@@ -57,7 +57,7 @@ import { STUDIO_TOOLS } from "../workspace/studio-panel";
 import { useI18n } from "../../lib/i18n";
 import type { RightPaneTab, RightPaneTabType, BrowserSelectedElement } from "./types";
 import type { FileMutationRecord } from "@const/agent";
-import { localDb, type LocalArtifact, type AudioSummaryData, type VideoSummaryData, type SlideDeckData, type InfographicData, type ReportData, type CheatSheetData } from "../../lib/db";
+import { type LocalArtifact, type AudioSummaryData, type VideoSummaryData, type SlideDeckData, type InfographicData, type ReportData, type CheatSheetData } from "../../lib/db";
 
 export interface GeneratingArtifactStatus {
   id: string;
@@ -428,38 +428,6 @@ export function RightPane({
                 learnId: tab.artifact.learnId || cheatsheetData.learnId,
               }}
               onExplainInChat={onExplainInChat}
-              onExportAsNote={async (csData) => {
-                if (!tab.artifact?.learnId) return;
-                const isIndo = language === "id";
-                const noteTitle = `${csData.title || "CheatSheet"} (${isIndo ? "Catatan" : "Note"})`;
-                const markdownLines = [
-                  `# ${csData.title || "CheatSheet"}\n`,
-                  csData.cards
-                    .map(
-                      (c) =>
-                        `## ${c.title}${c.badge ? ` [${c.badge}]` : ""}\n\n${c.content}`
-                    )
-                    .join("\n\n---\n\n"),
-                ].join("\n");
-
-                const artId = await localDb.createArtifact({
-                  learnId: tab.artifact.learnId,
-                  title: noteTitle,
-                  type: "note",
-                  status: "completed",
-                  content: markdownLines,
-                  sourcesCount: csData.sourceCount || 0,
-                });
-                toast.success(
-                  isIndo
-                    ? "Berhasil diekspor ke Catatan!"
-                    : "Exported to Notes successfully!"
-                );
-                if (onOpenArtifact) {
-                  const noteArt = await localDb.getArtifact(artId);
-                  if (noteArt) onOpenArtifact(noteArt);
-                }
-              }}
               onToggleExpand={onToggleCollapse}
               isExpanded={!isCollapsed}
             />
