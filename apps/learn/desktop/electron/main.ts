@@ -1,4 +1,4 @@
-import { app, BrowserWindow, shell, ipcMain, dialog, Menu, nativeTheme, protocol, net } from "electron";
+import { app, BrowserWindow, shell, ipcMain, dialog, Menu, nativeTheme, protocol, net, session } from "electron";
 import path from "node:path";
 import fs from "node:fs";
 import os from "node:os";
@@ -2613,6 +2613,14 @@ app.on("second-instance", (_event, commandLine) => {
       const match = initialArg.match(/const-learn:\/\/[^\s"']+/);
       pendingDeepLink = match ? match[0] : initialArg;
     }
+
+    // Automatically grant media/microphone permissions for seamless Voice Input without browser prompts
+    session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
+      if (permission === "media") {
+        return callback(true);
+      }
+      callback(true);
+    });
 
     createWindow();
 

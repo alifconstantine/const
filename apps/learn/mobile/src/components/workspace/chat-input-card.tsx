@@ -9,7 +9,8 @@ import {
   Video,
   Mic,
 } from "lucide-react";
-import { ScrollArea, cn, toast } from "@const/ui";
+import { ScrollArea, cn, toast, VoiceInput } from "@const/ui";
+import { useVoiceRecognition } from "../../lib/voice";
 import { useI18n } from "../../lib/i18n";
 
 export const MAX_ATTACHMENTS = 5;
@@ -63,7 +64,7 @@ export function ChatInputCard({
   onAttachmentsChange,
   onPreviewMedia,
 }: ChatInputCardProps) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -71,6 +72,25 @@ export function ChatInputCard({
   const [internalAttachments, setInternalAttachments] = useState<AttachedMedia[]>([]);
   const attachments = externalAttachments ?? internalAttachments;
   const [isMultiline, setIsMultiline] = useState(false);
+
+  // Real-time Voice Input via Groq Cloud Whisper API
+  const {
+    isListening: isVoiceListening,
+    isTranscribing: isVoiceTranscribing,
+    startListening: startVoiceListening,
+    stopListening: stopVoiceListening,
+  } = useVoiceRecognition({
+    language: language || "id",
+    onTranscript: (liveTranscript) => {
+      onChangeInput(liveTranscript);
+      if (liveTranscript.length > 40 || liveTranscript.includes("\n")) {
+        setIsMultiline(true);
+      }
+      setTimeout(() => {
+        textareaRef.current?.focus();
+      }, 50);
+    },
+  });
 
   const SINGLE_LINE_HEIGHT = 28;
   const MIN_MULTILINE_HEIGHT = 44;
@@ -286,19 +306,36 @@ export function ChatInputCard({
       );
     }
 
+    // 0. If actively transcribing audio via Groq Whisper: show loading pill
+    if (isVoiceTranscribing) {
+      return (
+        <VoiceInput
+          loading={true}
+          className="shrink-0"
+        />
+      );
+    }
+
+    // 1. If actively recording speech: show expanded VoiceInput pill
+    if (isVoiceListening) {
+      return (
+        <VoiceInput
+          listening={true}
+          onToggle={stopVoiceListening}
+          className="shrink-0"
+        />
+      );
+    }
+
     if (!canSend) {
-      // In empty mode, display Mic and ChatGPT voice waveform button
+      // In empty mode and not listening, display VoiceInput and ChatGPT voice waveform button
       return (
         <div className="flex items-center gap-1 shrink-0">
-          <button
-            type="button"
-            onClick={() => toast.info(t("voiceInputNotAvailable") || "Input suara akan segera hadir!")}
-            className="w-8 h-8 rounded-full hover:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer shrink-0 active:scale-95"
-            title={t("voiceInput") || "Input Suara"}
-            aria-label={t("voiceInput") || "Input Suara"}
-          >
-            <Mic className="w-[18px] h-[18px] stroke-[1.8]" />
-          </button>
+          <VoiceInput
+            listening={false}
+            onToggle={() => startVoiceListening(inputMessage)}
+            className="shrink-0"
+          />
           <button
             type="button"
             onClick={() => toast.info(t("voiceModeNotAvailable"))}
@@ -322,7 +359,10 @@ export function ChatInputCard({
       <div className="flex items-center gap-1 shrink-0">
         <button
           type="button"
-          onClick={() => onSend(inputMessage, attachments)}
+          onClick={() => {
+            if (isVoiceListening) stopVoiceListening();
+            onSend(inputMessage, attachments);
+          }}
           className="w-8 h-8 rounded-full bg-foreground text-background flex items-center justify-center transition-all cursor-pointer active:scale-95 shrink-0 shadow-xs"
           title={t("sendMessage")}
           aria-label={t("sendMessage")}

@@ -49,7 +49,9 @@ import {
   TooltipProvider,
   toast,
   AVAILABLE_CONNECTORS,
+  VoiceInput,
 } from "@const/ui";
+import { useVoiceRecognition } from "../../lib/voice";
 import { getConnectedConnectorIds } from "../../lib/connectors-service";
 import { DEFAULT_MODELS } from "@const/agent/models";
 import type { ModelConfig, AgentMessage } from "@const/agent/types";
@@ -374,6 +376,25 @@ export function ChatPanel({
     imageIndex?: number;
   } | null>(null);
   const [isMultiline, setIsMultiline] = useState(false);
+
+  // Real-time Voice Input via Groq Cloud Whisper API
+  const {
+    isListening: isVoiceListening,
+    isTranscribing: isVoiceTranscribing,
+    startListening: startVoiceListening,
+    stopListening: stopVoiceListening,
+  } = useVoiceRecognition({
+    language: language || "id",
+    onTranscript: (liveTranscript) => {
+      setInputMessage(liveTranscript);
+      if (liveTranscript.length > 50 || liveTranscript.includes("\n")) {
+        setIsMultiline(true);
+      }
+      setTimeout(() => {
+        textareaRef.current?.focus();
+      }, 50);
+    },
+  });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const modelDropdownRef = useRef<HTMLDivElement>(null);
@@ -1390,6 +1411,10 @@ export function ChatPanel({
     customAttachments?: AttachedFile[],
     overrideHistory?: DisplayMessage[]
   ) => {
+    if (isVoiceListening) {
+      stopVoiceListening();
+    }
+
     let textToSend = (customPrompt !== undefined ? customPrompt : inputMessage).trim();
     const currentAttachmentsRaw = customAttachments ? [...customAttachments] : [...attachments];
 
@@ -2857,54 +2882,77 @@ export function ChatPanel({
       );
     }
 
-    const hasInput = Boolean(inputMessage.trim() || attachments.length > 0);
-
-    if (!hasInput && !isMultiline) {
-      // In single-line mode when empty, show circular mic button (Image 2)
+    // 0. If actively transcribing audio via Groq Whisper: show loading pill
+    if (isVoiceTranscribing) {
       return (
-        <button
-          type="button"
-          className="h-8 w-8 rounded-full bg-muted/60 hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer shrink-0"
-          title={t("voiceInput")}
-          aria-label={t("voiceInput")}
-        >
-          <Mic className="h-4 w-4" />
-        </button>
+        <VoiceInput
+          loading={true}
+          className="shrink-0"
+        />
       );
     }
 
-    return (
-      <div className="flex items-center gap-1.5 shrink-0">
-        {isMultiline && (
+    // 1. If actively recording speech: show expanded VoiceInput pill
+    if (isVoiceListening) {
+      return (
+        <VoiceInput
+          listening={true}
+          onToggle={stopVoiceListening}
+          className="shrink-0"
+        />
+      );
+    }
+
+    const hasInput = Boolean(inputMessage.trim() || attachments.length > 0);
+
+    // 2. In single-line mode when empty: unified Mic button (click to record)
+    if (!hasInput && !isMultiline) {
+      return (
+        <VoiceInput
+          listening={false}
+          onToggle={() => startVoiceListening(inputMessage)}
+          className="shrink-0"
+        />
+      );
+    }
+
+    // 3. In multiline mode when empty: show Mic next to disabled Send
+    if (!hasInput) {
+      return (
+        <div className="flex items-center gap-1.5 shrink-0">
+          <VoiceInput
+            listening={false}
+            onToggle={() => startVoiceListening(inputMessage)}
+            className="shrink-0"
+          />
           <button
             type="button"
-            className="h-8 w-8 rounded-full hover:bg-muted/70 text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer shrink-0"
-            title={t("voiceInput")}
-            aria-label={t("voiceInput")}
+            disabled
+            className="h-8 w-8 rounded-full flex items-center justify-center transition-colors shrink-0 shadow-xs bg-muted/60 text-muted-foreground/40 cursor-not-allowed"
+            aria-label={t("sendMessage")}
           >
-            <Mic className="h-4 w-4" />
+            <ArrowUp className="h-4 w-4 stroke-[2.5]" />
           </button>
-        )}
-        <button
-          type="button"
-          onClick={(e) => {
-            e.preventDefault();
-            if (hasInput && !isStreaming) {
-              handleSend(inputMessage);
-            }
-          }}
-          disabled={!hasInput || isStreaming}
-          className={cn(
-            "h-8 w-8 rounded-full flex items-center justify-center transition-colors shrink-0 shadow-xs active:scale-95",
-            hasInput && !isStreaming
-              ? "bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer"
-              : "bg-muted/60 text-muted-foreground/40 cursor-not-allowed"
-          )}
-          aria-label={t("sendMessage")}
-        >
-          <ArrowUp className="h-4 w-4 stroke-[2.5]" />
-        </button>
-      </div>
+        </div>
+      );
+    }
+
+    // 4. When text is present: unified Send button (press Enter or click to send)
+    return (
+      <button
+        type="button"
+        onClick={(e) => {
+          e.preventDefault();
+          if (hasInput && !isStreaming) {
+            handleSend(inputMessage);
+          }
+        }}
+        disabled={!hasInput || isStreaming}
+        className="h-8 w-8 rounded-full flex items-center justify-center transition-all shrink-0 shadow-xs active:scale-95 bg-primary hover:bg-primary/90 text-primary-foreground cursor-pointer"
+        aria-label={t("sendMessage")}
+      >
+        <ArrowUp className="h-4 w-4 stroke-[2.5]" />
+      </button>
     );
   };
 
