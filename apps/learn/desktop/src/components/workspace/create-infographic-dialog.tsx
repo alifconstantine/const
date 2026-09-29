@@ -40,22 +40,21 @@ type ActiveDropdown = "source" | "orientation" | "language" | "model" | null;
 
 interface StyleCardDef {
   id: string;
-  labelId: string;
-  labelEn: string;
+  label: string;
 }
 
 // Visual styles catalog (thumbnail slots are left blank as placeholders for user assets)
-const STYLE_CARDS: StyleCardDef[] = [
-  { id: "auto", labelId: "Pilih otomatis", labelEn: "Auto select" },
-  { id: "clean_modern", labelId: "Modern Bersih", labelEn: "Clean Modern" },
-  { id: "sketch_notes", labelId: "Catatan Sketsa", labelEn: "Sketch Notes" },
-  { id: "vector", labelId: "Minimalis Vektor", labelEn: "Vector Minimalist" },
-  { id: "editorial", labelId: "Editorial", labelEn: "Editorial" },
-  { id: "kawaii", labelId: "Kawaii", labelEn: "Kawaii" },
-  { id: "clay", labelId: "Tanah Liat", labelEn: "Claymation" },
-  { id: "anime", labelId: "Anime", labelEn: "Anime" },
-  { id: "3d_photorealistic", labelId: "Fotorealistik 3D", labelEn: "3D Photorealistic" },
-  { id: "retro_comic", labelId: "Komik Retro", labelEn: "Retro Comic" },
+const getStyleCards = (t: (key: any) => string): StyleCardDef[] => [
+  { id: "auto", label: t("styleAutoSelect") },
+  { id: "clean_modern", label: t("styleCleanModern") },
+  { id: "sketch_notes", label: t("styleSketchNotes") },
+  { id: "vector", label: t("styleVectorMinimalist") },
+  { id: "editorial", label: t("styleEditorial") },
+  { id: "kawaii", label: t("styleKawaii") },
+  { id: "clay", label: t("styleClaymation") },
+  { id: "anime", label: t("styleAnime") },
+  { id: "3d_photorealistic", label: t("style3dPhotorealistic") },
+  { id: "retro_comic", label: t("styleRetroComic") },
 ];
 
 export function CreateInfographicDialog({
@@ -66,13 +65,13 @@ export function CreateInfographicDialog({
   onOpenImageSettings,
 }: CreateInfographicDialogProps) {
   const { t, language } = useI18n();
-  const isIndo = language === "id";
 
   // Form states
-  const [selectedLanguage, setSelectedLanguage] = useState<"id" | "en">(isIndo ? "id" : "en");
+  const [selectedLanguage, setSelectedLanguage] = useState<"id" | "en">(language === "id" ? "id" : "en");
   const [orientation, setOrientation] = useState<InfographicOrientation>("landscape");
   const [selectedStyle, setSelectedStyle] = useState<string>("auto");
   const [detailLevel, setDetailLevel] = useState<InfographicDetailLevel>("standard");
+  const styleCards = useMemo(() => getStyleCards(t), [t]);
   const [customDescription, setCustomDescription] = useState("");
 
   // Source selections
@@ -194,21 +193,12 @@ export function CreateInfographicDialog({
     }
   };
 
-  const suggestionChips = useMemo(() => {
-    return isIndo
-      ? [
-          "Soroti 3 metrik kunci",
-          "Diagram alur proses bertahap",
-          "Tabel perbandingan pro & kontra",
-          "Visualisasi hierarki konsep",
-        ]
-      : [
-          "Highlight 3 key metrics",
-          "Step-by-step process flowchart",
-          "Pros & cons comparison table",
-          "Hierarchical concept hierarchy",
-        ];
-  }, [isIndo]);
+  const suggestionChips = useMemo(() => [
+    t("chipHighlight3Metrics"),
+    t("chipStepByStepFlow"),
+    t("chipProsConsTable"),
+    t("chipHierarchicalConcept"),
+  ], [t]);
 
   const handleApplySuggestion = (chipText: string) => {
     if (!customDescription.trim()) {
@@ -244,7 +234,7 @@ export function CreateInfographicDialog({
           <div className="flex items-center gap-2.5">
             <BarChart3 className="h-4 w-4 text-white shrink-0" />
             <span className="text-sm font-semibold text-white tracking-tight">
-              {isIndo ? "Buat Infografik" : "Create Infographic"}
+              {t("createInfographicTitle")}
             </span>
           </div>
 
@@ -252,7 +242,7 @@ export function CreateInfographicDialog({
             type="button"
             onClick={() => onOpenChange(false)}
             className="h-7 w-7 rounded-lg hover:bg-[#222222] text-[#888888] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
-            title={isIndo ? "Tutup" : "Close"}
+            title={t("close")}
           >
             <X className="h-4 w-4" />
           </button>
@@ -272,7 +262,7 @@ export function CreateInfographicDialog({
                   data-studio-dropdown
                 >
                   <label className="text-[11.5px] font-medium text-[#999999]">
-                    {isIndo ? "Sumber Rujukan Materi" : "Source Scope"}
+                    {t("sourceScope")}
                   </label>
                   <div className="relative">
                     <button
@@ -282,12 +272,8 @@ export function CreateInfographicDialog({
                     >
                       <span className="text-white font-medium truncate">
                         {selectedSourceIds.length === sources.length
-                          ? isIndo
-                            ? `Semua sumber (${sources.length} sumber)`
-                            : `All sources (${sources.length})`
-                          : isIndo
-                          ? `${selectedSourceIds.length} dari ${sources.length} sumber terpilih`
-                          : `${selectedSourceIds.length} of ${sources.length} sources selected`}
+                          ? t("allSourcesCount", { count: sources.length })
+                          : t("selectedOfTotalSources", { selected: selectedSourceIds.length, total: sources.length })}
                       </span>
                       <ChevronDown
                         className={cn(
@@ -298,7 +284,7 @@ export function CreateInfographicDialog({
                     </button>
 
                     {openDropdown === "source" && (
-                      <div className="absolute top-full mt-1.5 left-0 right-0 z-50 bg-[#222222] border border-[#2b2b2b] rounded-xl p-2 shadow-2xl animate-in fade-in-0 zoom-in-95 duration-100">
+                      <div className="absolute top-full mt-1.5 left-0 right-0 z-50 bg-[#222222] border border-[#2b2b2b] rounded-xl p-1.5 shadow-2xl animate-in fade-in-0 zoom-in-95 duration-100">
                         {/* Select All Toggle */}
                         <button
                           type="button"
@@ -306,13 +292,7 @@ export function CreateInfographicDialog({
                           className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-[#2b2b2b] text-xs text-[#cccccc] cursor-pointer transition-colors"
                         >
                           <span className="font-medium">
-                            {selectedSourceIds.length === sources.length
-                              ? isIndo
-                                ? "Batalkan semua"
-                                : "Deselect all"
-                              : isIndo
-                              ? "Pilih semua sumber"
-                                : "Select all sources"}
+                            {selectedSourceIds.length === sources.length ? t("deselectAll") : t("selectAllSources")}
                           </span>
                           <div
                             className={cn(
@@ -372,7 +352,7 @@ export function CreateInfographicDialog({
                   data-studio-dropdown
                 >
                   <label className="text-[11.5px] font-medium text-[#999999]">
-                    {isIndo ? "Pilih Orientasi" : "Orientation"}
+                    {t("orientation")}
                   </label>
                   <div className="relative">
                     <button
@@ -382,10 +362,10 @@ export function CreateInfographicDialog({
                     >
                       <span className="text-white font-medium truncate">
                         {orientation === "landscape"
-                          ? isIndo ? "Lanskap (16:9)" : "Landscape (16:9)"
+                          ? t("orientationLandscape")
                           : orientation === "portrait"
-                          ? isIndo ? "Potret (9:16)" : "Portrait (9:16)"
-                          : isIndo ? "Persegi (1:1)" : "Square (1:1)"}
+                          ? t("orientationPortrait")
+                          : t("orientationSquare")}
                       </span>
                       <ChevronDown
                         className={cn(
@@ -399,9 +379,9 @@ export function CreateInfographicDialog({
                       <div className="absolute top-full mt-1.5 right-0 w-full min-w-[155px] z-50 bg-[#222222] border border-[#2b2b2b] rounded-xl p-1.5 shadow-2xl animate-in fade-in-0 zoom-in-95 duration-100">
                         {(
                           [
-                            { id: "landscape", labelId: "Lanskap (16:9)", labelEn: "Landscape (16:9)" },
-                            { id: "portrait", labelId: "Potret (9:16)", labelEn: "Portrait (9:16)" },
-                            { id: "square", labelId: "Persegi (1:1)", labelEn: "Square (1:1)" },
+                            { id: "landscape", label: t("orientationLandscape") },
+                            { id: "portrait", label: t("orientationPortrait") },
+                            { id: "square", label: t("orientationSquare") },
                           ] as const
                         ).map((item) => {
                           const isSelected = orientation === item.id;
@@ -420,7 +400,7 @@ export function CreateInfographicDialog({
                                   : "hover:bg-[#282828] text-[#cccccc] hover:text-white"
                               )}
                             >
-                              <span>{isIndo ? item.labelId : item.labelEn}</span>
+                              <span>{item.label}</span>
                               {isSelected && <Check className="h-3.5 w-3.5 text-white" />}
                             </button>
                           );
@@ -435,7 +415,7 @@ export function CreateInfographicDialog({
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <label className="text-[11.5px] font-medium text-[#999999]">
-                    {isIndo ? "Pilih Gaya Visual" : "Select Visual Style"}
+                    {t("selectVisualStyle")}
                   </label>
                   <div className="flex items-center gap-1">
                     <button
@@ -443,7 +423,7 @@ export function CreateInfographicDialog({
                       onClick={handleScrollLeft}
                       disabled={!canScrollLeft}
                       className="h-6 w-6 rounded-lg bg-[#222222] border border-[#2b2b2b] hover:border-[#383838] text-[#888888] hover:text-white disabled:opacity-30 disabled:hover:border-[#2b2b2b] disabled:hover:text-[#888888] disabled:cursor-not-allowed flex items-center justify-center transition-colors cursor-pointer"
-                      title={isIndo ? "Geser ke kiri" : "Scroll left"}
+                      title={t("scrollLeft")}
                     >
                       <ChevronLeft className="h-3.5 w-3.5" />
                     </button>
@@ -452,7 +432,7 @@ export function CreateInfographicDialog({
                       onClick={handleScrollRight}
                       disabled={!canScrollRight}
                       className="h-6 w-6 rounded-lg bg-[#222222] border border-[#2b2b2b] hover:border-[#383838] text-[#888888] hover:text-white disabled:opacity-30 disabled:hover:border-[#2b2b2b] disabled:hover:text-[#888888] disabled:cursor-not-allowed flex items-center justify-center transition-colors cursor-pointer"
-                      title={isIndo ? "Geser ke kanan" : "Scroll right"}
+                      title={t("scrollRight")}
                     >
                       <ChevronRight className="h-3.5 w-3.5" />
                     </button>
@@ -465,7 +445,7 @@ export function CreateInfographicDialog({
                     onScroll={checkScroll}
                     className="flex items-center gap-2.5 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden pb-1 pt-0.5 scroll-smooth"
                   >
-                    {STYLE_CARDS.map((style) => {
+                    {styleCards.map((style) => {
                       const isSelected = selectedStyle === style.id;
                       return (
                         <button
@@ -499,7 +479,7 @@ export function CreateInfographicDialog({
                               isSelected ? "text-white font-semibold" : "text-[#888888]"
                             )}
                           >
-                            {isIndo ? style.labelId : style.labelEn}
+                            {style.label}
                           </span>
                         </button>
                       );
@@ -513,14 +493,14 @@ export function CreateInfographicDialog({
                 {/* Tingkat Detail */}
                 <div className="space-y-1.5">
                   <label className="text-[11.5px] font-medium text-[#999999]">
-                    {isIndo ? "Tingkat Detail" : "Detail Level"}
+                    {t("detailLevel")}
                   </label>
                   <div className="h-9 p-0.5 bg-[#222222] border border-[#2b2b2b] rounded-xl grid grid-cols-3 gap-0.5">
                     {(
                       [
-                        { id: "brief", labelId: "Singkat", labelEn: "Brief" },
-                        { id: "standard", labelId: "Standar", labelEn: "Standard" },
-                        { id: "detailed", labelId: "Detail", labelEn: "Detailed" },
+                        { id: "brief", label: t("detailBrief") },
+                        { id: "standard", label: t("detailStandard") },
+                        { id: "detailed", label: t("detailDetailed") },
                       ] as const
                     ).map((item) => {
                       const isSelected = detailLevel === item.id;
@@ -536,7 +516,7 @@ export function CreateInfographicDialog({
                               : "text-[#888888] hover:text-white"
                           )}
                         >
-                          <span>{isIndo ? item.labelId : item.labelEn}</span>
+                          <span>{item.label}</span>
                         </button>
                       );
                     })}
@@ -552,7 +532,7 @@ export function CreateInfographicDialog({
                   data-studio-dropdown
                 >
                   <label className="text-[11.5px] font-medium text-[#999999]">
-                    {isIndo ? "Bahasa Konten" : "Content Language"}
+                    {t("contentLanguage")}
                   </label>
                   <div className="relative">
                     <button
@@ -561,7 +541,7 @@ export function CreateInfographicDialog({
                       className="w-full h-9 px-3 rounded-xl bg-[#222222] border border-[#2b2b2b] hover:border-[#383838] flex items-center justify-between text-xs text-left cursor-pointer transition-colors"
                     >
                       <span className="text-white font-medium">
-                        {selectedLanguage === "id" ? "Bahasa Indonesia" : "English"}
+                        {selectedLanguage === "id" ? t("indonesianLanguage") : t("englishLanguage")}
                       </span>
                       <ChevronDown
                         className={cn(
@@ -586,7 +566,7 @@ export function CreateInfographicDialog({
                               : "hover:bg-[#282828] text-[#cccccc] hover:text-white"
                           )}
                         >
-                          <span>Bahasa Indonesia</span>
+                          <span>{t("indonesianLanguage")}</span>
                           {selectedLanguage === "id" && <Check className="h-3.5 w-3.5 text-white" />}
                         </button>
                         <button
@@ -602,7 +582,7 @@ export function CreateInfographicDialog({
                               : "hover:bg-[#282828] text-[#cccccc] hover:text-white"
                           )}
                         >
-                          <span>English</span>
+                          <span>{t("englishLanguage")}</span>
                           {selectedLanguage === "en" && <Check className="h-3.5 w-3.5 text-white" />}
                         </button>
                       </div>
@@ -622,18 +602,18 @@ export function CreateInfographicDialog({
                   <div className="flex items-center gap-2">
                     <ImageIcon className="h-4 w-4 text-white" />
                     <span className="text-xs font-semibold text-white">
-                      {isIndo ? "Model Generator Gambar" : "Image Generation Model"}
+                      {t("imageGenerationModel")}
                     </span>
                   </div>
 
                   <div className="flex items-center gap-2">
                     {hasConfiguredImageModel ? (
                       <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#2b2b2b] text-[#d4d4d4] border border-[#383838]">
-                        {isIndo ? "Tersedia" : "Ready"}
+                        {t("readyStatus")}
                       </span>
                     ) : (
                       <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                        {isIndo ? "Belum Dikonfigurasi" : "Not Configured"}
+                        {t("notConfigured")}
                       </span>
                     )}
 
@@ -647,7 +627,7 @@ export function CreateInfographicDialog({
                         className="text-[11px] text-[#888888] hover:text-white flex items-center gap-1 cursor-pointer transition-colors"
                       >
                         <Settings className="h-3 w-3" />
-                        <span>{isIndo ? "Kelola" : "Manage"}</span>
+                        <span>{t("manageAction")}</span>
                       </button>
                     )}
                   </div>
@@ -658,9 +638,7 @@ export function CreateInfographicDialog({
                     <div className="flex items-start gap-2 text-xs text-amber-300/90 leading-relaxed">
                       <AlertCircle className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
                       <span>
-                        {isIndo
-                          ? "Fitur Infografis membutuhkan model gambar aktif. Tambahkan model di Pengaturan > Model > Image."
-                          : "Infographics require an active image model. Please configure one in Settings > Models > Image."}
+                        {t("imageModelRequiredNotice")}
                       </span>
                     </div>
                     {onOpenImageSettings && (
@@ -673,7 +651,7 @@ export function CreateInfographicDialog({
                         className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 text-xs font-medium cursor-pointer transition-colors"
                       >
                         <Settings className="h-3.5 w-3.5" />
-                        <span>{isIndo ? "Buka Pengaturan Model" : "Open Models Settings"}</span>
+                        <span>{t("openModelsSettings")}</span>
                         <ArrowRight className="h-3.5 w-3.5 ml-1" />
                       </button>
                     )}
@@ -692,7 +670,7 @@ export function CreateInfographicDialog({
                       className="w-full h-8 px-2.5 rounded-lg bg-[#2b2b2b] border border-[#383838] hover:border-[#444444] flex items-center justify-between text-xs text-white cursor-pointer transition-colors text-left"
                     >
                       <span className="truncate">
-                        {selectedModelId || (isIndo ? "Pilih model..." : "Select model...")}
+                        {selectedModelId || t("selectModelPlaceholder")}
                       </span>
                       <ChevronDown
                         className={cn(
@@ -746,18 +724,12 @@ export function CreateInfographicDialog({
               {/* 5. Deskripsi Tambahan / Instruksi Khusus + Preset Chips */}
               <div className="space-y-1.5">
                 <label className="text-[11.5px] font-medium text-[#999999]">
-                  {isIndo
-                    ? "Instruksi Khusus (Opsional)"
-                    : "Custom Instructions (Optional)"}
+                  {t("customInstructionsOptional")}
                 </label>
                 <textarea
                   value={customDescription}
                   onChange={(e) => setCustomDescription(e.target.value)}
-                  placeholder={
-                    isIndo
-                      ? 'Tentukan fokus, warna, atau tata letak: "Soroti 3 statistik kunci dan gunakan aksen biru muda..."'
-                      : 'Specify focus or layout: "Highlight 3 key metrics and use clear visual accents..."'
-                  }
+                  placeholder={t("infographicGuidancePlaceholder")}
                   rows={2}
                   className="w-full px-3 py-2 rounded-xl bg-[#222222] border border-[#2b2b2b] hover:border-[#383838] focus:border-[#444444] focus:outline-none text-xs text-white placeholder:text-[#666666] resize-none transition-colors font-sans"
                 />
@@ -793,7 +765,7 @@ export function CreateInfographicDialog({
               disabled={!hasConfiguredImageModel || selectedSourceIds.length === 0}
               className="px-4 py-2 rounded-xl bg-white hover:bg-neutral-200 disabled:opacity-40 disabled:hover:bg-white disabled:cursor-not-allowed text-xs font-semibold text-black flex items-center gap-1.5 transition-all cursor-pointer shadow-sm active:scale-98"
             >
-              <span>{isIndo ? "Buat Infografik" : "Generate Infographic"}</span>
+              <span>{t("generateInfographicAction")}</span>
             </button>
           </div>
         </form>

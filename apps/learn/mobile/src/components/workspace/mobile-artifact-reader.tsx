@@ -55,8 +55,7 @@ export function MobileArtifactReader({
   onConvertToSource,
   onGenerateNote,
 }: MobileArtifactReaderProps) {
-  const { language } = useI18n();
-  const isIndo = language === "id";
+  const { t } = useI18n();
 
   if (!open || !artifact) return null;
 
@@ -268,10 +267,10 @@ export function MobileArtifactReader({
             <div className="text-[10px] text-muted-foreground flex items-center gap-1.5">
               <span>
                 {isQuiz
-                  ? isIndo ? "Kuis Interaktif" : "Quiz"
+                  ? t("aiQuiz")
                   : isAudioSummary
-                  ? isIndo ? "Ringkasan Audio" : "Audio Summarize"
-                  : isIndo ? "Kartu Flashcard" : "Flashcards"}
+                  ? t("audioSummaryTitle")
+                  : t("flashcardsDeck")}
               </span>
             </div>
           </div>
@@ -281,7 +280,7 @@ export function MobileArtifactReader({
           type="button"
           onClick={onClose}
           className="h-8 w-8 rounded-full bg-secondary hover:bg-secondary/80 text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer active:scale-95 shrink-0"
-          aria-label="Tutup"
+          aria-label={t("close")}
         >
           <X className="h-4 w-4" />
         </button>
@@ -331,8 +330,7 @@ function MobileQuizBody({
   quiz: QuizData;
   onExplainInChat: (prompt: string) => void;
 }) {
-  const { language } = useI18n();
-  const isIndo = language === "id";
+  const { t } = useI18n();
 
   const questions: QuizQuestion[] = quiz.questions || [];
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -377,17 +375,13 @@ function MobileQuizBody({
     const correctOpt = currentQ.options.find((o) => o.isCorrect);
     const selectedOpt = currentQ.options.find((o) => o.id === currentAnswer);
 
-    const prompt = isIndo
-      ? `Tolong jelaskan lebih mendalam tentang pertanyaan kuis berikut:\n\n**Pertanyaan:** "${currentQ.question}"\n${
-          selectedOpt ? `**Jawaban Saya:** (${selectedOpt.id}) ${selectedOpt.text}\n` : ""
-        }**Kunci Jawaban:** (${correctOpt?.id}) ${correctOpt?.text}\n${
-          correctOpt?.explanation ? `**Penjelasan:** ${correctOpt.explanation}\n` : ""
-        }\nMengapa jawaban ini tepat dan apa konsep kunci di baliknya?`
-      : `Please explain this quiz question in depth:\n\n**Question:** "${currentQ.question}"\n${
-          selectedOpt ? `**My Answer:** (${selectedOpt.id}) ${selectedOpt.text}\n` : ""
-        }**Correct Answer:** (${correctOpt?.id}) ${correctOpt?.text}\n${
-          correctOpt?.explanation ? `**Explanation:** ${correctOpt.explanation}\n` : ""
-        }\nWhy is this correct and what is the key underlying concept?`;
+    const prompt = t("explainQuizPrompt", {
+      question: currentQ.question,
+      correctId: correctOpt?.id || "",
+      correctText: correctOpt?.text || "",
+      contextLine: correctOpt?.explanation ? t("quizContextLine", { explanation: correctOpt.explanation }) : "",
+      selectedLine: selectedOpt ? t("quizSelectedLine", { selectedId: selectedOpt.id, selectedText: selectedOpt.text }) : "",
+    });
 
     onExplainInChat(prompt);
   };
@@ -406,12 +400,10 @@ function MobileQuizBody({
           <Award className="h-8 w-8" />
         </div>
         <h2 className="text-lg font-bold text-foreground mb-1">
-          {isIndo ? "Kuis Selesai!" : "Quiz Completed!"}
+          {t("quizCompleted")}
         </h2>
         <p className="text-xs text-muted-foreground mb-6">
-          {isIndo
-            ? `Anda menjawab ${correctCount} dari ${totalQ} soal dengan benar (${scorePct}%).`
-            : `You scored ${correctCount} out of ${totalQ} questions correctly (${scorePct}%).`}
+          {t("yourScoreSummary", { score: correctCount, total: totalQ, pct: scorePct })}
         </p>
 
         <div className="w-full max-w-xs space-y-2.5">
@@ -421,7 +413,7 @@ function MobileQuizBody({
             className="w-full py-3 rounded-xl bg-secondary hover:bg-secondary/80 border border-border text-foreground font-medium text-xs flex items-center justify-center gap-2 cursor-pointer active:scale-98"
           >
             <RotateCcw className="h-4 w-4" />
-            <span>{isIndo ? "Ulangi Kuis" : "Retry Quiz"}</span>
+            <span>{t("restartQuiz")}</span>
           </button>
         </div>
       </div>
@@ -436,7 +428,7 @@ function MobileQuizBody({
       <div className="flex items-center justify-between text-xs text-muted-foreground">
         <div className="flex items-center gap-2">
           <span className="font-semibold text-foreground">
-            {isIndo ? "Pertanyaan" : "Question"} {currentIndex + 1}
+            {t("questionNumber")} {currentIndex + 1}
           </span>
           <span>/</span>
           <span>{totalQ}</span>
@@ -450,7 +442,7 @@ function MobileQuizBody({
             }
             className="text-[11px] text-foreground hover:underline flex items-center gap-1 cursor-pointer"
           >
-            <span>{isIndo ? "Petunjuk" : "Hint"}</span>
+            <span>{t("hintBadge")}</span>
             <ChevronDown
               className={cn(
                 "h-3 w-3 transition-transform",
@@ -534,12 +526,12 @@ function MobileQuizBody({
               {currentQ.options.find((o) => o.id === currentAnswer)?.isCorrect ? (
                 <>
                   <span className="text-emerald-400">✓</span>
-                  <span>{isIndo ? "Jawaban Anda Benar!" : "Correct Answer!"}</span>
+                  <span>{t("correctBadge")}</span>
                 </>
               ) : (
                 <>
                   <span className="text-rose-400">✕</span>
-                  <span>{isIndo ? "Jawaban Kurang Tepat" : "Incorrect"}</span>
+                  <span>{t("incorrectBadge")}</span>
                 </>
               )}
             </span>
@@ -551,16 +543,14 @@ function MobileQuizBody({
               className="px-3 py-1.5 rounded-full bg-secondary hover:bg-secondary/80 text-foreground text-[11px] font-medium border border-border flex items-center gap-1.5 transition-colors cursor-pointer active:scale-95"
             >
               <Sparkles className="h-3.5 w-3.5 text-amber-300" />
-              <span>{isIndo ? "Jelaskan" : "Explain"}</span>
+              <span>{t("explainAction")}</span>
             </button>
           </div>
 
           <p className="text-xs text-muted-foreground leading-relaxed">
             {currentQ.options.find((o) => o.id === currentAnswer)?.explanation ||
               currentQ.options.find((o) => o.isCorrect)?.explanation ||
-              (isIndo
-                ? "Pilihan di atas adalah jawaban yang paling tepat sesuai konteks materi."
-                : "The option above is the most accurate answer according to the material.")}
+              t("defaultQuizExplanation")}
           </p>
         </div>
       )}
@@ -574,7 +564,7 @@ function MobileQuizBody({
           className="px-4 py-2 rounded-xl bg-secondary border border-border text-xs font-medium text-foreground disabled:opacity-30 disabled:pointer-events-none flex items-center gap-1.5 cursor-pointer active:scale-95"
         >
           <ChevronLeft className="h-4 w-4" />
-          <span>{isIndo ? "Sebelumnya" : "Previous"}</span>
+          <span>{t("previousQuestion")}</span>
         </button>
 
         <button
@@ -584,12 +574,8 @@ function MobileQuizBody({
         >
           <span>
             {currentIndex === totalQ - 1
-              ? isIndo
-                ? "Selesai"
-                : "Finish"
-              : isIndo
-              ? "Selanjutnya"
-              : "Next"}
+              ? t("finishAction")
+              : t("nextQuestion")}
           </span>
           <ChevronRight className="h-4 w-4" />
         </button>
@@ -609,8 +595,7 @@ function MobileFlashcardBody({
   flashcard: FlashcardData;
   onExplainInChat: (prompt: string) => void;
 }) {
-  const { language } = useI18n();
-  const isIndo = language === "id";
+  const { t } = useI18n();
 
   const cards: FlashcardItem[] = flashcard.cards || [];
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -637,9 +622,10 @@ function MobileFlashcardBody({
   };
 
   const handleExplain = () => {
-    const prompt = isIndo
-      ? `Tolong jelaskan konsep flashcard ini lebih mendalam:\n\n**Depan (Istilah/Pertanyaan):** "${currentCard.front}"\n**Belakang (Penjelasan):** "${currentCard.back}"\n\nBerikan contoh konkret dan analogi mudah dipahami.`
-      : `Please explain this flashcard concept in depth:\n\n**Front (Term/Question):** "${currentCard.front}"\n**Back (Explanation):** "${currentCard.back}"\n\nProvide a concrete example and simple analogy.`;
+    const prompt = t("explainFlashcardPrompt", {
+      front: currentCard.front,
+      back: currentCard.back,
+    });
     onExplainInChat(prompt);
   };
 
@@ -659,7 +645,7 @@ function MobileFlashcardBody({
           className="text-[11px] text-foreground hover:underline flex items-center gap-1 cursor-pointer"
         >
           <Sparkles className="h-3 w-3 text-amber-300" />
-          <span>{isIndo ? "Jelaskan dengan AI" : "Explain with AI"}</span>
+          <span>{t("explainInChat")}</span>
         </button>
       </div>
 
@@ -669,7 +655,7 @@ function MobileFlashcardBody({
         className="w-full min-h-[260px] p-6 rounded-3xl bg-card border border-border shadow-md flex flex-col justify-between text-center cursor-pointer transition-all active:scale-[0.99]"
       >
         <div className="text-[10px] uppercase tracking-wider font-semibold text-muted-foreground">
-          {isFlipped ? (isIndo ? "Jawaban / Belakang" : "Back / Answer") : (isIndo ? "Pertanyaan / Depan" : "Front / Question")}
+          {isFlipped ? t("cardBackAnswer") : t("cardFrontTerm")}
         </div>
 
         <div className="my-auto py-4">
@@ -679,7 +665,7 @@ function MobileFlashcardBody({
         </div>
 
         <div className="text-[10px] text-muted-foreground">
-          {isIndo ? "Ketuk untuk membalik kartu" : "Tap to flip card"}
+          {t("clickCardToFlip")}
         </div>
       </div>
 
@@ -688,10 +674,10 @@ function MobileFlashcardBody({
         {(["hard", "medium", "easy"] as const).map((lvl) => {
           const label =
             lvl === "hard"
-              ? isIndo ? "Sulit" : "Hard"
+              ? t("hardRating")
               : lvl === "medium"
-              ? isIndo ? "Sedang" : "Medium"
-              : isIndo ? "Mudah" : "Easy";
+              ? t("goodRating")
+              : t("easyRating");
           const isSelected = ratings[currentCard.id] === lvl;
           return (
             <button
@@ -720,7 +706,7 @@ function MobileFlashcardBody({
           className="px-4 py-2 rounded-xl bg-secondary border border-border text-xs font-medium text-foreground disabled:opacity-30 disabled:pointer-events-none flex items-center gap-1.5 cursor-pointer active:scale-95"
         >
           <ChevronLeft className="h-4 w-4" />
-          <span>{isIndo ? "Sebelumnya" : "Previous"}</span>
+          <span>{t("previousAction")}</span>
         </button>
 
         <button
@@ -729,7 +715,7 @@ function MobileFlashcardBody({
           disabled={currentIndex === totalCards - 1}
           className="px-4 py-2 rounded-xl bg-foreground text-background text-xs font-semibold disabled:opacity-30 disabled:pointer-events-none flex items-center gap-1.5 cursor-pointer active:scale-95 shadow-xs"
         >
-          <span>{isIndo ? "Selanjutnya" : "Next"}</span>
+          <span>{t("nextAction")}</span>
           <ChevronRight className="h-4 w-4" />
         </button>
       </div>
@@ -755,8 +741,7 @@ function MobileAudioSummaryBody({
   data: AudioSummaryData;
   onExplainInChat: (prompt: string) => void;
 }) {
-  const { t, language } = useI18n();
-  const isIndo = language === "id";
+  const { t } = useI18n();
   const audioRef = React.useRef<HTMLAudioElement | null>(null);
 
   const [isPlaying, setIsPlaying] = useState(false);
@@ -875,11 +860,7 @@ function MobileAudioSummaryBody({
 
     setIsSynthesizing(true);
     try {
-      toast.info(
-        isIndo
-          ? "Memulai sintesis audio dengan Inworld TTS..."
-          : "Starting audio synthesis with Inworld TTS..."
-      );
+      toast.info(t("startingAudioSynthesis"));
       const synthRes = await synthesizeSpeechChunked({
         provider: {
           ...provider,
@@ -908,11 +889,7 @@ function MobileAudioSummaryBody({
           });
         }
 
-        toast.success(
-          isIndo
-            ? "Audio berhasil disintesis dan siap diputar!"
-            : "Audio synthesized successfully and ready to play!"
-        );
+        toast.success(t("audioSynthesizedReady"));
       } else {
         const errMsg = synthRes.error || "Synthesis failed";
         setAudioError(errMsg);
@@ -944,7 +921,7 @@ function MobileAudioSummaryBody({
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
             <AudioLines className="h-4 w-4 text-indigo-400" />
-            <span>{isIndo ? "Pemutar Suara" : "Voice Player"}</span>
+            <span>{t("voicePlayer")}</span>
           </div>
 
           {audioSrc && (
@@ -966,7 +943,7 @@ function MobileAudioSummaryBody({
               <AlertCircle className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
               <div>
                 <p className="font-medium text-amber-300">
-                  {isIndo ? "File audio belum siap atau gagal disintesis" : "Audio file is not ready or failed to synthesize"}
+                  {t("audioNotReady")}
                 </p>
                 {audioError && (
                   <p className="text-[11px] text-amber-300/80 mt-0.5 font-sans">
@@ -985,12 +962,12 @@ function MobileAudioSummaryBody({
               {isSynthesizing ? (
                 <>
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  <span>{isIndo ? "Memproses Audio..." : "Synthesizing Audio..."}</span>
+                  <span>{t("synthesizingAudio")}</span>
                 </>
               ) : (
                 <>
                   <Sparkles className="h-3.5 w-3.5" />
-                  <span>{isIndo ? "Sintesis Audio Sekarang" : "Synthesize Audio Now"}</span>
+                  <span>{t("synthesizeAudioNow")}</span>
                 </>
               )}
             </button>
@@ -1068,22 +1045,22 @@ function MobileAudioSummaryBody({
               className="flex items-center gap-1 px-2 py-1 rounded-lg hover:bg-secondary text-[11px] text-muted-foreground hover:text-foreground"
             >
               {copied ? <Check className="h-3 w-3 text-emerald-500" /> : <Copy className="h-3 w-3" />}
-              <span>{copied ? (isIndo ? "Tersalin" : "Copied") : (isIndo ? "Salin" : "Copy")}</span>
+              <span>{copied ? t("copiedBadge") : t("copy")}</span>
             </button>
 
             <button
               type="button"
-              onClick={() => onExplainInChat(`Tolong jelaskan lebih dalam ringkasan audio berikut:\n${data.script.slice(0, 1000)}`)}
+              onClick={() => onExplainInChat(t("explainAudioPrompt", { title: data.title || t("toolsAudioSummary"), script: data.script?.slice(0, 1000) || "" }))}
               className="flex items-center gap-1 px-2 py-1 rounded-lg bg-indigo-500/10 text-indigo-400 text-[11px] font-medium"
             >
               <Sparkles className="h-3 w-3" />
-              <span>{isIndo ? "Tanya" : "Ask"}</span>
+              <span>{t("askAction")}</span>
             </button>
           </div>
         </div>
 
         <div className="p-3.5 rounded-xl bg-secondary/30 text-xs text-foreground/90 leading-relaxed font-sans whitespace-pre-wrap">
-          {data.script || (isIndo ? "Tidak ada naskah transkrip." : "No transcript available.")}
+          {data.script || t("noTranscriptAvailable")}
         </div>
       </div>
     </div>

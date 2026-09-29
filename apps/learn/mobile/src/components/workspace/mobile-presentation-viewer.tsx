@@ -42,7 +42,6 @@ export function MobilePresentationViewer({
   onExplainInChat,
 }: MobilePresentationViewerProps) {
   const { t, language } = useI18n();
-  const isIndo = language === "id";
 
   const provider = data.provider || "native";
   const slides: SlideItem[] = useMemo(() => data.slides || [], [data.slides]);
@@ -64,14 +63,14 @@ export function MobilePresentationViewer({
       return buildPresentationHtml({
         title: data.title,
         topic: data.topic,
-        language: data.language || (isIndo ? "id" : "en"),
+        language: data.language || (language === "id" ? "id" : "en"),
         themeId: data.themeId as any,
         lengthMode: data.lengthMode || "auto",
         slides,
       });
     }
     return "";
-  }, [data.htmlContent, data.title, data.topic, data.language, data.themeId, data.lengthMode, slides, isIndo]);
+  }, [data.htmlContent, data.title, data.topic, data.language, data.themeId, data.lengthMode, slides, language]);
 
   const goToSlide = (index: number) => {
     if (index < 0 || index >= slides.length) return;
@@ -122,7 +121,7 @@ export function MobilePresentationViewer({
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    toast.success(isIndo ? "File HTML presentasi berhasil diunduh!" : "Presentation HTML downloaded!");
+    toast.success(t("presentationHtmlDownloaded"));
   };
 
   const handleDownloadPdf = () => {
@@ -133,13 +132,13 @@ export function MobilePresentationViewer({
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      toast.success(isIndo ? "File PDF berhasil diunduh!" : "Presentation PDF downloaded!");
+      toast.success(t("presentationPdfDownloaded"));
     } else {
       // Direct window print fallback for mobile
       if (iframeRef.current?.contentWindow) {
         iframeRef.current.contentWindow.print();
       } else {
-        toast.info(isIndo ? "PDF sedang disiapkan oleh Cloud Sandbox..." : "PDF is preparing in Cloud Sandbox...");
+        toast.info(t("renderingPdf"));
       }
     }
   };
@@ -153,11 +152,7 @@ export function MobilePresentationViewer({
       return;
     }
     setIsExportingCanva(true);
-    toast.info(
-      isIndo
-        ? `Memulai ekspor Canva ke format ${format.toUpperCase()}...`
-        : `Starting Canva export to ${format.toUpperCase()}...`
-    );
+    toast.info(t("startingCanvaExport", { format: format.toUpperCase() }));
     try {
       const res = await exportCanvaPresentation({
         designId: data.canvaDesignId,
@@ -171,11 +166,7 @@ export function MobilePresentationViewer({
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
-        toast.success(
-          isIndo
-            ? `Desain Canva berhasil diekspor ke ${format.toUpperCase()}!`
-            : `Canva design successfully exported to ${format.toUpperCase()}!`
-        );
+        toast.success(t("canvaExportSuccess", { format: format.toUpperCase() }));
       } else {
         throw new Error(res.error || "Export URL not available");
       }
@@ -229,7 +220,7 @@ export function MobilePresentationViewer({
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-1.5">
               <span className="text-xs font-semibold text-foreground truncate">
-                {data.title || (isIndo ? "Slide Presentasi" : "Presentation")}
+                {data.title || t("presentation")}
               </span>
               <span
                 className={cn(
@@ -243,7 +234,7 @@ export function MobilePresentationViewer({
               </span>
             </div>
             <p className="text-[10px] text-muted-foreground truncate">
-              {totalSlides} {isIndo ? "slide materi" : "slides"}
+              {totalSlides === 1 ? t("slidesCountSingle") : t("slidesCount", { count: totalSlides })}
             </p>
           </div>
         </div>
@@ -254,7 +245,7 @@ export function MobilePresentationViewer({
             type="button"
             onClick={handleToggleFullscreen}
             className="h-8 w-8 rounded-lg hover:bg-white/10 text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors"
-            title={isFullscreen ? (isIndo ? "Keluar Layar Penuh" : "Exit Fullscreen") : (isIndo ? "Layar Penuh" : "Fullscreen")}
+            title={isFullscreen ? t("exitFullscreen") : t("fullscreen")}
           >
             <Maximize2 className="h-4 w-4" />
           </button>
@@ -266,7 +257,7 @@ export function MobilePresentationViewer({
                 className="h-8 px-2.5 rounded-lg bg-[#242424] hover:bg-[#2c2c2c] text-foreground text-xs font-medium border border-[#333333] flex items-center gap-1.5"
               >
                 <Download className="h-3.5 w-3.5" />
-                <span className="text-[11px]">{isIndo ? "Ekspor" : "Export"}</span>
+                <span className="text-[11px]">{t("export")}</span>
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48 p-1 bg-[#1e1e1e] border-[#2e2e2e]">
@@ -277,7 +268,7 @@ export function MobilePresentationViewer({
                     onClick={handleDownloadPdf}
                   >
                     <FileText className="h-3.5 w-3.5 text-red-400" />
-                    <span>{isIndo ? "Unduh PDF" : "Download PDF"}</span>
+                    <span>{t("downloadPdf")}</span>
                   </DropdownMenuItem>
 
                   <DropdownMenuItem
@@ -285,7 +276,7 @@ export function MobilePresentationViewer({
                     onClick={handleDownloadHtml}
                   >
                     <FileCode className="h-3.5 w-3.5 text-blue-400" />
-                    <span>{isIndo ? "Unduh HTML Deck" : "Download HTML Deck"}</span>
+                    <span>{t("downloadHtmlDeck")}</span>
                   </DropdownMenuItem>
                 </>
               )}
@@ -298,7 +289,7 @@ export function MobilePresentationViewer({
                     disabled={isExportingCanva || !data.canvaDesignId}
                   >
                     <FileText className="h-3.5 w-3.5 text-red-400" />
-                    <span>{isIndo ? "Unduh PDF dari Canva" : "Download PDF from Canva"}</span>
+                    <span>{t("downloadPdfFromCanva")}</span>
                   </DropdownMenuItem>
 
                   <DropdownMenuItem
@@ -307,7 +298,7 @@ export function MobilePresentationViewer({
                     disabled={isExportingCanva || !data.canvaDesignId}
                   >
                     <Presentation className="h-3.5 w-3.5 text-orange-400" />
-                    <span>{isIndo ? "Unduh PPTX dari Canva" : "Download PPTX from Canva"}</span>
+                    <span>{t("downloadPptxFromCanva")}</span>
                   </DropdownMenuItem>
 
                   <DropdownMenuSeparator className="bg-[#2e2e2e]" />
@@ -318,7 +309,7 @@ export function MobilePresentationViewer({
                       onClick={() => window.open(data.canvaEditUrl, "_blank")}
                     >
                       <ExternalLink className="h-3.5 w-3.5 text-cyan-400" />
-                      <span>{isIndo ? "Buka di Canva" : "Open in Canva"}</span>
+                      <span>{t("openInCanvaEditor")}</span>
                     </DropdownMenuItem>
                   )}
                   {data.canvaViewUrl && (
@@ -327,7 +318,7 @@ export function MobilePresentationViewer({
                       onClick={() => window.open(data.canvaViewUrl, "_blank")}
                     >
                       <Eye className="h-3.5 w-3.5 text-muted-foreground" />
-                      <span>{isIndo ? "Lihat Desain Publik" : "View Public Design"}</span>
+                      <span>{t("viewPublicDesign")}</span>
                     </DropdownMenuItem>
                   )}
                 </>
@@ -341,7 +332,7 @@ export function MobilePresentationViewer({
                       onClick={() => window.open(data.googleSlidesUrl, "_blank")}
                     >
                       <ExternalLink className="h-3.5 w-3.5 text-amber-400" />
-                      <span>{isIndo ? "Buka Google Slides" : "Open Google Slides"}</span>
+                      <span>{t("openInGoogleSlides")}</span>
                     </DropdownMenuItem>
                   )}
                   {googleSlidesPptxUrl && (
@@ -350,7 +341,7 @@ export function MobilePresentationViewer({
                       onClick={() => window.open(googleSlidesPptxUrl, "_blank")}
                     >
                       <Download className="h-3.5 w-3.5 text-orange-400" />
-                      <span>{isIndo ? "Unduh PPTX" : "Download PPTX"}</span>
+                      <span>{t("downloadPptx")}</span>
                     </DropdownMenuItem>
                   )}
                 </>
@@ -380,7 +371,7 @@ export function MobilePresentationViewer({
                   <div className="w-full h-full flex flex-col items-center justify-center text-center p-4 text-muted-foreground">
                     <Loader2 className="h-6 w-6 animate-spin text-muted-foreground mb-2" />
                     <p className="text-xs">
-                      {isIndo ? "Menyiapkan slide..." : "Preparing slides..."}
+                      {t("loadingPresentationSlides")}
                     </p>
                   </div>
                 )}
@@ -393,6 +384,7 @@ export function MobilePresentationViewer({
                       onClick={() => goToSlide(currentSlideIndex - 1)}
                       disabled={currentSlideIndex <= 0}
                       className="h-5 w-5 rounded-full hover:bg-white/10 disabled:opacity-30 flex items-center justify-center text-foreground"
+                      title={t("prevSlide")}
                     >
                       <ChevronLeft className="h-3.5 w-3.5" />
                     </button>
@@ -406,6 +398,7 @@ export function MobilePresentationViewer({
                       onClick={() => goToSlide(currentSlideIndex + 1)}
                       disabled={currentSlideIndex >= slides.length - 1}
                       className="h-5 w-5 rounded-full hover:bg-white/10 disabled:opacity-30 flex items-center justify-center text-foreground"
+                      title={t("nextSlide")}
                     >
                       <ChevronRight className="h-3.5 w-3.5" />
                     </button>
@@ -419,6 +412,7 @@ export function MobilePresentationViewer({
                           ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
                           : "bg-white/5 text-muted-foreground border-transparent"
                       )}
+                      title={t("toggleSpeakerNotes")}
                     >
                       Notes
                     </button>
@@ -434,24 +428,26 @@ export function MobilePresentationViewer({
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-[11px] font-semibold text-amber-400 flex items-center gap-1">
                       <MessageSquare className="h-3 w-3" />
-                      {isIndo
-                        ? `Catatan Slide ${currentSlideIndex + 1}`
-                        : `Notes for Slide ${currentSlideIndex + 1}`}
+                      {t("speakerNotesSlide", {
+                        slide: currentSlideIndex + 1,
+                        title: currentSlide?.title || "",
+                      })}
                     </span>
                     {onExplainInChat && (
                       <button
                         type="button"
                         onClick={() => {
-                          const prompt = isIndo
-                            ? `Tolong jelaskan lebih lanjut materi slide "${currentSlide?.title}": ${currentSlide?.speakerNotes || currentSlide?.subtitle || "Materi konsep"}`
-                            : `Please elaborate on slide "${currentSlide?.title}": ${currentSlide?.speakerNotes || currentSlide?.subtitle || "Slide concept"}`;
+                          const prompt = t("explainSlidePrompt", {
+                            title: currentSlide?.title || "",
+                            notes: currentSlide?.speakerNotes || currentSlide?.subtitle || "",
+                          });
                           onExplainInChat(prompt);
                           onClose();
                         }}
                         className="text-[10px] text-muted-foreground hover:text-amber-400 flex items-center gap-1"
                       >
                         <Sparkles className="h-2.5 w-2.5" />
-                        <span>{isIndo ? "Tanya AI" : "Ask AI"}</span>
+                        <span>{t("askAiAboutSlide")}</span>
                       </button>
                     )}
                   </div>
@@ -460,7 +456,7 @@ export function MobilePresentationViewer({
                       <p className="whitespace-pre-wrap">{currentSlide.speakerNotes}</p>
                     ) : (
                       <p className="italic text-muted-foreground/50">
-                        {isIndo ? "Tidak ada catatan untuk slide ini." : "No speaker notes for this slide."}
+                        {t("noSpeakerNotes")}
                       </p>
                     )}
                   </div>
@@ -490,7 +486,7 @@ export function MobilePresentationViewer({
                       className="hover:text-amber-400 text-[11px] flex items-center gap-1 font-medium cursor-pointer"
                     >
                       <ExternalLink className="h-3 w-3" />
-                      <span>{isIndo ? "Buka di Google Slides" : "Open in Google Slides"}</span>
+                      <span>{t("openInGoogleSlides")}</span>
                     </button>
                   )}
                 </div>
@@ -510,9 +506,7 @@ export function MobilePresentationViewer({
                 {data.title || "Canva Presentation"}
               </h2>
               <p className="text-xs text-muted-foreground mb-4">
-                {isIndo
-                  ? "Presentasi berhasil dibuat di Canva. Anda dapat mengunduh sebagai PDF/PPTX atau membuka langsung di Canva Editor."
-                  : "Presentation created in Canva. You can download as PDF/PPTX or open directly in Canva Editor."}
+                {t("canvaSuccessDesc")}
               </p>
 
               <div className="flex flex-col gap-2 w-full">
@@ -528,7 +522,7 @@ export function MobilePresentationViewer({
                     ) : (
                       <Download className="h-3.5 w-3.5" />
                     )}
-                    <span>{isIndo ? "Unduh PDF" : "Download PDF"}</span>
+                    <span>{t("downloadPdf")}</span>
                   </button>
 
                   <button
@@ -542,7 +536,7 @@ export function MobilePresentationViewer({
                     ) : (
                       <Download className="h-3.5 w-3.5" />
                     )}
-                    <span>{isIndo ? "Unduh PPTX" : "Download PPTX"}</span>
+                    <span>{t("downloadPptx")}</span>
                   </button>
                 </div>
 
@@ -553,7 +547,7 @@ export function MobilePresentationViewer({
                     className="w-full py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-medium text-xs flex items-center justify-center gap-2 shadow-md cursor-pointer"
                   >
                     <ExternalLink className="h-3.5 w-3.5" />
-                    <span>{isIndo ? "Buka di Canva Editor" : "Open in Canva"}</span>
+                    <span>{t("openInCanvaEditor")}</span>
                   </button>
                 )}
 
@@ -564,7 +558,7 @@ export function MobilePresentationViewer({
                     className="w-full py-2.5 rounded-xl bg-[#282828] hover:bg-[#333333] text-foreground font-medium text-xs flex items-center justify-center gap-2 border border-[#3d3d3d] cursor-pointer"
                   >
                     <Eye className="h-3.5 w-3.5" />
-                    <span>{isIndo ? "Lihat Pratinjau Publik" : "View Public Link"}</span>
+                    <span>{t("viewPublicLink")}</span>
                   </button>
                 )}
               </div>
@@ -573,7 +567,7 @@ export function MobilePresentationViewer({
             {data.canvaThumbnails && data.canvaThumbnails.length > 0 && (
               <div className="mt-4">
                 <h3 className="text-xs font-semibold text-muted-foreground mb-2">
-                  {isIndo ? "Halaman Desain" : "Slide Thumbnails"}
+                  {t("canvaSlidePreviews")}
                 </h3>
                 <div className="grid grid-cols-2 gap-2">
                   {data.canvaThumbnails.map((th, idx) => (

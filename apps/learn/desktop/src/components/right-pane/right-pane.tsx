@@ -66,17 +66,7 @@ export interface GeneratingArtifactStatus {
   sourceCount?: number;
 }
 
-function formatArtifactTimeAgo(timestamp?: number, isIndo = true): string {
-  if (!timestamp) return isIndo ? "Baru saja" : "Just now";
-  const diffSec = Math.floor((Date.now() - timestamp) / 1000);
-  if (diffSec < 60) return isIndo ? "Baru saja" : "Just now";
-  const diffMin = Math.floor(diffSec / 60);
-  if (diffMin < 60) return isIndo ? `${diffMin} menit lalu` : `${diffMin}m ago`;
-  const diffHour = Math.floor(diffMin / 60);
-  if (diffHour < 24) return isIndo ? `${diffHour} jam lalu` : `${diffHour}h ago`;
-  const diffDay = Math.floor(diffHour / 24);
-  return isIndo ? `${diffDay} hari lalu` : `${diffDay}d ago`;
-}
+
 
 export interface RightPaneProps {
   width?: number;
@@ -145,18 +135,17 @@ export function RightPane({
   onGenerateNote,
   onExplainInChat,
 }: RightPaneProps) {
-  const { t, language } = useI18n();
-  const isIndo = language === "id";
+  const { t } = useI18n();
 
   const formatRelativeTime = (ts: number) => {
     const diffSec = Math.floor((Date.now() - ts) / 1000);
-    if (diffSec < 60) return language === "id" ? "baru saja" : "just now";
+    if (diffSec < 60) return t("relativeJustNow");
     const diffMin = Math.floor(diffSec / 60);
-    if (diffMin < 60) return `${diffMin}m ${language === "id" ? "lalu" : "ago"}`;
+    if (diffMin < 60) return t("relativeMinutesAgo", { minutes: diffMin });
     const diffHr = Math.floor(diffMin / 60);
-    if (diffHr < 24) return `${diffHr}h ${language === "id" ? "lalu" : "ago"}`;
+    if (diffHr < 24) return t("relativeHoursAgo", { hours: diffHr });
     const diffDay = Math.floor(diffHr / 24);
-    return `${diffDay}d ${language === "id" ? "lalu" : "ago"}`;
+    return t("relativeDaysAgo", { days: diffDay });
   };
 
   const getArtifactIcon = (type: string, isZip?: boolean) => {
@@ -689,20 +678,20 @@ export function RightPane({
                         const isInfographic = art.type === "infographic";
                         const isReport = art.type === "report";
                         const defaultGeneratingTitle = isInfographic
-                          ? (language === "id" ? "Membuat Infografis..." : "Creating Infographic...")
+                          ? t("creatingInfographicStatus")
                           : isVideo
-                          ? (language === "id" ? "Membuat Ringkasan Video..." : "Creating Video Summary...")
+                          ? t("creatingVideoSummaryStatus")
                           : isSlides
-                          ? (language === "id" ? "Menyusun Presentasi..." : "Creating Presentation...")
+                          ? t("creatingPresentationStatus")
                           : isReport
-                          ? (language === "id" ? "Menyusun Laporan..." : "Creating Report...")
+                          ? t("generatingReportStatus")
                           : isMindMap
-                          ? (language === "id" ? "Membuat Peta Pikiran..." : "Creating Mind Map...")
+                          ? t("creatingMindMapStatus")
                           : isQuiz
-                          ? (language === "id" ? "Membuat Kuis..." : "Creating Quiz...")
+                          ? t("creatingQuizStatus")
                           : isFlashcard
-                          ? (language === "id" ? "Membuat Kartu Tanya-Jawab..." : "Creating Flashcards...")
-                          : (language === "id" ? "Membuat Catatan..." : "Creating Note...");
+                          ? t("creatingFlashcardsStatus")
+                          : t("creatingNoteStatus");
 
                         return (
                           <div
@@ -772,11 +761,9 @@ export function RightPane({
                                 {art.title || defaultGeneratingTitle}
                               </div>
                               <div className="text-[11px] text-muted-foreground truncate mt-0.5">
-                                {language === "id"
-                                  ? `berdasarkan ${art.sourcesCount ?? 1} sumber`
-                                  : `based on ${art.sourcesCount ?? 1} source${
-                                      (art.sourcesCount ?? 1) === 1 ? "" : "s"
-                                    }`}
+                                {(art.sourcesCount ?? 1) === 1
+                                  ? t("basedOnSourcesCountSingle")
+                                  : t("basedOnSourcesCount", { count: art.sourcesCount ?? 1 })}
                               </div>
                             </div>
                             {onDeleteArtifact && (
@@ -787,7 +774,7 @@ export function RightPane({
                                   onDeleteArtifact(art.id);
                                 }}
                                 className="h-7 w-7 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive flex items-center justify-center transition-colors cursor-pointer shrink-0"
-                                title={language === "id" ? "Hapus" : "Delete"}
+                                title={t("delete")}
                               >
                                 <Trash2 className="h-3.5 w-3.5" />
                               </button>
@@ -816,20 +803,20 @@ export function RightPane({
                         : null;
                       const countText = itemCount !== null && itemCount !== undefined
                         ? isQuiz
-                          ? (language === "id" ? `${itemCount} Soal` : `${itemCount} Questions`)
+                          ? itemCount === 1 ? t("questionsCountSingle") : t("questionsCount", { count: itemCount })
                           : isFlashcard
-                          ? (language === "id" ? `${itemCount} Kartu` : `${itemCount} Cards`)
+                          ? itemCount === 1 ? t("cardsCountSingle") : t("cardsCount", { count: itemCount })
                           : isSlides
-                          ? (language === "id" ? `${itemCount} Slide` : `${itemCount} Slide${itemCount > 1 ? "s" : ""}`)
+                          ? itemCount === 1 ? t("slidesCountSingle") : t("slidesCount", { count: itemCount })
                           : isVideo
-                          ? (language === "id" ? `${itemCount} Scene` : `${itemCount} Scenes`)
+                          ? itemCount === 1 ? t("scenesCountSingle") : t("scenesCount", { count: itemCount })
                           : isReport
-                          ? (language === "id" ? `${itemCount} Bagian` : `${itemCount} Section${itemCount > 1 ? "s" : ""}`)
+                          ? itemCount === 1 ? t("sectionsCountSingle") : t("sectionsCount", { count: itemCount })
                           : null
                         : isMindMap
-                        ? (language === "id" ? "Peta Konsep" : "Concept Map")
+                        ? t("conceptMap")
                         : isInfographic
-                        ? (art.data?.styleLabel || (language === "id" ? "Poster Visual" : "Visual Poster"))
+                        ? (art.data?.styleLabel || t("visualPoster"))
                         : null;
 
                       const handleOpenThis = () => {
@@ -853,9 +840,7 @@ export function RightPane({
                               </div>
                               <div className="text-[11px] text-muted-foreground truncate mt-0.5">
                                 {countText ? `${countText} · ` : art.sourcesCount
-                                  ? `${art.sourcesCount} ${
-                                      language === "id" ? "sumber" : "source"
-                                    } · `
+                                  ? `${art.sourcesCount === 1 ? t("basedOnSourcesSingle") : t("basedOnSources", { count: art.sourcesCount })} · `
                                   : ""}
                                 {formatRelativeTime(art.createdAt || art.updatedAt)}
                               </div>
@@ -888,11 +873,7 @@ export function RightPane({
                                 }}
                               >
                                 <Eye className="h-3.5 w-3.5" />
-                                <span>
-                                  {language === "id"
-                                    ? "Buka Pratinjau"
-                                    : "Open Preview"}
-                                </span>
+                                <span>{t("openPreview")}</span>
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 className="cursor-pointer flex items-center gap-2 text-xs py-2 px-2.5 text-popover-foreground hover:text-popover-foreground"
@@ -900,20 +881,12 @@ export function RightPane({
                                   e.stopPropagation();
                                   if (art.content) {
                                     navigator.clipboard.writeText(art.content);
-                                    toast.success(
-                                      language === "id"
-                                        ? "Catatan disalin"
-                                        : "Note copied"
-                                    );
+                                    toast.success(t("noteCopied"));
                                   }
                                 }}
                               >
                                 <Copy className="h-3.5 w-3.5" />
-                                <span>
-                                  {language === "id"
-                                    ? "Salin Catatan"
-                                    : "Copy Note"}
-                                </span>
+                                <span>{t("copyNote")}</span>
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 className="cursor-pointer flex items-center gap-2 text-xs py-2 px-2.5 text-popover-foreground hover:text-popover-foreground"
@@ -923,11 +896,7 @@ export function RightPane({
                                 }}
                               >
                                 <Download className="h-3.5 w-3.5" />
-                                <span>
-                                  {language === "id"
-                                    ? "Unduh .md"
-                                    : "Download .md"}
-                                </span>
+                                <span>{t("downloadMd")}</span>
                               </DropdownMenuItem>
                               <DropdownMenuSeparator className="bg-border" />
                               <DropdownMenuItem
@@ -938,9 +907,7 @@ export function RightPane({
                                 }}
                               >
                                 <Trash2 className="h-3.5 w-3.5" />
-                                <span>
-                                  {language === "id" ? "Hapus" : "Delete"}
-                                </span>
+                                <span>{t("delete")}</span>
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>

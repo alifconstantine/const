@@ -32,8 +32,7 @@ export function CreateArtifactSheet({
   sources = [],
   onGenerate,
 }: CreateArtifactSheetProps) {
-  const { language } = useI18n();
-  const isIndo = language === "id";
+  const { t } = useI18n();
 
   const [artifactType, setArtifactType] = useState<"quiz" | "flashcard">(initialType);
   const [topic, setTopic] = useState("");
@@ -119,13 +118,7 @@ export function CreateArtifactSheet({
                 )}
               </div>
               <h2 className="text-sm font-semibold text-foreground tracking-tight">
-                {artifactType === "quiz"
-                  ? isIndo
-                    ? "Buat Kuis Interaktif"
-                    : "Create Interactive Quiz"
-                  : isIndo
-                  ? "Buat Kartu Tanya-Jawab"
-                  : "Create Flashcards"}
+                {artifactType === "quiz" ? t("interactiveQuizTitle") : t("flashcardsDeckTitle")}
               </h2>
             </div>
             <button
@@ -143,7 +136,7 @@ export function CreateArtifactSheet({
           {/* Toggle Type: Kuis vs Kartu Tanya-Jawab */}
           <div>
             <label className="block text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-              {isIndo ? "Tipe Format" : "Format Type"}
+              {t("learningFormat")}
             </label>
             <div className="grid grid-cols-2 gap-1.5 bg-secondary/60 p-1 rounded-xl border border-border">
               <button
@@ -157,7 +150,7 @@ export function CreateArtifactSheet({
                 )}
               >
                 <HelpCircle className="h-3.5 w-3.5" />
-                <span>{isIndo ? "Kuis Pilihan Ganda" : "Quiz"}</span>
+                <span>{t("multipleChoiceQuiz")}</span>
               </button>
               <button
                 type="button"
@@ -170,7 +163,7 @@ export function CreateArtifactSheet({
                 )}
               >
                 <Layers className="h-3.5 w-3.5" />
-                <span>{isIndo ? "Kartu (Flashcards)" : "Flashcards"}</span>
+                <span>{t("flashcardsDeck")}</span>
               </button>
             </div>
           </div>
@@ -179,21 +172,17 @@ export function CreateArtifactSheet({
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-                {isIndo ? "Topik Spesifik (Opsional)" : "Specific Topic (Optional)"}
+                {t("mainThemeFocusOptional")}
               </label>
               <span className="text-[10px] text-muted-foreground">
-                {isIndo ? "Kosongkan untuk cakupan umum" : "Leave blank for general"}
+                {t("leaveBlankForGeneral")}
               </span>
             </div>
             <input
               type="text"
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
-              placeholder={
-                isIndo
-                  ? "cth. Bab 3: Logika Proposisi & Kalkulus..."
-                  : "e.g. Chapter 3: Propositional Logic..."
-              }
+              placeholder={t("studioArtifactTopicPlaceholder")}
               className="w-full px-3 py-2.5 rounded-xl bg-secondary/60 border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/30 text-xs transition-colors"
             />
           </div>
@@ -204,13 +193,7 @@ export function CreateArtifactSheet({
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label className="block text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-                  {artifactType === "quiz"
-                    ? isIndo
-                      ? "Jumlah Soal"
-                      : "Question Count"
-                    : isIndo
-                    ? "Jumlah Kartu"
-                    : "Card Count"}
+                  {artifactType === "quiz" ? t("numberOfQuestions") : t("numberOfCards")}
                 </label>
                 {countMode === "custom" && (
                   <span className="text-[10px] text-muted-foreground">1-50</span>
@@ -251,7 +234,7 @@ export function CreateArtifactSheet({
                       : "bg-secondary/60 border-border text-muted-foreground hover:text-foreground"
                   )}
                 >
-                  {isIndo ? "Kustom" : "Custom"}
+                  {t("custom")}
                 </button>
               </div>
 
@@ -280,22 +263,16 @@ export function CreateArtifactSheet({
             {/* Difficulty */}
             <div>
               <label className="block text-[11px] font-semibold text-muted-foreground uppercase tracking-wider mb-1.5">
-                {isIndo ? "Tingkat Kesulitan" : "Difficulty"}
+                {t("difficultyLevel")}
               </label>
               <div className="flex items-center gap-1">
                 {(["easy", "medium", "hard"] as const).map((diff) => {
                   const label =
                     diff === "easy"
-                      ? isIndo
-                        ? "Mudah"
-                        : "Easy"
+                      ? t("difficultyEasy")
                       : diff === "medium"
-                      ? isIndo
-                        ? "Sedang"
-                        : "Medium"
-                      : isIndo
-                      ? "Sulit"
-                      : "Hard";
+                      ? t("difficultyMedium")
+                      : t("difficultyHard");
                   return (
                     <button
                       key={diff}
@@ -320,7 +297,7 @@ export function CreateArtifactSheet({
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
-                {isIndo ? "Pilih Sumber Acuan" : "Reference Sources"}
+                {t("sourceMaterialScope")}
               </label>
               {sources.length > 0 && (
                 <button
@@ -329,21 +306,15 @@ export function CreateArtifactSheet({
                   className="text-[11px] text-foreground hover:underline cursor-pointer"
                 >
                   {selectedSourceIds.length === sources.length
-                    ? isIndo
-                      ? "Batal Semua"
-                      : "Deselect All"
-                    : isIndo
-                    ? "Pilih Semua"
-                    : "Select All"}
+                    ? t("deselectAll")
+                    : t("selectAll")}
                 </button>
               )}
             </div>
 
             {sources.length === 0 ? (
               <div className="p-3 rounded-xl bg-secondary/60 border border-border text-center text-muted-foreground text-xs">
-                {isIndo
-                  ? "Belum ada sumber dalam notebook. AI akan membuat dari topik Anda."
-                  : "No sources in notebook. AI will generate based on your topic."}
+                {t("noSourcesInNotebookDesc")}
               </div>
             ) : (
               <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
@@ -388,7 +359,7 @@ export function CreateArtifactSheet({
               className="w-full py-3 rounded-xl bg-foreground hover:bg-foreground/90 text-background font-semibold text-xs transition-all shadow-md active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer"
             >
               <Sparkles className="h-4 w-4" />
-              <span>{isIndo ? "Buat sekarang" : "Generate now"}</span>
+              <span>{t("generateNow")}</span>
             </button>
           </div>
         </form>

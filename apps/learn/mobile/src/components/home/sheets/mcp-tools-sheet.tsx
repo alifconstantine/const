@@ -90,7 +90,6 @@ interface McpToolsSheetProps {
 
 export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
   const { t, language } = useI18n();
-  const isIndo = language === "id";
 
   // Two Main Tabs: Apps & Tools (First) and Custom MCP (Second)
   const [mainTab, setMainTab] = useState<MainTab>("apps");
@@ -266,11 +265,7 @@ export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
       if (isActive) {
         await disconnectConnector(connector.id);
         setConnectedIds(getConnectedConnectorIds());
-        toast.success(
-          isIndo
-            ? `${connector.name} berhasil dinonaktifkan.`
-            : `${connector.name} disconnected successfully.`
-        );
+        toast.success(t("connectorDisconnectedNotice", { name: connector.name }));
       } else {
         const res = await connectConnector(connector);
         setConnectedIds(getConnectedConnectorIds());
@@ -288,7 +283,7 @@ export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
   const handleCopyPrompt = (prompt: string, idx: number) => {
     navigator.clipboard.writeText(prompt);
     setCopiedPromptIndex(idx);
-    toast.success(isIndo ? "Prompt disalin ke clipboard!" : "Prompt copied to clipboard!");
+    toast.success(t("promptCopiedToClipboard"));
     setTimeout(() => setCopiedPromptIndex(null), 2000);
   };
 
@@ -307,11 +302,7 @@ export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
     const nextConfig = { ...mcpConfig, servers: updated };
     setMcpConfig(nextConfig);
     saveStoredMcpConfig(nextConfig);
-    toast.success(
-      isIndo
-        ? `Server ${nextChecked ? "diaktifkan" : "dinonaktifkan"}.`
-        : `Server ${nextChecked ? "enabled" : "disabled"}.`
-    );
+    toast.success(nextChecked ? t("serverEnabledNotice") : t("serverDisabledNotice"));
   };
 
   const handleRefresh = () => {
@@ -320,7 +311,7 @@ export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
       setIsRefreshing(false);
       setMcpConfig(getStoredMcpConfig());
       setConnectedIds(getConnectedConnectorIds());
-      toast.success(isIndo ? "Status server diperbarui." : "Server status refreshed.");
+      toast.success(t("serverStatusRefreshed"));
     }, 500);
   };
 
@@ -406,7 +397,7 @@ export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
         setMcpConfig(nextConfig);
         saveStoredMcpConfig(nextConfig);
         setIsEditingServer(false);
-        toast.success(isIndo ? `Server ${serverObj.name} disimpan.` : `Server ${serverObj.name} saved.`);
+        toast.success(t("serverSavedSuccess", { name: serverObj.name }));
         return;
       } catch (err: any) {
         toast.error(
@@ -491,7 +482,7 @@ export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
     setMcpConfig(nextConfig);
     saveStoredMcpConfig(nextConfig);
     setIsEditingServer(false);
-    toast.success(isIndo ? `Server ${serverObj.name} disimpan.` : `Server ${serverObj.name} saved.`);
+    toast.success(t("serverSavedSuccess", { name: serverObj.name }));
   };
 
   const handleDeleteServer = (serverId: string) => {
@@ -500,7 +491,7 @@ export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
     setMcpConfig(nextConfig);
     saveStoredMcpConfig(nextConfig);
     setIsEditingServer(false);
-    toast.success(isIndo ? "Server berhasil dihapus." : "Server deleted.");
+    toast.success(t("serverDeletedSuccess"));
   };
 
   const handleSaveFullJson = () => {
@@ -508,11 +499,7 @@ export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
       const imported = importMcpJson(fullJsonText);
       setMcpConfig(imported);
       saveStoredMcpConfig(imported);
-      toast.success(
-        isIndo
-          ? `Konfigurasi disimpan (${imported.servers.length} server).`
-          : `Configuration saved (${imported.servers.length} servers).`
-      );
+      toast.success(t("configSavedCount", { count: imported.servers.length }));
     } catch (err: any) {
       toast.error(
         t("failedSaveMcp") + (err?.message ? `: ${err.message}` : "")
@@ -523,7 +510,7 @@ export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
   const handleCopyFullJson = () => {
     navigator.clipboard.writeText(fullJsonText);
     setIsCopiedFullJson(true);
-    toast.success(isIndo ? "mcpServers.json berhasil disalin." : "mcpServers.json copied to clipboard.");
+    toast.success(t("configCopiedToClipboard"));
     setTimeout(() => setIsCopiedFullJson(false), 2000);
   };
 
@@ -532,16 +519,16 @@ export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
         open={open}
         onClose={onClose}
         defaultHeightVh={75}
-        ariaLabel={isIndo ? "MCP Tools & Konektor" : "MCP Tools & Connectors"}
+        ariaLabel={t("mcpConnectorsTitle")}
       >
       {/* Sheet Top Header */}
         <div className="px-4 sm:px-6 py-3.5 border-b border-border/60 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2">
             <h2 className="text-base font-semibold text-foreground tracking-tight">
-              {isIndo ? "MCP Tools & Konektor" : "MCP Tools & Connectors"}
+              {t("mcpConnectorsTitle")}
             </h2>
             <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10.5px] font-medium border border-primary/20">
-              {mainTab === "apps" ? `${filteredConnectors.length} Connectors` : `${mcpConfig.servers.length} Installed`}
+              {mainTab === "apps" ? t("activeCountBadge", { count: filteredConnectors.length }) : t("installedCountBadge", { count: mcpConfig.servers.length })}
             </span>
           </div>
 
@@ -583,7 +570,7 @@ export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
               )}
             >
               <Layers className="w-3.5 h-3.5" />
-              <span>{isIndo ? "Apps & Tools" : "Apps & Tools"}</span>
+              <span>{t("appsAndToolsTab")}</span>
             </button>
 
             <button
@@ -602,7 +589,7 @@ export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
               )}
             >
               <Code2 className="w-3.5 h-3.5" />
-              <span>{isIndo ? "Custom MCP" : "Custom MCP"}</span>
+              <span>{t("customMcpTab")}</span>
               {mcpConfig.servers.length > 0 && (
                 <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-secondary font-sans tabular-nums">
                   {mcpConfig.servers.length}
@@ -625,7 +612,7 @@ export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
                   <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
                   <input
                     type="text"
-                    placeholder={isIndo ? "Cari aplikasi, alat, atau skill..." : "Search apps, tools, or skills..."}
+                    placeholder={t("searchAppsPlaceholder")}
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="w-full pl-9 pr-4 py-2 text-xs rounded-xl bg-secondary/40 border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/40 transition-colors"
@@ -654,7 +641,7 @@ export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
                               "w-2.5 h-2.5 rounded-full ring-2 ring-card absolute -bottom-0.5 -right-0.5 transition-colors",
                               isConnected ? "bg-emerald-500" : "bg-amber-400 ring-amber-400/30"
                             )}
-                            title={isConnected ? "Connected" : "Disconnected"}
+                            title={isConnected ? t("connected") : t("connectorDisconnectedTooltip")}
                           />
                         </div>
 
@@ -670,8 +657,8 @@ export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
                           </div>
                           <p className="text-[11px] text-muted-foreground leading-relaxed line-clamp-1">
                             {isConnected
-                              ? (isIndo ? "Konektor plugin ini sudah terhubung dan tersedia." : "This plugin MCP server is connected and available.")
-                              : (isIndo ? "Hubungkan untuk menggunakan plugin MCP ini." : "Connect to use this plugin MCP server.")}
+                              ? t("connectorConnectedTooltip")
+                              : t("connectorDisconnectedTooltip")}
                           </p>
                         </div>
                       </div>
@@ -686,13 +673,13 @@ export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
                             className="text-cyan-400 hover:text-cyan-300 transition-colors text-xs font-medium flex items-center gap-1 cursor-pointer whitespace-nowrap"
                           >
                             <ExternalLink className="w-3 h-3" />
-                            <span>{isConnecting ? (isIndo ? "Menghubungkan..." : "Connecting...") : "Connect"}</span>
+                            <span>{isConnecting ? t("connecting") : t("connect")}</span>
                           </button>
                         ) : (
                           <div className="flex items-center gap-2">
                             <span className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 text-[10.5px] font-medium border border-emerald-500/20">
                               <Check className="w-3 h-3" />
-                              <span>{isIndo ? "Terhubung" : "Connected"}</span>
+                              <span>{t("connected")}</span>
                             </span>
                             <button
                               type="button"
@@ -700,7 +687,7 @@ export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
                               onClick={(e) => handleToggleConnect(connector, e)}
                               className="text-[11px] text-muted-foreground hover:text-destructive transition-colors cursor-pointer px-1.5 py-1"
                             >
-                              {isIndo ? "Putus" : "Disconnect"}
+                              {t("disconnect")}
                             </button>
                           </div>
                         )}
@@ -712,9 +699,7 @@ export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
                 {filteredConnectors.length === 0 && (
                   <div className="text-center py-10 rounded-2xl border border-dashed border-border bg-card/40">
                     <p className="text-xs text-muted-foreground">
-                      {isIndo
-                        ? `Tidak ada aplikasi yang sesuai dengan "${searchQuery}".`
-                        : `No connectors found matching "${searchQuery}".`}
+                      {t("noConnectorsFoundDesc", { query: searchQuery })}
                     </p>
                   </div>
                 )}
@@ -731,7 +716,7 @@ export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border hover:bg-secondary text-xs font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
               >
                 <ArrowLeft className="w-3.5 h-3.5" />
-                <span>{isIndo ? "Kembali ke Semua Connectors" : "Back to All Connectors"}</span>
+                <span>{t("backToAllConnectors")}</span>
               </button>
 
               <div className="p-4 rounded-2xl border border-border bg-card/80 space-y-4">
@@ -771,7 +756,7 @@ export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
                       onClick={(e) => handleToggleConnect(selectedConnector, e)}
                       className="w-full rounded-xl text-xs h-8 cursor-pointer"
                     >
-                      <span>{isIndo ? "Putuskan Koneksi" : "Disconnect"}</span>
+                      <span>{t("disconnect")}</span>
                     </Button>
                   ) : (
                     <Button
@@ -782,7 +767,7 @@ export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
                       className="w-full rounded-xl text-xs h-8 cursor-pointer bg-cyan-600 hover:bg-cyan-500 text-white"
                     >
                       <ExternalLink className="w-3.5 h-3.5 mr-1" />
-                      <span>{isIndo ? "Hubungkan" : "Connect"}</span>
+                      <span>{t("connect")}</span>
                     </Button>
                   )}
                 </div>
@@ -791,7 +776,7 @@ export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
               {/* Description & Capabilities */}
               <div className="p-4 rounded-2xl border border-border bg-card/50 space-y-2.5">
                 <h4 className="text-xs font-semibold text-foreground">
-                  {isIndo ? "Deskripsi" : "Description"}
+                  {t("description")}
                 </h4>
                 <p className="text-xs text-muted-foreground leading-relaxed">
                   {selectedConnector.description}
@@ -801,7 +786,7 @@ export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
               <div className="p-4 rounded-2xl border border-border bg-card/50 space-y-2.5">
                 <h4 className="text-xs font-semibold text-foreground flex items-center gap-2">
                   <ShieldCheck className="w-4 h-4 text-emerald-500" />
-                  <span>{isIndo ? "Kemampuan & Tools" : "Skills & Capabilities"}</span>
+                  <span>{t("skillsAndCapabilities")}</span>
                 </h4>
                 <div className="grid grid-cols-1 gap-1.5 pt-0.5">
                   {selectedConnector.skills.map((skill, i) => (
@@ -819,7 +804,7 @@ export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
               {selectedConnector.tryPrompts && selectedConnector.tryPrompts.length > 0 && (
                 <div className="p-4 rounded-2xl border border-border bg-card/50 space-y-2.5">
                   <h4 className="text-xs font-semibold text-foreground">
-                    {isIndo ? "Contoh Prompt Belajar" : "Example Study Prompts"}
+                    {t("exampleStudyPrompts")}
                   </h4>
                   <div className="space-y-2">
                     {selectedConnector.tryPrompts.map((prompt, idx) => (
@@ -934,12 +919,10 @@ export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
                       </div>
                       <div className="space-y-1">
                         <h3 className="text-sm font-semibold text-foreground">
-                          {isIndo ? "Belum Ada Server MCP Kustom" : "No Custom MCP Servers"}
+                          {t("noCustomMcpServersTitle")}
                         </h3>
                         <p className="text-xs text-muted-foreground max-w-xs mx-auto">
-                          {isIndo
-                            ? "Tambahkan server MCP kustom via Form atau JSON."
-                            : "Add a custom MCP server via Form or JSON."}
+                          {t("noCustomMcpServersDesc")}
                         </p>
                       </div>
                       <button
@@ -948,7 +931,7 @@ export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
                         className="px-3.5 py-1.5 rounded-xl bg-foreground text-background text-xs font-medium cursor-pointer shadow-xs inline-flex items-center gap-1.5"
                       >
                         <Plus className="w-3.5 h-3.5" />
-                        <span>{isIndo ? "Tambah Server" : "Add Server"}</span>
+                        <span>{t("addServerAction")}</span>
                       </button>
                     </div>
                   ) : (
@@ -1011,7 +994,7 @@ export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
                       className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground cursor-pointer"
                     >
                       <ArrowLeft className="w-3.5 h-3.5" />
-                      <span>{isIndo ? "Kembali" : "Back"}</span>
+                      <span>{t("back")}</span>
                     </button>
 
                     <div className="flex items-center p-0.5 rounded-xl bg-secondary/80 border border-border">
@@ -1243,9 +1226,7 @@ export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
               {customMcpSubTab === "json" && !isEditingServer && (
                 <div className="space-y-3">
                   <div className="p-3 rounded-xl bg-secondary/30 border border-border text-[11px] text-muted-foreground leading-relaxed">
-                    {isIndo
-                      ? "Format JSON ini kompatibel dengan standar mcpServers (Antigravity & Claude Desktop)."
-                      : "Adheres to standard mcpServers schema for Antigravity & Claude Desktop."}
+                    {t("mcpJsonEditorDesc")}
                   </div>
 
                   <div className="rounded-xl border border-border bg-card/60 overflow-hidden">
@@ -1279,7 +1260,7 @@ export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
                       onClick={handleSaveFullJson}
                       className="rounded-xl text-xs h-8 cursor-pointer bg-foreground text-background"
                     >
-                      <span>{isIndo ? "Simpan JSON" : "Save JSON"}</span>
+                      <span>{t("saveChangesAction")}</span>
                     </Button>
                   </div>
                 </div>

@@ -41,8 +41,7 @@ export function AudioSummaryViewer({
   data,
   onExplainInChat,
 }: AudioSummaryViewerProps) {
-  const { t, language } = useI18n();
-  const isIndo = language === "id";
+  const { t } = useI18n();
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -145,7 +144,7 @@ export function AudioSummaryViewer({
     if (!data.script) return;
     navigator.clipboard.writeText(data.script);
     setCopied(true);
-    toast.success(isIndo ? "Naskah berhasil disalin!" : "Script copied to clipboard!");
+    toast.success(t("scriptCopiedClipboard"));
     setTimeout(() => setCopied(false), 2000);
   };
 
@@ -157,14 +156,12 @@ export function AudioSummaryViewer({
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    toast.success(isIndo ? "Memulai unduhan audio MP3..." : "Downloading MP3 audio...");
+    toast.success(t("downloadingMp3Audio"));
   };
 
   const handleExplain = () => {
     if (!onExplainInChat) return;
-    const prompt = isIndo
-      ? `Tolong jelaskan lebih lanjut mengenai poin-poin dalam Ringkasan Audio "${data.title}":\n\n${data.script.slice(0, 1500)}`
-      : `Please explain more in-depth regarding the key takeaways from the Audio Summary "${data.title}":\n\n${data.script.slice(0, 1500)}`;
+    const prompt = t("explainAudioPrompt", { title: data.title || "", script: data.script.slice(0, 1500) });
     onExplainInChat(prompt);
   };
 
@@ -186,11 +183,7 @@ export function AudioSummaryViewer({
 
     setIsSynthesizing(true);
     try {
-      toast.info(
-        isIndo
-          ? "Memulai sintesis audio dengan Inworld TTS..."
-          : "Starting audio synthesis with Inworld TTS..."
-      );
+      toast.info(t("startingAudioSynthesis"));
       const synthRes = await synthesizeSpeechChunked({
         provider: {
           ...provider,
@@ -217,11 +210,7 @@ export function AudioSummaryViewer({
           content: JSON.stringify(updatedData),
         });
 
-        toast.success(
-          isIndo
-            ? "Audio berhasil disintesis dan siap diputar!"
-            : "Audio synthesized successfully and ready to play!"
-        );
+        toast.success(t("audioSynthesizedReady"));
       } else {
         const errMsg = synthRes.error || "Synthesis failed";
         setAudioError(errMsg);
@@ -266,10 +255,10 @@ export function AudioSummaryViewer({
                   <span className="flex items-center gap-1">
                     <Clock className="h-3 w-3" />
                     {data.lengthMode === "short"
-                      ? isIndo ? "Ringkas" : "Concise"
+                      ? t("concise")
                       : data.lengthMode === "long"
-                      ? isIndo ? "Panjang & Mendalam" : "In-depth"
-                      : isIndo ? "Otomatis" : "Auto"}
+                      ? t("inDepth")
+                      : t("autoOption")}
                   </span>
                   {data.voiceId && (
                     <>
@@ -305,7 +294,7 @@ export function AudioSummaryViewer({
                 <AlertCircle className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
                 <div>
                   <p className="font-medium text-amber-300">
-                    {isIndo ? "File audio belum siap atau gagal disintesis" : "Audio file is not ready or failed to synthesize"}
+                    {t("audioNotReady")}
                   </p>
                   {audioError && (
                     <p className="text-[11px] text-amber-300/80 mt-0.5 font-sans">
@@ -324,12 +313,12 @@ export function AudioSummaryViewer({
                 {isSynthesizing ? (
                   <>
                     <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    <span>{isIndo ? "Memproses Audio..." : "Synthesizing Audio..."}</span>
+                    <span>{t("synthesizingAudio")}</span>
                   </>
                 ) : (
                   <>
                     <Sparkles className="h-3.5 w-3.5" />
-                    <span>{isIndo ? "Sintesis Audio Sekarang" : "Synthesize Audio Now"}</span>
+                    <span>{t("synthesizeAudioNow")}</span>
                   </>
                 )}
               </button>
@@ -436,7 +425,7 @@ export function AudioSummaryViewer({
                 ) : (
                   <Copy className="h-3.5 w-3.5" />
                 )}
-                <span>{copied ? (isIndo ? "Tersalin" : "Copied") : (isIndo ? "Salin Naskah" : "Copy Script")}</span>
+                <span>{copied ? t("copied") : t("copyScript")}</span>
               </button>
 
               {onExplainInChat && (
@@ -446,7 +435,7 @@ export function AudioSummaryViewer({
                   className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-500 text-xs font-medium transition-colors cursor-pointer"
                 >
                   <Sparkles className="h-3.5 w-3.5" />
-                  <span>{isIndo ? "Tanya di Chat" : "Ask in Chat"}</span>
+                  <span>{t("askInChat")}</span>
                 </button>
               )}
             </div>
@@ -454,7 +443,7 @@ export function AudioSummaryViewer({
 
           {/* Transcript Content */}
           <div className="p-4 rounded-xl bg-secondary/30 border border-border/50 text-xs text-foreground/90 leading-relaxed font-sans whitespace-pre-wrap selection:bg-indigo-500/20">
-            {data.script || (isIndo ? "Tidak ada transkrip naskah tersedia." : "No transcript available.")}
+            {data.script || t("noTranscriptAvailable")}
           </div>
         </div>
       </ScrollArea>

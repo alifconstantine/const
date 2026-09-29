@@ -28,8 +28,7 @@ export function CreateCheatSheetSheet({
   sources = [],
   onGenerate,
 }: CreateCheatSheetSheetProps) {
-  const { t, language } = useI18n();
-  const isIndo = language === "id";
+  const { t } = useI18n();
 
   const [coverageMode, setCoverageMode] = useState<"short" | "auto" | "long">("auto");
   const [topicFocus, setTopicFocus] = useState("");
@@ -61,18 +60,18 @@ export function CreateCheatSheetSheet({
     const firstTitle = sources[0]?.title || "";
     if (firstTitle) {
       return [
-        isIndo ? `+ Intisari: ${firstTitle.slice(0, 18)}` : `+ Key Concepts: ${firstTitle.slice(0, 18)}`,
-        isIndo ? "+ Rumus & Formula Kunci" : "+ Formulas & Equations",
-        isIndo ? "+ Sintaks & Aturan Praktis" : "+ Syntax & Rules",
-        isIndo ? "+ Jebakan Soal Ujian" : "+ Exam Pitfalls",
+        t("chipKeyConcepts", { topic: firstTitle.slice(0, 18) }),
+        t("chipFormulasKeyEquations"),
+        t("chipSyntaxQuickRules"),
+        t("chipCommonExamPitfalls"),
       ];
     }
     return [
-      isIndo ? "+ Rumus & Formula Kunci" : "+ Formulas & Equations",
-      isIndo ? "+ Sintaks & Aturan Praktis" : "+ Syntax & Rules",
-      isIndo ? "+ Jebakan Soal Ujian" : "+ Exam Pitfalls",
+      t("chipFormulasKeyEquations"),
+      t("chipSyntaxQuickRules"),
+      t("chipCommonExamPitfalls"),
     ];
-  }, [sources, isIndo]);
+  }, [sources, t]);
 
   const handleChipClick = (chip: string) => {
     const clean = chip.replace(/^\+\s*/, "");
@@ -127,7 +126,7 @@ export function CreateCheatSheetSheet({
                 {t("cheatsheetDialogTitle")}
               </h2>
               <p className="text-[10px] text-muted-foreground truncate">
-                {selectedSourceIds.length} {isIndo ? "sumber aktif" : "active sources"}
+                {t("activeSourcesSelected", { count: selectedSourceIds.length })}
               </p>
             </div>
           </div>
@@ -148,7 +147,7 @@ export function CreateCheatSheetSheet({
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
               <label className="text-[11px] font-semibold text-foreground uppercase tracking-wider">
-                {isIndo ? "Sumber Pembelajaran" : "Sources"}
+                {t("sourceScope")}
               </label>
               <button
                 type="button"
@@ -156,8 +155,8 @@ export function CreateCheatSheetSheet({
                 className="text-[10px] text-sky-400 font-medium cursor-pointer"
               >
                 {selectedSourceIds.length === sources.length
-                  ? isIndo ? "Batal Semua" : "Deselect All"
-                  : isIndo ? "Pilih Semua" : "Select All"}
+                  ? t("deselectAll")
+                  : t("selectAll")}
               </button>
             </div>
 
@@ -191,13 +190,13 @@ export function CreateCheatSheetSheet({
           {/* Section 2: Coverage Mode */}
           <div className="space-y-1.5">
             <label className="text-[11px] font-semibold text-foreground uppercase tracking-wider">
-              {isIndo ? "Kedalaman & Jumlah Kartu" : "Coverage Mode"}
+              {t("coverageAndCardDensity")}
             </label>
             <div className="grid grid-cols-3 gap-1.5">
               {[
-                { id: "short", label: isIndo ? "Ringkas" : "Short", count: "6-8" },
-                { id: "auto", label: isIndo ? "Seimbang" : "Auto", count: "Auto" },
-                { id: "long", label: isIndo ? "Lengkap" : "In-Depth", count: "10-14" },
+                { id: "short", label: t("concise"), count: "6-8" },
+                { id: "auto", label: t("autoOption"), count: "Auto" },
+                { id: "long", label: t("inDepth"), count: "10-14" },
               ].map((m) => {
                 const isActive = coverageMode === m.id;
                 return (
@@ -213,7 +212,9 @@ export function CreateCheatSheetSheet({
                     )}
                   >
                     <span className="text-[11.5px] font-semibold">{m.label}</span>
-                    <span className="text-[9.5px] opacity-75">{m.count} {isIndo ? "kartu" : "cards"}</span>
+                    <span className="text-[9.5px] opacity-75">
+                      {m.count === "Auto" ? t("autoOption") : t("cardsCount", { count: m.count })}
+                    </span>
                   </button>
                 );
               })}

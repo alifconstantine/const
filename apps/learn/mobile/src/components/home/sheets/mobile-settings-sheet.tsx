@@ -153,7 +153,6 @@ export function MobileSettingsSheet({
   const [theme, setTheme] = useTheme();
   const [activeTab, setActiveTab] = useState<SettingsTab>(() => normalizeTab(initialTab));
   const initials = getUserInitials(user?.name, user?.email);
-  const isIndo = language === "id";
 
   // Tab Refs & Sliding Indicator (Matching ModelSelectionSheet and McpToolsSheet)
   const generalTabRef = useRef<HTMLButtonElement>(null);
@@ -318,9 +317,7 @@ export function MobileSettingsSheet({
               </span>
             </div>
             <p className="text-[11px] text-muted-foreground">
-              {isIndo
-                ? "Preferensi akun, tampilan, model AI, dan kuota"
-                : "Account, appearance, AI models, and usage telemetry"}
+              {t("mobileSettingsSubtitle")}
             </p>
           </div>
         </div>
@@ -329,7 +326,7 @@ export function MobileSettingsSheet({
           type="button"
           onClick={onClose}
           className="h-8 w-8 rounded-full hover:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer active:scale-95"
-          aria-label="Tutup"
+          aria-label={t("close")}
         >
           <X className="h-4 w-4" />
         </button>
@@ -360,7 +357,7 @@ export function MobileSettingsSheet({
             )}
           >
             <SlidersHorizontal className="w-3.5 h-3.5" />
-            <span>{isIndo ? "Umum" : "General"}</span>
+            <span>{t("tabGeneral")}</span>
           </button>
 
           <button
@@ -375,7 +372,7 @@ export function MobileSettingsSheet({
             )}
           >
             <Palette className="w-3.5 h-3.5" />
-            <span>{isIndo ? "Tampilan" : "Theme"}</span>
+            <span>{t("tabTheme")}</span>
           </button>
 
           <button
@@ -390,7 +387,7 @@ export function MobileSettingsSheet({
             )}
           >
             <Bot className="w-3.5 h-3.5" />
-            <span>{isIndo ? "Model" : "Models"}</span>
+            <span>{t("tabModels")}</span>
           </button>
 
           <button
@@ -405,7 +402,7 @@ export function MobileSettingsSheet({
             )}
           >
             <BarChart2 className="w-3.5 h-3.5" />
-            <span>{isIndo ? "Usage" : "Usage"}</span>
+            <span>{t("tabUsage")}</span>
           </button>
         </div>
       </div>
@@ -486,7 +483,7 @@ export function MobileSettingsSheet({
                     {t("language")}
                   </span>
                   <span className="text-[10px] text-muted-foreground">
-                    {isIndo ? "Pilih bahasa tampilan" : "Select UI language"}
+                    {t("selectUiLanguage")}
                   </span>
                 </div>
 
@@ -543,9 +540,7 @@ export function MobileSettingsSheet({
                     {t("interfaceTheme")}
                   </h3>
                   <p className="text-[11px] text-muted-foreground mt-0.5">
-                    {isIndo
-                      ? "Pilih palet tampilan antarmuka yang nyaman untuk mata Anda"
-                      : "Choose an interface theme suited to your viewing comfort"}
+                    {t("appearanceSubtitle")}
                   </p>
                 </div>
 
@@ -593,14 +588,14 @@ export function MobileSettingsSheet({
               <div className="flex items-center justify-between px-0.5">
                 <div>
                   <h3 className="text-xs font-semibold text-foreground">
-                    {isIndo ? "Model AI Terpasang" : "Available AI Models"}
+                    {t("availableAiModels")}
                   </h3>
                   <p className="text-[11px] text-muted-foreground mt-0.5">
                     {t("aiModelsSubtitle")}
                   </p>
                 </div>
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary text-muted-foreground border border-border shrink-0">
-                  {BUILTIN_MODELS.length} {isIndo ? "Model" : "Models"}
+                  {BUILTIN_MODELS.length} {t("tabModels")}
                 </span>
               </div>
 
@@ -637,7 +632,7 @@ export function MobileSettingsSheet({
                         </div>
 
                         <p className="text-[11px] text-muted-foreground leading-relaxed">
-                          {isIndo ? model.descId : model.descEn}
+                          {language === "id" ? model.descId : model.descEn}
                         </p>
 
                         <div className="flex items-center gap-2 pt-0.5 text-[10px] font-sans tabular-nums text-muted-foreground">
@@ -727,7 +722,7 @@ export function MobileSettingsSheet({
                   </div>
                   <div className="flex items-center justify-between text-[10px] text-muted-foreground font-sans tabular-nums">
                     <span>0 call</span>
-                    <span>{usagePercent}% {isIndo ? "kuota terpakai" : "quota used"}</span>
+                    <span>{t("quotaUsedPercent", { percent: usagePercent })}</span>
                     <span>{limitCount} calls</span>
                   </div>
                 </div>
@@ -756,7 +751,7 @@ export function MobileSettingsSheet({
                     {t("recentActivity")}
                   </span>
                   <span className="text-[10px] font-sans tabular-nums text-muted-foreground">
-                    {(composioUsage.recentCalls || []).length} {isIndo ? "aktivitas" : "activity"}
+                    {t("activityCount", { count: (composioUsage.recentCalls || []).length })}
                   </span>
                 </div>
 
@@ -809,7 +804,7 @@ export function MobileSettingsSheet({
                   <div className="flex items-center gap-2">
                     <Database className="w-4 h-4 text-muted-foreground" />
                     <h3 className="text-xs font-semibold text-foreground">
-                      {isIndo ? "Penyimpanan Database Lokal" : "Local Database Storage"}
+                      {t("localDatabaseStorage")}
                     </h3>
                   </div>
                   <span className="text-[10px] font-sans text-muted-foreground">
@@ -820,7 +815,7 @@ export function MobileSettingsSheet({
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div className="p-2.5 rounded-xl bg-secondary/30 border border-border/60 flex items-center justify-between">
                     <span className="text-muted-foreground text-[11px]">
-                      {isIndo ? "Buku Catatan" : "Notebooks"}
+                      {t("notebooks")}
                     </span>
                     <span className="font-semibold text-foreground font-sans tabular-nums">
                       {dbStats?.learnsCount ?? 0}
@@ -829,7 +824,7 @@ export function MobileSettingsSheet({
 
                   <div className="p-2.5 rounded-xl bg-secondary/30 border border-border/60 flex items-center justify-between">
                     <span className="text-muted-foreground text-[11px]">
-                      {isIndo ? "Sumber Belajar" : "Sources"}
+                      {t("sources")}
                     </span>
                     <span className="font-semibold text-foreground font-sans tabular-nums">
                       {dbStats?.sourcesCount ?? 0}
@@ -838,7 +833,7 @@ export function MobileSettingsSheet({
 
                   <div className="p-2.5 rounded-xl bg-secondary/30 border border-border/60 flex items-center justify-between">
                     <span className="text-muted-foreground text-[11px]">
-                      {isIndo ? "Sesi Diskusi" : "Chat Sessions"}
+                      {t("chatSessions")}
                     </span>
                     <span className="font-semibold text-foreground font-sans tabular-nums">
                       {dbStats?.sessionsCount ?? 0}
@@ -847,7 +842,7 @@ export function MobileSettingsSheet({
 
                   <div className="p-2.5 rounded-xl bg-secondary/30 border border-border/60 flex items-center justify-between">
                     <span className="text-muted-foreground text-[11px]">
-                      {isIndo ? "Hasil Studio" : "Studio Artifacts"}
+                      {t("studioArtifacts")}
                     </span>
                     <span className="font-semibold text-foreground font-sans tabular-nums">
                       {dbStats?.artifactsCount ?? 0}
@@ -856,9 +851,9 @@ export function MobileSettingsSheet({
                 </div>
 
                 <div className="pt-1 flex items-center justify-between text-[11px] text-muted-foreground">
-                  <span>{isIndo ? "Status Sinkronisasi" : "Sync Status"}</span>
+                  <span>{t("syncStatus")}</span>
                   <span className="font-medium text-emerald-600 dark:text-emerald-400">
-                    {isIndo ? "Tersimpan Lokal (Aman)" : "Local Storage (Persistent)"}
+                    {t("localStoragePersistent")}
                   </span>
                 </div>
               </div>
@@ -874,7 +869,7 @@ export function MobileSettingsSheet({
             onClick={onClose}
             className="px-4 py-1.5 rounded-xl bg-foreground text-background text-xs font-medium cursor-pointer hover:opacity-90 active:scale-95 transition-all shadow-xs"
           >
-            {isIndo ? "Selesai" : "Done"}
+            {t("done")}
           </button>
         </div>
     </InteractiveBottomSheet>

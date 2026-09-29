@@ -30,8 +30,7 @@ export function CreateCheatSheetDialog({
   sources,
   onGenerate,
 }: CreateCheatSheetDialogProps) {
-  const { t, language } = useI18n();
-  const isIndo = language === "id";
+  const { t } = useI18n();
 
   const [selectedSourceIds, setSelectedSourceIds] = useState<string[]>([]);
   const [coverageMode, setCoverageMode] = useState<"short" | "auto" | "long">("auto");
@@ -70,19 +69,19 @@ export function CreateCheatSheetDialog({
     const firstTitle = sources[0]?.title || "";
     if (firstTitle) {
       return [
-        isIndo ? `+ Intisari: ${firstTitle.slice(0, 20)}` : `+ Key Concepts: ${firstTitle.slice(0, 20)}`,
-        isIndo ? "+ Rumus & Formula Kunci" : "+ Formulas & Key Equations",
-        isIndo ? "+ Sintaks & Aturan Praktis" : "+ Syntax & Quick Rules",
-        isIndo ? "+ Jebakan Soal Ujian" : "+ Common Exam Pitfalls",
+        t("chipKeyConcepts", { topic: firstTitle.slice(0, 20) }),
+        t("chipFormulasKeyEquations"),
+        t("chipSyntaxQuickRules"),
+        t("chipCommonExamPitfalls"),
       ];
     }
     return [
-      isIndo ? "+ Rumus & Formula Kunci" : "+ Formulas & Key Equations",
-      isIndo ? "+ Sintaks & Aturan Praktis" : "+ Syntax & Quick Rules",
-      isIndo ? "+ Definisi & Asas Kunci" : "+ Key Definitions",
-      isIndo ? "+ Jebakan Soal Ujian" : "+ Common Exam Pitfalls",
+      t("chipFormulasKeyEquations"),
+      t("chipSyntaxQuickRules"),
+      t("chipKeyDefinitions"),
+      t("chipCommonExamPitfalls"),
     ];
-  }, [sources, isIndo]);
+  }, [sources, t]);
 
   const handleChipClick = (chipText: string) => {
     const clean = chipText.replace(/^\+\s*/, "");
@@ -139,9 +138,12 @@ export function CreateCheatSheetDialog({
             {/* Section 1: Source Selection */}
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-foreground tracking-tight flex items-center justify-between">
-                <span>{isIndo ? "Sumber Pembelajaran" : "Learning Sources"}</span>
+                <span>{t("learningSources")}</span>
                 <span className="text-[11px] font-normal text-muted-foreground">
-                  {selectedSourceIds.length} {isIndo ? "dari" : "of"} {sources.length} {isIndo ? "sumber dipilih" : "sources selected"}
+                  {t("selectedOfTotalSources", {
+                    selected: selectedSourceIds.length,
+                    total: sources.length,
+                  })}
                 </span>
               </label>
 
@@ -155,12 +157,8 @@ export function CreateCheatSheetDialog({
                     <BookOpen className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                     <span className="truncate">
                       {selectedSourceIds.length === sources.length
-                        ? isIndo
-                          ? `Semua Sumber (${sources.length} dokumen)`
-                          : `All Sources (${sources.length} docs)`
-                        : isIndo
-                        ? `${selectedSourceIds.length} sumber aktif dipilih`
-                        : `${selectedSourceIds.length} active sources selected`}
+                        ? t("allSourcesDocs", { count: sources.length })
+                        : t("activeSourcesSelected", { count: selectedSourceIds.length })}
                     </span>
                   </div>
                   <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0 ml-2" />
@@ -175,7 +173,7 @@ export function CreateCheatSheetDialog({
                           type="text"
                           value={sourceSearch}
                           onChange={(e) => setSourceSearch(e.target.value)}
-                          placeholder={isIndo ? "Cari sumber..." : "Search sources..."}
+                          placeholder={t("searchSourcesPlaceholder")}
                           className="w-full bg-secondary text-[11px] rounded-lg pl-7 pr-2 py-1 outline-none border border-border/60 text-foreground"
                         />
                       </div>
@@ -185,8 +183,8 @@ export function CreateCheatSheetDialog({
                         className="text-[10.5px] font-medium text-sky-400 hover:text-sky-300 transition-colors cursor-pointer shrink-0"
                       >
                         {selectedSourceIds.length === sources.length
-                          ? isIndo ? "Batal Semua" : "Deselect All"
-                          : isIndo ? "Pilih Semua" : "Select All"}
+                          ? t("deselectAll")
+                          : t("selectAll")}
                       </button>
                     </div>
 
@@ -223,7 +221,7 @@ export function CreateCheatSheetDialog({
             {/* Section 2: Coverage Mode */}
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-foreground tracking-tight">
-                {isIndo ? "Kedalaman & Jumlah Kartu" : "Coverage & Card Density"}
+                {t("coverageAndCardDensity")}
               </label>
 
               <div className="grid grid-cols-3 gap-2">
@@ -315,7 +313,7 @@ export function CreateCheatSheetDialog({
               onClick={() => onOpenChange(false)}
               className="px-4 py-2 rounded-xl text-xs font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
             >
-              {isIndo ? "Batal" : "Cancel"}
+              {t("cancel")}
             </button>
             <button
               type="submit"

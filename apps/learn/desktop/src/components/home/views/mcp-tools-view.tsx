@@ -87,7 +87,6 @@ const DEFAULT_SERVER_FORM: ServerFormData = {
 
 export function McpToolsView() {
   const { t, language } = useI18n();
-  const isIndo = language === "id";
 
   // Two Main Tabs: Apps & Tools (First) and Custom MCP (Second)
   const [mainTab, setMainTab] = useState<MainTab>("apps");
@@ -258,11 +257,7 @@ export function McpToolsView() {
       if (isActive) {
         await disconnectConnector(connector.id);
         setConnectedIds(getConnectedConnectorIds());
-        toast.success(
-          isIndo
-            ? `${connector.name} berhasil dinonaktifkan.`
-            : `${connector.name} disconnected successfully.`
-        );
+        toast.success(t("connectorDisconnectedNotice", { name: connector.name }));
       } else {
         const res = await connectConnector(connector);
         setConnectedIds(getConnectedConnectorIds());
@@ -280,7 +275,7 @@ export function McpToolsView() {
   const handleCopyPrompt = (prompt: string, idx: number) => {
     navigator.clipboard.writeText(prompt);
     setCopiedPromptIndex(idx);
-    toast.success(isIndo ? "Prompt disalin ke clipboard!" : "Prompt copied to clipboard!");
+    toast.success(t("promptCopiedToClipboard"));
     setTimeout(() => setCopiedPromptIndex(null), 2000);
   };
 
@@ -299,11 +294,7 @@ export function McpToolsView() {
     const nextConfig = { ...mcpConfig, servers: updated };
     setMcpConfig(nextConfig);
     saveStoredMcpConfig(nextConfig);
-    toast.success(
-      isIndo
-        ? `Server ${nextChecked ? "diaktifkan" : "dinonaktifkan"}.`
-        : `Server ${nextChecked ? "enabled" : "disabled"}.`
-    );
+    toast.success(nextChecked ? t("serverEnabledNotice") : t("serverDisabledNotice"));
   };
 
   const handleRefresh = () => {
@@ -312,7 +303,7 @@ export function McpToolsView() {
       setIsRefreshing(false);
       setMcpConfig(getStoredMcpConfig());
       setConnectedIds(getConnectedConnectorIds());
-      toast.success(isIndo ? "Status server berhasil diperbarui." : "Server status refreshed.");
+      toast.success(t("serverStatusRefreshed"));
     }, 500);
   };
 
@@ -396,7 +387,7 @@ export function McpToolsView() {
         setMcpConfig(nextConfig);
         saveStoredMcpConfig(nextConfig);
         setIsEditingServer(false);
-        toast.success(isIndo ? `Server ${serverObj.name} disimpan.` : `Server ${serverObj.name} saved.`);
+        toast.success(t("serverSavedSuccess", { name: serverObj.name }));
         return;
       } catch (err: any) {
         toast.error(
@@ -481,7 +472,7 @@ export function McpToolsView() {
     setMcpConfig(nextConfig);
     saveStoredMcpConfig(nextConfig);
     setIsEditingServer(false);
-    toast.success(isIndo ? `Server ${serverObj.name} disimpan.` : `Server ${serverObj.name} saved.`);
+    toast.success(t("serverSavedSuccess", { name: serverObj.name }));
   };
 
   const handleDeleteServer = (serverId: string) => {
@@ -490,7 +481,7 @@ export function McpToolsView() {
     setMcpConfig(nextConfig);
     saveStoredMcpConfig(nextConfig);
     setIsEditingServer(false);
-    toast.success(isIndo ? "Server dihapus." : "Server deleted.");
+    toast.success(t("serverDeletedSuccess"));
   };
 
   const handleSaveFullJson = () => {
@@ -498,11 +489,7 @@ export function McpToolsView() {
       const imported = importMcpJson(fullJsonText);
       setMcpConfig(imported);
       saveStoredMcpConfig(imported);
-      toast.success(
-        isIndo
-          ? `Berhasil memperbarui ${imported.servers.length} server MCP.`
-          : `Successfully updated ${imported.servers.length} MCP servers.`
-      );
+      toast.success(t("configSavedCount", { count: imported.servers.length }));
     } catch (err: any) {
       toast.error(
         t("failedSaveMcp") + (err?.message ? `: ${err.message}` : "")
@@ -513,7 +500,7 @@ export function McpToolsView() {
   const handleCopyFullJson = () => {
     navigator.clipboard.writeText(fullJsonText);
     setIsCopiedFullJson(true);
-    toast.success(isIndo ? "Konfigurasi disalin ke clipboard!" : "Configuration copied to clipboard!");
+    toast.success(t("configCopiedToClipboard"));
     setTimeout(() => setIsCopiedFullJson(false), 2000);
   };
 
@@ -525,16 +512,14 @@ export function McpToolsView() {
       <div className="space-y-1">
         <div className="flex items-center gap-2.5">
           <h1 className="font-serif text-2xl sm:text-3xl font-normal tracking-tight text-foreground">
-            {isIndo ? "Connectors & Integrasi MCP" : "Connectors & MCP Integrations"}
+            {t("mcpConnectorsTitle")}
           </h1>
           <span className="text-xs px-2.5 py-0.5 rounded-full bg-secondary text-muted-foreground font-sans tabular-nums">
-            {mainTab === "apps" ? `${connectedIds.length} ${isIndo ? "Aktif" : "Active"}` : `${mcpConfig.servers.length} Installed`}
+            {mainTab === "apps" ? t("activeCountBadge", { count: connectedIds.length }) : t("installedCountBadge", { count: mcpConfig.servers.length })}
           </span>
         </div>
         <p className="text-xs text-muted-foreground">
-          {isIndo
-            ? "Hubungkan akun Canva MCP, Google Workspace, dan YouTube, atau kelola server MCP kustom."
-            : "Connect Canva MCP, Google Workspace, and YouTube to expand your AI Tutor's capabilities."}
+          {t("mcpConnectorsSubtitle")}
         </p>
       </div>
 
@@ -570,7 +555,7 @@ export function McpToolsView() {
             )}
           >
             <Layers className="w-3.5 h-3.5" />
-            <span>{isIndo ? "Apps & Tools" : "Apps & Tools"}</span>
+            <span>{t("appsAndToolsTab")}</span>
           </button>
 
           <button
@@ -589,7 +574,7 @@ export function McpToolsView() {
             )}
           >
             <Code2 className="w-3.5 h-3.5" />
-            <span>{isIndo ? "Custom MCP" : "Custom MCP"}</span>
+            <span>{t("customMcpTab")}</span>
             {mcpConfig.servers.length > 0 && (
               <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-secondary font-sans tabular-nums">
                 {mcpConfig.servers.length}
@@ -610,7 +595,7 @@ export function McpToolsView() {
               <Search className="w-4 h-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
               <input
                 type="text"
-                placeholder={isIndo ? "Cari aplikasi, alat, atau skill..." : "Search apps, tools, or skills..."}
+                placeholder={t("searchAppsPlaceholder")}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-9 pr-4 py-2 text-xs rounded-xl bg-secondary/40 border border-border text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-foreground/40 transition-colors"
@@ -639,7 +624,7 @@ export function McpToolsView() {
                           "w-2.5 h-2.5 rounded-full ring-2 ring-card absolute -bottom-0.5 -right-0.5 transition-colors",
                           isConnected ? "bg-emerald-500" : "bg-amber-400 ring-amber-400/30"
                         )}
-                        title={isConnected ? "Connected" : "Disconnected"}
+                        title={isConnected ? t("connected") : t("connectorDisconnectedTooltip")}
                       />
                     </div>
 
@@ -655,8 +640,8 @@ export function McpToolsView() {
                       </div>
                       <p className="text-xs text-muted-foreground leading-relaxed truncate max-w-sm sm:max-w-xl">
                         {isConnected
-                          ? (isIndo ? "Konektor plugin ini sudah terhubung dan tersedia." : "This plugin MCP server is connected and available.")
-                          : (isIndo ? "Hubungkan untuk menggunakan plugin MCP ini." : "Connect to use this plugin MCP server.")}
+                          ? t("connectorConnectedTooltip")
+                          : t("connectorDisconnectedTooltip")}
                       </p>
                     </div>
                   </div>
@@ -671,13 +656,13 @@ export function McpToolsView() {
                         className="text-cyan-400 hover:text-cyan-300 transition-colors text-xs font-medium flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
                       >
                         <ExternalLink className="w-3.5 h-3.5" />
-                        <span>{isConnecting ? (isIndo ? "Menghubungkan..." : "Connecting...") : "Connect"}</span>
+                        <span>{isConnecting ? t("connecting") : t("connect")}</span>
                       </button>
                     ) : (
                       <div className="flex items-center gap-2">
                         <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 text-[11px] font-medium border border-emerald-500/20">
                           <Check className="w-3 h-3" />
-                          <span>{isIndo ? "Terhubung" : "Connected"}</span>
+                          <span>{t("connected")}</span>
                         </span>
                         <button
                           type="button"
@@ -685,7 +670,7 @@ export function McpToolsView() {
                           onClick={(e) => handleToggleConnect(connector, e)}
                           className="text-xs text-muted-foreground hover:text-destructive transition-colors cursor-pointer px-2 py-1"
                         >
-                          {isIndo ? "Putus" : "Disconnect"}
+                          {t("disconnect")}
                         </button>
                       </div>
                     )}
@@ -697,9 +682,7 @@ export function McpToolsView() {
             {filteredConnectors.length === 0 && (
               <div className="text-center py-12 rounded-2xl border border-dashed border-border bg-card/40">
                 <p className="text-xs text-muted-foreground">
-                  {isIndo
-                    ? `Tidak ada aplikasi yang sesuai dengan "${searchQuery}".`
-                    : `No connectors found matching "${searchQuery}".`}
+                  {t("noConnectorsFoundDesc", { query: searchQuery })}
                 </p>
               </div>
             )}
@@ -716,7 +699,7 @@ export function McpToolsView() {
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border hover:bg-secondary text-xs font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
           >
             <ArrowLeft className="w-3.5 h-3.5" />
-            <span>{isIndo ? "Kembali ke Semua Connectors" : "Back to All Connectors"}</span>
+            <span>{t("backToAllConnectors")}</span>
           </button>
 
           <div className="p-6 rounded-3xl border border-border bg-card/80 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-6">
@@ -757,7 +740,7 @@ export function McpToolsView() {
                   className="rounded-xl px-5 h-9 text-xs font-medium cursor-pointer"
                 >
                   <Unlink2 className="w-3.5 h-3.5 mr-1.5" />
-                  <span>{isIndo ? "Putuskan Koneksi" : "Disconnect"}</span>
+                  <span>{t("disconnect")}</span>
                 </Button>
               ) : (
                 <Button
@@ -768,7 +751,7 @@ export function McpToolsView() {
                   className="rounded-xl px-6 h-9 text-xs font-medium cursor-pointer bg-foreground text-background hover:opacity-90"
                 >
                   <Link2 className="w-3.5 h-3.5 mr-1.5" />
-                  <span>{isIndo ? "Hubungkan" : "Connect"}</span>
+                  <span>{t("connect")}</span>
                 </Button>
               )}
             </div>
@@ -779,7 +762,7 @@ export function McpToolsView() {
               <div className="p-5 rounded-2xl border border-border bg-card/50 space-y-3">
                 <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-primary" />
-                  <span>{isIndo ? "Tentang Integrasi" : "About Integration"}</span>
+                  <span>{t("aboutIntegration")}</span>
                 </h3>
                 <p className="text-xs text-muted-foreground leading-relaxed">
                   {selectedConnector.description}
@@ -789,7 +772,7 @@ export function McpToolsView() {
               <div className="p-5 rounded-2xl border border-border bg-card/50 space-y-3">
                 <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
                   <ShieldCheck className="w-4 h-4 text-emerald-500" />
-                  <span>{isIndo ? "Kemampuan & Tools (Capabilities)" : "Skills & Capabilities"}</span>
+                  <span>{t("skillsAndCapabilities")}</span>
                 </h3>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
                   {selectedConnector.skills.map((skill, i) => (
@@ -807,7 +790,7 @@ export function McpToolsView() {
               {selectedConnector.tryPrompts && selectedConnector.tryPrompts.length > 0 && (
                 <div className="p-5 rounded-2xl border border-border bg-card/50 space-y-3">
                   <h3 className="text-sm font-semibold text-foreground">
-                    {isIndo ? "Contoh Prompt Belajar" : "Example Study Prompts"}
+                    {t("exampleStudyPrompts")}
                   </h3>
                   <div className="space-y-2">
                     {selectedConnector.tryPrompts.map((prompt, idx) => (
@@ -837,7 +820,7 @@ export function McpToolsView() {
             <div className="space-y-4">
               <div className="p-5 rounded-2xl border border-border bg-card/50 space-y-3">
                 <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider text-muted-foreground">
-                  {isIndo ? "Informasi Pengembang" : "Developer Information"}
+                  {t("developerInfo")}
                 </h4>
                 <div className="space-y-2 text-xs">
                   <div>
@@ -931,7 +914,7 @@ export function McpToolsView() {
                   className="h-8 px-3.5 rounded-xl bg-foreground text-background hover:opacity-90 font-medium text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-xs"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  <span>{isIndo ? "Add server" : "Add server"}</span>
+                  <span>{t("addServerAction")}</span>
                 </button>
               </div>
             </div>
@@ -956,12 +939,10 @@ export function McpToolsView() {
                   </div>
                   <div className="space-y-1 max-w-sm mx-auto">
                     <h3 className="text-sm font-semibold text-foreground">
-                      {isIndo ? "Belum Ada Server MCP Kustom" : "No Custom MCP Servers"}
+                      {t("noCustomMcpServersTitle")}
                     </h3>
                     <p className="text-xs text-muted-foreground">
-                      {isIndo
-                        ? "Tambahkan server MCP kustom untuk menghubungkan alat eksternal atau skrip ke ruang kerja Anda."
-                        : "Add a custom MCP server to connect external tools or scripts to your workspace."}
+                      {t("noCustomMcpServersDesc")}
                     </p>
                   </div>
                   <button
@@ -970,7 +951,7 @@ export function McpToolsView() {
                     className="px-4 py-2 rounded-xl bg-foreground text-background hover:opacity-90 text-xs font-medium cursor-pointer shadow-xs inline-flex items-center gap-1.5"
                   >
                     <Plus className="w-3.5 h-3.5" />
-                    <span>{isIndo ? "Tambah Server Baru" : "Add Server"}</span>
+                    <span>{t("addServerAction")}</span>
                   </button>
                 </div>
               ) : (
@@ -1041,13 +1022,11 @@ export function McpToolsView() {
                 <div>
                   <h2 className="text-lg font-semibold text-foreground tracking-tight">
                     {isEditingExisting
-                      ? (isIndo ? "Edit MCP server" : "Edit MCP server")
-                      : (isIndo ? "New MCP server" : "New MCP server")}
+                      ? t("editMcpServerTitle")
+                      : t("newMcpServerTitle")}
                   </h2>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    {isIndo
-                      ? "Isi konfigurasi MCP baru, lalu simpan untuk kembali ke daftar."
-                      : "Fill in the new MCP configuration, then save to return to the list."}
+                    {t("mcpServerFormDesc")}
                   </p>
                 </div>
 
@@ -1177,7 +1156,7 @@ export function McpToolsView() {
                             className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer select-none"
                           >
                             {isHeadersOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-                            <span>{isIndo ? "Headers (opsional)" : "Headers (optional)"}</span>
+                            <span>{t("headersOptional")}</span>
                           </button>
 
                           {isHeadersOpen && (
@@ -1224,7 +1203,7 @@ export function McpToolsView() {
                             className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer select-none"
                           >
                             {isEnvOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-                            <span>{isIndo ? "Environment variables (opsional)" : "Environment variables (optional)"}</span>
+                            <span>{t("envVariablesOptional")}</span>
                           </button>
 
                           {isEnvOpen && (
@@ -1261,7 +1240,7 @@ export function McpToolsView() {
                       className="px-3.5 py-1.5 rounded-xl border border-destructive/30 hover:bg-destructive/10 text-destructive text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
-                      <span>{isIndo ? "Hapus" : "Delete"}</span>
+                      <span>{t("delete")}</span>
                     </button>
                   ) : <div />}
 
@@ -1271,14 +1250,14 @@ export function McpToolsView() {
                       onClick={() => setIsEditingServer(false)}
                       className="px-4 py-2 rounded-xl text-xs font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
                     >
-                      Cancel
+                      {t("cancel")}
                     </button>
                     <button
                       type="button"
                       onClick={handleSaveServer}
                       className="px-5 py-2 rounded-xl bg-foreground text-background hover:opacity-90 text-xs font-semibold cursor-pointer shadow-xs"
                     >
-                      Save
+                      {t("save")}
                     </button>
                   </div>
                 </div>
@@ -1295,9 +1274,7 @@ export function McpToolsView() {
                     mcpServers.json
                   </h3>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    {isIndo
-                      ? "Konfigurasi ini kompatibel dengan standar mcpServers (Antigravity & Claude Desktop)."
-                      : "Adheres to the official mcpServers specification used by Antigravity, Claude Desktop, and Cursor."}
+                    {t("mcpJsonEditorDesc")}
                   </p>
                 </div>
 
@@ -1312,14 +1289,14 @@ export function McpToolsView() {
                     ) : (
                       <Copy className="w-3.5 h-3.5 text-muted-foreground" />
                     )}
-                    <span>{isIndo ? "Salin JSON" : "Copy JSON"}</span>
+                    <span>{t("copyJsonAction")}</span>
                   </button>
                   <button
                     type="button"
                     onClick={handleSaveFullJson}
                     className="h-8 px-4 rounded-xl bg-foreground text-background hover:opacity-90 text-xs font-semibold transition-all cursor-pointer shadow-xs"
                   >
-                    {isIndo ? "Simpan Perubahan" : "Save Changes"}
+                    {t("saveChangesAction")}
                   </button>
                 </div>
               </div>

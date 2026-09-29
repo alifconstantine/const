@@ -54,7 +54,6 @@ export function CreateAudioSummarySheet({
   onOpenModelsSettings,
 }: CreateAudioSummarySheetProps) {
   const { t, language } = useI18n();
-  const isIndo = language === "id";
 
   const [topic, setTopic] = useState("");
   const [lengthMode, setLengthMode] = useState<"short" | "long" | "auto">("auto");
@@ -66,7 +65,7 @@ export function CreateAudioSummarySheet({
   // Voice state
   const [voiceModel, setVoiceModel] = useState("inworld-tts-2");
   const [voiceId, setVoiceId] = useState("Ashley");
-  const [audioLanguage, setAudioLanguage] = useState(isIndo ? "id-ID" : "en-US");
+  const [audioLanguage, setAudioLanguage] = useState(language === "id" ? "id-ID" : "en-US");
 
   // Read stored voice config
   const voiceConfig = useMemo(() => getStoredVoiceConfig(), [open]);
@@ -95,9 +94,9 @@ export function CreateAudioSummarySheet({
         if (inworldProvider.model) setVoiceModel(inworldProvider.model);
         if (inworldProvider.voice) setVoiceId(inworldProvider.voice);
       }
-      setAudioLanguage(isIndo ? "id-ID" : "en-US");
+      setAudioLanguage(language === "id" ? "id-ID" : "en-US");
     }
-  }, [open, sources, inworldProvider, isIndo]);
+  }, [open, sources, inworldProvider, language]);
 
   const handleToggleSource = (id: string) => {
     setSelectedSourceIds((prev) =>
@@ -192,7 +191,7 @@ export function CreateAudioSummarySheet({
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="text-[11px] font-semibold text-[#888888] uppercase tracking-wider">
-                {isIndo ? "Pilih Sumber Acuan" : "Reference Sources"}
+                {t("sourceMaterialScope")}
               </label>
               <button
                 type="button"
@@ -200,12 +199,8 @@ export function CreateAudioSummarySheet({
                 className="text-[11px] text-indigo-400 hover:text-indigo-300 font-medium transition-colors"
               >
                 {selectedSourceIds.length === sources.length
-                  ? isIndo
-                    ? "Batal Pilih Semua"
-                    : "Deselect All"
-                  : isIndo
-                  ? "Pilih Semua"
-                  : "Select All"}
+                  ? t("deselectAll")
+                  : t("selectAll")}
               </button>
             </div>
 
@@ -246,7 +241,7 @@ export function CreateAudioSummarySheet({
           {/* Length Selector */}
           <div className="space-y-1.5">
             <label className="text-[11px] font-semibold text-[#888888] uppercase tracking-wider">
-              {isIndo ? "Panjang & Kedalaman" : "Summary Length"}
+              {t("summaryLengthAndDepth")}
             </label>
             <div className="grid grid-cols-3 gap-2">
               {[
@@ -312,16 +307,16 @@ export function CreateAudioSummarySheet({
               <div className="flex items-center gap-1.5">
                 <Volume2 className="h-3.5 w-3.5 text-indigo-400" />
                 <span className="text-xs font-semibold text-white">
-                  {isIndo ? "Suara Inworld TTS" : "Inworld TTS Voice"}
+                  {t("voiceConfigurationInworld")}
                 </span>
               </div>
               {hasInworldKey ? (
                 <span className="text-[9.5px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                  {isIndo ? "Aktif" : "Active"}
+                  {t("active")}
                 </span>
               ) : (
                 <span className="text-[9.5px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                  {isIndo ? "Belum Ada Key" : "No API Key"}
+                  {t("notConfigured")}
                 </span>
               )}
             </div>
@@ -362,7 +357,7 @@ export function CreateAudioSummarySheet({
                   className="w-full h-8 px-2 rounded-lg bg-[#151517] border border-[#2e2e33] text-xs text-white disabled:opacity-40"
                 >
                   {availableModels.length === 0 ? (
-                    <option value="">{isIndo ? "Tidak ada model" : "No models"}</option>
+                    <option value="">{t("noModels")}</option>
                   ) : (
                     availableModels.map((m) => (
                       <option key={m.id} value={m.id}>
@@ -384,7 +379,7 @@ export function CreateAudioSummarySheet({
                   className="w-full h-8 px-2 rounded-lg bg-[#151517] border border-[#2e2e33] text-xs text-white disabled:opacity-40"
                 >
                   {availableVoices.length === 0 ? (
-                    <option value="">{isIndo ? "Tidak ada suara" : "No voices"}</option>
+                    <option value="">{t("noVoices")}</option>
                   ) : (
                     availableVoices.map((v) => (
                       <option key={v.id} value={v.id}>
@@ -423,7 +418,7 @@ export function CreateAudioSummarySheet({
               className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-xs font-semibold text-white shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-[0.98]"
             >
               <Sparkles className="h-4 w-4" />
-              <span>{isIndo ? "Buat Ringkasan Audio" : "Generate Audio Summary"}</span>
+              <span>{t("generateAudioSummary")}</span>
             </button>
           </div>
         </form>

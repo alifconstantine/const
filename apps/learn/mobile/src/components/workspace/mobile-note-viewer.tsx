@@ -236,11 +236,10 @@ export function MobileNoteViewer({
   onConvertToSource,
   onGenerateNote,
 }: MobileNoteViewerProps) {
-  const { language } = useI18n();
-  const isIndo = language === "id";
+  const { t } = useI18n();
 
   const [title, setTitle] = useState(
-    artifact?.title || (isIndo ? "Catatan Baru" : "New Note")
+    artifact?.title || t("newNote")
   );
   const [isSaving, setIsSaving] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -320,7 +319,7 @@ export function MobileNoteViewer({
       if (!artifact) return;
       try {
         await localDb.updateArtifact(artifact.id, {
-          title: newTitle || (isIndo ? "Catatan Baru" : "New Note"),
+          title: newTitle || t("newNote"),
         });
       } catch (err) {
         console.error("Failed to save note title:", err);
@@ -337,7 +336,7 @@ export function MobileNoteViewer({
     if (!artifact) return;
     try {
       await localDb.updateArtifact(artifact.id, {
-        title: title || (isIndo ? "Catatan Baru" : "New Note"),
+        title: title || t("newNote"),
       });
     } catch (err) {
       console.error("Failed to save note title on blur:", err);
@@ -356,16 +355,12 @@ export function MobileNoteViewer({
       try {
         await localDb.createSource({
           learnId: artifact.learnId,
-          title: title || (isIndo ? "Catatan" : "Note"),
+          title: title || t("note"),
           type: "text",
           content: md,
           includedInChat: true,
         });
-        toast.success(
-          isIndo
-            ? "Catatan berhasil dijadikan sumber rujukan notebook!"
-            : "Note added as notebook source successfully!"
-        );
+        toast.success(t("noteAddedAsSource"));
       } catch (err: any) {
         toast.error(err.message);
       }
@@ -377,7 +372,7 @@ export function MobileNoteViewer({
     if (navigator.clipboard) {
       navigator.clipboard.writeText(md);
       setCopied(true);
-      toast.success(isIndo ? "Catatan disalin ke clipboard" : "Note copied to clipboard");
+      toast.success(t("noteCopiedToClipboard"));
       setTimeout(() => setCopied(false), 2000);
     }
   };
@@ -393,7 +388,7 @@ export function MobileNoteViewer({
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    toast.success(isIndo ? "Catatan diunduh (.md)" : "Note downloaded (.md)");
+    toast.success(t("noteDownloaded"));
   };
 
   const handleDelete = () => {
@@ -445,7 +440,7 @@ export function MobileNoteViewer({
         break;
       case "link": {
         const url = window.prompt(
-          isIndo ? "Masukkan URL tautan:" : "Enter link URL:",
+          t("enterLinkUrl"),
           "https://"
         );
         if (url) {
@@ -500,7 +495,7 @@ export function MobileNoteViewer({
             type="button"
             onClick={onClose}
             className="h-9 w-9 rounded-xl hover:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer shrink-0"
-            title={isIndo ? "Kembali" : "Back"}
+            title={t("back")}
           >
             <ArrowLeft className="h-4 w-4" />
           </button>
@@ -510,7 +505,7 @@ export function MobileNoteViewer({
             </span>
             <ChevronRight className="h-3.5 w-3.5 text-muted-foreground/60 shrink-0" />
             <span className="text-xs font-semibold text-foreground truncate">
-              {isIndo ? "Catatan" : "Note"}
+              {t("note")}
             </span>
           </div>
         </div>
@@ -521,17 +516,17 @@ export function MobileNoteViewer({
             type="button"
             onClick={handleConvertToSourceAction}
             className="h-8 px-2.5 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground flex items-center gap-1.5 transition-colors cursor-pointer text-xs"
-            title={isIndo ? "Jadikan sumber rujukan notebook" : "Add as notebook source"}
+            title={t("addAsNotebookSource")}
           >
             <BookmarkPlus className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline font-medium">{isIndo ? "Jadikan Sumber" : "Add to Sources"}</span>
+            <span className="hidden sm:inline font-medium">{t("addAsSource")}</span>
           </button>
 
           <button
             type="button"
             onClick={handleCopy}
             className="h-8 w-8 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
-            title={isIndo ? "Salin catatan" : "Copy note"}
+            title={t("copyNote")}
           >
             {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
           </button>
@@ -540,7 +535,7 @@ export function MobileNoteViewer({
             type="button"
             onClick={handleDownload}
             className="h-8 w-8 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
-            title={isIndo ? "Unduh .md" : "Download .md"}
+            title={t("downloadMd")}
           >
             <Download className="h-3.5 w-3.5" />
           </button>
@@ -549,7 +544,7 @@ export function MobileNoteViewer({
             type="button"
             onClick={handleDelete}
             className="h-8 w-8 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive flex items-center justify-center transition-colors cursor-pointer"
-            title={isIndo ? "Hapus catatan" : "Delete note"}
+            title={t("deleteNote")}
           >
             <Trash2 className="h-3.5 w-3.5" />
           </button>
@@ -573,7 +568,7 @@ export function MobileNoteViewer({
               editorRef.current?.focus();
             }
           }}
-          placeholder={isIndo ? "Catatan Baru" : "New Note"}
+          placeholder={t("newNote")}
           spellCheck={false}
           autoComplete="off"
           autoCorrect="off"
@@ -730,11 +725,7 @@ export function MobileNoteViewer({
           contentEditable
           suppressContentEditableWarning
           onInput={handleInput}
-          data-placeholder={
-            isIndo
-              ? "Tulis catatan atau tempel konten materi di sini..."
-              : "Write note or paste study content here..."
-          }
+          data-placeholder={t("writeNotePlaceholder")}
           style={{
             outline: "none",
             border: "none",
@@ -789,20 +780,20 @@ export function MobileNoteViewer({
           )}
           <span>
             {isGenerating
-              ? (isIndo ? "Menghasilkan..." : "Generating...")
-              : "Generate"}
+              ? t("generating")
+              : t("generate")}
           </span>
         </button>
 
         <div className="flex items-center gap-2 text-[11px] text-muted-foreground">
           {isSaving ? (
             <span className="text-amber-500 animate-pulse font-medium">
-              {isIndo ? "Menyimpan..." : "Saving..."}
+              {t("saving")}
             </span>
           ) : (
             <span className="text-emerald-500 flex items-center gap-1 font-medium">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
-              {isIndo ? "Tersimpan otomatis" : "Auto-saved"}
+              {t("autoSaved")}
             </span>
           )}
         </div>

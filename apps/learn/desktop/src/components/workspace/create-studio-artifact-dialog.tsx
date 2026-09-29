@@ -33,8 +33,7 @@ export function CreateStudioArtifactDialog({
   sources,
   onGenerate,
 }: CreateStudioArtifactDialogProps) {
-  const { t, language } = useI18n();
-  const isIndo = language === "id";
+  const { t } = useI18n();
 
   const [artifactType, setArtifactType] = useState<"quiz" | "flashcard">(initialType);
   const [countMode, setCountMode] = useState<"5" | "10" | "custom">("10");
@@ -67,17 +66,17 @@ export function CreateStudioArtifactDialog({
     const primarySourceTitle = sources[0]?.title || "";
     if (primarySourceTitle) {
       return [
-        isIndo ? `+ Uji Pemahaman: ${primarySourceTitle.slice(0, 24)}` : `+ Key Concepts: ${primarySourceTitle.slice(0, 24)}`,
-        isIndo ? "+ Analisis Perbandingan Kinerja" : "+ Performance Comparison",
-        isIndo ? "+ Karakteristik & Metodologi Kunci" : "+ Key Characteristics",
+        t("chipTestUnderstandingTopic", { topic: primarySourceTitle.slice(0, 24) }),
+        t("chipPerformanceComparison"),
+        t("chipKeyCharacteristics"),
       ];
     }
     return [
-      isIndo ? "+ Uji Pemahaman Konsep" : "+ Test Core Understanding",
-      isIndo ? "+ Analisis Perbandingan" : "+ Comparative Analysis",
-      isIndo ? "+ Karakteristik & Prinsip Utama" : "+ Main Principles",
+      t("chipTestCoreUnderstanding"),
+      t("chipComparativeAnalysis"),
+      t("chipMainPrinciples"),
     ];
-  }, [sources, isIndo]);
+  }, [sources, t]);
 
   const handleChipClick = (chipText: string) => {
     const cleanText = chipText.replace(/^\+\s*/, "");
@@ -127,13 +126,7 @@ export function CreateStudioArtifactDialog({
               <Layers className="h-4 w-4 text-white shrink-0" />
             )}
             <span className="text-sm font-semibold text-white tracking-tight">
-              {artifactType === "quiz"
-                ? isIndo
-                  ? "Kuis Interaktif"
-                  : "Interactive Quiz"
-                : isIndo
-                ? "Kartu Tanya-Jawab (Flashcards)"
-                : "Flashcards Deck"}
+              {artifactType === "quiz" ? t("interactiveQuizTitle") : t("flashcardsDeckTitle")}
             </span>
           </div>
 
@@ -152,7 +145,7 @@ export function CreateStudioArtifactDialog({
               {/* Top Switcher: Quiz vs Flashcards */}
               <div className="space-y-1.5">
                 <label className="text-[11.5px] font-medium text-[#999999]">
-                  {isIndo ? "Format Belajar" : "Learning Format"}
+                  {t("learningFormat")}
                 </label>
                 <div className="grid grid-cols-2 gap-1.5 p-1 rounded-xl bg-[#222222] border border-[#2b2b2b]">
                   <button
@@ -166,7 +159,7 @@ export function CreateStudioArtifactDialog({
                     )}
                   >
                     <HelpCircle className="h-3.5 w-3.5 text-white" />
-                    <span className="truncate">{isIndo ? "Kuis Pilihan Ganda" : "Interactive Quiz"}</span>
+                    <span className="truncate">{t("multipleChoiceQuiz")}</span>
                   </button>
                   <button
                     type="button"
@@ -179,7 +172,7 @@ export function CreateStudioArtifactDialog({
                     )}
                   >
                     <Layers className="h-3.5 w-3.5 text-white" />
-                    <span className="truncate">{isIndo ? "Kartu Flashcards" : "Flashcards Deck"}</span>
+                    <span className="truncate">{t("flashcardsDeck")}</span>
                   </button>
                 </div>
               </div>
@@ -190,13 +183,7 @@ export function CreateStudioArtifactDialog({
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">
                     <label className="text-[11.5px] font-medium text-[#999999]">
-                      {artifactType === "quiz"
-                        ? isIndo
-                          ? "Jumlah Pertanyaan"
-                          : "Number of Questions"
-                        : isIndo
-                        ? "Jumlah Kartu"
-                        : "Number of Cards"}
+                      {artifactType === "quiz" ? t("numberOfQuestions") : t("numberOfCards")}
                     </label>
                     {countMode === "custom" && (
                       <span className="text-[10px] text-[#777777]">1 - 50</span>
@@ -239,7 +226,7 @@ export function CreateStudioArtifactDialog({
                       )}
                     >
                       {countMode === "custom" && <Check className="h-3 w-3 text-white stroke-[2.5]" />}
-                      <span>{isIndo ? "Kustom" : "Custom"}</span>
+                      <span>{t("custom")}</span>
                     </button>
                   </div>
 
@@ -262,13 +249,7 @@ export function CreateStudioArtifactDialog({
                         className="w-20 h-8 px-2.5 rounded-lg bg-[#222222] border border-[#2b2b2b] text-white font-sans tabular-nums text-xs focus:outline-none focus:border-[#444444] transition-colors text-center"
                       />
                       <span className="text-[11px] text-[#777777]">
-                        {artifactType === "quiz"
-                          ? isIndo
-                            ? "soal (maks. 50)"
-                            : "questions (max 50)"
-                          : isIndo
-                          ? "kartu (maks. 50)"
-                          : "cards (max 50)"}
+                        {artifactType === "quiz" ? t("questionsMax50") : t("cardsMax50")}
                       </span>
                     </div>
                   )}
@@ -277,7 +258,7 @@ export function CreateStudioArtifactDialog({
                 {/* Tingkat Kesulitan */}
                 <div className="space-y-1.5">
                   <label className="text-[11.5px] font-medium text-[#999999]">
-                    {isIndo ? "Tingkat Kesulitan" : "Difficulty Level"}
+                    {t("difficultyLevel")}
                   </label>
                   <div className="inline-flex w-full rounded-xl bg-[#222222] border border-[#2b2b2b] p-0.5">
                     <button
@@ -290,7 +271,7 @@ export function CreateStudioArtifactDialog({
                           : "text-[#888888] hover:text-[#cccccc]"
                       )}
                     >
-                      {isIndo ? "Mudah" : "Easy"}
+                      {t("difficultyEasy")}
                     </button>
                     <button
                       type="button"
@@ -303,7 +284,7 @@ export function CreateStudioArtifactDialog({
                       )}
                     >
                       {difficulty === "medium" && <Check className="h-3 w-3 text-white stroke-[2.5]" />}
-                      <span>{isIndo ? "Sedang" : "Medium"}</span>
+                      <span>{t("difficultyMedium")}</span>
                     </button>
                     <button
                       type="button"
@@ -315,7 +296,7 @@ export function CreateStudioArtifactDialog({
                           : "text-[#888888] hover:text-[#cccccc]"
                       )}
                     >
-                      {isIndo ? "Sulit" : "Hard"}
+                      {t("difficultyHard")}
                     </button>
                   </div>
                 </div>
@@ -324,7 +305,7 @@ export function CreateStudioArtifactDialog({
               {/* Sumber Dropdown */}
               <div className="space-y-1.5 relative">
                 <label className="text-[11.5px] font-medium text-[#999999]">
-                  {isIndo ? "Sumber Rujukan Materi" : "Source Material Scope"}
+                  {t("sourceMaterialScope")}
                 </label>
                 <div className="relative">
                   <button
@@ -334,12 +315,8 @@ export function CreateStudioArtifactDialog({
                   >
                     <span className="text-white font-medium truncate">
                       {selectedSourceIds.length === sources.length
-                        ? isIndo
-                          ? `Semua sumber (${sources.length} sumber)`
-                          : `All sources (${sources.length})`
-                        : isIndo
-                        ? `${selectedSourceIds.length} dari ${sources.length} sumber terpilih`
-                        : `${selectedSourceIds.length} of ${sources.length} sources selected`}
+                        ? t("allSourcesCount", { count: sources.length })
+                        : t("selectedOfTotalSources", { selected: selectedSourceIds.length, total: sources.length })}
                     </span>
                     <ChevronDown className="h-3.5 w-3.5 text-[#888888] shrink-0" />
                   </button>
@@ -353,7 +330,7 @@ export function CreateStudioArtifactDialog({
                           className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-[#2b2b2b] text-xs text-[#cccccc] cursor-pointer transition-colors"
                         >
                           <span className="font-medium">
-                            {selectedSourceIds.length === sources.length ? (isIndo ? "Batalkan Semua" : "Deselect All") : (isIndo ? "Pilih Semua Sumber" : "Select All")}
+                            {selectedSourceIds.length === sources.length ? t("deselectAll") : t("selectAllSources")}
                           </span>
                           <div
                             className={cn(
@@ -405,21 +382,17 @@ export function CreateStudioArtifactDialog({
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <label className="text-[11.5px] font-medium text-[#999999]">
-                    {isIndo ? "Apa topiknya? (Opsional)" : "What is the topic? (Optional)"}
+                    {t("whatIsTopicOptional")}
                   </label>
                   <span className="text-[10px] text-[#777777]">
-                    {isIndo ? "Kosongkan untuk cakupan umum" : "Leave blank for general"}
+                    {t("leaveBlankForGeneral")}
                   </span>
                 </div>
                 <textarea
                   value={topic}
                   onChange={(e) => setTopic(e.target.value)}
                   rows={2}
-                  placeholder={
-                    isIndo
-                      ? "Contoh: Identifikasi 5 perbedaan utama antara model reasoning dan non-reasoning berdasarkan data rujukan."
-                      : "E.g., Compare 5 key differences between reasoning and non-reasoning models."
-                  }
+                  placeholder={t("studioArtifactTopicPlaceholder")}
                   className="w-full px-3 py-2 rounded-xl bg-[#222222] border border-[#2b2b2b] hover:border-[#383838] focus:border-[#444444] focus:outline-none text-xs text-white placeholder:text-[#666666] resize-none transition-colors font-sans leading-relaxed"
                 />
 
@@ -447,14 +420,14 @@ export function CreateStudioArtifactDialog({
               onClick={() => onOpenChange(false)}
               className="px-4 py-2 rounded-xl bg-transparent hover:bg-[#222222] text-xs text-[#888888] hover:text-white transition-colors cursor-pointer"
             >
-              {isIndo ? "Batal" : "Cancel"}
+              {t("cancel")}
             </button>
             <button
               type="submit"
               disabled={sources.length === 0}
               className="px-4 py-2 rounded-xl bg-white hover:bg-neutral-200 disabled:opacity-40 disabled:hover:bg-white disabled:cursor-not-allowed text-xs font-semibold text-black flex items-center gap-1.5 transition-all cursor-pointer shadow-sm active:scale-98"
             >
-              <span>{isIndo ? "Buat sekarang" : "Generate Now"}</span>
+              <span>{t("generateNow")}</span>
             </button>
           </div>
         </form>

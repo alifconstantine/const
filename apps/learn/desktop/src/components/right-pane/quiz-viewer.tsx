@@ -34,8 +34,7 @@ export function QuizViewer({
   onToggleExpand,
   isExpanded = false,
 }: QuizViewerProps) {
-  const { language } = useI18n();
-  const isIndo = language === "id";
+  const { t } = useI18n();
 
   const questions: QuizQuestion[] = quiz.questions || [];
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -81,23 +80,20 @@ export function QuizViewer({
     const correctOpt = currentQ.options.find((o) => o.isCorrect);
     const selectedOpt = currentQ.options.find((o) => o.id === currentAnswer);
 
-    const promptText = isIndo
-      ? `Tolong jelaskan secara mendalam mengenai pertanyaan kuis ini:
+    const contextLine = correctOpt?.explanation
+      ? t("quizContextLine", { explanation: correctOpt.explanation })
+      : "";
+    const selectedLine = selectedOpt && !selectedOpt.isCorrect
+      ? t("quizSelectedLine", { selectedId: selectedOpt.id, selectedText: selectedOpt.text })
+      : "";
 
-**Pertanyaan**: "${currentQ.question}"
-
-**Jawaban Benar**: (${correctOpt?.id}) ${correctOpt?.text}
-${correctOpt?.explanation ? `*Konteks*: ${correctOpt.explanation}\n` : ""}
-${selectedOpt && !selectedOpt.isCorrect ? `**Jawaban yang Saya Pilih**: (${selectedOpt.id}) ${selectedOpt.text}\n` : ""}
-Berdasarkan materi sumber, tolong uraikan mengapa jawaban tersebut adalah yang paling tepat dan berikan pemahaman konseptual yang lebih luas.`
-      : `Please explain in-depth this quiz question:
-
-**Question**: "${currentQ.question}"
-
-**Correct Answer**: (${correctOpt?.id}) ${correctOpt?.text}
-${correctOpt?.explanation ? `*Context*: ${correctOpt.explanation}\n` : ""}
-${selectedOpt && !selectedOpt.isCorrect ? `**My Selected Answer**: (${selectedOpt.id}) ${selectedOpt.text}\n` : ""}
-Based on the learning sources, explain why this is the correct answer and provide a broader conceptual understanding.`;
+    const promptText = t("explainQuizPrompt", {
+      question: currentQ.question,
+      correctId: correctOpt?.id || "",
+      correctText: correctOpt?.text || "",
+      contextLine,
+      selectedLine,
+    });
 
     onExplainInChat(promptText);
   };
@@ -113,7 +109,7 @@ Based on the learning sources, explain why this is the correct answer and provid
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-6 text-center text-muted-foreground">
         <HelpCircle className="h-8 w-8 text-teal-500 mb-2" />
-        <p className="text-xs">{isIndo ? "Kuis tidak memiliki pertanyaan." : "Quiz has no questions."}</p>
+        <p className="text-xs">{t("quizHasNoQuestions")}</p>
       </div>
     );
   }
@@ -126,7 +122,7 @@ Based on the learning sources, explain why this is the correct answer and provid
           <span className="hover:text-foreground transition-colors cursor-pointer">Studio</span>
           <span>&gt;</span>
           <span className="text-foreground font-medium truncate">
-            {quiz.title || (isIndo ? "AI Kuis" : "AI Quiz")}
+            {quiz.title || t("aiQuiz")}
           </span>
         </div>
 
@@ -146,7 +142,7 @@ Based on the learning sources, explain why this is the correct answer and provid
       <div className="px-5 pt-4 pb-3 flex items-start justify-between shrink-0 border-b border-border">
         <div>
           <h2 className="text-base sm:text-lg font-semibold text-foreground tracking-tight leading-snug">
-            {quiz.title || (isIndo ? "AI Kuis" : "AI Quiz")}
+            {quiz.title || t("aiQuiz")}
           </h2>
           <button
             type="button"
@@ -154,9 +150,7 @@ Based on the learning sources, explain why this is the correct answer and provid
             className="text-[11.5px] text-teal-600 dark:text-teal-400 hover:underline flex items-center gap-1 mt-0.5 cursor-pointer"
           >
             <span>
-              {isIndo
-                ? `Lihat perintah dan ${quiz.sourceCount || 1} sumber`
-                : `View prompt and ${quiz.sourceCount || 1} source(s)`}
+              {t("viewPromptAndSources", { count: quiz.sourceCount || 1 })}
             </span>
             <ChevronDown
               className={`h-3 w-3 transition-transform ${
@@ -193,13 +187,13 @@ Based on the learning sources, explain why this is the correct answer and provid
         <div className="px-5 py-3 bg-muted/70 border-b border-border text-xs space-y-2 animate-in fade-in duration-150 shrink-0">
           {quiz.topic && (
             <div>
-              <span className="text-muted-foreground font-medium">{isIndo ? "Topik Fokus: " : "Focus Topic: "}</span>
+              <span className="text-muted-foreground font-medium">{t("focusTopicPrefix")}</span>
               <span className="text-foreground">{quiz.topic}</span>
             </div>
           )}
           {quiz.sourceTitles && quiz.sourceTitles.length > 0 && (
             <div>
-              <span className="text-muted-foreground font-medium">{isIndo ? "Sumber Rujukan: " : "Sources: "}</span>
+              <span className="text-muted-foreground font-medium">{t("sourcesPrefix")}</span>
               <div className="flex flex-wrap gap-1.5 mt-1">
                 {quiz.sourceTitles.map((t, idx) => (
                   <span
@@ -279,13 +273,13 @@ Based on the learning sources, explain why this is the correct answer and provid
                       {showResults && isCorrect && (
                         <span className="inline-flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold shrink-0">
                           <Check className="h-3.5 w-3.5" />
-                          <span>{isIndo ? "Benar!" : "Correct!"}</span>
+                          <span>{t("correctBadge")}</span>
                         </span>
                       )}
                       {showResults && isSelected && !isCorrect && (
                         <span className="inline-flex items-center gap-1 text-[11px] text-rose-600 dark:text-rose-400 font-semibold shrink-0">
                           <X className="h-3.5 w-3.5" />
-                          <span>{isIndo ? "Kurang tepat" : "Incorrect"}</span>
+                          <span>{t("incorrectBadge")}</span>
                         </span>
                       )}
                     </div>
@@ -317,7 +311,7 @@ Based on the learning sources, explain why this is the correct answer and provid
                       }
                       className="text-xs text-muted-foreground hover:text-foreground flex items-center gap-1 py-1.5 px-2.5 rounded-lg hover:bg-muted transition-colors cursor-pointer"
                     >
-                      <span>{isIndo ? "Petunjuk" : "Hint"}</span>
+                      <span>{t("hintBadge")}</span>
                       <ChevronDown
                         className={`h-3.5 w-3.5 transition-transform ${
                           showHint[currentQ.id] ? "rotate-180" : ""
@@ -330,14 +324,10 @@ Based on the learning sources, explain why this is the correct answer and provid
                     type="button"
                     onClick={handleExplain}
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-secondary hover:bg-secondary/80 border border-border text-xs font-medium text-foreground transition-all cursor-pointer active:scale-95 shadow-xs"
-                    title={
-                      isIndo
-                        ? "Minta AI menjelaskan soal ini di chat"
-                        : "Ask AI to explain this question in chat"
-                    }
+                    title={t("explainInChat")}
                   >
                     <Sparkles className="h-3.5 w-3.5 text-teal-500" />
-                    <span>{isIndo ? "Jelaskan" : "Explain in Chat"}</span>
+                    <span>{t("explainInChat")}</span>
                   </button>
                 )}
               </div>
@@ -351,7 +341,7 @@ Based on the learning sources, explain why this is the correct answer and provid
                     className="px-3.5 py-1.5 rounded-xl bg-secondary hover:bg-secondary/80 border border-border text-xs font-medium text-foreground transition-colors cursor-pointer flex items-center gap-1"
                   >
                     <ChevronLeft className="h-3.5 w-3.5" />
-                    <span>{isIndo ? "Sebelumnya" : "Previous"}</span>
+                    <span>{t("previousQuestion")}</span>
                   </button>
                 )}
 
@@ -362,12 +352,8 @@ Based on the learning sources, explain why this is the correct answer and provid
                 >
                   <span>
                     {currentIndex === totalQuestions - 1
-                      ? isIndo
-                        ? "Selesai"
-                        : "Finish"
-                      : isIndo
-                      ? "Berikutnya"
-                      : "Next"}
+                      ? t("finishAction")
+                      : t("nextAction")}
                   </span>
                   <ChevronRight className="h-3.5 w-3.5" />
                 </button>
@@ -377,7 +363,7 @@ Based on the learning sources, explain why this is the correct answer and provid
             {/* Hint Box (if toggled) */}
             {showHint[currentQ.id] && currentQ.hint && (
               <div className="p-3 rounded-xl bg-secondary border border-border text-xs text-foreground leading-relaxed animate-in fade-in duration-150">
-                <span className="font-semibold text-teal-600 dark:text-teal-400 mr-1.5">💡 {isIndo ? "Petunjuk:" : "Hint:"}</span>
+                <span className="font-semibold text-teal-600 dark:text-teal-400 mr-1.5">💡 {t("hintPrefix")}</span>
                 {currentQ.hint}
               </div>
             )}
@@ -391,24 +377,26 @@ Based on the learning sources, explain why this is the correct answer and provid
 
             <div>
               <h3 className="text-lg font-semibold text-foreground">
-                {isIndo ? "Kuis Telah Selesai!" : "Quiz Completed!"}
+                {t("quizCompleted")}
               </h3>
               <p className="text-xs text-muted-foreground mt-1">
-                {isIndo
-                  ? `Skor Anda: ${correctCount} dari ${totalQuestions} benar (${Math.round((correctCount / totalQuestions) * 100)}%)`
-                  : `Your Score: ${correctCount} of ${totalQuestions} correct (${Math.round((correctCount / totalQuestions) * 100)}%)`}
+                {t("yourScoreSummary", {
+                  score: correctCount,
+                  total: totalQuestions,
+                  pct: Math.round((correctCount / totalQuestions) * 100),
+                })}
               </p>
             </div>
 
             <div className="p-4 rounded-xl bg-card border border-border text-xs text-foreground space-y-2">
               <div className="flex justify-between">
-                <span className="text-muted-foreground">{isIndo ? "Akurasi" : "Accuracy"}</span>
+                <span className="text-muted-foreground">{t("accuracy")}</span>
                 <span className="font-semibold text-foreground">
                   {Math.round((correctCount / totalQuestions) * 100)}%
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-muted-foreground">{isIndo ? "Tingkat Kesulitan" : "Difficulty"}</span>
+                <span className="text-muted-foreground">{t("difficulty")}</span>
                 <span className="capitalize text-foreground">{quiz.difficulty || "Medium"}</span>
               </div>
             </div>
@@ -420,7 +408,7 @@ Based on the learning sources, explain why this is the correct answer and provid
                 className="px-4 py-2 rounded-xl bg-secondary hover:bg-secondary/80 border border-border text-xs font-medium text-foreground transition-colors cursor-pointer flex items-center gap-1.5"
               >
                 <RotateCcw className="h-3.5 w-3.5" />
-                <span>{isIndo ? "Ulangi Kuis" : "Restart Quiz"}</span>
+                <span>{t("restartQuiz")}</span>
               </button>
             </div>
           </div>
@@ -440,7 +428,7 @@ Based on the learning sources, explain why this is the correct answer and provid
             }`}
           >
             <ThumbsUp className="h-3 w-3" />
-            <span>{isIndo ? "Konten bagus" : "Good content"}</span>
+            <span>{t("goodContent")}</span>
           </button>
           <button
             type="button"
@@ -452,7 +440,7 @@ Based on the learning sources, explain why this is the correct answer and provid
             }`}
           >
             <ThumbsDown className="h-3 w-3" />
-            <span>{isIndo ? "Konten buruk" : "Bad content"}</span>
+            <span>{t("badContent")}</span>
           </button>
         </div>
 

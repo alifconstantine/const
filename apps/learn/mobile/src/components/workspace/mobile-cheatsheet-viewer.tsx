@@ -41,7 +41,11 @@ function getBadgePrintClass(badge?: string): string {
   return "badge-sky";
 }
 
-function buildCheatSheetPrintableHtml(data: CheatSheetData, isIndo: boolean): string {
+function buildCheatSheetPrintableHtml(
+  data: CheatSheetData,
+  t: (key: any, params?: any) => string,
+  language: string
+): string {
   const cardsHtml = (data.cards || [])
     .map((card) => {
       let contentHtml = "";
@@ -69,7 +73,7 @@ function buildCheatSheetPrintableHtml(data: CheatSheetData, isIndo: boolean): st
     .join("\n");
 
   return `<!DOCTYPE html>
-<html lang="${isIndo ? "id" : "en"}">
+<html lang="${language}">
 <head>
   <meta charset="UTF-8">
   <title>${escapeHtml(data.title || "CheatSheet")}</title>
@@ -235,9 +239,9 @@ function buildCheatSheetPrintableHtml(data: CheatSheetData, isIndo: boolean): st
     <div>
       <h1 class="header-title">${escapeHtml(data.title || "CheatSheet")}</h1>
       <div class="header-meta">
-        ${data.cards?.length || 0} ${isIndo ? "Kartu Referensi Pintar" : "Smart Reference Cards"} · 
+        ${data.cards?.length || 0} ${t("smartReferenceCards")} · 
         ${data.topic ? escapeHtml(data.topic) + " · " : ""}
-        ${new Date().toLocaleDateString(isIndo ? "id-ID" : "en-US", { day: "numeric", month: "short", year: "numeric" })}
+        ${new Date().toLocaleDateString(language === "id" ? "id-ID" : "en-US", { day: "numeric", month: "short", year: "numeric" })}
       </div>
     </div>
     <div class="header-brand">Const Learn Studio</div>
@@ -248,7 +252,7 @@ function buildCheatSheetPrintableHtml(data: CheatSheetData, isIndo: boolean): st
   </div>
 
   <div class="footer">
-    ${escapeHtml(data.title || "CheatSheet")} · ${isIndo ? "Dihasilkan secara cerdas dengan Const Learn Studio" : "Generated with Const Learn Studio"}
+    ${escapeHtml(data.title || "CheatSheet")} · ${t("generatedWithStudio")}
   </div>
 </body>
 </html>`;
@@ -261,7 +265,6 @@ export function MobileCheatSheetViewer({
   onExplainInChat,
 }: MobileCheatSheetViewerProps) {
   const { t, language } = useI18n();
-  const isIndo = language === "id";
 
   const [searchQuery, setSearchQuery] = useState("");
   const [copiedCardId, setCopiedCardId] = useState<string | null>(null);
@@ -291,16 +294,17 @@ export function MobileCheatSheetViewer({
 
   const handleAskTutor = (card: CheatSheetCard) => {
     if (!onExplainInChat) return;
-    const prompt = isIndo
-      ? `Bantu jelaskan konsep/rumus dari kartu CheatSheet "${card.title}" berikut:\n\n${card.content}`
-      : `Please explain the concept/formula from this CheatSheet card "${card.title}":\n\n${card.content}`;
+    const prompt = t("explainCheatSheetPrompt", {
+      title: card.title,
+      content: card.content,
+    });
     onClose();
     onExplainInChat(prompt);
   };
 
   const handleDownloadPdf = () => {
     try {
-      const htmlContent = buildCheatSheetPrintableHtml(data, isIndo);
+      const htmlContent = buildCheatSheetPrintableHtml(data, t, language);
       const printWindow = window.open("", "_blank");
       if (printWindow) {
         printWindow.document.write(htmlContent);
@@ -319,7 +323,7 @@ export function MobileCheatSheetViewer({
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-        toast.info(isIndo ? "File lembar contekan siap dicetak/disimpan ke PDF." : "CheatSheet file downloaded.");
+        toast.info(t("cheatsheetFileDownloaded"));
       }
     } catch (err: any) {
       console.error("PDF export error:", err);
@@ -347,8 +351,7 @@ export function MobileCheatSheetViewer({
               <span>{t("toolsCheatSheet")}</span>
               <span>•</span>
               <span>
-                {filteredCards.length}{" "}
-                {isIndo ? "kartu referensi" : "reference cards"}
+                {t("referenceCardsCount", { count: filteredCards.length })}
               </span>
             </div>
           </div>
@@ -359,10 +362,10 @@ export function MobileCheatSheetViewer({
             type="button"
             onClick={handleDownloadPdf}
             className="h-7 px-2.5 rounded-lg bg-white text-[#161616] hover:bg-neutral-200 text-[11px] font-semibold flex items-center gap-1.5 transition-all shadow-none cursor-pointer active:scale-95"
-            title={isIndo ? "Unduh PDF" : "Download PDF"}
+            title={t("downloadPdf")}
           >
             <Download className="h-3 w-3" />
-            <span>{isIndo ? "Unduh PDF" : "PDF"}</span>
+            <span>{t("downloadPdf")}</span>
           </button>
 
           <button
@@ -399,13 +402,10 @@ export function MobileCheatSheetViewer({
             </div>
             <div className="space-y-1">
               <h3 className="text-xs font-semibold text-white">
-                {isIndo ? "Gagal Menyusun Lembar Contekan" : "Failed to Create CheatSheet"}
+                {t("failedCreateCheatSheetTitle")}
               </h3>
               <p className="text-[11px] text-[#969696] leading-relaxed">
-                {artifact?.error ||
-                  (isIndo
-                    ? "Server AI sedang tidak dapat dijangkau (502 Bad Gateway) atau response tidak valid."
-                    : "The AI server is unreachable (502 Bad Gateway) or returned invalid output.")}
+                {artifact?.error || t("aiServerUnreachableMobile")}
               </p>
             </div>
           </div>
@@ -456,15 +456,7 @@ export function MobileCheatSheetViewer({
                       ) : (
                         <Copy className="h-3 w-3" />
                       )}
-                      <span>
-                        {isCopied
-                          ? isIndo
-                            ? "Tersalin"
-                            : "Copied"
-                          : isIndo
-                          ? "Salin"
-                          : "Copy"}
-                      </span>
+                      <span>{isCopied ? t("copied") : t("copy")}</span>
                     </button>
 
                     {onExplainInChat && (

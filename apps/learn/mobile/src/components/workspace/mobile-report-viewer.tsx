@@ -32,8 +32,7 @@ export function MobileReportViewer({
   onExplainInChat,
   onSelectStudioTool,
 }: MobileReportViewerProps) {
-  const { language } = useI18n();
-  const isIndo = language === "id";
+  const { t } = useI18n();
 
   const [activeSectionId, setActiveSectionId] = useState<string>(
     data.sections?.[0]?.id || ""
@@ -90,9 +89,7 @@ export function MobileReportViewer({
 
     navigator.clipboard.writeText(fullMarkdown);
     setCopied(true);
-    toast.success(
-      isIndo ? "Laporan berhasil disalin sebagai Markdown" : "Report copied as Markdown"
-    );
+    toast.success(t("reportCopiedMarkdown"));
     setTimeout(() => setCopied(false), 2000);
   };
 
@@ -109,9 +106,7 @@ export function MobileReportViewer({
         })
         .catch((err) => console.error("Failed to save feedback", err));
     }
-    toast.success(
-      isIndo ? "Terima kasih atas masukan Anda!" : "Thank you for your feedback!"
-    );
+    toast.success(t("thankYouFeedback"));
   };
 
   const handleWidgetAction = (sec: ReportSection) => {
@@ -124,9 +119,10 @@ export function MobileReportViewer({
     } else if (onExplainInChat) {
       onClose();
       onExplainInChat(
-        isIndo
-          ? `Bantu buatkan ${sec.recommendedWidget.title} berdasarkan bab "${sec.title}".`
-          : `Please generate ${sec.recommendedWidget.title} based on "${sec.title}".`
+        t("generateWidgetPrompt", {
+          title: sec.recommendedWidget.title,
+          section: sec.title,
+        })
       );
     }
   };
@@ -158,7 +154,7 @@ export function MobileReportViewer({
             type="button"
             onClick={onClose}
             className="h-8 w-8 rounded-full bg-[#222222] hover:bg-[#2c2c2c] text-[#888888] hover:text-white flex items-center justify-center transition-colors shrink-0"
-            aria-label={isIndo ? "Kembali" : "Back"}
+            aria-label={t("back")}
           >
             <ArrowLeft className="h-4 w-4" />
           </button>
@@ -167,14 +163,16 @@ export function MobileReportViewer({
               {data.title}
             </h1>
             <div className="text-[10px] text-[#888888] flex items-center gap-1.5">
-              <span>{isIndo ? "Laporan Pembelajaran" : "Learning Report"}</span>
+              <span>{t("learningReportTitle")}</span>
               <span>•</span>
               <button
                 type="button"
                 onClick={() => setShowSourcesSheet(true)}
                 className="text-stone-300 underline font-medium"
               >
-                {data.sourceCount || 1} {isIndo ? "sumber" : "sources"}
+                {data.sourceCount === 1
+                  ? t("viewSourcesCountSingle")
+                  : t("viewSourcesCount", { count: data.sourceCount || 1 })}
               </button>
             </div>
           </div>
@@ -184,8 +182,8 @@ export function MobileReportViewer({
           <button
             type="button"
             onClick={handleCopyMarkdown}
-            title={isIndo ? "Salin Markdown" : "Copy Markdown"}
-            className="h-8 w-8 rounded-full bg-[#222222] hover:bg-[#2c2c2c] text-[#888888] hover:text-white flex items-center justify-center transition-colors"
+            title={t("copyToClipboardAction")}
+            className="h-8 w-8 rounded-full bg-[#222222] hover:bg-[#2c2c2c] text-[#888888] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
           >
             {copied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
           </button>
@@ -253,7 +251,7 @@ export function MobileReportViewer({
                     </div>
                     <div className="space-y-0.5 min-w-0">
                       <div className="text-[9.5px] font-semibold text-[#888888] uppercase tracking-wider">
-                        {sec.recommendedWidget.badge || (isIndo ? "Direkomendasikan" : "Recommended")}
+                        {sec.recommendedWidget.badge || t("recommended")}
                       </div>
                       <div className="text-xs font-semibold text-white">
                         {sec.recommendedWidget.title}
@@ -292,7 +290,7 @@ export function MobileReportViewer({
             )}
           >
             <ThumbsUp className="h-3 w-3" />
-            <span>{isIndo ? "Laporan bagus" : "Good report"}</span>
+            <span>{t("goodReport")}</span>
           </button>
 
           <button
@@ -306,7 +304,7 @@ export function MobileReportViewer({
             )}
           >
             <ThumbsDown className="h-3 w-3" />
-            <span>{isIndo ? "Laporan buruk" : "Bad report"}</span>
+            <span>{t("badReport")}</span>
           </button>
         </div>
       </main>
@@ -317,7 +315,7 @@ export function MobileReportViewer({
           <div className="bg-[#222222] border-t border-[#2e2e2e] rounded-t-3xl p-5 space-y-3 max-h-[60vh] overflow-y-auto">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-semibold text-white">
-                {isIndo ? "Sumber Rujukan Laporan" : "Report Sources"}
+                {t("sourceReferences")}
               </h3>
               <button
                 type="button"

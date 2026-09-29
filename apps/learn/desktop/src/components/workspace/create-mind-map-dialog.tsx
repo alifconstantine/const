@@ -29,8 +29,7 @@ export function CreateMindMapDialog({
   sources,
   onGenerate,
 }: CreateMindMapDialogProps) {
-  const { language } = useI18n();
-  const isIndo = language === "id";
+  const { t } = useI18n();
 
   const [topic, setTopic] = useState("");
   const [selectedSourceIds, setSelectedSourceIds] = useState<string[]>([]);
@@ -48,17 +47,17 @@ export function CreateMindMapDialog({
     const primarySourceTitle = sources[0]?.title || "";
     if (primarySourceTitle) {
       return [
-        isIndo ? `+ Ikhtisar: ${primarySourceTitle.slice(0, 24)}` : `+ Overview: ${primarySourceTitle.slice(0, 24)}`,
-        isIndo ? "+ Struktur Hierarki Konsep" : "+ Hierarchical Architecture",
-        isIndo ? "+ Taksonomi & Kategori Utama" : "+ Core Taxonomy & Categories",
+        t("chipOverviewTopic", { topic: primarySourceTitle.slice(0, 24) }),
+        t("chipHierarchicalArchitecture"),
+        t("chipCoreTaxonomyCategories"),
       ];
     }
     return [
-      isIndo ? "+ Peta Konsep Keseluruhan" : "+ Comprehensive Concept Map",
-      isIndo ? "+ Alur Pemikiran & Hubungan" : "+ Logical Flow & Relationships",
-      isIndo ? "+ Gagasan Pokok & Cabang Materi" : "+ Core Branches & Themes",
+      t("chipComprehensiveConceptMap"),
+      t("chipLogicalFlowRelationships"),
+      t("chipCoreBranchesThemes"),
     ];
-  }, [sources, isIndo]);
+  }, [sources, t]);
 
   const handleChipClick = (chipText: string) => {
     const cleanText = chipText.replace(/^\+\s*/, "");
@@ -104,7 +103,7 @@ export function CreateMindMapDialog({
           <div className="flex items-center gap-2.5">
             <GitFork className="h-4 w-4 text-white shrink-0" />
             <span className="text-sm font-semibold text-white tracking-tight">
-              {isIndo ? "Peta Pikiran Interaktif (Mind Map)" : "Interactive Mind Map"}
+              {t("interactiveMindMapTitle")}
             </span>
           </div>
 
@@ -124,16 +123,14 @@ export function CreateMindMapDialog({
               <div className="p-3.5 rounded-xl bg-[#222222] border border-[#2b2b2b] flex items-start gap-3">
                 <GitFork className="h-4 w-4 text-white shrink-0 mt-0.5" />
                 <div className="text-xs text-[#d4d4d4] leading-relaxed">
-                  {isIndo
-                    ? "AI akan menganalisis materi sumber untuk menyusun diagram hierarkis interaktif yang menghubungkan konsep pokok, percabangan gagasan, dan detail rujukan secara visual."
-                    : "AI will analyze your source material to generate an interactive hierarchical diagram connecting core concepts, topic branches, and contextual references."}
+                  {t("mindMapConceptExplanation")}
                 </div>
               </div>
 
               {/* Sumber Dropdown */}
               <div className="space-y-1.5 relative">
                 <label className="text-[11.5px] font-medium text-[#999999]">
-                  {isIndo ? "Sumber Rujukan Materi" : "Source Material Scope"}
+                  {t("sourceMaterialScope")}
                 </label>
                 <div className="relative">
                   <button
@@ -143,12 +140,8 @@ export function CreateMindMapDialog({
                   >
                     <span className="text-white font-medium truncate">
                       {selectedSourceIds.length === sources.length
-                        ? isIndo
-                          ? `Semua sumber (${sources.length} sumber)`
-                          : `All sources (${sources.length})`
-                        : isIndo
-                        ? `${selectedSourceIds.length} dari ${sources.length} sumber terpilih`
-                        : `${selectedSourceIds.length} of ${sources.length} sources selected`}
+                        ? t("allSourcesCount", { count: sources.length })
+                        : t("selectedOfTotalSources", { selected: selectedSourceIds.length, total: sources.length })}
                     </span>
                     <ChevronDown className="h-3.5 w-3.5 text-[#888888] shrink-0" />
                   </button>
@@ -162,7 +155,7 @@ export function CreateMindMapDialog({
                           className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-[#2b2b2b] text-xs text-[#cccccc] cursor-pointer transition-colors"
                         >
                           <span className="font-medium">
-                            {selectedSourceIds.length === sources.length ? (isIndo ? "Batalkan Semua" : "Deselect All") : (isIndo ? "Pilih Semua Sumber" : "Select All")}
+                            {selectedSourceIds.length === sources.length ? t("deselectAll") : t("selectAllSources")}
                           </span>
                           <div
                             className={cn(
@@ -214,21 +207,17 @@ export function CreateMindMapDialog({
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <label className="text-[11.5px] font-medium text-[#999999]">
-                    {isIndo ? "Fokus Tema Utama (Opsional)" : "Main Theme / Focus (Optional)"}
+                    {t("mainThemeFocusOptional")}
                   </label>
                   <span className="text-[10.5px] text-[#777777]">
-                    {isIndo ? "Kosongkan untuk cakupan umum" : "Leave blank for general"}
+                    {t("leaveBlankForGeneral")}
                   </span>
                 </div>
                 <textarea
                   rows={2}
                   value={topic}
                   onChange={(e) => setTopic(e.target.value)}
-                  placeholder={
-                    isIndo
-                      ? "cth. Arsitektur Jaringan Saraf Tiruan, Alur Logika Bab 2, dll."
-                      : "e.g. Neural Network Architecture, Chapter 2 Logic Flow, etc."
-                  }
+                  placeholder={t("mindMapTopicPlaceholder")}
                   className="w-full px-3 py-2 rounded-xl bg-[#222222] border border-[#2b2b2b] hover:border-[#383838] focus:border-[#444444] focus:outline-none text-xs text-white placeholder:text-[#666666] resize-none transition-colors font-sans leading-relaxed"
                 />
 
@@ -256,14 +245,14 @@ export function CreateMindMapDialog({
               onClick={() => onOpenChange(false)}
               className="px-4 py-2 rounded-xl bg-transparent hover:bg-[#222222] text-xs text-[#888888] hover:text-white transition-colors cursor-pointer"
             >
-              {isIndo ? "Batal" : "Cancel"}
+              {t("cancel")}
             </button>
             <button
               type="submit"
               disabled={sources.length === 0}
               className="px-4 py-2 rounded-xl bg-white hover:bg-neutral-200 disabled:opacity-40 disabled:hover:bg-white disabled:cursor-not-allowed text-xs font-semibold text-black flex items-center gap-1.5 transition-all cursor-pointer shadow-sm active:scale-98"
             >
-              <span>{isIndo ? "Buat Peta Pikiran" : "Generate Mind Map"}</span>
+              <span>{t("generateMindMap")}</span>
             </button>
           </div>
         </form>

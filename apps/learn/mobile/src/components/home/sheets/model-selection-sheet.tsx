@@ -84,7 +84,6 @@ export function ModelSelectionSheet({
   initialCategory = "llm",
 }: ModelSelectionSheetProps) {
   const { t, language } = useI18n();
-  const isIndo = language === "id";
 
   const [activeCategory, setActiveCategory] = useState<ModelCategory>(initialCategory);
 
@@ -162,9 +161,7 @@ export function ModelSelectionSheet({
     setAiConfig(newConfig);
     saveStoredAiConfig(newConfig);
     onModelSelected?.(modelId);
-    toast.success(
-      isIndo ? `Model aktif diubah ke ${modelId}` : `Default model changed to ${modelId}`
-    );
+    toast.success(t("defaultModelChanged", { modelId }));
   };
 
   const handleCancelProviderEdit = () => {
@@ -196,11 +193,7 @@ export function ModelSelectionSheet({
     setExpandedProviderId(null);
     setEditFormData(null);
     setIsAddingModel(false);
-    toast.success(
-      isIndo
-        ? `Pengaturan ${editFormData.name} tersimpan.`
-        : `Provider ${editFormData.name} saved.`
-    );
+    toast.success(t("providerSettingsSaved", { name: editFormData.name }));
   };
 
   const handleDeleteProvider = (providerId: string, e?: React.MouseEvent) => {
@@ -217,7 +210,7 @@ export function ModelSelectionSheet({
       setExpandedProviderId(null);
       setEditFormData(null);
     }
-    toast.success(isIndo ? "Provider dihapus." : "Provider deleted.");
+    toast.success(t("providerDeleted"));
   };
 
   const handleFetchModels = async () => {
@@ -231,11 +224,7 @@ export function ModelSelectionSheet({
         ...editFormData,
         models: res.models,
       });
-      toast.success(
-        isIndo
-          ? `Berhasil mengambil ${res.models.length} model.`
-          : `Fetched ${res.models.length} models.`
-      );
+      toast.success(t("fetchedModelsCount", { count: res.models.length }));
     } else {
       toast.error(res.error || t("failedFetchModels"));
     }
@@ -250,7 +239,7 @@ export function ModelSelectionSheet({
         protocol: "openai-completions",
         models: CONST_ROUTER_DEFAULT_MODELS,
       });
-      toast.success(isIndo ? "Model direset ke default." : "Models restored to default.");
+      toast.success(t("modelsRestoredToDefault"));
     } else {
       const preset = PRESET_PROVIDERS.find((p) => p.id === editFormData.id);
       if (preset) {
@@ -260,7 +249,7 @@ export function ModelSelectionSheet({
           protocol: preset.protocol,
           models: [], // No dummy preset models!
         });
-        toast.success(isIndo ? "Konfigurasi direset ke preset." : "Config restored to preset.");
+        toast.success(t("configRestoredToPreset"));
       }
     }
   };
@@ -335,9 +324,7 @@ export function ModelSelectionSheet({
 
     if (res.success) {
       toast.success(
-        isIndo
-          ? `Koneksi berhasil! Latensi: ${res.latencyMs}ms`
-          : `Connected successfully! Latency: ${res.latencyMs}ms`
+        t("connectedWithLatency", { latency: res.latencyMs ?? 0 })
       );
     } else {
       toast.error(
@@ -465,9 +452,7 @@ export function ModelSelectionSheet({
     setExpandedVoiceProviderId(null);
     setEditVoiceFormData(null);
     toast.success(
-      isIndo
-        ? `Pengaturan suara ${editVoiceFormData.name} tersimpan.`
-        : `Voice provider ${editVoiceFormData.name} saved.`
+      t("voiceProviderSavedSuccess", { name: editVoiceFormData.name })
     );
   };
 
@@ -490,7 +475,7 @@ export function ModelSelectionSheet({
       setExpandedVoiceProviderId(null);
       setEditVoiceFormData(null);
     }
-    toast.success(isIndo ? "Penyedia suara dihapus." : "Voice provider removed.");
+    toast.success(t("voiceProviderRemoved"));
   };
 
   const [isTestingVoiceConnection, setIsTestingVoiceConnection] = useState(false);
@@ -508,9 +493,7 @@ export function ModelSelectionSheet({
 
     if (res.success) {
       toast.success(
-        isIndo
-          ? `Koneksi endpoint suara berhasil! Latensi: ${res.latencyMs}ms`
-          : `Voice endpoint connected! Latency: ${res.latencyMs}ms`
+        t("voiceEndpointConnected", { latency: res.latencyMs ?? 0 })
       );
     } else {
       toast.error(
@@ -555,11 +538,7 @@ export function ModelSelectionSheet({
 
     if (res.success && res.voices && res.voices.length > 0) {
       setCachedVoiceList(res.voices);
-      toast.success(
-        isIndo
-          ? `Berhasil memuat ${res.voices.length} karakter suara.`
-          : `Loaded ${res.voices.length} voice characters.`
-      );
+      toast.success(t("loadedVoiceCharactersCount", { count: res.voices.length }));
     } else {
       toast.error(res.error || t("failedLoadVoices"));
     }
@@ -577,11 +556,7 @@ export function ModelSelectionSheet({
 
     if (res.success && res.models && res.models.length > 0) {
       setAvailableVoiceModels(res.models);
-      toast.success(
-        isIndo
-          ? `Berhasil memperbarui model suara.`
-          : `Successfully updated voice models.`
-      );
+      toast.success(t("voiceModelsUpdatedSuccess"));
     } else {
       toast.error(res.error || t("failedLoadVoiceModels"));
     }
@@ -609,7 +584,7 @@ export function ModelSelectionSheet({
           audioPlayerRef.current.play().catch(() => {});
         }
       }, 100);
-      toast.success(isIndo ? "Memutar audio..." : "Playing audio...");
+      toast.success(t("playingAudioNotice"));
     } else {
       toast.error(res.error || t("failedSynthesizeAudio"));
     }
@@ -693,7 +668,7 @@ export function ModelSelectionSheet({
     setExpandedImageProviderId(null);
     setEditImageFormData(null);
     setIsAddingImageModel(false);
-    toast.success(isIndo ? "Penyedia gambar berhasil disimpan." : "Image provider saved successfully.");
+    toast.success(t("imageProviderSaved"));
   };
 
   const handleCancelImageProviderEdit = () => {
@@ -728,7 +703,7 @@ export function ModelSelectionSheet({
       setExpandedImageProviderId(null);
       setEditImageFormData(null);
     }
-    toast.success(isIndo ? "Penyedia gambar dihapus." : "Image provider removed.");
+    toast.success(t("imageProviderRemoved"));
   };
 
   const handleTestImageProviderConnection = async (targetProvider?: ImageProvider) => {
@@ -744,9 +719,7 @@ export function ModelSelectionSheet({
 
     if (res.success) {
       toast.success(
-        isIndo
-          ? `Koneksi endpoint gambar berhasil! Latensi: ${res.latencyMs}ms`
-          : `Image endpoint connected! Latency: ${res.latencyMs}ms`
+        t("imageEndpointConnected", { latency: res.latencyMs ?? 0 })
       );
     } else {
       toast.error(
@@ -761,24 +734,22 @@ export function ModelSelectionSheet({
       const res = await testImageModelConnectivity(provider, modelId);
       if (res.success) {
         toast.success(
-          isIndo ? `Model ${modelId} aktif & operasional!` : `Model ${modelId} is operational!`,
+          t("modelOperational", { modelId }),
           {
-            description: isIndo
-              ? `Latensi: ${res.latencyMs}ms • Endpoint berhasil merespons.`
-              : `Latency: ${res.latencyMs}ms • Endpoint responded successfully.`,
+            description: t("modelLatencyDesc", { latency: res.latencyMs ?? 0 }),
           }
         );
       } else {
         toast.error(
-          isIndo ? `Pengujian gagal untuk ${modelId}` : `Test failed for ${modelId}`,
+          t("testFailedForModel", { modelId }),
           {
-            description: res.error || (isIndo ? "Gagal berkomunikasi dengan provider." : "Failed to communicate with provider."),
+            description: res.error || t("failedCommunicateProvider"),
           }
         );
       }
     } catch (err: any) {
       toast.error(
-        isIndo ? `Error pengujian ${modelId}` : `Error testing ${modelId}`,
+        t("errorTestingModel", { modelId }),
         {
           description: err.message || "Unknown error occurred.",
         }
@@ -812,7 +783,7 @@ export function ModelSelectionSheet({
     setNewImageModelId("");
     setNewImageModelName("");
     setIsAddingImageModel(false);
-    toast.success(isIndo ? `Model ${cleanId} ditambahkan ke form.` : `Model ${cleanId} added to form.`);
+    toast.success(t("modelAddedToForm", { modelId: cleanId }));
   };
 
   const handleRemoveModelFromImageForm = (modelId: string) => {
@@ -831,11 +802,7 @@ export function ModelSelectionSheet({
     };
     setImageConfig(newConfig);
     saveStoredImageConfig(newConfig);
-    toast.success(
-      isIndo
-        ? `Model gambar aktif diubah ke ${modelId}`
-        : `Active image model set to ${modelId}`
-    );
+    toast.success(t("activeImageModelSet", { modelId }));
   };
 
   return (
@@ -849,12 +816,10 @@ export function ModelSelectionSheet({
         <div className="px-5 py-3 border-b border-border flex items-center justify-between shrink-0">
           <div>
             <h2 className="text-base font-semibold text-foreground tracking-tight">
-              {isIndo ? "Pengaturan Model & Suara" : "Models & Voice"}
+              {t("modelsAndVoice")}
             </h2>
             <p className="text-[11px] text-muted-foreground">
-              {isIndo
-                ? "Kelola penyedia model dan sintesis suara"
-                : "Manage AI providers and voice synthesis"}
+              {t("modelsAndVoiceSubtitle")}
             </p>
           </div>
 
@@ -862,7 +827,7 @@ export function ModelSelectionSheet({
             type="button"
             onClick={onClose}
             className="h-8 w-8 rounded-full hover:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer active:scale-95"
-            aria-label="Tutup"
+            aria-label={t("close")}
           >
             <X className="h-4 w-4" />
           </button>
@@ -931,7 +896,7 @@ export function ModelSelectionSheet({
                   className="h-9 px-3 rounded-xl border border-border hover:bg-secondary text-xs font-medium text-foreground transition-all flex items-center gap-1.5 cursor-pointer shrink-0 shadow-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-foreground/20"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  <span>{isIndo ? "Tambah" : "Add"}</span>
+                  <span>{t("add")}</span>
                   <ChevronDown className="w-3 h-3 text-muted-foreground" />
                 </button>
               </DropdownMenuTrigger>
@@ -941,14 +906,14 @@ export function ModelSelectionSheet({
                   className="text-xs px-3 py-2 rounded-lg cursor-pointer hover:bg-secondary/70 focus:bg-secondary/70 flex items-center gap-2"
                 >
                   <Plus className="w-3.5 h-3.5 text-muted-foreground" />
-                  <span>{isIndo ? "Penyedia adapter" : "Add provider"}</span>
+                  <span>{t("addProvider")}</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={handleAddCustomProvider}
                   className="text-xs px-3 py-2 rounded-lg cursor-pointer hover:bg-secondary/70 focus:bg-secondary/70 flex items-center gap-2"
                 >
                   <Plus className="w-3.5 h-3.5 text-muted-foreground" />
-                  <span>{isIndo ? "Kustom penyedia" : "Add a custom provider"}</span>
+                  <span>{t("addCustomProvider")}</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -961,7 +926,7 @@ export function ModelSelectionSheet({
               className="h-9 px-3 rounded-xl border border-border hover:bg-secondary text-xs font-medium text-foreground transition-all flex items-center gap-1.5 cursor-pointer shrink-0 shadow-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-foreground/20"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>{isIndo ? "Tambah" : "Add"}</span>
+              <span>{t("add")}</span>
             </button>
           )}
 
@@ -972,7 +937,7 @@ export function ModelSelectionSheet({
               className="h-9 px-3 rounded-xl border border-border hover:bg-secondary text-xs font-medium text-foreground transition-all flex items-center gap-1.5 cursor-pointer shrink-0 shadow-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-foreground/20"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>{isIndo ? "Tambah" : "Add"}</span>
+              <span>{t("add")}</span>
             </button>
           )}
         </div>
@@ -1031,7 +996,7 @@ export function ModelSelectionSheet({
                               : "border-border hover:bg-secondary text-foreground"
                           )}
                         >
-                          {isExpanded ? (isIndo ? "Tutup" : "Close") : "Edit"}
+                          {isExpanded ? t("close") : t("edit")}
                         </button>
                         {!provider.isDefault && (
                           <button
@@ -1039,7 +1004,7 @@ export function ModelSelectionSheet({
                             onClick={(e) => handleDeleteProvider(provider.id, e)}
                             className="px-3 py-1 rounded-xl border border-destructive/30 hover:border-destructive/60 hover:bg-destructive/10 text-destructive text-[11px] font-medium transition-all cursor-pointer"
                           >
-                            Delete
+                            {t("delete")}
                           </button>
                         )}
                       </div>
@@ -1051,7 +1016,7 @@ export function ModelSelectionSheet({
                         {/* Subtitle without raw debug ID */}
                         <div>
                           <h3 className="text-xs font-semibold text-foreground">
-                            {editFormData.name || (isIndo ? "Penyedia Baru" : "New Provider")}
+                            {editFormData.name || t("newProvider")}
                           </h3>
                         </div>
 
@@ -1169,9 +1134,7 @@ export function ModelSelectionSheet({
                           <div className="space-y-1.5">
                             {editFormData.models.length === 0 ? (
                               <div className="p-3 rounded-xl border border-dashed border-border text-center text-xs text-muted-foreground bg-secondary/10">
-                                {isIndo
-                                  ? "Belum ada model. Klik 'Fetch models' atau tambah manual."
-                                  : "No models. Click 'Fetch models' or add manually."}
+                                {t("noModelsRegisteredHint")}
                               </div>
                             ) : (
                               editFormData.models.map((model) => {
@@ -1200,7 +1163,7 @@ export function ModelSelectionSheet({
                                       {isDefault ? (
                                         <span className="text-[10.5px] font-medium text-foreground/90 px-2 py-0.5 rounded-full bg-secondary/80 border border-border/80 flex items-center gap-1">
                                           <Check className="w-3 h-3 text-emerald-500" />
-                                          <span>Default</span>
+                                          <span>{t("default")}</span>
                                         </span>
                                       ) : (
                                         (editFormData.isDefault || !editFormData.isCustom) && (
@@ -1209,7 +1172,7 @@ export function ModelSelectionSheet({
                                             onClick={() => handleSelectDefaultModel(model.id)}
                                             className="text-[11px] text-muted-foreground hover:text-foreground p-1 cursor-pointer"
                                           >
-                                            Set Default
+                                            {t("setDefault")}
                                           </button>
                                         )
                                       )}
@@ -1243,14 +1206,14 @@ export function ModelSelectionSheet({
                                     onClick={() => setIsAddingModel(false)}
                                     className="px-3 py-1 rounded-lg border border-border text-xs text-muted-foreground"
                                   >
-                                    Cancel
+                                    {t("cancel")}
                                   </button>
                                   <button
                                     type="button"
                                     onClick={handleAddModelToForm}
                                     className="px-3 py-1 rounded-lg bg-foreground text-background text-xs font-medium"
                                   >
-                                    Add
+                                    {t("add")}
                                   </button>
                                 </div>
                               </div>
@@ -1261,7 +1224,7 @@ export function ModelSelectionSheet({
                                 className="px-3 py-1.5 rounded-xl border border-border hover:bg-secondary text-xs text-foreground font-medium transition-colors cursor-pointer flex items-center gap-1.5 mt-1"
                               >
                                 <Plus className="w-3.5 h-3.5" />
-                                <span>Add model</span>
+                                <span>{t("addModel")}</span>
                               </button>
                             )}
                           </div>
@@ -1282,7 +1245,7 @@ export function ModelSelectionSheet({
                                 ) : (
                                   <Unplug className="w-3 h-3" />
                                 )}
-                                <span>{isTestingConnection ? "..." : (isIndo ? "Uji" : "Test")}</span>
+                                <span>{isTestingConnection ? "..." : t("test")}</span>
                               </button>
                             )}
                           </div>
@@ -1293,14 +1256,14 @@ export function ModelSelectionSheet({
                               onClick={handleCancelProviderEdit}
                               className="px-3 py-1.5 rounded-xl border border-border hover:bg-secondary text-xs font-medium text-foreground cursor-pointer"
                             >
-                              Cancel
+                              {t("cancel")}
                             </button>
                             <button
                               type="button"
                               onClick={handleApplyProviderEdit}
                               className="px-3.5 py-1.5 rounded-xl bg-foreground text-background text-xs font-semibold hover:opacity-90 active:scale-95 transition-all cursor-pointer"
                             >
-                              Apply
+                              {t("apply")}
                             </button>
                           </div>
                         </div>
@@ -1321,7 +1284,7 @@ export function ModelSelectionSheet({
                         onClick={() => setIsPresetModalOpen(false)}
                         className="text-xs text-muted-foreground hover:text-foreground cursor-pointer"
                       >
-                        Close
+                        {t("close")}
                       </button>
                     </div>
 
@@ -1405,7 +1368,7 @@ export function ModelSelectionSheet({
                               : "border-border hover:bg-secondary text-foreground"
                           )}
                         >
-                          {isExpanded ? (isIndo ? "Tutup" : "Close") : "Edit"}
+                          {isExpanded ? t("close") : t("edit")}
                         </button>
                         {!provider.isDefault && (
                           <button
@@ -1413,7 +1376,7 @@ export function ModelSelectionSheet({
                             onClick={(e) => handleDeleteVoiceProvider(provider.id, e)}
                             className="px-3 py-1 rounded-xl border border-destructive/30 hover:border-destructive/60 hover:bg-destructive/10 text-destructive text-[11px] font-medium transition-all cursor-pointer"
                           >
-                            Delete
+                            {t("delete")}
                           </button>
                         )}
                       </div>
@@ -1425,7 +1388,7 @@ export function ModelSelectionSheet({
                         {/* Subtitle without raw debug ID */}
                         <div className="flex items-center justify-between">
                           <h3 className="text-xs font-semibold text-foreground">
-                            {editVoiceFormData.name || (isIndo ? "Penyedia Suara Baru" : "New Voice Provider")}
+                            {editVoiceFormData.name || t("newVoiceProvider")}
                           </h3>
                           {editVoiceFormData.protocol === "inworld" && (
                             <a
@@ -1772,7 +1735,7 @@ export function ModelSelectionSheet({
                                 ) : (
                                   <Unplug className="w-3 h-3" />
                                 )}
-                                <span>{isTestingVoiceConnection ? "..." : (isIndo ? "Uji" : "Test")}</span>
+                                <span>{isTestingVoiceConnection ? "..." : t("test")}</span>
                               </button>
                             )}
                           </div>
@@ -1783,14 +1746,14 @@ export function ModelSelectionSheet({
                               onClick={handleCancelVoiceProviderEdit}
                               className="px-3 py-1.5 rounded-xl border border-border hover:bg-secondary text-xs font-medium text-foreground cursor-pointer"
                             >
-                              Cancel
+                              {t("cancel")}
                             </button>
                             <button
                               type="button"
                               onClick={handleApplyVoiceProviderEdit}
                               className="px-3.5 py-1.5 rounded-xl bg-foreground text-background text-xs font-semibold hover:opacity-90 active:scale-95 transition-all cursor-pointer"
                             >
-                              Apply
+                              {t("apply")}
                             </button>
                           </div>
                         </div>
@@ -1814,12 +1777,10 @@ export function ModelSelectionSheet({
                   </div>
                   <div className="space-y-1 max-w-xs mx-auto">
                     <h3 className="font-serif text-sm text-foreground font-medium">
-                      {isIndo ? "Belum Ada Penyedia Gambar" : "No Image Providers Configured"}
+                      {t("noImageProvidersConfigured")}
                     </h3>
                     <p className="text-[11px] text-muted-foreground leading-relaxed">
-                      {isIndo
-                        ? "Dukung OpenRouter, Together AI, OpenAI DALL-E, atau endpoint kustom Anda sendiri."
-                        : "Supports OpenRouter, Together AI, OpenAI DALL-E, or your own custom endpoint."}
+                      {t("noImageProvidersDesc")}
                     </p>
                   </div>
                   <button
@@ -1828,7 +1789,7 @@ export function ModelSelectionSheet({
                     className="px-3.5 py-1.5 rounded-xl bg-foreground text-background text-xs font-medium hover:opacity-90 active:scale-95 transition-all cursor-pointer inline-flex items-center gap-1.5"
                   >
                     <Plus className="w-3.5 h-3.5" />
-                    <span>{isIndo ? "Tambah Penyedia" : "Add Provider"}</span>
+                    <span>{t("addFirstProvider")}</span>
                   </button>
                 </div>
               ) : (
@@ -1853,14 +1814,14 @@ export function ModelSelectionSheet({
                       >
                         <div className="flex items-center gap-2 min-w-0">
                           <span className="text-xs font-semibold text-foreground truncate">
-                            {provider.name || (isIndo ? "Penyedia Baru" : "New Provider")}
+                            {provider.name || t("newImageProvider")}
                           </span>
                           <span className="px-1.5 py-0.5 rounded-md bg-secondary text-muted-foreground text-[10px] font-sans border border-border/70 shrink-0">
-                            {provider.models.length} {isIndo ? "model" : "models"}
+                            {t("modelsCount", { count: provider.models.length })}
                           </span>
                           {isActiveProvider && (
                             <span className="px-1.5 py-0.5 rounded-md bg-foreground/10 text-foreground text-[10px] font-medium border border-foreground/20 shrink-0">
-                              Active
+                              {t("active")}
                             </span>
                           )}
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
@@ -1880,14 +1841,14 @@ export function ModelSelectionSheet({
                                 : "border-border hover:bg-secondary text-foreground"
                             )}
                           >
-                            {isExpanded ? (isIndo ? "Tutup" : "Close") : "Edit"}
+                            {isExpanded ? t("close") : t("edit")}
                           </button>
                           <button
                             type="button"
                             onClick={(e) => handleDeleteImageProvider(provider.id, e)}
                             className="px-2.5 py-1 rounded-lg border border-destructive/30 hover:border-destructive/60 hover:bg-destructive/10 text-destructive text-[11px] font-medium transition-all cursor-pointer"
                           >
-                            Delete
+                            {t("delete")}
                           </button>
                         </div>
                       </div>
@@ -1898,7 +1859,7 @@ export function ModelSelectionSheet({
                           {/* 1. Name */}
                           <div className="space-y-1">
                             <label className="text-[11px] font-medium text-foreground block">
-                              {isIndo ? "Nama Penyedia" : "Provider Name"}
+                              {t("providerNameLabel")}
                             </label>
                             <input
                               type="text"
@@ -1944,7 +1905,7 @@ export function ModelSelectionSheet({
                           <div className="space-y-1">
                             <div className="flex items-center justify-between">
                               <label className="text-[11px] font-medium text-foreground block">
-                                {isIndo ? "Protokol API" : "API Protocol"}
+                                {t("apiProtocolLabel")}
                               </label>
                               <span className="text-[10px] text-muted-foreground font-sans">
                                 {editImageFormData.protocol === "openrouter"
@@ -1964,7 +1925,7 @@ export function ModelSelectionSheet({
                               }
                             >
                               <SelectTrigger className="w-full h-9 rounded-xl bg-secondary/30 border border-border text-xs text-foreground focus:ring-1 focus:ring-foreground/20">
-                                <SelectValue placeholder={isIndo ? "Pilih protokol" : "Select protocol"} />
+                                <SelectValue placeholder={t("selectProtocolPlaceholder")} />
                               </SelectTrigger>
                               <SelectContent className="bg-card border-border text-foreground rounded-xl shadow-xl">
                                 <SelectItem value="openrouter" className="text-xs cursor-pointer">
@@ -2013,12 +1974,10 @@ export function ModelSelectionSheet({
                           <div className="space-y-2 pt-2 border-t border-border/40">
                             <div>
                               <label className="text-[11px] font-medium text-foreground block">
-                                {isIndo ? "Model Gambar" : "Image Models"}
+                                {t("imageModelsLabel")}
                               </label>
                               <span className="text-[10px] text-muted-foreground">
-                                {isIndo
-                                  ? "Tambahkan Model ID manual dan lakukan pengujian."
-                                  : "Add Model IDs manually and test connectivity."}
+                                {t("imageModelsCatalogDesc")}
                               </span>
                             </div>
 
@@ -2026,9 +1985,7 @@ export function ModelSelectionSheet({
                             <div className="space-y-1.5">
                               {editImageFormData.models.length === 0 ? (
                                 <div className="p-3 rounded-xl border border-dashed border-border text-center text-[11px] text-muted-foreground bg-secondary/10">
-                                  {isIndo
-                                    ? "Belum ada model. Tambahkan manual di bawah."
-                                    : "No models configured. Add manually below."}
+                                  {t("noImageModelsCatalog")}
                                 </div>
                               ) : (
                                 editImageFormData.models.map((model) => {
@@ -2060,7 +2017,7 @@ export function ModelSelectionSheet({
                                         {isActive ? (
                                           <span className="text-[10px] font-medium text-foreground px-2 py-0.5 rounded-md bg-foreground/10 border border-foreground/20 flex items-center gap-0.5">
                                             <Check className="w-2.5 h-2.5 text-emerald-500" />
-                                            <span>Active</span>
+                                            <span>{t("active")}</span>
                                           </span>
                                         ) : (
                                           <button
@@ -2070,7 +2027,7 @@ export function ModelSelectionSheet({
                                             }
                                             className="text-[10px] text-muted-foreground hover:text-foreground px-2 py-0.5 rounded-md border border-border hover:bg-secondary cursor-pointer"
                                           >
-                                            Set Active
+                                            {t("setActive")}
                                           </button>
                                         )}
 
@@ -2088,7 +2045,7 @@ export function ModelSelectionSheet({
                                           ) : (
                                             <Play className="w-2.5 h-2.5 text-muted-foreground" />
                                           )}
-                                          <span>{isTestingThisModel ? "..." : "Test"}</span>
+                                          <span>{isTestingThisModel ? "..." : t("test")}</span>
                                         </button>
 
                                         {/* Delete Model button */}
@@ -2096,6 +2053,7 @@ export function ModelSelectionSheet({
                                           type="button"
                                           onClick={() => handleRemoveModelFromImageForm(model.id)}
                                           className="h-6 w-6 rounded-md border border-border hover:border-destructive/40 hover:bg-destructive/10 text-muted-foreground hover:text-destructive flex items-center justify-center cursor-pointer"
+                                          title={t("deleteModel")}
                                         >
                                           <Trash2 className="w-3 h-3" />
                                         </button>
@@ -2110,7 +2068,7 @@ export function ModelSelectionSheet({
                             {isAddingImageModel ? (
                               <div className="p-3 rounded-xl border border-border bg-secondary/30 space-y-2.5 animate-in fade-in-50 duration-200">
                                 <div className="text-[11px] font-semibold text-foreground">
-                                  {isIndo ? "Tambah Model Manual" : "Add Model Manually"}
+                                  {t("addImageModelManually")}
                                 </div>
                                 <div className="space-y-1.5">
                                   <input
@@ -2138,14 +2096,14 @@ export function ModelSelectionSheet({
                                     }}
                                     className="px-2.5 py-1 rounded-lg border border-border text-[11px] text-muted-foreground hover:text-foreground cursor-pointer"
                                   >
-                                    Cancel
+                                    {t("cancel")}
                                   </button>
                                   <button
                                     type="button"
                                     onClick={handleAddModelToImageForm}
                                     className="px-3 py-1 rounded-lg bg-foreground text-background text-[11px] font-medium cursor-pointer"
                                   >
-                                    {isIndo ? "Tambah" : "Add"}
+                                    {t("add")}
                                   </button>
                                 </div>
                               </div>
@@ -2155,8 +2113,8 @@ export function ModelSelectionSheet({
                                 onClick={() => setIsAddingImageModel(true)}
                                 className="w-full py-1.5 rounded-xl border border-dashed border-border hover:bg-secondary/40 text-[11px] font-medium text-muted-foreground hover:text-foreground flex items-center justify-center gap-1 cursor-pointer"
                               >
-                                <Plus className="w-3 h-3" />
-                                <span>{isIndo ? "Tambah Model Manual" : "Add Model Manually"}</span>
+                                <Plus className="w-3.5 h-3.5" />
+                                <span>{t("addImageModelManually")}</span>
                               </button>
                             )}
                           </div>
@@ -2176,7 +2134,7 @@ export function ModelSelectionSheet({
                                   ) : (
                                     <Unplug className="w-3 h-3" />
                                   )}
-                                  <span>{isTestingImageConnection ? "..." : (isIndo ? "Uji Koneksi" : "Test")}</span>
+                                  <span>{isTestingImageConnection ? "..." : t("test")}</span>
                                 </button>
                               )}
                             </div>
@@ -2187,14 +2145,14 @@ export function ModelSelectionSheet({
                                 onClick={handleCancelImageProviderEdit}
                                 className="px-3 py-1.5 rounded-xl border border-border hover:bg-secondary text-xs font-medium text-foreground cursor-pointer"
                               >
-                                Cancel
+                                {t("cancel")}
                               </button>
                               <button
                                 type="button"
                                 onClick={handleApplyImageProviderEdit}
                                 className="px-3.5 py-1.5 rounded-xl bg-foreground text-background text-xs font-semibold hover:opacity-90 active:scale-95 cursor-pointer"
                               >
-                                Apply
+                                {t("apply")}
                               </button>
                             </div>
                           </div>
@@ -2210,13 +2168,13 @@ export function ModelSelectionSheet({
 
         {/* Footer */}
         <div className="p-3.5 border-t border-border bg-secondary/20 flex items-center justify-between text-[11px] text-muted-foreground shrink-0">
-          <span>{isIndo ? "Tersimpan otomatis" : "Auto-saved locally"}</span>
+          <span>{t("autoSavedLocally")}</span>
           <button
             type="button"
             onClick={onClose}
             className="px-4 py-1.5 rounded-xl bg-foreground text-background text-xs font-medium cursor-pointer hover:opacity-90 active:scale-95 transition-all"
           >
-            {isIndo ? "Selesai" : "Done"}
+            {t("done")}
           </button>
         </div>
     </InteractiveBottomSheet>

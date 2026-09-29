@@ -42,8 +42,7 @@ export function VideoSummaryViewer({
   onToggleExpand: _onToggleExpand,
   isExpanded: _isExpanded = false,
 }: VideoSummaryViewerProps) {
-  const { t, language } = useI18n();
-  const isIndo = language === "id";
+  const { t } = useI18n();
 
   const scenes = data.scenes || [];
 
@@ -170,7 +169,7 @@ export function VideoSummaryViewer({
           setIsRenderingMp4(false);
           setRenderError(null);
           setRenderProgress("");
-          toast.success(isIndo ? "Video berhasil dirender!" : "Video rendered successfully!");
+          toast.success(t("videoRenderedSuccess"));
         }
       }
     };
@@ -178,7 +177,7 @@ export function VideoSummaryViewer({
     const handleRenderError = (e: any) => {
       if (e.detail?.artifactId === data.id) {
         setIsRenderingMp4(false);
-        const errMsg = e.detail.error || (isIndo ? "Gagal merender video MP4" : "Failed to render MP4 video");
+        const errMsg = e.detail.error || t("failedRenderMp4");
         setRenderError(errMsg);
         setRenderProgress("");
       }
@@ -206,7 +205,7 @@ export function VideoSummaryViewer({
       window.removeEventListener("const:video-render-error", handleRenderError);
       if (cleanupIpc) cleanupIpc();
     };
-  }, [data.id, isIndo]);
+  }, [data.id]);
 
   // Automatic background render trigger if not rendered yet
   useEffect(() => {
@@ -244,7 +243,7 @@ export function VideoSummaryViewer({
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      toast.success(isIndo ? "Pengunduhan video MP4 dimulai!" : "MP4 video download started!");
+      toast.success(t("videoDownloadStarted"));
     } catch {
       toast.error(t("failedDownloadVideo"));
     }
@@ -264,11 +263,7 @@ export function VideoSummaryViewer({
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      toast.success(
-        isIndo
-          ? "File komposisi HyperFrames berhasil diunduh!"
-          : "HyperFrames composition downloaded!"
-      );
+      toast.success(t("hyperFramesCompositionDownloaded"));
     } catch (err: any) {
       toast.error(err?.message || t("failedExportHtml"));
     } finally {
@@ -290,7 +285,7 @@ export function VideoSummaryViewer({
         <div className="flex items-center gap-2.5 truncate min-w-0 pr-2">
           <div className="w-2 h-2 rounded-full bg-blue-500 shrink-0" />
           <h2 className="text-sm sm:text-base font-semibold text-white truncate">
-            {data.title || (isIndo ? "Ringkasan Video" : "Video Summary")}
+            {data.title || t("videoSummary")}
           </h2>
           {duration > 0 && (
             <span className="hidden sm:inline-flex px-2 py-0.5 rounded-md bg-[#222222] border border-[#333333] text-[11px] font-sans text-[#969696] shrink-0 tabular-nums">
@@ -306,10 +301,10 @@ export function VideoSummaryViewer({
               type="button"
               onClick={handleOpenLightbox}
               className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#222222] hover:bg-[#2b2b2b] text-[#d4d4d4] hover:text-white text-xs font-medium transition-colors border border-[#333333] cursor-pointer"
-              title={isIndo ? "Perbesar Video" : "Expand Video"}
+              title={t("expandVideo")}
             >
               <Maximize2 className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">{isIndo ? "Perbesar" : "Expand"}</span>
+              <span className="hidden sm:inline">{t("expandView")}</span>
             </button>
           )}
 
@@ -319,14 +314,14 @@ export function VideoSummaryViewer({
                 type="button"
                 disabled={isExporting}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#222222] hover:bg-[#2b2b2b] text-white text-xs font-medium transition-colors border border-[#333333] cursor-pointer"
-                title={isIndo ? "Ekspor" : "Export"}
+                title={t("export")}
               >
                 {isExporting ? (
                   <Loader2 className="w-3.5 h-3.5 animate-spin text-white" />
                 ) : (
                   <Download className="w-3.5 h-3.5 text-white" />
                 )}
-                <span>{isIndo ? "Ekspor" : "Export"}</span>
+                <span>{t("export")}</span>
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-52 p-1 bg-[#222222] border-[#383838] text-white font-sans shadow-xl">
@@ -336,7 +331,7 @@ export function VideoSummaryViewer({
                   className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2 hover:bg-[#2b2b2b] focus:bg-[#2b2b2b] text-white rounded-md"
                 >
                   <Film className="w-3.5 h-3.5 text-blue-400" />
-                  <span>{isIndo ? "Unduh Video (MP4)" : "Download Video (MP4)"}</span>
+                  <span>{t("downloadVideoMp4")}</span>
                 </DropdownMenuItem>
               )}
               <DropdownMenuItem
@@ -344,7 +339,7 @@ export function VideoSummaryViewer({
                 className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2 hover:bg-[#2b2b2b] focus:bg-[#2b2b2b] text-white rounded-md"
               >
                 <FileCode className="w-3.5 h-3.5 text-emerald-400" />
-                <span>{isIndo ? "Unduh Komposisi (HTML)" : "Download HTML"}</span>
+                <span>{t("downloadHtml")}</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -372,12 +367,10 @@ export function VideoSummaryViewer({
               <Loader2 className="w-8 h-8 text-blue-400 animate-spin" />
             </div>
             <h3 className="text-lg font-semibold text-white mb-2">
-              {isIndo ? "Sedang Merender Video MP4..." : "Rendering MP4 Video..."}
+              {t("renderingMp4Video")}
             </h3>
             <p className="text-sm text-[#94a3b8] max-w-md mb-4">
-              {isIndo
-                ? "HyperFrames sedang mengompilasi grafis gerak dan naskah audio menjadi video 1080p berkualitas tinggi."
-                : "HyperFrames is compiling motion graphics and narration audio into a high-quality 1080p video."}
+              {t("renderingVideoDesc")}
             </p>
             {renderProgress ? (
               <div className="px-3 py-1 rounded-full bg-[#202020] border border-[#333333] text-[11px] text-blue-400 font-sans tabular-nums max-w-sm truncate mb-3">
@@ -387,10 +380,7 @@ export function VideoSummaryViewer({
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#222222] border border-[#383838] text-xs text-[#cbd5e1]">
               <span className="w-2 h-2 rounded-full bg-blue-400 animate-pulse" />
               <span>
-                {scenes.length}{" "}
-                {isIndo
-                  ? "Scene Sedang Diproses di Background"
-                  : "Scenes Processing in Background"}
+                {t("scenesProcessingBackground", { count: scenes.length })}
               </span>
             </div>
           </div>
@@ -400,12 +390,10 @@ export function VideoSummaryViewer({
               <AlertCircle className="w-7 h-7 text-red-400" />
             </div>
             <h3 className="text-base sm:text-lg font-semibold text-white mb-1.5">
-              {isIndo ? "Gagal Merender Video MP4" : "Failed to Render MP4 Video"}
+              {t("failedRenderMp4Video")}
             </h3>
             <p className="text-xs sm:text-sm text-[#a3a3a3] max-w-md mb-3">
-              {isIndo
-                ? "Terjadi kendala saat HyperFrames mengompilasi video. Naskah audio dan tata letak grafis tetap aman tersimpan."
-                : "An issue occurred while HyperFrames was compiling the video. Narration audio and layout remain safely stored."}
+              {t("videoRenderFailedDesc")}
             </p>
             <div className="w-full max-w-md p-2.5 rounded-lg bg-[#202020] border border-[#303030] text-left text-[11px] text-[#f87171] font-sans mb-4 max-h-24 overflow-y-auto select-text break-words">
               {renderError}
@@ -416,14 +404,14 @@ export function VideoSummaryViewer({
               className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-[#252525] hover:bg-[#303030] text-[#d4d4d4] hover:text-white text-xs font-medium transition-all border border-[#383838] cursor-pointer"
             >
               <FileCode className="w-3.5 h-3.5 text-emerald-400" />
-              <span>{isIndo ? "Unduh File HTML" : "Download HTML"}</span>
+              <span>{t("downloadHtmlFile")}</span>
             </button>
           </div>
         ) : (
           <div className="relative w-full h-full bg-[#161616] flex flex-col items-center justify-center p-8 text-center select-none">
             <Loader2 className="w-8 h-8 text-blue-400 animate-spin mb-3" />
             <p className="text-sm text-[#94a3b8]">
-              {isIndo ? "Menyiapkan video..." : "Preparing video..."}
+              {t("preparingVideo")}
             </p>
           </div>
         )}
@@ -433,7 +421,7 @@ export function VideoSummaryViewer({
       {isLightboxOpen && mp4Url && (
         <ImageLightbox
           src={mp4Url}
-          alt={data.title || (isIndo ? "Ringkasan Video" : "Video Summary")}
+          alt={data.title || t("videoSummary")}
           type="video"
           onClose={() => setIsLightboxOpen(false)}
         />

@@ -83,7 +83,6 @@ export function CreateVideoSummaryDialog({
   onOpenModelsSettings,
 }: CreateVideoSummaryDialogProps) {
   const { t, language } = useI18n();
-  const isIndo = language === "id";
 
   // Sources selection
   const [selectedSourceIds, setSelectedSourceIds] = useState<string[]>([]);
@@ -94,7 +93,7 @@ export function CreateVideoSummaryDialog({
   // Voice state
   const [voiceModel, setVoiceModel] = useState<string>("inworld-tts-2");
   const [voiceId, setVoiceId] = useState<string>("Ashley");
-  const [audioLanguage, setAudioLanguage] = useState<string>(isIndo ? "id-ID" : "en-US");
+  const [audioLanguage, setAudioLanguage] = useState<string>(language === "id" ? "id-ID" : "en-US");
   const [deliveryMode, setDeliveryMode] = useState<string>("BALANCED");
   const [speed, setSpeed] = useState<number>(1.0);
 
@@ -183,8 +182,8 @@ export function CreateVideoSummaryDialog({
       if (inworldProvider.deliveryMode) setDeliveryMode(inworldProvider.deliveryMode);
       if (inworldProvider.speed) setSpeed(inworldProvider.speed);
     }
-    setAudioLanguage(isIndo ? "id-ID" : "en-US");
-  }, [inworldProvider, isIndo, open]);
+    setAudioLanguage(language === "id" ? "id-ID" : "en-US");
+  }, [inworldProvider, language, open]);
 
   // When model is changed, sync voice ID default if not present
   useEffect(() => {
@@ -482,11 +481,11 @@ export function CreateVideoSummaryDialog({
                   </div>
                   {hasInworldKey ? (
                     <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#2b2b2b] text-[#d4d4d4] border border-[#383838]">
-                      {isIndo ? "Inworld Terhubung" : "Inworld Connected"}
+                      {t("inworldConnected")}
                     </span>
                   ) : (
                     <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                      {isIndo ? "Belum Dikonfigurasi" : "Not Configured"}
+                      {t("notConfigured")}
                     </span>
                   )}
                 </div>

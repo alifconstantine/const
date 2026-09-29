@@ -29,8 +29,7 @@ export function CreateMindMapSheet({
   sources = [],
   onGenerate,
 }: CreateMindMapSheetProps) {
-  const { language } = useI18n();
-  const isIndo = language === "id";
+  const { t } = useI18n();
 
   const [topic, setTopic] = useState("");
   const [selectedSourceIds, setSelectedSourceIds] = useState<string[]>(() =>
@@ -49,17 +48,17 @@ export function CreateMindMapSheet({
     const primarySourceTitle = sources[0]?.title || "";
     if (primarySourceTitle) {
       return [
-        isIndo ? `+ Ikhtisar: ${primarySourceTitle.slice(0, 24)}` : `+ Overview: ${primarySourceTitle.slice(0, 24)}`,
-        isIndo ? "+ Struktur Hierarki Konsep" : "+ Hierarchical Architecture",
-        isIndo ? "+ Taksonomi & Kategori Utama" : "+ Core Taxonomy & Categories",
+        t("chipOverviewTopic", { topic: primarySourceTitle.slice(0, 24) }),
+        t("chipHierarchicalArchitecture"),
+        t("chipCoreTaxonomyCategories"),
       ];
     }
     return [
-      isIndo ? "+ Peta Konsep Keseluruhan" : "+ Comprehensive Concept Map",
-      isIndo ? "+ Alur Pemikiran & Hubungan" : "+ Logical Flow & Relationships",
-      isIndo ? "+ Gagasan Pokok & Cabang Materi" : "+ Core Branches & Themes",
+      t("chipComprehensiveConceptMap"),
+      t("chipLogicalFlowRelationships"),
+      t("chipCoreBranchesThemes"),
     ];
-  }, [sources, isIndo]);
+  }, [sources, t]);
 
   const handleChipClick = (chipText: string) => {
     const cleanText = chipText.replace(/^\+\s*/, "");
@@ -127,7 +126,7 @@ export function CreateMindMapSheet({
                 <GitFork className="h-4 w-4" />
               </div>
               <h2 className="text-sm font-semibold text-white tracking-tight">
-                {isIndo ? "Buat Peta Pikiran (Mind Map)" : "Create Interactive Mind Map"}
+                {t("interactiveMindMapTitle")}
               </h2>
             </div>
             <button
@@ -146,9 +145,7 @@ export function CreateMindMapSheet({
           <div className="p-3.5 rounded-xl bg-purple-500/10 border border-purple-500/20 flex items-start gap-2.5 text-purple-200/90 leading-relaxed">
             <GitFork className="h-4 w-4 text-[#c084fc] shrink-0 mt-0.5" />
             <div className="text-[11.5px]">
-              {isIndo
-                ? "AI akan menganalisis materi sumber untuk menyusun diagram hierarkis interaktif yang menghubungkan konsep pokok, percabangan gagasan, dan detail rujukan secara visual."
-                : "AI will analyze your source material to generate an interactive hierarchical diagram connecting core concepts, topic branches, and contextual references."}
+              {t("mindMapConceptExplanation")}
             </div>
           </div>
 
@@ -156,7 +153,7 @@ export function CreateMindMapSheet({
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="text-[11px] font-semibold text-[#888888] uppercase tracking-wider">
-                {isIndo ? "Pilih Sumber Acuan" : "Reference Sources"}
+                {t("sourceMaterialScope")}
               </label>
               {sources.length > 0 && (
                 <button
@@ -165,21 +162,15 @@ export function CreateMindMapSheet({
                   className="text-[11px] text-[#ededed] hover:underline cursor-pointer"
                 >
                   {selectedSourceIds.length === sources.length
-                    ? isIndo
-                      ? "Batal Semua"
-                      : "Deselect All"
-                    : isIndo
-                    ? "Pilih Semua"
-                    : "Select All"}
+                    ? t("deselectAll")
+                    : t("selectAll")}
                 </button>
               )}
             </div>
 
             {sources.length === 0 ? (
               <div className="p-3 rounded-xl bg-[#222225] border border-[#333336] text-center text-[#888888] text-xs">
-                {isIndo
-                  ? "Belum ada sumber dalam notebook. AI akan membuat dari topik Anda."
-                  : "No sources in notebook. AI will generate based on your topic."}
+                {t("noSourcesInNotebookDesc")}
               </div>
             ) : (
               <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
@@ -221,21 +212,17 @@ export function CreateMindMapSheet({
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
               <label className="text-[11px] font-semibold text-[#888888] uppercase tracking-wider">
-                {isIndo ? "Fokus Tema Utama (Opsional)" : "Main Theme / Focus (Optional)"}
+                {t("mainThemeFocusOptional")}
               </label>
               <span className="text-[10px] text-[#666666]">
-                {isIndo ? "Kosongkan untuk cakupan umum" : "Leave blank for general"}
+                {t("leaveBlankForGeneral")}
               </span>
             </div>
             <textarea
               rows={2}
               value={topic}
               onChange={(e) => setTopic(e.target.value)}
-              placeholder={
-                isIndo
-                  ? "cth. Arsitektur Jaringan Saraf Tiruan, Alur Logika Bab 2, dll."
-                  : "e.g. Neural Network Architecture, Chapter 2 Logic Flow, etc."
-              }
+              placeholder={t("mindMapTopicPlaceholder")}
               className="w-full px-3.5 py-2.5 rounded-xl bg-[#222225] border border-[#333336] focus:border-[#c084fc]/70 focus:outline-none text-xs text-white placeholder-[#666666] transition-colors resize-none leading-relaxed"
             />
 
@@ -261,7 +248,7 @@ export function CreateMindMapSheet({
               className="w-full py-3 rounded-xl bg-[#c084fc] hover:bg-[#b06cf7] text-[#141416] font-semibold text-xs transition-all shadow-md active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer"
             >
               <Sparkles className="h-4 w-4 fill-current" />
-              <span>{isIndo ? "Buat Peta Pikiran" : "Generate Mind Map"}</span>
+              <span>{t("generateMindMap")}</span>
             </button>
           </div>
         </form>

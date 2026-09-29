@@ -172,10 +172,9 @@ export function CreateInfographicSheet({
   onGenerate,
   onOpenModelsSettings,
 }: CreateInfographicSheetProps) {
-  const { language } = useI18n();
-  const isIndo = language === "id";
+  const { t, language } = useI18n();
 
-  const [selectedLanguage, setSelectedLanguage] = useState<"id" | "en">(isIndo ? "id" : "en");
+  const [selectedLanguage, setSelectedLanguage] = useState<"id" | "en">(language === "id" ? "id" : "en");
   const [orientation, setOrientation] = useState<MobileInfographicOrientation>("landscape");
   const [selectedStyle, setSelectedStyle] = useState<string>("auto");
   const [detailLevel, setDetailLevel] = useState<MobileInfographicDetailLevel>("standard");
@@ -290,7 +289,7 @@ export function CreateInfographicSheet({
                 <BarChart3 className="h-4 w-4" />
               </div>
               <h2 className="text-sm font-semibold tracking-tight text-foreground">
-                {isIndo ? "Sesuaikan Infografik" : "Customize Infographic"}
+                {t("customizeInfographic")}
               </h2>
             </div>
             <button
@@ -310,7 +309,7 @@ export function CreateInfographicSheet({
             {/* Bahasa */}
             <div>
               <label className="text-[11px] font-medium text-muted-foreground block mb-1.5">
-                {isIndo ? "Pilih bahasa" : "Language"}
+                {t("language")}
               </label>
               <div className="h-10 p-1 bg-[#202227] border border-[#30333d] rounded-xl grid grid-cols-2 gap-1">
                 <button
@@ -343,14 +342,14 @@ export function CreateInfographicSheet({
             {/* Orientasi */}
             <div>
               <label className="text-[11px] font-medium text-muted-foreground block mb-1.5">
-                {isIndo ? "Orientasi" : "Orientation"}
+                {t("orientation")}
               </label>
               <div className="h-10 p-1 bg-[#202227] border border-[#30333d] rounded-xl grid grid-cols-3 gap-0.5">
                 {(
                   [
-                    { id: "landscape", label: "Lanskap" },
-                    { id: "portrait", label: "Potret" },
-                    { id: "square", label: "Persegi" },
+                    { id: "landscape", label: t("orientationLandscape") },
+                    { id: "portrait", label: t("orientationPortrait") },
+                    { id: "square", label: t("orientationSquare") },
                   ] as const
                 ).map((item) => (
                   <button
@@ -374,7 +373,7 @@ export function CreateInfographicSheet({
           {/* Section 2: Pilih Gaya Visual */}
           <div>
             <label className="text-[11px] font-medium text-muted-foreground block mb-1.5">
-              {isIndo ? "Pilih gaya visual" : "Visual style"}
+              {t("selectVisualStyle")}
             </label>
             <div
               ref={stylesCarouselRef}
@@ -410,7 +409,7 @@ export function CreateInfographicSheet({
                         isSelected ? "text-primary font-semibold" : "text-muted-foreground"
                       )}
                     >
-                      {isIndo ? style.labelId : style.labelEn}
+                      {language === "id" ? style.labelId : style.labelEn}
                     </span>
                   </button>
                 );
@@ -421,14 +420,14 @@ export function CreateInfographicSheet({
           {/* Section 3: Tingkat Detail */}
           <div>
             <label className="text-[11px] font-medium text-muted-foreground block mb-1.5">
-              {isIndo ? "Tingkat detail" : "Detail level"}
+              {t("detailLevel")}
             </label>
             <div className="h-10 p-1 bg-[#202227] border border-[#30333d] rounded-xl grid grid-cols-3 gap-1">
               {(
                 [
-                  { id: "brief", label: "Singkat" },
-                  { id: "standard", label: "Standar" },
-                  { id: "detailed", label: "Terperinci" },
+                  { id: "brief", label: t("detailBrief") },
+                  { id: "standard", label: t("detailStandard") },
+                  { id: "detailed", label: t("detailDetailed") },
                 ] as const
               ).map((item) => (
                 <button
@@ -452,7 +451,7 @@ export function CreateInfographicSheet({
           {/* Section 4: Model Gambar */}
           <div>
             <label className="text-[11px] font-medium text-muted-foreground block mb-1.5">
-              {isIndo ? "Pilih Model Gambar" : "Select Image Model"}
+              {t("selectImageModel")}
             </label>
 
             {hasConfiguredImageModel ? (
@@ -463,7 +462,7 @@ export function CreateInfographicSheet({
                   className="w-full h-10 px-3 rounded-xl bg-[#202227] border border-[#30333d] flex items-center justify-between text-xs font-medium text-foreground cursor-pointer"
                 >
                   <span className="truncate font-sans">
-                    {selectedModelId || (isIndo ? "Pilih model..." : "Select model...")}
+                    {selectedModelId || t("selectModelPlaceholder")}
                   </span>
                   <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                 </button>
@@ -505,12 +504,10 @@ export function CreateInfographicSheet({
                 <AlertCircle className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
                 <div className="flex-1 text-[11px]">
                   <div className="font-semibold text-amber-200">
-                    {isIndo ? "Belum Ada Model Gambar" : "No Image Model Configured"}
+                    {t("noImageModelConfigured")}
                   </div>
                   <div className="text-amber-300/80 mt-0.5">
-                    {isIndo
-                      ? "Perlu mengonfigurasi model gambar di Pengaturan."
-                      : "Configure an image model in Settings."}
+                    {t("noImageModelConfiguredDesc")}
                   </div>
                   {onOpenModelsSettings && (
                     <button
@@ -522,7 +519,7 @@ export function CreateInfographicSheet({
                       className="mt-2 inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-500 text-black font-semibold text-[11px] cursor-pointer"
                     >
                       <Settings className="h-3 w-3" />
-                      <span>{isIndo ? "Atur Model" : "Settings"}</span>
+                      <span>{t("settings")}</span>
                     </button>
                   )}
                 </div>
@@ -534,7 +531,7 @@ export function CreateInfographicSheet({
           <div>
             <div className="flex items-center justify-between mb-1.5">
               <label className="text-[11px] font-medium text-muted-foreground">
-                {isIndo ? `Sumber (${selectedSourceIds.length}/${sources.length})` : `Sources (${selectedSourceIds.length}/${sources.length})`}
+                {t("sourcesWithCount", { selected: selectedSourceIds.length, total: sources.length })}
               </label>
               <button
                 type="button"
@@ -542,8 +539,8 @@ export function CreateInfographicSheet({
                 className="text-[10px] text-primary hover:underline"
               >
                 {selectedSourceIds.length === sources.length
-                  ? isIndo ? "Batal semua" : "Deselect"
-                  : isIndo ? "Pilih semua" : "Select all"}
+                  ? t("deselectAll")
+                  : t("selectAll")}
               </button>
             </div>
             <div className="max-h-28 overflow-y-auto space-y-1 p-1 bg-[#1a1c22] rounded-xl border border-[#2a2c35]">
@@ -573,16 +570,12 @@ export function CreateInfographicSheet({
           {/* Section 6: Deskripsi Kustom */}
           <div>
             <label className="text-[11px] font-medium text-muted-foreground block mb-1.5">
-              {isIndo ? "Deskripsi infografis (opsional)" : "Custom description (optional)"}
+              {t("customDescriptionOptional")}
             </label>
             <textarea
               value={customDescription}
               onChange={(e) => setCustomDescription(e.target.value)}
-              placeholder={
-                isIndo
-                  ? 'Contoh: "Gunakan tema warna biru dan soroti 3 statistik utama."'
-                  : 'E.g., "Use a blue palette and highlight 3 core key metrics."'
-              }
+              placeholder={t("customDescriptionPlaceholder")}
               rows={2}
               className="w-full px-3 py-2 rounded-xl bg-[#202227] border border-[#30333d] focus:border-primary text-xs text-foreground placeholder:text-muted-foreground/60 resize-none focus:outline-hidden"
             />
@@ -601,7 +594,7 @@ export function CreateInfographicSheet({
               )}
             >
               <Sparkles className="h-4 w-4" />
-              <span>{isIndo ? "Buat Sekarang" : "Create Now"}</span>
+              <span>{t("createNow")}</span>
             </button>
           </div>
         </form>

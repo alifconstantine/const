@@ -51,8 +51,7 @@ export function ReportViewer({
   isExpanded: _isExpanded = false,
   onSelectStudioTool,
 }: ReportViewerProps) {
-  const { language } = useI18n();
-  const isIndo = language === "id";
+  const { t } = useI18n();
 
   const [activeSectionId, setActiveSectionId] = useState<string>(
     data.sections?.[0]?.id || ""
@@ -125,9 +124,7 @@ export function ReportViewer({
 
     navigator.clipboard.writeText(fullMarkdown);
     setCopied(true);
-    toast.success(
-      isIndo ? "Laporan berhasil disalin sebagai Markdown" : "Report copied as Markdown"
-    );
+    toast.success(t("reportCopiedMarkdown"));
     setTimeout(() => setCopied(false), 2000);
   };
 
@@ -151,9 +148,7 @@ export function ReportViewer({
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    toast.success(
-      isIndo ? "File Markdown berhasil diunduh!" : "Markdown file downloaded!"
-    );
+    toast.success(t("markdownFileDownloaded"));
   };
 
   const handlePrint = () => {
@@ -173,11 +168,7 @@ export function ReportViewer({
         })
         .catch((err) => console.error("Failed to save feedback", err));
     }
-    toast.success(
-      isIndo
-        ? "Terima kasih atas masukan Anda!"
-        : "Thank you for your feedback!"
-    );
+    toast.success(t("thankYouFeedback"));
   };
 
   const handleWidgetAction = (sec: ReportSection) => {
@@ -188,9 +179,10 @@ export function ReportViewer({
       onSelectStudioTool(targetTool);
     } else if (onExplainInChat) {
       onExplainInChat(
-        isIndo
-          ? `Bantu buatkan ${sec.recommendedWidget.title} berdasarkan bab "${sec.title}".`
-          : `Please generate ${sec.recommendedWidget.title} based on "${sec.title}".`
+        t("generateWidgetPrompt", {
+          title: sec.recommendedWidget.title,
+          section: sec.title,
+        })
       );
     }
   };
@@ -231,9 +223,9 @@ export function ReportViewer({
             >
               <BookOpen className="h-3 w-3 text-[#969696]" />
               <span className="hidden sm:inline">
-                {isIndo
-                  ? `Lihat ${data.sourceCount || 1} sumber`
-                  : `View ${data.sourceCount || 1} source${(data.sourceCount || 1) > 1 ? "s" : ""}`}
+                {data.sourceCount === 1
+                  ? t("viewSourcesCountSingle")
+                  : t("viewSourcesCount", { count: data.sourceCount || 1 })}
               </span>
               <span className="sm:hidden">{data.sourceCount || 1}</span>
             </button>
@@ -242,7 +234,7 @@ export function ReportViewer({
             {showSourcesPopup && data.sourceTitles && data.sourceTitles.length > 0 && (
               <div className="absolute top-full mt-2 right-0 w-64 bg-[#222222] border border-[#2b2b2b] rounded-xl p-2.5 shadow-2xl z-40 select-none">
                 <div className="text-[11px] font-semibold text-[#888888] uppercase tracking-wider mb-2 px-1">
-                  {isIndo ? "Sumber Rujukan Laporan" : "Source References"}
+                  {t("sourceReferences")}
                 </div>
                 <div className="space-y-1 max-h-40 overflow-y-auto">
                   {data.sourceTitles.map((title, i) => (
@@ -264,10 +256,10 @@ export function ReportViewer({
             type="button"
             onClick={() => setIsMaximized(true)}
             className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-[#222222] hover:bg-[#2b2b2b] text-[#d4d4d4] hover:text-white text-xs font-medium transition-colors border border-[#333333] cursor-pointer"
-            title={isIndo ? "Perbesar Laporan" : "Expand Report"}
+            title={t("expandReport")}
           >
             <Maximize2 className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">{isIndo ? "Perbesar" : "Expand"}</span>
+            <span className="hidden sm:inline">{t("expand")}</span>
           </button>
 
           {/* Ekspor Dropdown (matching Video Summary export dropdown) */}
@@ -276,10 +268,10 @@ export function ReportViewer({
               <button
                 type="button"
                 className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-lg bg-[#222222] hover:bg-[#2b2b2b] text-white text-xs font-medium transition-colors border border-[#333333] cursor-pointer"
-                title={isIndo ? "Ekspor" : "Export"}
+                title={t("export")}
               >
                 <Download className="w-3.5 h-3.5 text-white" />
-                <span className="hidden sm:inline">{isIndo ? "Ekspor" : "Export"}</span>
+                <span className="hidden sm:inline">{t("export")}</span>
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-52 p-1 bg-[#222222] border-[#383838] text-white font-sans shadow-xl">
@@ -288,21 +280,21 @@ export function ReportViewer({
                 className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2 hover:bg-[#2b2b2b] focus:bg-[#2b2b2b] text-white rounded-md"
               >
                 <FileText className="w-3.5 h-3.5 text-blue-400" />
-                <span>{isIndo ? "Unduh Markdown (.md)" : "Download Markdown (.md)"}</span>
+                <span>{t("downloadMarkdownAction")}</span>
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={handleCopyMarkdown}
                 className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2 hover:bg-[#2b2b2b] focus:bg-[#2b2b2b] text-white rounded-md"
               >
                 <Copy className="w-3.5 h-3.5 text-emerald-400" />
-                <span>{isIndo ? "Salin ke Clipboard" : "Copy to Clipboard"}</span>
+                <span>{t("copyToClipboardAction")}</span>
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={handlePrint}
                 className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2 hover:bg-[#2b2b2b] focus:bg-[#2b2b2b] text-white rounded-md"
               >
                 <Printer className="w-3.5 h-3.5 text-purple-400" />
-                <span>{isIndo ? "Cetak / Simpan PDF" : "Print / Save PDF"}</span>
+                <span>{t("printSavePdfAction")}</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -315,7 +307,7 @@ export function ReportViewer({
         <aside className="w-56 sm:w-64 h-full border-r border-[#2b2b2b] bg-[#161616] flex flex-col shrink-0 select-none">
           <div className="p-3.5 pb-2 flex items-center gap-2 text-xs font-semibold text-[#888888] tracking-wider uppercase">
             <ListOrdered className="h-3.5 w-3.5" />
-            <span>{isIndo ? "Daftar Bab" : "Table of Contents"}</span>
+            <span>{t("tableOfContents")}</span>
           </div>
 
           <ScrollArea className="flex-1 px-2.5 pb-4">
@@ -381,7 +373,7 @@ export function ReportViewer({
               )}
             >
               <ThumbsUp className="h-3 w-3" />
-              <span>{isIndo ? "Laporan bagus" : "Good report"}</span>
+              <span>{t("goodReport")}</span>
             </button>
 
             <button
@@ -395,7 +387,7 @@ export function ReportViewer({
               )}
             >
               <ThumbsDown className="h-3 w-3" />
-              <span>{isIndo ? "Laporan buruk" : "Bad report"}</span>
+              <span>{t("badReport")}</span>
             </button>
           </div>
         </aside>
@@ -443,8 +435,7 @@ export function ReportViewer({
                             </div>
                             <div className="space-y-0.5">
                               <div className="text-[10px] font-semibold text-[#888888] uppercase tracking-wider">
-                                {sec.recommendedWidget.badge ||
-                                  (isIndo ? "Direkomendasikan" : "Recommended")}
+                                {sec.recommendedWidget.badge || t("recommended")}
                               </div>
                               <div className="text-xs font-semibold text-white group-hover:text-amber-300 transition-colors">
                                 {sec.recommendedWidget.title}
@@ -463,7 +454,7 @@ export function ReportViewer({
                               setDismissedWidgets((prev) => ({ ...prev, [sec.id]: true }))
                             }
                             className="h-6 w-6 rounded-md hover:bg-[#2c2c2c] text-[#707070] hover:text-white flex items-center justify-center shrink-0 transition-colors cursor-pointer"
-                            title={isIndo ? "Tutup Rekomendasi" : "Dismiss Widget"}
+                            title={t("dismissWidget")}
                           >
                             <X className="h-3.5 w-3.5" />
                           </button>
@@ -509,9 +500,9 @@ export function ReportViewer({
                       className="h-8 px-3.5 rounded-full bg-[#262628] hover:bg-[#303032] border border-[#333333] text-xs font-normal text-[#d4d4d4] hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer"
                     >
                       <span>
-                        {isIndo
-                          ? `Lihat ${data.sourceCount || 1} sumber`
-                          : `View ${data.sourceCount || 1} source${(data.sourceCount || 1) > 1 ? "s" : ""}`}
+                        {data.sourceCount === 1
+                          ? t("viewSourcesCountSingle")
+                          : t("viewSourcesCount", { count: data.sourceCount || 1 })}
                       </span>
                     </button>
 
@@ -519,7 +510,7 @@ export function ReportViewer({
                     {showSourcesPopup && data.sourceTitles && data.sourceTitles.length > 0 && (
                       <div className="absolute top-full mt-2 right-0 w-72 bg-[#222224] border border-[#2e2e30] rounded-xl p-3 shadow-2xl z-50 select-none">
                         <div className="text-[11px] font-semibold text-[#888888] uppercase tracking-wider mb-2 px-1">
-                          {isIndo ? "Sumber Rujukan Laporan" : "Source References"}
+                          {t("sourceReferences")}
                         </div>
                         <div className="space-y-1 max-h-48 overflow-y-auto">
                           {data.sourceTitles.map((title, i) => (
@@ -541,7 +532,7 @@ export function ReportViewer({
                     type="button"
                     onClick={handleShare}
                     className="h-8 w-8 rounded-lg hover:bg-[#28282a] text-[#a3a3a3] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
-                    title={isIndo ? "Bagikan / Salin" : "Share / Copy"}
+                    title={t("shareOrCopy")}
                   >
                     <Share2 className="w-4 h-4" />
                   </button>
@@ -551,7 +542,7 @@ export function ReportViewer({
                     type="button"
                     onClick={() => setIsMaximized(false)}
                     className="h-8 w-8 rounded-lg hover:bg-[#28282a] text-[#a3a3a3] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
-                    title={isIndo ? "Perkecil (Kembali ke panel)" : "Restore"}
+                    title={t("restorePanel")}
                   >
                     <Minimize2 className="w-4 h-4" />
                   </button>
@@ -573,7 +564,7 @@ export function ReportViewer({
                       <button
                         type="button"
                         className="h-8 w-8 rounded-lg hover:bg-[#28282a] text-[#a3a3a3] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
-                        title="Opsi Lainnya"
+                        title={t("moreOptions")}
                       >
                         <MoreVertical className="w-4 h-4" />
                       </button>
@@ -584,21 +575,21 @@ export function ReportViewer({
                         className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2 hover:bg-[#2b2b2d] focus:bg-[#2b2b2d] text-white rounded-md"
                       >
                         <FileText className="w-3.5 h-3.5 text-blue-400" />
-                        <span>{isIndo ? "Unduh Markdown (.md)" : "Download Markdown (.md)"}</span>
+                        <span>{t("downloadMarkdownAction")}</span>
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={handleCopyMarkdown}
                         className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2 hover:bg-[#2b2b2d] focus:bg-[#2b2b2d] text-white rounded-md"
                       >
                         <Copy className="w-3.5 h-3.5 text-emerald-400" />
-                        <span>{isIndo ? "Salin ke Clipboard" : "Copy to Clipboard"}</span>
+                        <span>{t("copyToClipboardAction")}</span>
                       </DropdownMenuItem>
                       <DropdownMenuItem
                         onClick={handlePrint}
                         className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2 hover:bg-[#2b2b2d] focus:bg-[#2b2b2d] text-white rounded-md"
                       >
                         <Printer className="w-3.5 h-3.5 text-purple-400" />
-                        <span>{isIndo ? "Cetak / Simpan PDF" : "Print / Save PDF"}</span>
+                        <span>{t("printSavePdfAction")}</span>
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -659,7 +650,7 @@ export function ReportViewer({
                       )}
                     >
                       <ThumbsUp className="h-3 w-3" />
-                      <span>{isIndo ? "Laporan bagus" : "Good report"}</span>
+                      <span>{t("goodReport")}</span>
                     </button>
 
                     <button
@@ -673,7 +664,7 @@ export function ReportViewer({
                       )}
                     >
                       <ThumbsDown className="h-3 w-3" />
-                      <span>{isIndo ? "Laporan buruk" : "Bad report"}</span>
+                      <span>{t("badReport")}</span>
                     </button>
                   </div>
                 </aside>
@@ -722,8 +713,7 @@ export function ReportViewer({
                                     </div>
                                     <div className="space-y-0.5 min-w-0">
                                       <div className="text-[10px] font-medium text-[#888888] tracking-wide">
-                                        {sec.recommendedWidget.badge ||
-                                          (isIndo ? "Direkomendasikan • Widget" : "Recommended • Widget")}
+                                        {sec.recommendedWidget.badge || t("recommendedWidget")}
                                       </div>
                                       <div className="text-xs font-semibold text-white group-hover:text-amber-300 transition-colors truncate">
                                         {sec.recommendedWidget.title}
@@ -742,7 +732,7 @@ export function ReportViewer({
                                       setDismissedWidgets((prev) => ({ ...prev, [sec.id]: true }))
                                     }
                                     className="h-6 w-6 rounded-md hover:bg-[#323236] text-[#707070] hover:text-white flex items-center justify-center shrink-0 transition-colors cursor-pointer"
-                                    title={isIndo ? "Tutup Rekomendasi" : "Dismiss Widget"}
+                                    title={t("dismissWidget")}
                                   >
                                     <X className="h-3.5 w-3.5" />
                                   </button>
@@ -759,9 +749,7 @@ export function ReportViewer({
 
             {/* Disclaimer at bottom (matching screenshot) */}
             <div className="text-[11.5px] text-[#666666] text-center mt-2.5 select-none pointer-events-none">
-              {isIndo
-                ? "Const Learn dapat membuat kesalahan, jadi periksa kembali responsnya."
-                : "Const Learn can make mistakes, so double-check its responses."}
+              {t("aiDisclaimer")}
             </div>
           </div>,
           document.body

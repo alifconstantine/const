@@ -1544,32 +1544,31 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
   }) => {
     const selectedSources = (sources || []).filter((s) => options.selectedSourceIds.includes(s.id));
     const targetLang = (options.language?.startsWith("id") || language === "id") ? "id" : "en";
-    const isIndo = targetLang === "id";
 
     const title = options.topic.trim()
       ? (options.type === "quiz"
-          ? (isIndo ? `Kuis: ${options.topic}` : `Quiz: ${options.topic}`)
+          ? t("quizTopicTitle", { topic: options.topic })
           : options.type === "flashcard"
-          ? (isIndo ? `Kartu: ${options.topic}` : `Flashcard: ${options.topic}`)
+          ? t("flashcardTopicTitle", { topic: options.topic })
           : options.type === "audio_summary"
-          ? (isIndo ? `Ringkasan Audio: ${options.topic}` : `Audio Summary: ${options.topic}`)
-          : (isIndo ? `Peta Pikiran: ${options.topic}` : `Mind Map: ${options.topic}`))
+          ? t("audioSummaryTopicTitle", { topic: options.topic })
+          : t("mindMapTopicTitle", { topic: options.topic }))
       : (options.type === "quiz"
-          ? (isIndo ? `Kuis (${options.count || 5} Soal)` : `Quiz (${options.count || 5} Questions)`)
+          ? t("quizWithQuestions", { count: options.count || 5 })
           : options.type === "flashcard"
-          ? (isIndo ? `Kartu Hafalan (${options.count || 10} Kartu)` : `Flashcards (${options.count || 10} Cards)`)
+          ? t("flashcardWithCards", { count: options.count || 10 })
           : options.type === "audio_summary"
-          ? (isIndo ? "Ringkasan Audio" : "Audio Summary")
-          : (isIndo ? "Peta Pikiran" : "Mind Map"));
+          ? t("audioSummaryTitle")
+          : t("mindMapTitle"));
 
     const initialLoadingTitle =
       options.type === "quiz"
-        ? (isIndo ? "Membuat Kuis..." : "Creating Quiz...")
+        ? t("creatingQuizStatus")
         : options.type === "flashcard"
-        ? (isIndo ? "Membuat Kartu Tanya-Jawab..." : "Creating Flashcards...")
+        ? t("creatingFlashcardsStatus")
         : options.type === "audio_summary"
-        ? (isIndo ? "Membuat Ringkasan Audio..." : "Creating Audio Summary...")
-        : (isIndo ? "Membuat Peta Pikiran..." : "Creating Mind Map...");
+        ? t("creatingAudioSummaryStatus")
+        : t("creatingMindMapStatus");
 
     // 1. Immediately create in Dexie with status: "generating"
     const artId = await localDb.createArtifact({
@@ -1609,25 +1608,15 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
       });
 
       toast.success(
-        isIndo
-          ? (options.type === "quiz"
-              ? "Kuis berhasil dibuat!"
-              : options.type === "flashcard"
-              ? "Kartu tanya-jawab berhasil dibuat!"
-              : options.type === "mind_map"
-              ? "Peta pikiran berhasil dibuat!"
-              : options.type === "audio_summary"
-              ? "Ringkasan audio berhasil dibuat!"
-              : "Presentasi berhasil disusun!")
-          : (options.type === "quiz"
-              ? "Quiz created successfully!"
-              : options.type === "flashcard"
-              ? "Flashcards created successfully!"
-              : options.type === "mind_map"
-              ? "Mind map created successfully!"
-              : options.type === "audio_summary"
-              ? "Audio summary created successfully!"
-              : "Presentation slides created successfully!")
+        options.type === "quiz"
+          ? t("quizCreatedSuccess")
+          : options.type === "flashcard"
+          ? t("flashcardsCreatedSuccess")
+          : options.type === "mind_map"
+          ? t("mindMapCreatedSuccess")
+          : options.type === "audio_summary"
+          ? t("audioSummaryCreatedSuccess")
+          : t("presentationCreatedSuccess")
       );
 
       const fullArt = await localDb.getArtifact(artId);
@@ -1659,12 +1648,11 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
   }) => {
     const selectedSources = (sources || []).filter((s) => options.selectedSourceIds.includes(s.id));
     const targetLang = language === "id" ? "id" : "en";
-    const isIndo = targetLang === "id";
-    const title = isIndo ? "Presentasi Materi" : "Presentation Slides";
+    const title = t("presentationTitle");
 
     const artId = await localDb.createArtifact({
       learnId,
-      title: isIndo ? "Menyusun Presentasi..." : "Creating Presentation...",
+      title: t("creatingPresentationStatus"),
       type: "slides",
       status: "generating",
       sourcesCount: selectedSources.length,
@@ -1693,9 +1681,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
         status: "completed",
       });
 
-      toast.success(
-        isIndo ? "Presentasi berhasil disusun!" : "Presentation created successfully!"
-      );
+      toast.success(t("presentationCreatedSuccess"));
 
       const fullArt = await localDb.getArtifact(artId);
       if (fullArt) {
@@ -1733,13 +1719,12 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
     );
     if (selectedSources.length === 0) return;
 
-    const isIndo = params.language === "id";
-    const title = isIndo ? "Infografis Materi" : "Study Infographic";
+    const title = t("studyInfographicTitle");
 
     // 1. Create generating artifact in Dexie
     const artId = await localDb.createArtifact({
       learnId,
-      title: isIndo ? "Membuat Infografis..." : "Creating Infographic...",
+      title: t("creatingInfographicStatus"),
       type: "infographic",
       status: "generating",
       sourcesCount: selectedSources.length,
@@ -1770,9 +1755,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
         status: "completed",
       });
 
-      toast.success(
-        isIndo ? "Infografis berhasil dibuat!" : "Infographic created successfully!"
-      );
+      toast.success(t("infographicCreatedSuccess"));
 
       const fullArt = await localDb.getArtifact(artId);
       if (fullArt) {
@@ -1810,12 +1793,11 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
     );
     if (selectedSources.length === 0) return;
 
-    const isIndo = options.language === "id";
-    const title = options.templateTitle || (isIndo ? "Laporan Pembelajaran" : "Learning Report");
+    const title = options.templateTitle || t("learningReportTitle");
 
     const artId = await localDb.createArtifact({
       learnId,
-      title: isIndo ? "Menyusun Laporan..." : "Generating Report...",
+      title: t("generatingReportStatus"),
       type: "report",
       status: "generating",
       sourcesCount: selectedSources.length,
@@ -1845,9 +1827,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
         status: "completed",
       });
 
-      toast.success(
-        isIndo ? "Laporan berhasil dibuat!" : "Report created successfully!"
-      );
+      toast.success(t("reportCreatedSuccess"));
 
       const fullArt = await localDb.getArtifact(artId);
       if (fullArt) {
@@ -1879,14 +1859,13 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
     if (selectedSources.length === 0) return;
 
     const targetLang = language === "id" ? "id" : "en";
-    const isIndo = targetLang === "id";
     const title = options.topicFocus?.trim()
-      ? (isIndo ? `CheatSheet: ${options.topicFocus.trim()}` : `CheatSheet: ${options.topicFocus.trim()}`)
-      : (isIndo ? "Lembar Contekan Pintar" : "Smart CheatSheet");
+      ? `CheatSheet: ${options.topicFocus.trim()}`
+      : t("smartCheatSheetTitle");
 
     const artId = await localDb.createArtifact({
       learnId,
-      title: isIndo ? "Menyusun Lembar Contekan..." : "Creating CheatSheet...",
+      title: t("creatingCheatSheetStatus"),
       type: "cheatsheet",
       status: "generating",
       sourcesCount: selectedSources.length,
@@ -1912,9 +1891,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
         status: "completed",
       });
 
-      toast.success(
-        isIndo ? "Lembar contekan berhasil dibuat!" : "CheatSheet created successfully!"
-      );
+      toast.success(t("cheatSheetCreatedSuccess"));
 
       const fullArt = await localDb.getArtifact(artId);
       if (fullArt) {

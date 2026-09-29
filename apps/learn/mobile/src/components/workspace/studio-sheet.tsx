@@ -87,18 +87,17 @@ export function StudioSheet({
   onDeleteArtifact,
   onAddNote,
 }: StudioSheetProps) {
-  const { t, language } = useI18n();
-  const isIndo = language === "id";
+  const { t } = useI18n();
 
   const formatRelativeTime = (ts: number) => {
     const diffSec = Math.floor((Date.now() - ts) / 1000);
-    if (diffSec < 60) return language === "id" ? "baru saja" : "just now";
+    if (diffSec < 60) return t("relativeJustNow");
     const diffMin = Math.floor(diffSec / 60);
-    if (diffMin < 60) return `${diffMin}m ${language === "id" ? "lalu" : "ago"}`;
+    if (diffMin < 60) return t("relativeMinutesAgo", { minutes: diffMin });
     const diffHr = Math.floor(diffMin / 60);
-    if (diffHr < 24) return `${diffHr}h ${language === "id" ? "lalu" : "ago"}`;
+    if (diffHr < 24) return t("relativeHoursAgo", { hours: diffHr });
     const diffDay = Math.floor(diffHr / 24);
-    return `${diffDay}d ${language === "id" ? "lalu" : "ago"}`;
+    return t("relativeDaysAgo", { days: diffDay });
   };
 
   const getArtifactIcon = (type: string, isZip?: boolean) => {
@@ -174,7 +173,7 @@ export function StudioSheet({
               <LayoutGrid className="h-4 w-4 text-foreground shrink-0" />
             )}
             <span className="text-sm font-semibold text-foreground tracking-tight truncate">
-              {t("studioTools") || "Studio & Tools"}
+              {t("studioTools")}
             </span>
             <span className="text-[10.5px] font-sans px-2 py-0.5 rounded-full bg-secondary text-muted-foreground border border-border/70 shrink-0">
               {tools.length} tools
@@ -185,7 +184,7 @@ export function StudioSheet({
             type="button"
             onClick={onClose}
             className="h-8 w-8 rounded-full hover:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer active:scale-95 shrink-0"
-            aria-label="Tutup"
+            aria-label={t("close")}
           >
             <X className="h-4 w-4" />
           </button>
@@ -196,7 +195,7 @@ export function StudioSheet({
           {/* Section: Tools Grid (Matching Image 1) */}
           <div className="space-y-2 shrink-0">
             <div className="text-[11px] font-sans uppercase tracking-wider font-semibold text-muted-foreground px-0.5">
-              {t("studioTitle") || "Alat Interaktif"}
+              {t("studioTitle")}
             </div>
 
             <div className="grid grid-cols-2 gap-2">
@@ -218,7 +217,7 @@ export function StudioSheet({
                         <Icon className={`h-4 w-4 ${tool.iconColor} shrink-0`} />
                         {tool.hasBadge && (
                           <span className="bg-foreground text-background text-[8.5px] font-sans font-bold px-1.5 py-0.5 rounded-full leading-none shadow-2xs">
-                            {t("badgeNew") || "BARU"}
+                            {t("badgeNew")}
                           </span>
                         )}
                       </div>
@@ -243,7 +242,7 @@ export function StudioSheet({
           <div className="space-y-2.5 pt-1 flex-1">
             <div className="flex items-center justify-between px-0.5">
               <span className="text-xs font-semibold text-foreground">
-                {t("artifacts") || "Hasil Artefak & Unduhan"}
+                {t("artifacts")}
               </span>
               {artifacts && artifacts.length > 0 && (
                 <span className="text-[10.5px] font-sans px-2 py-0.5 rounded-full bg-secondary border border-border/70 text-muted-foreground">
@@ -266,20 +265,20 @@ export function StudioSheet({
                   const isInfographic = art.type === "infographic";
                   const isVideo = art.type === "video_summary";
                   const defaultGenTitle = isInfographic
-                    ? (language === "id" ? "Membuat Infografis..." : "Creating Infographic...")
+                    ? t("creatingInfographicStatus")
                     : isVideo
-                    ? (language === "id" ? "Membuat Ringkasan Video..." : "Creating Video Summary...")
+                    ? t("creatingVideoSummaryStatus")
                     : isReport
-                    ? (language === "id" ? "Menyusun Laporan..." : "Creating Report...")
+                    ? t("generatingReportStatus")
                     : isSlides
-                    ? (language === "id" ? "Membuat Presentasi..." : "Creating Presentation...")
+                    ? t("creatingPresentationStatus")
                     : isMindMap
-                    ? (language === "id" ? "Membuat Peta Pikiran..." : "Creating Mind Map...")
+                    ? t("creatingMindMapStatus")
                     : art.type === "quiz"
-                    ? (language === "id" ? "Membuat Kuis..." : "Creating Quiz...")
+                    ? t("creatingQuizStatus")
                     : art.type === "flashcard" || art.type === "flashcards"
-                    ? (language === "id" ? "Membuat Kartu Tanya-Jawab..." : "Creating Flashcards...")
-                    : (language === "id" ? "Membuat Catatan..." : "Creating Note...");
+                    ? t("creatingFlashcardsStatus")
+                    : t("creatingNoteStatus");
 
                   return (
                     <div
@@ -337,11 +336,9 @@ export function StudioSheet({
                           {art.title || defaultGenTitle}
                         </div>
                         <div className="text-[10.5px] text-muted-foreground truncate mt-0.5">
-                          {language === "id"
-                            ? `berdasarkan ${art.sourcesCount ?? 1} sumber`
-                            : `based on ${art.sourcesCount ?? 1} source${
-                                (art.sourcesCount ?? 1) === 1 ? "" : "s"
-                              }`}
+                          {(art.sourcesCount ?? 1) === 1
+                            ? t("basedOnSourcesCountSingle")
+                            : t("basedOnSourcesCount", { count: art.sourcesCount ?? 1 })}
                         </div>
                       </div>
                     </div>
@@ -368,20 +365,20 @@ export function StudioSheet({
                   : null;
                 const countText = itemCount !== null && itemCount !== undefined
                   ? isQuiz
-                    ? (language === "id" ? `${itemCount} soal` : `${itemCount} questions`)
+                    ? (itemCount === 1 ? t("questionsCountSingle") : t("questionsCount", { count: itemCount }))
                     : isFlashcard
-                    ? (language === "id" ? `${itemCount} kartu` : `${itemCount} cards`)
+                    ? (itemCount === 1 ? t("cardsCountSingle") : t("cardsCount", { count: itemCount }))
                     : isSlides
-                    ? (language === "id" ? `${itemCount} slide` : `${itemCount} slide${itemCount > 1 ? "s" : ""}`)
+                    ? (itemCount === 1 ? t("slidesCountSingle") : t("slidesCount", { count: itemCount }))
                     : isVideo
-                    ? (language === "id" ? `${itemCount} scene` : `${itemCount} scenes`)
+                    ? (itemCount === 1 ? t("scenesCountSingle") : t("scenesCount", { count: itemCount }))
                     : isReport
-                    ? (language === "id" ? `${itemCount} bagian` : `${itemCount} section${itemCount > 1 ? "s" : ""}`)
+                    ? (itemCount === 1 ? t("sectionsCountSingle") : t("sectionsCount", { count: itemCount }))
                     : null
                   : isMindMap
-                  ? (language === "id" ? "Peta Konsep" : "Concept Map")
+                  ? t("conceptMap")
                   : isInfographic
-                  ? (art.data?.styleLabel || (language === "id" ? "Poster Visual" : "Visual Poster"))
+                  ? (art.data?.styleLabel || t("visualPoster"))
                   : null;
 
                 const handleOpenThis = () => {
@@ -406,9 +403,7 @@ export function StudioSheet({
                         </div>
                         <div className="text-[10.5px] text-muted-foreground truncate mt-0.5">
                           {countText ? `${countText} · ` : art.sourcesCount
-                            ? `${art.sourcesCount} ${
-                                language === "id" ? "sumber" : "sources"
-                              } · `
+                            ? `${art.sourcesCount === 1 ? t("basedOnSourcesSingle") : t("basedOnSources", { count: art.sourcesCount })} · `
                             : ""}
                           {formatRelativeTime(art.createdAt || art.updatedAt)}
                         </div>
@@ -443,14 +438,14 @@ export function StudioSheet({
                           <Eye className="h-3.5 w-3.5" />
                           <span>
                             {isQuiz
-                              ? (language === "id" ? "Buka Kuis" : "Open Quiz")
+                              ? t("openQuiz")
                               : isFlashcard
-                              ? (language === "id" ? "Buka Flashcard" : "Open Flashcards")
+                              ? t("openFlashcards")
                               : isMindMap
-                              ? (language === "id" ? "Buka Peta Pikiran" : "Open Mind Map")
+                              ? t("openMindMap")
                               : isSlides
-                              ? (language === "id" ? "Buka Slide" : "Open Slides")
-                              : (language === "id" ? "Buka Catatan" : "Open Note")}
+                              ? t("openSlides")
+                              : t("openNote")}
                           </span>
                         </DropdownMenuItem>
                         {art.content && (
@@ -459,16 +454,12 @@ export function StudioSheet({
                             onClick={(e) => {
                               e.stopPropagation();
                               navigator.clipboard.writeText(art.content || "");
-                              toast.success(
-                                language === "id"
-                                  ? "Catatan disalin"
-                                  : "Note copied"
-                              );
+                              toast.success(t("noteCopied"));
                             }}
                           >
                             <Copy className="h-3.5 w-3.5" />
                             <span>
-                              {language === "id" ? "Salin Teks" : "Copy Text"}
+                              {t("copyText")}
                             </span>
                           </DropdownMenuItem>
                         )}
@@ -481,9 +472,7 @@ export function StudioSheet({
                         >
                           <Download className="h-3.5 w-3.5" />
                           <span>
-                            {language === "id"
-                              ? "Unduh .md"
-                              : "Download .md"}
+                            {t("downloadMd")}
                           </span>
                         </DropdownMenuItem>
                         <DropdownMenuSeparator className="bg-border" />
@@ -496,7 +485,7 @@ export function StudioSheet({
                         >
                           <Trash2 className="h-3.5 w-3.5" />
                           <span>
-                            {language === "id" ? "Hapus" : "Delete"}
+                            {t("delete")}
                           </span>
                         </DropdownMenuItem>
                       </DropdownMenuContent>
@@ -514,11 +503,10 @@ export function StudioSheet({
                 <PenTool className="h-4 w-4 stroke-[1.5] text-foreground" />
               </div>
               <h3 className="text-xs font-semibold text-foreground mb-1">
-                {t("studioEmptyTitle") || "Output studio akan disimpan di sini"}
+                {t("studioEmptyTitle")}
               </h3>
               <p className="text-[10.5px] text-muted-foreground leading-relaxed max-w-[220px]">
-                {t("studioEmptyDesc") ||
-                  "Setelah menambahkan sumber, klik untuk menambahkan Ringkasan Audio, Panduan Belajar, Peta Konsep, dan banyak lagi."}
+                {t("studioEmptyDesc")}
               </p>
             </div>
           )}
@@ -534,7 +522,7 @@ export function StudioSheet({
             className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-foreground text-background hover:opacity-90 text-xs font-semibold transition-all shadow-md active:scale-95 cursor-pointer border border-border/20"
           >
             <SquarePen className="h-4 w-4 stroke-[2]" />
-            <span>{t("addNote") || "Tambahkan catatan"}</span>
+            <span>{t("addNote")}</span>
           </button>
         </div>
       </aside>

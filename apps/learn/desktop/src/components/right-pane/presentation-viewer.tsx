@@ -45,8 +45,7 @@ export function PresentationViewer({
   onToggleExpand: _onToggleExpand,
   isExpanded: _isExpanded = false,
 }: PresentationViewerProps) {
-  const { t, language } = useI18n();
-  const isIndo = language === "id";
+  const { t } = useI18n();
 
   const provider = data.provider || "native";
   const slides: SlideItem[] = useMemo(() => data.slides || [], [data.slides]);
@@ -222,7 +221,7 @@ export function PresentationViewer({
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    toast.success(isIndo ? "File HTML presentasi berhasil diunduh!" : "Presentation HTML downloaded!");
+    toast.success(t("presentationHtmlDownloaded"));
   };
 
   const handleDownloadPdf = () => {
@@ -236,7 +235,7 @@ export function PresentationViewer({
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    toast.success(isIndo ? "File PDF presentasi berhasil diunduh!" : "Presentation PDF downloaded!");
+    toast.success(t("presentationPdfDownloaded"));
   };
 
   const handleTriggerPdfExport = async () => {
@@ -249,7 +248,7 @@ export function PresentationViewer({
     try {
       setIsRenderingPdf(true);
       setRenderError(null);
-      toast.info(isIndo ? "Memulai proses export PDF 16:9..." : "Starting 16:9 PDF export...");
+      toast.info(t("startingPdfExport"));
 
       const res = await electron.presentation.exportPdf({
         learnId: data.learnId || artifact?.learnId || "default",
@@ -263,7 +262,7 @@ export function PresentationViewer({
         data.pdfUrl = res.pdfUrl;
         if (res.pdfPath) data.pdfPath = res.pdfPath;
         setIsRenderingPdf(false);
-        toast.success(isIndo ? "PDF 16:9 siap diunduh!" : "16:9 PDF is ready!");
+        toast.success(t("pdfReady"));
       } else {
         throw new Error(res?.error || "Export failed");
       }
@@ -284,11 +283,7 @@ export function PresentationViewer({
       return;
     }
     setIsExportingCanva(true);
-    toast.info(
-      isIndo
-        ? `Memulai ekspor Canva ke format ${format.toUpperCase()}...`
-        : `Starting Canva export to ${format.toUpperCase()}...`
-    );
+    toast.info(t("startingCanvaExport", { format: format.toUpperCase() }));
     try {
       const res = await exportCanvaPresentation({
         designId: data.canvaDesignId,
@@ -302,11 +297,7 @@ export function PresentationViewer({
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
-        toast.success(
-          isIndo
-            ? `Desain Canva berhasil diekspor ke ${format.toUpperCase()}!`
-            : `Canva design successfully exported to ${format.toUpperCase()}!`
-        );
+        toast.success(t("canvaExportSuccess", { format: format.toUpperCase() }));
       } else {
         throw new Error(res.error || "Export URL not available");
       }
@@ -381,7 +372,7 @@ export function PresentationViewer({
             <Presentation className="h-3.5 w-3.5" />
           </div>
           <span className="text-xs font-semibold text-foreground truncate max-w-[180px] sm:max-w-[240px]">
-            {data.title || (isIndo ? "Presentasi" : "Presentation")}
+            {data.title || t("presentation")}
           </span>
 
           <span
@@ -401,7 +392,7 @@ export function PresentationViewer({
 
           {totalSlides > 0 && (
             <span className="text-[10px] text-muted-foreground hidden sm:inline-block">
-              {totalSlides} {isIndo ? "slide" : "slides"}
+              {totalSlides === 1 ? t("slidesCountSingle") : t("slidesCount", { count: totalSlides })}
             </span>
           )}
         </div>
@@ -413,7 +404,7 @@ export function PresentationViewer({
             <div className="flex items-center gap-1.5 text-[11px] text-amber-400 px-2 py-0.5 rounded-md bg-amber-400/10 border border-amber-400/20">
               <Loader2 className="h-3 w-3 animate-spin" />
               <span className="hidden sm:inline">
-                {isIndo ? "Merender PDF..." : "Rendering PDF..."}
+                {t("renderingPdf")}
               </span>
             </div>
           )}
@@ -430,7 +421,7 @@ export function PresentationViewer({
             type="button"
             onClick={handleToggleFullscreen}
             className="h-7 w-7 rounded-lg hover:bg-[#252525] text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
-            title={isFullscreen ? (isIndo ? "Keluar Layar Penuh" : "Exit Fullscreen") : (isIndo ? "Layar Penuh" : "Fullscreen")}
+            title={isFullscreen ? t("exitFullscreen") : t("fullscreen")}
           >
             <Maximize2 className="h-3.5 w-3.5" />
           </button>
@@ -441,10 +432,10 @@ export function PresentationViewer({
               <button
                 type="button"
                 className="h-7 px-2.5 rounded-lg bg-[#222222] hover:bg-[#2a2a2a] text-foreground text-xs font-medium border border-[#333333] flex items-center gap-1.5 transition-colors cursor-pointer"
-                title={isIndo ? "Ekspor & Unduh" : "Export & Download"}
+                title={t("exportAndDownload")}
               >
                 <Download className="h-3.5 w-3.5" />
-                <span className="hidden sm:inline">{isIndo ? "Ekspor" : "Export"}</span>
+                <span className="hidden sm:inline">{t("export")}</span>
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48 p-1 bg-[#1e1e1e] border-[#2e2e2e]">
@@ -456,7 +447,7 @@ export function PresentationViewer({
                     disabled={!pdfUrl && isRenderingPdf}
                   >
                     <FileText className="h-3.5 w-3.5 text-red-400" />
-                    <span>{isIndo ? "Unduh PDF (16:9)" : "Download PDF (16:9)"}</span>
+                    <span>{t("downloadPdf169")}</span>
                   </DropdownMenuItem>
 
                   <DropdownMenuItem
@@ -464,7 +455,7 @@ export function PresentationViewer({
                     onClick={handleDownloadHtml}
                   >
                     <FileCode className="h-3.5 w-3.5 text-blue-400" />
-                    <span>{isIndo ? "Unduh HTML Deck" : "Download HTML Deck"}</span>
+                    <span>{t("downloadHtmlDeck")}</span>
                   </DropdownMenuItem>
 
                   <DropdownMenuSeparator className="bg-[#2e2e2e]" />
@@ -475,7 +466,7 @@ export function PresentationViewer({
                     disabled={isRenderingPdf}
                   >
                     <RotateCw className={cn("h-3.5 w-3.5", isRenderingPdf && "animate-spin")} />
-                    <span>{isIndo ? "Render Ulang PDF" : "Re-render PDF"}</span>
+                    <span>{t("rerenderPdf")}</span>
                   </DropdownMenuItem>
                 </>
               )}
@@ -488,7 +479,7 @@ export function PresentationViewer({
                     disabled={isExportingCanva || !data.canvaDesignId}
                   >
                     <FileText className="h-3.5 w-3.5 text-red-400" />
-                    <span>{isIndo ? "Unduh PDF dari Canva" : "Download PDF from Canva"}</span>
+                    <span>{t("downloadPdfFromCanva")}</span>
                   </DropdownMenuItem>
 
                   <DropdownMenuItem
@@ -497,7 +488,7 @@ export function PresentationViewer({
                     disabled={isExportingCanva || !data.canvaDesignId}
                   >
                     <Presentation className="h-3.5 w-3.5 text-orange-400" />
-                    <span>{isIndo ? "Unduh PPTX dari Canva" : "Download PPTX from Canva"}</span>
+                    <span>{t("downloadPptxFromCanva")}</span>
                   </DropdownMenuItem>
 
                   <DropdownMenuSeparator className="bg-[#2e2e2e]" />
@@ -508,7 +499,7 @@ export function PresentationViewer({
                       onClick={() => window.open(data.canvaEditUrl, "_blank")}
                     >
                       <ExternalLink className="h-3.5 w-3.5 text-cyan-400" />
-                      <span>{isIndo ? "Buka di Canva Editor" : "Open in Canva Editor"}</span>
+                      <span>{t("openInCanvaEditor")}</span>
                     </DropdownMenuItem>
                   )}
                   {data.canvaViewUrl && (
@@ -517,7 +508,7 @@ export function PresentationViewer({
                       onClick={() => window.open(data.canvaViewUrl, "_blank")}
                     >
                       <Eye className="h-3.5 w-3.5 text-muted-foreground" />
-                      <span>{isIndo ? "Lihat Desain Publik" : "View Public Design"}</span>
+                      <span>{t("viewPublicDesign")}</span>
                     </DropdownMenuItem>
                   )}
                 </>
@@ -531,7 +522,7 @@ export function PresentationViewer({
                       onClick={() => window.open(data.googleSlidesUrl, "_blank")}
                     >
                       <ExternalLink className="h-3.5 w-3.5 text-amber-400" />
-                      <span>{isIndo ? "Buka di Google Slides" : "Open in Google Slides"}</span>
+                      <span>{t("openInGoogleSlides")}</span>
                     </DropdownMenuItem>
                   )}
                   {googleSlidesPptxUrl && (
@@ -540,7 +531,7 @@ export function PresentationViewer({
                       onClick={() => window.open(googleSlidesPptxUrl, "_blank")}
                     >
                       <Download className="h-3.5 w-3.5 text-orange-400" />
-                      <span>{isIndo ? "Unduh PowerPoint (.pptx)" : "Download PowerPoint (.pptx)"}</span>
+                      <span>{t("downloadPowerPointPptx")}</span>
                     </DropdownMenuItem>
                   )}
                   {googleSlidesPdfUrl && (
@@ -549,7 +540,7 @@ export function PresentationViewer({
                       onClick={() => window.open(googleSlidesPdfUrl, "_blank")}
                     >
                       <FileText className="h-3.5 w-3.5 text-red-400" />
-                      <span>{isIndo ? "Unduh PDF (.pdf)" : "Download PDF (.pdf)"}</span>
+                      <span>{t("downloadPdfFile")}</span>
                     </DropdownMenuItem>
                   )}
                 </>
@@ -589,7 +580,7 @@ export function PresentationViewer({
                   <div className="w-full h-full flex flex-col items-center justify-center text-center p-6 text-muted-foreground">
                     <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mb-3" />
                     <p className="text-xs">
-                      {isIndo ? "Memuat slide presentasi..." : "Loading presentation slides..."}
+                      {t("loadingPresentationSlides")}
                     </p>
                   </div>
                 )}
@@ -602,7 +593,7 @@ export function PresentationViewer({
                       onClick={() => goToSlide(currentSlideIndex - 1)}
                       disabled={currentSlideIndex <= 0}
                       className="h-6 w-6 rounded-full hover:bg-white/10 disabled:opacity-30 disabled:pointer-events-none flex items-center justify-center transition-colors cursor-pointer text-foreground"
-                      title={isIndo ? "Slide Sebelumnya (←)" : "Previous Slide (←)"}
+                      title={t("prevSlide") + " (←)"}
                     >
                       <ChevronLeft className="h-4 w-4" />
                     </button>
@@ -616,7 +607,7 @@ export function PresentationViewer({
                       onClick={() => goToSlide(currentSlideIndex + 1)}
                       disabled={currentSlideIndex >= slides.length - 1}
                       className="h-6 w-6 rounded-full hover:bg-white/10 disabled:opacity-30 disabled:pointer-events-none flex items-center justify-center transition-colors cursor-pointer text-foreground"
-                      title={isIndo ? "Slide Berikutnya (→ / Space)" : "Next Slide (→ / Space)"}
+                      title={t("nextSlide") + " (→ / Space)"}
                     >
                       <ChevronRight className="h-4 w-4" />
                     </button>
@@ -632,7 +623,7 @@ export function PresentationViewer({
                           ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
                           : "bg-white/5 hover:bg-white/10 text-muted-foreground hover:text-foreground border-transparent"
                       )}
-                      title={isIndo ? "Tampilkan Catatan Pembicara" : "Toggle Speaker Notes"}
+                      title={t("toggleSpeakerNotes")}
                     >
                       Notes
                     </button>
@@ -648,23 +639,25 @@ export function PresentationViewer({
                   <div className="flex items-center justify-between mb-1.5">
                     <span className="text-xs font-semibold text-amber-400 flex items-center gap-1.5">
                       <MessageSquare className="h-3.5 w-3.5" />
-                      {isIndo
-                        ? `Catatan Pembicara (Slide ${currentSlideIndex + 1}: ${currentSlide?.title || ""})`
-                        : `Speaker Notes (Slide ${currentSlideIndex + 1}: ${currentSlide?.title || ""})`}
+                      {t("speakerNotesSlide", {
+                        slide: currentSlideIndex + 1,
+                        title: currentSlide?.title || "",
+                      })}
                     </span>
                     {onExplainInChat && (
                       <button
                         type="button"
                         onClick={() => {
-                          const prompt = isIndo
-                            ? `Tolong jelaskan lebih dalam tentang materi pada slide "${currentSlide?.title}" dari presentasi:\nCatatan: ${currentSlide?.speakerNotes || currentSlide?.subtitle || "Materi konsep slide"}`
-                            : `Please elaborate in depth on the material in slide "${currentSlide?.title}":\nNotes: ${currentSlide?.speakerNotes || currentSlide?.subtitle || "Slide concept details"}`;
+                          const prompt = t("explainSlidePrompt", {
+                            title: currentSlide?.title || "",
+                            notes: currentSlide?.speakerNotes || currentSlide?.subtitle || "",
+                          });
                           onExplainInChat(prompt);
                         }}
                         className="text-[11px] text-muted-foreground hover:text-primary flex items-center gap-1 cursor-pointer transition-colors"
                       >
                         <Sparkles className="h-3 w-3" />
-                        <span>{isIndo ? "Tanya AI tentang slide ini" : "Ask AI about this slide"}</span>
+                        <span>{t("askAiAboutSlide")}</span>
                       </button>
                     )}
                   </div>
@@ -673,9 +666,7 @@ export function PresentationViewer({
                       <p className="whitespace-pre-wrap">{currentSlide.speakerNotes}</p>
                     ) : (
                       <p className="italic text-muted-foreground/50">
-                        {isIndo
-                          ? "Tidak ada catatan pembicara untuk slide ini."
-                          : "No speaker notes recorded for this slide."}
+                        {t("noSpeakerNotes")}
                       </p>
                     )}
                   </div>
@@ -718,7 +709,7 @@ export function PresentationViewer({
                       className="hover:text-amber-400 transition-colors cursor-pointer flex items-center gap-1 font-medium"
                     >
                       <ExternalLink className="h-3 w-3" />
-                      <span>{isIndo ? "Buka di Google Slides" : "Open in Google Slides"}</span>
+                      <span>{t("openInGoogleSlides")}</span>
                     </button>
                   )}
                 </div>
@@ -740,9 +731,7 @@ export function PresentationViewer({
                   {data.title || "Canva Presentation"}
                 </h2>
                 <p className="text-xs sm:text-sm text-muted-foreground max-w-md mb-6 leading-relaxed">
-                  {isIndo
-                    ? "Presentasi berhasil dibuat di Canva! Anda dapat mengunduh sebagai PDF/PPTX atau membuka langsung di Canva Editor."
-                    : "Presentation generated in Canva! You can download as PDF/PPTX or open directly in Canva Editor."}
+                  {t("canvaSuccessDesc")}
                 </p>
 
                 <div className="flex flex-wrap items-center justify-center gap-3">
@@ -757,7 +746,7 @@ export function PresentationViewer({
                     ) : (
                       <Download className="h-4 w-4" />
                     )}
-                    <span>{isIndo ? "Unduh PDF" : "Download PDF"}</span>
+                    <span>{t("downloadPdf")}</span>
                   </button>
 
                   <button
@@ -771,7 +760,7 @@ export function PresentationViewer({
                     ) : (
                       <Download className="h-4 w-4" />
                     )}
-                    <span>{isIndo ? "Unduh PPTX" : "Download PPTX"}</span>
+                    <span>{t("downloadPptx")}</span>
                   </button>
 
                   {data.canvaEditUrl && (
@@ -781,7 +770,7 @@ export function PresentationViewer({
                       className="px-5 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-medium text-xs sm:text-sm flex items-center gap-2 shadow-md transition-all active:scale-98 cursor-pointer"
                     >
                       <ExternalLink className="h-4 w-4" />
-                      <span>{isIndo ? "Buka di Canva Editor" : "Open in Canva Editor"}</span>
+                      <span>{t("openInCanvaEditor")}</span>
                     </button>
                   )}
 
@@ -792,7 +781,7 @@ export function PresentationViewer({
                       className="px-5 py-2.5 rounded-xl bg-[#282828] hover:bg-[#333333] text-foreground font-medium text-xs sm:text-sm flex items-center gap-2 border border-[#3d3d3d] transition-all cursor-pointer"
                     >
                       <Eye className="h-4 w-4" />
-                      <span>{isIndo ? "Lihat Tampilan Publik" : "View Public Link"}</span>
+                      <span>{t("viewPublicLink")}</span>
                     </button>
                   )}
                 </div>
@@ -802,7 +791,7 @@ export function PresentationViewer({
               {data.canvaThumbnails && data.canvaThumbnails.length > 0 && (
                 <div className="w-full">
                   <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 text-left">
-                    {isIndo ? "Pratinjau Halaman Canva" : "Canva Slide Previews"}
+                    {t("canvaSlidePreviews")}
                   </h3>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
                     {data.canvaThumbnails.map((thumb, idx) => (

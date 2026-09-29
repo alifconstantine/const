@@ -31,8 +31,7 @@ export function MobileInfographicViewer({
   onClose,
   onExplainInChat,
 }: MobileInfographicViewerProps) {
-  const { language } = useI18n();
-  const isIndo = language === "id";
+  const { t } = useI18n();
 
   const [zoomLevel, setZoomLevel] = useState<number>(1);
   const [panPosition, setPanPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -79,9 +78,7 @@ export function MobileInfographicViewer({
         setTimeout(() => URL.revokeObjectURL(downloadHref), 2000);
       }
 
-      toast.success(
-        isIndo ? "Mulai mengunduh infografis..." : "Downloading infographic..."
-      );
+      toast.success(t("downloadingInfographicImage"));
     } catch {
       window.open(data.imageUrl, "_blank");
     }
@@ -91,15 +88,17 @@ export function MobileInfographicViewer({
     const textToCopy = data.prompt || data.visualPrompt || data.title;
     navigator.clipboard.writeText(textToCopy);
     setIsCopied(true);
-    toast.success(isIndo ? "Prompt disalin!" : "Prompt copied!");
+    toast.success(t("visualPromptCopied"));
     setTimeout(() => setIsCopied(false), 2000);
   };
 
   const handleDiscussInChat = () => {
     if (!onExplainInChat) return;
-    const prompt = isIndo
-      ? `Tolong jelaskan lebih dalam intisari dari infografis "${data.title}":\n\nRingkasan: ${data.summary || ""}\nPoin Kunci:\n${(data.keyPoints || []).map((p) => `- ${p}`).join("\n")}`
-      : `Please analyze and elaborate on the concepts in this infographic "${data.title}":\n\nSummary: ${data.summary || ""}\nKey Points:\n${(data.keyPoints || []).map((p) => `- ${p}`).join("\n")}`;
+    const content = `${t("summary")}: ${data.summary || ""}\n${t("keyTakeaways")}:\n${(data.keyPoints || []).map((p) => `- ${p}`).join("\n")}`;
+    const prompt = t("explainInfographicPrompt", {
+      title: data.title || t("aiInfographic"),
+      content,
+    });
 
     onExplainInChat(prompt);
   };
@@ -151,13 +150,13 @@ export function MobileInfographicViewer({
             type="button"
             onClick={onClose}
             className="h-9 w-9 rounded-xl hover:bg-secondary text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer shrink-0"
-            aria-label="Kembali"
+            aria-label={t("back")}
           >
             <ArrowLeft className="h-4 w-4" />
           </button>
           <div className="min-w-0 flex-1">
             <h1 className="text-xs font-semibold text-foreground truncate">
-              {data.title || (isIndo ? "Infografis AI" : "AI Infographic")}
+              {data.title || t("aiInfographic")}
             </h1>
             <div className="text-[10px] text-muted-foreground flex items-center gap-1.5 truncate">
               <span className="capitalize">{data.styleLabel || data.style}</span>
@@ -188,7 +187,7 @@ export function MobileInfographicViewer({
             type="button"
             onClick={handleCopyPrompt}
             className="h-8 w-8 rounded-lg bg-secondary hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
-            title={isIndo ? "Salin Prompt" : "Copy Prompt"}
+            title={t("copyPrompt")}
           >
             {isCopied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
           </button>
@@ -199,7 +198,7 @@ export function MobileInfographicViewer({
             className="h-8 px-2.5 rounded-lg bg-primary text-primary-foreground text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer active:scale-95"
           >
             <Download className="h-3.5 w-3.5" />
-            <span className="text-[11px]">{isIndo ? "Unduh" : "Save"}</span>
+            <span className="text-[11px]">{t("save")}</span>
           </button>
         </div>
       </header>
@@ -221,7 +220,7 @@ export function MobileInfographicViewer({
           {!imageLoaded && (
             <div className="w-72 h-72 flex flex-col items-center justify-center gap-2 text-muted-foreground">
               <div className="h-7 w-7 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-              <span className="text-xs">{isIndo ? "Memuat infografis..." : "Loading..."}</span>
+              <span className="text-xs">{t("loadingInfographic")}</span>
             </div>
           )}
 
@@ -246,7 +245,7 @@ export function MobileInfographicViewer({
         >
           <div className="flex items-center gap-2">
             <Info className="h-3.5 w-3.5 text-primary" />
-            <span>{isIndo ? "Intisari & Poin Materi" : "Insights & Key Takeaways"}</span>
+            <span>{t("infographicInsightsTakeaways")}</span>
             {data.keyPoints && (
               <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-secondary text-muted-foreground font-sans tabular-nums">
                 {data.keyPoints.length}
@@ -261,7 +260,7 @@ export function MobileInfographicViewer({
             {data.summary && (
               <div>
                 <span className="font-semibold text-foreground block mb-0.5">
-                  {isIndo ? "Ringkasan" : "Summary"}
+                  {t("summary")}
                 </span>
                 <p className="text-muted-foreground leading-relaxed">{data.summary}</p>
               </div>
@@ -270,7 +269,7 @@ export function MobileInfographicViewer({
             {data.keyPoints && data.keyPoints.length > 0 && (
               <div>
                 <span className="font-semibold text-foreground block mb-1">
-                  {isIndo ? "Poin Kunci" : "Key Takeaways"}
+                  {t("keyTakeaways")}
                 </span>
                 <ul className="space-y-1">
                   {data.keyPoints.map((pt, idx) => (
@@ -291,7 +290,7 @@ export function MobileInfographicViewer({
                   className="w-full py-2 rounded-xl bg-secondary hover:bg-muted text-foreground flex items-center justify-center gap-2 font-medium transition-colors cursor-pointer"
                 >
                   <MessageSquare className="h-3.5 w-3.5 text-primary" />
-                  <span>{isIndo ? "Diskusikan di Chat AI" : "Discuss in AI Chat"}</span>
+                  <span>{t("discussInAiChat")}</span>
                 </button>
               </div>
             )}

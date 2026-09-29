@@ -75,7 +75,6 @@ type ModelCategory = "llm" | "image" | "voice";
 
 export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsViewProps) {
   const { t, language } = useI18n();
-  const isIndo = language === "id";
 
   // Modality category
   const [activeCategory, setActiveCategory] = useState<ModelCategory>(initialCategory);
@@ -163,11 +162,7 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
     setExpandedProviderId(null);
     setEditFormData(null);
     setIsAddingModel(false);
-    toast.success(
-      isIndo
-        ? `Pengaturan provider ${editFormData.name} berhasil disimpan.`
-        : `Provider ${editFormData.name} saved successfully.`
-    );
+    toast.success(t("providerSettingsSaved", { name: editFormData.name }));
   };
 
   const handleCancelProviderEdit = () => {
@@ -193,7 +188,7 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
       setExpandedProviderId(null);
       setEditFormData(null);
     }
-    toast.success(isIndo ? "Provider dihapus." : "Provider deleted.");
+    toast.success(t("providerDeleted"));
   };
 
   const handleSetDefaultModel = (modelId: string) => {
@@ -204,7 +199,7 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
     setAiConfig(newConfig);
     saveStoredAiConfig(newConfig);
     toast.success(
-      isIndo ? `Model default diubah ke ${modelId}` : `Default model changed to ${modelId}`
+      t("defaultModelChanged", { modelId })
     );
   };
 
@@ -220,9 +215,7 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
         models: res.models,
       });
       toast.success(
-        isIndo
-          ? `Berhasil mengambil ${res.models.length} model dari endpoint.`
-          : `Successfully fetched ${res.models.length} models from endpoint.`
+        t("fetchedModelsEndpoint", { count: res.models.length })
       );
     } else {
       toast.error(res.error || t("failedFetchModels"));
@@ -238,7 +231,7 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
         protocol: "openai-completions",
         models: CONST_ROUTER_DEFAULT_MODELS,
       });
-      toast.success(isIndo ? "Model dikembalikan ke default." : "Models restored to default.");
+      toast.success(t("modelsRestoredToDefault"));
     } else {
       const preset = PRESET_PROVIDERS.find((p) => p.id === editFormData.id);
       if (preset) {
@@ -248,7 +241,7 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
           protocol: preset.protocol,
           models: [], // No preset models!
         });
-        toast.success(isIndo ? "Konfigurasi direset ke preset." : "Config restored to preset.");
+        toast.success(t("configRestoredToPreset"));
       }
     }
   };
@@ -325,9 +318,7 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
 
     if (res.success) {
       toast.success(
-        isIndo
-          ? `Koneksi berhasil! Latensi: ${res.latencyMs}ms`
-          : `Connected successfully! Latency: ${res.latencyMs}ms`
+        t("connectedWithLatency", { latency: res.latencyMs ?? 0 })
       );
     } else {
       toast.error(
@@ -457,9 +448,7 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
     setExpandedVoiceProviderId(null);
     setEditVoiceFormData(null);
     toast.success(
-      isIndo
-        ? `Pengaturan suara ${editVoiceFormData.name} berhasil disimpan.`
-        : `Voice provider ${editVoiceFormData.name} saved successfully.`
+      t("voiceProviderSavedSuccess", { name: editVoiceFormData.name })
     );
   };
 
@@ -482,7 +471,7 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
       setExpandedVoiceProviderId(null);
       setEditVoiceFormData(null);
     }
-    toast.success(isIndo ? "Penyedia suara dihapus." : "Voice provider removed.");
+    toast.success(t("voiceProviderRemoved"));
   };
 
   const [isTestingVoiceConnection, setIsTestingVoiceConnection] = useState(false);
@@ -500,9 +489,7 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
 
     if (res.success) {
       toast.success(
-        isIndo
-          ? `Koneksi endpoint suara berhasil! Latensi: ${res.latencyMs}ms`
-          : `Voice endpoint connected! Latency: ${res.latencyMs}ms`
+        t("voiceEndpointConnected", { latency: res.latencyMs ?? 0 })
       );
     } else {
       toast.error(
@@ -548,9 +535,7 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
     if (res.success && res.voices && res.voices.length > 0) {
       setCachedVoiceList(res.voices);
       toast.success(
-        isIndo
-          ? `Berhasil memuat ${res.voices.length} karakter suara dari Inworld.`
-          : `Loaded ${res.voices.length} voice characters from Inworld.`
+        t("loadedVoiceCharactersCount", { count: res.voices.length })
       );
     } else {
       toast.error(res.error || t("failedLoadVoices"));
@@ -570,9 +555,7 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
     if (res.success && res.models && res.models.length > 0) {
       setAvailableVoiceModels(res.models);
       toast.success(
-        isIndo
-          ? `Berhasil memperbarui model suara.`
-          : `Successfully updated voice models.`
+        t("voiceModelsUpdatedSuccess")
       );
     } else {
       toast.error(res.error || t("failedLoadVoiceModels"));
@@ -603,7 +586,7 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
           setIsPlayingAudio(true);
         }
       }, 100);
-      toast.success(isIndo ? "Audio berhasil diputar." : "Audio synthesized successfully.");
+      toast.success(t("audioSynthesizedSuccess"));
     } else {
       toast.error(res.error || t("failedSynthesizeAudio"));
     }
@@ -687,7 +670,7 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
     setExpandedImageProviderId(null);
     setEditImageFormData(null);
     setIsAddingImageModel(false);
-    toast.success(isIndo ? "Penyedia gambar berhasil disimpan." : "Image provider saved successfully.");
+    toast.success(t("imageProviderSaved"));
   };
 
   const handleCancelImageProviderEdit = () => {
@@ -722,7 +705,7 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
       setExpandedImageProviderId(null);
       setEditImageFormData(null);
     }
-    toast.success(isIndo ? "Penyedia gambar dihapus." : "Image provider removed.");
+    toast.success(t("imageProviderRemoved"));
   };
 
   const handleTestImageProviderConnection = async (targetProvider?: ImageProvider) => {
@@ -738,9 +721,7 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
 
     if (res.success) {
       toast.success(
-        isIndo
-          ? `Koneksi endpoint gambar berhasil! Latensi: ${res.latencyMs}ms`
-          : `Image endpoint connected! Latency: ${res.latencyMs}ms`
+        t("imageEndpointConnected", { latency: res.latencyMs ?? 0 })
       );
     } else {
       toast.error(
@@ -755,24 +736,22 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
       const res = await testImageModelConnectivity(provider, modelId);
       if (res.success) {
         toast.success(
-          isIndo ? `Model ${modelId} aktif & operasional!` : `Model ${modelId} is operational!`,
+          t("modelOperational", { modelId }),
           {
-            description: isIndo
-              ? `Latensi: ${res.latencyMs}ms • Endpoint berhasil merespons.`
-              : `Latency: ${res.latencyMs}ms • Endpoint responded successfully.`,
+            description: t("modelLatencyDesc", { latency: res.latencyMs ?? 0 }),
           }
         );
       } else {
         toast.error(
-          isIndo ? `Pengujian gagal untuk ${modelId}` : `Test failed for ${modelId}`,
+          t("testFailedForModel", { modelId }),
           {
-            description: res.error || (isIndo ? "Gagal berkomunikasi dengan provider." : "Failed to communicate with provider."),
+            description: res.error || t("failedCommunicateProvider"),
           }
         );
       }
     } catch (err: any) {
       toast.error(
-        isIndo ? `Error pengujian ${modelId}` : `Error testing ${modelId}`,
+        t("errorTestingModel", { modelId }),
         {
           description: err.message || "Unknown error occurred.",
         }
@@ -806,7 +785,7 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
     setNewImageModelId("");
     setNewImageModelName("");
     setIsAddingImageModel(false);
-    toast.success(isIndo ? `Model ${cleanId} ditambahkan ke form.` : `Model ${cleanId} added to form.`);
+    toast.success(t("modelAddedToForm", { modelId: cleanId }));
   };
 
   const handleRemoveModelFromImageForm = (modelId: string) => {
@@ -826,9 +805,7 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
     setImageConfig(newConfig);
     saveStoredImageConfig(newConfig);
     toast.success(
-      isIndo
-        ? `Model gambar aktif diubah ke ${modelId}`
-        : `Active image model set to ${modelId}`
+      t("activeImageModelSet", { modelId })
     );
   };
 
@@ -839,16 +816,14 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
         <div>
           <div className="flex items-center gap-2.5">
             <h1 className="font-serif text-2xl sm:text-3xl font-normal tracking-tight text-foreground">
-              {isIndo ? "Model" : "Models"}
+              {t("modelsHeaderTitle")}
             </h1>
             <span className="text-xs px-2.5 py-0.5 rounded-full bg-secondary text-muted-foreground font-sans">
               Const Router
             </span>
           </div>
           <p className="text-xs text-muted-foreground mt-0.5">
-            {isIndo
-              ? "Masukkan API key Anda untuk menggunakan model dari penyedia berikut."
-              : "Enter your API keys to use models from the following providers."}
+            {t("modelsHeaderDesc")}
           </p>
         </div>
 
@@ -928,7 +903,7 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
                 className="h-9 px-3.5 rounded-xl border border-border hover:bg-secondary/70 text-xs font-medium text-foreground transition-all flex items-center gap-1.5 cursor-pointer shadow-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-foreground/20"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>{isIndo ? "Tambah penyedia" : "Add provider"}</span>
+                <span>{t("addProvider")}</span>
                 <ChevronDown className="w-3 h-3 text-muted-foreground" />
               </button>
             </DropdownMenuTrigger>
@@ -938,14 +913,14 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
                 className="text-xs px-3 py-2 rounded-lg cursor-pointer hover:bg-secondary/70 focus:bg-secondary/70 flex items-center gap-2"
               >
                 <Plus className="w-3.5 h-3.5 text-muted-foreground" />
-                <span>{isIndo ? "Pilih penyedia adapter" : "Add provider"}</span>
+                <span>{t("chooseAdapterProvider")}</span>
               </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={handleAddCustomProvider}
                 className="text-xs px-3 py-2 rounded-lg cursor-pointer hover:bg-secondary/70 focus:bg-secondary/70 flex items-center gap-2"
               >
                 <Plus className="w-3.5 h-3.5 text-muted-foreground" />
-                <span>{isIndo ? "Tambah kustom penyedia" : "Add a custom provider"}</span>
+                <span>{t("addCustomProvider")}</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
@@ -958,7 +933,7 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
             className="h-9 px-3.5 rounded-xl border border-border hover:bg-secondary/70 text-xs font-medium text-foreground transition-all flex items-center gap-1.5 cursor-pointer shadow-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-foreground/20"
           >
             <Plus className="w-3.5 h-3.5" />
-            <span>{isIndo ? "Tambah penyedia suara" : "Add voice provider"}</span>
+            <span>{t("addVoiceProvider")}</span>
           </button>
         )}
 
@@ -969,7 +944,7 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
             className="h-9 px-3.5 rounded-xl border border-border hover:bg-secondary/70 text-xs font-medium text-foreground transition-all flex items-center gap-1.5 cursor-pointer shadow-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-foreground/20"
           >
             <Plus className="w-3.5 h-3.5" />
-            <span>{isIndo ? "Tambah penyedia gambar" : "Add image provider"}</span>
+            <span>{t("addImageProvider")}</span>
           </button>
         )}
       </div>
@@ -1026,7 +1001,7 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
                           : "border-border hover:bg-secondary text-foreground"
                       )}
                     >
-                      {isExpanded ? (isIndo ? "Tutup" : "Close") : "Edit"}
+                      {isExpanded ? t("close") : t("edit")}
                     </button>
                     {!provider.isDefault && (
                       <button
@@ -1046,7 +1021,7 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
                     {/* Subtitle without raw debug ID */}
                     <div>
                       <h3 className="text-sm font-semibold text-foreground">
-                        {editFormData.name || (isIndo ? "Penyedia Baru" : "New Provider")}
+                        {editFormData.name || t("newProvider")}
                       </h3>
                     </div>
 
@@ -1171,9 +1146,7 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
                       <div className="space-y-2">
                         {editFormData.models.length === 0 ? (
                           <div className="p-4 rounded-xl border border-dashed border-border text-center text-xs text-muted-foreground bg-secondary/10">
-                            {isIndo
-                              ? "Belum ada model yang terdaftar. Masukkan API key lalu klik 'Fetch available models' atau tambah model secara manual."
-                              : "No models configured. Enter API key and click 'Fetch available models' or add manually."}
+                            {t("noModelsRegisteredHint")}
                           </div>
                         ) : (
                           editFormData.models.map((model) => {
@@ -1305,7 +1278,7 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
                             ) : (
                               <Unplug className="w-3.5 h-3.5" />
                             )}
-                            <span>{isTestingConnection ? (isIndo ? "Menguji..." : "Testing...") : (isIndo ? "Uji Koneksi" : "Test Connection")}</span>
+                            <span>{isTestingConnection ? t("testing") : t("testConnection")}</span>
                           </button>
                         )}
                       </div>
@@ -1429,7 +1402,7 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
                           : "border-border hover:bg-secondary text-foreground"
                       )}
                     >
-                      {isExpanded ? (isIndo ? "Tutup" : "Close") : "Edit"}
+                      {isExpanded ? t("close") : t("edit")}
                     </button>
                     {!provider.isDefault && (
                       <button
@@ -1437,7 +1410,7 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
                         onClick={(e) => handleDeleteVoiceProvider(provider.id, e)}
                         className="px-3.5 py-1.5 rounded-xl border border-destructive/30 hover:border-destructive/60 hover:bg-destructive/10 text-destructive text-xs font-medium transition-all cursor-pointer"
                       >
-                        Delete
+                        {t("delete")}
                       </button>
                     )}
                   </div>
@@ -1815,7 +1788,7 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
                             ) : (
                               <Unplug className="w-3.5 h-3.5" />
                             )}
-                            <span>{isTestingVoiceConnection ? (isIndo ? "Menguji..." : "Testing...") : (isIndo ? "Uji Koneksi" : "Test Connection")}</span>
+                            <span>{isTestingVoiceConnection ? t("testing") : t("testConnection")}</span>
                           </button>
                         )}
                       </div>
@@ -1826,14 +1799,14 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
                           onClick={handleCancelVoiceProviderEdit}
                           className="px-4 py-2 rounded-xl border border-border hover:bg-secondary text-xs font-medium text-foreground transition-colors cursor-pointer"
                         >
-                          Cancel
+                          {t("cancel")}
                         </button>
                         <button
                           type="button"
                           onClick={handleApplyVoiceProviderEdit}
                           className="px-4 py-2 rounded-xl bg-foreground text-background text-xs font-semibold hover:opacity-90 active:scale-95 transition-all cursor-pointer"
                         >
-                          Apply
+                          {t("apply")}
                         </button>
                       </div>
                     </div>
@@ -1857,12 +1830,10 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
               </div>
               <div className="space-y-1 max-w-md mx-auto">
                 <h3 className="font-serif text-lg text-foreground font-medium">
-                  {isIndo ? "Belum Ada Penyedia Gambar" : "No Image Providers Configured"}
+                  {t("noImageProvidersConfigured")}
                 </h3>
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  {isIndo
-                    ? "Const Learn mendukung generator gambar kustom (OpenRouter, Together AI, OpenAI DALL-E, Fal AI, dsb). Masukkan nama penyedia, Base URL, dan API Key untuk mulai membuat visual."
-                    : "Const Learn supports custom visual generators (OpenRouter, Together AI, OpenAI DALL-E, Fal AI, etc). Enter provider name, Base URL, and API key to begin."}
+                  {t("noImageProvidersDesc")}
                 </p>
               </div>
               <button
@@ -1871,7 +1842,7 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
                 className="px-4 py-2 rounded-xl bg-foreground text-background text-xs font-semibold hover:opacity-90 active:scale-95 transition-all cursor-pointer inline-flex items-center gap-1.5 shadow-xs"
               >
                 <Plus className="w-3.5 h-3.5" />
-                <span>{isIndo ? "Tambah Penyedia Pertama" : "Add First Provider"}</span>
+                <span>{t("addFirstProvider")}</span>
               </button>
             </div>
           ) : (
@@ -1896,7 +1867,7 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
                       <span className="text-sm font-semibold text-foreground tracking-tight truncate">
-                        {provider.name || (isIndo ? "Penyedia Gambar Baru" : "New Image Provider")}
+                        {provider.name || t("newImageProvider")}
                       </span>
                       {provider.baseUrl && (
                         <span className="px-2 py-0.5 rounded-md bg-secondary text-muted-foreground text-[10.5px] font-sans border border-border/70 truncate max-w-[200px] shrink-0">
@@ -1904,11 +1875,11 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
                         </span>
                       )}
                       <span className="px-2 py-0.5 rounded-md bg-secondary text-muted-foreground text-[10.5px] font-sans tabular-nums border border-border/70 shrink-0">
-                        {provider.models.length} {isIndo ? "model" : "models"}
+                        {t("modelsCount", { count: provider.models.length })}
                       </span>
                       {isActiveProvider && (
                         <span className="px-2 py-0.5 rounded-md bg-foreground/10 text-foreground text-[10.5px] font-medium border border-foreground/20 shrink-0">
-                          Active
+                          {t("active")}
                         </span>
                       )}
                       <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" />
@@ -1928,14 +1899,14 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
                             : "border-border hover:bg-secondary text-foreground"
                         )}
                       >
-                        {isExpanded ? (isIndo ? "Tutup" : "Close") : "Edit"}
+                        {isExpanded ? t("close") : t("edit")}
                       </button>
                       <button
                         type="button"
                         onClick={(e) => handleDeleteImageProvider(provider.id, e)}
                         className="px-3.5 py-1.5 rounded-xl border border-destructive/30 hover:border-destructive/60 hover:bg-destructive/10 text-destructive text-xs font-medium transition-all cursor-pointer"
                       >
-                        Delete
+                        {t("delete")}
                       </button>
                     </div>
                   </div>
@@ -1945,19 +1916,17 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
                     <div className="px-5 pb-5 pt-2 space-y-5 border-t border-border/40 animate-in fade-in-50 duration-200">
                       <div>
                         <h3 className="text-sm font-semibold text-foreground">
-                          {editImageFormData.name || (isIndo ? "Konfigurasi Penyedia Gambar" : "Configure Image Provider")}
+                          {editImageFormData.name || t("configureImageProvider")}
                         </h3>
                         <p className="text-[11px] text-muted-foreground mt-0.5">
-                          {isIndo
-                            ? "Masukkan endpoint gambar (OpenRouter /images, OpenAI /images/generations, atau custom) dan API Key Anda."
-                            : "Provide your image generation endpoint (OpenRouter /images, OpenAI /images/generations, or custom) and API key."}
+                          {t("configureImageProviderDesc")}
                         </p>
                       </div>
 
                       {/* 1. Display Name */}
                       <div className="space-y-1.5">
                         <label className="text-xs font-medium text-foreground block">
-                          {isIndo ? "Nama Penyedia" : "Provider Name"}
+                          {t("providerNameLabel")}
                         </label>
                         <input
                           type="text"
@@ -2003,7 +1972,7 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
                       <div className="space-y-1.5">
                         <div className="flex items-center justify-between">
                           <label className="text-xs font-medium text-foreground block">
-                            {isIndo ? "Protokol API" : "API protocol"}
+                            {t("apiProtocolLabel")}
                           </label>
                           <span className="text-[10.5px] text-muted-foreground font-sans">
                             {editImageFormData.protocol === "openrouter"
@@ -2023,7 +1992,7 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
                           }
                         >
                           <SelectTrigger className="w-full h-10 rounded-xl bg-secondary/30 border border-border text-xs text-foreground focus:ring-1 focus:ring-foreground/20">
-                            <SelectValue placeholder={isIndo ? "Pilih protokol API" : "Select API protocol"} />
+                            <SelectValue placeholder={t("selectApiProtocolPlaceholder")} />
                           </SelectTrigger>
                           <SelectContent className="bg-card border-border text-foreground rounded-xl shadow-xl">
                             <SelectItem value="openrouter" className="text-xs cursor-pointer">
@@ -2058,7 +2027,7 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
                             type="button"
                             onClick={() => setShowImageApiKey(!showImageApiKey)}
                             className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer transition-colors p-1"
-                            title={showImageApiKey ? "Hide key" : "Show key"}
+                            title={showImageApiKey ? t("hideKey") : t("showKey")}
                           >
                             {showImageApiKey ? (
                               <EyeOff className="w-3.5 h-3.5" />
@@ -2073,12 +2042,10 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
                       <div className="space-y-2.5 pt-2 border-t border-border/40">
                         <div className="pb-1">
                           <label className="text-xs font-medium text-foreground block">
-                            {isIndo ? "Daftar Model Gambar" : "Image Models Catalog"}
+                            {t("imageModelsCatalog")}
                           </label>
                           <span className="text-[11px] text-muted-foreground">
-                            {isIndo
-                              ? "Tambahkan Model ID secara manual untuk provider ini dan lakukan pengujian."
-                              : "Add Model IDs manually for this provider and test connectivity."}
+                            {t("imageModelsCatalogDesc")}
                           </span>
                         </div>
 
@@ -2086,9 +2053,7 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
                         <div className="space-y-2">
                           {editImageFormData.models.length === 0 ? (
                             <div className="p-4 rounded-xl border border-dashed border-border text-center text-xs text-muted-foreground bg-secondary/10">
-                              {isIndo
-                                ? "Belum ada model gambar terdaftar. Tambahkan Model ID manual di bawah (contoh: flux-1-schnell, dall-e-3, recraft-v3)."
-                                : "No image models configured. Add a Model ID manually below (e.g., flux-1-schnell, dall-e-3, recraft-v3)."}
+                              {t("noImageModelsCatalog")}
                             </div>
                           ) : (
                             editImageFormData.models.map((model) => {
@@ -2125,7 +2090,7 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
                                     {isActive ? (
                                       <span className="text-[11px] font-medium text-foreground px-2.5 py-1 rounded-lg bg-foreground/10 border border-foreground/20 flex items-center gap-1">
                                         <Check className="w-3 h-3 text-emerald-500" />
-                                        <span>Active</span>
+                                        <span>{t("active")}</span>
                                       </span>
                                     ) : (
                                       <button
@@ -2135,7 +2100,7 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
                                         }
                                         className="text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded-lg border border-border hover:bg-secondary transition-colors cursor-pointer"
                                       >
-                                        Set Active
+                                        {t("setActive")}
                                       </button>
                                     )}
 
@@ -2147,14 +2112,14 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
                                       }
                                       disabled={isTestingThisModel}
                                       className="px-2.5 py-1 rounded-lg border border-border hover:bg-secondary text-xs font-medium text-foreground transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
-                                      title={isIndo ? "Uji konektivitas model" : "Test model operational connectivity"}
+                                      title={t("testModelConnectivity")}
                                     >
                                       {isTestingThisModel ? (
                                         <RefreshCw className="w-3 h-3 animate-spin text-foreground" />
                                       ) : (
                                         <Play className="w-3 h-3 text-muted-foreground" />
                                       )}
-                                      <span>{isTestingThisModel ? (isIndo ? "Menguji..." : "Testing...") : "Test"}</span>
+                                      <span>{isTestingThisModel ? t("testing") : t("test")}</span>
                                     </button>
 
                                     {/* Delete Model Button */}
@@ -2162,7 +2127,7 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
                                       type="button"
                                       onClick={() => handleRemoveModelFromImageForm(model.id)}
                                       className="h-7 w-7 rounded-lg border border-border hover:border-destructive/40 hover:bg-destructive/10 text-muted-foreground hover:text-destructive flex items-center justify-center transition-colors cursor-pointer"
-                                      title={isIndo ? "Hapus model" : "Delete model"}
+                                      title={t("deleteModel")}
                                     >
                                       <Trash2 className="w-3.5 h-3.5" />
                                     </button>
@@ -2177,7 +2142,7 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
                         {isAddingImageModel ? (
                           <div className="p-3.5 rounded-xl border border-border bg-secondary/30 space-y-3 animate-in fade-in-50 duration-200">
                             <div className="text-xs font-semibold text-foreground">
-                              {isIndo ? "Tambah Model Gambar Manual" : "Add Image Model Manually"}
+                              {t("addImageModelManually")}
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                               <div className="space-y-1">
@@ -2194,7 +2159,7 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
                               </div>
                               <div className="space-y-1">
                                 <label className="text-[11px] text-muted-foreground block">
-                                  {isIndo ? "Nama Tampilan (Opsional)" : "Display Name (Optional)"}
+                                  {t("displayNameOptional")}
                                 </label>
                                 <input
                                   type="text"
@@ -2215,14 +2180,14 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
                                 }}
                                 className="px-3 py-1 rounded-xl border border-border hover:bg-secondary text-xs text-muted-foreground hover:text-foreground cursor-pointer"
                               >
-                                Cancel
+                                {t("cancel")}
                               </button>
                               <button
                                 type="button"
                                 onClick={handleAddModelToImageForm}
                                 className="px-3.5 py-1 rounded-xl bg-foreground text-background text-xs font-medium hover:opacity-90 active:scale-95 transition-all cursor-pointer"
                               >
-                                {isIndo ? "Tambahkan Model" : "Add Model"}
+                                {t("addModelAction")}
                               </button>
                             </div>
                           </div>
@@ -2233,7 +2198,7 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
                             className="w-full py-2 rounded-xl border border-dashed border-border hover:border-foreground/30 hover:bg-secondary/40 text-xs font-medium text-muted-foreground hover:text-foreground transition-all flex items-center justify-center gap-1.5 cursor-pointer"
                           >
                             <Plus className="w-3.5 h-3.5" />
-                            <span>{isIndo ? "Tambah Model Manual" : "Add Model Manually"}</span>
+                            <span>{t("addImageModelManually")}</span>
                           </button>
                         )}
                       </div>
@@ -2255,8 +2220,8 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
                               )}
                               <span>
                                 {isTestingImageConnection
-                                  ? (isIndo ? "Menguji..." : "Testing...")
-                                  : (isIndo ? "Uji Koneksi" : "Test Connection")}
+                                  ? t("testing")
+                                  : t("testConnection")}
                               </span>
                             </button>
                           )}
@@ -2268,14 +2233,14 @@ export function ModelsView({ onOpenSettings, initialCategory = "llm" }: ModelsVi
                             onClick={handleCancelImageProviderEdit}
                             className="px-4 py-2 rounded-xl border border-border hover:bg-secondary text-xs font-medium text-foreground transition-colors cursor-pointer"
                           >
-                            Cancel
+                            {t("cancel")}
                           </button>
                           <button
                             type="button"
                             onClick={handleApplyImageProviderEdit}
                             className="px-4 py-2 rounded-xl bg-foreground text-background text-xs font-semibold hover:opacity-90 active:scale-95 transition-all cursor-pointer"
                           >
-                            Apply
+                            {t("apply")}
                           </button>
                         </div>
                       </div>

@@ -29,8 +29,7 @@ export function FlashcardViewer({
   onToggleExpand,
   isExpanded = false,
 }: FlashcardViewerProps) {
-  const { language } = useI18n();
-  const isIndo = language === "id";
+  const { t } = useI18n();
 
   const cards: FlashcardItem[] = flashcard.cards || [];
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -78,19 +77,10 @@ export function FlashcardViewer({
     e.stopPropagation();
     if (!currentCard || !onExplainInChat) return;
 
-    const promptText = isIndo
-      ? `Tolong jelaskan secara komprehensif mengenai konsep flashcard ini:
-
-**Konsep / Istilah**: "${currentCard.front}"
-**Definisi / Intisari**: "${currentCard.back}"
-
-Berdasarkan materi sumber di notebook ini, bagaimana penerapan konsep tersebut dan berikan contoh konkret atau analogi yang mudah dipahami.`
-      : `Please explain comprehensively this flashcard concept:
-
-**Concept / Term**: "${currentCard.front}"
-**Definition / Takeaway**: "${currentCard.back}"
-
-Based on the notebook sources, explain how this concept applies with concrete examples or intuitive analogies.`;
+    const promptText = t("explainFlashcardPrompt", {
+      front: currentCard.front,
+      back: currentCard.back,
+    });
 
     onExplainInChat(promptText);
   };
@@ -99,7 +89,7 @@ Based on the notebook sources, explain how this concept applies with concrete ex
     return (
       <div className="flex-1 flex flex-col items-center justify-center p-6 text-center text-muted-foreground">
         <Layers className="h-8 w-8 text-pink-500 mb-2" />
-        <p className="text-xs">{isIndo ? "Flashcard tidak memiliki kartu." : "Flashcards deck is empty."}</p>
+        <p className="text-xs">{t("flashcardsEmpty")}</p>
       </div>
     );
   }
@@ -112,7 +102,7 @@ Based on the notebook sources, explain how this concept applies with concrete ex
           <span className="hover:text-foreground transition-colors cursor-pointer">Studio</span>
           <span>&gt;</span>
           <span className="text-foreground font-medium truncate">
-            {flashcard.title || (isIndo ? "Flashcards" : "Flashcards Deck")}
+            {flashcard.title || t("flashcardsDeck")}
           </span>
         </div>
 
@@ -132,12 +122,10 @@ Based on the notebook sources, explain how this concept applies with concrete ex
       <div className="px-5 pt-4 pb-3 flex items-start justify-between shrink-0 border-b border-border">
         <div>
           <h2 className="text-base sm:text-lg font-semibold text-foreground tracking-tight leading-snug">
-            {flashcard.title || (isIndo ? "Kartu Tanya-Jawab" : "Flashcards")}
+            {flashcard.title || t("flashcardTitle")}
           </h2>
           <span className="text-[11.5px] text-muted-foreground block mt-0.5">
-            {isIndo
-              ? `${totalCards} kartu berdasarkan ${flashcard.sourceCount || 1} sumber`
-              : `${totalCards} cards based on ${flashcard.sourceCount || 1} source(s)`}
+            {t("cardsBasedOnSources", { count: totalCards, sources: flashcard.sourceCount || 1 })}
           </span>
         </div>
 
@@ -167,7 +155,7 @@ Based on the notebook sources, explain how this concept applies with concrete ex
                 {currentIndex + 1} / {totalCards}
               </span>
               <span className="text-[11px] text-muted-foreground/60">
-                {isIndo ? "Klik kartu untuk membalik" : "Click card to flip"}
+                {t("clickCardToFlip")}
               </span>
             </div>
 
@@ -179,10 +167,10 @@ Based on the notebook sources, explain how this concept applies with concrete ex
               {/* Card Label Tag */}
               <div className="flex items-center justify-between text-[11px] text-muted-foreground">
                 <span className="uppercase tracking-wider font-semibold text-pink-600 dark:text-pink-400">
-                  {isFlipped ? (isIndo ? "Penjelasan / Jawaban" : "Back / Answer") : (isIndo ? "Konsep / Pertanyaan" : "Front / Term")}
+                  {isFlipped ? t("cardBackAnswer") : t("cardFrontTerm")}
                 </span>
                 <span className="text-muted-foreground/70 group-hover:text-foreground transition-colors">
-                  {isIndo ? "Balik ⟲" : "Flip ⟲"}
+                  {t("flipCard")} ⟲
                 </span>
               </div>
 
@@ -209,10 +197,10 @@ Based on the notebook sources, explain how this concept applies with concrete ex
                   type="button"
                   onClick={handleExplain}
                   className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-secondary hover:bg-secondary/80 border border-border text-[11px] font-medium text-foreground transition-all cursor-pointer active:scale-95 shrink-0"
-                  title="Jelaskan di Chat"
+                  title={t("explainInChat")}
                 >
                   <Sparkles className="h-3 w-3 text-teal-500" />
-                  <span>{isIndo ? "Jelaskan" : "Explain"}</span>
+                  <span>{t("explainAction")}</span>
                 </button>
               </div>
             </div>
@@ -225,21 +213,21 @@ Based on the notebook sources, explain how this concept applies with concrete ex
                   onClick={() => handleRate("hard")}
                   className="flex-1 py-1.5 rounded-xl bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-xs text-rose-600 dark:text-rose-400 font-medium transition-colors cursor-pointer"
                 >
-                  {isIndo ? "Belum Paham" : "Hard"}
+                  {t("hardRating")}
                 </button>
                 <button
                   type="button"
                   onClick={() => handleRate("medium")}
                   className="flex-1 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-xs text-amber-600 dark:text-amber-400 font-medium transition-colors cursor-pointer"
                 >
-                  {isIndo ? "Ragu-ragu" : "Good"}
+                  {t("goodRating")}
                 </button>
                 <button
                   type="button"
                   onClick={() => handleRate("easy")}
                   className="flex-1 py-1.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 text-xs text-emerald-600 dark:text-emerald-400 font-medium transition-colors cursor-pointer"
                 >
-                  {isIndo ? "Sudah Paham" : "Easy"}
+                  {t("easyRating")}
                 </button>
               </div>
             )}
@@ -253,7 +241,7 @@ Based on the notebook sources, explain how this concept applies with concrete ex
                 className="px-3.5 py-1.5 rounded-xl bg-secondary hover:bg-secondary/80 disabled:opacity-40 disabled:pointer-events-none border border-border text-xs font-medium text-foreground transition-colors cursor-pointer flex items-center gap-1"
               >
                 <ChevronLeft className="h-3.5 w-3.5" />
-                <span>{isIndo ? "Sebelumnya" : "Previous"}</span>
+                <span>{t("previousAction")}</span>
               </button>
 
               <button
@@ -263,12 +251,8 @@ Based on the notebook sources, explain how this concept applies with concrete ex
               >
                 <span>
                   {currentIndex === totalCards - 1
-                    ? isIndo
-                      ? "Selesai"
-                      : "Finish"
-                    : isIndo
-                    ? "Berikutnya"
-                    : "Next"}
+                    ? t("finishAction")
+                    : t("nextAction")}
                 </span>
                 <ChevronRight className="h-3.5 w-3.5" />
               </button>
@@ -283,12 +267,10 @@ Based on the notebook sources, explain how this concept applies with concrete ex
 
             <div>
               <h3 className="text-lg font-semibold text-foreground">
-                {isIndo ? "Sesi Flashcard Selesai!" : "Flashcards Session Complete!"}
+                {t("flashcardsSessionComplete")}
               </h3>
               <p className="text-xs text-muted-foreground mt-1">
-                {isIndo
-                  ? `Anda telah meninjau seluruh ${totalCards} kartu materi ini.`
-                  : `You've reviewed all ${totalCards} cards.`}
+                {t("reviewedAllCards", { count: totalCards })}
               </p>
             </div>
 
@@ -299,7 +281,7 @@ Based on the notebook sources, explain how this concept applies with concrete ex
                 className="px-4 py-2 rounded-xl bg-secondary hover:bg-secondary/80 border border-border text-xs font-medium text-foreground transition-colors cursor-pointer flex items-center gap-1.5"
               >
                 <RotateCcw className="h-3.5 w-3.5" />
-                <span>{isIndo ? "Ulangi Kartu" : "Review Again"}</span>
+                <span>{t("reviewAgain")}</span>
               </button>
             </div>
           </div>

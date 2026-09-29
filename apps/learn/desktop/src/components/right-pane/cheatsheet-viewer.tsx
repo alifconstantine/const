@@ -46,7 +46,11 @@ function getBadgePrintClass(badge?: string): string {
   return "badge-sky";
 }
 
-function buildCheatSheetPrintableHtml(data: CheatSheetData, isIndo: boolean): string {
+function buildCheatSheetPrintableHtml(
+  data: CheatSheetData,
+  t: (key: any, params?: any) => string,
+  language: string
+): string {
   const cardsHtml = (data.cards || [])
     .map((card) => {
       let contentHtml = "";
@@ -74,7 +78,7 @@ function buildCheatSheetPrintableHtml(data: CheatSheetData, isIndo: boolean): st
     .join("\n");
 
   return `<!DOCTYPE html>
-<html lang="${isIndo ? "id" : "en"}">
+<html lang="${language}">
 <head>
   <meta charset="UTF-8">
   <title>${escapeHtml(data.title || "CheatSheet")}</title>
@@ -240,9 +244,9 @@ function buildCheatSheetPrintableHtml(data: CheatSheetData, isIndo: boolean): st
     <div>
       <h1 class="header-title">${escapeHtml(data.title || "CheatSheet")}</h1>
       <div class="header-meta">
-        ${data.cards?.length || 0} ${isIndo ? "Kartu Referensi Pintar" : "Smart Reference Cards"} · 
+        ${data.cards?.length || 0} ${t("smartReferenceCards")} · 
         ${data.topic ? escapeHtml(data.topic) + " · " : ""}
-        ${new Date().toLocaleDateString(isIndo ? "id-ID" : "en-US", { day: "numeric", month: "short", year: "numeric" })}
+        ${new Date().toLocaleDateString(language === "id" ? "id-ID" : "en-US", { day: "numeric", month: "short", year: "numeric" })}
       </div>
     </div>
     <div class="header-brand">Const Learn Studio</div>
@@ -253,7 +257,7 @@ function buildCheatSheetPrintableHtml(data: CheatSheetData, isIndo: boolean): st
   </div>
 
   <div class="footer">
-    ${escapeHtml(data.title || "CheatSheet")} · ${isIndo ? "Dihasilkan secara cerdas dengan Const Learn Studio" : "Generated with Const Learn Studio"}
+    ${escapeHtml(data.title || "CheatSheet")} · ${t("generatedWithStudio")}
   </div>
 </body>
 </html>`;
@@ -267,7 +271,6 @@ export function CheatSheetViewer({
   isExpanded: _isExpanded = false,
 }: CheatSheetViewerProps) {
   const { t, language } = useI18n();
-  const isIndo = language === "id";
 
   const [searchQuery, setSearchQuery] = useState("");
   const [copiedCardId, setCopiedCardId] = useState<string | null>(null);
@@ -311,18 +314,19 @@ export function CheatSheetViewer({
 
   const handleAskTutor = (card: CheatSheetCard) => {
     if (!onExplainInChat) return;
-    const prompt = isIndo
-      ? `Bantu jelaskan konsep/rumus dari kartu CheatSheet "${card.title}" berikut:\n\n${card.content}`
-      : `Please explain the concept/formula from this CheatSheet card "${card.title}":\n\n${card.content}`;
+    const prompt = t("explainCheatSheetPrompt", {
+      title: card.title,
+      content: card.content,
+    });
     onExplainInChat(prompt);
   };
 
   const handleDownloadPdf = async () => {
     setIsDownloadingPdf(true);
-    toast.info(isIndo ? "Menyiapkan file PDF..." : "Preparing PDF document...");
+    toast.info(t("preparingPdfDocument"));
 
     try {
-      const htmlContent = buildCheatSheetPrintableHtml(data, isIndo);
+      const htmlContent = buildCheatSheetPrintableHtml(data, t, language);
 
       if ((window as any).electron?.cheatsheet?.exportPdf) {
         const res = await (window as any).electron.cheatsheet.exportPdf({
@@ -331,11 +335,7 @@ export function CheatSheetViewer({
         });
 
         if (res?.success) {
-          toast.success(
-            isIndo
-              ? `File PDF berhasil disimpan!`
-              : `PDF saved successfully!`
-          );
+          toast.success(t("pdfSavedSuccess"));
         } else if (!res?.canceled) {
           toast.error(res?.error || t("failedExportPdfGeneric"));
         }
@@ -358,7 +358,7 @@ export function CheatSheetViewer({
           a.click();
           document.body.removeChild(a);
           URL.revokeObjectURL(url);
-          toast.info(isIndo ? "File lembar contekan siap dicetak/disimpan ke PDF." : "CheatSheet file downloaded.");
+          toast.info(t("cheatsheetPdfDownloaded"));
         }
       }
     } catch (err: any) {
@@ -393,7 +393,7 @@ export function CheatSheetViewer({
               </span>
             ) : (
               <span className="text-[9.5px] font-semibold text-[#969696] uppercase tracking-wider font-sans">
-                {isIndo ? "REFERENSI" : "REFERENCE"}
+                {t("badgeReference")}
               </span>
             )}
 
@@ -403,7 +403,7 @@ export function CheatSheetViewer({
                 type="button"
                 onClick={() => handleCopyCard(card)}
                 className="h-6 w-6 rounded-md hover:bg-[#303030] text-[#969696] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
-                title={isIndo ? "Salin isi kartu" : "Copy card text"}
+                title={t("copyCardText")}
               >
                 {isCopied ? (
                   <Check className="h-3 w-3 text-white" />
@@ -460,11 +460,11 @@ export function CheatSheetViewer({
               {data.title}
             </h1>
             <div className="text-[11px] text-[#969696] flex items-center gap-2 mt-0.5 truncate">
-              <span className="shrink-0 whitespace-nowrap">{filteredCards.length} {isIndo ? "kartu referensi" : "reference cards"}</span>
+              <span className="shrink-0 whitespace-nowrap">{t("referenceCardsCount", { count: filteredCards.length })}</span>
               {data.sourceCount ? (
                 <>
                   <span className="text-[#5d5d5d] shrink-0">•</span>
-                  <span className="shrink-0 whitespace-nowrap">{data.sourceCount} {isIndo ? "sumber" : "sources"}</span>
+                  <span className="shrink-0 whitespace-nowrap">{t("sourcesCount", { count: data.sourceCount })}</span>
                 </>
               ) : null}
             </div>
@@ -491,10 +491,10 @@ export function CheatSheetViewer({
             onClick={handleDownloadPdf}
             disabled={isDownloadingPdf}
             className="h-8 px-3 rounded-lg bg-white text-[#161616] hover:bg-neutral-200 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-none cursor-pointer active:scale-95 disabled:opacity-50"
-            title={isIndo ? "Unduh Lembar Contekan sebagai PDF" : "Download CheatSheet as PDF"}
+            title={t("downloadCheatSheetPdf")}
           >
             <Download className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">{isIndo ? "Unduh PDF" : "Download PDF"}</span>
+            <span className="hidden sm:inline">{t("downloadPdf")}</span>
           </button>
 
           {/* Fullscreen / Maximized Preview Button */}
@@ -502,7 +502,7 @@ export function CheatSheetViewer({
             type="button"
             onClick={() => setIsMaximized(true)}
             className="h-8 w-8 rounded-lg hover:bg-[#2b2b2b] text-[#969696] hover:text-white flex items-center justify-center transition-colors cursor-pointer ml-0.5"
-            title={isIndo ? "Pratinjau Penuh" : "Fullscreen Preview"}
+            title={t("fullscreenPreview")}
           >
             <Maximize2 className="h-4 w-4" />
           </button>
@@ -530,12 +530,10 @@ export function CheatSheetViewer({
             <div className="py-16 text-center text-[#969696] space-y-2">
               <Search className="h-8 w-8 mx-auto opacity-40 mb-2" />
               <p className="text-xs font-medium text-white">
-                {isIndo ? "Tidak ada kartu yang cocok" : "No matching cards found"}
+                {t("noMatchingCardsFound")}
               </p>
               <p className="text-[11px] text-[#969696]">
-                {isIndo
-                  ? `Tidak ada hasil untuk pencarian "${searchQuery}". Coba kata kunci lain.`
-                  : `No results for "${searchQuery}". Try a different keyword.`}
+                {t("noResultsForQuery", { query: searchQuery })}
               </p>
             </div>
           ) : (
@@ -571,7 +569,7 @@ export function CheatSheetViewer({
                       {data.title}
                     </h2>
                     <div className="text-[11px] text-[#969696] flex items-center gap-2 mt-0.5 truncate">
-                      <span className="shrink-0 whitespace-nowrap">{filteredCards.length} {isIndo ? "kartu referensi" : "reference cards"}</span>
+                      <span className="shrink-0 whitespace-nowrap">{t("referenceCardsCount", { count: filteredCards.length })}</span>
                       {data.topic && (
                         <>
                           <span className="text-[#5d5d5d] shrink-0">•</span>
@@ -599,17 +597,17 @@ export function CheatSheetViewer({
                     onClick={handleDownloadPdf}
                     disabled={isDownloadingPdf}
                     className="h-8 px-3 rounded-lg bg-white text-[#161616] hover:bg-neutral-200 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-none cursor-pointer active:scale-95 disabled:opacity-50"
-                    title={isIndo ? "Unduh PDF" : "Download PDF"}
+                    title={t("downloadPdf")}
                   >
                     <Download className="h-3.5 w-3.5" />
-                    <span>{isIndo ? "Unduh PDF" : "Download PDF"}</span>
+                    <span>{t("downloadPdf")}</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setIsMaximized(false)}
                     className="h-8 w-8 rounded-lg hover:bg-[#2b2b2b] text-[#969696] hover:text-white flex items-center justify-center transition-colors cursor-pointer ml-1"
-                    title={isIndo ? "Kecilkan (Kembali ke panel)" : "Restore"}
+                    title={t("restorePanel")}
                   >
                     <Minimize2 className="h-4 w-4" />
                   </button>
@@ -633,7 +631,7 @@ export function CheatSheetViewer({
                     <div className="py-20 text-center text-[#969696] space-y-2">
                       <Search className="h-10 w-10 mx-auto opacity-40 mb-2" />
                       <p className="text-sm font-medium text-white">
-                        {isIndo ? "Tidak ada kartu yang cocok" : "No matching cards found"}
+                        {t("noMatchingCardsFound")}
                       </p>
                     </div>
                   ) : (

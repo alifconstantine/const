@@ -40,8 +40,7 @@ export function CreateReportDialog({
   sources,
   onGenerate,
 }: CreateReportDialogProps) {
-  const { language } = useI18n();
-  const isIndo = language === "id";
+  const { t, language } = useI18n();
 
   // State
   const [selectedSourceIds, setSelectedSourceIds] = useState<string[]>([]);
@@ -49,7 +48,7 @@ export function CreateReportDialog({
   const [format, setFormat] = useState<"interactive" | "document">("interactive");
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>("learning_summary");
   const [depth, setDepth] = useState<"short" | "medium" | "long" | "auto">("medium");
-  const [targetLang, setTargetLang] = useState<"id" | "en">(isIndo ? "id" : "en");
+  const [targetLang, setTargetLang] = useState<"id" | "en">(language === "id" ? "id" : "en");
   const [customInstructions, setCustomInstructions] = useState<string>("");
   const [isEditingPrompt, setIsEditingPrompt] = useState<boolean>(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -74,144 +73,89 @@ export function CreateReportDialog({
   // Dynamic suggested templates based on primary source
   const suggestedTemplates = useMemo<ReportTemplate[]>(() => {
     const primaryTitle = sources[0]?.title || "";
-    if (isIndo) {
-      return [
-        {
-          id: "strategy_doc",
-          name: "Dokumen Strategi",
-          description: primaryTitle
-            ? `Panduan strategis untuk implementasi ${primaryTitle.slice(0, 36)}...`
-            : "Panduan strategis untuk menentukan arah dan prioritas implementasi.",
-          defaultPrompt: "Fokuskan pada analisis SWOT, prioritas strategis, dan roadmap implementasi.",
-        },
-        {
-          id: "analysis_report",
-          name: "Laporan Analisis",
-          description: "Tinjauan komprehensif mengenai perbandingan, data kunci, dan implikasi teknis.",
-          defaultPrompt: "Sajikan perbandingan mendalam, metrik evaluasi teknis, dan trade-off.",
-        },
-        {
-          id: "concept_guide",
-          name: "Panduan Konsep",
-          description: "Penjelasan terstruktur mengenai istilah teknis, arsitektur, dan prinsip kerja.",
-          defaultPrompt: "Jelaskan konsep rumit dengan analogi sederhana dan definisi istilah kunci.",
-        },
-        {
-          id: "comparison_essay",
-          name: "Esai Perbandingan",
-          description: "Ulasan informatif yang membandingkan kelebihan dan kekurangan tiap opsi.",
-          defaultPrompt: "Bandingkan pendekatan atau solusi alternatif dengan parameter yang jelas.",
-        },
-      ];
-    }
-
     return [
       {
         id: "strategy_doc",
-        name: "Strategy Document",
+        name: t("strategyDocName"),
         description: primaryTitle
-          ? `Strategic execution guide for ${primaryTitle.slice(0, 36)}...`
-          : "Strategic roadmap for priority setting and operational implementation.",
-        defaultPrompt: "Focus on strategic pillars, trade-offs, and implementation roadmap.",
+          ? t("strategyDocDescWithTopic", { topic: primaryTitle.slice(0, 36) })
+          : t("strategyDocDesc"),
+        defaultPrompt: t("strategyDocPrompt"),
       },
       {
         id: "analysis_report",
-        name: "Analysis Report",
-        description: "Comprehensive review of comparative data, key findings, and technical nuances.",
-        defaultPrompt: "Present in-depth evaluation benchmarks, architectural metrics, and tradeoffs.",
+        name: t("analysisReportName"),
+        description: t("analysisReportDesc"),
+        defaultPrompt: t("analysisReportPrompt"),
       },
       {
         id: "concept_guide",
-        name: "Concept Guide",
-        description: "Clear explanations of core terminology, architectural pillars, and principles.",
-        defaultPrompt: "Demystify complex technical concepts using clean analogies and precise definitions.",
+        name: t("conceptGuideName"),
+        description: t("conceptGuideDesc"),
+        defaultPrompt: t("conceptGuidePrompt"),
       },
       {
         id: "comparison_essay",
-        name: "Comparative Essay",
-        description: "Evaluative essay comparing key strengths, weaknesses, and decision criteria.",
-        defaultPrompt: "Compare competing paradigms or solutions with structured dimensions.",
+        name: t("comparisonEssayName"),
+        description: t("comparisonEssayDesc"),
+        defaultPrompt: t("comparisonEssayPrompt"),
       },
     ];
-  }, [sources, isIndo]);
+  }, [sources, t]);
 
   // Standard templates
   const interactiveTemplates: ReportTemplate[] = useMemo(
     () => [
       {
         id: "learning_summary",
-        name: isIndo ? "Ringkasan Pembelajaran" : "Learning Summary",
-        description: isIndo
-          ? "Merangkum konsep utama bersama konten studio untuk membantu Anda belajar."
-          : "Synthesizes core concepts alongside embedded studio widgets for focused learning.",
-        defaultPrompt: isIndo
-          ? "Fokuskan pada intisari pembelajaran dengan sematan kuis uji pemahaman konsep."
-          : "Focus on key takeaways with embedded knowledge check widgets.",
+        name: t("learningSummaryName"),
+        description: t("learningSummaryDesc"),
+        defaultPrompt: t("learningSummaryPrompt"),
       },
       {
         id: "interactive_concept",
-        name: isIndo ? "Panduan Belajar Interaktif" : "Interactive Study Guide",
-        description: isIndo
-          ? "Panduan belajar bertahap dengan glosarium, kuis cepat, dan visualisasi data."
-          : "Step-by-step study guide with glossaries, quick quizzes, and data visualizations.",
-        defaultPrompt: isIndo
-          ? "Sajikan panduan bertahap dengan glosarium istilah dan kartu hafalan."
-          : "Provide a phased study guide with terminology glossary and recall flashcards.",
+        name: t("interactiveStudyGuideName"),
+        description: t("interactiveStudyGuideDesc"),
+        defaultPrompt: t("interactiveStudyGuidePrompt"),
       },
       {
         id: "custom_interactive",
-        name: isIndo ? "Buat Laporan Anda Sendiri" : "Custom Interactive Report",
-        description: isIndo
-          ? "Buat laporan sesuai keinginan Anda dengan menentukan struktur dan gaya khusus."
-          : "Create a tailored report defining your preferred structure and style.",
+        name: t("customInteractiveReportName"),
+        description: t("customInteractiveReportDesc"),
         defaultPrompt: "",
       },
     ],
-    [isIndo]
+    [t]
   );
 
   const documentTemplates: ReportTemplate[] = useMemo(
     () => [
       {
         id: "custom_document",
-        name: isIndo ? "Buat Laporan Anda Sendiri" : "Custom Report",
-        description: isIndo
-          ? "Buat laporan sesuai keinginan Anda dengan menentukan struktur, gaya, dan fokus."
-          : "Craft a customized document defining outline, tone, and focal points.",
+        name: t("customReportName"),
+        description: t("customReportDesc"),
         defaultPrompt: "",
       },
       {
         id: "briefing_doc",
-        name: isIndo ? "Dokumen Petunjuk Arahan" : "Briefing Document",
-        description: isIndo
-          ? "Ringkasan eksekutif sumber Anda yang menyertakan kutipan dan insight penting."
-          : "Executive briefing synthesizing high-level insights, key takeaways, and references.",
-        defaultPrompt: isIndo
-          ? "Tulis ringkasan eksekutif berstandar profesional untuk pengambil keputusan."
-          : "Draft an executive briefing highlighting key decisions and evidence.",
+        name: t("briefingDocName"),
+        description: t("briefingDocDesc"),
+        defaultPrompt: t("briefingDocPrompt"),
       },
       {
         id: "study_guide",
-        name: isIndo ? "Panduan Belajar" : "Study Guide",
-        description: isIndo
-          ? "Kuis jawaban singkat, saran pertanyaan esai, dan glosarium istilah penting."
-          : "Short-answer questions, essay prompts, and essential glossary.",
-        defaultPrompt: isIndo
-          ? "Sertakan glosarium, latihan soal mandiri, dan ringkasan konsep utama."
-          : "Include concept glossaries, practice questions, and chapter summaries.",
+        name: t("studyGuideName"),
+        description: t("studyGuideDesc"),
+        defaultPrompt: t("studyGuidePrompt"),
       },
       {
         id: "blog_post",
-        name: isIndo ? "Postingan Blog" : "Blog Post",
-        description: isIndo
-          ? "Poin-poin penting yang disajikan dalam artikel naratif yang sangat mudah dibaca."
-          : "Engaging narrative article translating technical findings for broader audiences.",
-        defaultPrompt: isIndo
-          ? "Gunakan gaya bahasa naratif yang menarik, mengalir, dan mudah dipahami publik."
-          : "Use an engaging narrative voice accessible to broad audiences.",
+        name: t("blogPostName"),
+        description: t("blogPostDesc"),
+        defaultPrompt: t("blogPostPrompt"),
       },
     ],
-    [isIndo]
+    [t]
   );
 
   const activeTemplateList = format === "interactive" ? interactiveTemplates : documentTemplates;
@@ -269,7 +213,7 @@ export function CreateReportDialog({
           <div className="flex items-center gap-2.5">
             <FileText className="h-4 w-4 text-white shrink-0" />
             <span className="text-sm font-semibold text-white tracking-tight">
-              {isIndo ? "Buat Laporan" : "Create Report"}
+              {t("createReport")}
             </span>
           </div>
 
@@ -288,7 +232,7 @@ export function CreateReportDialog({
               {/* Sumber Rujukan Materi */}
               <div className="space-y-1.5 relative">
                 <label className="text-[12px] font-medium text-[#969696]">
-                  {isIndo ? "Sumber Rujukan Materi" : "Source Scope"}
+                  {t("sourceScope")}
                 </label>
                 <div className="relative">
                   <button
@@ -298,12 +242,11 @@ export function CreateReportDialog({
                   >
                     <span className="text-white font-medium truncate">
                       {selectedSourceIds.length === sources.length
-                        ? isIndo
-                          ? `Semua sumber (${sources.length} sumber)`
-                          : `All sources (${sources.length} sources)`
-                        : isIndo
-                        ? `${selectedSourceIds.length} dari ${sources.length} sumber terpilih`
-                        : `${selectedSourceIds.length} of ${sources.length} sources selected`}
+                        ? t("allSourcesWithCount", { count: sources.length })
+                        : t("selectedOfTotalSources", {
+                            selected: selectedSourceIds.length,
+                            total: sources.length,
+                          })}
                     </span>
                     <ChevronDown className="h-3.5 w-3.5 text-[#888888] shrink-0" />
                   </button>
@@ -317,7 +260,7 @@ export function CreateReportDialog({
                           className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-[#2b2b2b] text-xs text-[#cccccc] cursor-pointer transition-colors"
                         >
                           <span className="font-medium">
-                            {isIndo ? "Pilih Semua Sumber" : "Select All Sources"}
+                            {t("selectAllSources")}
                           </span>
                           <div
                             className={cn(
@@ -367,7 +310,7 @@ export function CreateReportDialog({
               {/* Format Selection (Clean without 'Baru!') */}
               <div className="space-y-2">
                 <label className="text-[12px] font-medium text-[#969696]">
-                  {isIndo ? "Format" : "Format"}
+                  {t("formatLabel")}
                 </label>
                 <div className="grid grid-cols-2 gap-3">
                   {/* Option 1: Interaktif */}
@@ -383,7 +326,7 @@ export function CreateReportDialog({
                   >
                     <div className="flex items-center justify-between mb-1.5">
                       <div className="text-xs font-semibold text-white">
-                        {isIndo ? "Interaktif" : "Interactive"}
+                        {t("interactiveFormat")}
                       </div>
                       {format === "interactive" && (
                         <div className="h-4 w-4 rounded-full bg-white flex items-center justify-center">
@@ -392,9 +335,7 @@ export function CreateReportDialog({
                       )}
                     </div>
                     <div className="text-[11px] text-[#a0a0a0] leading-relaxed">
-                      {isIndo
-                        ? "Laporan interaktif dengan sematan konten studio"
-                        : "Interactive report with embedded studio widgets and quizzes"}
+                      {t("interactiveFormatDesc")}
                     </div>
                   </button>
 
@@ -411,7 +352,7 @@ export function CreateReportDialog({
                   >
                     <div className="flex items-center justify-between mb-1.5">
                       <div className="text-xs font-semibold text-white">
-                        {isIndo ? "Dokumen" : "Document"}
+                        {t("documentFormat")}
                       </div>
                       {format === "document" && (
                         <div className="h-4 w-4 rounded-full bg-white flex items-center justify-center">
@@ -420,9 +361,7 @@ export function CreateReportDialog({
                       )}
                     </div>
                     <div className="text-[11px] text-[#a0a0a0] leading-relaxed">
-                      {isIndo
-                        ? "Dokumen terstruktur yang hanya berisi teks"
-                        : "Structured narrative document focused purely on text & math"}
+                      {t("documentFormatDesc")}
                     </div>
                   </button>
                 </div>
@@ -431,7 +370,7 @@ export function CreateReportDialog({
               {/* Template Catalog Grid */}
               <div className="space-y-2.5">
                 <label className="text-[12px] font-medium text-[#969696]">
-                  {isIndo ? "Template" : "Template"}
+                  {t("templateLabel")}
                 </label>
                 <div
                   className={cn(
@@ -463,7 +402,7 @@ export function CreateReportDialog({
                               handleSelectTemplate(tpl);
                               setIsEditingPrompt(!isEditingPrompt);
                             }}
-                            title={isIndo ? "Kustomisasi Outline" : "Customize Prompt"}
+                            title={t("customizePrompt")}
                             className="h-6 w-6 rounded-full bg-[#2a2a2a] hover:bg-[#383838] text-[#888888] hover:text-white flex items-center justify-center shrink-0 transition-colors"
                           >
                             <Pencil className="h-3 w-3" />
@@ -483,7 +422,7 @@ export function CreateReportDialog({
                 <div className="space-y-2.5 pt-1">
                   <div className="flex items-center gap-1.5 text-[12px] font-medium text-[#969696]">
                     <FileText className="h-3.5 w-3.5 text-neutral-400" />
-                    <span>{isIndo ? "Template yang Disarankan" : "Recommended Templates"}</span>
+                    <span>{t("recommendedTemplates")}</span>
                   </div>
                   <div className="grid grid-cols-2 gap-2.5">
                     {suggestedTemplates.map((tpl) => {
@@ -534,13 +473,13 @@ export function CreateReportDialog({
                 {/* Kedalaman Laporan */}
                 <div className="space-y-1.5">
                   <label className="text-[11.5px] font-medium text-[#969696]">
-                    {isIndo ? "Kedalaman Analisis" : "Depth & Scope"}
+                    {t("depthAndScope")}
                   </label>
                   <div className="grid grid-cols-3 gap-1.5">
                     {[
-                      { id: "short", label: isIndo ? "Ringkas" : "Concise" },
-                      { id: "medium", label: isIndo ? "Standar" : "Balanced" },
-                      { id: "long", label: isIndo ? "Mendalam" : "In-depth" },
+                      { id: "short", label: t("concise") },
+                      { id: "medium", label: t("balanced") },
+                      { id: "long", label: t("inDepth") },
                     ].map((m) => (
                       <button
                         key={m.id}
@@ -562,7 +501,7 @@ export function CreateReportDialog({
                 {/* Bahasa Keluaran */}
                 <div className="space-y-1.5">
                   <label className="text-[11.5px] font-medium text-[#969696]">
-                    {isIndo ? "Bahasa Dokumen" : "Document Language"}
+                    {t("documentLanguage")}
                   </label>
                   <div className="grid grid-cols-2 gap-1.5">
                     {[
@@ -591,7 +530,7 @@ export function CreateReportDialog({
               <div className="space-y-1.5 pt-1">
                 <div className="flex items-center justify-between">
                   <label className="text-[11.5px] font-medium text-[#969696]">
-                    {isIndo ? "Arahan Khusus / Outline (Opsional)" : "Custom Guidance / Outline (Optional)"}
+                    {t("customGuidanceOptional")}
                   </label>
                   {currentTemplate?.defaultPrompt && (
                     <button
@@ -599,7 +538,7 @@ export function CreateReportDialog({
                       onClick={() => setCustomInstructions(currentTemplate.defaultPrompt || "")}
                       className="text-[10.5px] text-[#888888] hover:text-white hover:underline cursor-pointer"
                     >
-                      {isIndo ? "Pulihkan Default" : "Reset Default"}
+                      {t("resetDefaultAction")}
                     </button>
                   )}
                 </div>
@@ -607,11 +546,7 @@ export function CreateReportDialog({
                   ref={textareaRef}
                   value={customInstructions}
                   onChange={(e) => setCustomInstructions(e.target.value)}
-                  placeholder={
-                    isIndo
-                      ? "Contoh: Sorot perbandingan arsitektur AI, gunakan analogi yang mudah dipahami mahasiswa, dan sertakan rumus latensi..."
-                      : "E.g., Emphasize latency trade-offs, target academic rigor with clean KaTeX formulations..."
-                  }
+                  placeholder={t("reportGuidancePlaceholder")}
                   rows={2}
                   className="w-full px-3 py-2 rounded-xl bg-[#222222] border border-[#2b2b2b] focus:border-[#444444] text-xs text-white placeholder-[#666666] outline-none resize-none transition-colors"
                 />
@@ -626,7 +561,7 @@ export function CreateReportDialog({
               onClick={() => onOpenChange(false)}
               className="px-4 py-2 rounded-xl hover:bg-[#222222] text-xs font-medium text-[#888888] hover:text-white transition-colors cursor-pointer"
             >
-              {isIndo ? "Batal" : "Cancel"}
+              {t("cancel")}
             </button>
             <button
               type="submit"
@@ -638,7 +573,7 @@ export function CreateReportDialog({
                   : "bg-white/40 text-black/50 cursor-not-allowed"
               )}
             >
-              <span>{isIndo ? "Buat sekarang" : "Create now"}</span>
+              <span>{t("createNowAction")}</span>
             </button>
           </div>
         </form>

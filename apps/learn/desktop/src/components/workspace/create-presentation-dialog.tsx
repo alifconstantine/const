@@ -27,23 +27,19 @@ export interface CreatePresentationDialogProps {
   }) => void;
 }
 
-const getProviders = (isIndo: boolean) => [
+const getProviders = (t: (key: any) => string) => [
   {
     id: "native" as const,
     name: "Const Native",
-    tagline: isIndo
-      ? "Open-Design 1920×1080 Canvas Deck & PDF"
-      : "Open-Design 1920×1080 Canvas Deck & PDF",
-    badge: isIndo ? "Direkomendasikan" : "Recommended",
+    tagline: t("constNativeTagline"),
+    badge: t("recommended"),
     icon: Presentation,
     color: "text-amber-400",
   },
   {
     id: "canva" as const,
     name: "Canva MCP",
-    tagline: isIndo
-      ? "Template Canva & Desain Interaktif"
-      : "Editable Canva Design & Live Templates",
+    tagline: t("canvaMcpTagline"),
     badge: "Canva AI",
     icon: LayoutTemplate,
     color: "text-cyan-400",
@@ -51,9 +47,7 @@ const getProviders = (isIndo: boolean) => [
   {
     id: "slides" as const,
     name: "Google Slides",
-    tagline: isIndo
-      ? "Slide Cloud di Google Drive & PPTX"
-      : "Cloud Slides in Google Drive & PPTX",
+    tagline: t("googleSlidesTagline"),
     badge: "Google Suite",
     icon: Layers,
     color: "text-emerald-400",
@@ -73,9 +67,8 @@ export function CreatePresentationDialog({
   sources,
   onGenerate,
 }: CreatePresentationDialogProps) {
-  const { language } = useI18n();
-  const isIndo = language === "id";
-  const providers = useMemo(() => getProviders(isIndo), [isIndo]);
+  const { t } = useI18n();
+  const providers = useMemo(() => getProviders(t), [t]);
 
   // Sources selection
   const [selectedSourceIds, setSelectedSourceIds] = useState<string[]>([]);
@@ -152,7 +145,7 @@ export function CreatePresentationDialog({
           <div className="flex items-center gap-2.5">
             <Presentation className="h-4 w-4 text-white shrink-0" />
             <span className="text-sm font-semibold text-white tracking-tight">
-              {isIndo ? "Buat Slide Presentasi" : "Create Presentation Slides"}
+              {t("createPresentationTitle")}
             </span>
           </div>
 
@@ -171,16 +164,14 @@ export function CreatePresentationDialog({
               {/* Concept Box */}
               <div className="p-3.5 rounded-xl bg-[#222222] border border-[#2b2b2b] flex items-start gap-3">
                 <div className="text-xs text-[#d4d4d4] leading-relaxed">
-                  {isIndo
-                    ? "Hasilkan slide presentasi berstandar Open-Design 1920×1080, Canva, atau Google Slides dari catatan dan materi sumber Anda."
-                    : "Generate professional 1920x1080 Open-Design, Canva, or Google Slides decks from your study sources."}
+                  {t("presentationConceptBox")}
                 </div>
               </div>
 
               {/* Sumber Dropdown */}
               <div className="space-y-1.5 relative">
                 <label className="text-[11.5px] font-medium text-[#999999]">
-                  {isIndo ? "Sumber Rujukan Materi" : "Source Scope"}
+                  {t("sourceScope")}
                 </label>
                 <div className="relative">
                   <button
@@ -190,12 +181,8 @@ export function CreatePresentationDialog({
                   >
                     <span className="text-white font-medium truncate">
                       {selectedSourceIds.length === sources.length
-                        ? isIndo
-                          ? `Semua sumber (${sources.length} sumber)`
-                          : `All sources (${sources.length})`
-                        : isIndo
-                        ? `${selectedSourceIds.length} dari ${sources.length} sumber terpilih`
-                        : `${selectedSourceIds.length} of ${sources.length} sources selected`}
+                        ? t("allSourcesCount", { count: sources.length })
+                        : t("selectedOfTotalSources", { selected: selectedSourceIds.length, total: sources.length })}
                     </span>
                     <ChevronDown className="h-3.5 w-3.5 text-[#888888] shrink-0" />
                   </button>
@@ -209,7 +196,7 @@ export function CreatePresentationDialog({
                           className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-[#2b2b2b] text-xs text-[#cccccc] cursor-pointer transition-colors"
                         >
                           <span className="font-medium">
-                            {isIndo ? "Pilih Semua Sumber" : "Select All Sources"}
+                            {selectedSourceIds.length === sources.length ? t("deselectAll") : t("selectAllSources")}
                           </span>
                           <div
                             className={cn(
@@ -259,7 +246,7 @@ export function CreatePresentationDialog({
               {/* Provider Selection */}
               <div className="space-y-2">
                 <label className="text-[11.5px] font-medium text-[#999999]">
-                  {isIndo ? "Pilih Engine / Format Presentasi" : "Presentation Engine"}
+                  {t("presentationEngine")}
                 </label>
                 <div className="grid grid-cols-3 gap-2.5">
                   {providers.map((p) => {
@@ -305,7 +292,7 @@ export function CreatePresentationDialog({
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="text-[11.5px] font-medium text-[#999999]">
-                    {isIndo ? "Jumlah Slide & Kedalaman" : "Slide Count & Depth"}
+                    {t("slideCountAndDepth")}
                   </label>
                   <button
                     type="button"
@@ -313,13 +300,7 @@ export function CreatePresentationDialog({
                     className="text-[11px] text-amber-400 hover:underline cursor-pointer flex items-center gap-1"
                   >
                     <Sliders className="h-3 w-3" />
-                    {isCustomCount
-                      ? isIndo
-                        ? "Mode Otomatis"
-                        : "Preset Mode"
-                      : isIndo
-                      ? "Atur Jumlah Angka"
-                      : "Custom Count"}
+                    {isCustomCount ? t("presetMode") : t("customCount")}
                   </button>
                 </div>
 
@@ -328,18 +309,18 @@ export function CreatePresentationDialog({
                     {[
                       {
                         id: "auto",
-                        label: isIndo ? "Otomatis" : "Adaptive",
-                        desc: isIndo ? "5–8 Slide proporsional" : "5–8 Balanced slides",
+                        label: t("modeAdaptiveLabel"),
+                        desc: t("modeAdaptiveDesc"),
                       },
                       {
                         id: "short",
-                        label: isIndo ? "Singkat" : "Concise",
-                        desc: isIndo ? "3–5 Slide intisari" : "3–5 Essential slides",
+                        label: t("modeConciseLabel"),
+                        desc: t("modeConciseDesc"),
                       },
                       {
                         id: "long",
-                        label: isIndo ? "Panjang" : "In-Depth",
-                        desc: isIndo ? "8–12+ Slide mendalam" : "8–12+ Comprehensive",
+                        label: t("modeInDepthLabel"),
+                        desc: t("modeInDepthDesc"),
                       },
                     ].map((mode) => {
                       const isSelected = lengthMode === mode.id;
@@ -377,7 +358,7 @@ export function CreatePresentationDialog({
                               : "bg-[#1f1f1f] border-[#2c2c2c] hover:border-[#383838] text-[#999]"
                           )}
                         >
-                          {count} {isIndo ? "Slide" : "Slides"}
+                          {t("slidesCount", { count })}
                         </button>
                       );
                     })}
@@ -390,7 +371,7 @@ export function CreatePresentationDialog({
                 <div className="space-y-2">
                   <label className="text-[11.5px] font-medium text-[#999999] flex items-center gap-1.5">
                     <Palette className="h-3.5 w-3.5" />
-                    {isIndo ? "Palet Tema Desain (Open-Design)" : "Design Theme Palette"}
+                    {t("designThemePalette")}
                   </label>
                   <div className="grid grid-cols-4 gap-2">
                     {THEMES.map((th) => {
@@ -424,16 +405,12 @@ export function CreatePresentationDialog({
               {/* Custom Guidance */}
               <div className="space-y-1.5">
                 <label className="text-[11.5px] font-medium text-[#999999]">
-                  {isIndo ? "Instruksi Khusus Tambahan (Opsional)" : "Custom Guidance (Optional)"}
+                  {t("customGuidanceOptional")}
                 </label>
                 <textarea
                   value={customInstructions}
                   onChange={(e) => setCustomInstructions(e.target.value)}
-                  placeholder={
-                    isIndo
-                      ? "Contoh: Fokuskan pada perbandingan arsitektur, buat tone profesional untuk presentasi pimpinan..."
-                      : "E.g., Emphasize benchmarks and key findings, target technical leadership..."
-                  }
+                  placeholder={t("presentationGuidancePlaceholder")}
                   rows={2}
                   className="w-full px-3 py-2 rounded-xl bg-[#222222] border border-[#2b2b2b] focus:border-[#444444] text-xs text-white placeholder-[#666666] outline-none resize-none transition-colors"
                 />
@@ -448,14 +425,14 @@ export function CreatePresentationDialog({
               onClick={() => onOpenChange(false)}
               className="px-4 py-2 rounded-xl bg-transparent hover:bg-[#222222] text-xs font-medium text-[#888888] hover:text-white transition-colors cursor-pointer"
             >
-              {isIndo ? "Batal" : "Cancel"}
+              {t("cancel")}
             </button>
             <button
               type="submit"
               disabled={selectedSourceIds.length === 0}
               className="px-4 py-2 rounded-xl bg-white hover:bg-neutral-200 disabled:opacity-40 disabled:hover:bg-white disabled:cursor-not-allowed text-xs font-semibold text-black flex items-center gap-1.5 transition-all cursor-pointer shadow-sm active:scale-98"
             >
-              <span>{isIndo ? "Buat Slide Presentasi" : "Create Slides"}</span>
+              <span>{t("createSlides")}</span>
             </button>
           </div>
         </form>

@@ -27,23 +27,19 @@ export interface CreatePresentationSheetProps {
   }) => void;
 }
 
-const getProviders = (isIndo: boolean) => [
+const getProviders = (t: (key: any) => string) => [
   {
     id: "native" as const,
     name: "Const Native",
-    tagline: isIndo
-      ? "1920×1080 Canvas Deck & Cloud Sandbox PDF"
-      : "1920×1080 Canvas Deck & Cloud Sandbox PDF",
-    badge: isIndo ? "Direkomendasikan" : "Recommended",
+    tagline: t("constNativeTagline"),
+    badge: t("recommended"),
     icon: Presentation,
     color: "text-amber-400",
   },
   {
     id: "canva" as const,
     name: "Canva MCP",
-    tagline: isIndo
-      ? "Template Canva & Desain Interaktif"
-      : "Editable Canva Design & Live Templates",
+    tagline: t("canvaMcpTagline"),
     badge: "Canva AI",
     icon: Sparkles,
     color: "text-cyan-400",
@@ -51,9 +47,7 @@ const getProviders = (isIndo: boolean) => [
   {
     id: "slides" as const,
     name: "Google Slides",
-    tagline: isIndo
-      ? "Slide Cloud di Google Drive & PPTX"
-      : "Interactive Presentation Embed & PPTX",
+    tagline: t("googleSlidesTagline"),
     badge: "Google Suite",
     icon: Presentation,
     color: "text-amber-500",
@@ -73,9 +67,8 @@ export function CreatePresentationSheet({
   sources = [],
   onGenerate,
 }: CreatePresentationSheetProps) {
-  const { language } = useI18n();
-  const isIndo = language === "id";
-  const providers = useMemo(() => getProviders(isIndo), [isIndo]);
+  const { t } = useI18n();
+  const providers = useMemo(() => getProviders(t), [t]);
 
   const [provider, setProvider] = useState<"native" | "canva" | "slides">("native");
   const [lengthMode, setLengthMode] = useState<"short" | "medium" | "long" | "auto">("auto");
@@ -150,12 +143,10 @@ export function CreatePresentationSheet({
             </div>
             <div>
               <h2 className="text-sm font-semibold text-foreground">
-                {isIndo ? "Buat Slide Presentasi" : "Create Presentation Slides"}
+                {t("createPresentationTitle")}
               </h2>
               <p className="text-[11px] text-muted-foreground">
-                {isIndo
-                  ? "Pilih sumber materi, engine slide, dan format"
-                  : "Select sources, engine, and slide depth"}
+                {t("presentationSubtitle")}
               </p>
             </div>
           </div>
@@ -175,24 +166,22 @@ export function CreatePresentationSheet({
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
                 <Layers className="h-3.5 w-3.5 text-muted-foreground" />
-                {isIndo ? "Pilih Sumber Materi" : "Select Sources"}
+                {t("sourceScope")}
               </span>
               <button
                 type="button"
                 onClick={handleToggleAllSources}
-                className="text-[11px] font-medium text-amber-400 hover:text-amber-300 transition-colors"
+                className="text-[11px] font-medium text-amber-400 hover:text-amber-300 transition-colors cursor-pointer"
               >
                 {selectedSourceIds.length === sources.length
-                  ? (isIndo ? "Hapus Semua" : "Deselect All")
-                  : (isIndo ? "Pilih Semua" : "Select All")}
+                  ? t("deselectAll")
+                  : t("selectAll")}
               </button>
             </div>
 
             {sources.length === 0 ? (
               <p className="text-xs text-muted-foreground italic p-3 rounded-xl bg-[#1c1c1c] border border-[#282828]">
-                {isIndo
-                  ? "Belum ada sumber. Tambahkan sumber terlebih dahulu."
-                  : "No sources found. Add sources first."}
+                {t("noSourcesInNotebookDesc")}
               </p>
             ) : (
               <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
@@ -232,7 +221,7 @@ export function CreatePresentationSheet({
           <div>
             <label className="text-xs font-semibold text-foreground flex items-center gap-1.5 mb-2">
               <Sliders className="h-3.5 w-3.5 text-muted-foreground" />
-              {isIndo ? "Pilih Engine Presentasi" : "Presentation Engine"}
+              {t("presentationEngine")}
             </label>
             <div className="grid grid-cols-1 gap-2">
               {providers.map((p) => {
@@ -292,14 +281,14 @@ export function CreatePresentationSheet({
           <div>
             <label className="text-xs font-semibold text-foreground flex items-center gap-1.5 mb-2">
               <Sliders className="h-3.5 w-3.5 text-muted-foreground" />
-              {isIndo ? "Jumlah Slide & Kedalaman" : "Slide Count & Depth"}
+              {t("slideCountAndDepth")}
             </label>
             <div className="grid grid-cols-4 gap-2">
               {[
-                { id: "auto", label: isIndo ? "Otomatis" : "Auto", desc: isIndo ? "Adaptif" : "Adaptive" },
-                { id: "short", label: isIndo ? "Singkat" : "Short", desc: isIndo ? "3-5 Slide" : "3-5 Slides" },
-                { id: "long", label: isIndo ? "Panjang" : "Long", desc: isIndo ? "8-12 Slide" : "8-12 Slides" },
-                { id: "custom", label: isIndo ? "Kustom" : "Custom", desc: `${customCount} ${isIndo ? "Slide" : "Slides"}` },
+                { id: "auto", label: t("modeAdaptiveLabel"), desc: t("modeAdaptiveDesc") },
+                { id: "short", label: t("modeConciseLabel"), desc: t("modeConciseDesc") },
+                { id: "long", label: t("modeInDepthLabel"), desc: t("modeInDepthDesc") },
+                { id: "custom", label: t("custom"), desc: t("slidesCount", { count: customCount }) },
               ].map((m) => {
                 const isSelected = m.id === "custom" ? isCustomCount : !isCustomCount && lengthMode === m.id;
                 return (
@@ -332,7 +321,7 @@ export function CreatePresentationSheet({
             {isCustomCount && (
               <div className="mt-3 p-3 rounded-xl bg-[#1c1c1c] border border-[#282828] flex items-center justify-between gap-3">
                 <span className="text-xs text-muted-foreground">
-                  {isIndo ? "Jumlah target slide:" : "Target slide count:"}
+                  {t("targetSlideCount")}
                 </span>
                 <input
                   type="number"
@@ -351,7 +340,7 @@ export function CreatePresentationSheet({
             <div>
               <label className="text-xs font-semibold text-foreground flex items-center gap-1.5 mb-2">
                 <Palette className="h-3.5 w-3.5 text-muted-foreground" />
-                {isIndo ? "Tema Visual Slide" : "Slide Visual Theme"}
+                {t("designThemePalette")}
               </label>
               <div className="grid grid-cols-2 gap-2">
                 {THEMES.map((th) => {
@@ -385,16 +374,12 @@ export function CreatePresentationSheet({
           <div>
             <label className="text-xs font-semibold text-foreground flex items-center gap-1.5 mb-1.5">
               <Sparkles className="h-3.5 w-3.5 text-muted-foreground" />
-              {isIndo ? "Instruksi Khusus (Opsional)" : "Custom Guidance (Optional)"}
+              {t("customGuidanceOptional")}
             </label>
             <textarea
               value={customInstructions}
               onChange={(e) => setCustomInstructions(e.target.value)}
-              placeholder={
-                isIndo
-                  ? "Contoh: Tekankan pada aspek arsitektur teknis dan hasil benchmark metrik..."
-                  : "E.g., Emphasize architectural trade-offs and quantitative benchmark metrics..."
-              }
+              placeholder={t("presentationGuidancePlaceholder")}
               rows={2}
               className="w-full px-3 py-2 rounded-xl bg-[#1a1a1a] border border-[#2b2b2b] text-xs text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-amber-500/80 resize-none"
             />
@@ -409,9 +394,7 @@ export function CreatePresentationSheet({
             >
               <Presentation className="h-4 w-4" />
               <span>
-                {isIndo
-                  ? `Susun Presentasi (${selectedSourceIds.length} Sumber)`
-                  : `Generate Slides (${selectedSourceIds.length} Sources)`}
+                {t("createSlides")} {t("sourcesWithCount", { count: selectedSourceIds.length })}
               </span>
             </button>
           </div>

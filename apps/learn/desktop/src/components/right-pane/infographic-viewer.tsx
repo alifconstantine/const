@@ -35,8 +35,7 @@ export function InfographicViewer({
   onToggleExpand,
   isExpanded = false,
 }: InfographicViewerProps) {
-  const { language } = useI18n();
-  const isIndo = language === "id";
+  const { t } = useI18n();
 
   const [zoomLevel, setZoomLevel] = useState<number>(1);
   const [panPosition, setPanPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -122,9 +121,7 @@ export function InfographicViewer({
         setTimeout(() => URL.revokeObjectURL(downloadHref), 2000);
       }
 
-      toast.success(
-        isIndo ? "Gambar infografis mulai diunduh!" : "Downloading infographic image!"
-      );
+      toast.success(t("downloadingInfographicImage"));
     } catch (err) {
       window.open(data.imageUrl, "_blank");
     }
@@ -134,25 +131,27 @@ export function InfographicViewer({
     const textToCopy = data.prompt || data.visualPrompt || data.title;
     navigator.clipboard.writeText(textToCopy);
     setIsCopied(true);
-    toast.success(isIndo ? "Prompt visual disalin ke papan klip!" : "Visual prompt copied!");
+    toast.success(t("visualPromptCopied"));
     setTimeout(() => setIsCopied(false), 2000);
   };
 
   const handleDiscussInChat = () => {
     if (!onExplainInChat) return;
-    const prompt = isIndo
-      ? `Tolong jelaskan lebih dalam dan diskusikan poin-poin materi dari infografis "${data.title}":\n\nRingkasan: ${data.summary || ""}\nPoin Kunci:\n${(data.keyPoints || []).map((p) => `- ${p}`).join("\n")}`
-      : `Please analyze and elaborate on the concepts presented in this infographic "${data.title}":\n\nSummary: ${data.summary || ""}\nKey Points:\n${(data.keyPoints || []).map((p) => `- ${p}`).join("\n")}`;
+    const content = `${t("summary")}: ${data.summary || ""}\n${t("keyTakeaways")}:\n${(data.keyPoints || []).map((p) => `- ${p}`).join("\n")}`;
+    const prompt = t("explainInfographicPrompt", {
+      title: data.title || t("aiInfographic"),
+      content,
+    });
 
     onExplainInChat(prompt);
   };
 
   const orientationBadge =
     data.orientation === "portrait"
-      ? isIndo ? "Potret (9:16)" : "Portrait (9:16)"
+      ? t("aspectPortrait")
       : data.orientation === "square"
-      ? isIndo ? "Persegi (1:1)" : "Square (1:1)"
-      : isIndo ? "Lanskap (16:9)" : "Landscape (16:9)";
+      ? t("aspectSquare")
+      : t("aspectLandscape");
 
   return (
     <div className="h-full flex flex-col bg-background text-foreground select-none overflow-hidden font-sans">
@@ -164,7 +163,7 @@ export function InfographicViewer({
           </div>
           <div className="min-w-0 flex-1">
             <div className="text-xs font-semibold text-foreground tracking-tight truncate">
-              {data.title || (isIndo ? "Infografis AI" : "AI Infographic")}
+              {data.title || t("aiInfographic")}
             </div>
             <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground truncate">
               <span className="capitalize">{data.styleLabel || data.style}</span>
@@ -189,7 +188,7 @@ export function InfographicViewer({
               onClick={handleZoomOut}
               disabled={zoomLevel <= 0.5}
               className="h-7 w-7 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center disabled:opacity-40 transition-colors cursor-pointer"
-              title={isIndo ? "Perkecil" : "Zoom out"}
+              title={t("zoomOut")}
             >
               <ZoomOut className="h-3.5 w-3.5" />
             </button>
@@ -201,7 +200,7 @@ export function InfographicViewer({
               onClick={handleZoomIn}
               disabled={zoomLevel >= 3.5}
               className="h-7 w-7 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center disabled:opacity-40 transition-colors cursor-pointer"
-              title={isIndo ? "Perbesar" : "Zoom in"}
+              title={t("zoomIn")}
             >
               <ZoomIn className="h-3.5 w-3.5" />
             </button>
@@ -210,7 +209,7 @@ export function InfographicViewer({
                 type="button"
                 onClick={handleResetZoom}
                 className="h-7 w-7 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer border-l border-border/50 ml-0.5"
-                title={isIndo ? "Reset Zoom" : "Reset zoom"}
+                title={t("resetZoom")}
               >
                 <RotateCcw className="h-3 w-3" />
               </button>
@@ -222,10 +221,10 @@ export function InfographicViewer({
             type="button"
             onClick={handleCopyPrompt}
             className="h-8 px-2 rounded-lg bg-secondary/80 hover:bg-secondary border border-border/60 text-muted-foreground hover:text-foreground text-xs flex items-center gap-1.5 transition-colors cursor-pointer"
-            title={isIndo ? "Salin Prompt" : "Copy Prompt"}
+            title={t("copyPrompt")}
           >
             {isCopied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
-            <span className="hidden md:inline">{isIndo ? "Salin" : "Copy"}</span>
+            <span className="hidden md:inline">{t("copy")}</span>
           </button>
 
           {/* Download Image */}
@@ -233,10 +232,10 @@ export function InfographicViewer({
             type="button"
             onClick={handleDownload}
             className="h-8 px-2.5 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer active:scale-95"
-            title={isIndo ? "Unduh Gambar (PNG)" : "Download Image"}
+            title={t("downloadImage")}
           >
             <Download className="h-3.5 w-3.5" />
-            <span className="hidden sm:inline">{isIndo ? "Unduh" : "Download"}</span>
+            <span className="hidden sm:inline">{t("download")}</span>
           </button>
 
           {/* Toggle Expand */}
@@ -245,7 +244,7 @@ export function InfographicViewer({
               type="button"
               onClick={onToggleExpand}
               className="h-8 w-8 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer ml-0.5"
-              title={isExpanded ? (isIndo ? "Kecilkan Panel" : "Collapse") : (isIndo ? "Lebarkan Panel" : "Expand")}
+              title={isExpanded ? t("collapsePanel") : t("expandPanel")}
             >
               {isExpanded ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
             </button>
@@ -279,7 +278,7 @@ export function InfographicViewer({
           {!imageLoaded && (
             <div className="w-96 h-80 flex flex-col items-center justify-center gap-3 text-muted-foreground bg-[#13141a]">
               <div className="h-8 w-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
-              <span className="text-xs">{isIndo ? "Memuat infografis..." : "Loading infographic..."}</span>
+              <span className="text-xs">{t("loadingInfographic")}</span>
             </div>
           )}
 
@@ -304,7 +303,7 @@ export function InfographicViewer({
         >
           <div className="flex items-center gap-2">
             <Info className="h-3.5 w-3.5 text-primary" />
-            <span>{isIndo ? "Intisari & Poin Materi Infografis" : "Infographic Insights & Key Takeaways"}</span>
+            <span>{t("infographicInsightsTakeaways")}</span>
             {data.keyPoints && data.keyPoints.length > 0 && (
               <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-secondary text-muted-foreground font-sans tabular-nums">
                 {data.keyPoints.length}
@@ -321,7 +320,7 @@ export function InfographicViewer({
             {data.summary && (
               <div>
                 <span className="font-semibold text-foreground block mb-0.5">
-                  {isIndo ? "Ringkasan" : "Summary"}
+                  {t("summary")}
                 </span>
                 <p className="text-muted-foreground leading-relaxed">{data.summary}</p>
               </div>
@@ -330,7 +329,7 @@ export function InfographicViewer({
             {data.keyPoints && data.keyPoints.length > 0 && (
               <div>
                 <span className="font-semibold text-foreground block mb-1">
-                  {isIndo ? "Poin Kunci" : "Key Takeaways"}
+                  {t("keyTakeaways")}
                 </span>
                 <ul className="space-y-1">
                   {data.keyPoints.map((pt, idx) => (
@@ -351,7 +350,7 @@ export function InfographicViewer({
                   className="px-3 py-1.5 rounded-lg bg-secondary hover:bg-muted text-foreground flex items-center gap-1.5 font-medium transition-colors cursor-pointer"
                 >
                   <MessageSquare className="h-3.5 w-3.5 text-primary" />
-                  <span>{isIndo ? "Tanyakan & Diskusikan di Chat AI" : "Discuss in AI Chat"}</span>
+                  <span>{t("discussInAiChat")}</span>
                 </button>
               </div>
             )}

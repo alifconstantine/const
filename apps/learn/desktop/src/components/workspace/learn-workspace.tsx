@@ -483,7 +483,7 @@ export function LearnWorkspace({
       const browserTab: RightPaneTab = {
         id: `browser_${Date.now()}`,
         type: "browser",
-        title: language === "id" ? "Peramban Web" : "Web Browser",
+        title: t("webBrowser"),
         url: initialUrl || "", // Tidak buka apa-apa di awal sesuai permintaan user
       };
       setRightPaneTabs((prev) => [...prev, browserTab]);
@@ -582,32 +582,31 @@ export function LearnWorkspace({
 
     const selectedSources = (sources || []).filter((s) => params.selectedSourceIds.includes(s.id));
     const targetLang = (params.language?.startsWith("id") || language === "id") ? "id" : "en";
-    const isIndo = targetLang === "id";
 
     const title = params.topic.trim()
       ? (params.type === "quiz"
-          ? (isIndo ? `Kuis: ${params.topic}` : `Quiz: ${params.topic}`)
+          ? t("quizTopicTitle", { topic: params.topic })
           : params.type === "flashcard"
-          ? (isIndo ? `Kartu: ${params.topic}` : `Flashcard: ${params.topic}`)
+          ? t("flashcardTopicTitle", { topic: params.topic })
           : params.type === "audio_summary"
-          ? (isIndo ? `Ringkasan Audio: ${params.topic}` : `Audio Summary: ${params.topic}`)
-          : (isIndo ? `Peta Pikiran: ${params.topic}` : `Mind Map: ${params.topic}`))
+          ? t("audioSummaryTopicTitle", { topic: params.topic })
+          : t("mindMapTopicTitle", { topic: params.topic }))
       : (params.type === "quiz"
-          ? (isIndo ? `Kuis (${params.count || 5} Soal)` : `Quiz (${params.count || 5} Questions)`)
+          ? t("quizWithQuestions", { count: params.count || 5 })
           : params.type === "flashcard"
-          ? (isIndo ? `Kartu Hafalan (${params.count || 10} Kartu)` : `Flashcards (${params.count || 10} Cards)`)
+          ? t("flashcardWithCards", { count: params.count || 10 })
           : params.type === "audio_summary"
-          ? (isIndo ? "Ringkasan Audio" : "Audio Summary")
-          : (isIndo ? "Peta Pikiran" : "Mind Map"));
+          ? t("audioSummaryTitle")
+          : t("mindMapTitle"));
 
     const initialLoadingTitle =
       params.type === "quiz"
-        ? (isIndo ? "Membuat Kuis..." : "Creating Quiz...")
+        ? t("creatingQuizStatus")
         : params.type === "flashcard"
-        ? (isIndo ? "Membuat Kartu Tanya-Jawab..." : "Creating Flashcards...")
+        ? t("creatingFlashcardsStatus")
         : params.type === "audio_summary"
-        ? (isIndo ? "Membuat Ringkasan Audio..." : "Creating Audio Summary...")
-        : (isIndo ? "Membuat Peta Pikiran..." : "Creating Mind Map...");
+        ? t("creatingAudioSummaryStatus")
+        : t("creatingMindMapStatus");
 
     // 2. Immediately create in Dexie with status: "generating" (appears instantly in Artifacts list)
     const artId = await localDb.createArtifact({
@@ -646,25 +645,15 @@ export function LearnWorkspace({
       });
 
       toast.success(
-        isIndo
-          ? (params.type === "quiz"
-              ? "Kuis berhasil dibuat!"
-              : params.type === "flashcard"
-              ? "Kartu tanya-jawab berhasil dibuat!"
-              : params.type === "mind_map"
-              ? "Peta pikiran berhasil dibuat!"
-              : params.type === "audio_summary"
-              ? "Ringkasan audio berhasil dibuat!"
-              : "Presentasi berhasil disusun!")
-          : (params.type === "quiz"
-              ? "Quiz created successfully!"
-              : params.type === "flashcard"
-              ? "Flashcards created successfully!"
-              : params.type === "mind_map"
-              ? "Mind map created successfully!"
-              : params.type === "audio_summary"
-              ? "Audio summary created successfully!"
-              : "Presentation slides created successfully!")
+        params.type === "quiz"
+          ? t("quizCreatedSuccess")
+          : params.type === "flashcard"
+          ? t("flashcardsCreatedSuccess")
+          : params.type === "mind_map"
+          ? t("mindMapCreatedSuccess")
+          : params.type === "audio_summary"
+          ? t("audioSummaryCreatedSuccess")
+          : t("presentationCreatedSuccess")
       );
 
       // Auto-open in preview & auto-widen
@@ -705,16 +694,12 @@ export function LearnWorkspace({
     );
     if (selectedSources.length === 0) return;
 
-    const isIndo = Boolean(
-      (params.audioLanguage && params.audioLanguage.startsWith("id")) ||
-      params.language === "id"
-    );
-    const title = isIndo ? "Ringkasan Video" : "Video Summary";
+    const title = t("videoSummaryTitle");
 
     // 1. Create generating artifact in Dexie
     const artId = await localDb.createArtifact({
       learnId,
-      title: isIndo ? "Membuat Ringkasan Video..." : "Creating Video Summary...",
+      title: t("creatingVideoSummaryStatus"),
       type: "video_summary",
       status: "generating",
       sourcesCount: selectedSources.length,
@@ -747,11 +732,7 @@ export function LearnWorkspace({
         status: "completed",
       });
 
-      toast.success(
-        isIndo
-          ? "Ringkasan Video berhasil dibuat!"
-          : "Video Summary created successfully!"
-      );
+      toast.success(t("videoSummaryCreatedSuccess"));
 
       // 4. Auto-open in preview & auto-widen
       const fullArt = await localDb.getArtifact(artId);
@@ -786,14 +767,13 @@ export function LearnWorkspace({
     );
     if (selectedSources.length === 0) return;
 
-    const isIndo = language === "id";
-    const targetLang: "id" | "en" = isIndo ? "id" : "en";
-    const title = isIndo ? "Presentasi Materi" : "Presentation Slides";
+    const targetLang: "id" | "en" = language === "id" ? "id" : "en";
+    const title = t("presentationTitle");
 
     // 1. Create generating artifact in Dexie
     const artId = await localDb.createArtifact({
       learnId,
-      title: isIndo ? "Menyusun Presentasi..." : "Creating Presentation...",
+      title: t("creatingPresentationStatus"),
       type: "slides",
       status: "generating",
       sourcesCount: selectedSources.length,
@@ -822,11 +802,7 @@ export function LearnWorkspace({
         status: "completed",
       });
 
-      toast.success(
-        isIndo
-          ? "Presentasi berhasil dibuat!"
-          : "Presentation created successfully!"
-      );
+      toast.success(t("presentationCreatedSuccess"));
 
       // 4. Auto-open in preview & auto-widen
       const fullArt = await localDb.getArtifact(artId);
@@ -863,13 +839,12 @@ export function LearnWorkspace({
     );
     if (selectedSources.length === 0) return;
 
-    const isIndo = params.language === "id";
-    const title = isIndo ? "Infografis Materi" : "Study Infographic";
+    const title = t("studyInfographicTitle");
 
     // 1. Create generating artifact in Dexie
     const artId = await localDb.createArtifact({
       learnId,
-      title: isIndo ? "Membuat Infografis..." : "Creating Infographic...",
+      title: t("creatingInfographicStatus"),
       type: "infographic",
       status: "generating",
       sourcesCount: selectedSources.length,
@@ -900,9 +875,7 @@ export function LearnWorkspace({
         status: "completed",
       });
 
-      toast.success(
-        isIndo ? "Infografis berhasil dibuat!" : "Infographic created successfully!"
-      );
+      toast.success(t("infographicCreatedSuccess"));
 
       const fullArt = await localDb.getArtifact(artId);
       if (fullArt) {
@@ -938,13 +911,12 @@ export function LearnWorkspace({
     );
     if (selectedSources.length === 0) return;
 
-    const isIndo = params.language === "id";
-    const title = params.templateTitle || (isIndo ? "Laporan Pembelajaran" : "Learning Report");
+    const title = params.templateTitle || t("learningReportTitle");
 
     // 1. Create generating artifact in Dexie
     const artId = await localDb.createArtifact({
       learnId,
-      title: isIndo ? "Menyusun Laporan..." : "Generating Report...",
+      title: t("generatingReportStatus"),
       type: "report",
       status: "generating",
       sourcesCount: selectedSources.length,
@@ -974,11 +946,7 @@ export function LearnWorkspace({
         status: "completed",
       });
 
-      toast.success(
-        isIndo
-          ? "Laporan berhasil dibuat!"
-          : "Report created successfully!"
-      );
+      toast.success(t("reportCreatedSuccess"));
 
       // 4. Auto-open in preview & auto-widen
       const fullArt = await localDb.getArtifact(artId);
@@ -1010,15 +978,14 @@ export function LearnWorkspace({
     );
     if (selectedSources.length === 0) return;
 
-    const isIndo = language === "id";
-    const targetLang: "id" | "en" = isIndo ? "id" : "en";
+    const targetLang: "id" | "en" = language === "id" ? "id" : "en";
     const title = params.topicFocus?.trim()
-      ? (isIndo ? `CheatSheet: ${params.topicFocus.trim()}` : `CheatSheet: ${params.topicFocus.trim()}`)
-      : (isIndo ? "Lembar Contekan Pintar" : "Smart CheatSheet");
+      ? `CheatSheet: ${params.topicFocus.trim()}`
+      : t("smartCheatSheetTitle");
 
     const artId = await localDb.createArtifact({
       learnId,
-      title: isIndo ? "Menyusun Lembar Contekan..." : "Creating CheatSheet...",
+      title: t("creatingCheatSheetStatus"),
       type: "cheatsheet",
       status: "generating",
       sourcesCount: selectedSources.length,
@@ -1042,11 +1009,7 @@ export function LearnWorkspace({
         status: "completed",
       });
 
-      toast.success(
-        isIndo
-          ? "Lembar contekan berhasil dibuat!"
-          : "CheatSheet created successfully!"
-      );
+      toast.success(t("cheatSheetCreatedSuccess"));
 
       const fullArt = await localDb.getArtifact(artId);
       if (fullArt) {
@@ -1146,7 +1109,7 @@ export function LearnWorkspace({
         const newTab: RightPaneTab = {
           id: tabId,
           type: "note_preview",
-          title: art.title || (language === "id" ? "Catatan Baru" : "New Note"),
+          title: art.title || t("newNote"),
           artifactId: art.id,
           artifact: art,
         };
@@ -1176,16 +1139,12 @@ export function LearnWorkspace({
     try {
       await localDb.createSource({
         learnId,
-        title: art.title || (language === "id" ? "Catatan Baru" : "New Note"),
+        title: art.title || t("newNote"),
         content: art.content || "",
         type: "text",
         includedInChat: true,
       });
-      toast.success(
-        language === "id"
-          ? "Catatan berhasil dikonversikan menjadi sumber!"
-          : "Note converted to source successfully!"
-      );
+      toast.success(t("noteConvertedToSourceSuccess"));
     } catch (err) {
       console.error("Failed to convert note to source:", err);
       toast.error(t("failedConvertNoteToSource"));
@@ -1208,7 +1167,7 @@ export function LearnWorkspace({
   const handleAddNote = async () => {
     if (!learnId) return;
 
-    const defaultTitle = language === "id" ? "Catatan Baru" : "New Note";
+    const defaultTitle = t("newNote");
     const artId = await localDb.createArtifact({
       learnId,
       title: defaultTitle,
@@ -1262,7 +1221,7 @@ export function LearnWorkspace({
       return;
     }
 
-    const defaultTitle = language === "id" ? "Catatan Baru" : "New Note";
+    const defaultTitle = t("newNote");
     await localDb.updateArtifact(art.id, {
       status: "generating",
       sourcesCount,
@@ -1298,12 +1257,12 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
         },
         onDone: async (finalContent) => {
           const contentToSave = finalContent || noteContent;
-          let noteTitle = language === "id" ? "Catatan: Ringkasan Sumber" : "Study Note: Summary";
+          let noteTitle = t("studyNoteSummaryDefault");
           const h1Match = contentToSave.match(/^#\s+(.+)$/m);
           if (h1Match && h1Match[1]) {
             noteTitle = h1Match[1].replace(/[*_~`]/g, "").trim();
           } else if (learn?.title) {
-            noteTitle = `${language === "id" ? "Catatan: " : "Note: "}${learn.title}`;
+            noteTitle = `${t("notePrefix")}${learn.title}`;
           }
 
           await localDb.updateArtifact(art.id, {
@@ -1312,11 +1271,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
             status: "completed",
           });
 
-          toast.success(
-            language === "id"
-              ? `Catatan "${noteTitle}" selesai dibuat!`
-              : `Note "${noteTitle}" completed!`
-          );
+          toast.success(t("noteCompletedSuccess", { title: noteTitle }));
         },
         onError: async (err) => {
           console.error("Failed to generate note:", err);

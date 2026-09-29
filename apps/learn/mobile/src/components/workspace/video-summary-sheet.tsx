@@ -170,8 +170,7 @@ export function VideoSummarySheet({
   data,
   onExplainInChat: _onExplainInChat,
 }: VideoSummarySheetProps) {
-  const { t, language } = useI18n();
-  const isIndo = language === "id";
+  const { t } = useI18n();
 
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -394,11 +393,7 @@ export function VideoSummarySheet({
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      toast.success(
-        isIndo
-          ? "File komposisi HyperFrames berhasil diunduh!"
-          : "HyperFrames composition downloaded!"
-      );
+      toast.success(t("hyperFramesCompositionDownloaded"));
     } catch (err: any) {
       toast.error(err?.message || t("failedExportHtml"));
     }
@@ -414,11 +409,7 @@ export function VideoSummarySheet({
     }
 
     setIsRenderingCloud(true);
-    toast(
-      isIndo
-        ? "Sedang merender video MP4 di Composio Cloud Sandbox..."
-        : "Rendering MP4 video in Composio Cloud Sandbox..."
-    );
+    toast(t("renderingMp4Video"));
 
     try {
       const res = await renderVideoInSandbox({
@@ -438,9 +429,7 @@ export function VideoSummarySheet({
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
 
-        toast.success(
-          isIndo ? "Video MP4 berhasil dirender dan diunduh!" : "MP4 video rendered and downloaded!"
-        );
+        toast.success(t("videoRenderedSuccess"));
       } else {
         toast.error(
           res.error || t("failedRenderVideoMp4")
@@ -489,7 +478,7 @@ export function VideoSummarySheet({
           </div>
           <div className="min-w-0 flex-1">
             <h2 className="text-xs font-semibold text-white truncate leading-tight">
-              {data.title || (isIndo ? "Ringkasan Video" : "Video Summary")}
+              {data.title || t("videoSummary")}
             </h2>
             <p className="text-[10.5px] text-[#888888] truncate">
               {scenes.length} Scenes • {formatSeconds(totalDuration)}

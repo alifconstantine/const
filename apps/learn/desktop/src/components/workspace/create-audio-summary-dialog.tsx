@@ -54,7 +54,6 @@ export function CreateAudioSummaryDialog({
   onOpenModelsSettings,
 }: CreateAudioSummaryDialogProps) {
   const { t, language } = useI18n();
-  const isIndo = language === "id";
 
   const [topic, setTopic] = useState("");
   const [lengthMode, setLengthMode] = useState<"short" | "long" | "auto">("auto");
@@ -65,7 +64,7 @@ export function CreateAudioSummaryDialog({
   // Voice state
   const [voiceModel, setVoiceModel] = useState("inworld-tts-2");
   const [voiceId, setVoiceId] = useState("Ashley");
-  const [audioLanguage, setAudioLanguage] = useState(isIndo ? "id-ID" : "en-US");
+  const [audioLanguage, setAudioLanguage] = useState(language === "id" ? "id-ID" : "en-US");
 
   // Read stored voice config
   const voiceConfig = useMemo(() => getStoredVoiceConfig(), [open]);
@@ -100,8 +99,8 @@ export function CreateAudioSummaryDialog({
       if (inworldProvider.model) setVoiceModel(inworldProvider.model);
       if (inworldProvider.voice) setVoiceId(inworldProvider.voice);
     }
-    setAudioLanguage(isIndo ? "id-ID" : "en-US");
-  }, [inworldProvider, isIndo, open]);
+    setAudioLanguage(language === "id" ? "id-ID" : "en-US");
+  }, [inworldProvider, language, open]);
 
   const handleToggleSource = (sourceId: string) => {
     setSelectedSourceIds((prev) =>
@@ -176,7 +175,7 @@ export function CreateAudioSummaryDialog({
               {/* Sumber Dropdown */}
               <div className="space-y-1.5 relative">
                 <label className="text-[11.5px] font-medium text-[#999999]">
-                  {isIndo ? "Sumber Rujukan Materi" : "Source Material Scope"}
+                  {t("sourceMaterialScope")}
                 </label>
                 <div className="relative">
                   <button
@@ -186,12 +185,11 @@ export function CreateAudioSummaryDialog({
                   >
                     <span className="text-white font-medium truncate">
                       {selectedSourceIds.length === sources.length
-                        ? isIndo
-                          ? `Semua sumber (${sources.length} sumber)`
-                          : `All sources (${sources.length})`
-                        : isIndo
-                        ? `${selectedSourceIds.length} dari ${sources.length} sumber terpilih`
-                        : `${selectedSourceIds.length} of ${sources.length} sources selected`}
+                        ? t("allSourcesCount", { count: sources.length })
+                        : t("selectedOfTotalSources", {
+                            selected: selectedSourceIds.length,
+                            total: sources.length,
+                          })}
                     </span>
                     <ChevronDown className="h-3.5 w-3.5 text-[#888888] shrink-0" />
                   </button>
@@ -205,7 +203,7 @@ export function CreateAudioSummaryDialog({
                           className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-[#2b2b2b] text-xs text-[#cccccc] cursor-pointer transition-colors"
                         >
                           <span className="font-medium">
-                            {isIndo ? "Pilih Semua Sumber" : "Select All Sources"}
+                            {t("selectAllSources")}
                           </span>
                           <div
                             className={cn(
@@ -257,7 +255,7 @@ export function CreateAudioSummaryDialog({
               {/* Length Options: Ringkas, Panjang, Auto */}
               <div className="space-y-1.5">
                 <label className="text-[11.5px] font-medium text-[#999999]">
-                  {isIndo ? "Panjang & Kedalaman Ringkasan" : "Summary Length & Depth"}
+                  {t("summaryLengthAndDepth")}
                 </label>
                 <div className="grid grid-cols-3 gap-2.5">
                   {[
@@ -325,16 +323,16 @@ export function CreateAudioSummaryDialog({
                   <div className="flex items-center gap-2">
                     <Volume2 className="h-4 w-4 text-white" />
                     <span className="text-xs font-semibold text-white">
-                      {isIndo ? "Konfigurasi Suara (Inworld TTS)" : "Voice Configuration (Inworld TTS)"}
+                      {t("voiceConfigurationInworld")}
                     </span>
                   </div>
                   {hasInworldKey ? (
                     <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                      {isIndo ? "API Key Terhubung" : "API Key Connected"}
+                      {t("apiKeyConnected")}
                     </span>
                   ) : (
                     <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                      {isIndo ? "Belum Dikonfigurasi" : "Not Configured"}
+                      {t("notConfigured")}
                     </span>
                   )}
                 </div>
@@ -377,7 +375,7 @@ export function CreateAudioSummaryDialog({
                       className="w-full h-8 px-2 rounded-lg bg-[#222222] border border-[#2b2b2b] text-xs text-white disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus:border-[#444444]"
                     >
                       {availableModels.length === 0 ? (
-                        <option value="">{isIndo ? "Tidak ada model" : "No models"}</option>
+                        <option value="">{t("noModels")}</option>
                       ) : (
                         availableModels.map((m) => (
                           <option key={m.id} value={m.id}>
@@ -400,7 +398,7 @@ export function CreateAudioSummaryDialog({
                       className="w-full h-8 px-2 rounded-lg bg-[#222222] border border-[#2b2b2b] text-xs text-white disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus:border-[#444444]"
                     >
                       {availableVoices.length === 0 ? (
-                        <option value="">{isIndo ? "Tidak ada suara" : "No voices"}</option>
+                        <option value="">{t("noVoices")}</option>
                       ) : (
                         availableVoices.map((v) => (
                           <option key={v.id} value={v.id}>
@@ -448,7 +446,7 @@ export function CreateAudioSummaryDialog({
               disabled={!hasInworldKey || sources.length === 0}
               className="px-4 py-2 rounded-xl bg-white hover:bg-neutral-200 disabled:opacity-40 disabled:hover:bg-white disabled:cursor-not-allowed text-xs font-semibold text-black flex items-center gap-1.5 transition-all cursor-pointer shadow-sm active:scale-98"
             >
-              <span>{isIndo ? "Buat Ringkasan Audio" : "Generate Audio Summary"}</span>
+              <span>{t("generateAudioSummary")}</span>
             </button>
           </div>
         </form>
