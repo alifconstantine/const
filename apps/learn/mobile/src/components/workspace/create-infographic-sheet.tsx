@@ -600,7 +600,7 @@ export function CreateInfographicSheet({
               )}
             >
               <BarChart3 className="h-4 w-4" />
-              <span>{isIndo ? "Buat Sekarang" : "Create Now"}</span>
+              <span>{isIndo ? "Buat Infographic" : "Create Infographic"}</span>
             </button>
           </div>
         </form>

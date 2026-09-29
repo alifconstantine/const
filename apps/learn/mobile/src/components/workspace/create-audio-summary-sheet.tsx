@@ -419,10 +419,10 @@ export function CreateAudioSummarySheet({
             <button
               type="submit"
               disabled={!hasInworldKey || sources.length === 0}
-              className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-xs font-semibold text-white shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-[0.98]"
+              className="w-full py-3 rounded-2xl bg-white hover:bg-neutral-200 disabled:opacity-40 disabled:hover:bg-white disabled:cursor-not-allowed text-xs font-semibold text-black flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-sm active:scale-98"
             >
               <AudioLines className="h-4 w-4" />
-              <span>{isIndo ? "Buat Ringkasan Audio" : "Generate Audio Summary"}</span>
+              <span>{isIndo ? "Buat Audio Summary" : "Create Audio Summary"}</span>
             </button>
           </div>
         </form>

@@ -1004,7 +1004,7 @@ export const translations = {
     videoCoverageAutoDesc: "AI menganalisis keluasan sumber untuk kedalaman optimal",
     videoAdditionalPrompt: "Arahan Tambahan (Opsional)",
     videoAdditionalPromptPlaceholder: "contoh: Fokuskan pada perbandingan arsitektur, jelaskan dengan analogi...",
-    videoGenerateBtn: "Buat Ringkasan Video",
+    videoGenerateBtn: "Buat Video Summary",
     videoGenerating: "Membuat Ringkasan Video...",
     videoExportBtn: "Ekspor Video",
     videoExportMp4: "Unduh Video (MP4/WebM)",

@@ -602,7 +602,7 @@ export function CreateReportSheet({
               )}
             >
               <FileText className="h-4 w-4" />
-              <span>{isIndo ? "Buat sekarang" : "Create now"}</span>
+              <span>{isIndo ? "Buat Report" : "Create Report"}</span>
             </button>
           </div>
         </form>

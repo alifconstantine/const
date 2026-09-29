@@ -793,7 +793,7 @@ export function CreateInfographicDialog({
               disabled={!hasConfiguredImageModel || selectedSourceIds.length === 0}
               className="px-4 py-2 rounded-xl bg-white hover:bg-neutral-200 disabled:opacity-40 disabled:hover:bg-white disabled:cursor-not-allowed text-xs font-semibold text-black flex items-center gap-1.5 transition-all cursor-pointer shadow-sm active:scale-98"
             >
-              <span>{isIndo ? "Buat Infografik" : "Generate Infographic"}</span>
+              <span>{isIndo ? "Buat Infographic" : "Create Infographic"}</span>
             </button>
           </div>
         </form>

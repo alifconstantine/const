@@ -48,6 +48,20 @@ export function CreateStudioArtifactDialog({
     setArtifactType(initialType);
   }, [initialType]);
 
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest("[data-studio-dropdown]")) {
+        setIsSourceDropdownOpen(false);
+      }
+    };
+    if (isSourceDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [isSourceDropdownOpen]);
+
   // Sync default selected sources to all available sources
   useEffect(() => {
     if (sources.length > 0 && selectedSourceIds.length === 0) {
@@ -322,7 +336,7 @@ export function CreateStudioArtifactDialog({
               </div>
 
               {/* Sumber Dropdown */}
-              <div className="space-y-1.5 relative">
+              <div className="space-y-1.5 relative" data-studio-dropdown>
                 <label className="text-[11.5px] font-medium text-[#999999]">
                   {isIndo ? "Sumber Rujukan Materi" : "Source Material Scope"}
                 </label>
@@ -341,7 +355,12 @@ export function CreateStudioArtifactDialog({
                         ? `${selectedSourceIds.length} dari ${sources.length} sumber terpilih`
                         : `${selectedSourceIds.length} of ${sources.length} sources selected`}
                     </span>
-                    <ChevronDown className="h-3.5 w-3.5 text-[#888888] shrink-0" />
+                    <ChevronDown
+                      className={cn(
+                        "h-3.5 w-3.5 text-[#888888] shrink-0 transition-transform duration-150",
+                        isSourceDropdownOpen ? "rotate-180 text-white" : ""
+                      )}
+                    />
                   </button>
 
                   {isSourceDropdownOpen && (
@@ -454,7 +473,11 @@ export function CreateStudioArtifactDialog({
               disabled={sources.length === 0}
               className="px-4 py-2 rounded-xl bg-white hover:bg-neutral-200 disabled:opacity-40 disabled:hover:bg-white disabled:cursor-not-allowed text-xs font-semibold text-black flex items-center gap-1.5 transition-all cursor-pointer shadow-sm active:scale-98"
             >
-              <span>{isIndo ? "Buat sekarang" : "Generate Now"}</span>
+              <span>
+                {artifactType === "quiz"
+                  ? isIndo ? "Buat Kuis" : "Create Quiz"
+                  : isIndo ? "Buat Flashcards" : "Create Flashcards"}
+              </span>
             </button>
           </div>
         </form>

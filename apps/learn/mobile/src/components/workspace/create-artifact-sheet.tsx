@@ -380,14 +380,27 @@ export function CreateArtifactSheet({
             )}
           </div>
 
-          {/* Action Button: "Buat sekarang" */}
+          {/* Action Button: "Create Quiz" / "Create Flashcards" */}
           <div className="pt-2 pb-1">
             <button
               type="submit"
-              className="w-full py-3 rounded-xl bg-foreground hover:bg-foreground/90 text-background font-semibold text-xs transition-all shadow-md active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer"
+              disabled={sources.length === 0}
+              className="w-full py-3 rounded-2xl bg-white hover:bg-neutral-200 disabled:opacity-40 disabled:hover:bg-white disabled:cursor-not-allowed text-black font-semibold text-xs sm:text-sm flex items-center justify-center gap-1.5 shadow-sm active:scale-98 cursor-pointer transition-all"
             >
-              <Layers className="h-4 w-4" />
-              <span>{isIndo ? "Buat sekarang" : "Generate now"}</span>
+              {artifactType === "quiz" ? (
+                <HelpCircle className="h-4 w-4 text-black" />
+              ) : (
+                <Layers className="h-4 w-4 text-black" />
+              )}
+              <span>
+                {artifactType === "quiz"
+                  ? isIndo
+                    ? "Buat Kuis"
+                    : "Create Quiz"
+                  : isIndo
+                  ? "Buat Flashcards"
+                  : "Create Flashcards"}
+              </span>
             </button>
           </div>
         </form>

@@ -2,13 +2,11 @@ import React, { useState, useMemo } from "react";
 import {
   X,
   Presentation,
-  Layers,
   Check,
   FileText,
   Sliders,
-  Palette,
 } from "lucide-react";
-import { cn } from "@const/ui";
+import { BrandLogo, cn } from "@const/ui";
 import { useI18n } from "../../lib/i18n";
 import type { LocalSource } from "../../lib/db";
 
@@ -21,7 +19,6 @@ export interface CreatePresentationSheetProps {
     provider: "native" | "canva" | "slides";
     lengthMode: "short" | "medium" | "long" | "auto";
     slideCount?: number;
-    themeId?: "bold_dark" | "swiss_blue" | "sea_indigo" | "ash_lime";
     customInstructions?: string;
   }) => void;
 }
@@ -34,8 +31,7 @@ const getProviders = (isIndo: boolean) => [
       ? "1920×1080 Canvas Deck & Cloud Sandbox PDF"
       : "1920×1080 Canvas Deck & Cloud Sandbox PDF",
     badge: isIndo ? "Direkomendasikan" : "Recommended",
-    icon: Presentation,
-    color: "text-amber-400",
+    logoId: null,
   },
   {
     id: "canva" as const,
@@ -44,8 +40,7 @@ const getProviders = (isIndo: boolean) => [
       ? "Template Canva & Desain Interaktif"
       : "Editable Canva Design & Live Templates",
     badge: "Canva AI",
-    icon: Palette,
-    color: "text-cyan-400",
+    logoId: "canva",
   },
   {
     id: "slides" as const,
@@ -54,16 +49,8 @@ const getProviders = (isIndo: boolean) => [
       ? "Slide Cloud di Google Drive & PPTX"
       : "Interactive Presentation Embed & PPTX",
     badge: "Google Suite",
-    icon: Presentation,
-    color: "text-amber-500",
+    logoId: "google-slides",
   },
-];
-
-const THEMES = [
-  { id: "bold_dark", name: "Modern Dark", color: "#38bdf8", bg: "#06080F" },
-  { id: "swiss_blue", name: "Swiss Blue", color: "#002fa7", bg: "#f2f2ef" },
-  { id: "sea_indigo", name: "Sea Indigo", color: "#5ac8fa", bg: "#060913" },
-  { id: "ash_lime", name: "Ash & Lime", color: "#84a300", bg: "#e7e5df" },
 ];
 
 export function CreatePresentationSheet({
@@ -72,7 +59,7 @@ export function CreatePresentationSheet({
   sources = [],
   onGenerate,
 }: CreatePresentationSheetProps) {
-  const { language } = useI18n();
+  const { t, language } = useI18n();
   const isIndo = language === "id";
   const providers = useMemo(() => getProviders(isIndo), [isIndo]);
 
@@ -80,7 +67,6 @@ export function CreatePresentationSheet({
   const [lengthMode, setLengthMode] = useState<"short" | "medium" | "long" | "auto">("auto");
   const [customCount, setCustomCount] = useState<number>(10);
   const [isCustomCount, setIsCustomCount] = useState(false);
-  const [themeId, setThemeId] = useState<"bold_dark" | "swiss_blue" | "sea_indigo" | "ash_lime">("bold_dark");
   const [customInstructions, setCustomInstructions] = useState("");
   const [selectedSourceIds, setSelectedSourceIds] = useState<string[]>(() =>
     sources.map((s) => s.id)
@@ -115,7 +101,6 @@ export function CreatePresentationSheet({
       provider,
       lengthMode,
       slideCount: isCustomCount ? Number(customCount) || 10 : undefined,
-      themeId,
       customInstructions: customInstructions.trim() || undefined,
     });
     onClose();
@@ -127,14 +112,14 @@ export function CreatePresentationSheet({
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 z-[60] bg-black/70 backdrop-blur-[2px] transition-opacity duration-300 animate-in fade-in"
+        className="fixed inset-0 z-[60] bg-black/75 backdrop-blur-[2px] transition-opacity duration-300 animate-in fade-in"
         onClick={onClose}
         aria-hidden="true"
       />
 
       {/* Bottom Sheet */}
       <div
-        className="fixed inset-x-0 bottom-0 z-[60] max-h-[92vh] flex flex-col rounded-t-3xl bg-[#161616] border-t border-[#262626] shadow-2xl animate-in slide-in-from-bottom duration-300 select-none pb-safe"
+        className="fixed inset-x-0 bottom-0 z-[60] max-h-[92vh] flex flex-col rounded-t-3xl bg-[#161616] text-[#e0e0e0] border-t border-[#262626] shadow-2xl animate-in slide-in-from-bottom duration-300 select-none pb-safe"
       >
         {/* Handle Bar */}
         <div className="flex justify-center pt-2.5 pb-1">
@@ -144,57 +129,58 @@ export function CreatePresentationSheet({
         {/* Header */}
         <div className="px-5 py-3 border-b border-[#242424] flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5">
-            <div className="h-8 w-8 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
-              <Presentation className="h-4 w-4" />
-            </div>
+            <Presentation className="h-4 w-4 text-white shrink-0" />
             <div>
-              <h2 className="text-sm font-semibold text-foreground">
+              <h2 className="text-sm font-semibold text-white">
                 {isIndo ? "Buat Slide Presentasi" : "Create Presentation Slides"}
               </h2>
-              <p className="text-[11px] text-muted-foreground">
-                {isIndo
-                  ? "Pilih sumber materi, engine slide, dan format"
-                  : "Select sources, engine, and slide depth"}
+              <p className="text-[11px] text-[#888888]">
+                {selectedSourceIds.length === sources.length
+                  ? isIndo
+                    ? `Semua sumber (${sources.length} sumber)`
+                    : `All sources (${sources.length})`
+                  : isIndo
+                  ? `${selectedSourceIds.length} dari ${sources.length} sumber dipilih`
+                  : `${selectedSourceIds.length} of ${sources.length} sources selected`}
               </p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="h-8 w-8 rounded-full hover:bg-white/10 text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
+            className="h-7 w-7 rounded-lg hover:bg-[#222222] text-[#888888] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
         {/* Content Scrollable Form */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
           {/* Section 1: Source Selection */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-semibold text-foreground flex items-center gap-1.5">
-                <Layers className="h-3.5 w-3.5 text-muted-foreground" />
-                {isIndo ? "Pilih Sumber Materi" : "Select Sources"}
-              </span>
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <label className="text-[11.5px] font-medium text-[#999999]">
+                {isIndo ? "Sumber Rujukan Materi" : "Source Scope"}
+              </label>
               <button
                 type="button"
                 onClick={handleToggleAllSources}
-                className="text-[11px] font-medium text-amber-400 hover:text-amber-300 transition-colors"
+                className="text-[11px] font-medium text-white/80 hover:text-white transition-colors cursor-pointer"
               >
                 {selectedSourceIds.length === sources.length
-                  ? (isIndo ? "Hapus Semua" : "Deselect All")
+                  ? (isIndo ? "Batal Semua" : "Deselect All")
                   : (isIndo ? "Pilih Semua" : "Select All")}
               </button>
             </div>
 
             {sources.length === 0 ? (
-              <p className="text-xs text-muted-foreground italic p-3 rounded-xl bg-[#1c1c1c] border border-[#282828]">
+              <p className="text-xs text-[#888888] italic p-3 rounded-xl bg-[#222222] border border-[#2b2b2b]">
                 {isIndo
                   ? "Belum ada sumber. Tambahkan sumber terlebih dahulu."
                   : "No sources found. Add sources first."}
               </p>
             ) : (
-              <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+              <div className="space-y-1.5 max-h-32 overflow-y-auto rounded-xl bg-[#222222] p-1.5 border border-[#2b2b2b]">
                 {sources.map((s) => {
                   const isChecked = selectedSourceIds.includes(s.id);
                   return (
@@ -202,24 +188,26 @@ export function CreatePresentationSheet({
                       key={s.id}
                       onClick={() => handleToggleSource(s.id)}
                       className={cn(
-                        "flex items-center gap-2.5 p-2.5 rounded-xl border text-xs cursor-pointer transition-all",
+                        "flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs cursor-pointer transition-colors",
                         isChecked
-                          ? "bg-amber-500/10 border-amber-500/40 text-foreground"
-                          : "bg-[#1a1a1a] border-[#262626] text-muted-foreground hover:text-foreground"
+                          ? "bg-[#2c2c2c] text-white font-medium"
+                          : "text-[#888888] hover:text-[#cccccc]"
                       )}
                     >
+                      <div className="flex items-center gap-2 truncate pr-2">
+                        <FileText className="h-3.5 w-3.5 text-[#777777] shrink-0" />
+                        <span className="truncate text-xs">{s.title}</span>
+                      </div>
                       <div
                         className={cn(
                           "h-4 w-4 rounded flex items-center justify-center shrink-0 border transition-colors",
                           isChecked
-                            ? "bg-amber-500 border-amber-500 text-black"
-                            : "border-white/20 bg-transparent"
+                            ? "bg-white border-white text-black"
+                            : "border-[#444449] bg-transparent"
                         )}
                       >
                         {isChecked && <Check className="h-3 w-3 stroke-[3]" />}
                       </div>
-                      <FileText className="h-3.5 w-3.5 shrink-0 opacity-70" />
-                      <span className="truncate font-medium flex-1">{s.title}</span>
                     </div>
                   );
                 })}
@@ -228,55 +216,55 @@ export function CreatePresentationSheet({
           </div>
 
           {/* Section 2: Presentation Engine (Native, Canva, Google Slides) */}
-          <div>
-            <label className="text-xs font-semibold text-foreground flex items-center gap-1.5 mb-2">
-              <Sliders className="h-3.5 w-3.5 text-muted-foreground" />
+          <div className="space-y-1.5">
+            <label className="text-[11.5px] font-medium text-[#999999]">
               {isIndo ? "Pilih Engine Presentasi" : "Presentation Engine"}
             </label>
             <div className="grid grid-cols-1 gap-2">
               {providers.map((p) => {
                 const isSelected = provider === p.id;
-                const Icon = p.icon;
                 return (
                   <div
                     key={p.id}
-                    onClick={() => setProvider(p.id as any)}
+                    onClick={() => setProvider(p.id)}
                     className={cn(
-                      "p-3 rounded-2xl border flex items-center gap-3 cursor-pointer transition-all",
+                      "p-3 rounded-xl border flex items-center gap-3 cursor-pointer transition-all",
                       isSelected
-                        ? "bg-[#202020] border-amber-500/80 shadow-sm"
-                        : "bg-[#181818] border-[#262626] hover:bg-[#1e1e1e]"
+                        ? "bg-[#252525] border-white/40 shadow-sm text-white"
+                        : "bg-[#181818] border-[#262626] hover:bg-[#1e1e1e] text-[#888888]"
                     )}
                   >
                     <div
                       className={cn(
-                        "h-9 w-9 rounded-xl flex items-center justify-center shrink-0 border",
-                        isSelected
-                          ? "bg-amber-500/15 border-amber-500/30 text-amber-400"
-                          : "bg-[#222222] border-[#303030] text-muted-foreground"
+                        "h-8 w-8 rounded-lg flex items-center justify-center shrink-0",
+                        isSelected ? "bg-[#2c2c2c]" : "bg-[#202020]"
                       )}
                     >
-                      <Icon className="h-4 w-4" />
+                      {p.logoId ? (
+                        <BrandLogo id={p.logoId} size="xs" className="w-5 h-5 rounded-md p-0.5 border-0 shadow-none bg-transparent" />
+                      ) : (
+                        <Presentation className="h-4 w-4 text-white" />
+                      )}
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
-                        <span className="text-xs font-semibold text-foreground">
+                        <span className="text-xs font-semibold text-white">
                           {p.name}
                         </span>
-                        <span className="text-[9px] font-sans px-1.5 py-0.2 rounded-full bg-white/5 border border-white/10 text-muted-foreground">
+                        <span className="text-[9px] font-sans px-1.5 py-0.2 rounded-full bg-white/5 border border-white/10 text-[#888888]">
                           {p.badge}
                         </span>
                       </div>
-                      <p className="text-[10px] text-muted-foreground truncate mt-0.5">
+                      <p className="text-[10px] text-[#888888] truncate mt-0.5">
                         {p.tagline}
                       </p>
                     </div>
                     <div
                       className={cn(
-                        "h-4 w-4 rounded-full border flex items-center justify-center shrink-0",
+                        "h-4 w-4 rounded-full border flex items-center justify-center shrink-0 transition-colors",
                         isSelected
-                          ? "border-amber-500 bg-amber-500 text-black"
-                          : "border-white/20"
+                          ? "border-white bg-white text-black"
+                          : "border-[#444449] bg-transparent"
                       )}
                     >
                       {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-black" />}
@@ -288,49 +276,56 @@ export function CreatePresentationSheet({
           </div>
 
           {/* Section 3: Slide Count / Length Mode */}
-          <div>
-            <label className="text-xs font-semibold text-foreground flex items-center gap-1.5 mb-2">
-              <Sliders className="h-3.5 w-3.5 text-muted-foreground" />
-              {isIndo ? "Jumlah Slide & Kedalaman" : "Slide Count & Depth"}
-            </label>
-            <div className="grid grid-cols-4 gap-2">
-              {[
-                { id: "auto", label: isIndo ? "Otomatis" : "Auto", desc: isIndo ? "Adaptif" : "Adaptive" },
-                { id: "short", label: isIndo ? "Singkat" : "Short", desc: isIndo ? "3-5 Slide" : "3-5 Slides" },
-                { id: "long", label: isIndo ? "Panjang" : "Long", desc: isIndo ? "8-12 Slide" : "8-12 Slides" },
-                { id: "custom", label: isIndo ? "Kustom" : "Custom", desc: `${customCount} ${isIndo ? "Slide" : "Slides"}` },
-              ].map((m) => {
-                const isSelected = m.id === "custom" ? isCustomCount : !isCustomCount && lengthMode === m.id;
-                return (
-                  <button
-                    key={m.id}
-                    type="button"
-                    onClick={() => {
-                      if (m.id === "custom") {
-                        setIsCustomCount(true);
-                      } else {
-                        setIsCustomCount(false);
-                        setLengthMode(m.id as any);
-                      }
-                    }}
-                    className={cn(
-                      "p-2 rounded-xl border text-center transition-all cursor-pointer",
-                      isSelected
-                        ? "bg-amber-500/15 border-amber-500 text-foreground"
-                        : "bg-[#1a1a1a] border-[#262626] text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    <div className="text-xs font-semibold">{m.label}</div>
-                    <div className="text-[9px] opacity-70 mt-0.5">{m.desc}</div>
-                  </button>
-                );
-              })}
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <label className="text-[11.5px] font-medium text-[#999999]">
+                {isIndo ? "Jumlah Slide & Kedalaman" : "Slide Count & Depth"}
+              </label>
+              <button
+                type="button"
+                onClick={() => setIsCustomCount(!isCustomCount)}
+                className="text-[11px] text-[#aaaaaa] hover:text-white transition-colors cursor-pointer flex items-center gap-1"
+              >
+                <Sliders className="h-3 w-3" />
+                {isCustomCount
+                  ? isIndo
+                    ? "Mode Preset"
+                    : "Preset Mode"
+                  : isIndo
+                  ? "Atur Jumlah Angka"
+                  : "Custom Count"}
+              </button>
             </div>
 
-            {/* Custom slide count slider if selected */}
-            {isCustomCount && (
-              <div className="mt-3 p-3 rounded-xl bg-[#1c1c1c] border border-[#282828] flex items-center justify-between gap-3">
-                <span className="text-xs text-muted-foreground">
+            {!isCustomCount ? (
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { id: "auto" as const, label: isIndo ? "Otomatis" : "Auto", desc: isIndo ? "Adaptif" : "Adaptive" },
+                  { id: "short" as const, label: isIndo ? "Singkat" : "Short", desc: isIndo ? "3-5 Slide" : "3-5 Slides" },
+                  { id: "long" as const, label: isIndo ? "Panjang" : "Long", desc: isIndo ? "8-12 Slide" : "8-12 Slides" },
+                ].map((m) => {
+                  const isSelected = lengthMode === m.id;
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      onClick={() => setLengthMode(m.id)}
+                      className={cn(
+                        "p-2.5 rounded-xl border text-center transition-all cursor-pointer",
+                        isSelected
+                          ? "bg-[#252525] border-white/40 text-white shadow"
+                          : "bg-[#1f1f1f] border-[#2c2c2c] text-[#888888] hover:border-[#383838]"
+                      )}
+                    >
+                      <div className="text-xs font-semibold">{m.label}</div>
+                      <div className="text-[9px] text-[#888888] mt-0.5">{m.desc}</div>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="p-3 rounded-xl bg-[#222222] border border-[#2b2b2b] flex items-center justify-between gap-3">
+                <span className="text-xs text-[#888888]">
                   {isIndo ? "Jumlah target slide:" : "Target slide count:"}
                 </span>
                 <input
@@ -339,51 +334,15 @@ export function CreatePresentationSheet({
                   max={25}
                   value={customCount}
                   onChange={(e) => setCustomCount(Math.max(3, Math.min(25, Number(e.target.value) || 10)))}
-                  className="w-16 px-2 py-1 rounded-lg bg-[#141414] border border-[#333333] text-foreground text-xs text-center font-sans tabular-nums font-bold focus:outline-none focus:border-amber-500"
+                  className="w-16 px-2 py-1 rounded-lg bg-[#141414] border border-[#333333] text-white text-xs text-center font-sans tabular-nums font-bold focus:outline-none focus:border-white/50"
                 />
               </div>
             )}
           </div>
 
-          {/* Section 4: Theme Picker (for Native engine) */}
-          {provider === "native" && (
-            <div>
-              <label className="text-xs font-semibold text-foreground flex items-center gap-1.5 mb-2">
-                <Palette className="h-3.5 w-3.5 text-muted-foreground" />
-                {isIndo ? "Tema Visual Slide" : "Slide Visual Theme"}
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                {THEMES.map((th) => {
-                  const isSelected = themeId === th.id;
-                  return (
-                    <div
-                      key={th.id}
-                      onClick={() => setThemeId(th.id as any)}
-                      className={cn(
-                        "p-2.5 rounded-xl border flex items-center gap-2.5 cursor-pointer transition-all",
-                        isSelected
-                          ? "bg-white/10 border-amber-500/80"
-                          : "bg-[#1a1a1a] border-[#262626] hover:bg-[#202020]"
-                      )}
-                    >
-                      <div
-                        className="h-4 w-4 rounded-full border border-white/20 shrink-0"
-                        style={{ backgroundColor: th.color }}
-                      />
-                      <span className="text-xs font-medium text-foreground truncate">
-                        {th.name}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Section 5: Custom Prompt / Guidance */}
-          <div>
-            <label className="text-xs font-semibold text-foreground flex items-center gap-1.5 mb-1.5">
-              <Sliders className="h-3.5 w-3.5 text-muted-foreground" />
+          {/* Section 4: Custom Prompt / Guidance */}
+          <div className="space-y-1.5">
+            <label className="text-[11.5px] font-medium text-[#999999]">
               {isIndo ? "Instruksi Khusus (Opsional)" : "Custom Guidance (Optional)"}
             </label>
             <textarea
@@ -391,27 +350,23 @@ export function CreatePresentationSheet({
               onChange={(e) => setCustomInstructions(e.target.value)}
               placeholder={
                 isIndo
-                  ? "Contoh: Tekankan pada aspek arsitektur teknis dan hasil benchmark metrik..."
-                  : "E.g., Emphasize architectural trade-offs and quantitative benchmark metrics..."
+                  ? "Contoh: Tekankan pada aspek arsitektur teknis, gunakan palet warna biru korporat..."
+                  : "E.g., Emphasize architectural trade-offs, use clean blue color palette..."
               }
               rows={2}
-              className="w-full px-3 py-2 rounded-xl bg-[#1a1a1a] border border-[#2b2b2b] text-xs text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:border-amber-500/80 resize-none"
+              className="w-full px-3 py-2 rounded-xl bg-[#222222] border border-[#2b2b2b] text-xs text-white placeholder:text-[#666666] focus:outline-none focus:border-[#444444] resize-none font-sans"
             />
           </div>
 
           {/* Submit Button */}
-          <div className="pt-1 pb-2">
+          <div className="pt-2 pb-2">
             <button
               type="submit"
               disabled={selectedSourceIds.length === 0}
-              className="w-full py-3 rounded-2xl bg-amber-500 hover:bg-amber-400 disabled:opacity-40 disabled:pointer-events-none text-black font-semibold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg transition-all active:scale-98 cursor-pointer"
+              className="w-full py-3 rounded-2xl bg-white hover:bg-neutral-200 disabled:opacity-40 disabled:hover:bg-white disabled:cursor-not-allowed text-black font-semibold text-xs sm:text-sm flex items-center justify-center gap-1.5 shadow-sm transition-all active:scale-98 cursor-pointer"
             >
               <Presentation className="h-4 w-4" />
-              <span>
-                {isIndo
-                  ? `Susun Presentasi (${selectedSourceIds.length} Sumber)`
-                  : `Generate Slides (${selectedSourceIds.length} Sources)`}
-              </span>
+              <span>{isIndo ? "Buat Presentation Slides" : "Create Presentation Slides"}</span>
             </button>
           </div>
         </form>

@@ -2163,7 +2163,12 @@ async function generateStructuredSlideDeckItems(options: {
   primaryTitle: string;
   groundedContext: any;
   customInstructions?: string;
-}): Promise<{ deckTitle: string; topic: string; slides: SlideItem[] }> {
+}): Promise<{
+  deckTitle: string;
+  topic: string;
+  slides: SlideItem[];
+  themeId?: "bold_dark" | "swiss_blue" | "sea_indigo" | "ash_lime";
+}> {
   const { sources: _sources, targetCount, language, primaryTitle, groundedContext, customInstructions } = options;
   const isIndo = language === "id";
 
@@ -2185,7 +2190,13 @@ ATURAN DESAIN OPEN-DESIGN & HARNESS:
 4. Tulis "speakerNotes" lengkap untuk setiap slide agar pembicara dapat menyampaikan materi dengan artikulatif dan percaya diri.
 5. ZERO SITASI: JANGAN pernah menyertakan tag sitasi seperti [source:...] dalam teks slide atau speaker notes. Teks harus 100% bersih dan siap presentasi profesional.
 6. MANDAT BAHASA: Tulis judul, isi slide, dan speaker notes dalam Bahasa Indonesia.
-7. Output WAJIB berupa JSON murni sesuai format spesifikasi.`
+7. PILIH TEMA WARNA & DESAIN (themeId):
+   Tentukan nilai 'themeId' dari salah satu pilihan berikut yang paling cocok dengan topik atau sesuai Instruksi Khusus:
+   - "bold_dark" (modern dark tech yang elegan & berwibawa)
+   - "swiss_blue" (swiss international / latar putih minimalis berkelas dengan aksen klein blue)
+   - "sea_indigo" (deep oceanic dark dengan aksen cyan/indigo terang)
+   - "ash_lime" (editorial minimalis terang dengan aksen kontras lime)
+8. Output WAJIB berupa JSON murni sesuai format spesifikasi.`
     : `You are an elite Presentation Designer and Slide Architect.
 Your task is to craft a world-class 1920x1080 slide presentation deck from the provided source materials.
 
@@ -2196,7 +2207,13 @@ OPEN-DESIGN SPECIFICATIONS:
 4. Include detailed "speakerNotes" for each slide.
 5. NO CITATION TAGS: Do not include [source:...] tags in the output.
 6. Language: Output 100% in English.
-7. Return pure JSON only matching the schema.`;
+7. COLOR & DESIGN THEME (themeId):
+   Select the best matching themeId for the content or according to Custom Guidance:
+   - "bold_dark" (default / premium modern deep dark)
+   - "swiss_blue" (swiss international / clean white with klein blue)
+   - "sea_indigo" (oceanic dark with bright cyan/indigo)
+   - "ash_lime" (editorial light with lime accents)
+8. Return pure JSON only matching the schema.`;
 
   const userPrompt = `Materi Sumber Rujukan:
 ${groundedContext.formattedContext || primaryTitle}
@@ -2208,6 +2225,7 @@ Format JSON yang wajib diikuti:
 {
   "title": "Judul Presentasi Yang Kuat & Padat",
   "topic": "Topik Utama",
+  "themeId": "bold_dark",
   "slides": [
     {
       "slideNumber": 1,
@@ -2463,9 +2481,29 @@ Format JSON yang wajib diikuti:
           },
         ];
 
+  const validThemes = ["bold_dark", "swiss_blue", "sea_indigo", "ash_lime"];
+  let resolvedThemeId =
+    parsedResponse?.themeId && validThemes.includes(parsedResponse.themeId)
+      ? parsedResponse.themeId
+      : undefined;
+
+  if (!resolvedThemeId && customInstructions) {
+    const ci = customInstructions.toLowerCase();
+    if (ci.includes("swiss") || ci.includes("blue") || ci.includes("biru") || ci.includes("light") || ci.includes("terang") || ci.includes("putih") || ci.includes("white")) {
+      resolvedThemeId = "swiss_blue";
+    } else if (ci.includes("indigo") || ci.includes("ocean") || ci.includes("laut") || ci.includes("cyan")) {
+      resolvedThemeId = "sea_indigo";
+    } else if (ci.includes("lime") || ci.includes("hijau") || ci.includes("green") || ci.includes("ash") || ci.includes("editorial")) {
+      resolvedThemeId = "ash_lime";
+    } else if (ci.includes("dark") || ci.includes("gelap") || ci.includes("hitam") || ci.includes("black")) {
+      resolvedThemeId = "bold_dark";
+    }
+  }
+
   return {
     deckTitle,
     topic: parsedResponse?.topic || primaryTitle,
+    themeId: resolvedThemeId,
     slides,
   };
 }
@@ -2481,7 +2519,7 @@ export async function generatePresentationArtifact(
     lengthMode = "auto",
     slideCount,
     language = "id",
-    themeId = "bold_dark",
+    themeId,
     customInstructions,
   } = options;
 
@@ -2629,8 +2667,6 @@ ${groundedContext.formattedContext.slice(0, 3000)}`;
   // -------------------------------------------------------------------------
   // For both Native and Google Slides, we generate structured slides using Open-Design
   // specifications so the presentation is ALWAYS renderable, rich, and never empty!
-  const effectiveTheme = provider === "slides" ? "swiss_blue" : (themeId || "bold_dark");
-
   const structuredDeck = await generateStructuredSlideDeckItems({
     sources,
     targetCount,
@@ -2639,6 +2675,11 @@ ${groundedContext.formattedContext.slice(0, 3000)}`;
     groundedContext,
     customInstructions,
   });
+
+  const effectiveTheme =
+    provider === "slides"
+      ? "swiss_blue"
+      : (themeId || structuredDeck.themeId || "bold_dark");
 
   let googleSlidesResult: any = null;
   if (provider === "slides") {

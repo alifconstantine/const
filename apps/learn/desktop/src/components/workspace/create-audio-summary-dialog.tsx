@@ -88,6 +88,20 @@ export function CreateAudioSummaryDialog({
     return INWORLD_MODELS;
   }, [hasInworldKey]);
 
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest("[data-studio-dropdown]")) {
+        setIsSourceDropdownOpen(false);
+      }
+    };
+    if (isSourceDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [isSourceDropdownOpen]);
+
   // Sync initial selections
   useEffect(() => {
     if (sources.length > 0 && selectedSourceIds.length === 0) {
@@ -174,7 +188,7 @@ export function CreateAudioSummaryDialog({
               </div>
 
               {/* Sumber Dropdown */}
-              <div className="space-y-1.5 relative">
+              <div className="space-y-1.5 relative" data-studio-dropdown>
                 <label className="text-[11.5px] font-medium text-[#999999]">
                   {isIndo ? "Sumber Rujukan Materi" : "Source Material Scope"}
                 </label>
@@ -193,7 +207,12 @@ export function CreateAudioSummaryDialog({
                         ? `${selectedSourceIds.length} dari ${sources.length} sumber terpilih`
                         : `${selectedSourceIds.length} of ${sources.length} sources selected`}
                     </span>
-                    <ChevronDown className="h-3.5 w-3.5 text-[#888888] shrink-0" />
+                    <ChevronDown
+                      className={cn(
+                        "h-3.5 w-3.5 text-[#888888] shrink-0 transition-transform duration-150",
+                        isSourceDropdownOpen ? "rotate-180 text-white" : ""
+                      )}
+                    />
                   </button>
 
                   {isSourceDropdownOpen && (
@@ -448,7 +467,7 @@ export function CreateAudioSummaryDialog({
               disabled={!hasInworldKey || sources.length === 0}
               className="px-4 py-2 rounded-xl bg-white hover:bg-neutral-200 disabled:opacity-40 disabled:hover:bg-white disabled:cursor-not-allowed text-xs font-semibold text-black flex items-center gap-1.5 transition-all cursor-pointer shadow-sm active:scale-98"
             >
-              <span>{isIndo ? "Buat Ringkasan Audio" : "Generate Audio Summary"}</span>
+              <span>{isIndo ? "Buat Audio Summary" : "Create Audio Summary"}</span>
             </button>
           </div>
         </form>

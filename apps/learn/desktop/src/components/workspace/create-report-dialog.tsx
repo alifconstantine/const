@@ -54,6 +54,20 @@ export function CreateReportDialog({
   const [isEditingPrompt, setIsEditingPrompt] = useState<boolean>(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest("[data-studio-dropdown]")) {
+        setIsSourceDropdownOpen(false);
+      }
+    };
+    if (isSourceDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [isSourceDropdownOpen]);
+
   // Sync initial selections
   useEffect(() => {
     if (sources.length > 0 && selectedSourceIds.length === 0) {
@@ -269,7 +283,7 @@ export function CreateReportDialog({
           <div className="flex items-center gap-2.5">
             <FileText className="h-4 w-4 text-white shrink-0" />
             <span className="text-sm font-semibold text-white tracking-tight">
-              {isIndo ? "Buat Laporan" : "Create Report"}
+              {isIndo ? "Buat Report" : "Create Report"}
             </span>
           </div>
 
@@ -286,7 +300,7 @@ export function CreateReportDialog({
           <ScrollArea className="flex-1 min-h-0 w-full px-6 py-2">
             <div className="space-y-5 pb-4">
               {/* Sumber Rujukan Materi */}
-              <div className="space-y-1.5 relative">
+              <div className="space-y-1.5 relative" data-studio-dropdown>
                 <label className="text-[12px] font-medium text-[#969696]">
                   {isIndo ? "Sumber Rujukan Materi" : "Source Scope"}
                 </label>
@@ -305,34 +319,43 @@ export function CreateReportDialog({
                         ? `${selectedSourceIds.length} dari ${sources.length} sumber terpilih`
                         : `${selectedSourceIds.length} of ${sources.length} sources selected`}
                     </span>
-                    <ChevronDown className="h-3.5 w-3.5 text-[#888888] shrink-0" />
+                    <ChevronDown
+                      className={cn(
+                        "h-3.5 w-3.5 text-[#888888] shrink-0 transition-transform duration-150",
+                        isSourceDropdownOpen ? "rotate-180 text-white" : ""
+                      )}
+                    />
                   </button>
 
                   {isSourceDropdownOpen && (
-                    <div className="absolute top-full mt-1.5 left-0 right-0 z-30 bg-[#222222] border border-[#2b2b2b] rounded-xl p-2 shadow-2xl">
-                      <ScrollArea className="max-h-48 w-full" viewportClassName="space-y-1 pr-1">
-                        <button
-                          type="button"
-                          onClick={handleSelectAllSources}
-                          className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-[#2b2b2b] text-xs text-[#cccccc] cursor-pointer transition-colors"
+                    <div className="absolute top-full mt-1.5 left-0 right-0 z-30 bg-[#222222] border border-[#2b2b2b] rounded-xl p-2 shadow-2xl animate-in fade-in-0 zoom-in-95 duration-100">
+                      <button
+                        type="button"
+                        onClick={handleSelectAllSources}
+                        className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-[#2b2b2b] text-xs text-[#cccccc] cursor-pointer transition-colors"
+                      >
+                        <span className="font-medium">
+                          {selectedSourceIds.length === sources.length
+                            ? isIndo ? "Batal Pilih Semua" : "Deselect All Sources"
+                            : isIndo ? "Pilih Semua Sumber" : "Select All Sources"}
+                        </span>
+                        <div
+                          className={cn(
+                            "h-4 w-4 rounded border flex items-center justify-center transition-colors",
+                            selectedSourceIds.length === sources.length
+                              ? "bg-white border-white text-black"
+                              : "border-[#444449] bg-transparent"
+                          )}
                         >
-                          <span className="font-medium">
-                            {isIndo ? "Pilih Semua Sumber" : "Select All Sources"}
-                          </span>
-                          <div
-                            className={cn(
-                              "h-4 w-4 rounded border flex items-center justify-center transition-colors",
-                              selectedSourceIds.length === sources.length
-                                ? "bg-white border-white text-black"
-                                : "border-[#444449] bg-transparent"
-                            )}
-                          >
-                            {selectedSourceIds.length === sources.length && (
-                              <Check className="h-3 w-3 stroke-[3]" />
-                            )}
-                          </div>
-                        </button>
+                          {selectedSourceIds.length === sources.length && (
+                            <Check className="h-3 w-3 stroke-[3]" />
+                          )}
+                        </div>
+                      </button>
 
+                      <div className="h-px bg-[#2e2e2e] my-1.5" />
+
+                      <ScrollArea className="max-h-52 w-full" viewportClassName="space-y-1 pr-1.5">
                         {sources.map((src) => {
                           const isSelected = selectedSourceIds.includes(src.id);
                           return (
@@ -342,9 +365,10 @@ export function CreateReportDialog({
                               onClick={() => handleToggleSource(src.id)}
                               className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-[#2b2b2b] text-xs text-left cursor-pointer transition-colors"
                             >
-                              <span className="truncate pr-2 font-medium text-white">
-                                {src.title || "Sumber"}
-                              </span>
+                              <div className="flex items-center gap-2 truncate pr-2">
+                                <FileText className="h-3.5 w-3.5 text-[#777777] shrink-0" />
+                                <span className="truncate text-[#e0e0e0]">{src.title}</span>
+                              </div>
                               <div
                                 className={cn(
                                   "h-4 w-4 rounded border flex items-center justify-center shrink-0 transition-colors",
@@ -638,7 +662,8 @@ export function CreateReportDialog({
                   : "bg-white/40 text-black/50 cursor-not-allowed"
               )}
             >
-              <span>{isIndo ? "Buat sekarang" : "Create now"}</span>
+              <FileText className="h-3.5 w-3.5" />
+              <span>{isIndo ? "Buat Report" : "Create Report"}</span>
             </button>
           </div>
         </form>
