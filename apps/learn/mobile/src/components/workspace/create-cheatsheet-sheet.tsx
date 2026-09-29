@@ -4,8 +4,6 @@ import {
   FileSpreadsheet,
   Check,
   FileText,
-  Sparkles,
-  BookOpen,
 } from "lucide-react";
 import { cn } from "@const/ui";
 import { useI18n } from "../../lib/i18n";
@@ -69,6 +67,7 @@ export function CreateCheatSheetSheet({
     return [
       t("chipFormulasKeyEquations"),
       t("chipSyntaxQuickRules"),
+      t("chipKeyDefinitions"),
       t("chipCommonExamPitfalls"),
     ];
   }, [sources, t]);
@@ -84,6 +83,8 @@ export function CreateCheatSheetSheet({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (selectedSourceIds.length === 0) return;
+
     onGenerate({
       selectedSourceIds:
         selectedSourceIds.length > 0 ? selectedSourceIds : sources.map((s) => s.id),
@@ -99,34 +100,37 @@ export function CreateCheatSheetSheet({
     <>
       {/* Backdrop */}
       <div
-        className="fixed inset-0 z-50 bg-black/75 backdrop-blur-[2px] transition-opacity"
+        className="fixed inset-0 z-50 bg-black/75 backdrop-blur-[2px] transition-opacity duration-300 animate-in fade-in"
         onClick={onClose}
         aria-hidden="true"
       />
 
       {/* Slide-up Bottom Sheet */}
       <div
-        className="fixed inset-x-0 bottom-0 z-50 max-h-[90vh] bg-card text-card-foreground border-t border-border rounded-t-[28px] flex flex-col font-sans select-none overflow-hidden animate-in slide-in-from-bottom duration-300"
+        className="fixed inset-x-0 bottom-0 z-50 max-h-[92vh] bg-[#161616] text-[#e0e0e0] border-t border-[#262626] rounded-t-3xl flex flex-col font-sans select-none overflow-hidden animate-in slide-in-from-bottom duration-300 pb-safe shadow-2xl"
         role="dialog"
         aria-modal="true"
       >
         {/* Drag handle */}
         <div className="pt-2.5 pb-1 flex justify-center shrink-0">
-          <div className="w-10 h-1 rounded-full bg-muted-foreground/30" />
+          <div className="w-10 h-1 rounded-full bg-white/20" />
         </div>
 
         {/* Sheet Header */}
-        <div className="px-4 py-2.5 flex items-center justify-between border-b border-border/60 shrink-0">
+        <div className="px-5 py-3 flex items-center justify-between border-b border-[#242424] shrink-0">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="h-8 w-8 rounded-xl bg-sky-500/10 border border-sky-500/20 text-sky-400 flex items-center justify-center shrink-0">
-              <FileSpreadsheet className="h-4 w-4" />
-            </div>
+            <FileSpreadsheet className="h-4 w-4 text-white shrink-0" />
             <div className="min-w-0">
-              <h2 className="text-xs font-semibold text-foreground truncate">
+              <h2 className="text-sm font-semibold text-white tracking-tight truncate">
                 {t("cheatsheetDialogTitle")}
               </h2>
-              <p className="text-[10px] text-muted-foreground truncate">
-                {t("activeSourcesSelected", { count: selectedSourceIds.length })}
+              <p className="text-[11px] text-[#888888] truncate mt-0.5">
+                {selectedSourceIds.length === sources.length
+                  ? t("allSourcesCount", { count: sources.length })
+                  : t("selectedOfTotalSources", {
+                      selected: selectedSourceIds.length,
+                      total: sources.length,
+                    })}
               </p>
             </div>
           </div>
@@ -134,25 +138,24 @@ export function CreateCheatSheetSheet({
           <button
             type="button"
             onClick={onClose}
-            className="h-8 w-8 rounded-full bg-secondary hover:bg-secondary/80 text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer"
-            aria-label="Tutup"
+            className="p-1 rounded-full text-[#888888] hover:text-white hover:bg-[#252525] transition-colors cursor-pointer"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
-        {/* Scrollable Form Content */}
-        <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 space-y-4">
+        {/* Form Body */}
+        <form onSubmit={handleSubmit} className="p-4 space-y-4 overflow-y-auto flex-1 font-sans">
           {/* Section 1: Source Selection */}
           <div className="space-y-1.5">
             <div className="flex items-center justify-between">
-              <label className="text-[11px] font-semibold text-foreground uppercase tracking-wider">
-                {t("sourceScope")}
+              <label className="text-[11.5px] font-medium text-[#999999]">
+                {t("sourceMaterialScope")}
               </label>
               <button
                 type="button"
                 onClick={handleSelectAll}
-                className="text-[10px] text-sky-400 font-medium cursor-pointer"
+                className="text-[11px] text-white/80 hover:text-white font-medium cursor-pointer"
               >
                 {selectedSourceIds.length === sources.length
                   ? t("deselectAll")
@@ -160,28 +163,36 @@ export function CreateCheatSheetSheet({
               </button>
             </div>
 
-            <div className="max-h-28 overflow-y-auto space-y-1 rounded-xl bg-secondary/30 p-1.5 border border-border/50">
+            <div className="max-h-36 overflow-y-auto space-y-1 pr-1 bg-[#1f1f1f] p-1.5 rounded-xl border border-[#2b2b2b]">
               {sources.map((src) => {
                 const isSelected = selectedSourceIds.includes(src.id);
                 return (
-                  <div
+                  <button
                     key={src.id}
+                    type="button"
                     onClick={() => handleToggleSource(src.id)}
                     className={cn(
-                      "flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs cursor-pointer transition-colors",
-                      isSelected ? "bg-secondary text-foreground font-medium" : "text-muted-foreground"
+                      "w-full flex items-center justify-between p-2 rounded-lg text-xs transition-colors cursor-pointer text-left",
+                      isSelected
+                        ? "bg-[#282828] text-white"
+                        : "hover:bg-[#242424] text-[#888888]"
                     )}
                   >
-                    <span className="truncate pr-2 text-[11px]">{src.title}</span>
+                    <div className="flex items-center gap-2 truncate pr-2">
+                      <FileText className="h-3.5 w-3.5 text-[#777777] shrink-0" />
+                      <span className="truncate">{src.title}</span>
+                    </div>
                     <div
                       className={cn(
-                        "h-3.5 w-3.5 rounded border flex items-center justify-center shrink-0",
-                        isSelected ? "bg-sky-500 border-sky-500 text-white" : "border-border"
+                        "h-4 w-4 rounded border flex items-center justify-center shrink-0 transition-colors",
+                        isSelected
+                          ? "bg-white border-white text-black"
+                          : "border-[#444449] bg-transparent"
                       )}
                     >
-                      {isSelected && <Check className="h-2 w-2 stroke-[3]" />}
+                      {isSelected && <Check className="h-2.5 w-2.5 stroke-[3]" />}
                     </div>
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -189,30 +200,30 @@ export function CreateCheatSheetSheet({
 
           {/* Section 2: Coverage Mode */}
           <div className="space-y-1.5">
-            <label className="text-[11px] font-semibold text-foreground uppercase tracking-wider">
+            <label className="text-[11.5px] font-medium text-[#999999]">
               {t("coverageAndCardDensity")}
             </label>
-            <div className="grid grid-cols-3 gap-1.5">
+            <div className="grid grid-cols-3 gap-2">
               {[
-                { id: "short", label: t("concise"), count: "6-8" },
-                { id: "auto", label: t("autoOption"), count: "Auto" },
-                { id: "long", label: t("inDepth"), count: "10-14" },
+                { id: "short" as const, label: t("concise"), count: "6-8" },
+                { id: "auto" as const, label: t("balanced"), count: "Auto" },
+                { id: "long" as const, label: t("inDepth"), count: "10-14" },
               ].map((m) => {
                 const isActive = coverageMode === m.id;
                 return (
                   <button
                     key={m.id}
                     type="button"
-                    onClick={() => setCoverageMode(m.id as any)}
+                    onClick={() => setCoverageMode(m.id)}
                     className={cn(
-                      "p-2 rounded-xl border text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5",
+                      "p-2.5 rounded-xl border text-center transition-all cursor-pointer flex flex-col items-center justify-center gap-0.5",
                       isActive
-                        ? "bg-sky-500/10 border-sky-500/50 text-sky-400"
-                        : "bg-secondary/40 border-border/70 text-muted-foreground"
+                        ? "bg-[#252525] border-white/40 text-white shadow-lg"
+                        : "bg-[#1f1f1f] border-[#2c2c2c] text-[#888888] hover:border-[#383838]"
                     )}
                   >
-                    <span className="text-[11.5px] font-semibold">{m.label}</span>
-                    <span className="text-[9.5px] opacity-75">
+                    <span className="text-xs font-semibold">{m.label}</span>
+                    <span className="text-[10px] text-[#888888]">
                       {m.count === "Auto" ? t("autoOption") : t("cardsCount", { count: m.count })}
                     </span>
                   </button>
@@ -223,7 +234,7 @@ export function CreateCheatSheetSheet({
 
           {/* Section 3: Topic Focus */}
           <div className="space-y-1.5">
-            <label className="text-[11px] font-semibold text-foreground uppercase tracking-wider">
+            <label className="text-[11.5px] font-medium text-[#999999]">
               {t("cheatsheetTopicFocus")}
             </label>
             <textarea
@@ -231,15 +242,15 @@ export function CreateCheatSheetSheet({
               onChange={(e) => setTopicFocus(e.target.value)}
               placeholder={t("cheatsheetTopicPlaceholder")}
               rows={2}
-              className="w-full bg-secondary/50 rounded-xl p-2.5 text-xs outline-none border border-border focus:border-sky-500/50 text-foreground placeholder:text-muted-foreground/60 resize-none"
+              className="w-full px-3 py-2 rounded-xl bg-[#222222] border border-[#2b2b2b] text-xs text-white placeholder:text-[#666666] focus:border-[#444444] focus:outline-none resize-none font-sans"
             />
-            <div className="flex flex-wrap gap-1">
+            <div className="flex flex-wrap gap-1.5 pt-0.5">
               {topicChips.map((chip, idx) => (
                 <button
                   key={idx}
                   type="button"
                   onClick={() => handleChipClick(chip)}
-                  className="text-[10px] px-2 py-0.5 rounded-full bg-secondary border border-border/60 text-muted-foreground"
+                  className="px-2.5 py-1 rounded-lg bg-[#222222] hover:bg-[#2b2b2b] border border-[#2e2e2e] text-[11px] text-[#a0a0a0] hover:text-white transition-all cursor-pointer active:scale-98"
                 >
                   {chip}
                 </button>
@@ -248,13 +259,13 @@ export function CreateCheatSheetSheet({
           </div>
 
           {/* Bottom Submit Action */}
-          <div className="pt-2 pb-6">
+          <div className="pt-2 pb-2">
             <button
               type="submit"
-              disabled={sources.length === 0}
-              className="w-full py-3 rounded-2xl bg-foreground text-background font-semibold text-xs flex items-center justify-center gap-1.5 shadow-lg transition-all active:scale-[0.98] cursor-pointer"
+              disabled={selectedSourceIds.length === 0}
+              className="w-full py-3 rounded-2xl bg-white hover:bg-neutral-200 disabled:opacity-40 disabled:hover:bg-white disabled:cursor-not-allowed text-black font-semibold text-xs sm:text-sm flex items-center justify-center gap-1.5 shadow-sm transition-all active:scale-98 cursor-pointer"
             >
-              <Sparkles className="h-4 w-4" />
+              <FileSpreadsheet className="h-4 w-4" />
               <span>{t("cheatsheetGenerateBtn")}</span>
             </button>
           </div>

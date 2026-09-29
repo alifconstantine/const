@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import {
   X,
-  Sparkles,
+  Bot,
   HelpCircle,
   Layers,
   Check,
@@ -542,7 +542,7 @@ function MobileQuizBody({
               onClick={handleExplain}
               className="px-3 py-1.5 rounded-full bg-secondary hover:bg-secondary/80 text-foreground text-[11px] font-medium border border-border flex items-center gap-1.5 transition-colors cursor-pointer active:scale-95"
             >
-              <Sparkles className="h-3.5 w-3.5 text-amber-300" />
+              <Bot className="h-3.5 w-3.5 text-amber-300" />
               <span>{t("explainAction")}</span>
             </button>
           </div>
@@ -644,7 +644,7 @@ function MobileFlashcardBody({
           onClick={handleExplain}
           className="text-[11px] text-foreground hover:underline flex items-center gap-1 cursor-pointer"
         >
-          <Sparkles className="h-3 w-3 text-amber-300" />
+          <Bot className="h-3 w-3 text-amber-300" />
           <span>{t("explainInChat")}</span>
         </button>
       </div>
@@ -966,7 +966,7 @@ function MobileAudioSummaryBody({
                 </>
               ) : (
                 <>
-                  <Sparkles className="h-3.5 w-3.5" />
+                  <AudioLines className="h-3.5 w-3.5" />
                   <span>{t("synthesizeAudioNow")}</span>
                 </>
               )}
@@ -1053,7 +1053,7 @@ function MobileAudioSummaryBody({
               onClick={() => onExplainInChat(t("explainAudioPrompt", { title: data.title || t("toolsAudioSummary"), script: data.script?.slice(0, 1000) || "" }))}
               className="flex items-center gap-1 px-2 py-1 rounded-lg bg-indigo-500/10 text-indigo-400 text-[11px] font-medium"
             >
-              <Sparkles className="h-3 w-3" />
+              <Bot className="h-3 w-3" />
               <span>{t("askAction")}</span>
             </button>
           </div>

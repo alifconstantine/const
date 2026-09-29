@@ -17,7 +17,7 @@ import {
   Wrench,
   Check,
   Circle,
-  Sparkles,
+  Layers,
 } from "lucide-react";
 import { useI18n } from "../../lib/i18n";
 
@@ -296,7 +296,7 @@ export function PythonRunnerCard({ toolCall, isExpanded, onToggle }: PythonRunne
               >
                 <div className="flex items-center justify-between text-[11px]">
                   <span className="font-sans text-foreground/90 flex items-center gap-1.5">
-                    <Sparkles className="h-3 w-3 text-yellow-400" />
+                    <Layers className="h-3 w-3 text-yellow-400" />
                     {t("generatedChart")} <strong>{fileName}</strong>
                   </span>
                   <button

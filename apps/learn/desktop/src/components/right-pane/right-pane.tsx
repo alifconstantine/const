@@ -25,7 +25,6 @@ import {
   FileSpreadsheet,
   BookOpen,
   Loader2,
-  Sparkles,
 } from "lucide-react";
 import {
   cn,

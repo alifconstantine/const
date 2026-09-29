@@ -11,7 +11,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Eye,
-  Sparkles,
+  Bot,
   MessageSquare,
 } from "lucide-react";
 import {
@@ -446,7 +446,7 @@ export function MobilePresentationViewer({
                         }}
                         className="text-[10px] text-muted-foreground hover:text-amber-400 flex items-center gap-1"
                       >
-                        <Sparkles className="h-2.5 w-2.5" />
+                        <Bot className="h-2.5 w-2.5" />
                         <span>{t("askAiAboutSlide")}</span>
                       </button>
                     )}

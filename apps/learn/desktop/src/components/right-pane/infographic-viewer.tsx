@@ -7,7 +7,6 @@ import {
   Copy,
   Maximize2,
   Minimize2,
-  Sparkles,
   MessageSquare,
   BarChart3,
   Layers,

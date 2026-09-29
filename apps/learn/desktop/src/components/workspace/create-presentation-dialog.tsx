@@ -5,11 +5,9 @@ import {
   ChevronDown,
   Presentation,
   Sliders,
-  Layers,
-  Palette,
-  LayoutTemplate,
+  FileText,
 } from "lucide-react";
-import { Dialog, DialogContent, ScrollArea, cn } from "@const/ui";
+import { Dialog, DialogContent, ScrollArea, BrandLogo, cn } from "@const/ui";
 import { useI18n } from "../../lib/i18n";
 import type { LocalSource } from "../../lib/db";
 
@@ -22,7 +20,6 @@ export interface CreatePresentationDialogProps {
     provider: "native" | "canva" | "slides";
     lengthMode: "short" | "medium" | "long" | "auto";
     slideCount?: number;
-    themeId?: "bold_dark" | "swiss_blue" | "sea_indigo" | "ash_lime";
     customInstructions?: string;
   }) => void;
 }
@@ -33,33 +30,23 @@ const getProviders = (t: (key: any) => string) => [
     name: "Const Native",
     tagline: t("constNativeTagline"),
     badge: t("recommended"),
-    icon: Presentation,
-    color: "text-amber-400",
+    logoId: null,
   },
   {
     id: "canva" as const,
     name: "Canva MCP",
     tagline: t("canvaMcpTagline"),
     badge: "Canva AI",
-    icon: LayoutTemplate,
-    color: "text-cyan-400",
+    logoId: "canva",
   },
   {
     id: "slides" as const,
     name: "Google Slides",
     tagline: t("googleSlidesTagline"),
     badge: "Google Suite",
-    icon: Layers,
-    color: "text-emerald-400",
+    logoId: "google-slides",
   },
 ];
-
-const THEMES = [
-  { id: "bold_dark", name: "Modern Dark", color: "#38bdf8", bg: "#080C16" },
-  { id: "swiss_blue", name: "Klein Blue Swiss", color: "#002FA7", bg: "#fafaf8" },
-  { id: "sea_indigo", name: "Sea Indigo", color: "#5ac8fa", bg: "#0a0e1a" },
-  { id: "ash_lime", name: "Ash & Lime", color: "#84a300", bg: "#f1efea" },
-] as const;
 
 export function CreatePresentationDialog({
   open,
@@ -82,11 +69,22 @@ export function CreatePresentationDialog({
   const [customSlideCount, setCustomSlideCount] = useState<number>(10);
   const [isCustomCount, setIsCustomCount] = useState(false);
 
-  // Theme
-  const [themeId, setThemeId] = useState<"bold_dark" | "swiss_blue" | "sea_indigo" | "ash_lime">("bold_dark");
-
   // Optional instructions
   const [customInstructions, setCustomInstructions] = useState("");
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest("[data-studio-dropdown]")) {
+        setIsSourceDropdownOpen(false);
+      }
+    };
+    if (isSourceDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [isSourceDropdownOpen]);
 
   // Sync initial selections
   useEffect(() => {
@@ -130,7 +128,6 @@ export function CreatePresentationDialog({
       provider,
       lengthMode,
       slideCount: targetCount,
-      themeId: provider === "native" ? themeId : undefined,
       customInstructions: customInstructions.trim() || undefined,
     });
 
@@ -139,7 +136,7 @@ export function CreatePresentationDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[640px] max-h-[88vh] flex flex-col gap-0 p-0 bg-[#161616] border border-[#2b2b2b] text-[#e0e0e0] rounded-2xl shadow-2xl overflow-hidden font-sans [&>button]:hidden outline-none focus:outline-none focus-visible:outline-none ring-0 focus-visible:ring-0">
+      <DialogContent className="max-w-[620px] w-full max-h-[88vh] flex flex-col gap-0 p-0 bg-[#161616] border border-[#2b2b2b] text-[#e0e0e0] rounded-2xl shadow-2xl overflow-hidden font-sans [&>button]:hidden outline-none focus:outline-none focus-visible:outline-none ring-0 focus-visible:ring-0">
         {/* Header */}
         <div className="shrink-0 flex items-center justify-between px-5 pt-5 pb-2 bg-[#161616]">
           <div className="flex items-center gap-2.5">
@@ -159,17 +156,18 @@ export function CreatePresentationDialog({
         </div>
 
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
-          <ScrollArea className="flex-1 min-h-0 w-full px-5 py-1">
-            <div className="space-y-4 pb-3">
+          <ScrollArea className="flex-1 min-h-0 w-full px-5 py-2">
+            <div className="space-y-4 pb-2">
               {/* Concept Box */}
               <div className="p-3.5 rounded-xl bg-[#222222] border border-[#2b2b2b] flex items-start gap-3">
+                <Presentation className="h-4 w-4 text-white shrink-0 mt-0.5" />
                 <div className="text-xs text-[#d4d4d4] leading-relaxed">
                   {t("presentationConceptBox")}
                 </div>
               </div>
 
-              {/* Sumber Dropdown */}
-              <div className="space-y-1.5 relative">
+              {/* Source Scope Dropdown (consistent with Video Summary) */}
+              <div className="space-y-1.5 relative" data-studio-dropdown>
                 <label className="text-[11.5px] font-medium text-[#999999]">
                   {t("sourceScope")}
                 </label>
@@ -184,34 +182,41 @@ export function CreatePresentationDialog({
                         ? t("allSourcesCount", { count: sources.length })
                         : t("selectedOfTotalSources", { selected: selectedSourceIds.length, total: sources.length })}
                     </span>
-                    <ChevronDown className="h-3.5 w-3.5 text-[#888888] shrink-0" />
+                    <ChevronDown
+                      className={cn(
+                        "h-3.5 w-3.5 text-[#888888] shrink-0 transition-transform duration-150",
+                        isSourceDropdownOpen ? "rotate-180 text-white" : ""
+                      )}
+                    />
                   </button>
 
                   {isSourceDropdownOpen && (
-                    <div className="absolute top-full mt-1.5 left-0 right-0 z-30 bg-[#222222] border border-[#2b2b2b] rounded-xl p-2 shadow-2xl">
-                      <ScrollArea className="max-h-48 w-full" viewportClassName="space-y-1 pr-1">
-                        <button
-                          type="button"
-                          onClick={handleSelectAllSources}
-                          className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-[#2b2b2b] text-xs text-[#cccccc] cursor-pointer transition-colors"
+                    <div className="absolute top-full mt-1.5 left-0 right-0 z-30 bg-[#222222] border border-[#2b2b2b] rounded-xl p-2 shadow-2xl animate-in fade-in-0 zoom-in-95 duration-100">
+                      <button
+                        type="button"
+                        onClick={handleSelectAllSources}
+                        className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-[#2b2b2b] text-xs text-[#cccccc] cursor-pointer transition-colors"
+                      >
+                        <span className="font-medium">
+                          {selectedSourceIds.length === sources.length ? t("deselectAll") : t("selectAllSources")}
+                        </span>
+                        <div
+                          className={cn(
+                            "h-4 w-4 rounded border flex items-center justify-center transition-colors",
+                            selectedSourceIds.length === sources.length
+                              ? "bg-white border-white text-black"
+                              : "border-[#444449] bg-transparent"
+                          )}
                         >
-                          <span className="font-medium">
-                            {selectedSourceIds.length === sources.length ? t("deselectAll") : t("selectAllSources")}
-                          </span>
-                          <div
-                            className={cn(
-                              "h-4 w-4 rounded border flex items-center justify-center transition-colors",
-                              selectedSourceIds.length === sources.length
-                                ? "bg-white border-white text-black"
-                                : "border-[#444449] bg-transparent"
-                            )}
-                          >
-                            {selectedSourceIds.length === sources.length && (
-                              <Check className="h-3 w-3 stroke-[3]" />
-                            )}
-                          </div>
-                        </button>
+                          {selectedSourceIds.length === sources.length && (
+                            <Check className="h-3 w-3 stroke-[3]" />
+                          )}
+                        </div>
+                      </button>
 
+                      <div className="h-px bg-[#2e2e2e] my-1.5" />
+
+                      <ScrollArea className="max-h-52 w-full" viewportClassName="space-y-1 pr-1.5">
                         {sources.map((src) => {
                           const isSelected = selectedSourceIds.includes(src.id);
                           return (
@@ -221,9 +226,10 @@ export function CreatePresentationDialog({
                               onClick={() => handleToggleSource(src.id)}
                               className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-[#2b2b2b] text-xs text-left cursor-pointer transition-colors"
                             >
-                              <span className="truncate pr-2 font-medium text-white">
-                                {src.title || "Sumber"}
-                              </span>
+                              <div className="flex items-center gap-2 truncate pr-2">
+                                <FileText className="h-3.5 w-3.5 text-[#777777] shrink-0" />
+                                <span className="truncate text-[#e0e0e0]">{src.title}</span>
+                              </div>
                               <div
                                 className={cn(
                                   "h-4 w-4 rounded border flex items-center justify-center shrink-0 transition-colors",
@@ -244,29 +250,32 @@ export function CreatePresentationDialog({
               </div>
 
               {/* Provider Selection */}
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <label className="text-[11.5px] font-medium text-[#999999]">
                   {t("presentationEngine")}
                 </label>
-                <div className="grid grid-cols-3 gap-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                   {providers.map((p) => {
                     const isSelected = provider === p.id;
-                    const Icon = p.icon;
                     return (
                       <button
                         key={p.id}
                         type="button"
-                        onClick={() => setProvider(p.id as any)}
+                        onClick={() => setProvider(p.id)}
                         className={cn(
                           "p-3 rounded-xl border text-left flex flex-col justify-between transition-all cursor-pointer relative overflow-hidden",
                           isSelected
-                            ? "bg-[#252525] border-white/40 shadow-lg"
-                            : "bg-[#1f1f1f] border-[#2c2c2c] hover:border-[#3a3a3a] opacity-80 hover:opacity-100"
+                            ? "bg-[#252525] border-white/40 shadow-lg text-white"
+                            : "bg-[#1f1f1f] border-[#2c2c2c] hover:border-[#383838] opacity-80 hover:opacity-100 text-[#888888]"
                         )}
                       >
                         <div>
                           <div className="flex items-center justify-between mb-2">
-                            <Icon className={cn("h-4 w-4", p.color)} />
+                            {p.logoId ? (
+                              <BrandLogo id={p.logoId} size="xs" className="w-5 h-5 rounded-md p-0.5 border-0 shadow-none bg-transparent" />
+                            ) : (
+                              <Presentation className="h-4 w-4 text-white" />
+                            )}
                             <span className="text-[9px] font-sans uppercase px-1.5 py-0.5 rounded bg-[#2e2e2e] text-[#aaa]">
                               {p.badge}
                             </span>
@@ -278,8 +287,8 @@ export function CreatePresentationDialog({
                         </div>
 
                         {isSelected && (
-                          <div className="absolute top-2 right-2">
-                            <div className="h-2 w-2 rounded-full bg-white animate-pulse" />
+                          <div className="absolute top-2.5 right-2.5">
+                            <div className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
                           </div>
                         )}
                       </button>
@@ -289,7 +298,7 @@ export function CreatePresentationDialog({
               </div>
 
               {/* Slide Count / Length Mode */}
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <label className="text-[11.5px] font-medium text-[#999999]">
                     {t("slideCountAndDepth")}
@@ -297,7 +306,7 @@ export function CreatePresentationDialog({
                   <button
                     type="button"
                     onClick={() => setIsCustomCount(!isCustomCount)}
-                    className="text-[11px] text-amber-400 hover:underline cursor-pointer flex items-center gap-1"
+                    className="text-[11px] text-[#aaaaaa] hover:text-white transition-colors cursor-pointer flex items-center gap-1"
                   >
                     <Sliders className="h-3 w-3" />
                     {isCustomCount ? t("presetMode") : t("customCount")}
@@ -305,20 +314,20 @@ export function CreatePresentationDialog({
                 </div>
 
                 {!isCustomCount ? (
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     {[
                       {
-                        id: "auto",
+                        id: "auto" as const,
                         label: t("modeAdaptiveLabel"),
                         desc: t("modeAdaptiveDesc"),
                       },
                       {
-                        id: "short",
+                        id: "short" as const,
                         label: t("modeConciseLabel"),
                         desc: t("modeConciseDesc"),
                       },
                       {
-                        id: "long",
+                        id: "long" as const,
                         label: t("modeInDepthLabel"),
                         desc: t("modeInDepthDesc"),
                       },
@@ -328,11 +337,11 @@ export function CreatePresentationDialog({
                         <button
                           key={mode.id}
                           type="button"
-                          onClick={() => setLengthMode(mode.id as any)}
+                          onClick={() => setLengthMode(mode.id)}
                           className={cn(
                             "p-2.5 rounded-xl border text-left transition-all cursor-pointer",
                             isSelected
-                              ? "bg-[#252525] border-white/40 text-white"
+                              ? "bg-[#252525] border-white/40 text-white shadow"
                               : "bg-[#1f1f1f] border-[#2c2c2c] hover:border-[#383838] text-[#888]"
                           )}
                         >
@@ -354,7 +363,7 @@ export function CreatePresentationDialog({
                           className={cn(
                             "flex-1 py-2 rounded-xl border text-xs font-medium transition-all cursor-pointer",
                             isSelected
-                              ? "bg-[#252525] border-amber-400 text-amber-300 font-semibold shadow"
+                              ? "bg-[#252525] border-white text-white font-semibold shadow"
                               : "bg-[#1f1f1f] border-[#2c2c2c] hover:border-[#383838] text-[#999]"
                           )}
                         >
@@ -366,43 +375,7 @@ export function CreatePresentationDialog({
                 )}
               </div>
 
-              {/* Native Theme Selection */}
-              {provider === "native" && (
-                <div className="space-y-2">
-                  <label className="text-[11.5px] font-medium text-[#999999] flex items-center gap-1.5">
-                    <Palette className="h-3.5 w-3.5" />
-                    {t("designThemePalette")}
-                  </label>
-                  <div className="grid grid-cols-4 gap-2">
-                    {THEMES.map((th) => {
-                      const isSelected = themeId === th.id;
-                      return (
-                        <button
-                          key={th.id}
-                          type="button"
-                          onClick={() => setThemeId(th.id as any)}
-                          className={cn(
-                            "p-2 rounded-xl border text-left flex items-center gap-2 transition-all cursor-pointer",
-                            isSelected
-                              ? "bg-[#252525] border-white/40 shadow"
-                              : "bg-[#1f1f1f] border-[#2c2c2c] hover:border-[#383838] opacity-75 hover:opacity-100"
-                          )}
-                        >
-                          <div
-                            className="h-3.5 w-3.5 rounded-full border border-white/20 shrink-0"
-                            style={{ backgroundColor: th.color }}
-                          />
-                          <span className="text-[11px] font-medium text-white truncate">
-                            {th.name}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Custom Guidance */}
+              {/* Custom Guidance (Optional) */}
               <div className="space-y-1.5">
                 <label className="text-[11.5px] font-medium text-[#999999]">
                   {t("customGuidanceOptional")}
@@ -412,7 +385,7 @@ export function CreatePresentationDialog({
                   onChange={(e) => setCustomInstructions(e.target.value)}
                   placeholder={t("presentationGuidancePlaceholder")}
                   rows={2}
-                  className="w-full px-3 py-2 rounded-xl bg-[#222222] border border-[#2b2b2b] focus:border-[#444444] text-xs text-white placeholder-[#666666] outline-none resize-none transition-colors"
+                  className="w-full px-3 py-2 rounded-xl bg-[#222222] border border-[#2b2b2b] hover:border-[#383838] focus:border-[#444444] text-xs text-white placeholder:text-[#666666] outline-none resize-none transition-colors font-sans"
                 />
               </div>
             </div>
@@ -432,6 +405,7 @@ export function CreatePresentationDialog({
               disabled={selectedSourceIds.length === 0}
               className="px-4 py-2 rounded-xl bg-white hover:bg-neutral-200 disabled:opacity-40 disabled:hover:bg-white disabled:cursor-not-allowed text-xs font-semibold text-black flex items-center gap-1.5 transition-all cursor-pointer shadow-sm active:scale-98"
             >
+              <Presentation className="h-3.5 w-3.5" />
               <span>{t("createSlides")}</span>
             </button>
           </div>

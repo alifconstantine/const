@@ -3,7 +3,7 @@ import {
   Check,
   X,
   ChevronDown,
-  Sparkles,
+  Bot,
   ChevronLeft,
   ChevronRight,
   RotateCcw,
@@ -326,7 +326,7 @@ export function QuizViewer({
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-secondary hover:bg-secondary/80 border border-border text-xs font-medium text-foreground transition-all cursor-pointer active:scale-95 shadow-xs"
                     title={t("explainInChat")}
                   >
-                    <Sparkles className="h-3.5 w-3.5 text-teal-500" />
+                    <Bot className="h-3.5 w-3.5 text-teal-500" />
                     <span>{t("explainInChat")}</span>
                   </button>
                 )}

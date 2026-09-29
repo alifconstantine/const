@@ -10,7 +10,7 @@ import {
   Download,
   Copy,
   Check,
-  Sparkles,
+  Bot,
   AudioLines,
   Clock,
   Mic,
@@ -317,7 +317,7 @@ export function AudioSummaryViewer({
                   </>
                 ) : (
                   <>
-                    <Sparkles className="h-3.5 w-3.5" />
+                    <Volume2 className="h-3.5 w-3.5" />
                     <span>{t("synthesizeAudioNow")}</span>
                   </>
                 )}
@@ -434,7 +434,7 @@ export function AudioSummaryViewer({
                   onClick={handleExplain}
                   className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 text-indigo-500 text-xs font-medium transition-colors cursor-pointer"
                 >
-                  <Sparkles className="h-3.5 w-3.5" />
+                  <Bot className="h-3.5 w-3.5" />
                   <span>{t("askInChat")}</span>
                 </button>
               )}

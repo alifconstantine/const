@@ -87,6 +87,20 @@ export function CreateAudioSummaryDialog({
     return INWORLD_MODELS;
   }, [hasInworldKey]);
 
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest("[data-studio-dropdown]")) {
+        setIsSourceDropdownOpen(false);
+      }
+    };
+    if (isSourceDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [isSourceDropdownOpen]);
+
   // Sync initial selections
   useEffect(() => {
     if (sources.length > 0 && selectedSourceIds.length === 0) {
@@ -173,7 +187,7 @@ export function CreateAudioSummaryDialog({
               </div>
 
               {/* Sumber Dropdown */}
-              <div className="space-y-1.5 relative">
+              <div className="space-y-1.5 relative" data-studio-dropdown>
                 <label className="text-[11.5px] font-medium text-[#999999]">
                   {t("sourceMaterialScope")}
                 </label>
@@ -191,7 +205,12 @@ export function CreateAudioSummaryDialog({
                             total: sources.length,
                           })}
                     </span>
-                    <ChevronDown className="h-3.5 w-3.5 text-[#888888] shrink-0" />
+                    <ChevronDown
+                      className={cn(
+                        "h-3.5 w-3.5 text-[#888888] shrink-0 transition-transform duration-150",
+                        isSourceDropdownOpen ? "rotate-180 text-white" : ""
+                      )}
+                    />
                   </button>
 
                   {isSourceDropdownOpen && (

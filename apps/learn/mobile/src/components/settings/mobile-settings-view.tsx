@@ -19,7 +19,7 @@ import {
   Check,
   ShieldCheck,
   Globe,
-  Sparkles,
+  Brain,
   LogOut,
   ArrowLeftRight,
   Clock,
@@ -612,7 +612,7 @@ export function MobileSettingsView({
                       )}
                       {model.supportsThinking && (
                         <span className="inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 font-medium">
-                          <Sparkles className="w-2.5 h-2.5" />
+                          <Brain className="w-2.5 h-2.5" />
                           Thinking
                         </span>
                       )}

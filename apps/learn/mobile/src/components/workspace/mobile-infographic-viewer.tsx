@@ -3,7 +3,6 @@ import {
   ArrowLeft,
   Download,
   Copy,
-  Sparkles,
   MessageSquare,
   BarChart3,
   Info,

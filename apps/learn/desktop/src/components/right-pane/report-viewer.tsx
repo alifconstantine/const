@@ -8,7 +8,6 @@ import {
   Download,
   ThumbsUp,
   ThumbsDown,
-  Sparkles,
   X,
   Maximize2,
   Minimize2,
@@ -197,7 +196,7 @@ export function ReportViewer({
       case "flashcard":
         return Layers;
       default:
-        return Sparkles;
+        return Layers;
     }
   };
 

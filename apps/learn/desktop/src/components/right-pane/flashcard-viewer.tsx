@@ -3,7 +3,7 @@ import {
   ChevronLeft,
   ChevronRight,
   RotateCcw,
-  Sparkles,
+  Bot,
   Maximize2,
   Minimize2,
   Share2,
@@ -199,7 +199,7 @@ export function FlashcardViewer({
                   className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-secondary hover:bg-secondary/80 border border-border text-[11px] font-medium text-foreground transition-all cursor-pointer active:scale-95 shrink-0"
                   title={t("explainInChat")}
                 >
-                  <Sparkles className="h-3 w-3 text-teal-500" />
+                  <Bot className="h-3 w-3 text-teal-500" />
                   <span>{t("explainAction")}</span>
                 </button>
               </div>

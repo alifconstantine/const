@@ -46,7 +46,7 @@ import {
   BarChart3,
   Table2,
   Layers,
-  Sparkles,
+  LayoutGrid,
 } from "lucide-react";
 
 import { LearnCard, LearnItem } from "./learn-card";
@@ -211,11 +211,11 @@ export function LearnHome({
 
   const tabs: { key: TabKey; label: string; icon: React.ElementType }[] = useMemo(
     () => [
-      { key: "all", label: t("tabAll"), icon: Layers },
+      { key: "all", label: t("tabAll"), icon: LayoutGrid },
       { key: "learns", label: t("learns"), icon: BookOpen },
       { key: "sources", label: t("sources"), icon: FileText },
       { key: "collections", label: t("collections"), icon: Folder },
-      { key: "artifact", label: t("artifacts"), icon: Sparkles },
+      { key: "artifact", label: t("artifacts"), icon: Layers },
     ],
     [t]
   );

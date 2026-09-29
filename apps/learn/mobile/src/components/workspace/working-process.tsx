@@ -8,7 +8,6 @@ import {
   CheckCircle2,
   AlertCircle,
   Layers,
-  Sparkles,
   ExternalLink,
   Check,
   ListTodo,
@@ -1278,7 +1277,7 @@ function PythonRunnerTraceItem({ tool }: { tool: TraceStep }) {
         )}
       >
         <div className="flex items-center gap-2 min-w-0 pr-2">
-          <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+          <TerminalIcon className="w-3.5 h-3.5 text-amber-500 shrink-0" />
           <span className="font-sans text-foreground font-medium text-xs">
             Python Execution
           </span>

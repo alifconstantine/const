@@ -4,7 +4,6 @@ import {
   Check,
   ChevronDown,
   FileText,
-  Sparkles,
   Pencil,
 } from "lucide-react";
 import { cn } from "@const/ui";
@@ -417,7 +416,7 @@ export function CreateReportSheet({
           {format === "document" && suggestedTemplates.length > 0 && (
             <div className="space-y-2 pt-1">
               <div className="flex items-center gap-1.5 text-xs font-medium text-[#969696]">
-                <Sparkles className="h-3.5 w-3.5 text-amber-400" />
+                <FileText className="h-3.5 w-3.5 text-amber-400" />
                 <span>{t("recommendedTemplates")}</span>
               </div>
               <div className="space-y-2">
@@ -557,7 +556,7 @@ export function CreateReportSheet({
               )}
             >
               <FileText className="h-4 w-4" />
-              <span>{t("createNowAction")}</span>
+              <span>{t("createReport")}</span>
             </button>
           </div>
         </form>

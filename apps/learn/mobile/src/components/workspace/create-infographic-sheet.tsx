@@ -2,7 +2,6 @@ import React, { useState, useMemo, useRef, useEffect } from "react";
 import {
   X,
   BarChart3,
-  Sparkles,
   Check,
   ChevronDown,
   ChevronLeft,
@@ -593,8 +592,8 @@ export function CreateInfographicSheet({
                   : "bg-white/10 text-muted-foreground cursor-not-allowed opacity-50"
               )}
             >
-              <Sparkles className="h-4 w-4" />
-              <span>{t("createNow")}</span>
+              <BarChart3 className="h-4 w-4" />
+              <span>{t("generateInfographicAction")}</span>
             </button>
           </div>
         </form>

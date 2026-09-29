@@ -1117,7 +1117,7 @@ export async function generatePresentationArtifact(
     lengthMode = "auto",
     slideCount,
     language = "id",
-    themeId = "bold_dark",
+    themeId,
     customInstructions,
   } = options;
 
@@ -1235,8 +1235,6 @@ export async function generatePresentationArtifact(
   // -------------------------------------------------------------------------
   // PROVIDER 2: GOOGLE SLIDES & PROVIDER 3: NATIVE (Open-Design 1920x1080)
   // -------------------------------------------------------------------------
-  const effectiveTheme = provider === "slides" ? "swiss_blue" : (themeId || "bold_dark");
-
   const systemPrompt = isIndo
     ? `Anda adalah Lead Presentation Designer dan Slide Architect profesional.
 Tugas Anda adalah merancang Slide Presentasi kelas dunia (1920x1080 canvas deck) yang memukau, terstruktur, berbasis data riil dari materi sumber rujukan.
@@ -1255,7 +1253,13 @@ ATURAN DESAIN OPEN-DESIGN & HARNESS:
 4. Tulis "speakerNotes" lengkap untuk setiap slide agar pembicara dapat menyampaikan materi dengan artikulatif dan percaya diri.
 5. ZERO SITASI: JANGAN pernah menyertakan tag sitasi seperti [source:...] dalam teks slide atau speaker notes. Teks harus 100% bersih dan siap presentasi profesional.
 6. MANDAT BAHASA: Tulis judul, isi slide, dan speaker notes dalam Bahasa Indonesia.
-7. Output WAJIB berupa JSON murni sesuai format spesifikasi.`
+7. PILIH TEMA WARNA & DESAIN (themeId):
+   Tentukan nilai 'themeId' dari salah satu pilihan berikut yang paling cocok dengan topik atau sesuai Instruksi Khusus:
+   - "bold_dark" (modern dark tech yang elegan & berwibawa)
+   - "swiss_blue" (swiss international / latar putih minimalis berkelas dengan aksen klein blue)
+   - "sea_indigo" (deep oceanic dark dengan aksen cyan/indigo terang)
+   - "ash_lime" (editorial minimalis terang dengan aksen kontras lime)
+8. Output WAJIB berupa JSON murni sesuai format spesifikasi.`
     : `You are an elite Presentation Designer and Slide Architect.
 Your task is to craft a world-class 1920x1080 slide presentation deck from the provided source materials.
 
@@ -1266,11 +1270,17 @@ OPEN-DESIGN SPECIFICATIONS:
 4. Include detailed "speakerNotes" for each slide.
 5. NO CITATION TAGS: Do not include [source:...] tags in the output.
 6. Language: Output 100% in English.
-7. Return pure JSON only matching the schema.`;
+7. COLOR & DESIGN THEME (themeId):
+   Select the best matching themeId for the content or according to Custom Guidance:
+   - "bold_dark" (default / premium modern deep dark)
+   - "swiss_blue" (swiss international / clean white with klein blue)
+   - "sea_indigo" (oceanic dark with bright cyan/indigo)
+   - "ash_lime" (editorial light with lime accents)
+8. Return pure JSON only matching the schema.`;
 
   const userPrompt = `Materi Sumber Rujukan:\n${sourceSnippets || primaryTitle}\n\n${
     customInstructions ? `Instruksi Khusus: "${customInstructions}"\n` : ""
-  }Target Jumlah Slide: TEPAT ${targetCount} slide.\nKeluarkan output JSON terstruktur ("title", "topic", "slides" dengan "slideNumber", "title", "subtitle", "layout", "kicker", "bullets", "bentoCards", "numbers", "statHighlight", "comparisonDetails", "timelineSteps", "speakerNotes").`;
+  }Target Jumlah Slide: TEPAT ${targetCount} slide.\nKeluarkan output JSON terstruktur ("title", "topic", "themeId", "slides" dengan "slideNumber", "title", "subtitle", "layout", "kicker", "bullets", "bentoCards", "numbers", "statHighlight", "comparisonDetails", "timelineSteps", "speakerNotes").`;
 
   let parsedResponse: any = null;
   try {
@@ -1394,6 +1404,30 @@ OPEN-DESIGN SPECIFICATIONS:
         ];
 
   let slidesResult: any = null;
+  const validThemes = ["bold_dark", "swiss_blue", "sea_indigo", "ash_lime"];
+  let resolvedThemeId =
+    parsedResponse?.themeId && validThemes.includes(parsedResponse.themeId)
+      ? parsedResponse.themeId
+      : undefined;
+
+  if (!resolvedThemeId && customInstructions) {
+    const ci = customInstructions.toLowerCase();
+    if (ci.includes("swiss") || ci.includes("blue") || ci.includes("biru") || ci.includes("light") || ci.includes("terang") || ci.includes("putih") || ci.includes("white")) {
+      resolvedThemeId = "swiss_blue";
+    } else if (ci.includes("indigo") || ci.includes("ocean") || ci.includes("laut") || ci.includes("cyan")) {
+      resolvedThemeId = "sea_indigo";
+    } else if (ci.includes("lime") || ci.includes("hijau") || ci.includes("green") || ci.includes("ash") || ci.includes("editorial")) {
+      resolvedThemeId = "ash_lime";
+    } else if (ci.includes("dark") || ci.includes("gelap") || ci.includes("hitam") || ci.includes("black")) {
+      resolvedThemeId = "bold_dark";
+    }
+  }
+
+  const effectiveTheme =
+    provider === "slides"
+      ? "swiss_blue"
+      : (themeId || resolvedThemeId || "bold_dark");
+
   if (provider === "slides") {
     const markdownDeck = `Theme: corporate_blue\n\n# ${deckTitle}\n\n${sourceSnippets.slice(0, 2500)}`;
     try {

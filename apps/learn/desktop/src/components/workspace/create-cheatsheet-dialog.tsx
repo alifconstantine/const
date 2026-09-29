@@ -4,10 +4,7 @@ import {
   X,
   Check,
   ChevronDown,
-  Sparkles,
   FileText,
-  Search,
-  BookOpen,
 } from "lucide-react";
 import { Dialog, DialogContent, ScrollArea, cn } from "@const/ui";
 import { useI18n } from "../../lib/i18n";
@@ -36,7 +33,20 @@ export function CreateCheatSheetDialog({
   const [coverageMode, setCoverageMode] = useState<"short" | "auto" | "long">("auto");
   const [topicFocus, setTopicFocus] = useState<string>("");
   const [isSourceDropdownOpen, setIsSourceDropdownOpen] = useState(false);
-  const [sourceSearch, setSourceSearch] = useState("");
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (!target.closest("[data-studio-dropdown]")) {
+        setIsSourceDropdownOpen(false);
+      }
+    };
+    if (isSourceDropdownOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [isSourceDropdownOpen]);
 
   // Default: select all active sources
   useEffect(() => {
@@ -44,12 +54,6 @@ export function CreateCheatSheetDialog({
       setSelectedSourceIds(sources.map((s) => s.id));
     }
   }, [sources]);
-
-  const filteredSources = useMemo(() => {
-    if (!sourceSearch.trim()) return sources;
-    const q = sourceSearch.toLowerCase();
-    return sources.filter((s) => (s.title || "").toLowerCase().includes(q));
-  }, [sources, sourceSearch]);
 
   const handleToggleSource = (id: string) => {
     setSelectedSourceIds((prev) =>
@@ -94,6 +98,8 @@ export function CreateCheatSheetDialog({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (selectedSourceIds.length === 0) return;
+
     onGenerate({
       selectedSourceIds:
         selectedSourceIds.length > 0 ? selectedSourceIds : sources.map((s) => s.id),
@@ -105,221 +111,236 @@ export function CreateCheatSheetDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[560px] p-0 bg-card border border-border text-foreground rounded-2xl shadow-2xl overflow-hidden font-sans [&>button]:hidden outline-none ring-0">
-        {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border/60 bg-card">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className="h-9 w-9 rounded-xl bg-sky-500/10 border border-sky-500/20 text-sky-400 flex items-center justify-center shrink-0">
-              <FileSpreadsheet className="h-5 w-5" />
-            </div>
-            <div className="min-w-0">
-              <h2 className="text-sm font-semibold text-foreground tracking-tight truncate">
-                {t("cheatsheetDialogTitle")}
-              </h2>
-              <p className="text-[11.5px] text-muted-foreground truncate mt-0.5">
-                {t("cheatsheetDialogSubtitle")}
-              </p>
-            </div>
+      <DialogContent className="max-w-[620px] w-full max-h-[88vh] flex flex-col gap-0 p-0 bg-[#161616] border border-[#2b2b2b] text-[#e0e0e0] rounded-2xl shadow-2xl overflow-hidden font-sans [&>button]:hidden outline-none focus:outline-none focus-visible:outline-none ring-0 focus-visible:ring-0">
+        {/* Header - Borderless austere studio style */}
+        <div className="shrink-0 flex items-center justify-between px-5 pt-5 pb-2 bg-[#161616]">
+          <div className="flex items-center gap-2.5">
+            <FileSpreadsheet className="h-4 w-4 text-white shrink-0" />
+            <span className="text-sm font-semibold text-white tracking-tight">
+              {t("cheatsheetDialogTitle")}
+            </span>
           </div>
 
           <button
             type="button"
             onClick={() => onOpenChange(false)}
-            className="h-8 w-8 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground flex items-center justify-center transition-colors cursor-pointer shrink-0"
-            aria-label="Tutup"
+            className="h-7 w-7 rounded-lg hover:bg-[#222222] text-[#888888] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="flex flex-col">
-          <div className="p-5 space-y-4 max-h-[70vh] overflow-y-auto">
-            {/* Section 1: Source Selection */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-foreground tracking-tight flex items-center justify-between">
-                <span>{t("learningSources")}</span>
-                <span className="text-[11px] font-normal text-muted-foreground">
-                  {t("selectedOfTotalSources", {
-                    selected: selectedSourceIds.length,
-                    total: sources.length,
-                  })}
-                </span>
-              </label>
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
+          <ScrollArea className="flex-1 min-h-0 w-full px-5 py-2">
+            <div className="space-y-4 pb-2">
+              {/* Concept Explanation Box */}
+              <div className="p-3.5 rounded-xl bg-[#222222] border border-[#2b2b2b] flex items-start gap-3">
+                <FileSpreadsheet className="h-4 w-4 text-white shrink-0 mt-0.5" />
+                <div className="text-xs text-[#d4d4d4] leading-relaxed">
+                  {t("cheatsheetDialogSubtitle")}
+                </div>
+              </div>
 
-              <div className="relative" data-studio-dropdown>
-                <button
-                  type="button"
-                  onClick={() => setIsSourceDropdownOpen(!isSourceDropdownOpen)}
-                  className="w-full h-10 px-3 rounded-xl bg-secondary/60 hover:bg-secondary border border-border/80 text-foreground flex items-center justify-between text-xs transition-colors cursor-pointer"
-                >
-                  <div className="flex items-center gap-2 truncate">
-                    <BookOpen className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                    <span className="truncate">
+              {/* Source Selection (matching Video Summary studio dropdown) */}
+              <div className="space-y-1.5 relative" data-studio-dropdown>
+                <label className="text-[11.5px] font-medium text-[#999999]">
+                  {t("sourceMaterialScope")}
+                </label>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setIsSourceDropdownOpen(!isSourceDropdownOpen)}
+                    className="w-full h-9 px-3 rounded-xl bg-[#222222] border border-[#2b2b2b] hover:border-[#383838] flex items-center justify-between text-xs text-left cursor-pointer transition-colors"
+                  >
+                    <span className="text-white font-medium truncate">
                       {selectedSourceIds.length === sources.length
-                        ? t("allSourcesDocs", { count: sources.length })
-                        : t("activeSourcesSelected", { count: selectedSourceIds.length })}
+                        ? t("allSourcesCount", { count: sources.length })
+                        : t("selectedOfTotalSources", {
+                            selected: selectedSourceIds.length,
+                            total: sources.length,
+                          })}
                     </span>
-                  </div>
-                  <ChevronDown className="h-3.5 w-3.5 text-muted-foreground shrink-0 ml-2" />
-                </button>
+                    <ChevronDown
+                      className={cn(
+                        "h-3.5 w-3.5 text-[#888888] shrink-0 transition-transform duration-150",
+                        isSourceDropdownOpen ? "rotate-180 text-white" : ""
+                      )}
+                    />
+                  </button>
 
-                {isSourceDropdownOpen && (
-                  <div className="absolute top-full left-0 right-0 mt-1.5 p-2 rounded-xl bg-popover border border-border shadow-xl z-20 space-y-1.5 animate-in fade-in zoom-in-95 duration-150">
-                    <div className="flex items-center justify-between px-1 pb-1.5 border-b border-border/50">
-                      <div className="relative flex-1 mr-2">
-                        <Search className="h-3 w-3 absolute left-2 top-2.5 text-muted-foreground" />
-                        <input
-                          type="text"
-                          value={sourceSearch}
-                          onChange={(e) => setSourceSearch(e.target.value)}
-                          placeholder={t("searchSourcesPlaceholder")}
-                          className="w-full bg-secondary text-[11px] rounded-lg pl-7 pr-2 py-1 outline-none border border-border/60 text-foreground"
-                        />
-                      </div>
+                  {isSourceDropdownOpen && (
+                    <div className="absolute top-full mt-1.5 left-0 right-0 z-30 bg-[#222222] border border-[#2b2b2b] rounded-xl p-2 shadow-2xl animate-in fade-in-0 zoom-in-95 duration-100">
+                      {/* Select All Toggle */}
                       <button
                         type="button"
                         onClick={handleSelectAllSources}
-                        className="text-[10.5px] font-medium text-sky-400 hover:text-sky-300 transition-colors cursor-pointer shrink-0"
+                        className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-[#2b2b2b] text-xs text-[#cccccc] cursor-pointer transition-colors"
                       >
-                        {selectedSourceIds.length === sources.length
-                          ? t("deselectAll")
-                          : t("selectAll")}
-                      </button>
-                    </div>
-
-                    <div className="max-h-36 overflow-y-auto space-y-1 pr-1">
-                      {filteredSources.map((src) => {
-                        const isSelected = selectedSourceIds.includes(src.id);
-                        return (
-                          <div
-                            key={src.id}
-                            onClick={() => handleToggleSource(src.id)}
-                            className={cn(
-                              "flex items-center justify-between p-2 rounded-lg text-xs cursor-pointer transition-colors",
-                              isSelected ? "bg-secondary text-foreground" : "hover:bg-secondary/40 text-muted-foreground"
-                            )}
-                          >
-                            <span className="truncate pr-2">{src.title}</span>
-                            <div
-                              className={cn(
-                                "h-4 w-4 rounded border flex items-center justify-center shrink-0",
-                                isSelected ? "bg-sky-500 border-sky-500 text-white" : "border-border"
-                              )}
-                            >
-                              {isSelected && <Check className="h-2.5 w-2.5 stroke-[3]" />}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Section 2: Coverage Mode */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-foreground tracking-tight">
-                {t("coverageAndCardDensity")}
-              </label>
-
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  {
-                    id: "short",
-                    title: t("cheatsheetCoverageShort"),
-                    desc: t("cheatsheetCoverageShortDesc"),
-                  },
-                  {
-                    id: "auto",
-                    title: t("cheatsheetCoverageAuto"),
-                    desc: t("cheatsheetCoverageAutoDesc"),
-                  },
-                  {
-                    id: "long",
-                    title: t("cheatsheetCoverageLong"),
-                    desc: t("cheatsheetCoverageLongDesc"),
-                  },
-                ].map((mode) => {
-                  const isActive = coverageMode === mode.id;
-                  return (
-                    <button
-                      key={mode.id}
-                      type="button"
-                      onClick={() => setCoverageMode(mode.id as any)}
-                      className={cn(
-                        "p-2.5 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between h-[84px] select-none",
-                        isActive
-                          ? "bg-sky-500/10 border-sky-500/40 text-foreground"
-                          : "bg-secondary/40 border-border/70 hover:bg-secondary text-muted-foreground hover:text-foreground"
-                      )}
-                    >
-                      <div className="flex items-center justify-between w-full">
-                        <span className={cn("text-[11.5px] font-semibold tracking-tight", isActive ? "text-sky-400" : "text-foreground")}>
-                          {mode.title}
+                        <span className="font-medium">
+                          {selectedSourceIds.length === sources.length
+                            ? t("deselectAll")
+                            : t("selectAll")}
                         </span>
                         <div
                           className={cn(
-                            "h-3.5 w-3.5 rounded-full border flex items-center justify-center shrink-0",
-                            isActive ? "border-sky-400 bg-sky-400" : "border-muted-foreground/40"
+                            "h-4 w-4 rounded border flex items-center justify-center transition-colors",
+                            selectedSourceIds.length === sources.length
+                              ? "bg-white border-white text-black"
+                              : "border-[#444449] bg-transparent"
                           )}
                         >
-                          {isActive && <div className="h-1.5 w-1.5 rounded-full bg-black" />}
+                          {selectedSourceIds.length === sources.length && (
+                            <Check className="h-3 w-3 stroke-[3]" />
+                          )}
                         </div>
-                      </div>
-                      <p className="text-[10px] text-muted-foreground line-clamp-2 leading-tight">
-                        {mode.desc}
-                      </p>
+                      </button>
+
+                      <div className="h-px bg-[#2e2e2e] my-1.5" />
+
+                      {/* ScrollArea with max-height to handle many sources smoothly */}
+                      <ScrollArea className="max-h-52 w-full" viewportClassName="space-y-1 pr-1.5">
+                        {sources.map((src) => {
+                          const isSelected = selectedSourceIds.includes(src.id);
+                          return (
+                            <button
+                              key={src.id}
+                              type="button"
+                              onClick={() => handleToggleSource(src.id)}
+                              className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-[#2b2b2b] text-xs text-left cursor-pointer transition-colors"
+                            >
+                              <div className="flex items-center gap-2 truncate pr-2">
+                                <FileText className="h-3.5 w-3.5 text-[#777777] shrink-0" />
+                                <span className="truncate text-[#e0e0e0]">{src.title}</span>
+                              </div>
+                              <div
+                                className={cn(
+                                  "h-4 w-4 rounded border flex items-center justify-center transition-colors shrink-0",
+                                  isSelected
+                                    ? "bg-white border-white text-black"
+                                    : "border-[#444449] bg-transparent"
+                                )}
+                              >
+                                {isSelected && <Check className="h-3 w-3 stroke-[3]" />}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </ScrollArea>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Coverage & Card Density */}
+              <div className="space-y-1.5">
+                <label className="text-[11.5px] font-medium text-[#999999]">
+                  {t("coverageAndCardDensity")}
+                </label>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  {[
+                    {
+                      id: "short" as const,
+                      title: t("cheatsheetCoverageShort"),
+                      desc: t("cheatsheetCoverageShortDesc"),
+                    },
+                    {
+                      id: "auto" as const,
+                      title: t("cheatsheetCoverageAuto"),
+                      desc: t("cheatsheetCoverageAutoDesc"),
+                    },
+                    {
+                      id: "long" as const,
+                      title: t("cheatsheetCoverageLong"),
+                      desc: t("cheatsheetCoverageLongDesc"),
+                    },
+                  ].map((mode) => {
+                    const isSelected = coverageMode === mode.id;
+                    return (
+                      <button
+                        key={mode.id}
+                        type="button"
+                        onClick={() => setCoverageMode(mode.id)}
+                        className={cn(
+                          "p-3 rounded-xl border text-left flex flex-col justify-between transition-all cursor-pointer min-w-0 h-[88px]",
+                          isSelected
+                            ? "bg-[#252525] border-white/40 text-white shadow-lg"
+                            : "bg-[#1f1f1f] border-[#2c2c2c] hover:border-[#383838] text-[#888888] opacity-80 hover:opacity-100"
+                        )}
+                      >
+                        <div className="flex items-center justify-between w-full mb-1">
+                          <span
+                            className={cn(
+                              "text-xs font-semibold truncate pr-1.5",
+                              isSelected ? "text-white" : "text-[#d0d0d0]"
+                            )}
+                          >
+                            {mode.title}
+                          </span>
+                          <div
+                            className={cn(
+                              "h-3.5 w-3.5 rounded-full border flex items-center justify-center shrink-0 transition-colors",
+                              isSelected ? "border-white bg-white text-black" : "border-[#444449] bg-transparent"
+                            )}
+                          >
+                            {isSelected && <div className="h-1.5 w-1.5 rounded-full bg-black" />}
+                          </div>
+                        </div>
+                        <p className="text-[10px] text-[#888888] line-clamp-2 leading-tight">
+                          {mode.desc}
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Topic Focus or Custom Prompt */}
+              <div className="space-y-1.5">
+                <label className="text-[11.5px] font-medium text-[#999999]">
+                  {t("cheatsheetTopicFocus")}
+                </label>
+                <textarea
+                  value={topicFocus}
+                  onChange={(e) => setTopicFocus(e.target.value)}
+                  placeholder={t("cheatsheetTopicPlaceholder")}
+                  rows={2}
+                  className="w-full px-3 py-2 rounded-xl bg-[#222222] border border-[#2b2b2b] hover:border-[#383838] focus:border-[#444444] focus:outline-none text-xs text-white placeholder:text-[#666666] resize-none transition-colors font-sans"
+                />
+
+                {/* Suggestions chips */}
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {topicChips.map((chip, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => handleChipClick(chip)}
+                      className="px-2.5 py-1 rounded-lg bg-[#222222] hover:bg-[#2b2b2b] border border-[#2e2e2e] hover:border-[#383838] text-[11px] text-[#a0a0a0] hover:text-white transition-all cursor-pointer active:scale-98"
+                    >
+                      {chip}
                     </button>
-                  );
-                })}
+                  ))}
+                </div>
               </div>
             </div>
+          </ScrollArea>
 
-            {/* Section 3: Topic Focus / Custom Prompt */}
-            <div className="space-y-1.5">
-              <label className="text-xs font-semibold text-foreground tracking-tight">
-                {t("cheatsheetTopicFocus")}
-              </label>
-              <textarea
-                value={topicFocus}
-                onChange={(e) => setTopicFocus(e.target.value)}
-                placeholder={t("cheatsheetTopicPlaceholder")}
-                rows={2}
-                className="w-full bg-secondary/60 hover:bg-secondary focus:bg-secondary rounded-xl p-3 text-xs outline-none border border-border/80 focus:border-sky-500/50 text-foreground placeholder:text-muted-foreground/60 resize-none transition-colors"
-              />
-
-              {/* Suggestions chips */}
-              <div className="flex flex-wrap gap-1.5 pt-0.5">
-                {topicChips.map((chip, idx) => (
-                  <button
-                    key={idx}
-                    type="button"
-                    onClick={() => handleChipClick(chip)}
-                    className="text-[10.5px] px-2.5 py-1 rounded-full bg-secondary hover:bg-secondary/80 border border-border/70 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-                  >
-                    {chip}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          {/* Footer Actions */}
-          <div className="px-5 py-3.5 border-t border-border/60 bg-secondary/30 flex items-center justify-end gap-2.5">
+          {/* Footer Actions - Borderless studio style */}
+          <div className="shrink-0 flex items-center justify-end gap-2 px-5 py-3.5 bg-[#161616]">
             <button
               type="button"
               onClick={() => onOpenChange(false)}
-              className="px-4 py-2 rounded-xl text-xs font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+              className="px-4 py-2 rounded-xl bg-transparent hover:bg-[#222222] text-xs text-[#888888] hover:text-white transition-colors cursor-pointer"
             >
               {t("cancel")}
             </button>
             <button
               type="submit"
-              className="px-5 py-2 rounded-xl bg-foreground text-background hover:bg-foreground/90 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer active:scale-98"
+              disabled={selectedSourceIds.length === 0}
+              className="px-4 py-2 rounded-xl bg-white hover:bg-neutral-200 disabled:opacity-40 disabled:hover:bg-white disabled:cursor-not-allowed text-xs font-semibold text-black flex items-center gap-1.5 transition-all cursor-pointer shadow-sm active:scale-98"
             >
-              <Sparkles className="h-3.5 w-3.5" />
+              <FileSpreadsheet className="h-3.5 w-3.5" />
               <span>{t("cheatsheetGenerateBtn")}</span>
             </button>
           </div>

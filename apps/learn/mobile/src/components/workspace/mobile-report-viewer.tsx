@@ -7,7 +7,6 @@ import {
   Check,
   ThumbsUp,
   ThumbsDown,
-  Sparkles,
   BarChart3,
   HelpCircle,
   Layers,
@@ -137,7 +136,7 @@ export function MobileReportViewer({
       case "flashcard":
         return Layers;
       default:
-        return Sparkles;
+        return Layers;
     }
   };
 

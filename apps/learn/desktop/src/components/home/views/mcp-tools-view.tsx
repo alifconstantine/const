@@ -17,7 +17,7 @@ import {
   Search,
   ArrowLeft,
   ShieldCheck,
-  Sparkles,
+  Info,
   Unlink2,
   Link2,
 } from "lucide-react";
@@ -761,7 +761,7 @@ export function McpToolsView() {
             <div className="md:col-span-2 space-y-6">
               <div className="p-5 rounded-2xl border border-border bg-card/50 space-y-3">
                 <h3 className="text-sm font-semibold text-foreground flex items-center gap-2">
-                  <Sparkles className="w-4 h-4 text-primary" />
+                  <Info className="w-4 h-4 text-primary" />
                   <span>{t("aboutIntegration")}</span>
                 </h3>
                 <p className="text-xs text-muted-foreground leading-relaxed">
