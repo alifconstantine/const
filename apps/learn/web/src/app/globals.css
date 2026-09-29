@@ -1,2 +1,261 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 @import "@const/ui/globals.css";
+
+/* Const Design System — Studio Monochrome Theme Calibration (DESIGN.md) */
+:root {
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.dark, [data-theme="dark"] {
+  /* Level 0 Canvas - Deep Obsidian Black */
+  --theme-surface-surface: #0a0a0a;
+  /* Reading Ink Bright */
+  --theme-surface-on-surface: #ffffff;
+  /* Secondary Ink */
+  --theme-surface-on-surface-variant: #d4d4d4;
+  /* Level 1 Header / Chip */
+  --theme-surface-surface-container: #171717;
+  /* Level 2 Field / Sidebar */
+  --theme-surface-surface-container-high: #202020;
+  /* Level 3 Hover */
+  --theme-surface-surface-container-higher: #2a2a2a;
+  --theme-surface-surface-container-highest: #383838;
+  --theme-surface-inverse-surface: #ffffff;
+  --theme-surface-inverse-on-surface: #0a0a0a;
+  --theme-surface-inverse-on-surface-variant: #5d5d5d;
+  /* Hairline */
+  --theme-outline: #262626;
+  --theme-outline-variant: #1f1f1f;
+  --divider: #262626;
+  --theme-primary-primary: #ffffff;
+  --theme-primary-on-primary: #0a0a0a;
+  --theme-tonal-tonal: #171717;
+  --theme-tonal-on-tonal: #ffffff;
+  --theme-button-states-primary-enabled: #ffffff;
+  --theme-button-states-primary-hovered: #e5e5e5;
+  --theme-button-states-primary-disabled: #171717;
+}
+
+html.dark body, body.dark {
+  background-color: #0a0a0a !important;
+  color: #d4d4d4 !important;
+}
+
+html:not(.dark) body {
+  background-color: #fafafa;
+  color: #111827;
+}
+
+::selection {
+  background-color: rgba(0, 102, 255, 0.25) !important;
+  color: #ffffff !important;
+}
+
+/* Restrict header styling to site nav only with dark/light calibration */
+header.header,
+header[data-header] {
+  background: rgba(250, 250, 250, 0.88) !important;
+  border-bottom: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.dark header.header,
+.dark header[data-header] {
+  background: rgba(10, 10, 10, 0.88) !important;
+  border-bottom: none !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* Navbar Download CTA Button */
+.download-cta-btn {
+  background-color: #111827 !important;
+  color: #ffffff !important;
+  border: none !important;
+}
+
+.dark .download-cta-btn {
+  background-color: #ffffff !important;
+  color: #0a0a0a !important;
+  border: none !important;
+}
+
+.dark .download-cta-btn:hover {
+  background-color: #e5e5e5 !important;
+}
+
+/* Remove all divider/border lines between sections */
+section,
+.faq-section,
+.sub-footer,
+.download-section-container,
+.feature-explorer-section,
+.welcome-wrapper-outer,
+.landing-video-section,
+.agent-first-section {
+  border-top: none !important;
+  border-bottom: none !important;
+}
+
+/* Ensure Navbar header-actions keeps theme toggle and download grouped on the right */
+.header-actions:where(.astro-nen7h5rs) {
+  width: auto !important;
+  justify-content: flex-end !important;
+  display: flex !important;
+}
+
+@media (max-width: 1024px) {
+  .header-actions:where(.astro-nen7h5rs) {
+    display: flex !important;
+  }
+}
+
+/* Download CTA Section - Ensure NO rectangular box behind header text */
+.download-section-content .header {
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+
+.download-section-content .header * {
+  background: transparent !important;
+}
+
+/* Landing Main Header */
+.landing-main-header {
+  color: #111827;
+}
+
+.dark .landing-main-header {
+  color: #ffffff !important;
+}
+
+/* Agent First Statement */
+.agent-first-text {
+  color: #111827;
+}
+
+.dark .agent-first-text {
+  color: #ffffff !important;
+}
+
+/* Feature Explorer - Enhanced Adaptive Legibility per DESIGN.md */
+.feature-explorer-section .feature-description {
+  color: #52525b !important;
+  opacity: 1 !important;
+  font-size: 1.05rem !important;
+  line-height: 1.65 !important;
+  font-weight: 400 !important;
+}
+
+.dark .feature-explorer-section .feature-description {
+  color: #d4d4d4 !important;
+}
+
+.feature-explorer-section .feature-title {
+  color: #111827 !important;
+  font-size: clamp(2rem, 3vw, 2.75rem) !important;
+  font-weight: 500 !important;
+  line-height: 1.2 !important;
+  letter-spacing: -0.01em !important;
+}
+
+.dark .feature-explorer-section .feature-title {
+  color: #ffffff !important;
+}
+
+/* WebGL Canvas & Particle Containers Background Sync (#fafafa / #0a0a0a) */
+.welcome-wrapper {
+  position: relative !important;
+  isolation: isolate !important;
+}
+
+.hero-video-wrapper {
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 0 !important;
+  pointer-events: none !important;
+}
+
+.hero-video-container {
+  width: 100% !important;
+  height: 100% !important;
+  opacity: 1 !important;
+}
+
+.welcome-section {
+  position: relative !important;
+  z-index: 10 !important;
+}
+
+.welcome-wrapper-outer,
+.welcome-wrapper,
+.hero-video-wrapper,
+.hero-video-container,
+.main-particles-component-section,
+.main-particles-container,
+.main-particles-container canvas {
+  background-color: #fafafa !important;
+}
+
+.dark .welcome-wrapper-outer,
+.dark .welcome-wrapper,
+.dark .hero-video-wrapper,
+.dark .hero-video-container,
+.dark .main-particles-component-section,
+.dark .main-particles-container,
+.dark .main-particles-container canvas {
+  background-color: #0a0a0a !important;
+}
+
+/* Download Section CTA Canvas & Backdrop - Perfect Rounded Corners without border clipping */
+.download-section {
+  isolation: isolate !important;
+  border-radius: 1.5rem !important; /* 24px = rounded-3xl */
+  overflow: hidden !important;
+}
+
+.download-section-backdrop {
+  top: 0 !important;
+  left: 0 !important;
+  right: 0 !important;
+  bottom: 0 !important;
+  border-radius: inherit !important;
+  background-color: transparent !important;
+  background: transparent !important;
+}
+
+.download-section-backdrop .main-particles-component-section,
+.download-section-backdrop .main-particles-container,
+.download-section-backdrop .main-particles-container canvas {
+  background-color: transparent !important;
+  border-radius: inherit !important;
+}
+
+/* Feature Explorer Media - Clean Rounded Corners */
+.feature-media {
+  border-radius: 1rem !important;
+  isolation: isolate !important;
+  overflow: hidden !important;
+}
+
+.feature-media-item,
+.feature-image {
+  border-radius: inherit !important;
+}
+
+/* Video Wrapper - Clean Rounded Corners */
+.video-wrapper {
+  isolation: isolate !important;
+  border-radius: 1.5rem !important;
+  overflow: hidden !important;
+}
+
+.landing-video {
+  border-radius: inherit !important;
+}
+

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { cn } from "../lib/utils";
+import { ConstLogoIcon } from "./const-logo";
 
 const SLUG_MAPPINGS: Record<string, string> = {
   x: "x-formerly-twitter",
@@ -134,6 +135,21 @@ export function BrandLogo({ id, name = "", size = "md", className = "" }: BrandL
 
   const fallbackColor = FALLBACK_COLORS[id] || "bg-zinc-500 text-white";
 
+  // Const Platform Logo
+  if (id === "const" || resolvedSlug === "const") {
+    return (
+      <div
+        className={cn(
+          "shrink-0 flex items-center justify-center select-none overflow-hidden",
+          className
+        )}
+        title={name || "Const"}
+      >
+        <ConstLogoIcon size={size} />
+      </div>
+    );
+  }
+
   // Code Interpreter / Cloud Sandbox Special Icon (matching const-ai)
   if (id === "codeinterpreter" || resolvedSlug === "codeinterpreter" || id === "cloud-sandbox") {
     return (
@@ -161,6 +177,7 @@ export function BrandLogo({ id, name = "", size = "md", className = "" }: BrandL
       </div>
     );
   }
+
 
   return (
     <div
