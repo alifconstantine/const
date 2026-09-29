@@ -4,7 +4,6 @@ import {
   X,
   Check,
   ChevronDown,
-  Sparkles,
   FileText,
   Search,
   BookOpen,
@@ -321,7 +320,7 @@ export function CreateCheatSheetDialog({
               type="submit"
               className="px-5 py-2 rounded-xl bg-foreground text-background hover:bg-foreground/90 text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer active:scale-98"
             >
-              <Sparkles className="h-3.5 w-3.5" />
+              <FileSpreadsheet className="h-3.5 w-3.5" />
               <span>{t("cheatsheetGenerateBtn")}</span>
             </button>
           </div>

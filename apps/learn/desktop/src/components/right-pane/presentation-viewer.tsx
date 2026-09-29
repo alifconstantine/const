@@ -11,7 +11,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Eye,
-  Sparkles,
+  Bot,
   MessageSquare,
   CheckCircle2,
   RotateCw,
@@ -663,7 +663,7 @@ export function PresentationViewer({
                         }}
                         className="text-[11px] text-muted-foreground hover:text-primary flex items-center gap-1 cursor-pointer transition-colors"
                       >
-                        <Sparkles className="h-3 w-3" />
+                        <Bot className="h-3 w-3" />
                         <span>{isIndo ? "Tanya AI tentang slide ini" : "Ask AI about this slide"}</span>
                       </button>
                     )}

@@ -1,7 +1,6 @@
 import React, { useState } from "react";
 import {
   X,
-  Sparkles,
   HelpCircle,
   Layers,
   Check,
@@ -387,7 +386,7 @@ export function CreateArtifactSheet({
               type="submit"
               className="w-full py-3 rounded-xl bg-foreground hover:bg-foreground/90 text-background font-semibold text-xs transition-all shadow-md active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer"
             >
-              <Sparkles className="h-4 w-4" />
+              <Layers className="h-4 w-4" />
               <span>{isIndo ? "Buat sekarang" : "Generate now"}</span>
             </button>
           </div>

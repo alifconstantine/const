@@ -2,7 +2,6 @@ import React, { useState, useMemo } from "react";
 import {
   X,
   Presentation,
-  Sparkles,
   Layers,
   Check,
   FileText,
@@ -45,7 +44,7 @@ const getProviders = (isIndo: boolean) => [
       ? "Template Canva & Desain Interaktif"
       : "Editable Canva Design & Live Templates",
     badge: "Canva AI",
-    icon: Sparkles,
+    icon: Palette,
     color: "text-cyan-400",
   },
   {
@@ -384,7 +383,7 @@ export function CreatePresentationSheet({
           {/* Section 5: Custom Prompt / Guidance */}
           <div>
             <label className="text-xs font-semibold text-foreground flex items-center gap-1.5 mb-1.5">
-              <Sparkles className="h-3.5 w-3.5 text-muted-foreground" />
+              <Sliders className="h-3.5 w-3.5 text-muted-foreground" />
               {isIndo ? "Instruksi Khusus (Opsional)" : "Custom Guidance (Optional)"}
             </label>
             <textarea

@@ -5,7 +5,7 @@ import {
   Search,
   Copy,
   Check,
-  Sparkles,
+  Bot,
   Download,
   AlertCircle,
 } from "lucide-react";
@@ -474,7 +474,7 @@ export function MobileCheatSheetViewer({
                         className="px-2 py-0.5 rounded-md bg-[#1b1b1b] hover:bg-[#282828] border border-[#2e2e2e] text-[#969696] hover:text-white text-[10.5px] font-medium flex items-center gap-1 transition-colors cursor-pointer active:scale-95"
                         title={t("cheatsheetAskTutor")}
                       >
-                        <Sparkles className="h-3 w-3 text-[#969696]" />
+                        <Bot className="h-3 w-3 text-[#969696]" />
                         <span>{t("cheatsheetAskTutor")}</span>
                       </button>
                     )}

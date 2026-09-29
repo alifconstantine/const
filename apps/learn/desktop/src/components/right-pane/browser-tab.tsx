@@ -16,7 +16,7 @@ import {
   BookOpen,
   GraduationCap,
   FileText,
-  Sparkles,
+  Bot,
   Code2,
   ZoomIn,
   ZoomOut,
@@ -728,7 +728,7 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
           }
           aria-label="Select element for chat"
         >
-          <Sparkles className="w-3.5 h-3.5" />
+          <Bot className="w-3.5 h-3.5" />
         </button>
 
         {/* Audio Mute Quick Toggle */}

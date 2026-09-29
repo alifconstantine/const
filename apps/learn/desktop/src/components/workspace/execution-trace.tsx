@@ -9,7 +9,6 @@ import {
   CheckCircle2,
   AlertCircle,
   Layers,
-  Sparkles,
   ExternalLink,
   Send,
   ArrowRight,
@@ -1127,7 +1126,7 @@ function PythonRunnerTraceItem({ tool }: { tool: TraceStep | DisplayToolCall }) 
                   >
                     <div className="flex items-center justify-between text-[11px]">
                       <span className="text-foreground flex items-center gap-1.5">
-                        <Sparkles className="h-3 w-3 text-amber-500" />
+                        <Layers className="h-3 w-3 text-amber-500" />
                         <strong>{fileName}</strong>
                       </span>
                       <button

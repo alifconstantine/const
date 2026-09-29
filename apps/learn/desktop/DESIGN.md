@@ -230,12 +230,13 @@ Studio tool cards (`StudioPanel`) feature distinctive, muted dark-calibrated col
 
 ### 2. Feature & Tab Icon Alignment
 - **Artifacts**: Represented strictly by `Layers` (`lucide-react`).
-  - Do **not** use `Sparkles` for Artifacts (`Sparkles` is reserved strictly for Generative AI / Chat actions).
+  - Do **not** use `Sparkles` anywhere in the application.
   - Empty states in the Artifacts tab must use the matching `Layers` icon.
 - **Sources / Files**: `FileText`
 - **Workspaces / Folders**: `Folder`
 - **Terminal / Execution**: `SquareTerminal` / `Terminal`
 - **Settings / Account**: `Settings` / `User`
+- **Zero Sparkles Policy**: `Sparkles` is strictly prohibited across all interfaces (tabs, actions, dialogs, badges, cards, and viewers). Always use semantic Lucide vector icons instead (e.g. `Layers` for artifacts, `Bot` or `MessageSquare` for AI chat actions, `Brain` for thinking model badges, `Terminal` for code execution).
 
 ---
 
@@ -257,6 +258,6 @@ Studio tool cards (`StudioPanel`) feature distinctive, muted dark-calibrated col
 - **Don't** add horizontal dividing lines (`border-b`, `border-t`) under workspace headers or inside dropdown/popover menus.
 - **Don't** use raw native `overflow-y-auto` or `overflow-x-auto` which exposes Windows' default boxy/arrow scrollbars. Always use `ScrollArea`.
 - **Don't** allow default browser/OS focus rings (such as Chromium's 2px yellow/amber outline on Windows) to appear around modal dialogs, cards, or panels when clicked or opened.
-- **Don't** use `Sparkles` for Artifacts or non-AI feature tabs.
+- **Don't** use `Sparkles` anywhere in the application (use semantic icons such as `Layers`, `Bot`, `Brain`, `Terminal`, `AudioLines`, or `HelpCircle` instead).
 - **Don't** use emojis as interface icons or empty state visual representations.
 - **Don't** use heavy drop shadows (`shadow-md`, `shadow-xl`) on workspace panels.

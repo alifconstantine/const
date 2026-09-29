@@ -4,7 +4,6 @@ import {
   AudioLines,
   Check,
   FileText,
-  Sparkles,
   AlertCircle,
   ArrowRight,
   Settings,
@@ -422,7 +421,7 @@ export function CreateAudioSummarySheet({
               disabled={!hasInworldKey || sources.length === 0}
               className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-xs font-semibold text-white shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-[0.98]"
             >
-              <Sparkles className="h-4 w-4" />
+              <AudioLines className="h-4 w-4" />
               <span>{isIndo ? "Buat Ringkasan Audio" : "Generate Audio Summary"}</span>
             </button>
           </div>

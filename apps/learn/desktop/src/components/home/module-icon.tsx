@@ -14,7 +14,7 @@ import {
   Rocket,
   BarChart3,
   Layers,
-  Sparkles,
+  Star,
   Palette,
   type LucideIcon,
 } from "lucide-react";
@@ -41,7 +41,7 @@ export const MODULE_ICONS: ModuleIconDef[] = [
   { id: "rocket", label: "Proyek", labelEn: "Project", icon: Rocket },
   { id: "chart", label: "Data", labelEn: "Data", icon: BarChart3 },
   { id: "layers", label: "Arsitektur", labelEn: "Architecture", icon: Layers },
-  { id: "sparkles", label: "Spesial", labelEn: "Special", icon: Sparkles },
+  { id: "special", label: "Spesial", labelEn: "Special", icon: Star },
   { id: "palette", label: "Desain", labelEn: "Design", icon: Palette },
 ];
 
@@ -55,7 +55,8 @@ export const LEGACY_EMOJI_TO_ICON: Record<string, string> = {
   "🧪": "flask",
   "📊": "chart",
   "🎨": "palette",
-  "⚡": "sparkles",
+  "⚡": "special",
+  "sparkles": "special",
   "🧠": "brain",
   "💡": "lightbulb",
   "🎓": "graduation",

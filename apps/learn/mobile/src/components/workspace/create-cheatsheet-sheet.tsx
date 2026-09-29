@@ -4,7 +4,6 @@ import {
   FileSpreadsheet,
   Check,
   FileText,
-  Sparkles,
   BookOpen,
 } from "lucide-react";
 import { cn } from "@const/ui";
@@ -253,7 +252,7 @@ export function CreateCheatSheetSheet({
               disabled={sources.length === 0}
               className="w-full py-3 rounded-2xl bg-foreground text-background font-semibold text-xs flex items-center justify-center gap-1.5 shadow-lg transition-all active:scale-[0.98] cursor-pointer"
             >
-              <Sparkles className="h-4 w-4" />
+              <FileSpreadsheet className="h-4 w-4" />
               <span>{t("cheatsheetGenerateBtn")}</span>
             </button>
           </div>

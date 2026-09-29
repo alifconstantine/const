@@ -16,7 +16,6 @@ import {
   Unplug,
   Eye,
   EyeOff,
-  Sparkles,
 } from "lucide-react";
 import {
   DropdownMenu,

@@ -3,7 +3,7 @@ import {
   Check,
   X,
   ChevronDown,
-  Sparkles,
+  Bot,
   ChevronLeft,
   ChevronRight,
   RotateCcw,
@@ -336,7 +336,7 @@ Based on the learning sources, explain why this is the correct answer and provid
                         : "Ask AI to explain this question in chat"
                     }
                   >
-                    <Sparkles className="h-3.5 w-3.5 text-teal-500" />
+                    <Bot className="h-3.5 w-3.5 text-teal-500" />
                     <span>{isIndo ? "Jelaskan" : "Explain in Chat"}</span>
                   </button>
                 )}

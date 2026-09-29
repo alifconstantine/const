@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import {
   X,
-  Sparkles,
   GitFork,
   Check,
   FileText,
@@ -260,7 +259,7 @@ export function CreateMindMapSheet({
               type="submit"
               className="w-full py-3 rounded-xl bg-[#c084fc] hover:bg-[#b06cf7] text-[#141416] font-semibold text-xs transition-all shadow-md active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer"
             >
-              <Sparkles className="h-4 w-4 fill-current" />
+              <GitFork className="h-4 w-4" />
               <span>{isIndo ? "Buat Peta Pikiran" : "Generate Mind Map"}</span>
             </button>
           </div>
