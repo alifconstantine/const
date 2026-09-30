@@ -22,8 +22,10 @@ import {
   Globe,
   ChevronRight,
   Check,
+  ArrowDownCircle,
 } from "lucide-react";
 import { useI18n, LANGUAGE_OPTIONS } from "../lib/i18n";
+import { useAppUpdate } from "../lib/app-update";
 
 export interface UserProfile {
   name?: string | null;
@@ -37,6 +39,7 @@ interface NavbarProps {
   onSignOut: () => void;
   onSwitchAccount?: () => void;
   onOpenSettings?: () => void;
+  onOpenUpdate?: () => void;
 }
 
 export function getUserInitials(name?: string | null, email?: string | null): string {
@@ -66,8 +69,10 @@ export function Navbar({
   onSignOut,
   onSwitchAccount,
   onOpenSettings,
+  onOpenUpdate,
 }: NavbarProps) {
   const { t, language, setLanguage } = useI18n();
+  const { isUpdateAvailable, latestRelease } = useAppUpdate();
   const initials = getUserInitials(user?.name, user?.email);
   const [theme, setTheme] = useTheme();
 
@@ -123,6 +128,13 @@ export function Navbar({
                   )}
                 </AvatarFallback>
               </Avatar>
+              {/* Notification dot if update is available */}
+              {isUpdateAvailable && (
+                <span className="absolute top-0 right-0 flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500 ring-2 ring-background" />
+                </span>
+              )}
             </button>
           </DropdownMenuTrigger>
 
@@ -149,6 +161,25 @@ export function Navbar({
                 </div>
                 <DropdownMenuSeparator className="my-1 bg-border/60" />
               </>
+            )}
+
+            {/* 0. Update Available (Shown only if update is available) */}
+            {isUpdateAvailable && (
+              <DropdownMenuItem
+                onClick={() => {
+                  setIsMenuOpen(false);
+                  if (onOpenUpdate) onOpenUpdate();
+                }}
+                className="cursor-pointer flex items-center justify-between py-2 px-2.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 focus:bg-emerald-500/20 focus:text-emerald-300 transition-colors border border-emerald-500/25 mb-1"
+              >
+                <div className="flex items-center gap-2">
+                  <ArrowDownCircle className="w-4 h-4 text-emerald-400 shrink-0 animate-pulse" />
+                  <span className="font-medium text-emerald-300">{t("updateAvailable")}</span>
+                </div>
+                <span className="text-[10px] font-sans px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-medium">
+                  {latestRelease?.version}
+                </span>
+              </DropdownMenuItem>
             )}
 
             {/* 1. Settings */}

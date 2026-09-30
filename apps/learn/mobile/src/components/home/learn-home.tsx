@@ -47,6 +47,7 @@ import {
   Table2,
   Layers,
   LayoutGrid,
+  ArrowDownCircle,
 } from "lucide-react";
 
 import { LearnCard, LearnItem } from "./learn-card";
@@ -64,8 +65,10 @@ import { MenuContainer, MenuItem } from "../ui/fluid-menu";
 import { ModelSelectionSheet } from "./sheets/model-selection-sheet";
 import { McpToolsSheet } from "./sheets/mcp-tools-sheet";
 import { MobileSettingsSheet } from "./sheets/mobile-settings-sheet";
+import { UpdateSheet } from "./sheets/update-sheet";
 import type { UserProfile } from "../navbar";
 import { useI18n } from "../../lib/i18n";
+import { useAppUpdate } from "../../lib/app-update";
 
 type TabKey = "all" | "learns" | "sources" | "collections" | "artifact";
 type SortOption = "recent" | "oldest" | "title_asc" | "title_desc";
@@ -75,6 +78,7 @@ interface LearnHomeProps {
   searchQuery?: string;
   onSearchQueryChange?: (query: string) => void;
   onOpenSettings?: () => void;
+  onOpenUpdate?: () => void;
   user?: UserProfile | null;
   onSignOut?: () => void;
   onSwitchAccount?: () => void;
@@ -193,11 +197,13 @@ export function LearnHome({
   searchQuery: propSearchQuery,
   onSearchQueryChange,
   onOpenSettings,
+  onOpenUpdate,
   user,
   onSignOut,
   onSwitchAccount,
 }: LearnHomeProps) {
   const { t, language } = useI18n();
+  const { isUpdateAvailable } = useAppUpdate();
 
   const sortLabels: Record<SortOption, string> = useMemo(
     () => ({
@@ -254,6 +260,7 @@ export function LearnHome({
   const [isModelSheetOpen, setIsModelSheetOpen] = useState(false);
   const [isMcpSheetOpen, setIsMcpSheetOpen] = useState(false);
   const [isSettingsSheetOpen, setIsSettingsSheetOpen] = useState(false);
+  const [isUpdateSheetOpen, setIsUpdateSheetOpen] = useState(false);
 
   const handleCreateNewLearn = async (collectionId?: string) => {
     const targetColId = collectionId || activeCollectionId || undefined;
@@ -1647,9 +1654,37 @@ export function LearnHome({
                   >
                     <X size={20} strokeWidth={2} className="text-white" />
                   </div>
+                  {/* Animated notification dot on menu button if update available */}
+                  {isUpdateAvailable && !isFluidMenuExpanded && (
+                    <span className="absolute -top-1 -right-1 flex h-2.5 w-2.5 pointer-events-none">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500 ring-2 ring-[#222222]" />
+                    </span>
+                  )}
                 </div>
               }
             />
+
+            {/* Child: Update (Shown only if update is available) */}
+            {isUpdateAvailable && (
+              <MenuItem
+                label={t("updateAvailable")}
+                icon={
+                  <div className="relative flex items-center justify-center">
+                    <ArrowDownCircle size={20} strokeWidth={1.8} className="text-emerald-400 animate-pulse" />
+                    <span className="absolute -top-0.5 -right-0.5 flex h-2 w-2 rounded-full bg-emerald-400" />
+                  </div>
+                }
+                onClick={() => {
+                  setIsFluidMenuExpanded(false);
+                  if (onOpenUpdate) {
+                    onOpenUpdate();
+                  } else {
+                    setIsUpdateSheetOpen(true);
+                  }
+                }}
+              />
+            )}
 
             {/* Child 1: Model AI */}
             <MenuItem
@@ -1797,6 +1832,11 @@ export function LearnHome({
         user={user}
         onSignOut={onSignOut}
         onSwitchAccount={onSwitchAccount}
+      />
+
+      <UpdateSheet
+        open={isUpdateSheetOpen}
+        onClose={() => setIsUpdateSheetOpen(false)}
       />
     </div>
   );

@@ -36,6 +36,7 @@ import {
 } from "lucide-react";
 import { getUserInitials, type UserProfile } from "../navbar";
 import { useI18n, LANGUAGE_OPTIONS } from "../../lib/i18n";
+import { DesktopUpdateBadge } from "./desktop-update-badge";
 
 export type HomeNavTab = "learns" | "sources" | "collections" | "artifacts" | "models" | "mcp";
 
@@ -111,16 +112,19 @@ export function Sidebar({
             </div>
           </div>
 
-          {/* Close Sidebar Icon Button */}
-          <button
-            type="button"
-            onClick={onCollapse}
-            className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-            title={t("closeSidebarKeyboard")}
-            aria-label={t("closeSidebar")}
-          >
-            <PanelLeft className="w-4 h-4" />
-          </button>
+          {/* Right actions: Update button (to the left of sidebar button) + Close Sidebar button */}
+          <div className="flex items-center gap-1">
+            <DesktopUpdateBadge />
+            <button
+              type="button"
+              onClick={onCollapse}
+              className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+              title={t("closeSidebarKeyboard")}
+              aria-label={t("closeSidebar")}
+            >
+              <PanelLeft className="w-4 h-4" />
+            </button>
+          </div>
         </div>
 
         {/* Action: Create New Notebook Button (Kimi Reference Style) */}

@@ -640,6 +640,23 @@ app.on("second-instance", (_event, commandLine) => {
     }
   );
 
+  ipcMain.handle("updater:check", async () => {
+    return {
+      isPackaged: app.isPackaged,
+      version: app.getVersion(),
+    };
+  });
+
+  ipcMain.on("updater:quit-and-install", () => {
+    try {
+      console.log("[Updater] quit-and-install invoked. Relaunching app...");
+      app.relaunch();
+      app.exit(0);
+    } catch (err) {
+      console.error("[Updater] Failed to quit and install:", err);
+    }
+  });
+
   ipcMain.handle("dialog:open-directory", async () => {
     if (!win) return null;
     const result = await dialog.showOpenDialog(win, {

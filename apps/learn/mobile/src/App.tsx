@@ -8,6 +8,7 @@ import { Navbar } from "./components/navbar";
 import { LearnHome } from "./components/home/learn-home";
 import { MobileLearnWorkspace } from "./components/workspace/learn-workspace";
 import { MobileSettingsView } from "./components/settings/mobile-settings-view";
+import { UpdateSheet } from "./components/home/sheets/update-sheet";
 import { localDb } from "./lib/db";
 import { useI18n } from "./lib/i18n";
 
@@ -23,6 +24,7 @@ function AuthenticatedContent({
   const [activeLearnId, setActiveLearnId] = useState<string | null>(null);
   const [openAddSourceOnLoad, setOpenAddSourceOnLoad] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isUpdateOpen, setIsUpdateOpen] = useState(false);
 
   const handleOpenLearn = (learnId: string, openAddSource = false) => {
     setActiveLearnId(learnId);
@@ -78,13 +80,19 @@ function AuthenticatedContent({
         onSignOut={onSignOut}
         onSwitchAccount={onSwitchAccount}
         onOpenSettings={() => setIsSettingsOpen(true)}
+        onOpenUpdate={() => setIsUpdateOpen(true)}
       />
       <LearnHome
         onOpenLearn={handleOpenLearn}
         onOpenSettings={() => setIsSettingsOpen(true)}
+        onOpenUpdate={() => setIsUpdateOpen(true)}
         user={user}
         onSignOut={onSignOut}
         onSwitchAccount={onSwitchAccount}
+      />
+      <UpdateSheet
+        open={isUpdateOpen}
+        onClose={() => setIsUpdateOpen(false)}
       />
     </div>
   );

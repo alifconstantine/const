@@ -185,6 +185,10 @@ declare global {
         setTitleBarOverlay?: (options: { color?: string; symbolColor?: string; height?: number }) => Promise<void>;
         onMaximizedChange?: (callback: (max: boolean) => void) => () => void;
       };
+      updater?: {
+        checkForUpdates?: () => Promise<{ hasUpdate: boolean; version?: string }>;
+        quitAndInstall?: () => void;
+      };
     };
   }
 }

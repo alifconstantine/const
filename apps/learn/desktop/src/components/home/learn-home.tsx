@@ -56,6 +56,7 @@ import { LearnIcon } from "./learn-icon";
 import { CreateCard } from "./create-card";
 import { RecentlyViewedCard } from "./recently-viewed-card";
 import { Sidebar, HomeNavTab } from "./sidebar";
+import { DesktopUpdateBadge } from "./desktop-update-badge";
 import { SourcesView } from "./sources-view";
 import { ModelsView } from "./views/models-view";
 import { McpToolsView } from "./views/mcp-tools-view";
@@ -790,15 +791,18 @@ export function LearnHome({
         {/* Top Header Bar when sidebar is collapsed (Kimi Reference Style) */}
         {!isSidebarOpen && (
           <div className="h-10 px-4 pt-3 flex items-center justify-between shrink-0 select-none">
-            <button
-              type="button"
-              onClick={() => setIsSidebarOpen(true)}
-              className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors cursor-pointer flex items-center justify-center"
-              title={t("openSidebarKeyboard")}
-              aria-label={t("openSidebar")}
-            >
-              <PanelLeft className="w-4 h-4" />
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setIsSidebarOpen(true)}
+                className="p-1.5 rounded-lg hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors cursor-pointer flex items-center justify-center"
+                title={t("openSidebarKeyboard")}
+                aria-label={t("openSidebar")}
+              >
+                <PanelLeft className="w-4 h-4" />
+              </button>
+              <DesktopUpdateBadge />
+            </div>
           </div>
         )}
 

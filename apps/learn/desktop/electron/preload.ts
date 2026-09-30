@@ -191,4 +191,9 @@ contextBridge.exposeInMainWorld("electron", {
       return () => ipcRenderer.removeListener("window:maximized-change", handler);
     },
   },
+  updater: {
+    checkForUpdates: () => ipcRenderer.invoke("updater:check"),
+    quitAndInstall: () => ipcRenderer.send("updater:quit-and-install"),
+  },
 });
+

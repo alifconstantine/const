@@ -39,6 +39,7 @@ Desktop.ini
 .idea/
 .claude/
 .zcode/
+.zcodeignore
 *.suo
 *.ntvs*
 *.njsproj
