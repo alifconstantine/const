@@ -54,5 +54,6 @@ coverage/
 # Build artifacts & caches
 dist/
 dist-electron/
+release/
 build/
 *.tsbuildinfo

@@ -3,6 +3,9 @@ import { LogIn, Globe } from "lucide-react";
 import { Button } from "@const/ui";
 import { useQuery } from "convex/react";
 import { api } from "@const/backend/_generated/api";
+import { Capacitor } from "@capacitor/core";
+import { App as CapApp } from "@capacitor/app";
+import { Browser } from "@capacitor/browser";
 import { ConvexClientProvider } from "./components/convex-provider";
 import { Navbar } from "./components/navbar";
 import { LearnHome } from "./components/home/learn-home";
@@ -112,19 +115,34 @@ export default function App() {
   const accountsBaseUrl =
     (import.meta.env.VITE_ACCOUNTS_URL as string) || "https://accounts.const.web.id";
 
+  const handleTokenReceived = (receivedToken: string, receivedRefreshToken?: string | null) => {
+    localStorage.setItem("const_learn_auth_token", receivedToken);
+    localStorage.setItem("const_sso_token", receivedToken);
+    if (receivedRefreshToken) {
+      localStorage.setItem("const_sso_refresh_token", receivedRefreshToken);
+    }
+    setToken(receivedToken);
+    setIsWaitingAuth(false);
+  };
+
   useEffect(() => {
-    // 1. Check if token returned via URL query parameter (standard web/PWA flow)
-    const searchParams = new URLSearchParams(window.location.search);
-    const urlToken = searchParams.get("token");
-    const refreshToken = searchParams.get("refreshToken");
-    if (urlToken) {
-      localStorage.setItem("const_learn_auth_token", urlToken);
-      localStorage.setItem("const_sso_token", urlToken);
-      if (refreshToken) {
-        localStorage.setItem("const_sso_refresh_token", refreshToken);
+    // Helper to extract token & refresh token from any URL or deep link
+    const extractToken = (rawUrl: string) => {
+      try {
+        const match = rawUrl.match(/[?&]token=([^&"'\s]+)/);
+        const urlToken = match?.[1] ? decodeURIComponent(match[1]) : null;
+        const refreshMatch = rawUrl.match(/[?&]refreshToken=([^&"'\s]+)/);
+        const refreshToken = refreshMatch?.[1] ? decodeURIComponent(refreshMatch[1]) : null;
+        return { token: urlToken, refreshToken };
+      } catch {
+        return { token: null, refreshToken: null };
       }
-      setToken(urlToken);
-      setIsWaitingAuth(false);
+    };
+
+    // 1. Check if token returned via standard URL query parameter (web/PWA flow)
+    const { token: urlToken, refreshToken } = extractToken(window.location.href);
+    if (urlToken) {
+      handleTokenReceived(urlToken, refreshToken);
       window.history.replaceState({}, document.title, window.location.pathname);
     }
 
@@ -140,22 +158,64 @@ export default function App() {
     };
     window.addEventListener("storage", handleStorage);
 
+    // 3. Native Deep Link Listener for Capacitor Android
+    let cleanupListener: (() => void) | undefined;
+    if (Capacitor.isNativePlatform()) {
+      // Check if cold-started directly from deep link
+      CapApp.getLaunchUrl().then((launch) => {
+        if (launch?.url) {
+          const { token: deepToken, refreshToken: deepRefresh } = extractToken(launch.url);
+          if (deepToken) {
+            handleTokenReceived(deepToken, deepRefresh);
+          }
+        }
+      });
+
+      // Listen for runtime appUrlOpen (returning from external or in-app browser)
+      CapApp.addListener("appUrlOpen", async (data) => {
+        if (data?.url) {
+          const { token: deepToken, refreshToken: deepRefresh } = extractToken(data.url);
+          if (deepToken) {
+            handleTokenReceived(deepToken, deepRefresh);
+            try {
+              await Browser.close();
+            } catch {}
+          }
+        }
+      }).then((handle) => {
+        cleanupListener = () => handle.remove();
+      });
+    }
+
     return () => {
       window.removeEventListener("storage", handleStorage);
+      if (cleanupListener) {
+        cleanupListener();
+      }
     };
   }, []);
 
-  const handleSignIn = () => {
+  const handleSignIn = async () => {
     setIsWaitingAuth(true);
 
-    // In web/preview mode, redirect back to current origin so accounts can return the token
-    const continueTarget = window.location.protocol.startsWith("http")
-      ? `${window.location.origin}${window.location.pathname}`
-      : "const-learn://callback";
+    const isNative = Capacitor.isNativePlatform();
+    // On native mobile app, always use custom scheme deep link const-learn://callback
+    const continueTarget = isNative
+      ? "const-learn://callback"
+      : `${window.location.origin}${window.location.pathname}`;
 
     const base = accountsBaseUrl.replace(/\/+$/, "");
-    const targetUrl = `${base}/?continue=${encodeURIComponent(continueTarget)}&prompt=select_account`;
-    window.location.href = targetUrl;
+    const targetUrl = `${base}/?continue=${encodeURIComponent(continueTarget)}&prompt=select_account&app=learn`;
+
+    if (isNative) {
+      try {
+        await Browser.open({ url: targetUrl, presentationStyle: "popover" });
+      } catch {
+        window.location.href = targetUrl;
+      }
+    } else {
+      window.location.href = targetUrl;
+    }
   };
 
   const handleSignOut = () => {
@@ -166,20 +226,30 @@ export default function App() {
     setIsWaitingAuth(false);
   };
 
-  const handleSwitchAccount = () => {
+  const handleSwitchAccount = async () => {
     localStorage.removeItem("const_learn_auth_token");
     localStorage.removeItem("const_sso_token");
     localStorage.removeItem("const_sso_refresh_token");
     setToken(null);
     setIsWaitingAuth(true);
 
-    const continueTarget = window.location.protocol.startsWith("http")
-      ? `${window.location.origin}${window.location.pathname}`
-      : "const-learn://callback";
+    const isNative = Capacitor.isNativePlatform();
+    const continueTarget = isNative
+      ? "const-learn://callback"
+      : `${window.location.origin}${window.location.pathname}`;
 
     const base = accountsBaseUrl.replace(/\/+$/, "");
-    const targetUrl = `${base}/?continue=${encodeURIComponent(continueTarget)}&action=switch_account`;
-    window.location.href = targetUrl;
+    const targetUrl = `${base}/?continue=${encodeURIComponent(continueTarget)}&action=switch_account&app=learn`;
+
+    if (isNative) {
+      try {
+        await Browser.open({ url: targetUrl, presentationStyle: "popover" });
+      } catch {
+        window.location.href = targetUrl;
+      }
+    } else {
+      window.location.href = targetUrl;
+    }
   };
 
   // -------------------------------------------------------------

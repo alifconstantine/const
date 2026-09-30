@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from "@capacitor/cli";
 
 const config: CapacitorConfig = {
-  appId: "id.web.const.learn",
+  appId: "id.web.constapp.learn",
   appName: "Const Learn",
   webDir: "dist",
   server: {

@@ -8,5 +8,6 @@ allowBuilds:
   '@google/genai': true
   canvas: true
   core-js: false
+  electron-winstaller: true
   esbuild: true
   protobufjs: true

@@ -7,10 +7,13 @@
     "build": "tsc && vite build",
     "check-types": "tsc --noEmit",
     "cap:sync": "cap sync",
-    "cap:android": "cap open android"
+    "cap:android": "cap open android",
+    "sync:android": "tsc && vite build && cap sync android"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.1",
+    "@capacitor/app": "^8.1.1",
+    "@capacitor/browser": "^8.0.4",
     "@capacitor/cli": "^8.5.1",
     "@capacitor/core": "^8.5.1",
     "@const/backend": "workspace:*",
