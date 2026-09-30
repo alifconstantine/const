@@ -63,6 +63,45 @@ export interface Translations {
     terms: string;
     langLabel: string;
   };
+  downloadPage: {
+    badge: string;
+    title: string;
+    subtitle: string;
+    tabDesktop: string;
+    tabMobile: string;
+    detectedBadge: string;
+    winTitle: string;
+    winDesc: string;
+    winReq: string;
+    macTitle: string;
+    macDesc: string;
+    macReq: string;
+    linuxTitle: string;
+    linuxDesc: string;
+    linuxReq: string;
+    androidTitle: string;
+    androidDesc: string;
+    androidReq: string;
+    iosTitle: string;
+    iosDesc: string;
+    iosReq: string;
+    btnDownload: string;
+    btnDirectApk: string;
+    btnPlayStore: string;
+    btnAppStore: string;
+    btnTestFlight: string;
+    checksumLabel: string;
+    releaseNotesLabel: string;
+    modalTitle: string;
+    modalSubtitle: string;
+    modalStep1: string;
+    modalStep2: string;
+    modalStep3: string;
+    modalSha: string;
+    modalClose: string;
+    modalTrouble: string;
+    modalGithub: string;
+  };
 }
 
 const translations: Record<Locale, Translations> = {
@@ -191,6 +230,45 @@ const translations: Record<Locale, Translations> = {
       terms: 'Terms of Service',
       langLabel: 'English',
     },
+    downloadPage: {
+      badge: 'OFFICIAL BUILDS',
+      title: 'Download Const Learn',
+      subtitle: 'Native active research and interactive learning hub on your local machine and mobile device.',
+      tabDesktop: 'Desktop Powerhouse',
+      tabMobile: 'Mobile Companion',
+      detectedBadge: 'Recommended for your device',
+      winTitle: 'Windows',
+      winDesc: '64-bit installer with native uv Python sandbox, ripgrep engine, and hardware-accelerated WebGL studio.',
+      winReq: 'Windows 10/11 (64-bit) · 4GB RAM · 500MB disk',
+      macTitle: 'macOS',
+      macDesc: 'Universal binary optimized for Apple Silicon (M1/M2/M3/M4) and Intel with Metal hardware acceleration.',
+      macReq: 'macOS 12.0 Monterey or later · Apple Silicon / Intel',
+      linuxTitle: 'Linux',
+      linuxDesc: 'AppImage and Debian package with full offline agent capabilities and system terminal bridge.',
+      linuxReq: 'glibc 2.31+ (Ubuntu 20.04+, Debian 11+, Fedora 36+)',
+      androidTitle: 'Android',
+      androidDesc: 'Standalone APK build with local model cache, interactive lesson sync, and voice dialogue.',
+      androidReq: 'Android 10.0 (API 29) or higher · ARM64-v8a',
+      iosTitle: 'iOS & iPadOS',
+      iosDesc: 'Optimized touch interface for iPad split-screen learning and iPhone pocket study buddy.',
+      iosReq: 'iOS 15.0 or iPadOS 15.0 or higher',
+      btnDownload: 'Download',
+      btnDirectApk: 'Download APK (.apk)',
+      btnPlayStore: 'Google Play Store',
+      btnAppStore: 'App Store (Coming Soon)',
+      btnTestFlight: 'Join TestFlight Beta',
+      checksumLabel: 'SHA-256 Checksum',
+      releaseNotesLabel: 'Release Notes (v0.1.0)',
+      modalTitle: 'Thank you for downloading Const Learn!',
+      modalSubtitle: 'Your download should begin automatically. Follow the steps below to finish installation.',
+      modalStep1: 'Open the downloaded installer from your browser or Downloads folder.',
+      modalStep2: 'Follow the on-screen setup wizard to install Const Learn on your system.',
+      modalStep3: 'Launch Const Learn and start mastering concepts with native agent intelligence.',
+      modalSha: 'Verified SHA-256 checksum:',
+      modalClose: 'Close',
+      modalTrouble: 'Trouble with the download?',
+      modalGithub: 'Visit GitHub Releases',
+    },
   },
   id: {
     nav: {
@@ -316,6 +394,45 @@ const translations: Record<Locale, Translations> = {
       privacy: 'Kebijakan Privasi',
       terms: 'Syarat & Ketentuan',
       langLabel: 'Indonesia',
+    },
+    downloadPage: {
+      badge: 'RILIS RESMI',
+      title: 'Unduh Const Learn',
+      subtitle: 'Hub riset aktif dan pembelajaran adaptif interaktif langsung di komputer dan gawai Anda.',
+      tabDesktop: 'Desktop Powerhouse',
+      tabMobile: 'Mobile Companion',
+      detectedBadge: 'Rekomendasi untuk perangkat Anda',
+      winTitle: 'Windows',
+      winDesc: 'Installer 64-bit dilengkapi runtime Python uv lokal, mesin ripgrep, dan studio visual WebGL terakselerasi.',
+      winReq: 'Windows 10/11 (64-bit) · RAM 4GB · Ruang disk 500MB',
+      macTitle: 'macOS',
+      macDesc: 'Universal binary teroptimasi untuk Apple Silicon (M1/M2/M3/M4) dan Intel dengan akselerasi Metal.',
+      macReq: 'macOS 12.0 Monterey atau lebih baru · Apple Silicon / Intel',
+      linuxTitle: 'Linux',
+      linuxDesc: 'Paket AppImage dan Debian dengan kapabilitas agen offline penuh serta jembatan terminal sistem.',
+      linuxReq: 'glibc 2.31+ (Ubuntu 20.04+, Debian 11+, Fedora 36+)',
+      androidTitle: 'Android',
+      androidDesc: 'Berkas APK langsung dengan cache model lokal, sinkronisasi materi interaktif, dan dialog suara.',
+      androidReq: 'Android 10.0 (API 29) atau lebih tinggi · ARM64-v8a',
+      iosTitle: 'iOS & iPadOS',
+      iosDesc: 'Antarmuka sentuh adaptif untuk split-screen iPad dan partner belajar saku di iPhone Anda.',
+      iosReq: 'iOS 15.0 atau iPadOS 15.0 atau lebih baru',
+      btnDownload: 'Unduh',
+      btnDirectApk: 'Unduh APK (.apk)',
+      btnPlayStore: 'Google Play Store',
+      btnAppStore: 'App Store (Segera Hadir)',
+      btnTestFlight: 'Gabung TestFlight Beta',
+      checksumLabel: 'Checksum SHA-256',
+      releaseNotesLabel: 'Catatan Rilis (v0.1.0)',
+      modalTitle: 'Terima kasih telah mengunduh Const Learn!',
+      modalSubtitle: 'Unduhan Anda akan dimulai secara otomatis. Ikuti panduan singkat berikut untuk pemasangan.',
+      modalStep1: 'Buka installer yang telah diunduh dari browser atau folder Downloads Anda.',
+      modalStep2: 'Ikuti panduan instalasi di layar untuk memasang Const Learn di sistem Anda.',
+      modalStep3: 'Buka Const Learn dan mulailah belajar mendalam bersama kecerdasan agen native.',
+      modalSha: 'Checksum SHA-256 terverifikasi:',
+      modalClose: 'Tutup',
+      modalTrouble: 'Mengalami kendala saat mengunduh?',
+      modalGithub: 'Kunjungi GitHub Releases',
     },
   },
 };

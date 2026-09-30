@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import { Inter } from 'next/font/google';
 import { ThemeProvider } from 'next-themes';
 import { I18nProvider } from '../context/I18nContext';
 import ClientEnvironment from '../components/ClientEnvironment';
@@ -6,12 +7,23 @@ import './globals.css';
 import './landing.css';
 import './footer-faq.css';
 
+const inter = Inter({
+  variable: '--font-sans',
+  subsets: ['latin'],
+  display: 'swap',
+});
+
 export const metadata: Metadata = {
   title: 'Const Learn — Understand Anything',
   description: 'Actionable AI Research, Native Learning Agent & Interactive Learning Hub',
   icons: {
-    icon: '/favicon.ico',
-    apple: '/apple-touch-icon.png',
+    icon: [
+      { url: '/favicon.svg', type: 'image/svg+xml' },
+      { url: '/favicon.ico', sizes: '32x32' },
+    ],
+    apple: [
+      { url: '/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
+    ],
   },
 };
 
@@ -50,11 +62,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang="en" className={inter.variable} suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: earlyInitScript }} />
       </head>
-      <body className="min-h-screen bg-background text-foreground antialiased selection:bg-[#0066ff]/25 selection:text-white" suppressHydrationWarning>
+      <body className="min-h-screen bg-background font-sans text-foreground antialiased selection:bg-[#0066ff]/25 selection:text-white" suppressHydrationWarning>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           <I18nProvider>
             <ClientEnvironment />

@@ -259,3 +259,13 @@ section,
   border-radius: inherit !important;
 }
 
+/* Download Page — Inter Sans-Serif Enforcement */
+.landing-page,
+.landing-page button,
+.landing-page h1,
+.landing-page h2,
+.landing-page h3,
+.landing-page p,
+.landing-page span {
+  font-family: var(--font-sans, 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif) !important;
+}

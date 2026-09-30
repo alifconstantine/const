@@ -50,9 +50,15 @@ const THEME_FILES: Record<string, { dark: string; light: string }> = {
   monday: { dark: "light.svg", light: "default.svg" },
   replicate: { dark: "dark.svg", light: "light.svg" },
   composio: { dark: "dark.svg", light: "light.svg" },
+  apple: { dark: "dark.svg", light: "light.svg" },
 };
 
 const FALLBACK_COLORS: Record<string, string> = {
+  apple: "bg-zinc-900 dark:bg-zinc-100 text-white dark:text-black",
+  windows: "bg-[#00adef] text-white",
+  linux: "bg-amber-500 text-black",
+  android: "bg-[#34a853] text-white",
+  ios: "bg-zinc-900 dark:bg-zinc-100 text-white dark:text-black",
   canva: "bg-blue-600 dark:bg-blue-700 text-white",
   canva_mcp: "bg-blue-600 dark:bg-blue-700 text-white",
   spotify: "bg-green-500 dark:bg-green-600 text-black",
@@ -126,7 +132,7 @@ export function BrandLogo({ id, name = "", size = "md", className = "" }: BrandL
   }
 
   // Certain logos are black/dark and need to be inverted in dark mode to be visible
-  const shouldInvertInDarkMode = ["notion", "linear", "typeform"].includes(resolvedSlug);
+  const shouldInvertInDarkMode = ["notion", "linear", "typeform", "ios"].includes(resolvedSlug);
 
   // Fallback monogram
   const monogram = (name || id || "T")
