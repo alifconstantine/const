@@ -11,24 +11,38 @@
     "check-types": "tsc --noEmit",
     "package:win": "tsc && vite build && electron-builder --win --x64 --arm64",
     "package:win:x64": "tsc && vite build && electron-builder --win --x64",
-    "package:win:arm64": "tsc && vite build && electron-builder --win --arm64"
+    "package:win:arm64": "tsc && vite build && electron-builder --win --arm64",
+    "package:linux": "tsc && vite build && electron-builder --linux AppImage pacman",
+    "package:linux:appimage": "tsc && vite build && electron-builder --linux AppImage",
+    "package:linux:pacman": "tsc && vite build && electron-builder --linux pacman"
   },
   "build": {
     "appId": "id.web.const.learn.desktop",
     "productName": "Const Learn",
     "directories": {
-      "output": "release"
+      "output": "release",
+      "buildResources": "build"
     },
     "files": [
       "dist/**/*",
-      "dist-electron/**/*"
+      "dist-electron/**/*",
+      "build/**/*"
     ],
     "win": {
+      "icon": "build/icon.ico",
       "target": [
         {
           "target": "nsis",
           "arch": ["x64", "arm64"]
         }
+      ]
+    },
+    "linux": {
+      "icon": "build/icon.png",
+      "category": "Education",
+      "target": [
+        "AppImage",
+        "pacman"
       ]
     },
     "nsis": {

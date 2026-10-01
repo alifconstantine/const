@@ -56,4 +56,5 @@ dist/
 dist-electron/
 release/
 build/
+!apps/learn/desktop/build/
 *.tsbuildinfo

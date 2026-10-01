@@ -468,8 +468,19 @@ app.on("second-instance", (_event, commandLine) => {
     // Disable default native menu bar so it does not clutter the UI
     Menu.setApplicationMenu(null);
 
+    const iconCandidate = process.platform === "win32"
+      ? path.join(__dirname, "../build/icon.ico")
+      : path.join(__dirname, "../build/icon.png");
+
+    const appIcon = fs.existsSync(iconCandidate)
+      ? iconCandidate
+      : fs.existsSync(path.join(__dirname, "build/icon.png"))
+      ? path.join(__dirname, "build/icon.png")
+      : undefined;
+
     win = new BrowserWindow({
       title: "Const Learn",
+      icon: appIcon,
       width: 1280,
       height: 800,
       minWidth: 960,
