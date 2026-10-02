@@ -942,7 +942,7 @@ export function ChatCard({
 
               {/* Choose Project Dropdown Popover */}
               {isProjectOpen && (
-                <div className="absolute top-full left-0 mt-2 w-64 sm:w-72 max-w-[calc(100vw-32px)] bg-white dark:bg-[#222222] border border-[#e2e2e4] dark:border-[#383838] rounded-2xl shadow-2xl p-1.5 z-50 flex flex-col text-left select-none animate-in fade-in zoom-in-95 duration-100">
+                <div className="absolute top-full left-0 mt-2 w-64 sm:w-72 max-w-[calc(100vw-32px)] bg-white dark:bg-[#222222] border border-[#e2e2e4] dark:border-[#383838] rounded-2xl shadow-2xl p-1.5 z-[60] flex flex-col text-left select-none animate-in fade-in zoom-in-95 duration-100">
                   {/* Real Workspaces List (only shown if real folders were opened) */}
                   {workspaces.length > 0 && (
                     <>
@@ -1185,7 +1185,7 @@ export function ChatCard({
           </ScrollArea>
 
           {/* Bottom Actions Row: Plus, Hand/Shield, Context Window, Model Selector, Send Button */}
-          <div className="flex items-center justify-between pt-2.5 text-xs relative w-full min-w-0 gap-1.5 overflow-hidden">
+          <div className={cn("flex items-center justify-between pt-2.5 text-xs relative w-full min-w-0 gap-1.5", isAnyBottomMenuOpen ? "z-40" : "z-10")}>
             {/* Left Actions: Plus and Mode Selector */}
             <div className="flex items-center gap-1 sm:gap-1.5 min-w-0 shrink">
               {/* Plus Button & Add Context Dropdown */}
@@ -1222,7 +1222,7 @@ export function ChatCard({
 
                 {/* Add Context Popover Menu */}
                 {isPlusOpen && (
-                  <div className="absolute bottom-full mb-2 left-0 w-44 max-w-[calc(100vw-32px)] bg-white dark:bg-[#1e1e1e] border border-[#e2e2e4] dark:border-[#383838] rounded-2xl shadow-2xl p-1.5 z-50 flex flex-col text-left select-none animate-in fade-in zoom-in-95 duration-100">
+                  <div className="absolute bottom-full mb-2 left-0 w-44 max-w-[calc(100vw-32px)] bg-white dark:bg-[#222222] border border-[#e2e2e4] dark:border-[#383838] rounded-2xl shadow-2xl p-1.5 z-[60] flex flex-col text-left select-none animate-in fade-in zoom-in-95 duration-100">
                     <div className="px-2.5 py-1 text-[11px] font-medium text-[#a9a9a9] dark:text-[#777777]">
                       Add Context
                     </div>
@@ -1335,7 +1335,7 @@ export function ChatCard({
 
                 {/* Mode Selector Popover (Only 2 items: Ask before changes & Full access) */}
                 {isModeOpen && (
-                  <div className="absolute bottom-full mb-2 left-0 w-64 sm:w-72 max-w-[calc(100vw-32px)] bg-white dark:bg-[#222222] border border-[#e2e2e4] dark:border-[#383838] rounded-2xl shadow-2xl p-1.5 z-50 flex flex-col text-left select-none animate-in fade-in zoom-in-95 duration-100">
+                  <div className="absolute bottom-full mb-2 left-0 w-64 sm:w-72 max-w-[calc(100vw-32px)] bg-white dark:bg-[#222222] border border-[#e2e2e4] dark:border-[#383838] rounded-2xl shadow-2xl p-1.5 z-[60] flex flex-col text-left select-none animate-in fade-in zoom-in-95 duration-100">
                     {/* 1. Ask before changes */}
                     <button
                       type="button"
@@ -1441,7 +1441,7 @@ export function ChatCard({
 
                   {/* Context Window Popover */}
                   {isContextOpen && (
-                    <div className="absolute bottom-full mb-2 right-0 w-72 sm:w-80 max-w-[calc(100vw-32px)] bg-white dark:bg-[#1e1e1e] border border-[#e2e2e4] dark:border-[#383838] rounded-2xl shadow-2xl p-4 z-50 flex flex-col gap-3 text-left select-none animate-in fade-in zoom-in-95 duration-100">
+                    <div className="absolute bottom-full mb-2 right-0 w-72 sm:w-80 max-w-[calc(100vw-32px)] bg-white dark:bg-[#222222] border border-[#e2e2e4] dark:border-[#383838] rounded-2xl shadow-2xl p-4 z-[60] flex flex-col gap-3 text-left select-none animate-in fade-in zoom-in-95 duration-100">
                       {/* Header: % of context used and tokens */}
                       <div className="flex items-center justify-between text-[13px]">
                         <span className="text-[#161616] dark:text-white font-medium">
@@ -1570,18 +1570,18 @@ export function ChatCard({
 
                 {/* Model Selector Popover */}
                 {isModelOpen && (
-                  <div className="absolute bottom-full mb-2 right-0 w-[260px] max-w-[calc(100vw-32px)] bg-white dark:bg-[#1e1e1e] border border-[#e2e2e4] dark:border-[#333333] rounded-2xl shadow-2xl p-1.5 z-50 flex flex-col text-left select-none animate-in fade-in zoom-in-95 duration-100">
+                  <div className="absolute bottom-full mb-2 right-0 w-[260px] max-w-[calc(100vw-32px)] bg-white dark:bg-[#222222] border border-[#e2e2e4] dark:border-[#383838] rounded-2xl shadow-2xl p-1.5 z-[60] flex flex-col text-left select-none animate-in fade-in zoom-in-95 duration-100">
                     {models.length > 0 ? (
                       <>
                         {/* Search Input at the top (pinned, outside scroll) */}
-                        <div className="flex-none flex items-center gap-2 px-2 py-1 mb-1">
+                        <div className="flex-none flex items-center gap-2 px-2.5 py-1.5 mb-1 border-b border-[#e2e2e4]/60 dark:border-[#383838]/60">
                           <Search className="w-3.5 h-3.5 text-[#a9a9a9] dark:text-[#777777] shrink-0" />
                           <input
                             type="text"
                             value={searchModelQuery}
                             onChange={(e) => setSearchModelQuery(e.target.value)}
                             placeholder="Search models..."
-                            className="w-full bg-transparent text-[12px] text-[#262626] dark:text-[#d4d4d4] placeholder:text-[#a9a9a9] dark:placeholder:text-[#666666] outline-none font-sans"
+                            className="w-full bg-transparent text-[12px] text-[#262626] dark:text-[#d4d4d4] placeholder:text-[#a9a9a9] dark:placeholder:text-[#777777] outline-none font-sans"
                             autoFocus
                           />
                           {searchModelQuery && (
@@ -1597,12 +1597,12 @@ export function ChatCard({
 
                         {/* Models categorized with ScrollArea */}
                         {filteredGroupedModels.length > 0 ? (
-                          <ScrollArea className="max-h-[260px] w-full flex-1 min-h-0" viewportClassName="pr-1">
-                            <div className="space-y-2 py-0.5 pr-0.5">
+                          <ScrollArea className="max-h-[260px] w-full flex-1 min-h-0">
+                            <div className="space-y-1.5 py-0.5">
                               {filteredGroupedModels.map((group) => (
                                 <div key={group.providerId} className="flex flex-col">
                                   {/* Category Header */}
-                                  <div className="px-2 pt-1 pb-0.5 text-[11px] font-medium text-[#5ea0e8] dark:text-[#5ea0e8] select-none tracking-wide">
+                                  <div className="px-2.5 pt-1.5 pb-0.5 text-[11px] font-medium text-[#a9a9a9] dark:text-[#888888] uppercase tracking-wider select-none">
                                     {group.providerName}
                                   </div>
 
@@ -1629,15 +1629,15 @@ export function ChatCard({
                                             setIsModelOpen(false);
                                           }}
                                           className={cn(
-                                            "w-full px-2.5 py-1.5 flex items-center justify-between text-[13px] rounded-lg transition-colors cursor-pointer text-left",
+                                            "w-full px-2.5 py-1.5 flex items-center justify-between text-[12px] rounded-lg transition-colors cursor-pointer text-left",
                                             isSelected
-                                              ? "bg-black/5 dark:bg-white/[0.08] text-black dark:text-white font-medium"
-                                              : "text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/[0.06]"
+                                              ? "bg-black/10 dark:bg-white/10 text-black dark:text-white font-medium"
+                                              : "text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5"
                                           )}
                                         >
                                           <span className="truncate font-normal min-w-0 pr-2">{m.name}</span>
                                           {isSelected && (
-                                            <Check className="w-4 h-4 text-[#262626] dark:text-white shrink-0 ml-auto" />
+                                            <Check className="w-3.5 h-3.5 text-[#262626] dark:text-[#d4d4d4] shrink-0 ml-auto" />
                                           )}
                                         </button>
                                       );
@@ -1654,14 +1654,14 @@ export function ChatCard({
                         )}
 
                         {/* Bottom Footer: Manage models (pinned, outside scroll) */}
-                        <div className="flex-none pt-1">
+                        <div className="flex-none pt-1 mt-1 border-t border-[#e2e2e4]/60 dark:border-[#383838]/60">
                           <button
                             type="button"
                             onClick={() => {
                               setIsModelOpen(false);
                               onOpenSettings?.("model-settings");
                             }}
-                            className="w-full px-2.5 py-1.5 flex items-center gap-2 text-[12px] text-[#a9a9a9] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 rounded-lg transition-colors cursor-pointer"
+                            className="w-full px-2.5 py-1.5 flex items-center gap-2 text-[12px] text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 rounded-lg transition-colors cursor-pointer"
                           >
                             <Settings className="w-3.5 h-3.5 text-[#a9a9a9] dark:text-[#777777] shrink-0" />
                             <span>Manage models</span>
@@ -1717,8 +1717,8 @@ export function ChatCard({
 
                   {/* Thinking Level Popover Dropdown */}
                   {isThinkingOpen && (
-                    <div className="absolute bottom-full mb-2 right-0 w-44 max-w-[calc(100vw-32px)] bg-white dark:bg-[#222222] border border-[#e2e2e4] dark:border-[#383838] rounded-2xl shadow-2xl p-1.5 z-50 flex flex-col text-left select-none animate-in fade-in zoom-in-95 duration-100">
-                      <div className="px-2 py-1 text-[11px] font-medium text-[#a9a9a9] dark:text-[#888888] uppercase tracking-wider mb-1 flex items-center justify-between">
+                    <div className="absolute bottom-full mb-2 right-0 w-44 max-w-[calc(100vw-32px)] bg-white dark:bg-[#222222] border border-[#e2e2e4] dark:border-[#383838] rounded-2xl shadow-2xl p-1.5 z-[60] flex flex-col text-left select-none animate-in fade-in zoom-in-95 duration-100">
+                      <div className="px-2.5 py-1 text-[11px] font-medium text-[#a9a9a9] dark:text-[#888888] uppercase tracking-wider mb-1 flex items-center justify-between">
                         <span>Thinking</span>
                       </div>
                       <div className="flex flex-col gap-0.5">
