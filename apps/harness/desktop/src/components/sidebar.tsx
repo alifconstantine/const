@@ -36,7 +36,6 @@ import {
   CalendarClock,
   Clock,
   Palette,
-  Speech,
   ChevronDown,
   ChevronRight,
   MessageSquare,
@@ -189,7 +188,7 @@ export function Sidebar({
     }
   };
 
-  const [activeTab, setActiveTab] = useState<"project" | "recent" | "design" | "outside">("project");
+  const [activeTab, setActiveTab] = useState<"project" | "recent" | "outside">("project");
   const [hoveredConvoId, setHoveredConvoId] = useState<string | null>(null);
   const [collapsedFolders, setCollapsedFolders] = useState<Record<string, boolean>>({});
   const [isProjectsSectionCollapsed, setIsProjectsSectionCollapsed] = useState<boolean>(() => {
@@ -589,27 +588,9 @@ export function Sidebar({
             }`} />
             <span>Scheduled Tasks</span>
           </button>
-
-          {/* Design */}
-          <button
-            type="button"
-            className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[#666666] dark:text-[#999999] hover:bg-[#dedee2] dark:hover:bg-[#383838] hover:text-black dark:hover:text-white transition-colors cursor-pointer group"
-          >
-            <Palette className="w-4 h-4 text-[#777777] dark:text-[#888888] group-hover:text-black dark:group-hover:text-white transition-colors" />
-            <span>Design</span>
-          </button>
-
-          {/* Speech */}
-          <button
-            type="button"
-            className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[#666666] dark:text-[#999999] hover:bg-[#dedee2] dark:hover:bg-[#383838] hover:text-black dark:hover:text-white transition-colors cursor-pointer group"
-          >
-            <Speech className="w-4 h-4 text-[#777777] dark:text-[#888888] group-hover:text-black dark:group-hover:text-white transition-colors" />
-            <span>Speech</span>
-          </button>
         </div>
 
-        {/* Switcher Dropdown (Project, Design, Outside Project) & Action Icons */}
+        {/* Switcher Dropdown (Recent, Project, Conversation) & Action Icons */}
         <div className="pt-3 pb-1 mt-1">
           <div className="flex items-center justify-between">
             {/* Left: Dropdown Switcher */}
@@ -631,12 +612,6 @@ export function Sidebar({
                       <span>Project</span>
                     </>
                   )}
-                  {activeTab === "design" && (
-                    <>
-                      <Palette className="w-3.5 h-3.5 text-[#777777] dark:text-[#888888] group-hover:text-black dark:group-hover:text-white transition-colors" />
-                      <span>Design</span>
-                    </>
-                  )}
                   {activeTab === "outside" && (
                     <>
                       <MessageSquare className="w-3.5 h-3.5 text-[#777777] dark:text-[#888888] group-hover:text-black dark:group-hover:text-white transition-colors" />
@@ -648,50 +623,39 @@ export function Sidebar({
               </DropdownMenuTrigger>
               <DropdownMenuContent
                 align="start"
-                className="w-44 bg-[#ffffff] dark:bg-[#222222] border-[#dedee2] dark:border-[#383838] text-[#262626] dark:text-[#d4d4d4] p-1 rounded-xl shadow-xl z-50 text-xs"
+                className="w-40 bg-[#ffffff] dark:bg-[#222222] border-[#dedee2] dark:border-[#383838] text-[#262626] dark:text-[#d4d4d4] p-1 rounded-xl shadow-xl z-50"
               >
                 <DropdownMenuItem
                   onClick={() => setActiveTab("recent")}
-                  className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer transition-colors ${
+                  className={`flex items-center !gap-1.5 !px-2.5 !py-1 !text-xs font-medium !rounded-lg cursor-pointer transition-colors [&>svg]:!size-3.5 ${
                     activeTab === "recent"
                       ? "bg-[#dedee2] dark:bg-[#383838] text-[#262626] dark:text-white font-medium"
                       : "hover:bg-[#dedee2]/60 dark:hover:bg-[#303030] text-[#262626] dark:text-[#d4d4d4]"
                   }`}
                 >
-                  <Clock className="w-3.5 h-3.5 text-[#8a8a8a] dark:text-[#d4d4d4]" />
+                  <Clock className="w-3.5 h-3.5 text-[#8a8a8a] dark:text-[#d4d4d4] shrink-0" />
                   <span>Recent</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => setActiveTab("project")}
-                  className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer transition-colors ${
+                  className={`flex items-center !gap-1.5 !px-2.5 !py-1 !text-xs font-medium !rounded-lg cursor-pointer transition-colors [&>svg]:!size-3.5 ${
                     activeTab === "project"
                       ? "bg-[#dedee2] dark:bg-[#383838] text-[#262626] dark:text-white font-medium"
                       : "hover:bg-[#dedee2]/60 dark:hover:bg-[#303030] text-[#262626] dark:text-[#d4d4d4]"
                   }`}
                 >
-                  <Folder className="w-3.5 h-3.5 text-[#8a8a8a] dark:text-[#d4d4d4]" />
+                  <Folder className="w-3.5 h-3.5 text-[#8a8a8a] dark:text-[#d4d4d4] shrink-0" />
                   <span>Project</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem
-                  onClick={() => setActiveTab("design")}
-                  className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer transition-colors ${
-                    activeTab === "design"
-                      ? "bg-[#dedee2] dark:bg-[#383838] text-[#262626] dark:text-white font-medium"
-                      : "hover:bg-[#dedee2]/60 dark:hover:bg-[#303030] text-[#262626] dark:text-[#d4d4d4]"
-                  }`}
-                >
-                  <Palette className="w-3.5 h-3.5 text-[#8a8a8a] dark:text-[#d4d4d4]" />
-                  <span>Design</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem
                   onClick={() => setActiveTab("outside")}
-                  className={`flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer transition-colors ${
+                  className={`flex items-center !gap-1.5 !px-2.5 !py-1 !text-xs font-medium !rounded-lg cursor-pointer transition-colors [&>svg]:!size-3.5 ${
                     activeTab === "outside"
                       ? "bg-[#dedee2] dark:bg-[#383838] text-[#262626] dark:text-white font-medium"
                       : "hover:bg-[#dedee2]/60 dark:hover:bg-[#303030] text-[#262626] dark:text-[#d4d4d4]"
                   }`}
                 >
-                  <MessageSquare className="w-3.5 h-3.5 text-[#8a8a8a] dark:text-[#d4d4d4]" />
+                  <MessageSquare className="w-3.5 h-3.5 text-[#8a8a8a] dark:text-[#d4d4d4] shrink-0" />
                   <span>Conversation</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -732,11 +696,7 @@ export function Sidebar({
       <div className="flex-1 overflow-hidden flex flex-col my-1 w-full max-w-full">
         <ScrollArea className="flex-1 w-full [&>div>div[style]]:!block" viewportClassName="[&>div[style]]:!block">
           <div className="flex flex-col gap-2 py-1 pr-1.5 w-full max-w-full">
-            {activeTab === "design" ? (
-              <div className="px-2.5 py-6 text-xs text-[#777777] italic text-center">
-                Design workspace
-              </div>
-            ) : activeTab === "recent" ? (
+            {activeTab === "recent" ? (
               <TooltipProvider delayDuration={150}>
                 <div className="flex flex-col gap-0.5 pl-1 w-full max-w-full">
                   {recentConversations.length === 0 ? (
