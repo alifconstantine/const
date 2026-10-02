@@ -2202,6 +2202,12 @@ function AuthenticatedContent({
         e.preventDefault();
         setIsSearchOpen((prev) => !prev);
       }
+
+      // Settings: Ctrl+, or Cmd+,
+      if ((e.ctrlKey || e.metaKey) && e.key === ",") {
+        e.preventDefault();
+        setIsSettingsOpen((prev) => !prev);
+      }
     };
 
     const handleOpenCommandPalette = () => setIsSearchOpen(true);
@@ -2213,18 +2219,6 @@ function AuthenticatedContent({
       window.removeEventListener("const:open-command-palette", handleOpenCommandPalette);
     };
   }, []);
-
-  if (isSettingsOpen) {
-    return (
-      <SettingsView
-        initialTab={settingsTab}
-        onBackToWorkspace={() => setIsSettingsOpen(false)}
-        user={user}
-        onSignOut={onSignOut}
-        onSwitchAccount={onSwitchAccount}
-      />
-    );
-  }
 
   return (
     <div className="h-full w-full max-w-full flex bg-[#ececee] dark:bg-[#121212] text-[#262626] dark:text-[#d4d4d4] overflow-hidden select-none">
@@ -2697,6 +2691,18 @@ function AuthenticatedContent({
         conversationId={conversationId}
         conversationTitle={conversationTitle}
         messages={messages}
+      />
+
+      {/* Settings Modal (Antigravity Style Pop-up) */}
+      <SettingsView
+        open={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        onBackToWorkspace={() => setIsSettingsOpen(false)}
+        initialTab={settingsTab}
+        user={user}
+        onSignOut={onSignOut}
+        onSwitchAccount={onSwitchAccount}
+        conversations={conversations}
       />
     </div>
   );
