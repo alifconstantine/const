@@ -90,7 +90,7 @@ function offsetToLineCol(sourceText: string, offset: number): { line: number; ch
 function getLineSnippet(sourceText: string, line: number): string {
   const lines = sourceText.split(/\r?\n/);
   if (line >= 1 && line <= lines.length) {
-    return lines[line - 1].trim();
+    return lines[line - 1]?.trim() ?? "";
   }
   return "";
 }

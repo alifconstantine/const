@@ -22,7 +22,6 @@ import {
   FileText,
   X,
   Brain,
-  Mic,
 } from "lucide-react";
 import {
   ScrollArea,
@@ -31,7 +30,6 @@ import {
   TooltipTrigger,
   TooltipContent,
   TooltipProvider,
-  toast,
 } from "@const/ui";
 import { useQuery } from "convex/react";
 import { api } from "@const/backend/_generated/api";
@@ -275,58 +273,6 @@ export function ChatCard({
 
   const [isModeOpen, setIsModeOpen] = useState(false);
   const modeMenuRef = useRef<HTMLDivElement>(null);
-
-  // Voice Input (Speech Recognition) state
-  const [isListening, setIsListening] = useState(false);
-  const recognitionRef = useRef<any>(null);
-
-  const handleToggleVoice = () => {
-    const SpeechRecognition =
-      (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      toast("Voice input is not supported in this environment");
-      return;
-    }
-
-    if (isListening) {
-      recognitionRef.current?.stop();
-      setIsListening(false);
-      return;
-    }
-
-    try {
-      const recognition = new SpeechRecognition();
-      recognition.continuous = false;
-      recognition.interimResults = true;
-      recognition.lang = "en-US";
-
-      recognition.onstart = () => {
-        setIsListening(true);
-      };
-
-      recognition.onresult = (event: any) => {
-        const transcript = Array.from(event.results)
-          .map((r: any) => r[0]?.transcript)
-          .join("");
-        if (transcript) {
-          setPrompt((prev) => (prev ? `${prev} ${transcript}` : transcript));
-        }
-      };
-
-      recognition.onerror = () => {
-        setIsListening(false);
-      };
-
-      recognition.onend = () => {
-        setIsListening(false);
-      };
-
-      recognitionRef.current = recognition;
-      recognition.start();
-    } catch {
-      setIsListening(false);
-    }
-  };
 
   // 3. Model Selector State (Persistent in localStorage & ~/.const/config.json)
   const quota = useQuery(api.router.quotas.getUserQuota, {});
@@ -849,26 +795,15 @@ export function ChatCard({
 
   return (
     <div className="w-full max-w-full flex flex-col items-center gap-2 select-none min-w-0">
-      {/* Unified AI Card matching Image 2 */}
+      {/* Unified Card */}
       <div
-        className={cn(
-          "w-full max-w-full rounded-2xl border border-[#dedee2] dark:border-[#333333] bg-[#ffffff] dark:bg-[#1e1e1e] select-none transition-colors shadow-xs min-w-0 relative flex flex-col justify-between focus-within:border-[#a9a9a9] dark:focus-within:border-[#555555]",
-          isAnyBottomMenuOpen ? "z-30" : "z-10"
-        )}
+        className={`w-full max-w-full rounded-2xl border border-[#e2e2e4] dark:border-[#383838] select-none transition-colors shadow-sm dark:shadow-none min-w-0 ${
+          compact ? "bg-[#ffffff] dark:bg-[#2b2b2b] focus-within:border-[#a9a9a9] dark:focus-within:border-[#555555]" : "bg-[#ffffff] dark:bg-[#222222]"
+        }`}
       >
-        {/* Running Tasks Banner attached above input, matching Image 3 */}
-        {runningTasks && runningTasks.length > 0 && (
-          <AttachedTaskBanner
-            tasks={runningTasks}
-            onSelectTask={onSelectTask || (() => {})}
-            onStopTask={onStopTask || (() => {})}
-            className="rounded-t-2xl"
-          />
-        )}
-
         {/* Top Header Strip: Choose Project (Only visible in landing view) */}
         {!compact && (
-          <div className={cn("w-full px-3.5 pt-2.5 pb-1 flex items-center relative min-w-0 rounded-t-2xl", isProjectOpen ? "z-30" : "z-10")}>
+          <div className={cn("w-full px-3.5 pt-2 pb-1.5 flex items-center relative min-w-0 rounded-t-2xl", isProjectOpen ? "z-30" : "z-10")}>
             <div className="relative max-w-full min-w-0" ref={projectMenuRef}>
               <button
                 type="button"
@@ -877,12 +812,12 @@ export function ChatCard({
                   closeAllMenus();
                   setIsProjectOpen(next);
                 }}
-                className="inline-flex items-center gap-1.5 text-xs text-[#777777] dark:text-[#888888] hover:text-black dark:hover:text-white transition-colors cursor-pointer font-sans max-w-full"
+                className="inline-flex items-center gap-1.5 text-[13px] text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white transition-colors cursor-pointer font-sans max-w-full"
                 title={currentProject}
               >
-                <Folder className="w-3.5 h-3.5 text-[#888888] shrink-0" />
+                <Folder className="w-3.5 h-3.5 text-[#a9a9a9] dark:text-[#5d5d5d] shrink-0" />
                 <span className="truncate max-w-[200px] sm:max-w-[320px]">{displayProjectName}</span>
-                <ChevronDown className="w-3 h-3 text-[#888888] ml-0.5 shrink-0" />
+                <ChevronDown className="w-3 h-3 text-[#a9a9a9] dark:text-[#5d5d5d] ml-0.5 shrink-0" />
               </button>
 
               {/* Choose Project Dropdown Popover */}
@@ -972,7 +907,27 @@ export function ChatCard({
           </div>
         )}
 
-        <div className="w-full px-3 sm:px-3.5 pt-1.5 pb-2.5 flex flex-col justify-between min-w-0">
+        {/* AI Input Box: Background is #ffffff (light) / #2b2b2b (dark) with #262626 / #d4d4d4 text */}
+        <div
+          className={cn(
+            "w-full bg-[#ffffff] dark:bg-[#2b2b2b] flex flex-col justify-between transition-colors focus-within:border-[#a9a9a9] dark:focus-within:border-[#555555] min-w-0 relative",
+            compact
+              ? "max-w-full rounded-2xl"
+              : "rounded-2xl border border-[#e2e2e4] dark:border-[#383838] -mx-[1px] -mb-[1px] w-[calc(100%+2px)] max-w-[calc(100%+2px)]",
+            isAnyBottomMenuOpen ? "z-30" : "z-10"
+          )}
+        >
+          {/* Running Tasks Banner attached above input, matching Image 3 */}
+          {runningTasks && runningTasks.length > 0 && (
+            <AttachedTaskBanner
+              tasks={runningTasks}
+              onSelectTask={onSelectTask || (() => {})}
+              onStopTask={onStopTask || (() => {})}
+              className="rounded-t-2xl"
+            />
+          )}
+
+          <div className="w-full px-3 sm:px-3.5 pt-2.5 pb-2.5 flex flex-col justify-between min-w-0">
             {/* Attachments Shelf (Square Cards for Images, Videos, PDFs, Docs) */}
             {attachments.length > 0 && (
             <div className="w-full flex items-center gap-2.5 pt-1.5 pb-2.5 px-0.5 overflow-x-auto select-none scrollbar-none">
@@ -1080,9 +1035,9 @@ export function ChatCard({
               }}
               rows={1}
               placeholder={
-                isExecuting
-                  ? "Agent is responding..."
-                  : "Ask anything, @ to mention, / for actions"
+                compact
+                  ? "Message or run a task... / commands, @ files or sessions"
+                  : "Ask Const anything, @ to add context, / for commands or capabilities"
               }
               className="w-full resize-none bg-transparent text-[14px] leading-5 text-[#262626] dark:text-[#d4d4d4] placeholder:text-[#a9a9a9] dark:placeholder:text-[#5d5d5d] outline-none font-sans overflow-hidden py-0.5 block"
               onKeyDown={(e) => {
@@ -1094,11 +1049,11 @@ export function ChatCard({
             />
           </ScrollArea>
 
-          {/* Bottom Actions Row matching Image 2 */}
-          <div className="flex items-center justify-between pt-2 text-xs relative min-w-0 gap-1.5 sm:gap-2">
-            {/* Left Actions matching Image 2: Plus, Model Selector (with thinking badge), and Mode Toggle */}
+          {/* Bottom Actions Row: Plus, Hand/Shield, Context Window, Model Selector, Send Button */}
+          <div className="flex items-center justify-between pt-2.5 text-xs relative w-full min-w-0 gap-1.5 overflow-hidden">
+            {/* Left Actions: Plus and Mode Selector */}
             <div className="flex items-center gap-1 sm:gap-1.5 min-w-0 shrink">
-              {/* 1. Plus Button & Add Context Dropdown */}
+              {/* Plus Button & Add Context Dropdown */}
               <div className="relative shrink-0" ref={plusMenuRef}>
                 <button
                   type="button"
@@ -1111,7 +1066,7 @@ export function ChatCard({
                     "w-6 h-6 flex items-center justify-center rounded-md transition-colors cursor-pointer",
                     isPlusOpen
                       ? "text-[#262626] dark:text-white bg-black/10 dark:bg-white/10"
-                      : "text-[#666666] dark:text-[#999999] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5"
+                      : "text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5"
                   )}
                   title="Add context"
                   aria-label="Add context"
@@ -1194,188 +1149,8 @@ export function ChatCard({
                 )}
               </div>
 
-              {/* 2. Model & Reasoning Selector Pill matching Image 2: "Gemini 3.8 Flash High ∨" */}
-              <div className="relative min-w-0" ref={modelMenuRef}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const next = !isModelOpen;
-                    closeAllMenus();
-                    if (next) setSearchModelQuery("");
-                    setIsModelOpen(next);
-                  }}
-                  className="inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 text-[12px] sm:text-[13px] font-normal transition-colors cursor-pointer min-w-0 max-w-[170px] sm:max-w-[220px] md:max-w-[280px]"
-                  title={`${selectedModel || "Manage model"}${isThinkingSupported && thinkingLevel ? ` (${thinkingLevel} thinking)` : ""}`}
-                >
-                  <span className="truncate">{selectedModel || "Manage model"}</span>
-                  {isThinkingSupported && thinkingLevel && (
-                    <span className="text-[#888888] dark:text-[#777777] text-[11px] font-normal capitalize shrink-0">
-                      {thinkingLevel}
-                    </span>
-                  )}
-                  <ChevronDown className="w-3 h-3 text-[#888888] dark:text-[#666666] shrink-0 ml-0.5" />
-                </button>
-
-                {/* Model Selector Popover */}
-                {isModelOpen && (
-                  <div className="absolute bottom-full mb-2 left-0 w-[270px] max-w-[calc(100vw-32px)] bg-white dark:bg-[#1e1e1e] border border-[#e2e2e4] dark:border-[#333333] rounded-2xl shadow-2xl p-1.5 z-50 flex flex-col text-left select-none animate-in fade-in zoom-in-95 duration-100">
-                    {models.length > 0 ? (
-                      <>
-                        {/* Search Input at the top */}
-                        <div className="flex-none flex items-center gap-2 px-2 py-1 mb-1">
-                          <Search className="w-3.5 h-3.5 text-[#a9a9a9] dark:text-[#777777] shrink-0" />
-                          <input
-                            type="text"
-                            value={searchModelQuery}
-                            onChange={(e) => setSearchModelQuery(e.target.value)}
-                            placeholder="Search models..."
-                            className="w-full bg-transparent text-[12px] text-[#262626] dark:text-[#d4d4d4] placeholder:text-[#a9a9a9] dark:placeholder:text-[#666666] outline-none font-sans"
-                            autoFocus
-                          />
-                          {searchModelQuery && (
-                            <button
-                              type="button"
-                              onClick={() => setSearchModelQuery("")}
-                              className="p-0.5 hover:bg-black/5 dark:hover:bg-white/10 rounded text-[#a9a9a9] hover:text-[#262626] dark:hover:text-white transition-colors cursor-pointer"
-                            >
-                              <X className="w-3 h-3" />
-                            </button>
-                          )}
-                        </div>
-
-                        {/* Reasoning Effort Selector (Quick row inside model popover) */}
-                        {isThinkingSupported && supportedThinkingLevels.length > 0 && (
-                          <div className="px-2 pt-1 pb-2 mb-1.5 border-b border-[#e2e2e4] dark:border-[#333333]/60 select-none">
-                            <div className="flex items-center justify-between text-[11px] text-[#888888] dark:text-[#777777] mb-1">
-                              <span className="font-medium">Reasoning effort</span>
-                              <span className="capitalize text-[#262626] dark:text-white font-medium">{thinkingLevel}</span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              {supportedThinkingLevels.map((lvl) => (
-                                <button
-                                  key={lvl}
-                                  type="button"
-                                  onClick={() => {
-                                    setThinkingLevel(lvl);
-                                    localStorage.setItem("const_harness_thinking_level", lvl);
-                                  }}
-                                  className={cn(
-                                    "flex-1 py-1 rounded-md text-[11px] capitalize transition-colors cursor-pointer text-center",
-                                    thinkingLevel === lvl
-                                      ? "bg-black/10 dark:bg-white/10 text-black dark:text-white font-medium"
-                                      : "text-[#777777] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5"
-                                  )}
-                                >
-                                  {lvl}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Models categorized with ScrollArea */}
-                        {filteredGroupedModels.length > 0 ? (
-                          <ScrollArea className="max-h-[240px] w-full flex-1 min-h-0" viewportClassName="pr-1">
-                            <div className="space-y-2 py-0.5 pr-0.5">
-                              {filteredGroupedModels.map((group) => (
-                                <div key={group.providerId} className="flex flex-col">
-                                  {/* Category Header */}
-                                  <div className="px-2 pt-1 pb-0.5 text-[11px] font-medium text-[#5ea0e8] dark:text-[#5ea0e8] select-none tracking-wide">
-                                    {group.providerName}
-                                  </div>
-
-                                  {/* Model Items */}
-                                  <div className="flex flex-col space-y-0.5">
-                                    {group.items.map((m) => {
-                                      const isSelected =
-                                        selectedModel === m.name || selectedModel === m.id;
-                                      return (
-                                        <button
-                                          key={m.id}
-                                          type="button"
-                                          onClick={() => {
-                                            setSelectedModel(m.name);
-                                            localStorage.setItem("const_harness_active_model", m.name);
-                                            window.electron?.saveConfig?.({ activeModel: m.id });
-                                            if (m.id === "combo/coding" || m.name === "combo/coding") {
-                                              setThinkingLevel("high");
-                                              localStorage.setItem("const_harness_thinking_level", "high");
-                                            } else if (m.defaultThinkingLevel) {
-                                              setThinkingLevel(m.defaultThinkingLevel);
-                                              localStorage.setItem("const_harness_thinking_level", m.defaultThinkingLevel);
-                                            }
-                                            setIsModelOpen(false);
-                                          }}
-                                          className={cn(
-                                            "w-full px-2.5 py-1.5 flex items-center justify-between text-[13px] rounded-lg transition-colors cursor-pointer text-left",
-                                            isSelected
-                                              ? "bg-black/5 dark:bg-white/[0.08] text-black dark:text-white font-medium"
-                                              : "text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/[0.06]"
-                                          )}
-                                        >
-                                          <span className="truncate font-normal min-w-0 pr-2">{m.name}</span>
-                                          {isSelected && (
-                                            <Check className="w-4 h-4 text-[#262626] dark:text-white shrink-0 ml-auto" />
-                                          )}
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          </ScrollArea>
-                        ) : (
-                          <div className="py-6 px-3 text-center text-xs text-[#a9a9a9] dark:text-[#777777]">
-                            No models found
-                          </div>
-                        )}
-
-                        {/* Bottom Footer: Manage models */}
-                        <div className="flex-none pt-1">
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setIsModelOpen(false);
-                              onOpenSettings?.("model-settings");
-                            }}
-                            className="w-full px-2.5 py-1.5 flex items-center gap-2 text-[12px] text-[#a9a9a9] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 rounded-lg transition-colors cursor-pointer"
-                          >
-                            <Settings className="w-3.5 h-3.5 text-[#a9a9a9] dark:text-[#777777] shrink-0" />
-                            <span>Manage models</span>
-                          </button>
-                        </div>
-                      </>
-                    ) : (
-                      <div className="p-3.5 flex flex-col items-center text-center">
-                        <div className="w-9 h-9 rounded-xl bg-[#f4f4f6] dark:bg-[#2a2a2a] border border-[#e2e2e4] dark:border-[#383838] flex items-center justify-center text-[#262626] dark:text-[#d4d4d4] mb-2.5 shadow-sm">
-                          <Cpu className="w-4 h-4 text-[#262626] dark:text-[#d4d4d4] stroke-[1.75]" />
-                        </div>
-                        <div className="text-[13px] font-medium text-[#262626] dark:text-[#d4d4d4]">
-                          No models configured
-                        </div>
-                        <p className="text-[11px] text-[#a9a9a9] dark:text-[#888888] leading-relaxed mt-1 mb-3.5">
-                          Connect or configure model providers to start executing tasks.
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsModelOpen(false);
-                            onOpenSettings?.("model-settings");
-                          }}
-                          className="w-full py-1.5 px-3 rounded-lg bg-[#dedee2] hover:bg-[#d5d5d9] dark:bg-[#333333] dark:hover:bg-[#3d3d3d] border border-[#d5d5d9] dark:border-[#444444]/60 text-[12px] font-medium text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white transition-colors cursor-pointer flex items-center justify-center gap-1.5"
-                        >
-                          <Plus className="w-3.5 h-3.5 text-[#262626] dark:text-[#d4d4d4]" />
-                          <span>Manage models</span>
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* 3. Access Mode Selector: Ask before changes vs Full access */}
-              <div className="relative shrink-0" ref={modeMenuRef}>
+              {/* Access Mode Selector: Ask before changes vs Full access */}
+              <div className="relative min-w-0 shrink" ref={modeMenuRef}>
                 <button
                   type="button"
                   onClick={() => {
@@ -1383,28 +1158,32 @@ export function ChatCard({
                     closeAllMenus();
                     setIsModeOpen(next);
                   }}
-                  className={cn(
-                    "inline-flex items-center gap-1 px-1.5 py-1 rounded-md text-[12px] font-normal transition-colors cursor-pointer shrink-0",
+                  className={`inline-flex items-center gap-1 sm:gap-1.5 px-1.5 sm:px-2 py-1 rounded-md text-[13px] font-normal transition-colors cursor-pointer min-w-0 max-w-[155px] ${
                     mode === "full_access"
                       ? "text-[#e79737] hover:bg-[#e79737]/10"
-                      : "text-[#888888] dark:text-[#999999] hover:text-[#262626] dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5"
-                  )}
-                  title={mode === "full_access" ? "Full access: Run with fewer confirmations" : "Ask before changes: Ask before file edits"}
+                      : "text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5"
+                  }`}
+                  title={mode === "full_access" ? "Full access" : "Ask before changes"}
                 >
                   {mode === "full_access" ? (
-                    <ShieldAlert className="w-3.5 h-3.5 text-[#e79737] shrink-0" />
+                    <ShieldAlert className="w-3.5 h-3.5 text-[#e79737] stroke-[1.75] shrink-0" />
                   ) : (
-                    <Hand className="w-3.5 h-3.5 shrink-0" />
+                    <Hand className="w-3.5 h-3.5 text-[#a9a9a9] dark:text-[#5d5d5d] stroke-[1.75] shrink-0" />
                   )}
-                  <span className="hidden 2xl:inline truncate max-w-[110px]">
+                  <span className="truncate min-w-0">
                     {mode === "full_access" ? "Full access" : "Ask before changes"}
                   </span>
-                  <ChevronDown className="w-2.5 h-2.5 text-[#888888] shrink-0 hidden 2xl:inline" />
+                  <ChevronDown
+                    className={`w-3 h-3 ml-0.5 shrink-0 ${
+                      mode === "full_access" ? "text-[#e79737]" : "text-[#a9a9a9] dark:text-[#5d5d5d]"
+                    }`}
+                  />
                 </button>
 
-                {/* Mode Selector Popover */}
+                {/* Mode Selector Popover (Only 2 items: Ask before changes & Full access) */}
                 {isModeOpen && (
                   <div className="absolute bottom-full mb-2 left-0 w-64 sm:w-72 max-w-[calc(100vw-32px)] bg-white dark:bg-[#222222] border border-[#e2e2e4] dark:border-[#383838] rounded-2xl shadow-2xl p-1.5 z-50 flex flex-col text-left select-none animate-in fade-in zoom-in-95 duration-100">
+                    {/* 1. Ask before changes */}
                     <button
                       type="button"
                       onClick={() => {
@@ -1428,6 +1207,7 @@ export function ChatCard({
                       )}
                     </button>
 
+                    {/* 2. Full access */}
                     <button
                       type="button"
                       onClick={() => {
@@ -1455,9 +1235,9 @@ export function ChatCard({
               </div>
             </div>
 
-            {/* Right Actions matching Image 2: Context Window, Voice Input Mic, and Send Button */}
-            <div className="flex items-center gap-1 sm:gap-1.5 shrink-0 ml-auto">
-              {/* Context Window Indicator */}
+            {/* Right Actions: Context Window, Model Selector, Send Button */}
+            <div className="flex items-center gap-1 sm:gap-2 shrink min-w-0 ml-auto">
+              {/* 1. Context Windows Indicator & Detailed Popover */}
               {shouldShowContextUsage && (
                 <div className="relative" ref={contextMenuRef}>
                   <button
@@ -1509,6 +1289,7 @@ export function ChatCard({
                   {/* Context Window Popover */}
                   {isContextOpen && (
                     <div className="absolute bottom-full mb-2 right-0 w-72 sm:w-80 max-w-[calc(100vw-32px)] bg-white dark:bg-[#1e1e1e] border border-[#e2e2e4] dark:border-[#383838] rounded-2xl shadow-2xl p-4 z-50 flex flex-col gap-3 text-left select-none animate-in fade-in zoom-in-95 duration-100">
+                      {/* Header: % of context used and tokens */}
                       <div className="flex items-center justify-between text-[13px]">
                         <span className="text-[#161616] dark:text-white font-medium">
                           {rawPercentUsed === 0 ? "0%" : rawPercentUsed < 0.1 ? "<0.1%" : `${percentUsed}%`} of context used
@@ -1518,6 +1299,7 @@ export function ChatCard({
                         </span>
                       </div>
 
+                      {/* Multi-segment Horizontal Progress Bar */}
                       <div className="w-full h-2 bg-[#f0f0f2] dark:bg-[#2d2d2d] rounded-full overflow-hidden flex gap-0.5">
                         {systemPromptTokens > 0 && (
                           <div
@@ -1557,6 +1339,7 @@ export function ChatCard({
                         )}
                       </div>
 
+                      {/* Legend / Breakdown List */}
                       <div className="flex flex-col gap-2 pt-1">
                         <div className="flex items-center justify-between text-[12px]">
                           <div className="flex items-center gap-2">
@@ -1615,23 +1398,209 @@ export function ChatCard({
                 </div>
               )}
 
-              {/* Voice Input Mic Button matching Image 2 */}
-              <button
-                type="button"
-                onClick={handleToggleVoice}
-                className={cn(
-                  "w-7 h-7 rounded-lg flex items-center justify-center transition-colors cursor-pointer select-none shrink-0",
-                  isListening
-                    ? "bg-red-500/15 text-red-500 animate-pulse"
-                    : "text-[#888888] dark:text-[#999999] hover:text-[#262626] dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5"
-                )}
-                title={isListening ? "Listening... (click to stop)" : "Voice input"}
-                aria-label="Voice input"
-              >
-                <Mic className="w-3.5 h-3.5" />
-              </button>
+              {/* 2. Model Selector Dropdown (Const ∨) */}
+              <div className="relative min-w-0 shrink" ref={modelMenuRef}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const next = !isModelOpen;
+                    closeAllMenus();
+                    if (next) setSearchModelQuery("");
+                    setIsModelOpen(next);
+                  }}
+                  className="inline-flex items-center gap-1 px-1.5 py-1 rounded-md text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 text-[13px] font-normal transition-colors cursor-pointer min-w-0 max-w-[120px] sm:max-w-[180px] md:max-w-[240px]"
+                  title={selectedModel || "Manage model"}
+                >
+                  <span className="truncate min-w-0">{selectedModel || "Manage model"}</span>
+                  <ChevronDown className="w-3 h-3 text-[#a9a9a9] dark:text-[#5d5d5d] ml-0.5 shrink-0" />
+                </button>
 
-              {/* Send or Stop Generation Button */}
+                {/* Model Selector Popover */}
+                {isModelOpen && (
+                  <div className="absolute bottom-full mb-2 right-0 w-[260px] max-w-[calc(100vw-32px)] bg-white dark:bg-[#1e1e1e] border border-[#e2e2e4] dark:border-[#333333] rounded-2xl shadow-2xl p-1.5 z-50 flex flex-col text-left select-none animate-in fade-in zoom-in-95 duration-100">
+                    {models.length > 0 ? (
+                      <>
+                        {/* Search Input at the top (pinned, outside scroll) */}
+                        <div className="flex-none flex items-center gap-2 px-2 py-1 mb-1">
+                          <Search className="w-3.5 h-3.5 text-[#a9a9a9] dark:text-[#777777] shrink-0" />
+                          <input
+                            type="text"
+                            value={searchModelQuery}
+                            onChange={(e) => setSearchModelQuery(e.target.value)}
+                            placeholder="Search models..."
+                            className="w-full bg-transparent text-[12px] text-[#262626] dark:text-[#d4d4d4] placeholder:text-[#a9a9a9] dark:placeholder:text-[#666666] outline-none font-sans"
+                            autoFocus
+                          />
+                          {searchModelQuery && (
+                            <button
+                              type="button"
+                              onClick={() => setSearchModelQuery("")}
+                              className="p-0.5 hover:bg-black/5 dark:hover:bg-white/10 rounded text-[#a9a9a9] hover:text-[#262626] dark:hover:text-white transition-colors cursor-pointer"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Models categorized with ScrollArea */}
+                        {filteredGroupedModels.length > 0 ? (
+                          <ScrollArea className="max-h-[260px] w-full flex-1 min-h-0" viewportClassName="pr-1">
+                            <div className="space-y-2 py-0.5 pr-0.5">
+                              {filteredGroupedModels.map((group) => (
+                                <div key={group.providerId} className="flex flex-col">
+                                  {/* Category Header */}
+                                  <div className="px-2 pt-1 pb-0.5 text-[11px] font-medium text-[#5ea0e8] dark:text-[#5ea0e8] select-none tracking-wide">
+                                    {group.providerName}
+                                  </div>
+
+                                  {/* Model Items */}
+                                  <div className="flex flex-col space-y-0.5">
+                                    {group.items.map((m) => {
+                                      const isSelected =
+                                        selectedModel === m.name || selectedModel === m.id;
+                                      return (
+                                        <button
+                                          key={m.id}
+                                          type="button"
+                                          onClick={() => {
+                                            setSelectedModel(m.name);
+                                            localStorage.setItem("const_harness_active_model", m.name);
+                                            window.electron?.saveConfig?.({ activeModel: m.id });
+                                            if (m.id === "combo/coding" || m.name === "combo/coding") {
+                                              setThinkingLevel("high");
+                                              localStorage.setItem("const_harness_thinking_level", "high");
+                                            } else if (m.defaultThinkingLevel) {
+                                              setThinkingLevel(m.defaultThinkingLevel);
+                                              localStorage.setItem("const_harness_thinking_level", m.defaultThinkingLevel);
+                                            }
+                                            setIsModelOpen(false);
+                                          }}
+                                          className={cn(
+                                            "w-full px-2.5 py-1.5 flex items-center justify-between text-[13px] rounded-lg transition-colors cursor-pointer text-left",
+                                            isSelected
+                                              ? "bg-black/5 dark:bg-white/[0.08] text-black dark:text-white font-medium"
+                                              : "text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/[0.06]"
+                                          )}
+                                        >
+                                          <span className="truncate font-normal min-w-0 pr-2">{m.name}</span>
+                                          {isSelected && (
+                                            <Check className="w-4 h-4 text-[#262626] dark:text-white shrink-0 ml-auto" />
+                                          )}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </ScrollArea>
+                        ) : (
+                          <div className="py-6 px-3 text-center text-xs text-[#a9a9a9] dark:text-[#777777]">
+                            No models found
+                          </div>
+                        )}
+
+                        {/* Bottom Footer: Manage models (pinned, outside scroll) */}
+                        <div className="flex-none pt-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setIsModelOpen(false);
+                              onOpenSettings?.("model-settings");
+                            }}
+                            className="w-full px-2.5 py-1.5 flex items-center gap-2 text-[12px] text-[#a9a9a9] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 rounded-lg transition-colors cursor-pointer"
+                          >
+                            <Settings className="w-3.5 h-3.5 text-[#a9a9a9] dark:text-[#777777] shrink-0" />
+                            <span>Manage models</span>
+                          </button>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="p-3.5 flex flex-col items-center text-center">
+                        <div className="w-9 h-9 rounded-xl bg-[#f4f4f6] dark:bg-[#2a2a2a] border border-[#e2e2e4] dark:border-[#383838] flex items-center justify-center text-[#262626] dark:text-[#d4d4d4] mb-2.5 shadow-sm">
+                          <Cpu className="w-4 h-4 text-[#262626] dark:text-[#d4d4d4] stroke-[1.75]" />
+                        </div>
+                        <div className="text-[13px] font-medium text-[#262626] dark:text-[#d4d4d4]">
+                          No models configured
+                        </div>
+                        <p className="text-[11px] text-[#a9a9a9] dark:text-[#888888] leading-relaxed mt-1 mb-3.5">
+                          Connect or configure model providers to start executing tasks.
+                        </p>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setIsModelOpen(false);
+                            onOpenSettings?.("model-settings");
+                          }}
+                          className="w-full py-1.5 px-3 rounded-lg bg-[#dedee2] hover:bg-[#d5d5d9] dark:bg-[#333333] dark:hover:bg-[#3d3d3d] border border-[#d5d5d9] dark:border-[#444444]/60 text-[12px] font-medium text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+                        >
+                          <Plus className="w-3.5 h-3.5 text-[#262626] dark:text-[#d4d4d4]" />
+                          <span>Manage models</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* 2.5 Thinking / Reasoning Level Selector (Right next to Model Selector, shown when model supports thinking) */}
+              {isThinkingSupported && supportedThinkingLevels.length > 0 && (
+                <div className="relative" ref={thinkingMenuRef}>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const next = !isThinkingOpen;
+                      closeAllMenus();
+                      setIsThinkingOpen(next);
+                    }}
+                    className="inline-flex items-center gap-1 px-1.5 py-1 rounded-md text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 text-[13px] font-normal transition-colors cursor-pointer shrink-0"
+                    title={`Thinking effort: ${thinkingLevel}`}
+                    aria-label={`Thinking effort: ${thinkingLevel}`}
+                  >
+                    <Brain className="w-3.5 h-3.5 text-[#a9a9a9] dark:text-[#888888] shrink-0" />
+                    <span className="capitalize">{thinkingLevel}</span>
+                    <ChevronDown className="w-3 h-3 text-[#a9a9a9] dark:text-[#5d5d5d] ml-0.5 shrink-0" />
+                  </button>
+
+                  {/* Thinking Level Popover Dropdown */}
+                  {isThinkingOpen && (
+                    <div className="absolute bottom-full mb-2 right-0 w-44 max-w-[calc(100vw-32px)] bg-white dark:bg-[#222222] border border-[#e2e2e4] dark:border-[#383838] rounded-2xl shadow-2xl p-1.5 z-50 flex flex-col text-left select-none animate-in fade-in zoom-in-95 duration-100">
+                      <div className="px-2 py-1 text-[11px] font-medium text-[#a9a9a9] dark:text-[#888888] uppercase tracking-wider mb-1 flex items-center justify-between">
+                        <span>Thinking</span>
+                      </div>
+                      <div className="flex flex-col gap-0.5">
+                        {supportedThinkingLevels.map((lvl) => {
+                          const isSelected = thinkingLevel === lvl;
+                          return (
+                            <button
+                              key={lvl}
+                              type="button"
+                              onClick={() => {
+                                setThinkingLevel(lvl);
+                                localStorage.setItem("const_harness_thinking_level", lvl);
+                                setIsThinkingOpen(false);
+                              }}
+                              className={cn(
+                                "w-full px-2.5 py-1.5 flex items-center justify-between text-[12px] rounded-lg transition-colors cursor-pointer capitalize text-left",
+                                isSelected
+                                  ? "bg-black/10 dark:bg-white/10 text-black dark:text-white font-medium"
+                                  : "text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5"
+                              )}
+                            >
+                              <span className="font-normal capitalize">{lvl}</span>
+                              {isSelected && (
+                                <Check className="w-3.5 h-3.5 text-[#262626] dark:text-[#d4d4d4] shrink-0 ml-2" />
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* 3. Send or Stop Generation Button */}
               {isExecuting ? (
                 <button
                   type="button"
@@ -1665,6 +1634,7 @@ export function ChatCard({
             </div>
           </div>
         </div>
+      </div>
       </div>
 
       {/* Active Conversation Footer Info Bar (Option A: Condensed, No Scrollbar) */}
