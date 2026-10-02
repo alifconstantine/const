@@ -904,6 +904,7 @@ export function ChatCard({
                 onClick={() => {
                   const next = !isProjectOpen;
                   closeAllMenus();
+                  if (next) setSearchWorkspace("");
                   setIsProjectOpen(next);
                 }}
                 className="inline-flex items-center gap-1.5 text-[13px] text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white transition-colors cursor-pointer font-sans max-w-full"
@@ -932,36 +933,38 @@ export function ChatCard({
                         />
                       </div>
 
-                      <div className="max-h-48 overflow-y-auto flex flex-col gap-0.5 py-0.5">
-                        {filteredWorkspaces.map((ws) => {
-                          const wsName = ws.replace(/\\/g, "/").split("/").filter(Boolean).pop() || ws;
-                          return (
-                            <button
-                              key={ws}
-                              type="button"
-                              onClick={() => {
-                                setCurrentProject(ws);
-                                onProjectChange?.(ws);
-                                localStorage.setItem("const_harness_current_project", ws);
-                                setIsProjectOpen(false);
-                              }}
-                              className="w-full px-2.5 py-1.5 flex items-center justify-between text-[13px] text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 rounded-lg transition-colors cursor-pointer"
-                              title={ws}
-                            >
-                              <div className="flex items-center gap-2 truncate">
-                                <Folder className="w-3.5 h-3.5 text-[#a9a9a9] dark:text-[#5d5d5d] shrink-0" />
-                                <div className="flex flex-col text-left truncate">
-                                  <span className="truncate">{wsName}</span>
-                                  <span className="text-[10px] text-[#a9a9a9] dark:text-[#777777] truncate">{ws}</span>
+                      <ScrollArea className="max-h-48">
+                        <div className="flex flex-col gap-0.5 py-0.5">
+                          {filteredWorkspaces.map((ws) => {
+                            const wsName = ws.replace(/\\/g, "/").split("/").filter(Boolean).pop() || ws;
+                            return (
+                              <button
+                                key={ws}
+                                type="button"
+                                onClick={() => {
+                                  setCurrentProject(ws);
+                                  onProjectChange?.(ws);
+                                  localStorage.setItem("const_harness_current_project", ws);
+                                  setIsProjectOpen(false);
+                                }}
+                                className="w-full px-2.5 py-1.5 flex items-center justify-between text-[13px] text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 rounded-lg transition-colors cursor-pointer"
+                                title={ws}
+                              >
+                                <div className="flex items-center gap-2 truncate">
+                                  <Folder className="w-3.5 h-3.5 text-[#a9a9a9] dark:text-[#5d5d5d] shrink-0" />
+                                  <div className="flex flex-col text-left truncate">
+                                    <span className="truncate">{wsName}</span>
+                                    <span className="text-[10px] text-[#a9a9a9] dark:text-[#777777] truncate">{ws}</span>
+                                  </div>
                                 </div>
-                              </div>
-                              {currentProject === ws && (
-                                <Check className="w-3.5 h-3.5 text-[#262626] dark:text-[#d4d4d4] shrink-0" />
-                              )}
-                            </button>
-                          );
-                        })}
-                      </div>
+                                {currentProject === ws && (
+                                  <Check className="w-3.5 h-3.5 text-[#262626] dark:text-[#d4d4d4] shrink-0" />
+                                )}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </ScrollArea>
 
                       <div className="h-[1px] bg-[#e2e2e4] dark:bg-[#383838]/60 my-1" />
                     </>
