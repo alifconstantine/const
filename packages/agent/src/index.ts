@@ -181,5 +181,16 @@ export {
 	globalTaskManager,
 	BackgroundProcessManager,
 	applyUnifiedDiff,
+	createCheckpoint,
+	restoreCheckpoint,
+	executeRollbackMutation,
+	recordMutation,
+	getMutationHistory,
+	listCheckpoints,
+	clearCheckpoints,
+	clearMutationHistory,
+	type CheckpointItem,
+	type RollbackResult,
+	type RestoreCheckpointResult,
 } from "./const/index.ts";
 

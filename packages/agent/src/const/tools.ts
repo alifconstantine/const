@@ -9,6 +9,12 @@ import { executeLspQuery, type LspOperation } from "./lsp.js";
 import { executeAstGrep } from "./ast-grep.js";
 import { executeWebSearch, executeWebFetch } from "./web.js";
 import { executeGitStatus, executeGitDiff, executeGitCommit, executeGitLog } from "./git.js";
+import {
+  recordMutation,
+  executeRollbackMutation,
+  createCheckpoint,
+  restoreCheckpoint,
+} from "./checkpoint.js";
 
 export interface ExecuteToolOptions {
   signal?: AbortSignal;
@@ -793,6 +799,70 @@ export const CONST_DEFAULT_TOOLS: NativeToolDefinition[] = [
           max_count: {
             type: "number",
             description: "Maximum number of commits to list (default: 10).",
+          },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "checkpoint",
+      description:
+        "Create a named snapshot checkpoint of the workspace state and file modifications before undertaking risky refactors or changes. Allows immediate full restore via restore_checkpoint if changes break.",
+      parameters: {
+        type: "object",
+        properties: {
+          name: {
+            type: "string",
+            description:
+              "Optional descriptive label or goal for this checkpoint (e.g. 'before refactoring auth logic').",
+          },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "restore_checkpoint",
+      description:
+        "Restore workspace files back to a previously created checkpoint, rolling back all intervening modifications and restoring snapshots. If no checkpoint_id is provided, restores the most recent checkpoint.",
+      parameters: {
+        type: "object",
+        properties: {
+          checkpoint_id: {
+            type: "string",
+            description:
+              "Optional ID of the checkpoint to restore. Defaults to the latest active checkpoint.",
+          },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "rollback_mutation",
+      description:
+        "Autonomously undo recent file mutation(s) without needing the user to manually click undo in the chat. Can revert the latest modification, revert modifications to a specific file, or revert by mutation ID.",
+      parameters: {
+        type: "object",
+        properties: {
+          file_path: {
+            type: "string",
+            description:
+              "Optional specific file path whose recent change(s) should be reverted.",
+          },
+          steps: {
+            type: "number",
+            description:
+              "Number of recent modifications to undo (default: 1).",
+          },
+          mutation_id: {
+            type: "string",
+            description:
+              "Optional specific mutation ID to roll back.",
           },
         },
       },
@@ -3125,6 +3195,14 @@ function runProcess(
   });
 }
 
+function notifyFileMutation(
+  record: FileMutationRecord,
+  options?: ExecuteToolOptions
+): void {
+  recordMutation(record);
+  options?.onFileMutation?.(record);
+}
+
 // ---------------------------------------------------------------------------
 // Tool Execution Router
 // ---------------------------------------------------------------------------
@@ -3301,17 +3379,20 @@ export async function executeNativeTool(
         : path.relative(workspacePath, filePath);
 
       // Record file mutation for rollback ledger
-      options.onFileMutation?.({
-        id: `mut_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-        stepIndex: options.stepIndex ?? 0,
-        operation,
-        absolutePath: filePath,
-        filePath: filePath,
-        targetFile: displayPath || filePath,
-        previousContent,
-        newContent: content,
-        timestamp: Date.now(),
-      });
+      notifyFileMutation(
+        {
+          id: `mut_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+          stepIndex: options.stepIndex ?? 0,
+          operation,
+          absolutePath: filePath,
+          filePath: filePath,
+          targetFile: displayPath || filePath,
+          previousContent,
+          newContent: content,
+          timestamp: Date.now(),
+        },
+        options
+      );
 
       return {
         result: `File written successfully: ${displayPath} (${content.length} characters)`,
@@ -3376,17 +3457,20 @@ export async function executeNativeTool(
         const updated = fileText.replace(oldContent, newContent);
         await fs.writeFile(filePath, updated, "utf-8");
 
-        options.onFileMutation?.({
-          id: `mut_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-          stepIndex: options.stepIndex ?? 0,
-          operation: "modify",
-          absolutePath: filePath,
-          filePath: filePath,
-          targetFile: editDisplayPath || filePath,
-          previousContent: fileText,
-          newContent: updated,
-          timestamp: Date.now(),
-        });
+        notifyFileMutation(
+          {
+            id: `mut_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+            stepIndex: options.stepIndex ?? 0,
+            operation: "modify",
+            absolutePath: filePath,
+            filePath: filePath,
+            targetFile: editDisplayPath || filePath,
+            previousContent: fileText,
+            newContent: updated,
+            timestamp: Date.now(),
+          },
+          options
+        );
 
         return {
           result: `Successfully edited '${path.basename(filePath)}'. Replaced ${oldContent.length} characters with ${newContent.length} characters.`,
@@ -3404,17 +3488,20 @@ export async function executeNativeTool(
         const finalContent = originalEol === "\r\n" ? updated.replace(/\n/g, "\r\n") : updated;
         await fs.writeFile(filePath, finalContent, "utf-8");
 
-        options.onFileMutation?.({
-          id: `mut_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-          stepIndex: options.stepIndex ?? 0,
-          operation: "modify",
-          absolutePath: filePath,
-          filePath: filePath,
-          targetFile: editDisplayPath || filePath,
-          previousContent: fileText,
-          newContent: finalContent,
-          timestamp: Date.now(),
-        });
+        notifyFileMutation(
+          {
+            id: `mut_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+            stepIndex: options.stepIndex ?? 0,
+            operation: "modify",
+            absolutePath: filePath,
+            filePath: filePath,
+            targetFile: editDisplayPath || filePath,
+            previousContent: fileText,
+            newContent: finalContent,
+            timestamp: Date.now(),
+          },
+          options
+        );
 
         return {
           result: `Successfully edited '${path.basename(filePath)}' (line-endings normalized).`,
@@ -3432,17 +3519,20 @@ export async function executeNativeTool(
         const finalContent = originalEol === "\r\n" ? updated.replace(/\n/g, "\r\n") : updated;
         await fs.writeFile(filePath, finalContent, "utf-8");
 
-        options.onFileMutation?.({
-          id: `mut_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-          stepIndex: options.stepIndex ?? 0,
-          operation: "modify",
-          absolutePath: filePath,
-          filePath: filePath,
-          targetFile: editDisplayPath || filePath,
-          previousContent: fileText,
-          newContent: finalContent,
-          timestamp: Date.now(),
-        });
+        notifyFileMutation(
+          {
+            id: `mut_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+            stepIndex: options.stepIndex ?? 0,
+            operation: "modify",
+            absolutePath: filePath,
+            filePath: filePath,
+            targetFile: editDisplayPath || filePath,
+            previousContent: fileText,
+            newContent: finalContent,
+            timestamp: Date.now(),
+          },
+          options
+        );
 
         return {
           result: `Successfully edited '${path.basename(filePath)}' (whitespace-tolerant matching).`,
@@ -4019,17 +4109,20 @@ export async function executeNativeTool(
         ? filePath
         : path.relative(workspacePath, filePath);
 
-      options.onFileMutation?.({
-        id: `mut_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-        stepIndex: options.stepIndex ?? 0,
-        operation: "modify",
-        absolutePath: filePath,
-        filePath: filePath,
-        targetFile: displayPath || filePath,
-        previousContent: originalContent,
-        newContent: resultText,
-        timestamp: Date.now(),
-      });
+      notifyFileMutation(
+        {
+          id: `mut_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+          stepIndex: options.stepIndex ?? 0,
+          operation: "modify",
+          absolutePath: filePath,
+          filePath: filePath,
+          targetFile: displayPath || filePath,
+          previousContent: originalContent,
+          newContent: resultText,
+          timestamp: Date.now(),
+        },
+        options
+      );
 
       return {
         result: `Patch applied successfully to '${displayPath}'. File updated.`,
@@ -4351,6 +4444,99 @@ export async function executeNativeTool(
       } catch (err: any) {
         return {
           result: `git_log error: ${err.message}`,
+          isError: true,
+        };
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // Tool: checkpoint (aliases: create_checkpoint, save_checkpoint)
+    // -----------------------------------------------------------------------
+    if (
+      normalizedTool === "checkpoint" ||
+      normalizedTool === "createcheckpoint" ||
+      normalizedTool === "savecheckpoint"
+    ) {
+      try {
+        const cp = await createCheckpoint(
+          { name: typeof args.name === "string" ? args.name : undefined },
+          workspacePath,
+          signal
+        );
+        const gitNote = cp.gitRef ? ` (Git ref: ${cp.gitRef.slice(0, 8)})` : "";
+        return {
+          result: `Checkpoint '${cp.id}' created successfully${gitNote}.${cp.name ? ` Note: "${cp.name}".` : ""} Tracked ${cp.snapshots.length} file snapshot(s). If subsequent edits fail, invoke restore_checkpoint to revert.`,
+          isError: false,
+        };
+      } catch (err: any) {
+        return {
+          result: `checkpoint error: ${err.message}`,
+          isError: true,
+        };
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // Tool: restore_checkpoint (aliases: restorecheckpoint, revert_checkpoint)
+    // -----------------------------------------------------------------------
+    if (
+      normalizedTool === "restorecheckpoint" ||
+      normalizedTool === "revertcheckpoint"
+    ) {
+      try {
+        const res = await restoreCheckpoint(
+          {
+            checkpointId:
+              (typeof args.checkpoint_id === "string" ? args.checkpoint_id : undefined) ||
+              (typeof args.id === "string" ? args.id : undefined),
+          },
+          workspacePath,
+          signal
+        );
+        return {
+          result: res.message,
+          isError: !res.success,
+        };
+      } catch (err: any) {
+        return {
+          result: `restore_checkpoint error: ${err.message}`,
+          isError: true,
+        };
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // Tool: rollback_mutation (aliases: rollbackmutation, rollback, undomutation)
+    // -----------------------------------------------------------------------
+    if (
+      normalizedTool === "rollbackmutation" ||
+      normalizedTool === "rollback" ||
+      normalizedTool === "undomutation"
+    ) {
+      try {
+        const filePath =
+          (typeof args.file_path === "string" ? args.file_path : undefined) ||
+          (typeof args.path === "string" ? args.path : undefined) ||
+          (typeof args.file === "string" ? args.file : undefined);
+        const steps = typeof args.steps === "number" ? args.steps : 1;
+        const mutationId =
+          typeof args.mutation_id === "string"
+            ? args.mutation_id
+            : typeof args.id === "string"
+            ? args.id
+            : undefined;
+
+        const res = await executeRollbackMutation(
+          { filePath, steps, mutationId },
+          workspacePath
+        );
+        return {
+          result: res.message,
+          isError: !res.success,
+        };
+      } catch (err: any) {
+        return {
+          result: `rollback_mutation error: ${err.message}`,
           isError: true,
         };
       }
