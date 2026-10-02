@@ -756,16 +756,15 @@ export function Sidebar({
                                       {isScheduledTaskConversation(convo) && (
                                         <Clock className="w-3 h-3 text-[#777777] dark:text-[#888888] shrink-0" />
                                       )}
-                                      {isActive ? (
-                                        <div className="relative flex items-center justify-center p-0.5 text-foreground" title="Active task">
-                                          <PanelLeft className="w-3.5 h-3.5 text-[#262626] dark:text-[#d4d4d4]" />
-                                          <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-[#0066ff] ring-1 ring-background" />
-                                        </div>
-                                      ) : (
-                                        <span className="text-[11px] text-[#888888] dark:text-[#777777] font-mono whitespace-nowrap">
-                                          {formatRelativeTime(convo.updatedAt || convo.createdAt)}
-                                        </span>
-                                      )}
+                                      <span
+                                        className={`text-[11px] font-sans tabular-nums whitespace-nowrap select-none ${
+                                          isActive
+                                            ? "text-[#262626] dark:text-[#b0b0b0] font-medium"
+                                            : "text-[#888888] dark:text-[#777777]"
+                                        }`}
+                                      >
+                                        {formatRelativeTime(convo.updatedAt || convo.createdAt)}
+                                      </span>
                                     </div>
                                   )}
 
@@ -1040,16 +1039,15 @@ export function Sidebar({
                                                     {isScheduledTaskConversation(convo) && (
                                                       <Clock className="w-3 h-3 text-[#777777] dark:text-[#888888] shrink-0" />
                                                     )}
-                                                    {isActive ? (
-                                                      <div className="relative flex items-center justify-center p-0.5 text-foreground" title="Active task">
-                                                        <PanelLeft className="w-3.5 h-3.5 text-[#262626] dark:text-[#d4d4d4]" />
-                                                        <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-[#0066ff] ring-1 ring-background" />
-                                                      </div>
-                                                    ) : (
-                                                      <span className="text-[11px] text-[#888888] dark:text-[#777777] font-mono whitespace-nowrap select-none">
-                                                        {formatRelativeTime(convo.updatedAt || convo.createdAt)}
-                                                      </span>
-                                                    )}
+                                                    <span
+                                                      className={`text-[11px] font-sans tabular-nums whitespace-nowrap select-none ${
+                                                        isActive
+                                                          ? "text-[#262626] dark:text-[#b0b0b0] font-medium"
+                                                          : "text-[#888888] dark:text-[#777777]"
+                                                      }`}
+                                                    >
+                                                      {formatRelativeTime(convo.updatedAt || convo.createdAt)}
+                                                    </span>
                                                   </div>
                                                 )}
 
@@ -1247,16 +1245,15 @@ export function Sidebar({
                                         {isScheduledTaskConversation(convo) && (
                                           <Clock className="w-3 h-3 text-[#777777] dark:text-[#888888] shrink-0" />
                                         )}
-                                        {isActive ? (
-                                          <div className="relative flex items-center justify-center p-0.5 text-foreground" title="Active task">
-                                            <PanelLeft className="w-3.5 h-3.5 text-[#262626] dark:text-[#d4d4d4]" />
-                                            <span className="absolute -top-0.5 -right-0.5 w-1.5 h-1.5 rounded-full bg-[#0066ff] ring-1 ring-background" />
-                                          </div>
-                                        ) : (
-                                          <span className="text-[11px] text-[#888888] dark:text-[#777777] font-mono whitespace-nowrap select-none">
-                                            {formatRelativeTime(convo.updatedAt || convo.createdAt)}
-                                          </span>
-                                        )}
+                                        <span
+                                          className={`text-[11px] font-sans tabular-nums whitespace-nowrap select-none ${
+                                            isActive
+                                              ? "text-[#262626] dark:text-[#b0b0b0] font-medium"
+                                              : "text-[#888888] dark:text-[#777777]"
+                                          }`}
+                                        >
+                                          {formatRelativeTime(convo.updatedAt || convo.createdAt)}
+                                        </span>
                                       </div>
                                     )}
 
