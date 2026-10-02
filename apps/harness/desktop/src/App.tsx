@@ -992,6 +992,9 @@ function AuthenticatedContent({
         ? Math.max(25, Math.min(180, Math.round(outputTokens / (estimatedLlmMs / 1000))))
         : 58;
     const cacheHitRate = turns > 1 ? 76 : turns === 1 ? 64 : 0;
+    const totalTokens = inputTokens + outputTokens;
+    const cachedInputTokens = Math.round(inputTokens * (cacheHitRate / 100));
+    const uncachedInputTokens = Math.max(0, inputTokens - cachedInputTokens);
 
     return {
       turns,
@@ -1003,6 +1006,9 @@ function AuthenticatedContent({
       cacheHitRate,
       inputTokens,
       outputTokens,
+      totalTokens,
+      cachedInputTokens,
+      uncachedInputTokens,
     };
   }, [messages]);
 
