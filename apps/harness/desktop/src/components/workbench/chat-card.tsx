@@ -236,11 +236,25 @@ export function ChatCard({
   const [isPlusOpen, setIsPlusOpen] = useState(false);
   const plusMenuRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    textareaRef.current?.focus();
+    return () => {
+      attachments.forEach((a) => {
+        if (a.url && a.url.startsWith("blob:")) {
+          try {
+            URL.revokeObjectURL(a.url);
+          } catch {}
+        }
+      });
+    };
+  }, []);
 
   useEffect(() => {
-    if (initialPrompt !== undefined && initialPrompt !== "") {
+    if (initialPrompt !== undefined) {
       setPrompt(initialPrompt);
-      textareaRef.current?.focus();
+      if (initialPrompt !== "") {
+        textareaRef.current?.focus();
+      }
     }
   }, [initialPrompt]);
 
@@ -347,11 +361,20 @@ export function ChatCard({
 
   // 1. Workspace / Project Selector State (Clean, zero dummy projects)
   const [currentProject, setCurrentProject] = useState<string>(() => {
-    return initialProject || localStorage.getItem("const_harness_current_project") || "Outside Project";
+    if (typeof initialProject === "string" && initialProject !== "[object Object]") {
+      return initialProject;
+    }
+    try {
+      const saved = localStorage.getItem("const_harness_current_project");
+      if (saved && saved !== "[object Object]" && typeof saved === "string") {
+        return saved;
+      }
+    } catch {}
+    return "Outside Project";
   });
 
   useEffect(() => {
-    if (initialProject !== undefined) {
+    if (typeof initialProject === "string" && initialProject !== "[object Object]") {
       setCurrentProject(initialProject);
     }
   }, [initialProject]);

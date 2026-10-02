@@ -2,8 +2,6 @@ import React, { useState, useEffect } from "react";
 import {
   SquareTerminal,
   PanelRight,
-  ArrowLeft,
-  ArrowRight,
   MessageCirclePlus,
   PanelLeft,
   Minus,
@@ -200,37 +198,18 @@ export function TopToolbar({
               type="button"
               onClick={onToggleSidebar}
               className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-[#222222] text-[#262626] dark:text-[#d4d4d4] transition-colors cursor-pointer flex items-center justify-center"
-              title="Open sidebar"
+              title="Open sidebar (Ctrl+B)"
               aria-label="Open sidebar"
             >
               <PanelLeft className="w-4 h-4 text-[#262626] dark:text-[#d4d4d4]" />
             </button>
 
-            <div className="flex items-center gap-0.5 text-[#262626] dark:text-[#d4d4d4]">
-              <button
-                type="button"
-                className="p-1.5 rounded-md hover:bg-black/5 dark:hover:bg-[#222222] hover:text-black dark:hover:text-white transition-colors disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
-                title="Go back"
-                aria-label="Go back"
-              >
-                <ArrowLeft className="w-4 h-4" />
-              </button>
-              <button
-                type="button"
-                className="p-1.5 rounded-md hover:bg-black/5 dark:hover:bg-[#222222] hover:text-black dark:hover:text-white transition-colors disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
-                title="Go forward"
-                aria-label="Go forward"
-              >
-                <ArrowRight className="w-4 h-4" />
-              </button>
-            </div>
-
             <button
               type="button"
-              onClick={onNewChat}
-              className="p-1.5 ml-1 rounded-md text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-[#222222] transition-colors cursor-pointer"
-              title="New task"
-              aria-label="New task"
+              onClick={() => onNewChat?.()}
+              className="p-1.5 rounded-lg text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-[#222222] transition-colors cursor-pointer flex items-center justify-center"
+              title={typeof navigator !== "undefined" && navigator?.userAgent?.includes("Mac") ? "New chat (⌘K)" : "New chat (Ctrl+K)"}
+              aria-label="New chat"
             >
               <MessageCirclePlus className="w-4 h-4" />
             </button>

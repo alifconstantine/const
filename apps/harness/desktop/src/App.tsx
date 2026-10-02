@@ -173,8 +173,24 @@ function AuthenticatedContent({
   }, [conversationId]);
   const [conversationTitle, setConversationTitle] = useState<string>("");
   const [currentProject, setCurrentProject] = useState<string>(() => {
-    return localStorage.getItem("const_harness_current_project") || "Outside Project";
+    try {
+      const saved = localStorage.getItem("const_harness_current_project");
+      if (saved && saved !== "[object Object]" && typeof saved === "string") {
+        return saved;
+      }
+    } catch {}
+    return "Outside Project";
   });
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("const_harness_current_project");
+      if (saved === "[object Object]") {
+        localStorage.setItem("const_harness_current_project", "Outside Project");
+      }
+    } catch {}
+  }, []);
+
   const [currentMode, setCurrentMode] = useState<"ask_before_changes" | "full_access">(() => {
     return getDefaultAgentMode();
   });
@@ -859,7 +875,14 @@ function AuthenticatedContent({
 
   // Clean display project name (e.g. "small-web" instead of full path)
   const displayProject = useMemo(() => {
-    if (currentProject === "Outside Project") return "";
+    if (
+      typeof currentProject !== "string" ||
+      !currentProject ||
+      currentProject === "Outside Project" ||
+      currentProject === "[object Object]"
+    ) {
+      return "";
+    }
     return currentProject.replace(/\\/g, "/").split("/").filter(Boolean).pop() || currentProject;
   }, [currentProject]);
 
@@ -2098,17 +2121,31 @@ function AuthenticatedContent({
     }
   };
 
-  const handleNewChat = (targetProject?: string) => {
+  const handleNewChat = (targetProject?: any) => {
     setIsScheduledTasksOpen(false);
+    setIsSettingsOpen(false);
+    setIsRenameDialogOpen(false);
+    setIsTrajectoryOpen(false);
     setMessages([]);
     setConversationTitle("");
-    setConversationId(`session_${Date.now()}`);
+    const newSessionId = `session_${Date.now()}`;
+    setConversationId(newSessionId);
+    conversationIdRef.current = newSessionId;
     setEditingPrompt("");
     setLastKnownLlmUsage(null);
     setCurrentMode(getDefaultAgentMode());
-    if (targetProject) {
+    setSidebarReviewMutations(null);
+
+    // Only update project if targetProject is a valid string, not a MouseEvent or "[object Object]"
+    if (
+      typeof targetProject === "string" &&
+      targetProject.trim() &&
+      targetProject !== "[object Object]"
+    ) {
       setCurrentProject(targetProject);
-      localStorage.setItem("const_harness_current_project", targetProject);
+      try {
+        localStorage.setItem("const_harness_current_project", targetProject);
+      } catch {}
     }
   };
 
@@ -2249,9 +2286,17 @@ function AuthenticatedContent({
         setIsSidebarOpen((prev) => !prev);
       }
 
-      // New task: Ctrl+K or Cmd+K
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k" && !e.shiftKey) {
-        if (!isInput) {
+      // New chat: Ctrl+K (Win/Linux) or Cmd+K (Mac)
+      const isMacUser = typeof navigator !== "undefined" && navigator?.userAgent?.includes("Mac");
+      const isNewChatShortcut =
+        !e.shiftKey &&
+        e.key.toLowerCase() === "k" &&
+        (isMacUser ? e.metaKey : e.ctrlKey);
+
+      if (isNewChatShortcut) {
+        const isInModal = target?.closest?.("[role='dialog'], [data-modal]");
+        const isSingleLineInput = target?.tagName === "INPUT";
+        if (!isInModal && !isSingleLineInput) {
           e.preventDefault();
           handleNewChat();
         }
@@ -2334,7 +2379,7 @@ function AuthenticatedContent({
                 <TopToolbar
                   isSidebarOpen={isSidebarOpen}
                   onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
-                  onNewChat={handleNewChat}
+                  onNewChat={() => handleNewChat()}
                   conversationTitle={conversationTitle}
                   project={displayProject}
                   conversationId={conversationId}
@@ -2375,6 +2420,7 @@ function AuthenticatedContent({
               {/* Floating Chat Input Card */}
               <div className="w-full max-w-full z-10 min-w-0">
                 <ChatCard
+                  key={conversationId}
                   onSendMessage={handleSendMessage}
                   isExecuting={isExecuting}
                   onAbort={() => handleAbort()}
@@ -2643,6 +2689,7 @@ function AuthenticatedContent({
                     />
                   ) : (
                     <ChatCard
+                      key={conversationId}
                       compact
                       isExecuting={isExecuting}
                       onSendMessage={handleSendMessage}

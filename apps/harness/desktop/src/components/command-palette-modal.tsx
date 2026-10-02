@@ -7,6 +7,7 @@ import {
   FolderPlus,
   List,
   MessageSquare,
+  MessageCirclePlus,
   PanelLeft,
   Plus,
   Rocket,
@@ -271,10 +272,10 @@ export function CommandPaletteModal({
   const actions: PaletteAction[] = useMemo(
     () => [
       {
-        id: "act-new-task",
-        title: "New task",
-        shortcut: "Ctrl+N",
-        icon: <Plus size={16} />,
+        id: "act-new-chat",
+        title: "New chat",
+        shortcut: typeof navigator !== "undefined" && navigator?.userAgent?.includes("Mac") ? "⌘K" : "Ctrl+K",
+        icon: <MessageCirclePlus size={16} />,
         category: "suggested",
         run: () => {
           onClose();
@@ -698,7 +699,7 @@ export function CommandPaletteModal({
                   No matching actions or tasks found
                 </p>
                 <span className="text-xs text-white/40">
-                  Try searching for task titles, workspace names, or actions like "new task"
+                  Try searching for chat titles, workspace names, or actions like "new chat"
                 </span>
               </div>
             )}

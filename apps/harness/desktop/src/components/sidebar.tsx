@@ -29,8 +29,6 @@ import {
 import {
   PanelLeft,
   PlusCircle,
-  ArrowLeft,
-  ArrowRight,
   MessageCirclePlus,
   Search,
   CalendarClock,
@@ -538,18 +536,18 @@ export function Sidebar({
           </div>
         </div>
 
-        {/* Action: Create New Task Button (Always crisp white as primary action) */}
+        {/* Action: Create New Chat Button (Always crisp white as primary action) */}
         <div className="pt-1 pb-1.5">
           <button
             type="button"
             onClick={() => onNewChat?.()}
             className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-secondary/80 hover:bg-secondary border border-border/60 hover:border-border text-foreground font-medium text-xs transition-all cursor-pointer shadow-2xs group active:scale-[0.99]"
-            title={`New task (${isMac ? "⌘K" : "Ctrl+K"})`}
+            title={`New chat (${isMac ? "⌘K" : "Ctrl+K"})`}
           >
             <div className="flex items-center gap-2">
               <MessageCirclePlus className="w-4 h-4 text-black dark:text-white transition-colors stroke-[1.8]" />
               <span className="font-medium text-black dark:text-white">
-                New task
+                New chat
               </span>
             </div>
             <span className="text-xs text-black/70 dark:text-white/70 group-hover:text-black dark:group-hover:text-white font-sans transition-colors select-none tracking-tight">
