@@ -2347,6 +2347,7 @@ function AuthenticatedContent({
             conversations={conversations}
             activeConversationId={conversationId}
             runningConvoIds={runningConvoIds}
+            pendingApprovals={pendingApprovals}
             onSelectConversation={handleSelectConversation}
             onDeleteConversation={handleDeleteConversation}
             onRenameConversation={handleRenameConversation}

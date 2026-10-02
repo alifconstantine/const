@@ -55,6 +55,7 @@ import {
   Trash2,
   X,
   Loader2,
+  Hand,
   Globe,
   ZoomIn,
   BarChart2,
@@ -90,6 +91,7 @@ interface SidebarProps {
   conversations?: ConversationItem[];
   activeConversationId?: string;
   runningConvoIds?: Set<string>;
+  pendingApprovals?: Map<string, any>;
   onSelectConversation?: (id: string) => void;
   onDeleteConversation?: (id: string) => void;
   onRenameConversation?: (id: string, newTitle: string) => void;
@@ -162,6 +164,7 @@ export function Sidebar({
   conversations = [],
   activeConversationId,
   runningConvoIds,
+  pendingApprovals,
   onSelectConversation,
   onDeleteConversation,
   onRenameConversation,
@@ -745,7 +748,14 @@ export function Sidebar({
 
                                 {/* Right: Timestamp or Loading Spinner + Action Menu */}
                                 <div className="flex items-center gap-1.5 shrink-0 ml-auto select-none">
-                                  {runningConvoIds?.has(convo.id) ? (
+                                  {pendingApprovals?.has(convo.id) ? (
+                                    <div
+                                      title="Needs permission / Waiting for approval"
+                                      className="flex items-center justify-center p-0.5 text-amber-500 shrink-0"
+                                    >
+                                      <Hand className="w-3.5 h-3.5 text-[#ff7a00] dark:text-[#ff9500] animate-pulse shrink-0" />
+                                    </div>
+                                  ) : runningConvoIds?.has(convo.id) ? (
                                     <Loader2 className="w-3.5 h-3.5 animate-spin text-[#969696]" />
                                   ) : (
                                     <div
@@ -1028,7 +1038,14 @@ export function Sidebar({
                                                 className="flex items-center gap-1.5 shrink-0 ml-auto select-none"
                                               >
                                                 {/* Relative time or Loading Spinner */}
-                                                {runningConvoIds?.has(convo.id) ? (
+                                                {pendingApprovals?.has(convo.id) ? (
+                                                  <div
+                                                    title="Needs permission / Waiting for approval"
+                                                    className="flex items-center justify-center p-0.5 text-amber-500 shrink-0"
+                                                  >
+                                                    <Hand className="w-3.5 h-3.5 text-[#ff7a00] dark:text-[#ff9500] animate-pulse shrink-0" />
+                                                  </div>
+                                                ) : runningConvoIds?.has(convo.id) ? (
                                                   <Loader2 className="w-3.5 h-3.5 animate-spin text-[#969696]" />
                                                 ) : (
                                                   <div
@@ -1234,7 +1251,14 @@ export function Sidebar({
                                     className="flex items-center gap-1.5 shrink-0 ml-auto select-none"
                                   >
                                     {/* Relative time or Loading Spinner */}
-                                    {runningConvoIds?.has(convo.id) ? (
+                                    {pendingApprovals?.has(convo.id) ? (
+                                      <div
+                                        title="Needs permission / Waiting for approval"
+                                        className="flex items-center justify-center p-0.5 text-amber-500 shrink-0"
+                                      >
+                                        <Hand className="w-3.5 h-3.5 text-[#ff7a00] dark:text-[#ff9500] animate-pulse shrink-0" />
+                                      </div>
+                                    ) : runningConvoIds?.has(convo.id) ? (
                                       <Loader2 className="w-3.5 h-3.5 animate-spin text-[#969696]" />
                                     ) : (
                                       <div
