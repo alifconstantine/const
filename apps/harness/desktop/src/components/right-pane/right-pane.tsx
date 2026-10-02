@@ -13,6 +13,8 @@ import type { FileMutationRecord } from "../../vite-env";
 
 interface RightPaneProps {
   width: number;
+  maxWidth?: number;
+  minWidth?: number;
   onWidthChange: (width: number) => void;
   tabs: RightPaneTab[];
   activeTabId: string | null;
@@ -35,6 +37,8 @@ interface RightPaneProps {
 
 export function RightPane({
   width,
+  maxWidth,
+  minWidth = 300,
   onWidthChange,
   tabs,
   activeTabId,
@@ -70,7 +74,9 @@ export function RightPane({
     const handleMouseMove = (moveEvent: MouseEvent) => {
       if (!isDraggingRef.current) return;
       const deltaX = startXRef.current - moveEvent.clientX;
-      const newWidth = Math.max(320, Math.min(window.innerWidth * 0.75, startWidthRef.current + deltaX));
+      const effectiveMin = minWidth ?? 300;
+      const effectiveMax = maxWidth ?? Math.max(effectiveMin, window.innerWidth * 0.55);
+      const newWidth = Math.max(effectiveMin, Math.min(effectiveMax, startWidthRef.current + deltaX));
       onWidthChange(newWidth);
     };
 

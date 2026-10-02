@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import {
   LogIn,
   Loader2,
@@ -224,9 +224,32 @@ function AuthenticatedContent({
     const saved = localStorage.getItem("const_harness_right_sidebar_open");
     return saved ? JSON.parse(saved) : false;
   });
+
+  // Minimum width protection for main content column (matching apps/learn protection)
+  const MIN_MAIN_CONTENT_WIDTH = 460;
+
+  const clampRightSidebarWidth = useCallback(
+    (desiredWidth: number, sidebarOpen = isSidebarOpen) => {
+      const windowWidth = typeof window !== "undefined" ? window.innerWidth : 1280;
+      const effectiveSidebarWidth = sidebarOpen ? 256 : 0;
+      // Account for layout margins/paddings (~32px)
+      const maxAllowedByMain = Math.max(300, windowWidth - effectiveSidebarWidth - MIN_MAIN_CONTENT_WIDTH - 32);
+      const maxRightSidebarWidth = Math.min(
+        Math.max(Math.round(windowWidth * 0.55), 580),
+        850,
+        maxAllowedByMain
+      );
+      return Math.min(Math.max(desiredWidth, 300), maxRightSidebarWidth);
+    },
+    [isSidebarOpen]
+  );
+
   const [rightSidebarWidth, setRightSidebarWidth] = useState<number>(() => {
     const saved = localStorage.getItem("const_harness_right_sidebar_width");
-    return saved ? Number(saved) : 480;
+    const initial = saved ? Number(saved) : 480;
+    const windowWidth = typeof window !== "undefined" ? window.innerWidth : 1280;
+    const maxAllowed = Math.max(300, windowWidth - 256 - 460 - 32);
+    return Math.min(Math.max(initial, 300), maxAllowed);
   });
   const [rightPaneTabs, setRightPaneTabs] = useState<RightPaneTab[]>([]);
   const [activeRightPaneTabId, setActiveRightPaneTabId] = useState<string | null>(null);
@@ -240,6 +263,20 @@ function AuthenticatedContent({
   useEffect(() => {
     localStorage.setItem("const_harness_right_sidebar_width", String(rightSidebarWidth));
   }, [rightSidebarWidth]);
+
+  // Window resize protection (matching apps/learn)
+  useEffect(() => {
+    const handleResize = () => {
+      setRightSidebarWidth((prev) => clampRightSidebarWidth(prev));
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [clampRightSidebarWidth]);
+
+  // Clamp right sidebar width when left sidebar is opened or closed
+  useEffect(() => {
+    setRightSidebarWidth((prev) => clampRightSidebarWidth(prev, isSidebarOpen));
+  }, [isSidebarOpen, clampRightSidebarWidth]);
 
   const handleToggleRightSidebar = () => {
     setIsRightSidebarOpen((prev) => !prev);
@@ -2621,7 +2658,9 @@ function AuthenticatedContent({
                 <div style={{ width: `${rightSidebarWidth}px` }} className="h-full">
                   <RightPane
                     width={rightSidebarWidth}
-                    onWidthChange={setRightSidebarWidth}
+                    maxWidth={clampRightSidebarWidth(window.innerWidth)}
+                    minWidth={300}
+                    onWidthChange={(w) => setRightSidebarWidth(clampRightSidebarWidth(w))}
                     onDraggingChange={setIsDraggingRightSidebar}
                     tabs={rightPaneTabs}
                     activeTabId={activeRightPaneTabId}
