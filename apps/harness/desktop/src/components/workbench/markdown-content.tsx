@@ -91,7 +91,7 @@ function TokenRenderer({ token, isNested }: { token: Token; isNested?: boolean }
           <ol className={cn("space-y-2 my-2.5 pl-0.5 text-[#262626] dark:text-[#cfcfcf]", isNested && "my-1.5 pl-2 space-y-1.5")}>
             {list.items.map((item: Tokens.ListItem, idx: number) => (
               <li key={idx} className="flex items-start gap-2.5 leading-[1.65]">
-                <span className="select-none font-mono text-[12px] text-[#888888] dark:text-[#777777] pt-0.5 w-4 text-right shrink-0">
+                <span className="select-none font-sans tabular-nums text-[12px] text-[#888888] dark:text-[#777777] pt-0.5 w-4 text-right shrink-0">
                   {start + idx}.
                 </span>
                 <div className="flex-1 min-w-0">

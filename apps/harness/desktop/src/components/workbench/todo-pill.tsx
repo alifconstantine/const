@@ -98,7 +98,7 @@ export function TodoPill({ todos, className = "", defaultExpanded = false }: Tod
             <div className="flex items-center justify-between pb-2.5 mb-2 border-b border-[#2a2a2a]">
               <div className="flex items-center gap-2">
                 <span className="text-neutral-400 font-medium">Progress</span>
-                <span className="text-emerald-400 font-mono font-medium">
+                <span className="text-emerald-400 font-sans tabular-nums font-medium">
                   {completedCount}/{totalCount}
                 </span>
               </div>

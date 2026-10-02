@@ -223,7 +223,7 @@ function TimelineStepItem({ message, stepIndex }: { message: any; stepIndex: num
           )}
         </div>
         {message.timestamp && (
-          <span className="font-mono text-[11px] text-[#888888]">
+          <span className="font-sans tabular-nums text-[11px] text-[#888888]">
             {new Date(message.timestamp).toLocaleTimeString()}
           </span>
         )}

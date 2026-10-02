@@ -194,7 +194,7 @@ export function ScheduledTaskHistory({
                               </span>
                             )}
                           </td>
-                          <td className="px-3.5 py-3 text-[#d4d4d4] font-mono">
+                          <td className="px-3.5 py-3 text-[#d4d4d4] font-sans tabular-nums">
                             {formatDuration(run.durationMs)}
                           </td>
                           <td className="px-2 py-3 text-right">

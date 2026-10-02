@@ -265,7 +265,7 @@ export function ReviewDialog({
               <Layers className="w-4 h-4 text-[#e79737] dark:text-[#ff7a00]" />
               <h2 className="text-sm font-medium text-[#161616] dark:text-[#e5e5e5]">Review Changes</h2>
             </div>
-            <div className="flex items-center gap-1.5 font-mono text-xs text-[#a9a9a9] dark:text-[#888888]">
+            <div className="flex items-center gap-1.5 font-sans tabular-nums text-xs text-[#a9a9a9] dark:text-[#888888]">
               <span>({mutations.length} file{mutations.length > 1 ? "s" : ""})</span>
               <span className="text-[#409D62]">+{totalStats.added}</span>
               <span className="text-[#ff5c5c]">-{totalStats.removed}</span>
@@ -336,7 +336,7 @@ export function ReviewDialog({
                       </div>
 
                       <div className="shrink-0 flex items-center gap-1.5">
-                        <div className="flex items-center gap-1 font-mono text-[10px]">
+                        <div className="flex items-center gap-1 font-sans tabular-nums text-[10px]">
                           <span className="text-[#409D62]">+{fileStats.added}</span>
                           <span className="text-[#ff5c5c]">-{fileStats.removed}</span>
                         </div>

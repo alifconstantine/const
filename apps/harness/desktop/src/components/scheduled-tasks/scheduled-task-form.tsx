@@ -685,7 +685,7 @@ export function ScheduledTaskForm({
                         <div className="px-2 py-1 flex items-center justify-between text-[11px] font-medium tracking-wider text-[#969696] border-b border-[#383838] mb-1">
                           <span className="uppercase tracking-wider">Models</span>
                           {quota && (
-                            <span className="text-[10px] text-[#4ade80] font-mono">
+                            <span className="text-[10px] text-[#4ade80] font-sans tabular-nums">
                               {formatTokenDisplay(quota.remainingTokens)} left
                             </span>
                           )}

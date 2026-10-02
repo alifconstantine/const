@@ -698,7 +698,7 @@ function FileMutationToolItem({
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {diffStats && (diffStats.added > 0 || diffStats.removed > 0) && (
-            <div className="flex items-center gap-1.5 font-mono text-xs">
+            <div className="flex items-center gap-1.5 font-sans tabular-nums text-xs">
               <span className="text-[#409D62]">+{diffStats.added}</span>
               <span className="text-[#ff5c5c]">-{diffStats.removed}</span>
             </div>
@@ -781,7 +781,7 @@ function ExplorationItem({
           <span className="text-[#d4d4d4] font-medium truncate">*{query}*</span>
           <div className="ml-auto flex items-center gap-1.5 shrink-0">
             {resultCount && (
-              <span className="text-[#666666] text-xs font-mono">{resultCount}</span>
+              <span className="text-[#666666] text-xs font-sans tabular-nums">{resultCount}</span>
             )}
             {hasResult && (
               <ChevronDown
@@ -860,7 +860,7 @@ function ExplorationItem({
           <FileIcon filename={fileName} />
           <span className="text-[#d4d4d4] group-hover:text-white truncate font-sans">{fileName}</span>
           {lineRange && (
-            <span className="text-xs text-[#666666] shrink-0 font-mono">{lineRange}</span>
+            <span className="text-xs text-[#666666] shrink-0 font-sans tabular-nums">{lineRange}</span>
           )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
@@ -982,8 +982,8 @@ export function MutationsSummaryCard({
           <span className="font-normal text-[#262626] dark:text-[#d4d4d4]">
             {mutations.length} file{mutations.length > 1 ? "s" : ""} changed
           </span>
-          <span className="font-mono text-xs text-[#409D62] font-medium">+{totalAdded}</span>
-          <span className="font-mono text-xs text-[#ff5c5c] font-medium">-{totalRemoved}</span>
+          <span className="font-sans tabular-nums text-xs text-[#409D62] font-medium">+{totalAdded}</span>
+          <span className="font-sans tabular-nums text-xs text-[#ff5c5c] font-medium">-{totalRemoved}</span>
           <ChevronRight
             className={cn(
               "w-3.5 h-3.5 text-[#a9a9a9] dark:text-[#777777] group-hover/card:text-[#262626] dark:group-hover/card:text-[#cccccc] transition-transform duration-200 ease-out",
@@ -1084,7 +1084,7 @@ function MutationRowItem({
 
       <div className="shrink-0 ml-2 flex items-center gap-2">
         {/* Colors #409D62 and #ff5c5c matching worked */}
-        <div className="flex items-center gap-1.5 font-mono text-xs">
+        <div className="flex items-center gap-1.5 font-sans tabular-nums text-xs">
           <span className="text-[#409D62]">+{fileStats.added}</span>
           <span className="text-[#ff5c5c]">-{fileStats.removed}</span>
         </div>

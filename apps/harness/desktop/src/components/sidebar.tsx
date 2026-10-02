@@ -1544,7 +1544,7 @@ export function Sidebar({
               <Archive className="w-4 h-4 text-[#a9a9a9] dark:text-[#888888]" />
               <span>Archived Sessions</span>
               {archivedSessions.length > 0 && (
-                <span className="text-xs px-2 py-0.5 rounded-full bg-[#f0f0f2] dark:bg-[#2a2a2a] text-[#262626] dark:text-[#888888] font-mono">
+                <span className="text-xs px-2 py-0.5 rounded-full bg-[#f0f0f2] dark:bg-[#2a2a2a] text-[#262626] dark:text-[#888888] font-sans tabular-nums">
                   {archivedSessions.length}
                 </span>
               )}

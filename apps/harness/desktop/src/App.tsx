@@ -828,7 +828,7 @@ function AuthenticatedContent({
           />
           <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent p-2 opacity-0 group-hover:opacity-100 transition-opacity text-xs text-white">
             <p className="truncate font-medium">{att.name}</p>
-            <span className="text-[10px] text-[#a0a0a0] font-mono">
+            <span className="text-[10px] text-[#a0a0a0] font-sans tabular-nums">
               {formatFileSize(att.size)}
             </span>
           </div>
@@ -865,7 +865,7 @@ function AuthenticatedContent({
           <span className="font-medium truncate max-w-[200px]" title={att.name}>
             {att.name}
           </span>
-          <span className="text-[10px] text-[#a9a9a9] dark:text-[#777777] font-mono">
+          <span className="text-[10px] text-[#a9a9a9] dark:text-[#777777] font-sans tabular-nums">
             {formatFileSize(att.size)}
           </span>
         </div>
@@ -2515,7 +2515,7 @@ function AuthenticatedContent({
                         })()}
                         {/* User hover action bar: Timestamp, Copy, Edit */}
                         <div className="flex items-center gap-2 pt-1.5 opacity-0 group-hover:opacity-100 transition-opacity text-xs text-[#a9a9a9] dark:text-[#888888] select-none">
-                          <span className="text-[11px] font-mono text-[#a9a9a9] dark:text-[#777777]">
+                          <span className="text-[11px] font-sans tabular-nums text-[#a9a9a9] dark:text-[#777777]">
                             {formatMessageTimestamp(msg.timestamp)}
                           </span>
                           <button
@@ -2626,7 +2626,7 @@ function AuthenticatedContent({
                             >
                               <ThumbsDown className="w-3.5 h-3.5" />
                             </button>
-                            <span className="text-[11px] font-mono text-[#a9a9a9] dark:text-[#777777] ml-1.5">
+                            <span className="text-[11px] font-sans tabular-nums text-[#a9a9a9] dark:text-[#777777] ml-1.5">
                               {formatMessageTimestamp(msg.timestamp)}
                             </span>
                           </div>

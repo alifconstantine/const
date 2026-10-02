@@ -204,7 +204,7 @@ export function QuestionCard({
         </div>
 
         {/* Pagination < 1/2 > - Next is disabled until current question is answered/confirmed */}
-        <div className="flex items-center gap-1 shrink-0 text-neutral-400 font-mono text-xs">
+        <div className="flex items-center gap-1 shrink-0 text-neutral-400 font-sans tabular-nums text-xs">
           <button
             type="button"
             onClick={handlePrev}
@@ -257,7 +257,7 @@ export function QuestionCard({
               }`}
             >
               {/* Number: 1., 2., 3. */}
-              <span className="font-mono text-xs text-[#888888] dark:text-[#777777] font-medium shrink-0">
+              <span className="font-sans tabular-nums text-xs text-[#888888] dark:text-[#777777] font-medium shrink-0">
                 {oIdx + 1}.
               </span>
 
@@ -295,7 +295,7 @@ export function QuestionCard({
               : "bg-transparent hover:bg-black/[0.03] dark:hover:bg-white/[0.04] text-[#555555] dark:text-[#999999]"
           }`}
         >
-          <span className="font-mono text-xs text-[#888888] dark:text-[#777777] font-medium shrink-0">
+          <span className="font-sans tabular-nums text-xs text-[#888888] dark:text-[#777777] font-medium shrink-0">
             {sortedOptions.length + 1}.
           </span>
           <input

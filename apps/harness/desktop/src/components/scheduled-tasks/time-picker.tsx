@@ -89,7 +89,7 @@ export function TimePicker({ value, onChange }: TimePickerProps): React.JSX.Elem
           <div className="flex items-center gap-2 pb-2 mb-2 border-b border-[#383838]">
             <input
               type="text"
-              className="w-16 bg-[#2b2b2b] border border-[#383838] rounded px-2 py-1 text-xs text-white outline-none focus:border-[#5d5d5d] font-mono text-center"
+              className="w-16 bg-[#2b2b2b] border border-[#383838] rounded px-2 py-1 text-xs text-white outline-none focus:border-[#5d5d5d] font-sans tabular-nums text-center"
               value={inputVal}
               onChange={handleDirectInput}
               maxLength={5}

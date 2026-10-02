@@ -1244,7 +1244,7 @@ export function ChatCard({
                                   <span className="text-[11px] font-medium text-[#262626] dark:text-[#d4d4d4] leading-tight w-full line-clamp-2 break-words block" title={file.name}>
                                     {file.name}
                                   </span>
-                                  <span className="text-[8.5px] text-[#a9a9a9] dark:text-[#777777] font-mono mt-0.5 block truncate">
+                                  <span className="text-[8.5px] text-[#a9a9a9] dark:text-[#777777] font-sans tabular-nums mt-0.5 block truncate">
                                     {formatFileSize(file.size)}
                                   </span>
                                 </div>
@@ -1272,7 +1272,7 @@ export function ChatCard({
                           className="z-50 max-w-[220px] bg-[#262626] dark:bg-[#1e1e1e] text-white dark:text-[#e0e0e0] text-[11px] px-2.5 py-1.5 rounded-lg shadow-2xl border border-black/10 dark:border-[#383838] select-none pointer-events-none break-all"
                         >
                           <div className="font-medium truncate max-w-[200px]">{file.name}</div>
-                          <div className="text-[9.5px] text-[#a0a0a0] font-mono mt-0.5">
+                          <div className="text-[9.5px] text-[#a0a0a0] font-sans tabular-nums mt-0.5">
                             {formatFileSize(file.size)}
                           </div>
                         </TooltipContent>
@@ -1421,7 +1421,7 @@ export function ChatCard({
                         <span className="text-[13px]">Media</span>
                       </div>
                       {attachments.length > 0 && (
-                        <span className="text-[10px] font-mono text-[#a9a9a9] dark:text-[#777777]">
+                        <span className="text-[10px] font-sans tabular-nums text-[#a9a9a9] dark:text-[#777777]">
                           {attachments.length}/{MAX_ATTACHMENTS}
                         </span>
                       )}
@@ -1634,7 +1634,7 @@ export function ChatCard({
                         <span className="text-[#161616] dark:text-white font-medium">
                           {rawPercentUsed === 0 ? "0%" : rawPercentUsed < 0.1 ? "<0.1%" : `${percentUsed}%`} of context used
                         </span>
-                        <span className="font-mono text-[12px] text-[#a9a9a9] dark:text-[#a0a0a0]">
+                        <span className="font-sans tabular-nums text-[12px] text-[#a9a9a9] dark:text-[#a0a0a0]">
                           ~{formatTokenDisplay(usedTokens)} / {formatTokenDisplay(totalTokens)}
                         </span>
                       </div>
@@ -1686,7 +1686,7 @@ export function ChatCard({
                             <div className="w-2.5 h-2.5 rounded-xs bg-[#71717a] shrink-0" />
                             <span className="text-[#262626] dark:text-[#d4d4d4]">System prompt</span>
                           </div>
-                          <span className="font-mono text-[#262626] dark:text-[#d4d4d4]">
+                          <span className="font-sans tabular-nums text-[#262626] dark:text-[#d4d4d4]">
                             ~{formatTokenDisplay(systemPromptTokens)}
                           </span>
                         </div>
@@ -1696,7 +1696,7 @@ export function ChatCard({
                             <div className="w-2.5 h-2.5 rounded-xs bg-[#a855f7] shrink-0" />
                             <span className="text-[#262626] dark:text-[#d4d4d4]">Tools</span>
                           </div>
-                          <span className="font-mono text-[#262626] dark:text-[#d4d4d4]">
+                          <span className="font-sans tabular-nums text-[#262626] dark:text-[#d4d4d4]">
                             ~{formatTokenDisplay(toolsTokens)}
                           </span>
                         </div>
@@ -1706,7 +1706,7 @@ export function ChatCard({
                             <div className="w-2.5 h-2.5 rounded-xs bg-[#3b82f6] shrink-0" />
                             <span className="text-[#262626] dark:text-[#d4d4d4]">Messages</span>
                           </div>
-                          <span className="font-mono text-[#262626] dark:text-[#d4d4d4]">
+                          <span className="font-sans tabular-nums text-[#262626] dark:text-[#d4d4d4]">
                             ~{formatTokenDisplay(effectiveMessagesTokens)}
                           </span>
                         </div>
@@ -1717,7 +1717,7 @@ export function ChatCard({
                               <div className="w-2.5 h-2.5 rounded-xs bg-[#10b981] shrink-0" />
                               <span className="text-[#10b981] font-medium">Current input</span>
                             </div>
-                            <span className="font-mono text-[#10b981]">
+                            <span className="font-sans tabular-nums text-[#10b981]">
                               ~{formatTokenDisplay(draftInputTokens)}
                             </span>
                           </div>
@@ -1728,7 +1728,7 @@ export function ChatCard({
                             <div className="w-2.5 h-2.5 rounded-xs bg-[#e2e2e4] dark:bg-[#383838] shrink-0" />
                             <span className="text-[#777777] dark:text-[#888888]">Available context</span>
                           </div>
-                          <span className="font-mono text-[#777777] dark:text-[#888888]">
+                          <span className="font-sans tabular-nums text-[#777777] dark:text-[#888888]">
                             ~{formatTokenDisplay(Math.max(0, totalTokens - usedTokens))}
                           </span>
                         </div>

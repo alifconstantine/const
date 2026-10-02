@@ -42,7 +42,7 @@ export function FloatingTodoCard({
       >
         <div className="flex items-center gap-2">
           <span className="text-[#777777] dark:text-[#a0a0a0] font-medium text-xs">Progress</span>
-          <span className="text-[#222222] dark:text-[#e0e0e0] font-mono text-xs font-semibold">
+          <span className="text-[#222222] dark:text-[#e0e0e0] font-sans tabular-nums text-xs font-semibold">
             {completedCount}/{totalCount}
           </span>
         </div>

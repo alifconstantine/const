@@ -701,7 +701,7 @@ export function SettingsView({
                       <div className="flex flex-col gap-1.5 pt-1">
                         <div className="flex items-center justify-between text-[11px]">
                           <span className="text-[#737373] dark:text-[#969696]">Weekly Token Quota</span>
-                          <span className="font-mono text-[#262626] dark:text-[#d4d4d4]">
+                          <span className="font-sans tabular-nums text-[#262626] dark:text-[#d4d4d4]">
                             {formatTokenDisplay(quota.remainingTokens)} / {formatTokenDisplay(quota.weeklyLimitTokens || 7_000_000)}
                           </span>
                         </div>
@@ -1012,7 +1012,7 @@ export function SettingsView({
                     <span className="text-[11px] font-medium text-[#737373] dark:text-[#969696] uppercase tracking-wider">
                       Remaining
                     </span>
-                    <span className="text-xl font-semibold font-mono text-[#262626] dark:text-white mt-1">
+                    <span className="text-xl font-semibold font-sans tabular-nums text-[#262626] dark:text-white mt-1">
                       {formatTokenDisplay(quota?.remainingTokens ?? 7_000_000)}
                     </span>
                     <span className="text-[11px] text-[#737373] dark:text-[#969696]">
@@ -1024,7 +1024,7 @@ export function SettingsView({
                     <span className="text-[11px] font-medium text-[#737373] dark:text-[#969696] uppercase tracking-wider">
                       Weekly Quota
                     </span>
-                    <span className="text-xl font-semibold font-mono text-[#262626] dark:text-white mt-1">
+                    <span className="text-xl font-semibold font-sans tabular-nums text-[#262626] dark:text-white mt-1">
                       {formatTokenDisplay(quota?.weeklyLimitTokens ?? 7_000_000)}
                     </span>
                     <span className="text-[11px] text-[#737373] dark:text-[#969696]">
@@ -1036,7 +1036,7 @@ export function SettingsView({
                     <span className="text-[11px] font-medium text-[#737373] dark:text-[#969696] uppercase tracking-wider">
                       Resets In
                     </span>
-                    <span className="text-xl font-semibold font-mono text-[#262626] dark:text-white mt-1">
+                    <span className="text-xl font-semibold font-sans tabular-nums text-[#262626] dark:text-white mt-1">
                       {quota?.resetsInText || "7d 0h"}
                     </span>
                     <span className="text-[11px] text-[#737373] dark:text-[#969696]">
@@ -1056,7 +1056,7 @@ export function SettingsView({
                         {formatTokenDisplay((quota?.weeklyLimitTokens ?? 7_000_000) - (quota?.remainingTokens ?? 7_000_000))} used of {formatTokenDisplay(quota?.weeklyLimitTokens ?? 7_000_000)} limit
                       </span>
                     </div>
-                    <span className="font-mono text-xs font-medium px-2 py-0.5 rounded-md bg-[#ebebed] dark:bg-[#2b2b2b] text-[#262626] dark:text-[#d4d4d4]">
+                    <span className="font-sans tabular-nums text-xs font-medium px-2 py-0.5 rounded-md bg-[#ebebed] dark:bg-[#2b2b2b] text-[#262626] dark:text-[#d4d4d4]">
                       {percentRemaining.toFixed(0)}% Left
                     </span>
                   </div>
@@ -1076,7 +1076,7 @@ export function SettingsView({
                     />
                   </div>
 
-                  <div className="font-mono text-[11px] text-[#737373] dark:text-[#969696] flex items-center justify-between">
+                  <div className="font-sans tabular-nums text-[11px] text-[#737373] dark:text-[#969696] flex items-center justify-between">
                     <span>0 tokens</span>
                     <span>{formatTokenDisplay(quota?.weeklyLimitTokens ?? 7_000_000)} max</span>
                   </div>
@@ -1298,7 +1298,7 @@ export function SettingsView({
                                         </span>
                                       )}
                                       {m.supportsThinking && (
-                                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#ff7a00]/10 text-[#ea580c] dark:text-[#ff9838] border border-[#ff7a00]/25 font-mono">
+                                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#ff7a00]/10 text-[#ea580c] dark:text-[#ff9838] border border-[#ff7a00]/25 font-sans">
                                           Thinking: {m.thinkingLevels?.join(", ") || "low, medium, high"}
                                         </span>
                                       )}
