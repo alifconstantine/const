@@ -66,7 +66,7 @@ export interface UserConfig {
 }
 
 const defaultUserConfig: UserConfig = {
-  activeModel: "gemini-3.6-flash",
+  activeModel: "gemini-3.8-flash",
   activeProvider: "const",
   providers: {
     const: {
@@ -125,9 +125,10 @@ function loadUserConfig(): UserConfig {
         merged.activeModel === "Const" ||
         merged.activeModel.includes("(Const Router)") ||
         merged.activeModel.includes("(Native)") ||
+        merged.activeModel === "gemini-3.6-flash" ||
         !merged.activeModel
       ) {
-        merged.activeModel = "gemini-3.6-flash";
+        merged.activeModel = "gemini-3.8-flash";
       }
 
       // Ensure native Const provider points to router.const.web.id
@@ -543,7 +544,7 @@ app.whenReady().then(() => {
               thinkingLevels: m.thinking_levels || m.thinkingLevels || (supportsThinking ? ["low", "medium", "high", "xhigh", "max"] : undefined),
               defaultThinkingLevel: m.default_thinking_level || m.defaultThinkingLevel || "medium",
               maxOutputTokens: m.max_output_tokens || m.maxOutputTokens || 128000,
-              contextWindow: m.context_window || m.contextWindow || (m.id.includes("gemini") ? 1048576 : 128000),
+              contextWindow: m.context_length || m.contextLength || m.context_window || m.contextWindow || (m.id.includes("gemini") ? 1048576 : 128000),
             };
           });
         }
@@ -642,7 +643,7 @@ app.whenReady().then(() => {
           ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
         },
         body: JSON.stringify({
-          model: config.activeModel || "gemini-3.6-flash",
+          model: config.activeModel || "gemini-3.8-flash",
           messages: [
             {
               role: "user",
@@ -729,7 +730,7 @@ app.whenReady().then(() => {
       }
     ) => {
       const config = loadUserConfig();
-      const model = payload.model || config.activeModel || "gemini-3.6-flash";
+      const model = payload.model || config.activeModel || "gemini-3.8-flash";
 
       // Match model to provider
       const allModels = [...DEFAULT_MODELS, ...(config.customModels || [])];
@@ -1289,7 +1290,7 @@ app.whenReady().then(() => {
       }
 
       const config = loadUserConfig();
-      const model = task.model || config.activeModel || "gemini-3.6-flash";
+      const model = task.model || config.activeModel || "gemini-3.8-flash";
 
       const allModels = [...DEFAULT_MODELS, ...(config.customModels || [])];
       const modelDef = allModels.find((m) => m.id === model || m.displayName === model);

@@ -376,6 +376,8 @@ export function ChatCard({
   useEffect(() => {
     if (typeof initialProject === "string" && initialProject !== "[object Object]") {
       setCurrentProject(initialProject);
+    } else if (initialProject !== undefined) {
+      setCurrentProject("Outside Project");
     }
   }, [initialProject]);
   const [isProjectOpen, setIsProjectOpen] = useState(false);
@@ -458,9 +460,9 @@ export function ChatCard({
       contextWindow: 128000,
     },
     {
-      id: "gemini-3.6-flash",
-      name: "Gemini 3.6 Flash",
-      desc: "Frontier multimodal reasoning & code generation",
+      id: "gemini-3.8-flash",
+      name: "Gemini 3.8 Flash",
+      desc: "Advanced frontier thinking & reasoning depth",
       provider: "const",
       providerName: "ConstRouter",
       supportsThinking: true,
@@ -482,9 +484,9 @@ export function ChatCard({
       contextWindow: 1048576,
     },
     {
-      id: "gemini-3.8-flash",
-      name: "Gemini 3.8 Flash",
-      desc: "Advanced frontier thinking & reasoning depth",
+      id: "gemini-3.6-flash",
+      name: "Gemini 3.6 Flash",
+      desc: "Frontier multimodal reasoning & code generation",
       provider: "const",
       providerName: "ConstRouter",
       supportsThinking: true,
@@ -492,6 +494,18 @@ export function ChatCard({
       defaultThinkingLevel: "medium",
       maxOutputTokens: 128000,
       contextWindow: 1048576,
+    },
+    {
+      id: "qwen-3.8-27b",
+      name: "Qwen 3.8 27B",
+      desc: "Open-weight reasoning powerhouse with deep thinking capabilities",
+      provider: "const",
+      providerName: "ConstRouter",
+      supportsThinking: true,
+      thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
+      defaultThinkingLevel: "medium",
+      maxOutputTokens: 65536,
+      contextWindow: 131072,
     },
     {
       id: "combo/auto",
@@ -569,8 +583,12 @@ export function ChatCard({
   const [selectedModel, setSelectedModel] = useState<string | null>(() => {
     const saved = localStorage.getItem("const_harness_active_model");
     if (!saved || saved === "Const" || saved.includes("(Const Router)") || saved.includes("(Native)")) {
-      return "Gemini 3.6 Flash";
+      return "Gemini 3.8 Flash";
     }
+    if (saved === "gemini-3.8-flash") return "Gemini 3.8 Flash";
+    if (saved === "gemini-3.7-flash") return "Gemini 3.7 Flash";
+    if (saved === "gemini-3.6-flash") return "Gemini 3.6 Flash";
+    if (saved === "qwen-3.8-27b") return "Qwen 3.8 27B";
     if (saved === "Auto Router" || saved === "Auto (Best Available)" || saved === "combo/auto") return "combo/auto";
     if (saved === "Low-Latency Fast Chain" || saved === "Fast (Low Latency)" || saved === "combo/fast") return "combo/fast";
     if (saved === "Coding Agent Chain" || saved === "Coding & Reasoning" || saved === "combo/coding") return "combo/coding";
@@ -583,7 +601,8 @@ export function ChatCard({
   const currentModelItem = useMemo(() => {
     return (
       models.find((m) => m.name === selectedModel || m.id === selectedModel) ||
-      models.find((m) => m.id === "gemini-3.6-flash") ||
+      models.find((m) => m.id === "gemini-3.8-flash") ||
+      models.find((m) => m.name === "Gemini 3.8 Flash") ||
       models[0]
     );
   }, [models, selectedModel]);
@@ -708,15 +727,22 @@ export function ChatCard({
             }
             setModels(deduped);
 
-            const saved = localStorage.getItem("const_harness_active_model");
-            if (!saved) {
-              const first = deduped[0];
-              if (first) {
-                const initialName = first.name || first.id;
-                setSelectedModel(initialName);
-                localStorage.setItem("const_harness_active_model", initialName);
+            // Normalize selectedModel with freshly loaded models
+            setSelectedModel((prev) => {
+              const current = prev || localStorage.getItem("const_harness_active_model");
+              if (!current || current === "gemini-3.8-flash" || current === "gemini-3.6-flash") {
+                const foundDefault = deduped.find((m) => m.id === "gemini-3.8-flash");
+                const defaultName = foundDefault ? foundDefault.name : "Gemini 3.8 Flash";
+                localStorage.setItem("const_harness_active_model", defaultName);
+                return defaultName;
               }
-            }
+              const found = deduped.find((m) => m.id === current || m.name === current);
+              if (found) {
+                localStorage.setItem("const_harness_active_model", found.name);
+                return found.name;
+              }
+              return current;
+            });
           }
         })
         .catch(() => {});
@@ -725,10 +751,19 @@ export function ChatCard({
     if (window.electron?.getConfig) {
       window.electron.getConfig().then((cfg) => {
         if (cfg?.activeModel) {
-          let modelName = cfg.activeModel;
-          if (modelName === "combo/auto" || modelName === "Auto Router" || modelName === "Auto (Best Available)") modelName = "combo/auto";
-          else if (modelName === "combo/fast" || modelName === "Low-Latency Fast Chain" || modelName === "Fast (Low Latency)") modelName = "combo/fast";
-          else if (modelName === "combo/coding" || modelName === "Coding Agent Chain" || modelName === "Coding & Reasoning") modelName = "combo/coding";
+          const raw = cfg.activeModel;
+          let modelName = raw;
+          if (raw === "gemini-3.8-flash") modelName = "Gemini 3.8 Flash";
+          else if (raw === "gemini-3.7-flash") modelName = "Gemini 3.7 Flash";
+          else if (raw === "gemini-3.6-flash") modelName = "Gemini 3.6 Flash";
+          else if (raw === "qwen-3.8-27b") modelName = "Qwen 3.8 27B";
+          else if (raw === "combo/auto" || raw === "Auto Router" || raw === "Auto (Best Available)") modelName = "combo/auto";
+          else if (raw === "combo/fast" || raw === "Low-Latency Fast Chain" || raw === "Fast (Low Latency)") modelName = "combo/fast";
+          else if (raw === "combo/coding" || raw === "Coding Agent Chain" || raw === "Coding & Reasoning") modelName = "combo/coding";
+          else {
+            const found = models.find((m) => m.id === raw || m.name === raw);
+            if (found) modelName = found.name;
+          }
           setSelectedModel(modelName);
           localStorage.setItem("const_harness_active_model", modelName);
         }
@@ -841,15 +876,15 @@ export function ChatCard({
       prompt: text,
       project: currentProject,
       mode,
-      model: matchedModel?.id || "gemini-3.6-flash",
+      model: matchedModel?.id || currentModelItem?.id || "gemini-3.8-flash",
       thinkingLevel: isThinkingSupported ? thinkingLevel : undefined,
       attachments: currentAttachments.length > 0 ? currentAttachments : undefined,
-      maxOutputTokens: matchedModel?.maxOutputTokens,
+      maxOutputTokens: matchedModel?.maxOutputTokens || currentModelItem?.maxOutputTokens,
     });
   };
 
   const displayProjectName =
-    currentProject === "Outside Project"
+    !currentProject || typeof currentProject !== "string" || currentProject === "Outside Project" || currentProject === "[object Object]"
       ? "Outside Project"
       : currentProject.replace(/\\/g, "/").split("/").filter(Boolean).pop() || currentProject;
 
@@ -1570,9 +1605,9 @@ export function ChatCard({
                     setIsModelOpen(next);
                   }}
                   className="inline-flex items-center gap-1 px-1.5 py-1 rounded-md text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 text-[13px] font-normal transition-colors cursor-pointer min-w-0 max-w-[120px] sm:max-w-[180px] md:max-w-[240px]"
-                  title={selectedModel || "Manage model"}
+                  title={currentModelItem?.name || selectedModel || "Gemini 3.8 Flash"}
                 >
-                  <span className="truncate min-w-0">{selectedModel || "Manage model"}</span>
+                  <span className="truncate min-w-0">{currentModelItem?.name || selectedModel || "Gemini 3.8 Flash"}</span>
                   <ChevronDown className="w-3 h-3 text-[#a9a9a9] dark:text-[#5d5d5d] ml-0.5 shrink-0" />
                 </button>
 
@@ -1618,7 +1653,9 @@ export function ChatCard({
                                   <div className="flex flex-col space-y-0.5">
                                     {group.items.map((m) => {
                                       const isSelected =
-                                        selectedModel === m.name || selectedModel === m.id;
+                                        currentModelItem?.id === m.id ||
+                                        selectedModel === m.name ||
+                                        selectedModel === m.id;
                                       return (
                                         <button
                                           key={m.id}

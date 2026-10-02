@@ -38,6 +38,18 @@ export const DEFAULT_MODELS: ModelConfig[] = [
     contextWindow: 1048576,
   },
   {
+    id: "qwen-3.8-27b",
+    displayName: "Qwen 3.8 27B",
+    provider: "const",
+    baseUrl: "https://router.const.web.id/v1",
+    supportsThinking: true,
+    supportsTools: true,
+    thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
+    defaultThinkingLevel: "medium",
+    maxOutputTokens: 65536,
+    contextWindow: 131072,
+  },
+  {
     id: "combo/auto",
     displayName: "combo/auto",
     provider: "const",

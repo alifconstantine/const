@@ -187,10 +187,10 @@ function AuthenticatedContent({
       const saved = localStorage.getItem("const_harness_current_project");
       if (saved === "[object Object]") {
         localStorage.setItem("const_harness_current_project", "Outside Project");
+        setCurrentProject("Outside Project");
       }
     } catch {}
   }, []);
-
   const [currentMode, setCurrentMode] = useState<"ask_before_changes" | "full_access">(() => {
     return getDefaultAgentMode();
   });

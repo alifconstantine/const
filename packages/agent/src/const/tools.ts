@@ -688,7 +688,7 @@ export const CONST_DEFAULT_TOOLS: NativeToolDefinition[] = [
     function: {
       name: "web_search",
       description:
-        "Search the web for up-to-date documentation, API references, library updates, or debugging solutions. Supports Exa AI neural search (if EXA_API_KEY is configured) and public web search fallback.",
+        "Search the web using Const Search for up-to-date documentation, API references, library updates, real-time facts, or debugging solutions.",
       parameters: {
         type: "object",
         properties: {

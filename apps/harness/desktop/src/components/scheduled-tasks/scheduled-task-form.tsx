@@ -119,9 +119,9 @@ export function ScheduledTaskForm({
   const quota = useQuery(api.router.quotas.getUserQuota, {});
   const [models, setModels] = useState<ModelItem[]>([
     {
-      id: "gemini-3.6-flash",
-      name: "Gemini 3.6 Flash",
-      desc: "Frontier multimodal reasoning & code generation",
+      id: "gemini-3.8-flash",
+      name: "Gemini 3.8 Flash",
+      desc: "Advanced frontier thinking & max depth",
       provider: "const",
       providerName: "Const",
       supportsThinking: true,
@@ -135,9 +135,17 @@ export function ScheduledTaskForm({
       supportsThinking: true,
     },
     {
-      id: "gemini-3.8-flash",
-      name: "Gemini 3.8 Flash",
-      desc: "Advanced frontier thinking & max depth",
+      id: "gemini-3.6-flash",
+      name: "Gemini 3.6 Flash",
+      desc: "Frontier multimodal reasoning & code generation",
+      provider: "const",
+      providerName: "Const",
+      supportsThinking: true,
+    },
+    {
+      id: "qwen-3.8-27b",
+      name: "Qwen 3.8 27B",
+      desc: "Open-weight reasoning powerhouse with deep thinking capabilities",
       provider: "const",
       providerName: "Const",
       supportsThinking: true,
@@ -173,11 +181,11 @@ export function ScheduledTaskForm({
   });
 
   const [selectedModel, setSelectedModel] = useState<string>(() => {
-    return (
-      initialValues?.model ||
-      localStorage.getItem("const_harness_active_model") ||
-      "Gemini 3.6 Flash"
-    );
+    const saved = initialValues?.model || localStorage.getItem("const_harness_active_model");
+    if (!saved || saved === "Const" || saved === "gemini-3.6-flash") return "Gemini 3.8 Flash";
+    if (saved === "gemini-3.8-flash") return "Gemini 3.8 Flash";
+    if (saved === "gemini-3.7-flash") return "Gemini 3.7 Flash";
+    return saved;
   });
   const [isModelOpen, setIsModelOpen] = useState(false);
   const modelMenuRef = useRef<HTMLDivElement>(null);
@@ -201,6 +209,15 @@ export function ScheduledTaskForm({
             };
           });
           setModels(mapped);
+          setSelectedModel((prev) => {
+            const current = prev || localStorage.getItem("const_harness_active_model");
+            if (!current || current === "gemini-3.8-flash" || current === "gemini-3.6-flash") {
+              const foundDefault = mapped.find((m: any) => m.id === "gemini-3.8-flash");
+              return foundDefault ? foundDefault.name : "Gemini 3.8 Flash";
+            }
+            const found = mapped.find((m: any) => m.id === current || m.name === current);
+            return found ? found.name : current;
+          });
         }
       }).catch(() => {});
     }
@@ -288,7 +305,7 @@ export function ScheduledTaskForm({
       schedule,
       workspacePath: workspacePath === "Outside Project" ? "" : workspacePath,
       permissionPreset: mode,
-      model: selectedModel,
+      model: models.find((m) => m.name === selectedModel || m.id === selectedModel)?.id || selectedModel || "gemini-3.8-flash",
     });
   };
 
@@ -659,7 +676,7 @@ export function ScheduledTaskForm({
                       }}
                       className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[13px] bg-[#2b2b2b] hover:bg-[#383838] border border-[#383838] text-[#d4d4d4] hover:text-white transition-colors cursor-pointer"
                     >
-                      <span>{selectedModel || "Select model"}</span>
+                      <span>{models.find((m) => m.name === selectedModel || m.id === selectedModel)?.name || selectedModel || "Gemini 3.8 Flash"}</span>
                       <ChevronDown className="w-3 h-3 text-[#969696] ml-0.5" />
                     </button>
 

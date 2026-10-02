@@ -64,14 +64,14 @@ export const CONST_ROUTER_DEFAULT_URL = "https://router.const.web.id/v1";
 
 export const BUILTIN_CONST_MODELS = [
   {
-    id: "gemini-3.6-flash",
-    name: "Gemini 3.6 Flash",
+    id: "gemini-3.8-flash",
+    name: "Gemini 3.8 Flash",
     contextWindow: "1M Context",
     maxOutput: "128K Output",
     supportsThinking: true,
     thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
     isDefault: true,
-    desc: "Frontier multimodal reasoning & code generation. Included in your 7M weekly tokens quota.",
+    desc: "Advanced frontier thinking with extended reasoning depth (up to max). Included in your 7M weekly tokens quota.",
   },
   {
     id: "gemini-3.7-flash",
@@ -83,13 +83,22 @@ export const BUILTIN_CONST_MODELS = [
     desc: "Hybrid frontier reasoning model with dynamic thinking effort. Included in your 7M weekly tokens quota.",
   },
   {
-    id: "gemini-3.8-flash",
-    name: "Gemini 3.8 Flash",
+    id: "gemini-3.6-flash",
+    name: "Gemini 3.6 Flash",
     contextWindow: "1M Context",
     maxOutput: "128K Output",
     supportsThinking: true,
     thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
-    desc: "Advanced frontier thinking with extended reasoning depth (up to max). Included in your 7M weekly tokens quota.",
+    desc: "Frontier multimodal reasoning & code generation. Included in your 7M weekly tokens quota.",
+  },
+  {
+    id: "qwen-3.8-27b",
+    name: "Qwen 3.8 27B",
+    contextWindow: "131K Context",
+    maxOutput: "65K Output",
+    supportsThinking: true,
+    thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
+    desc: "Open-weight reasoning powerhouse with deep thinking capabilities. Included in your 7M weekly tokens quota.",
   },
   {
     id: "combo/auto",
@@ -196,7 +205,12 @@ export function SettingsView({
   // Local configuration
   const [config, setConfig] = useState<UserConfig | null>(null);
   const [activeModel, setActiveModel] = useState<string>(() => {
-    return localStorage.getItem("const_harness_active_model") || "gemini-3.6-flash";
+    const saved = localStorage.getItem("const_harness_active_model");
+    if (!saved || saved === "Const" || saved === "gemini-3.6-flash") return "gemini-3.8-flash";
+    if (saved === "Gemini 3.8 Flash") return "gemini-3.8-flash";
+    if (saved === "Gemini 3.7 Flash") return "gemini-3.7-flash";
+    if (saved === "Gemini 3.6 Flash") return "gemini-3.6-flash";
+    return saved;
   });
 
   const [defaultConfirmationMode, setDefaultConfirmationMode] = useState<
@@ -313,11 +327,13 @@ export function SettingsView({
 
   const handleSelectActiveModel = (modelId: string) => {
     setActiveModel(modelId);
-    localStorage.setItem("const_harness_active_model", modelId);
+    const found = BUILTIN_CONST_MODELS.find((m) => m.id === modelId);
+    const displayName = found?.name || modelId;
+    localStorage.setItem("const_harness_active_model", displayName);
     if (window.electron?.saveConfig) {
       window.electron.saveConfig({ activeModel: modelId }).catch(() => {});
     }
-    toast.success(`Active model set to ${modelId}`);
+    toast.success(`Active model set to ${displayName}`);
   };
 
   const handleAddModelToNewProvider = () => {

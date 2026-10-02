@@ -7,7 +7,7 @@ export interface WebSearchSource {
 
 export interface WebSearchResult {
   query: string;
-  provider: "exa" | "duckduckgo";
+  provider: "const-search" | "exa" | "duckduckgo";
   sources: WebSearchSource[];
   formatted: string;
 }
@@ -22,7 +22,7 @@ export interface WebFetchResult {
 }
 
 /**
- * Searches the web using Exa AI if EXA_API_KEY is available, or DuckDuckGo fallback.
+ * Searches the web using native Const Search (router.const.web.id), with Exa AI or DuckDuckGo fallback.
  */
 export async function executeWebSearch(
   query: string,
@@ -34,9 +34,57 @@ export async function executeWebSearch(
     throw new Error("Search query cannot be empty.");
   }
 
+  // 1. Try native Const Search (router.const.web.id/v1/search)
+  try {
+    const routerBaseUrl = (
+      process.env.CONST_ROUTER_BASE_URL || "https://router.const.web.id/v1"
+    ).replace(/\/+$/, "");
+    const searchEndpoint = routerBaseUrl.endsWith("/search") ? routerBaseUrl : `${routerBaseUrl}/search`;
+    const searchHeaders: Record<string, string> = {
+      "Content-Type": "application/json",
+      "User-Agent": "const-agent/0.1.0",
+    };
+    const apiKey = process.env.CONST_ROUTER_API_KEY || process.env.CONST_ENGINE_API_KEY || "";
+    if (apiKey) {
+      searchHeaders["Authorization"] = `Bearer ${apiKey}`;
+    }
+
+    const resp = await fetch(searchEndpoint, {
+      method: "POST",
+      headers: searchHeaders,
+      body: JSON.stringify({
+        query: cleanQuery,
+        num_results: Math.min(Math.max(numResults, 1), 20),
+      }),
+      signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(12000)]) : AbortSignal.timeout(12000),
+    });
+
+    if (resp.ok) {
+      const data = (await resp.json()) as any;
+      if (data && Array.isArray(data.results) && data.results.length > 0) {
+        const sources: WebSearchSource[] = data.results.map((r: any) => ({
+          title: r.title || r.url,
+          url: r.url,
+          snippet: r.snippet || (typeof r.content === "string" ? r.content : "") || "",
+          publishedAt: r.published_date || r.publishedDate,
+        }));
+
+        const formatted = formatSearchResults(cleanQuery, "const-search", sources);
+        return {
+          query: cleanQuery,
+          provider: "const-search",
+          sources,
+          formatted,
+        };
+      }
+    }
+  } catch {
+    // Fall through to Exa AI or DuckDuckGo fallback
+  }
+
   const exaKey = process.env.EXA_API_KEY || process.env.VITE_EXA_API_KEY || "";
 
-  // 1. Try Exa Search if key is present
+  // 2. Try Exa Search if key is present
   if (exaKey) {
     try {
       const resp = await fetch("https://api.exa.ai/search", {
