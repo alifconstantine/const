@@ -16,7 +16,17 @@ export interface WorkspaceFileEntry {
   kind?: "file" | "directory";
 }
 
-export type MentionCandidateKind = "file" | "directory" | "session" | "tool";
+export interface SessionMediaItem {
+  id: string;
+  name: string;
+  size?: number;
+  type?: string;
+  url?: string;
+  base64?: string;
+  path?: string;
+}
+
+export type MentionCandidateKind = "directory" | "file" | "media" | "session";
 
 export interface MentionCandidate {
   id: string;
@@ -24,11 +34,12 @@ export interface MentionCandidate {
   title: string;
   subtitle?: string;
   insertion: string;
+  drillPath?: string;
+  drill?: boolean;
   score: number;
   fileType?: "code" | "image" | "doc" | "generic";
   updatedAt?: number;
   fullPath?: string;
-  badge?: string;
 }
 
 export interface ActiveAtToken {
@@ -80,7 +91,7 @@ export function activeAtToken(text: string, cursorPosition: number): ActiveAtTok
  */
 export function formatFileMention(
   path: string,
-  kind: "file" | "directory" = "file",
+  kind: "file" | "directory" | "media" = "file",
   preserveQuote = false
 ): string {
   const normalized = path.replace(/\\/g, "/");
@@ -152,129 +163,192 @@ export function scoreCandidate(
   return null;
 }
 
-export const SPECIAL_TOOLS: Array<{
-  id: string;
-  name: string;
-  title: string;
-  description: string;
-  insertion: string;
-}> = [
-  {
-    id: "tool-browser",
-    name: "browser",
-    title: "browser",
-    description: "Browse the web, inspect web pages, search Google",
-    insertion: "@browser ",
-  },
-  {
-    id: "tool-terminal",
-    name: "terminal",
-    title: "terminal",
-    description: "Run terminal commands and CLI workflows in workspace",
-    insertion: "@terminal ",
-  },
-];
+/**
+ * Matches a conversation's project attribute with current active project.
+ */
+export function matchesProject(convoProject?: string, currentProject?: string): boolean {
+  if (!currentProject || currentProject === "Outside Project") {
+    return !convoProject || convoProject === "Outside Project";
+  }
+  if (!convoProject || convoProject === "Outside Project") {
+    return false;
+  }
+  const normConvo = convoProject.replace(/\\/g, "/").toLowerCase().trim();
+  const normCurrent = currentProject.replace(/\\/g, "/").toLowerCase().trim();
+  if (normConvo === normCurrent) return true;
+  const convoBase = normConvo.split("/").filter(Boolean).pop();
+  const currentBase = normCurrent.split("/").filter(Boolean).pop();
+  return Boolean(convoBase && currentBase && convoBase === currentBase);
+}
+
+export function formatFileSize(bytes?: number): string {
+  if (!bytes || bytes <= 0) return "";
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 export interface SearchMentionsOptions {
   query: string;
   quoted?: boolean;
   files?: WorkspaceFileEntry[];
+  sessionMedia?: SessionMediaItem[];
   conversations?: ConversationItem[];
   currentProject?: string;
   maxResults?: number;
 }
 
 /**
- * Rank and return top mention candidates across workspace files, sessions, and tools.
+ * Rank and return mention candidates categorized into Files & Folders and Sessions.
+ * Only sessions belonging to currentProject are included.
  */
 export function searchMentionCandidates({
   query,
   quoted = false,
   files = [],
+  sessionMedia = [],
   conversations = [],
   currentProject,
-  maxResults = 20,
+  maxResults = 25,
 }: SearchMentionsOptions): MentionCandidate[] {
-  const ranked: MentionCandidate[] = [];
   const isOutsideProject = !currentProject || currentProject === "Outside Project";
-  const now = Date.now();
+  const normalizedQuery = query.replace(/\\/g, "/");
+  const lastSlashIndex = normalizedQuery.lastIndexOf("/");
+  const hasSlash = lastSlashIndex >= 0;
 
-  // 1. Process Special Tools
-  for (const tool of SPECIAL_TOOLS) {
-    if (quoted) continue; // tools are not quoted
-    let score: number | null = null;
-    if (query === "") {
-      score = 1100; // Pin tools near top on empty query
+  const filesAndFolders: MentionCandidate[] = [];
+  const sessionCandidates: MentionCandidate[] = [];
+
+  // 1. Process Workspace Files & Folders
+  if (!isOutsideProject && files.length > 0) {
+    if (normalizedQuery === "" || hasSlash) {
+      // Directory-scoped listing (e.g. root items if query="", or children of folder if query has slash)
+      const targetDir = hasSlash ? normalizedQuery.slice(0, lastSlashIndex) : "";
+      const fragment = hasSlash ? normalizedQuery.slice(lastSlashIndex + 1) : "";
+
+      for (const file of files) {
+        const fileParent = (file.parentDir || "").replace(/\\/g, "/");
+        const isChild =
+          targetDir === ""
+            ? fileParent === "" || !file.path.includes("/")
+            : fileParent.toLowerCase() === targetDir.toLowerCase();
+
+        if (!isChild) continue;
+
+        const isDir = file.kind === "directory";
+        let score: number | null = 0;
+        if (fragment !== "") {
+          score = scoreCandidate(file.name, file.path, fragment, isDir);
+        } else {
+          // Directories listed first, then files
+          score = isDir ? 800 : 700;
+        }
+
+        if (score !== null) {
+          const displayTitle = isDir && !file.name.endsWith("/") ? `${file.name}/` : file.name;
+          const drillPath = isDir ? (file.path.endsWith("/") ? file.path : `${file.path}/`) : undefined;
+
+          filesAndFolders.push({
+            id: `file:${file.fullPath || file.path}`,
+            kind: isDir ? "directory" : "file",
+            title: displayTitle,
+            subtitle: targetDir ? undefined : file.parentDir,
+            insertion: formatFileMention(file.path, isDir ? "directory" : "file", quoted),
+            drillPath,
+            drill: isDir,
+            score,
+            fileType: file.type || "generic",
+            fullPath: file.fullPath,
+          });
+        }
+      }
     } else {
-      score = scoreCandidate(tool.name, tool.description, query, false);
-    }
-    if (score !== null) {
-      ranked.push({
-        id: tool.id,
-        kind: "tool",
-        title: `@${tool.title}`,
-        subtitle: tool.description,
-        insertion: tool.insertion,
-        score,
-        badge: "tool",
-      });
+      // Global fuzzy search across all files and folders
+      for (const file of files) {
+        const isDir = file.kind === "directory";
+        const score = scoreCandidate(file.name, file.path, normalizedQuery, isDir);
+
+        if (score !== null) {
+          const displayTitle = isDir && !file.name.endsWith("/") ? `${file.name}/` : file.name;
+          const drillPath = isDir ? (file.path.endsWith("/") ? file.path : `${file.path}/`) : undefined;
+
+          filesAndFolders.push({
+            id: `file:${file.fullPath || file.path}`,
+            kind: isDir ? "directory" : "file",
+            title: displayTitle,
+            subtitle: file.parentDir || undefined,
+            insertion: formatFileMention(file.path, isDir ? "directory" : "file", quoted),
+            drillPath,
+            drill: isDir,
+            score,
+            fileType: file.type || "generic",
+            fullPath: file.fullPath,
+          });
+        }
+      }
     }
   }
 
-  // 2. Process Workspace Files & Folders (only if not outside project)
-  if (!isOutsideProject && files.length > 0) {
-    for (const file of files) {
-      const isDir = file.kind === "directory";
-      const slashIdx = file.path.lastIndexOf("/");
-      const parentDir = slashIdx >= 0 ? file.path.slice(0, slashIdx) : "";
-
-      let score: number | null = null;
-      if (query === "") {
-        // Bias root items and directories slightly when query is empty
-        const depth = file.path.split("/").length;
-        score = Math.max(10, 800 - depth * 50 + (isDir ? 30 : 0));
+  // 2. Process Session Uploaded Media (only if not drilling deeper in folders)
+  if (!hasSlash && sessionMedia.length > 0) {
+    for (const media of sessionMedia) {
+      if (!media.name) continue;
+      let score: number | null = 0;
+      if (normalizedQuery === "") {
+        score = 850; // Pin session media right beside top files
       } else {
-        score = scoreCandidate(file.name, file.path, query, isDir);
+        score = scoreCandidate(media.name, media.name, normalizedQuery, false);
       }
 
       if (score !== null) {
-        ranked.push({
-          id: `file:${file.fullPath || file.path}`,
-          kind: isDir ? "directory" : "file",
-          title: file.name + (isDir ? "/" : ""),
-          subtitle: parentDir || "workspace root",
-          insertion: formatFileMention(file.path, isDir ? "directory" : "file", quoted),
+        const sizeLabel = media.size ? formatFileSize(media.size) : "";
+        filesAndFolders.push({
+          id: `media:${media.id || media.name}`,
+          kind: "media",
+          title: media.name,
+          subtitle: sizeLabel ? `Media · ${sizeLabel}` : "Uploaded media",
+          insertion: formatFileMention(media.name, "media", quoted),
           score,
-          fileType: file.type || "generic",
-          fullPath: file.fullPath,
-          badge: isDir ? "dir" : "file",
+          fileType: "image",
+          fullPath: media.path || media.url,
         });
       }
     }
   }
 
-  // 3. Process Past Conversations / Sessions
-  if (conversations.length > 0) {
-    for (const convo of conversations) {
+  // Sort files and folders: highest score first, directories before files, shorter name wins
+  filesAndFolders.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    if (a.kind === "directory" && b.kind !== "directory") return -1;
+    if (b.kind === "directory" && a.kind !== "directory") return 1;
+    return a.title.localeCompare(b.title);
+  });
+
+  // 3. Process Past Conversations / Sessions (STRICTLY for current project only!)
+  // If user is currently typing a subpath (e.g. @dir/file), do not show sessions
+  if (!hasSlash && conversations.length > 0) {
+    const projectSessions = conversations.filter((c) => matchesProject(c.project, currentProject));
+
+    for (const convo of projectSessions) {
       const cleanTitle = getCleanConversationTitle(convo.title);
-      let score: number | null = null;
-      if (query === "") {
-        // Show recent sessions near top on empty query
-        const ageHours = Math.max(0, (now - (convo.updatedAt || convo.createdAt)) / (1000 * 60 * 60));
-        score = Math.max(50, 950 - Math.min(400, Math.round(ageHours * 5)));
+      let score: number | null = 0;
+
+      if (normalizedQuery === "") {
+        const timeVal = convo.updatedAt || convo.createdAt || 0;
+        score = Math.max(100, 600 - Math.min(300, Math.round((Date.now() - timeVal) / (1000 * 60 * 60 * 24))));
       } else {
-        score = scoreCandidate(cleanTitle, cleanTitle, query, false);
+        score = scoreCandidate(cleanTitle, cleanTitle, normalizedQuery, false);
       }
 
       if (score !== null) {
         const timeAgo = formatRelativeTime(convo.updatedAt || convo.createdAt);
-        const projectTag =
+        const projectDisplay =
           convo.project && convo.project !== "Outside Project"
-            ? convo.project.replace(/\\/g, "/").split("/").filter(Boolean).pop()
+            ? convo.project
             : undefined;
-        const subtitle = projectTag ? `${projectTag} · ${timeAgo}` : timeAgo;
+        const subtitle = projectDisplay ? `${projectDisplay} · ${timeAgo}` : timeAgo;
 
-        ranked.push({
+        sessionCandidates.push({
           id: `session:${convo.id}`,
           kind: "session",
           title: cleanTitle,
@@ -282,33 +356,17 @@ export function searchMentionCandidates({
           insertion: formatSessionMention(cleanTitle),
           score,
           updatedAt: convo.updatedAt || convo.createdAt,
-          badge: "session",
         });
       }
     }
+
+    sessionCandidates.sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      return (b.updatedAt || 0) - (a.updatedAt || 0);
+    });
   }
 
-  // Sort candidates deterministically
-  ranked.sort((left, right) => {
-    // 1. Higher score first
-    if (right.score !== left.score) {
-      return right.score - left.score;
-    }
-    // 2. Tools first on tie
-    if (left.kind === "tool" && right.kind !== "tool") return -1;
-    if (right.kind === "tool" && left.kind !== "tool") return 1;
-    // 3. Directories before files
-    if (left.kind === "directory" && right.kind === "file") return -1;
-    if (right.kind === "directory" && left.kind === "file") return 1;
-    // 4. Shorter path / title length wins
-    const leftLen = left.subtitle ? left.title.length + left.subtitle.length : left.title.length;
-    const rightLen = right.subtitle ? right.title.length + right.subtitle.length : right.title.length;
-    if (leftLen !== rightLen) {
-      return leftLen - rightLen;
-    }
-    // 5. Alphabetical tie breaker
-    return left.title.localeCompare(right.title);
-  });
-
-  return ranked.slice(0, maxResults);
+  // Combine: Files & Folders first, followed by Sessions, capped at maxResults
+  const combined = [...filesAndFolders.slice(0, 16), ...sessionCandidates.slice(0, 8)];
+  return combined.slice(0, maxResults);
 }

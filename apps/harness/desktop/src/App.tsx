@@ -565,6 +565,22 @@ function AuthenticatedContent({
     return list;
   }, [messages]);
 
+  const sessionMediaAttachments = useMemo(() => {
+    const list: AttachedFile[] = [];
+    const seen = new Set<string>();
+    for (const msg of messages) {
+      if (Array.isArray(msg.attachments)) {
+        for (const att of msg.attachments) {
+          if (att && att.name && !seen.has(att.name)) {
+            seen.add(att.name);
+            list.push(att);
+          }
+        }
+      }
+    }
+    return list;
+  }, [messages]);
+
   const handleOpenFileDiff = (mutation: FileMutationRecord) => {
     setIsRightSidebarOpen(true);
     const filePath = mutation.filePath || mutation.targetFile;
@@ -2437,6 +2453,8 @@ function AuthenticatedContent({
                   mode={currentMode}
                   onModeChange={handleModeChange}
                   conversations={conversations}
+                  sessionMedia={sessionMediaAttachments}
+                  onOpenFilePreview={handleOpenFilePreview}
                 />
               </div>
             </div>
@@ -2505,10 +2523,22 @@ function AuthenticatedContent({
                                   )}
                                   viewportClassName="[&>div[style]]:!block"
                                 >
-                                  <div className="pr-2">{msg.content}</div>
+                                  <div className="pr-2">
+                                    <MarkdownContent
+                                      content={msg.content}
+                                      onOpenFilePreview={handleOpenFilePreview}
+                                      className="space-y-1 text-[14px]"
+                                    />
+                                  </div>
                                 </ScrollArea>
                               ) : (
-                                <div>{msg.content}</div>
+                                <div>
+                                  <MarkdownContent
+                                    content={msg.content}
+                                    onOpenFilePreview={handleOpenFilePreview}
+                                    className="space-y-1 text-[14px]"
+                                  />
+                                </div>
                               )}
                             </div>
                           );
@@ -2569,7 +2599,10 @@ function AuthenticatedContent({
                         {/* Formatted Markdown Content */}
                         {msg.content ? (
                           <div className="px-0.5">
-                            <MarkdownContent content={msg.content} />
+                            <MarkdownContent
+                              content={msg.content}
+                              onOpenFilePreview={handleOpenFilePreview}
+                            />
                           </div>
                         ) : null}
 
@@ -2710,6 +2743,8 @@ function AuthenticatedContent({
                       mode={currentMode}
                       onModeChange={handleModeChange}
                       conversations={conversations}
+                      sessionMedia={sessionMediaAttachments}
+                      onOpenFilePreview={handleOpenFilePreview}
                     />
                   )}
                 </SmoothCardMorph>

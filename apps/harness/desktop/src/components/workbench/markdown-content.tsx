@@ -6,9 +6,14 @@ import { cn } from "@const/ui";
 interface MarkdownContentProps {
   content: string;
   className?: string;
+  onOpenFilePreview?: (filePath: string) => void;
 }
 
-export function MarkdownContent({ content, className = "" }: MarkdownContentProps) {
+export function MarkdownContent({
+  content,
+  className = "",
+  onOpenFilePreview,
+}: MarkdownContentProps) {
   if (!content) return null;
 
   // Configure marked for GitHub Flavored Markdown
@@ -17,15 +22,51 @@ export function MarkdownContent({ content, className = "" }: MarkdownContentProp
     breaks: true,
   });
 
+  // Normalize @[path] mentions into clickable file links
+  let processed = content.replace(/@\[([^\]]+)\]/g, (_, rawPath) => {
+    const trimmed = rawPath.trim();
+    const normalized = trimmed.replace(/\\/g, "/");
+    const fileName = normalized.split("/").filter(Boolean).pop() || trimmed;
+    return `[${fileName}](file;file:///${normalized})`;
+  });
+
+  // Normalize file;file:/// or file; links into valid file:/// links for marked
+  processed = processed.replace(/\]\(file;file:\/\/\/?/gi, "](file:///");
+  processed = processed.replace(/\]\(file;/gi, "](file:///");
+
   // Normalize single-space indented list items so they parse cleanly into nested lists
-  const normalizedContent = content.replace(/\n( +)([*+-]) /g, (match, spaces, bullet) => {
+  const normalizedContent = processed.replace(/\n( +)([*+-]) /g, (match, spaces, bullet) => {
     return spaces.length === 1 ? `\n  ${bullet} ` : match;
   });
 
   const tokens = marked.lexer(normalizedContent);
 
+  const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const target = (e.target as HTMLElement).closest("a");
+    if (!target) return;
+
+    const href = target.getAttribute("href") || "";
+    if (
+      href.startsWith("file://") ||
+      href.startsWith("file;file://") ||
+      href.startsWith("file;") ||
+      /^[a-zA-Z]:[\\/]/.test(href)
+    ) {
+      e.preventDefault();
+      let cleaned = href
+        .replace(/^file;file:\/\/\/?/i, "")
+        .replace(/^file:\/\/\/?/i, "")
+        .replace(/^file;/i, "");
+      if (/^\/[a-zA-Z]:/i.test(cleaned)) {
+        cleaned = cleaned.slice(1);
+      }
+      onOpenFilePreview?.(cleaned);
+    }
+  };
+
   return (
     <div
+      onClick={handleClick}
       className={cn(
         "space-y-3 text-[14px] leading-[1.68] text-[#262626] dark:text-[#d4d4d4] select-text font-sans [&_strong]:font-medium [&_b]:font-medium [&_strong]:text-[#161616] dark:[&_strong]:text-[#ececec] [&_b]:text-[#161616] dark:[&_b]:text-[#ececec]",
         className
@@ -496,7 +537,7 @@ function InlineRenderer({ text }: { text: string }) {
     return (
       <span
         dangerouslySetInnerHTML={{ __html: html }}
-        className="[&_code]:bg-[#eaeaea] dark:[&_code]:bg-[#242424] [&_code]:text-[#161616] dark:[&_code]:text-[#e0e0e0] [&_code]:font-mono [&_code]:text-[12.5px] [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:border [&_code]:border-[#e2e2e4] dark:[&_code]:border-[#383838] [&_strong]:font-medium [&_b]:font-medium [&_strong]:text-[#161616] dark:[&_strong]:text-[#ececec] [&_em]:italic [&_em]:text-[#262626] dark:[&_em]:text-[#d4d4d4] [&_a]:text-[#e79737] dark:[&_a]:text-[#ff7a00] [&_a]:hover:underline cursor-text"
+        className="[&_code]:bg-[#eaeaea] dark:[&_code]:bg-[#242424] [&_code]:text-[#161616] dark:[&_code]:text-[#e0e0e0] [&_code]:font-mono [&_code]:text-[12.5px] [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:border [&_code]:border-[#e2e2e4] dark:[&_code]:border-[#383838] [&_strong]:font-medium [&_b]:font-medium [&_strong]:text-[#161616] dark:[&_strong]:text-[#ececec] [&_em]:italic [&_em]:text-[#262626] dark:[&_em]:text-[#d4d4d4] [&_a]:text-[#2563eb] dark:[&_a]:text-[#60a5fa] [&_a]:hover:underline [&_a]:font-medium cursor-pointer"
       />
     );
   }

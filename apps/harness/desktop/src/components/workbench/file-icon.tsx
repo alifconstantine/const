@@ -117,14 +117,14 @@ export function FileIcon({
     );
   }
 
-  // 8. HTML (*.html, *.htm) -> <> in orange
+  // 8. HTML (*.html, *.htm) -> </> in orange
   if (ext === "html" || ext === "htm") {
     return (
       <span
-        className={`${className} inline-flex items-center justify-center font-mono font-bold text-[10px] leading-none select-none text-[#e34c26] shrink-0`}
+        className={`${className} inline-flex items-center justify-center font-mono font-bold text-[10.5px] leading-none select-none text-[#e34c26] shrink-0`}
         title={filename}
       >
-        {"<>"}
+        {"</>"}
       </span>
     );
   }
