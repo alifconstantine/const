@@ -407,11 +407,11 @@ export async function restoreCheckpoint(
   if (!targetCp) {
     return {
       success: false,
-      checkpointId: "",
+      checkpointId: options.checkpointId || "",
       revertedMutationsCount: 0,
       restoredFilesCount: 0,
       restoredFiles: [],
-      message: "No checkpoint available to restore.",
+      message: "No checkpoints available to restore.",
     };
   }
 
