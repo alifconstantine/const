@@ -404,6 +404,17 @@ export async function restoreCheckpoint(
     targetCp = checkpoints[checkpoints.length - 1];
   }
 
+  if (!targetCp) {
+    return {
+      success: false,
+      checkpointId: "",
+      revertedMutationsCount: 0,
+      restoredFilesCount: 0,
+      restoredFiles: [],
+      message: "No checkpoint available to restore.",
+    };
+  }
+
   const restoredFilesSet = new Set<string>();
 
   // 1. Rollback all mutations recorded AFTER this checkpoint was created
