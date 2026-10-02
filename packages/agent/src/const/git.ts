@@ -72,11 +72,11 @@ export async function executeGitStatus(
         const upParts = parts[1].split(" ");
         upstream = upParts[0];
         const bracket = branchInfo.match(/\[(.*?)\]/);
-        if (bracket) {
+        if (bracket && bracket[1]) {
           const aheadMatch = bracket[1].match(/ahead (\d+)/);
           const behindMatch = bracket[1].match(/behind (\d+)/);
-          if (aheadMatch) ahead = parseInt(aheadMatch[1], 10);
-          if (behindMatch) behind = parseInt(behindMatch[1], 10);
+          if (aheadMatch && aheadMatch[1]) ahead = parseInt(aheadMatch[1], 10);
+          if (behindMatch && behindMatch[1]) behind = parseInt(behindMatch[1], 10);
         }
       }
       continue;
@@ -91,10 +91,10 @@ export async function executeGitStatus(
     const workTreeCode = line[1];
     const filePath = line.slice(3).trim();
 
-    if (indexCode !== " " && indexCode !== "?") {
+    if (indexCode && indexCode !== " " && indexCode !== "?") {
       staged.push({ path: filePath, status: indexCode });
     }
-    if (workTreeCode !== " " && workTreeCode !== "?") {
+    if (workTreeCode && workTreeCode !== " " && workTreeCode !== "?") {
       unstaged.push({ path: filePath, status: workTreeCode });
     }
   }

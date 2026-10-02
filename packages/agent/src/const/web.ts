@@ -122,26 +122,31 @@ function parseDuckDuckGoHtml(html: string, limit: number): WebSearchSource[] {
   let m: RegExpExecArray | null;
 
   while ((m = titleRegex.exec(html)) !== null && rawTitles.length < limit) {
-    let url = m[1];
+    let url = m[1] ?? "";
     if (url.includes("uddg=")) {
       const match = url.match(/uddg=([^&]+)/);
-      if (match) url = decodeURIComponent(match[1]);
+      if (match && match[1]) url = decodeURIComponent(match[1]);
     }
-    const title = decodeHtmlEntities(m[2].replace(/<[^>]+>/g, "").trim());
+    const rawTitleStr = m[2] ? m[2].replace(/<[^>]+>/g, "").trim() : "";
+    const title = decodeHtmlEntities(rawTitleStr);
     rawTitles.push({ url, title });
   }
 
   const rawSnippets: string[] = [];
   while ((m = snippetRegex.exec(html)) !== null && rawSnippets.length < limit) {
-    rawSnippets.push(decodeHtmlEntities(m[1].replace(/<[^>]+>/g, "").trim()));
+    const rawSnipStr = m[1] ? m[1].replace(/<[^>]+>/g, "").trim() : "";
+    rawSnippets.push(decodeHtmlEntities(rawSnipStr));
   }
 
   for (let i = 0; i < rawTitles.length; i++) {
-    sources.push({
-      title: rawTitles[i].title,
-      url: rawTitles[i].url,
-      snippet: rawSnippets[i] || "",
-    });
+    const item = rawTitles[i];
+    if (item) {
+      sources.push({
+        title: item.title,
+        url: item.url,
+        snippet: rawSnippets[i] || "",
+      });
+    }
   }
 
   return sources;
@@ -222,7 +227,7 @@ export async function executeWebFetch(
 
     // Parse HTML to Markdown
     const titleMatch = bodyText.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
-    const title = titleMatch ? decodeHtmlEntities(titleMatch[1].trim()) : url;
+    const title = titleMatch && titleMatch[1] ? decodeHtmlEntities(titleMatch[1].trim()) : url;
 
     const markdown = convertHtmlToMarkdown(bodyText);
     const truncated = markdown.length > maxChars;
