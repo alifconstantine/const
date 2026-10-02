@@ -2778,7 +2778,6 @@ function AuthenticatedContent({
         user={user}
         onSignOut={onSignOut}
         onSwitchAccount={onSwitchAccount}
-        conversations={conversations}
       />
     </div>
   );
