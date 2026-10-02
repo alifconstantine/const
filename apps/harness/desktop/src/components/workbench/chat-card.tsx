@@ -1852,7 +1852,7 @@ export function ChatCard({
                 sideOffset={8}
                 className="w-72 sm:w-80 p-3.5 rounded-xl bg-popover/95 backdrop-blur-md border border-border/80 shadow-2xl z-50 font-sans"
               >
-                <div className="flex items-center justify-between mb-2.5">
+                <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
                     <Database className="w-4 h-4 text-muted-foreground shrink-0" />
                     <span className="font-medium text-[13px] text-foreground">Token usage</span>
@@ -1861,7 +1861,6 @@ export function ChatCard({
                     {totalTokens.toLocaleString()} tok
                   </span>
                 </div>
-                <div className="my-2 border-t border-border/60" />
                 <div className="space-y-2 text-[12.5px] font-sans">
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Cache hit</span>
