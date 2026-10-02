@@ -6,6 +6,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import type { FileMutationRecord } from "./mutation-ledger.js";
 import type { TodoItem, QuestionItem, BackgroundTaskItem, NativeToolDefinition } from "./types.js";
 import { executeLspQuery, type LspOperation } from "./lsp.js";
+import { executeAstGrep } from "./ast-grep.js";
 
 export interface ExecuteToolOptions {
   signal?: AbortSignal;
@@ -633,6 +634,44 @@ export const CONST_DEFAULT_TOOLS: NativeToolDefinition[] = [
           },
         },
         required: ["operation", "file_path"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "ast_grep",
+      description:
+        "Structural syntax-tree code search (AST Grep). Search for structural patterns across code with metavariables (e.g. '$VAR', 'function $NAME($$$ARGS) { $$$ }', 'import { $$$ } from \"$MOD\"') ignoring formatting differences. Returns matched files, lines, and extracted metavariables.",
+      parameters: {
+        type: "object",
+        properties: {
+          pattern: {
+            type: "string",
+            description: "The AST pattern to search for (supports metavariables like $NAME, $$$ARGS).",
+          },
+          path: {
+            type: "string",
+            description: "File or directory to search in (defaults to workspace root).",
+          },
+          lang: {
+            type: "string",
+            description: "Optional language override (e.g. 'ts', 'tsx', 'js', 'py', 'rust', 'go').",
+          },
+          globs: {
+            type: "string",
+            description: "Optional glob pattern to filter files (e.g. '*.ts', 'src/**/*.tsx').",
+          },
+          rewrite: {
+            type: "string",
+            description: "Optional structural replacement pattern to preview AST rewrite.",
+          },
+          limit: {
+            type: "number",
+            description: "Maximum matches to return (default 50).",
+          },
+        },
+        required: ["pattern"],
       },
     },
   },
@@ -3997,6 +4036,49 @@ export async function executeNativeTool(
       } catch (err: any) {
         return {
           result: `LSP Error (${operation} on ${rawPath}): ${err.message}`,
+          isError: true,
+        };
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // Tool: ast_grep (aliases: astsearch, astgrep)
+    // -----------------------------------------------------------------------
+    if (normalizedTool === "astgrep" || normalizedTool === "astsearch") {
+      const pattern = args.pattern || args.pat;
+      if (!pattern || typeof pattern !== "string") {
+        return {
+          result: "Error: Missing 'pattern' parameter for ast_grep.",
+          isError: true,
+        };
+      }
+
+      const targetPath = extractPathArg(args) || args.path || ".";
+      const lang = typeof args.lang === "string" ? args.lang : undefined;
+      const globs = typeof args.globs === "string" ? args.globs : undefined;
+      const rewrite = typeof args.rewrite === "string" ? args.rewrite : undefined;
+      const limit = typeof args.limit === "number" ? args.limit : 50;
+
+      try {
+        const grepRes = await executeAstGrep(
+          {
+            pattern,
+            targetPath,
+            lang,
+            globs,
+            rewrite,
+            limit,
+            signal,
+          },
+          workspacePath
+        );
+        return {
+          result: grepRes.formatted,
+          isError: false,
+        };
+      } catch (err: any) {
+        return {
+          result: `ast_grep error: ${err.message}`,
           isError: true,
         };
       }
