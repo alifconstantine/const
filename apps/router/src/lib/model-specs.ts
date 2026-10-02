@@ -3,7 +3,7 @@ export const DEFAULT_MAX_OUTPUT = "128000"; // 128K
 export const DEFAULT_INPUT_TYPES = ["text"];
 export const DEFAULT_OUTPUT_TYPES = ["text"];
 
-export type ThinkingLevel = "low" | "medium" | "high";
+export type ThinkingLevel = "low" | "medium" | "high" | "xhigh" | "max";
 
 export interface ModelSpec {
   id: string;

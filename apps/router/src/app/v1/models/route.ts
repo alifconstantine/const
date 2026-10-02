@@ -102,8 +102,8 @@ export async function GET(req: NextRequest) {
         tool_calling: true,
         vision: true,
       },
-      thinking_levels: ["low", "medium", "high"],
-      reasoning_effort: ["low", "medium", "high"],
+      thinking_levels: ["low", "medium", "high", "xhigh", "max"],
+      reasoning_effort: ["low", "medium", "high", "xhigh", "max"],
       default_thinking_level: "medium",
       input_modalities: ["text", "image", "video"],
       output_modalities: ["text"],
@@ -156,8 +156,8 @@ export async function GET(req: NextRequest) {
         supportsThinking: true,
         tool_calling: true,
       },
-      thinking_levels: ["low", "medium", "high"],
-      reasoning_effort: ["low", "medium", "high"],
+      thinking_levels: ["low", "medium", "high", "xhigh", "max"],
+      reasoning_effort: ["low", "medium", "high", "xhigh", "max"],
       default_thinking_level: "medium",
     },
     {
@@ -204,8 +204,8 @@ export async function GET(req: NextRequest) {
         supportsThinking: true,
         tool_calling: true,
       },
-      thinking_levels: ["low", "medium", "high"],
-      reasoning_effort: ["low", "medium", "high"],
+      thinking_levels: ["low", "medium", "high", "xhigh", "max"],
+      reasoning_effort: ["low", "medium", "high", "xhigh", "max"],
       default_thinking_level: "high",
     },
   ];
@@ -246,8 +246,8 @@ export async function GET(req: NextRequest) {
                   supportsThinking: supportsThinking,
                   tool_calling: true,
                 },
-                thinking_levels: supportsThinking ? ["low", "medium", "high"] : undefined,
-                reasoning_effort: supportsThinking ? ["low", "medium", "high"] : undefined,
+                thinking_levels: supportsThinking ? ["low", "medium", "high", "xhigh", "max"] : undefined,
+                reasoning_effort: supportsThinking ? ["low", "medium", "high", "xhigh", "max"] : undefined,
               });
             }
           }

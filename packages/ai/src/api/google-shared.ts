@@ -43,10 +43,11 @@ export function resolveGoogleThinkingLevel<T extends GoogleApiType>(
 		case "medium":
 		case "high":
 			return resolvedLevel;
+		case "xhigh":
+		case "max":
+			return "high";
 		default:
-			throw new Error(
-				`Unsupported Google thinking level mapping for ${model.provider}/${model.id}: ${level} -> ${String(mapped)}`,
-			);
+			return "high";
 	}
 }
 

@@ -78,7 +78,7 @@ export const BUILTIN_CONST_MODELS = [
     contextWindow: "1M Context",
     maxOutput: "128K Output",
     supportsThinking: true,
-    thinkingLevels: ["low", "medium", "high"],
+    thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
     isDefault: true,
     desc: "Frontier multimodal reasoning & code generation. Included in your 7M weekly tokens quota.",
   },
@@ -88,7 +88,7 @@ export const BUILTIN_CONST_MODELS = [
     contextWindow: "1M Context",
     maxOutput: "128K Output",
     supportsThinking: true,
-    thinkingLevels: ["low", "medium", "high"],
+    thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
     desc: "Hybrid frontier reasoning model with dynamic thinking effort. Included in your 7M weekly tokens quota.",
   },
   {
@@ -106,7 +106,7 @@ export const BUILTIN_CONST_MODELS = [
     contextWindow: "1M Context",
     maxOutput: "128K Output",
     supportsThinking: true,
-    thinkingLevels: ["low", "medium", "high"],
+    thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
     desc: "Intelligent dynamic router balancing latency, reasoning, and multi-model failover.",
   },
   {
@@ -123,7 +123,7 @@ export const BUILTIN_CONST_MODELS = [
     contextWindow: "1M Context",
     maxOutput: "128K Output",
     supportsThinking: true,
-    thinkingLevels: ["low", "medium", "high"],
+    thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
     desc: "Specialized models tuned for software architecture, code generation, refactoring, and logical reasoning.",
   },
 ];
@@ -313,7 +313,12 @@ export function SettingsView({
     "Anthropic: messages (/v1/messages)"
   );
   const [newProviderModels, setNewProviderModels] = useState<
-    Array<{ id: string; name: string }>
+    Array<{
+      id: string;
+      name: string;
+      supportsThinking?: boolean;
+      thinkingLevels?: string[];
+    }>
   >([]);
 
   // Add Model dialog state
@@ -386,7 +391,12 @@ export function SettingsView({
     const nameToUse = tempModelName.trim() || tempModelId.trim();
     setNewProviderModels((prev) => [
       ...prev,
-      { id: tempModelId.trim(), name: nameToUse },
+      {
+        id: tempModelId.trim(),
+        name: nameToUse,
+        supportsThinking: true,
+        thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
+      },
     ]);
     setTempModelId("");
     setTempModelName("");
@@ -446,6 +456,7 @@ export function SettingsView({
           provider: providerId,
           baseUrl: newProvider.baseUrl,
           supportsThinking: true,
+          thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
           supportsTools: true,
         })),
       ];
@@ -1626,11 +1637,6 @@ export function SettingsView({
                                           <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#0066ff]/20 text-[#60a5fa] border border-[#0066ff]/30 font-medium flex items-center gap-1 font-sans">
                                             <Check className="w-3 h-3" />
                                             Active in Chat
-                                          </span>
-                                        )}
-                                        {m.supportsThinking && (
-                                          <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#1b1b1b] text-[#969696] border border-[#2e2e2e] font-sans">
-                                            Thinking: {m.thinkingLevels?.join(", ") || "low, medium, high"}
                                           </span>
                                         )}
                                       </div>

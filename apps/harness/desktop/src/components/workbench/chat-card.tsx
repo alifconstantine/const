@@ -39,26 +39,6 @@ import { AttachedTaskBanner } from "./attached-task-banner";
 import type { BackgroundTaskItem } from "../../vite-env";
 import { getDefaultAgentMode } from "../../lib/conversation-store";
 
-function getThinkingDescription(lvl: string): string {
-  switch (lvl.toLowerCase()) {
-    case "low":
-      return "Fast reasoning";
-    case "medium":
-      return "Balanced thinking";
-    case "high":
-      return "Thorough analysis";
-    case "xhigh":
-      return "Extended reasoning";
-    case "max":
-      return "Maximum depth";
-    case "minimal":
-      return "Minimal tokens";
-    case "off":
-      return "No thinking";
-    default:
-      return `${lvl} effort`;
-  }
-}
 
 function formatTokenDisplay(tokens: number): string {
   if (!tokens || isNaN(tokens) || tokens <= 0) return "0";
@@ -417,7 +397,7 @@ export function ChatCard({
       provider: "deepseek",
       providerName: "DeepSeek",
       supportsThinking: true,
-      thinkingLevels: ["low", "medium", "high"],
+      thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
       defaultThinkingLevel: "medium",
       maxOutputTokens: 128000,
       contextWindow: 128000,
@@ -441,7 +421,7 @@ export function ChatCard({
       provider: "deepseek",
       providerName: "DeepSeek",
       supportsThinking: true,
-      thinkingLevels: ["low", "medium", "high"],
+      thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
       defaultThinkingLevel: "medium",
       maxOutputTokens: 128000,
       contextWindow: 128000,
@@ -453,7 +433,7 @@ export function ChatCard({
       provider: "const",
       providerName: "ConstRouter",
       supportsThinking: true,
-      thinkingLevels: ["low", "medium", "high"],
+      thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
       defaultThinkingLevel: "medium",
       maxOutputTokens: 128000,
       contextWindow: 1048576,
@@ -465,7 +445,7 @@ export function ChatCard({
       provider: "const",
       providerName: "ConstRouter",
       supportsThinking: true,
-      thinkingLevels: ["low", "medium", "high"],
+      thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
       defaultThinkingLevel: "medium",
       maxOutputTokens: 128000,
       contextWindow: 1048576,
@@ -473,7 +453,7 @@ export function ChatCard({
     {
       id: "gemini-3.8-flash",
       name: "Gemini 3.8 Flash",
-      desc: "Advanced frontier thinking & max depth",
+      desc: "Advanced frontier thinking & reasoning depth",
       provider: "const",
       providerName: "ConstRouter",
       supportsThinking: true,
@@ -489,7 +469,7 @@ export function ChatCard({
       provider: "const",
       providerName: "ConstRouter",
       supportsThinking: true,
-      thinkingLevels: ["low", "medium", "high"],
+      thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
       defaultThinkingLevel: "medium",
       maxOutputTokens: 128000,
       contextWindow: 1000000,
@@ -511,7 +491,7 @@ export function ChatCard({
       provider: "const",
       providerName: "ConstRouter",
       supportsThinking: true,
-      thinkingLevels: ["low", "medium", "high"],
+      thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
       defaultThinkingLevel: "high",
       maxOutputTokens: 128000,
       contextWindow: 1000000,
@@ -586,10 +566,9 @@ export function ChatCard({
   const isThinkingSupported = Boolean(
     currentModelItem?.id === "combo/fast"
       ? false
-      : currentModelItem?.supportsThinking ||
-        (currentModelItem?.id?.startsWith("gemini-3.") ?? false) ||
-        currentModelItem?.id === "combo/coding" ||
-        currentModelItem?.id === "combo/auto"
+      : currentModelItem?.supportsThinking !== undefined
+      ? currentModelItem.supportsThinking
+      : true
   );
 
   const supportedThinkingLevels: string[] = useMemo(() => {
@@ -597,13 +576,7 @@ export function ChatCard({
     if (currentModelItem?.thinkingLevels && currentModelItem.thinkingLevels.length > 0) {
       return currentModelItem.thinkingLevels;
     }
-    if (
-      currentModelItem?.id === "gemini-3.8-flash" ||
-      currentModelItem?.name?.toLowerCase().includes("3.8")
-    ) {
-      return ["low", "medium", "high", "xhigh", "max"];
-    }
-    return ["low", "medium", "high"];
+    return ["low", "medium", "high", "xhigh", "max"];
   }, [isThinkingSupported, currentModelItem]);
 
   const [thinkingLevel, setThinkingLevel] = useState<string>(() => {
@@ -623,9 +596,12 @@ export function ChatCard({
         }
       }
       if (!supportedThinkingLevels.includes(thinkingLevel)) {
-        const fallback = currentModelItem?.defaultThinkingLevel || (supportedThinkingLevels.includes("medium")
-          ? "medium"
-          : supportedThinkingLevels[0]!);
+        let fallback = currentModelItem?.defaultThinkingLevel;
+        if (!fallback || !supportedThinkingLevels.includes(fallback)) {
+          fallback = supportedThinkingLevels.includes("medium")
+            ? "medium"
+            : supportedThinkingLevels[supportedThinkingLevels.length - 1]!;
+        }
         setThinkingLevel(fallback);
         localStorage.setItem("const_harness_thinking_level", fallback);
       }
@@ -641,9 +617,12 @@ export function ChatCard({
           if (items && items.length > 0) {
             const mapped = items.map((m: any) => {
               const isConst = isConstProvider(m.provider);
-              let supportsThinking = Boolean(
-                m.supportsThinking || m.supports_thinking || m.supports_reasoning
-              );
+              let supportsThinking =
+                m.id === "combo/fast"
+                  ? false
+                  : m.supportsThinking !== undefined
+                  ? Boolean(m.supportsThinking)
+                  : true;
               let name = m.displayName || m.name || m.id;
               let defaultThinkingLevel = m.defaultThinkingLevel || m.default_thinking_level || "medium";
 
@@ -671,14 +650,9 @@ export function ChatCard({
                 provider: isConst ? "const" : (m.provider || "custom"),
                 providerName: isConst ? "Const" : (m.providerName || "Custom"),
                 supportsThinking,
-                thinkingLevels:
-                  m.thinkingLevels ||
-                  m.thinking_levels ||
-                  (m.id === "gemini-3.8-flash" || (name || m.id).includes("3.8")
-                    ? ["low", "medium", "high", "xhigh", "max"]
-                    : supportsThinking
-                    ? ["low", "medium", "high"]
-                    : undefined),
+                thinkingLevels: supportsThinking
+                  ? m.thinkingLevels || m.thinking_levels || ["low", "medium", "high", "xhigh", "max"]
+                  : undefined,
                 defaultThinkingLevel,
                 maxOutputTokens: m.maxOutputTokens ?? m.max_output_tokens ?? (isConst ? 128000 : 65536),
                 contextWindow:
@@ -1635,7 +1609,9 @@ export function ChatCard({
                                               : "text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5"
                                           )}
                                         >
-                                          <span className="truncate font-normal min-w-0 pr-2">{m.name}</span>
+                                          <div className="flex items-center gap-1.5 min-w-0 pr-2">
+                                            <span className="truncate font-normal">{m.name}</span>
+                                          </div>
                                           {isSelected && (
                                             <Check className="w-3.5 h-3.5 text-[#262626] dark:text-[#d4d4d4] shrink-0 ml-auto" />
                                           )}
@@ -1711,19 +1687,20 @@ export function ChatCard({
                     aria-label={`Thinking effort: ${thinkingLevel}`}
                   >
                     <Brain className="w-3.5 h-3.5 text-[#a9a9a9] dark:text-[#888888] shrink-0" />
-                    <span className="capitalize">{thinkingLevel}</span>
+                    <span className="capitalize">{thinkingLevel === "xhigh" ? "XHigh" : thinkingLevel}</span>
                     <ChevronDown className="w-3 h-3 text-[#a9a9a9] dark:text-[#5d5d5d] ml-0.5 shrink-0" />
                   </button>
 
                   {/* Thinking Level Popover Dropdown */}
                   {isThinkingOpen && (
-                    <div className="absolute bottom-full mb-2 right-0 w-44 max-w-[calc(100vw-32px)] bg-white dark:bg-[#222222] border border-[#e2e2e4] dark:border-[#383838] rounded-2xl shadow-2xl p-1.5 z-[60] flex flex-col text-left select-none animate-in fade-in zoom-in-95 duration-100">
-                      <div className="px-2.5 py-1 text-[11px] font-medium text-[#a9a9a9] dark:text-[#888888] uppercase tracking-wider mb-1 flex items-center justify-between">
-                        <span>Thinking</span>
+                    <div className="absolute bottom-full mb-2 right-0 w-36 max-w-[calc(100vw-32px)] bg-white dark:bg-[#222222] border border-[#e2e2e4] dark:border-[#383838] rounded-2xl shadow-2xl p-1.5 z-[60] flex flex-col text-left select-none animate-in fade-in zoom-in-95 duration-100">
+                      <div className="px-2 py-1 text-[11px] font-medium text-[#a9a9a9] dark:text-[#888888] uppercase tracking-wider mb-0.5">
+                        Thinking
                       </div>
                       <div className="flex flex-col gap-0.5">
                         {supportedThinkingLevels.map((lvl) => {
                           const isSelected = thinkingLevel === lvl;
+                          const label = lvl === "xhigh" ? "XHigh" : lvl.charAt(0).toUpperCase() + lvl.slice(1);
                           return (
                             <button
                               key={lvl}
@@ -1731,16 +1708,17 @@ export function ChatCard({
                               onClick={() => {
                                 setThinkingLevel(lvl);
                                 localStorage.setItem("const_harness_thinking_level", lvl);
+                                localStorage.setItem("const_harness_user_thinking_override", "true");
                                 setIsThinkingOpen(false);
                               }}
                               className={cn(
-                                "w-full px-2.5 py-1.5 flex items-center justify-between text-[12px] rounded-lg transition-colors cursor-pointer capitalize text-left",
+                                "w-full px-2.5 py-1.5 flex items-center justify-between text-[12px] rounded-lg transition-colors cursor-pointer text-left",
                                 isSelected
                                   ? "bg-black/10 dark:bg-white/10 text-black dark:text-white font-medium"
                                   : "text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5"
                               )}
                             >
-                              <span className="font-normal capitalize">{lvl}</span>
+                              <span className="font-normal">{label}</span>
                               {isSelected && (
                                 <Check className="w-3.5 h-3.5 text-[#262626] dark:text-[#d4d4d4] shrink-0 ml-2" />
                               )}

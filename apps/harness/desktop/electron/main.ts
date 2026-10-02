@@ -540,7 +540,7 @@ app.whenReady().then(() => {
               baseUrl: routerBaseUrl,
               supportsThinking,
               supportsTools: Boolean(m.supports_tools ?? true),
-              thinkingLevels: m.thinking_levels || m.thinkingLevels || (supportsThinking ? ["low", "medium", "high"] : undefined),
+              thinkingLevels: m.thinking_levels || m.thinkingLevels || (supportsThinking ? ["low", "medium", "high", "xhigh", "max"] : undefined),
               defaultThinkingLevel: m.default_thinking_level || m.defaultThinkingLevel || "medium",
               maxOutputTokens: m.max_output_tokens || m.maxOutputTokens || 128000,
               contextWindow: m.context_window || m.contextWindow || (m.id.includes("gemini") ? 1048576 : 128000),
@@ -564,7 +564,7 @@ app.whenReady().then(() => {
         baseUrl: m.baseUrl || config.providers[m.provider]?.baseUrl,
         supportsThinking,
         supportsTools: m.supportsTools ?? true,
-        thinkingLevels: (m as any).thinkingLevels || (supportsThinking ? ["low", "medium", "high"] : undefined),
+        thinkingLevels: (m as any).thinkingLevels || (supportsThinking ? ["low", "medium", "high", "xhigh", "max"] : undefined),
         defaultThinkingLevel: (m as any).defaultThinkingLevel || "medium",
         maxOutputTokens: (m as any).maxOutputTokens || 65536,
         contextWindow: (m as any).contextWindow || (m as any).context_window || 128000,
@@ -586,7 +586,7 @@ app.whenReady().then(() => {
       if (rawId === "combo/auto" || displayName === "Auto Router" || displayName === "Auto (Best Available)" || displayName === "combo/auto") {
         displayName = "combo/auto";
         supportsThinking = true;
-        thinkingLevels = ["low", "medium", "high"];
+        thinkingLevels = ["low", "medium", "high", "xhigh", "max"];
         defaultThinkingLevel = "medium";
       } else if (rawId === "combo/fast" || displayName === "Low-Latency Fast Chain" || displayName === "Fast (Low Latency)" || displayName === "combo/fast") {
         displayName = "combo/fast";
@@ -595,7 +595,7 @@ app.whenReady().then(() => {
       } else if (rawId === "combo/coding" || displayName === "Coding Agent Chain" || displayName === "Coding & Reasoning" || displayName === "combo/coding") {
         displayName = "combo/coding";
         supportsThinking = true;
-        thinkingLevels = ["low", "medium", "high"];
+        thinkingLevels = ["low", "medium", "high", "xhigh", "max"];
         defaultThinkingLevel = "high";
       }
 

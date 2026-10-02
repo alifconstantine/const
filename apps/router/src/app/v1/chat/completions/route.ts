@@ -471,8 +471,12 @@ async function dispatchSingleModel({
       stream,
     };
     if (reasoning_effort && reasoning_effort !== "off") {
-      constPayload.reasoning = reasoning_effort;
-      constPayload.reasoning_effort = reasoning_effort;
+      let effort = reasoning_effort;
+      if (resolvedModel.toLowerCase().includes("gemini") && (effort === "xhigh" || effort === "max")) {
+        effort = "high";
+      }
+      constPayload.reasoning = effort;
+      constPayload.reasoning_effort = effort;
     }
     if (max_tokens !== undefined) {
       constPayload.max_tokens = max_tokens;
@@ -665,8 +669,12 @@ async function dispatchSingleModel({
     stream,
   };
   if (reasoning_effort && reasoning_effort !== "off") {
-    payload.reasoning_effort = reasoning_effort;
-    payload.reasoning = reasoning_effort;
+    let effort = reasoning_effort;
+    if (targetModel.toLowerCase().includes("gemini") && (effort === "xhigh" || effort === "max")) {
+      effort = "high";
+    }
+    payload.reasoning_effort = effort;
+    payload.reasoning = effort;
   }
   if (max_tokens !== undefined) {
     payload.max_tokens = max_tokens;
