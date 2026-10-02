@@ -8,6 +8,7 @@ import type { TodoItem, QuestionItem, BackgroundTaskItem, NativeToolDefinition }
 import { executeLspQuery, type LspOperation } from "./lsp.js";
 import { executeAstGrep } from "./ast-grep.js";
 import { executeWebSearch, executeWebFetch } from "./web.js";
+import { executeGitStatus, executeGitDiff, executeGitCommit, executeGitLog } from "./git.js";
 
 export interface ExecuteToolOptions {
   signal?: AbortSignal;
@@ -717,6 +718,83 @@ export const CONST_DEFAULT_TOOLS: NativeToolDefinition[] = [
           },
         },
         required: ["url"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "git_status",
+      description:
+        "Inspect git repository status: current branch, upstream tracking status, staged modifications, unstaged files, and untracked files.",
+      parameters: {
+        type: "object",
+        properties: {},
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "git_diff",
+      description:
+        "View unified git diff of file modifications in the workspace. Supports staged diff, specific file diff, or comparison with a commit.",
+      parameters: {
+        type: "object",
+        properties: {
+          staged: {
+            type: "boolean",
+            description: "View staged changes (default: false).",
+          },
+          file: {
+            type: "string",
+            description: "Optional specific file path to diff.",
+          },
+          commit: {
+            type: "string",
+            description: "Optional commit hash or revision to compare against (e.g. 'HEAD~1').",
+          },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "git_commit",
+      description:
+        "Stage changes and create a git commit with a clear, descriptive commit message.",
+      parameters: {
+        type: "object",
+        properties: {
+          message: {
+            type: "string",
+            description: "The commit message.",
+          },
+          files: {
+            type: "array",
+            items: { type: "string" },
+            description: "Optional list of files to stage and commit (defaults to all changes).",
+          },
+        },
+        required: ["message"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "git_log",
+      description:
+        "View recent git commit history with hashes, author names, relative dates, and messages.",
+      parameters: {
+        type: "object",
+        properties: {
+          max_count: {
+            type: "number",
+            description: "Maximum number of commits to list (default: 10).",
+          },
+        },
       },
     },
   },
@@ -4183,6 +4261,96 @@ export async function executeNativeTool(
       } catch (err: any) {
         return {
           result: `web_fetch error: ${err.message}`,
+          isError: true,
+        };
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // Tool: git_status (aliases: gitstatus, gstatus)
+    // -----------------------------------------------------------------------
+    if (normalizedTool === "gitstatus" || normalizedTool === "gstatus") {
+      try {
+        const statusRes = await executeGitStatus(workspacePath, signal);
+        return {
+          result: statusRes.formatted,
+          isError: false,
+        };
+      } catch (err: any) {
+        return {
+          result: `git_status error: ${err.message}`,
+          isError: true,
+        };
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // Tool: git_diff (aliases: gitdiff, gdiff)
+    // -----------------------------------------------------------------------
+    if (normalizedTool === "gitdiff" || normalizedTool === "gdiff") {
+      try {
+        const diffRes = await executeGitDiff(
+          {
+            staged: Boolean(args.staged),
+            file: typeof args.file === "string" ? args.file : undefined,
+            commit: typeof args.commit === "string" ? args.commit : undefined,
+          },
+          workspacePath,
+          signal
+        );
+        return {
+          result: diffRes,
+          isError: false,
+        };
+      } catch (err: any) {
+        return {
+          result: `git_diff error: ${err.message}`,
+          isError: true,
+        };
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // Tool: git_commit (aliases: gitcommit, gcommit)
+    // -----------------------------------------------------------------------
+    if (normalizedTool === "gitcommit" || normalizedTool === "gcommit") {
+      const message = args.message || args.msg || args.m;
+      if (!message || typeof message !== "string") {
+        return {
+          result: "Error: Missing 'message' parameter for git_commit.",
+          isError: true,
+        };
+      }
+
+      const files = Array.isArray(args.files) ? args.files : undefined;
+      try {
+        const commitRes = await executeGitCommit(message, files, workspacePath, signal);
+        return {
+          result: commitRes,
+          isError: false,
+        };
+      } catch (err: any) {
+        return {
+          result: `git_commit error: ${err.message}`,
+          isError: true,
+        };
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // Tool: git_log (aliases: gitlog, glog)
+    // -----------------------------------------------------------------------
+    if (normalizedTool === "gitlog" || normalizedTool === "glog") {
+      const maxCount = Number(args.max_count || args.limit || args.count || 10);
+      try {
+        const logRes = await executeGitLog(maxCount, workspacePath, signal);
+        return {
+          result: logRes.formatted,
+          isError: false,
+        };
+      } catch (err: any) {
+        return {
+          result: `git_log error: ${err.message}`,
           isError: true,
         };
       }
