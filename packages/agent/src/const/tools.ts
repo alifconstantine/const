@@ -5,6 +5,7 @@ import os from "node:os";
 import { spawn, type ChildProcess } from "node:child_process";
 import type { FileMutationRecord } from "./mutation-ledger.js";
 import type { TodoItem, QuestionItem, BackgroundTaskItem, NativeToolDefinition } from "./types.js";
+import { executeLspQuery, type LspOperation } from "./lsp.js";
 
 export interface ExecuteToolOptions {
   signal?: AbortSignal;
@@ -601,6 +602,37 @@ export const CONST_DEFAULT_TOOLS: NativeToolDefinition[] = [
           },
         },
         required: ["action"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "lsp",
+      description:
+        "Query code intelligence for precision code navigation and understanding using Language Server Protocol / TypeScript Language Service. Operations: 'goToDefinition' (find symbol declaration/source), 'findReferences' (find all usages across codebase), 'goToImplementation' (find concrete implementation), 'hover' (type signature and doc comments at cursor position), 'documentSymbols' (outline all classes, functions, methods in a file). Lines and characters are 1-indexed.",
+      parameters: {
+        type: "object",
+        properties: {
+          operation: {
+            type: "string",
+            enum: ["goToDefinition", "findReferences", "goToImplementation", "hover", "documentSymbols"],
+            description: "The LSP operation to execute.",
+          },
+          file_path: {
+            type: "string",
+            description: "The target file to query (relative to workspace or absolute).",
+          },
+          line: {
+            type: "number",
+            description: "1-indexed line number of the cursor position (optional for documentSymbols).",
+          },
+          character: {
+            type: "number",
+            description: "1-indexed character / column number of the cursor position (optional for documentSymbols).",
+          },
+        },
+        required: ["operation", "file_path"],
       },
     },
   },
@@ -3924,6 +3956,50 @@ export async function executeNativeTool(
         result: `Unknown action '${action}'. Available actions: list, status, kill.`,
         isError: true,
       };
+    }
+
+    // -----------------------------------------------------------------------
+    // Tool: lsp (Language Server Protocol & TypeScript Language Service)
+    // -----------------------------------------------------------------------
+    if (normalizedTool === "lsp" || normalizedTool === "languageserver") {
+      const operation = args.operation as LspOperation;
+      const rawPath = extractPathArg(args) || args.file_path || args.filePath || args.file;
+      const line = Number(args.line ?? args.lineNumber ?? 1);
+      const character = Number(args.character ?? args.col ?? args.column ?? 1);
+
+      if (!rawPath) {
+        return {
+          result: "Error: Missing 'file_path' parameter for LSP operation.",
+          isError: true,
+        };
+      }
+
+      if (!operation) {
+        return {
+          result:
+            "Error: Missing 'operation' parameter for LSP. Choose from: goToDefinition, findReferences, goToImplementation, hover, documentSymbols.",
+          isError: true,
+        };
+      }
+
+      try {
+        const queryResult = await executeLspQuery(
+          operation,
+          rawPath,
+          line,
+          character,
+          workspacePath
+        );
+        return {
+          result: queryResult.formatted,
+          isError: false,
+        };
+      } catch (err: any) {
+        return {
+          result: `LSP Error (${operation} on ${rawPath}): ${err.message}`,
+          isError: true,
+        };
+      }
     }
 
     // -----------------------------------------------------------------------
