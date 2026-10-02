@@ -662,13 +662,36 @@ export function LearnHome({
     });
   };
 
-  const handleSelectAll = () => {
+  const isAllSelected = useMemo(() => {
     if (activeTab === "all") {
-      const isAllSelected =
+      return (
         selectedLearnIds.size === learns.length &&
         selectedCollectionIds.size === filteredCollections.length &&
-        (learns.length > 0 || filteredCollections.length > 0);
+        (learns.length > 0 || filteredCollections.length > 0)
+      );
+    }
+    if (activeTab === "learns") {
+      return selectedLearnIds.size === learns.length && learns.length > 0;
+    }
+    if (activeTab === "collections") {
+      if (activeCollection) {
+        return selectedLearnIds.size === collectionLearns.length && collectionLearns.length > 0;
+      }
+      return selectedCollectionIds.size === filteredCollections.length && filteredCollections.length > 0;
+    }
+    return false;
+  }, [
+    activeTab,
+    activeCollection,
+    selectedLearnIds.size,
+    selectedCollectionIds.size,
+    learns.length,
+    filteredCollections.length,
+    collectionLearns.length,
+  ]);
 
+  const handleSelectAll = () => {
+    if (activeTab === "all") {
       if (isAllSelected) {
         setSelectedLearnIds(new Set());
         setSelectedCollectionIds(new Set());
@@ -677,20 +700,20 @@ export function LearnHome({
         setSelectedCollectionIds(new Set(filteredCollections.map((c) => c.id)));
       }
     } else if (activeTab === "learns") {
-      if (selectedLearnIds.size === learns.length && learns.length > 0) {
+      if (isAllSelected) {
         setSelectedLearnIds(new Set());
       } else {
         setSelectedLearnIds(new Set(learns.map((l) => l.id)));
       }
     } else if (activeTab === "collections") {
       if (activeCollection) {
-        if (selectedLearnIds.size === collectionLearns.length && collectionLearns.length > 0) {
+        if (isAllSelected) {
           setSelectedLearnIds(new Set());
         } else {
           setSelectedLearnIds(new Set(collectionLearns.map((l) => l.id)));
         }
       } else {
-        if (selectedCollectionIds.size === filteredCollections.length && filteredCollections.length > 0) {
+        if (isAllSelected) {
           setSelectedCollectionIds(new Set());
         } else {
           setSelectedCollectionIds(new Set(filteredCollections.map((c) => c.id)));
@@ -1506,72 +1529,93 @@ export function LearnHome({
           FLOATING MULTI-SELECT ACTION BAR (HUD) (Mobile)
           ------------------------------------------------------------- */}
       {isSelectionMode && (
-        <div className="fixed bottom-5 inset-x-3 sm:inset-x-auto sm:left-1/2 sm:-translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-3 duration-200 pointer-events-auto safe-area-bottom">
-          <div className="flex items-center justify-between sm:justify-start gap-1 px-3 py-2 rounded-2xl bg-[#1c1c1c] text-foreground border border-border/80 shadow-2xl backdrop-blur-md max-w-md mx-auto">
-            {/* Selected Counter */}
-            <div className="px-2 py-1 text-xs font-medium font-sans text-muted-foreground whitespace-nowrap">
-              {t("itemsSelected", { count: totalSelectedCount })}
+        <div className="fixed bottom-5 left-1/2 -translate-x-1/2 z-50 animate-in fade-in slide-in-from-bottom-3 duration-200 pointer-events-auto safe-area-bottom w-fit max-w-[calc(100vw-2rem)]">
+          <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-2xl bg-card/95 text-foreground border border-border/80 shadow-2xl backdrop-blur-md">
+            {/* Selected Counter Badge */}
+            <div className="flex items-center gap-1.5 pl-1.5 pr-2 py-1 text-xs font-medium font-sans whitespace-nowrap">
+              <span className="flex h-5 min-w-5 px-1.5 items-center justify-center rounded-full bg-primary/20 text-primary text-[11px] font-bold">
+                {totalSelectedCount}
+              </span>
+              <span className="text-muted-foreground text-xs hidden min-[360px]:inline">
+                {language === "id" ? "terpilih" : "selected"}
+              </span>
             </div>
 
             <div className="h-4 w-px bg-border/80 shrink-0" />
 
-            {/* Select All / Deselect All */}
-            <button
-              type="button"
-              onClick={handleSelectAll}
-              className="h-8 px-2 rounded-xl text-xs flex items-center gap-1 text-muted-foreground hover:text-foreground active:bg-secondary/80 transition-colors cursor-pointer"
-            >
-              <CheckSquare className="h-3.5 w-3.5 shrink-0" />
-              <span className="text-[11px]">
-                {(activeTab === "collections" && !activeCollection
-                  ? selectedCollectionIds.size === filteredCollections.length && filteredCollections.length > 0
-                  : activeTab === "collections" && activeCollection
-                  ? selectedLearnIds.size === collectionLearns.length && collectionLearns.length > 0
-                  : activeTab === "all"
-                  ? selectedLearnIds.size === learns.length && selectedCollectionIds.size === filteredCollections.length && (learns.length > 0 || filteredCollections.length > 0)
-                  : selectedLearnIds.size === learns.length && learns.length > 0)
-                  ? t("deselectAll")
-                  : t("selectAll")}
-              </span>
-            </button>
-
-            {/* Add to Module (only when learns are selected) */}
-            {selectedLearnIds.size > 0 && (
+            {/* Actions (Icon-Only) */}
+            <div className="flex items-center gap-0.5">
+              {/* Select All / Deselect All */}
               <button
                 type="button"
-                onClick={() => setIsBatchAddToModuleOpen(true)}
-                className="h-8 px-2 rounded-xl text-xs flex items-center gap-1 text-muted-foreground hover:text-foreground active:bg-secondary/80 transition-colors cursor-pointer"
+                onClick={handleSelectAll}
+                className={cn(
+                  "h-9 w-9 rounded-xl flex items-center justify-center transition-all cursor-pointer",
+                  isAllSelected
+                    ? "bg-primary text-primary-foreground shadow-xs"
+                    : "text-muted-foreground hover:text-foreground active:bg-secondary"
+                )}
+                title={isAllSelected ? t("deselectAll") : t("selectAll")}
+                aria-label={isAllSelected ? t("deselectAll") : t("selectAll")}
               >
-                <FolderPlus className="h-3.5 w-3.5 text-primary shrink-0" />
-                <span className="text-[11px]">{t("addToModule")}</span>
+                <CheckSquare className="h-4 w-4" />
               </button>
-            )}
 
-            {/* Remove from current Module (when inside drilled-down module and learns selected) */}
-            {activeCollection && selectedLearnIds.size > 0 && (
+              {/* Add to Module / Folder */}
+              {!activeCollection && activeTab !== "collections" && (
+                <button
+                  type="button"
+                  disabled={selectedLearnIds.size === 0}
+                  onClick={() => setIsBatchAddToModuleOpen(true)}
+                  className={cn(
+                    "h-9 w-9 rounded-xl flex items-center justify-center transition-all",
+                    selectedLearnIds.size > 0
+                      ? "text-primary hover:bg-primary/10 active:scale-95 cursor-pointer"
+                      : "text-muted-foreground/30 cursor-not-allowed"
+                  )}
+                  title={t("addToModule")}
+                  aria-label={t("addToModule")}
+                >
+                  <FolderPlus className="h-4 w-4" />
+                </button>
+              )}
+
+              {/* Remove from current Module (when inside drilled-down folder) */}
+              {activeCollection && (
+                <button
+                  type="button"
+                  disabled={selectedLearnIds.size === 0}
+                  onClick={handleBatchRemoveFromActiveCollection}
+                  className={cn(
+                    "h-9 w-9 rounded-xl flex items-center justify-center transition-all",
+                    selectedLearnIds.size > 0
+                      ? "text-amber-500 hover:bg-amber-500/10 active:scale-95 cursor-pointer"
+                      : "text-muted-foreground/30 cursor-not-allowed"
+                  )}
+                  title={t("removeFromModule")}
+                  aria-label={t("removeFromModule")}
+                >
+                  <FolderMinus className="h-4 w-4" />
+                </button>
+              )}
+
+              {/* Batch Delete */}
               <button
                 type="button"
-                onClick={handleBatchRemoveFromActiveCollection}
-                className="h-8 px-2 rounded-xl text-xs flex items-center gap-1 text-amber-500 hover:text-amber-400 active:bg-amber-500/10 transition-colors cursor-pointer"
-              >
-                <FolderMinus className="h-3.5 w-3.5 shrink-0" />
-                <span className="text-[11px]">{t("removeFromModule")}</span>
-              </button>
-            )}
-
-            {/* Batch Delete */}
-            {totalSelectedCount > 0 && (
-              <button
-                type="button"
+                disabled={totalSelectedCount === 0}
                 onClick={handleBatchDeleteClick}
-                className="h-8 px-2 rounded-xl text-xs flex items-center gap-1 text-rose-500 hover:text-rose-400 active:bg-rose-500/10 transition-colors cursor-pointer"
+                className={cn(
+                  "h-9 w-9 rounded-xl flex items-center justify-center transition-all",
+                  totalSelectedCount > 0
+                    ? "text-rose-500 hover:bg-rose-500/10 active:scale-95 cursor-pointer"
+                    : "text-muted-foreground/30 cursor-not-allowed"
+                )}
+                title={totalSelectedCount > 0 ? `${t("batchDelete")} (${totalSelectedCount})` : t("batchDelete")}
+                aria-label={t("batchDelete")}
               >
-                <Trash2 className="h-3.5 w-3.5 shrink-0" />
-                <span className="text-[11px]">
-                  {t("batchDelete")} ({totalSelectedCount})
-                </span>
+                <Trash2 className="h-4 w-4" />
               </button>
-            )}
+            </div>
 
             <div className="h-4 w-px bg-border/80 shrink-0" />
 
@@ -1579,10 +1623,11 @@ export function LearnHome({
             <button
               type="button"
               onClick={handleExitSelectionMode}
-              className="h-8 w-8 rounded-xl flex items-center justify-center text-muted-foreground hover:text-foreground active:bg-secondary/80 transition-colors cursor-pointer shrink-0"
+              className="h-9 w-9 rounded-xl flex items-center justify-center text-muted-foreground hover:text-foreground active:bg-secondary transition-all cursor-pointer shrink-0"
               title={t("cancelSelect")}
+              aria-label={t("cancelSelect")}
             >
-              <X className="h-3.5 w-3.5" />
+              <X className="h-4 w-4" />
             </button>
           </div>
         </div>
