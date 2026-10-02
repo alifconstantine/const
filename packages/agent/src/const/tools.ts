@@ -7,6 +7,7 @@ import type { FileMutationRecord } from "./mutation-ledger.js";
 import type { TodoItem, QuestionItem, BackgroundTaskItem, NativeToolDefinition } from "./types.js";
 import { executeLspQuery, type LspOperation } from "./lsp.js";
 import { executeAstGrep } from "./ast-grep.js";
+import { executeWebSearch, executeWebFetch } from "./web.js";
 
 export interface ExecuteToolOptions {
   signal?: AbortSignal;
@@ -672,6 +673,50 @@ export const CONST_DEFAULT_TOOLS: NativeToolDefinition[] = [
           },
         },
         required: ["pattern"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "web_search",
+      description:
+        "Search the web for up-to-date documentation, API references, library updates, or debugging solutions. Supports Exa AI neural search (if EXA_API_KEY is configured) and public web search fallback.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: {
+            type: "string",
+            description: "Search query text.",
+          },
+          num_results: {
+            type: "number",
+            description: "Number of search results to return (default: 5).",
+          },
+        },
+        required: ["query"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "web_fetch",
+      description:
+        "Fetch web content from a URL (HTTP/HTTPS) and convert HTML to clean, readable Markdown. Strips scripts, styles, and unwanted markup while preserving text, headings, code blocks, and tables.",
+      parameters: {
+        type: "object",
+        properties: {
+          url: {
+            type: "string",
+            description: "The full web URL to fetch.",
+          },
+          max_chars: {
+            type: "number",
+            description: "Maximum characters of content to return (default: 30000).",
+          },
+        },
+        required: ["url"],
       },
     },
   },
@@ -4079,6 +4124,65 @@ export async function executeNativeTool(
       } catch (err: any) {
         return {
           result: `ast_grep error: ${err.message}`,
+          isError: true,
+        };
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // Tool: web_search (aliases: websearch, searchweb)
+    // -----------------------------------------------------------------------
+    if (normalizedTool === "websearch" || normalizedTool === "searchweb") {
+      const query = args.query || args.q || args.search;
+      if (!query || typeof query !== "string") {
+        return {
+          result: "Error: Missing 'query' parameter for web_search.",
+          isError: true,
+        };
+      }
+
+      const numResults = Number(args.num_results || args.numResults || args.limit || 5);
+      try {
+        const searchRes = await executeWebSearch(query, numResults, signal);
+        return {
+          result: searchRes.formatted,
+          isError: false,
+        };
+      } catch (err: any) {
+        return {
+          result: `web_search error: ${err.message}`,
+          isError: true,
+        };
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // Tool: web_fetch (aliases: webfetch, fetchurl, readurl, curl)
+    // -----------------------------------------------------------------------
+    if (
+      normalizedTool === "webfetch" ||
+      normalizedTool === "fetchurl" ||
+      normalizedTool === "readurl" ||
+      normalizedTool === "curl"
+    ) {
+      const url = args.url || args.link || args.href;
+      if (!url || typeof url !== "string") {
+        return {
+          result: "Error: Missing 'url' parameter for web_fetch.",
+          isError: true,
+        };
+      }
+
+      const maxChars = Number(args.max_chars || args.maxChars || 30000);
+      try {
+        const fetchRes = await executeWebFetch(url, maxChars, signal);
+        return {
+          result: fetchRes.formatted,
+          isError: false,
+        };
+      } catch (err: any) {
+        return {
+          result: `web_fetch error: ${err.message}`,
           isError: true,
         };
       }
