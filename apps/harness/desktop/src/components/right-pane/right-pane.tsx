@@ -30,6 +30,7 @@ interface RightPaneProps {
   onStopTask?: (taskId: string) => void;
   onUpdateTab?: (tabId: string, updates: Partial<RightPaneTab>) => void;
   onSelectElementForChat?: (element: BrowserSelectedElement) => void;
+  onDraggingChange?: (isDragging: boolean) => void;
 }
 
 export function RightPane({
@@ -51,6 +52,7 @@ export function RightPane({
   onStopTask,
   onUpdateTab,
   onSelectElementForChat,
+  onDraggingChange,
 }: RightPaneProps) {
   const isDraggingRef = useRef(false);
   const startXRef = useRef(0);
@@ -59,6 +61,7 @@ export function RightPane({
   // Resize handler
   const handleMouseDown = (e: React.MouseEvent) => {
     isDraggingRef.current = true;
+    onDraggingChange?.(true);
     startXRef.current = e.clientX;
     startWidthRef.current = width;
     document.body.style.cursor = "col-resize";
@@ -73,6 +76,7 @@ export function RightPane({
 
     const handleMouseUp = () => {
       isDraggingRef.current = false;
+      onDraggingChange?.(false);
       document.body.style.cursor = "";
       document.body.style.userSelect = "";
       window.removeEventListener("mousemove", handleMouseMove);
@@ -129,7 +133,7 @@ export function RightPane({
 
   return (
     <aside
-      className="h-full flex flex-col relative bg-[#141414] border-l border-[#262626] shrink-0 overflow-hidden z-20"
+      className="h-full flex flex-col relative bg-[#ffffff] dark:bg-[#141414] border-l border-t border-b border-[#dedee2] dark:border-[#282828] rounded-tl-2xl rounded-bl-2xl shrink-0 overflow-hidden z-20 shadow-xs"
       style={{ width: `${width}px` }}
     >
       {/* Draggable resize handle on the left edge */}
@@ -160,7 +164,7 @@ export function RightPane({
       />
 
       {/* Main Tab Body (Persistent Stack keeping tabs alive in DOM) */}
-      <div className="flex-1 w-full h-[calc(100%-40px)] min-h-0 relative overflow-hidden flex flex-col bg-[#141414]">
+      <div className="flex-1 w-full h-[calc(100%-40px)] min-h-0 relative overflow-hidden flex flex-col bg-[#ffffff] dark:bg-[#141414]">
         {isOpeningNewTab || tabs.length === 0 || !activeTab ? (
           /* Empty / New Tab Picker matching Image 2 1:1 */
           <OpenTabView onSelectTabType={onOpenTabType} />

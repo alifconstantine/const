@@ -231,6 +231,7 @@ function AuthenticatedContent({
   const [rightPaneTabs, setRightPaneTabs] = useState<RightPaneTab[]>([]);
   const [activeRightPaneTabId, setActiveRightPaneTabId] = useState<string | null>(null);
   const [isOpeningNewTab, setIsOpeningNewTab] = useState<boolean>(false);
+  const [isDraggingRightSidebar, setIsDraggingRightSidebar] = useState<boolean>(false);
 
   useEffect(() => {
     localStorage.setItem("const_harness_right_sidebar_open", JSON.stringify(isRightSidebarOpen));
@@ -2292,7 +2293,12 @@ function AuthenticatedContent({
 
             {/* Main Workbench Body: Center Conversation Canvas + Collapsible Right Sidebar */}
             <div className="flex-1 min-w-0 flex flex-row overflow-hidden relative">
-              <div className="flex-1 min-w-0 h-full flex flex-col relative overflow-hidden">
+              <div
+                className={cn(
+                  "flex-1 min-w-0 h-full flex flex-col relative overflow-hidden",
+                  !isDraggingRightSidebar && "transition-[width,flex] duration-300 ease-in-out"
+                )}
+              >
                 {/* Dynamic Canvas: Landing Layout when 0 messages vs Active Stream Layout */}
                 {messages.length === 0 ? (
           <div className="flex-1 min-w-0 relative flex flex-col items-center justify-center px-3.5 sm:px-6 md:px-8 pt-6 pb-6 overflow-y-auto">
@@ -2601,36 +2607,48 @@ function AuthenticatedContent({
         )}
               </div>
 
-              {/* Right Sidebar (Side Pane) matching Image 1 & 2 */}
-              {isRightSidebarOpen && (
-                <RightPane
-                  width={rightSidebarWidth}
-                  onWidthChange={setRightSidebarWidth}
-                  tabs={rightPaneTabs}
-                  activeTabId={activeRightPaneTabId}
-                  isOpeningNewTab={isOpeningNewTab}
-                  onSelectTab={(tabId) => {
-                    setActiveRightPaneTabId(tabId);
-                    setIsOpeningNewTab(false);
-                  }}
-                  onCloseTab={handleCloseTab}
-                  onNewTab={handleNewTab}
-                  onOpenTabType={handleOpenTabType}
-                  onReorderTabs={handleReorderTabs}
-                  workspacePath={currentProject === "Outside Project" ? undefined : currentProject}
-                  mutations={
-                    sidebarReviewMutations && sidebarReviewMutations.length > 0
-                      ? sidebarReviewMutations
-                      : allSessionMutations
-                  }
-                  onRollbackFile={handleRollback}
-                  onRollbackAll={handleRollbackAll}
-                  onOpenFileDiff={handleOpenFileDiff}
-                  onStopTask={handleStopBackgroundTask}
-                  onUpdateTab={handleUpdateTab}
-                  onSelectElementForChat={handleSelectElementForChat}
-                />
-              )}
+              {/* Right Sidebar (Side Pane) matching Image 1 & 2 with smooth animated open/close */}
+              <div
+                className={cn(
+                  "shrink-0 h-full overflow-hidden z-20",
+                  !isDraggingRightSidebar && "transition-[width,opacity] duration-300 ease-in-out",
+                  isRightSidebarOpen ? "opacity-100" : "w-0 opacity-0 pointer-events-none"
+                )}
+                style={{
+                  width: isRightSidebarOpen ? `${rightSidebarWidth}px` : 0,
+                }}
+              >
+                <div style={{ width: `${rightSidebarWidth}px` }} className="h-full">
+                  <RightPane
+                    width={rightSidebarWidth}
+                    onWidthChange={setRightSidebarWidth}
+                    onDraggingChange={setIsDraggingRightSidebar}
+                    tabs={rightPaneTabs}
+                    activeTabId={activeRightPaneTabId}
+                    isOpeningNewTab={isOpeningNewTab}
+                    onSelectTab={(tabId) => {
+                      setActiveRightPaneTabId(tabId);
+                      setIsOpeningNewTab(false);
+                    }}
+                    onCloseTab={handleCloseTab}
+                    onNewTab={handleNewTab}
+                    onOpenTabType={handleOpenTabType}
+                    onReorderTabs={handleReorderTabs}
+                    workspacePath={currentProject === "Outside Project" ? undefined : currentProject}
+                    mutations={
+                      sidebarReviewMutations && sidebarReviewMutations.length > 0
+                        ? sidebarReviewMutations
+                        : allSessionMutations
+                    }
+                    onRollbackFile={handleRollback}
+                    onRollbackAll={handleRollbackAll}
+                    onOpenFileDiff={handleOpenFileDiff}
+                    onStopTask={handleStopBackgroundTask}
+                    onUpdateTab={handleUpdateTab}
+                    onSelectElementForChat={handleSelectElementForChat}
+                  />
+                </div>
+              </div>
             </div>
           </>
         )}
