@@ -45,6 +45,8 @@ import {
   Loader2,
   Pencil,
   Brain,
+  Mic,
+  MessageSquare,
 } from "lucide-react";
 import { ModelConfigDialog } from "@/components/models/model-config-dialog";
 import { formatTokenDisplay, isReasoningModel } from "@/lib/model-specs";
@@ -63,6 +65,8 @@ interface ModelItem {
   outputTypes?: string[];
   isDefault?: boolean;
   supportsThinking?: boolean;
+  category?: "llm" | "stt" | "search";
+  endpoint?: string;
 }
 
 interface ProviderGroup {
@@ -84,6 +88,8 @@ const PROVIDERS_DATA: ProviderGroup[] = [
         name: "Gemini 3.8 Flash",
         modelId: "gemini-3.8-flash",
         provider: "const",
+        category: "llm",
+        endpoint: "/v1/chat/completions",
         contextWindow: "1000000",
         maxOutputTokens: "128000",
         inputTypes: ["text", "image", "video"],
@@ -96,6 +102,8 @@ const PROVIDERS_DATA: ProviderGroup[] = [
         name: "Gemini 3.7 Flash",
         modelId: "gemini-3.7-flash",
         provider: "const",
+        category: "llm",
+        endpoint: "/v1/chat/completions",
         contextWindow: "1000000",
         maxOutputTokens: "128000",
         inputTypes: ["text", "image", "video"],
@@ -103,10 +111,38 @@ const PROVIDERS_DATA: ProviderGroup[] = [
         supportsThinking: true,
       },
       {
+        id: "qwen-3.8-27b",
+        name: "Qwen 3.8 27B",
+        modelId: "qwen-3.8-27b",
+        provider: "const",
+        category: "llm",
+        endpoint: "/v1/chat/completions",
+        contextWindow: "131072",
+        maxOutputTokens: "65536",
+        inputTypes: ["text"],
+        outputTypes: ["text"],
+        supportsThinking: true,
+      },
+      {
+        id: "whisper-large-v3-turbo",
+        name: "Whisper Large V3 Turbo",
+        modelId: "whisper-large-v3-turbo",
+        provider: "const",
+        category: "stt",
+        endpoint: "/v1/audio/transcriptions",
+        contextWindow: "-",
+        maxOutputTokens: "-",
+        inputTypes: ["audio"],
+        outputTypes: ["text"],
+        supportsThinking: false,
+      },
+      {
         id: "const-search",
-        name: "Const Search",
+        name: "Const Search (Exa AI)",
         modelId: "const-search",
         provider: "const",
+        category: "search",
+        endpoint: "/v1/search",
         contextWindow: "-",
         maxOutputTokens: "-",
         inputTypes: ["text", "search"],
@@ -135,6 +171,7 @@ export default function ModelsPage() {
 
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedProvider, setSelectedProvider] = useState("all");
+  const [selectedCategory, setSelectedCategory] = useState<"all" | "llm" | "stt" | "search">("all");
   const [copiedModelId, setCopiedModelId] = useState<string | null>(null);
   const [testingModelId, setTestingModelId] = useState<string | null>(null);
   const [editingModel, setEditingModel] = useState<ModelItem | null>(null);
@@ -160,6 +197,8 @@ export default function ModelsPage() {
             provider: up.name,
             providerDocId: up._id,
             providerId: up.providerId,
+            category: "llm",
+            endpoint: "/v1/chat/completions",
             contextWindow: m.contextWindow || "1000000",
             maxOutputTokens: m.maxOutputTokens || "128000",
             inputTypes: m.inputTypes || ["text"],
@@ -222,7 +261,7 @@ export default function ModelsPage() {
     }
   };
 
-  // Filter models by provider and search query
+  // Filter models by provider, category, and search query
   const filteredProviders = useMemo(() => {
     const query = searchQuery.toLowerCase().trim();
 
@@ -234,13 +273,24 @@ export default function ModelsPage() {
 
       // Filter models inside provider
       const matchedModels = provider.models.filter((model) => {
+        // Modality / Category filter
+        if (selectedCategory !== "all") {
+          const isAudio = model.category === "stt" || model.inputTypes?.includes("audio") || model.modelId.includes("whisper");
+          const isSearch = model.category === "search" || model.inputTypes?.includes("search") || model.modelId === "const-search";
+          const isLlm = !isAudio && !isSearch;
+
+          if (selectedCategory === "llm" && !isLlm) return false;
+          if (selectedCategory === "stt" && !isAudio) return false;
+          if (selectedCategory === "search" && !isSearch) return false;
+        }
+
         if (!query) return true;
         const inName = model.name.toLowerCase().includes(query);
         const inId = model.modelId.toLowerCase().includes(query);
         return inName || inId;
       });
 
-      if (matchedModels.length === 0 && query) {
+      if (matchedModels.length === 0 && (query || selectedCategory !== "all")) {
         return null;
       }
 
@@ -249,7 +299,7 @@ export default function ModelsPage() {
         models: matchedModels,
       };
     }).filter(Boolean) as ProviderGroup[];
-  }, [allProviders, searchQuery, selectedProvider]);
+  }, [allProviders, searchQuery, selectedProvider, selectedCategory]);
 
   // Total available models count across filtered
   const totalAvailableModels = allProviders.reduce(
@@ -364,22 +414,50 @@ export default function ModelsPage() {
           </div>
         </Card>
 
-        {/* 4. Controls: Search Model + Provider Selector */}
+        {/* 4. Controls: Category Filter Pills + Search Model + Provider Selector */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
-          {/* Left: Search Input */}
-          <div className="relative flex-1">
-            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
-            <input
-              type="text"
-              placeholder="Search model name or capability..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 h-10 rounded-xl bg-secondary/50 border-none text-xs text-foreground placeholder:text-muted-foreground font-sans outline-none focus:outline-none focus:ring-1 focus:ring-foreground/20 transition-all"
-            />
+          {/* Category Filter Pills */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+            {[
+              { id: "all", label: "All Modalities", icon: null },
+              { id: "llm", label: "LLM / Chat", icon: MessageSquare },
+              { id: "stt", label: "Audio / STT", icon: Mic },
+              { id: "search", label: "Search", icon: Search },
+            ].map((cat) => {
+              const Icon = cat.icon;
+              const isActive = selectedCategory === cat.id;
+              return (
+                <button
+                  key={cat.id}
+                  onClick={() => setSelectedCategory(cat.id as any)}
+                  className={cn(
+                    "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-sans transition-all cursor-pointer whitespace-nowrap",
+                    isActive
+                      ? "bg-foreground text-background font-medium shadow-sm"
+                      : "bg-secondary/60 text-muted-foreground hover:text-foreground hover:bg-secondary"
+                  )}
+                >
+                  {Icon && <Icon className="h-3 w-3" />}
+                  <span>{cat.label}</span>
+                </button>
+              );
+            })}
           </div>
 
-          {/* Right: Provider Selector */}
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-2 flex-1 sm:justify-end">
+            {/* Search Input */}
+            <div className="relative flex-1 sm:max-w-xs">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Search models..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 h-10 rounded-xl bg-secondary/50 border-none text-xs text-foreground placeholder:text-muted-foreground font-sans outline-none focus:outline-none focus:ring-1 focus:ring-foreground/20 transition-all"
+              />
+            </div>
+
+            {/* Provider Selector */}
             <Select
               value={selectedProvider}
               onValueChange={(val) => {
@@ -390,7 +468,7 @@ export default function ModelsPage() {
                 setSelectedProvider(val);
               }}
             >
-              <SelectTrigger className="h-10 min-w-[140px] rounded-xl bg-secondary/50 border-none text-xs font-sans text-foreground">
+              <SelectTrigger className="h-10 min-w-[130px] rounded-xl bg-secondary/50 border-none text-xs font-sans text-foreground">
                 <SelectValue placeholder="Select Provider" />
               </SelectTrigger>
               <SelectContent className="rounded-xl border-none bg-popover text-xs font-sans shadow-lg">
@@ -426,7 +504,7 @@ export default function ModelsPage() {
                 No models found
               </h3>
               <p className="text-xs text-muted-foreground font-light max-w-sm mx-auto">
-                No models match your current search query &quot;{searchQuery}&quot;.
+                No models match your current filters.
               </p>
               <Button
                 variant="outline"
@@ -434,6 +512,7 @@ export default function ModelsPage() {
                 onClick={() => {
                   setSearchQuery("");
                   setSelectedProvider("all");
+                  setSelectedCategory("all");
                 }}
                 className="mt-2 rounded-full text-xs h-8 border-none bg-secondary hover:bg-secondary/80"
               >
@@ -483,7 +562,7 @@ export default function ModelsPage() {
                           key={model.id}
                           className="border-none hover:bg-secondary/20 transition-colors"
                         >
-                          {/* 1. Model Name with Copy Button next to it */}
+                          {/* 1. Model Name with Copy Button and Endpoint next to it */}
                           <TableCell className="py-4 pl-6 pr-4">
                             <div className="flex items-center gap-2 flex-wrap">
                               <span className="font-medium text-sm text-foreground font-sans">
@@ -518,6 +597,13 @@ export default function ModelsPage() {
                                   Default
                                 </Badge>
                               )}
+
+                              {/* Endpoint badge */}
+                              {model.endpoint && (
+                                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-secondary/80 text-muted-foreground border border-border/40">
+                                  {model.endpoint}
+                                </span>
+                              )}
                             </div>
                           </TableCell>
 
@@ -551,6 +637,12 @@ export default function ModelsPage() {
                               {model.inputTypes?.includes("video") && (
                                 <span className="text-[10px] font-sans px-1.5 py-0.5 rounded-md bg-secondary border border-border text-foreground">
                                   Video
+                                </span>
+                              )}
+                              {model.inputTypes?.includes("audio") && (
+                                <span className="text-[10px] font-sans px-1.5 py-0.5 rounded-md bg-rose-500/10 border border-rose-500/20 text-rose-500 flex items-center gap-1">
+                                  <Mic className="h-2.5 w-2.5" />
+                                  Audio
                                 </span>
                               )}
                               {model.inputTypes?.includes("search") && (

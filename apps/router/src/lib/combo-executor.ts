@@ -104,14 +104,17 @@ export async function executeComboChat(
       auto: [
         { modelId: "gemini-3.8-flash", providerId: "const", providerName: "Const Gateway", priority: 1 },
         { modelId: "gemini-3.7-flash", providerId: "const", providerName: "Const Gateway", priority: 2 },
+        { modelId: "qwen-3.8-27b", providerId: "const", providerName: "Const Gateway", priority: 3 },
       ],
       fast: [
         { modelId: "gemini-3.8-flash", providerId: "const", providerName: "Const Gateway", priority: 1 },
-        { modelId: "gemini-3.7-flash", providerId: "const", providerName: "Const Gateway", priority: 2 },
+        { modelId: "qwen-3.8-27b", providerId: "const", providerName: "Const Gateway", priority: 2 },
+        { modelId: "gemini-3.7-flash", providerId: "const", providerName: "Const Gateway", priority: 3 },
       ],
       coding: [
         { modelId: "gemini-3.8-flash", providerId: "const", providerName: "Const Gateway", priority: 1 },
-        { modelId: "gemini-3.7-flash", providerId: "const", providerName: "Const Gateway", priority: 2 },
+        { modelId: "qwen-3.8-27b", providerId: "const", providerName: "Const Gateway", priority: 2 },
+        { modelId: "gemini-3.7-flash", providerId: "const", providerName: "Const Gateway", priority: 3 },
       ],
     };
 
@@ -297,9 +300,22 @@ export async function executeComboChat(
           headers["Authorization"] = `Bearer ${apiKey}`;
         }
 
+        // Context clamping safeguard for Qwen (131K limit)
+        let targetMessages = formattedMessages;
+        if (targetModel.includes("Qwen") || target.modelId.toLowerCase().includes("qwen")) {
+          let curTokens = estimateMessagesTokens(targetMessages);
+          if (curTokens > 125000 && targetMessages.length > 2) {
+            targetMessages = [...formattedMessages];
+            while (curTokens > 125000 && targetMessages.length > 2) {
+              targetMessages.splice(1, 1);
+              curTokens = estimateMessagesTokens(targetMessages);
+            }
+          }
+        }
+
         const constPayload: Record<string, unknown> = {
           model: targetModel,
-          messages: formattedMessages,
+          messages: targetMessages,
           temperature,
           stream: true,
         };

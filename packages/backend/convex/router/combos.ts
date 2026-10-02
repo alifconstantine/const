@@ -31,7 +31,7 @@ export const SYSTEM_DEFAULT_COMBOS = [
         priority: 2,
       },
       {
-        modelId: "gemini-3.6-flash",
+        modelId: "qwen-3.8-27b",
         providerId: "const",
         providerName: "Const Gateway",
         priority: 3,
@@ -58,13 +58,13 @@ export const SYSTEM_DEFAULT_COMBOS = [
         priority: 1,
       },
       {
-        modelId: "gemini-3.7-flash",
+        modelId: "qwen-3.8-27b",
         providerId: "const",
         providerName: "Const Gateway",
         priority: 2,
       },
       {
-        modelId: "gemini-3.6-flash",
+        modelId: "gemini-3.7-flash",
         providerId: "const",
         providerName: "Const Gateway",
         priority: 3,
@@ -91,13 +91,13 @@ export const SYSTEM_DEFAULT_COMBOS = [
         priority: 1,
       },
       {
-        modelId: "gemini-3.7-flash",
+        modelId: "qwen-3.8-27b",
         providerId: "const",
         providerName: "Const Gateway",
         priority: 2,
       },
       {
-        modelId: "gemini-3.6-flash",
+        modelId: "gemini-3.7-flash",
         providerId: "const",
         providerName: "Const Gateway",
         priority: 3,
@@ -127,7 +127,7 @@ export async function getDynamicDefaultCombos(ctx: any, userId?: string | null) 
       providerName: "Const Gateway",
     },
     {
-      modelId: "gemini-3.6-flash",
+      modelId: "qwen-3.8-27b",
       providerId: "const",
       providerName: "Const Gateway",
     },

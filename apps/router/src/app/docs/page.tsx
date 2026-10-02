@@ -456,10 +456,11 @@ console.log(data.choices[0].message.content);`}</pre>
 
                 {[
                   { method: "POST", path: "/v1/chat/completions", protocol: "OpenAI Chat Completions", desc: "Streaming & non-streaming text & reasoning" },
-                  { method: "GET", path: "/v1/models", protocol: "OpenAI Models List", desc: "Lists all available models and combos" },
+                  { method: "GET", path: "/v1/models", protocol: "OpenAI Models List", desc: "Lists all available models (?type=llm, audio, search, all)" },
+                  { method: "POST", path: "/v1/audio/transcriptions", protocol: "OpenAI Audio Whisper", desc: "Speech-to-text audio transcription (Whisper Large V3 Turbo)" },
+                  { method: "POST", path: "/v1/search", protocol: "Const Search (Exa AI)", desc: "Web search and deep research grounding" },
                   { method: "POST", path: "/v1/images/generations", protocol: "OpenAI Image Generation", desc: "Text-to-image synthesis (Imagen 3, DALL-E, Flux)" },
                   { method: "POST", path: "/v1/images/edits", protocol: "OpenAI Image Edits", desc: "Multipart inpainting & image editing" },
-                  { method: "POST", path: "/v1/audio/transcriptions", protocol: "OpenAI Audio Whisper", desc: "Speech-to-text audio transcription" },
                   { method: "POST", path: "/v1/audio/speech", protocol: "OpenAI Audio Speech (TTS)", desc: "Text-to-speech audio streaming" },
                   { method: "POST", path: "/v1/audio/music", protocol: "Const Generative Music", desc: "Full-length music track generation" },
                   { method: "POST", path: "/v1/embeddings", protocol: "OpenAI Embeddings", desc: "High-dimensional dense vector embeddings" },
@@ -735,7 +736,7 @@ data: [DONE]`}</pre>
                 <div className="flex items-center justify-between text-[#969696] border-b border-[#2e2e2e] pb-2 text-[11px]">
                   <span>SPEECH-TO-TEXT CURL</span>
                   <button
-                    onClick={() => handleCopy(`curl -X POST "${baseUrl}/audio/transcriptions" \\\n  -H "Authorization: Bearer sk-const-live-yourkey" \\\n  -F file="@meeting-recording.mp3" \\\n  -F model="whisper-1" \\\n  -F language="id" \\\n  -F response_format="json"`, "transcribe-curl")}
+                    onClick={() => handleCopy(`curl -X POST "${baseUrl}/audio/transcriptions" \\\n  -H "Authorization: Bearer sk-const-live-yourkey" \\\n  -F file="@meeting-recording.mp3" \\\n  -F model="whisper-large-v3-turbo" \\\n  -F language="id" \\\n  -F response_format="json"`, "transcribe-curl")}
                     className="hover:text-white transition-colors cursor-pointer"
                   >
                     {copiedCode === "transcribe-curl" ? <Check className="h-3 w-3 text-white" /> : <Copy className="h-3 w-3" />}
@@ -744,7 +745,7 @@ data: [DONE]`}</pre>
                 <pre>{`curl -X POST "${baseUrl}/audio/transcriptions" \\
   -H "Authorization: Bearer sk-const-live-yourkey" \\
   -F file="@meeting-recording.mp3" \\
-  -F model="whisper-1" \\
+  -F model="whisper-large-v3-turbo" \\
   -F language="id" \\
   -F response_format="json"`}</pre>
               </div>

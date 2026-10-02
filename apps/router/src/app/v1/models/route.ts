@@ -28,6 +28,9 @@ interface ModelResponseItem {
   owned_by: string;
   provider?: string;
   provider_name?: string;
+  type?: "chat" | "audio" | "search";
+  category?: "llm" | "stt" | "search";
+  endpoint?: string;
   context_length?: number | null;
   max_input_tokens?: number | null;
   max_output_tokens?: number | null;
@@ -59,6 +62,9 @@ export async function GET(req: NextRequest) {
       owned_by: "const",
       provider: "const",
       provider_name: "Const",
+      type: "chat",
+      category: "llm",
+      endpoint: "/v1/chat/completions",
       context_length: 1000000,
       max_input_tokens: 1000000,
       max_output_tokens: 128000,
@@ -88,6 +94,9 @@ export async function GET(req: NextRequest) {
       owned_by: "const",
       provider: "const",
       provider_name: "Const",
+      type: "chat",
+      category: "llm",
+      endpoint: "/v1/chat/completions",
       context_length: 1000000,
       max_input_tokens: 1000000,
       max_output_tokens: 128000,
@@ -109,14 +118,74 @@ export async function GET(req: NextRequest) {
       output_modalities: ["text"],
     },
     {
-      id: "const-search",
-      name: "Const Search",
-      display_name: "Const Search",
+      id: "qwen-3.8-27b",
+      name: "Qwen 3.8 27B",
+      display_name: "Qwen 3.8 27B",
       object: "model",
       created: 1700000000,
       owned_by: "const",
       provider: "const",
       provider_name: "Const",
+      type: "chat",
+      category: "llm",
+      endpoint: "/v1/chat/completions",
+      context_length: 131072,
+      max_input_tokens: 131072,
+      max_output_tokens: 65536,
+      supports_thinking: true,
+      supports_reasoning: true,
+      supportsThinking: true,
+      supportsReasoningEffort: true,
+      capabilities: {
+        reasoning: true,
+        thinking: true,
+        supportsThinking: true,
+        tool_calling: true,
+      },
+      thinking_levels: ["low", "medium", "high", "xhigh", "max"],
+      reasoning_effort: ["low", "medium", "high", "xhigh", "max"],
+      default_thinking_level: "medium",
+      input_modalities: ["text"],
+      output_modalities: ["text"],
+    },
+    {
+      id: "whisper-large-v3-turbo",
+      name: "Whisper Large V3 Turbo",
+      display_name: "Whisper Large V3 Turbo",
+      object: "model",
+      created: 1700000000,
+      owned_by: "const",
+      provider: "const",
+      provider_name: "Const",
+      type: "audio",
+      category: "stt",
+      endpoint: "/v1/audio/transcriptions",
+      context_length: null,
+      max_input_tokens: null,
+      max_output_tokens: null,
+      supports_thinking: false,
+      supports_reasoning: false,
+      supportsThinking: false,
+      supportsReasoningEffort: false,
+      capabilities: {
+        audio_transcription: true,
+        speech_to_text: true,
+      },
+      input_modalities: ["audio"],
+      output_modalities: ["text"],
+    },
+    {
+      id: "const-search",
+      name: "Const Search",
+      display_name: "Const Search (Exa AI)",
+      object: "model",
+      created: 1700000000,
+      owned_by: "const",
+      provider: "const",
+      provider_name: "Const",
+      type: "search",
+      category: "search",
+      endpoint: "/v1/search",
       context_length: null,
       max_input_tokens: null,
       max_output_tokens: null,
@@ -143,6 +212,9 @@ export async function GET(req: NextRequest) {
       owned_by: "const",
       provider: "const",
       provider_name: "Const",
+      type: "chat",
+      category: "llm",
+      endpoint: "/v1/chat/completions",
       context_length: 1000000,
       max_input_tokens: 1000000,
       max_output_tokens: 128000,
@@ -169,6 +241,9 @@ export async function GET(req: NextRequest) {
       owned_by: "const",
       provider: "const",
       provider_name: "Const",
+      type: "chat",
+      category: "llm",
+      endpoint: "/v1/chat/completions",
       context_length: 1000000,
       max_input_tokens: 1000000,
       max_output_tokens: 128000,
@@ -191,6 +266,9 @@ export async function GET(req: NextRequest) {
       owned_by: "const",
       provider: "const",
       provider_name: "Const",
+      type: "chat",
+      category: "llm",
+      endpoint: "/v1/chat/completions",
       context_length: 1000000,
       max_input_tokens: 1000000,
       max_output_tokens: 128000,
@@ -236,6 +314,9 @@ export async function GET(req: NextRequest) {
                 owned_by: prov.name,
                 provider: prov.providerId,
                 provider_name: prov.name,
+                type: "chat",
+                category: "llm",
+                endpoint: "/v1/chat/completions",
                 supports_thinking: supportsThinking,
                 supports_reasoning: supportsThinking,
                 supportsThinking: supportsThinking,
@@ -270,6 +351,9 @@ export async function GET(req: NextRequest) {
                 owned_by: "const",
                 provider: "const",
                 provider_name: "Const",
+                type: "chat",
+                category: "llm",
+                endpoint: "/v1/chat/completions",
                 context_length: c.contextLength || 1000000,
                 max_input_tokens: c.contextLength || 1000000,
                 max_output_tokens: 128000,
@@ -309,10 +393,27 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  // Query parameter filtering:
+  // - ?type=all: returns all models across modalities
+  // - ?type=audio or ?type=stt: returns only audio models
+  // - ?type=search: returns only search models
+  // - default (no param or ?type=llm / ?type=chat): returns ONLY LLM / Chat models!
+  const { searchParams } = new URL(req.url);
+  const typeFilter = (searchParams.get("type") || searchParams.get("category"))?.toLowerCase()?.trim();
+
+  const finalModels = uniqueModels.filter((m) => {
+    const mType = m.type || (m.input_modalities?.includes("audio") ? "audio" : m.capabilities?.search ? "search" : "chat");
+    if (typeFilter === "all") return true;
+    if (typeFilter === "audio" || typeFilter === "stt") return mType === "audio";
+    if (typeFilter === "search") return mType === "search";
+    // Default or "chat" / "llm": only return LLMs / Chat models
+    return mType === "chat";
+  });
+
   return NextResponse.json(
     {
       object: "list",
-      data: uniqueModels,
+      data: finalModels,
     },
     {
       headers: CORS_HEADERS,

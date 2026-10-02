@@ -94,6 +94,62 @@ export async function POST(req: NextRequest) {
         });
       }
 
+      // Whisper Large V3 Turbo tests against /v1/audio/transcriptions
+      if (model.toLowerCase().includes("whisper") || mappedModel === "Whisper Large v3 Turbo") {
+        const sampleRate = 8000;
+        const numSamples = sampleRate * 1;
+        const dataSize = numSamples * 2;
+        const buffer = Buffer.alloc(44 + dataSize);
+        buffer.write("RIFF", 0);
+        buffer.writeUInt32LE(36 + dataSize, 4);
+        buffer.write("WAVE", 8);
+        buffer.write("fmt ", 12);
+        buffer.writeUInt32LE(16, 16);
+        buffer.writeUInt16LE(1, 20);
+        buffer.writeUInt16LE(1, 22);
+        buffer.writeUInt32LE(sampleRate, 24);
+        buffer.writeUInt32LE(sampleRate * 2, 28);
+        buffer.writeUInt16LE(2, 32);
+        buffer.writeUInt16LE(16, 34);
+        buffer.write("data", 36);
+        buffer.writeUInt32LE(dataSize, 40);
+
+        const form = new FormData();
+        form.append("file", new Blob([buffer], { type: "audio/wav" }), "ping.wav");
+        form.append("model", "Whisper Large v3 Turbo");
+
+        const authHeaders: Record<string, string> = {};
+        if (constApiKey) authHeaders["Authorization"] = `Bearer ${constApiKey}`;
+
+        const res = await fetch(`${constBaseUrl}/v1/audio/transcriptions`, {
+          method: "POST",
+          headers: authHeaders,
+          body: form,
+          signal: controller.signal,
+        }).finally(() => clearTimeout(timeoutId));
+
+        const latency = Date.now() - startTime;
+        const data = await res.json().catch(() => null);
+
+        if (!res.ok) {
+          const errorMsg =
+            data?.error?.message ||
+            data?.message ||
+            `Audio STT upstream error (HTTP ${res.status} ${res.statusText})`;
+          return NextResponse.json(
+            { success: false, error: errorMsg, status: res.status, latency },
+            { status: res.status }
+          );
+        }
+
+        return NextResponse.json({
+          success: true,
+          latency,
+          reply: `Whisper audio transcription model is active and operational`,
+          model: "whisper-large-v3-turbo",
+        });
+      }
+
       const res = await fetch(`${constBaseUrl}/v1/chat/completions`, {
         method: "POST",
         headers,

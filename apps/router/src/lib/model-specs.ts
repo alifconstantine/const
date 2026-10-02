@@ -22,11 +22,13 @@ export interface ModelSpec {
   contextLength?: number;
   contextWindow?: string;
   maxOutputTokens?: string;
+  category?: "llm" | "stt" | "search";
+  endpoint?: string;
   inputTypes?: string[];
   outputTypes?: string[];
 }
 
-// Built-in models matching exactly what is listed in /models
+// Built-in models matching exactly what is managed by Const Gateway / OmniRoute
 export const BUILTIN_MODELS: ModelSpec[] = [
   {
     id: "gemini-3.8-flash",
@@ -34,6 +36,11 @@ export const BUILTIN_MODELS: ModelSpec[] = [
     modelId: "gemini-3.8-flash",
     provider: "const",
     providerName: "Const",
+    category: "llm",
+    endpoint: "/v1/chat/completions",
+    contextLength: 1000000,
+    contextWindow: "1M",
+    maxOutputTokens: "128K",
     supportsThinking: true,
     thinkingDefault: "medium",
     isDefault: true,
@@ -46,9 +53,44 @@ export const BUILTIN_MODELS: ModelSpec[] = [
     modelId: "gemini-3.7-flash",
     provider: "const",
     providerName: "Const",
+    category: "llm",
+    endpoint: "/v1/chat/completions",
+    contextLength: 1000000,
+    contextWindow: "1M",
+    maxOutputTokens: "128K",
     supportsThinking: true,
     thinkingDefault: "medium",
     inputTypes: ["text", "image", "video"],
+    outputTypes: ["text"],
+  },
+  {
+    id: "qwen-3.8-27b",
+    name: "Qwen 3.8 27B",
+    modelId: "qwen-3.8-27b",
+    provider: "const",
+    providerName: "Const",
+    category: "llm",
+    endpoint: "/v1/chat/completions",
+    contextLength: 131072,
+    contextWindow: "131K",
+    maxOutputTokens: "65K",
+    supportsThinking: true,
+    thinkingDefault: "medium",
+    inputTypes: ["text"],
+    outputTypes: ["text"],
+  },
+  {
+    id: "whisper-large-v3-turbo",
+    name: "Whisper Large V3 Turbo",
+    modelId: "whisper-large-v3-turbo",
+    provider: "const",
+    providerName: "Const",
+    category: "stt",
+    endpoint: "/v1/audio/transcriptions",
+    supportsThinking: false,
+    contextWindow: "-",
+    maxOutputTokens: "-",
+    inputTypes: ["audio"],
     outputTypes: ["text"],
   },
   {
@@ -57,6 +99,8 @@ export const BUILTIN_MODELS: ModelSpec[] = [
     modelId: "const-search",
     provider: "const",
     providerName: "Const",
+    category: "search",
+    endpoint: "/v1/search",
     supportsThinking: false,
     contextWindow: "-",
     maxOutputTokens: "-",
@@ -82,6 +126,8 @@ export function findModelSpec(modelId: string, customModels: ModelSpec[] = []): 
  * Normalizes any variation of Const managed model IDs to the exact OmniRoute combo model title.
  * - "gemini-3.7-flash", "gemini 3.7 flash", "Gemini 3.7 Flash" -> "Gemini 3.7 Flash"
  * - "gemini-3.8-flash", "gemini 3.8 flash", "Gemini 3.8 Flash" -> "Gemini 3.8 Flash"
+ * - "qwen-3.8-27b", "qwen 3.8 27b", "Qwen 3.8 27B" -> "Qwen 3.8 27B"
+ * - "whisper-large-v3-turbo", "whisper-1" -> "Whisper Large v3 Turbo"
  */
 export function normalizeConstModelName(modelId: string): string {
   if (!modelId) return modelId;
@@ -101,6 +147,24 @@ export function normalizeConstModelName(modelId: string): string {
     clean.startsWith("gemini-3.8")
   ) {
     return "Gemini 3.8 Flash";
+  }
+  if (
+    clean === "qwen-3.8-27b" ||
+    clean === "qwen 3.8 27b" ||
+    clean === "qwen3.8-27b" ||
+    clean.startsWith("qwen-3.8") ||
+    clean.startsWith("qwen 3.8")
+  ) {
+    return "Qwen 3.8 27B";
+  }
+  if (
+    clean === "whisper-large-v3-turbo" ||
+    clean === "whisper large v3 turbo" ||
+    clean === "whisper-large-v3" ||
+    clean === "whisper-1" ||
+    clean === "whisper"
+  ) {
+    return "Whisper Large v3 Turbo";
   }
   if (
     clean === "const-search" ||
@@ -123,7 +187,10 @@ export function isBuiltinModel(modelId: string, customModels: ModelSpec[] = []):
   if (
     clean === "gemini-3.7-flash" || clean === "gemini 3.7 flash" ||
     clean === "gemini-3.8-flash" || clean === "gemini 3.8 flash" ||
-    clean.startsWith("gemini-3.8") || clean.startsWith("gemini-3.7")
+    clean.startsWith("gemini-3.8") || clean.startsWith("gemini-3.7") ||
+    clean === "qwen-3.8-27b" || clean === "qwen 3.8 27b" || clean.startsWith("qwen-3.8") ||
+    clean === "whisper-large-v3-turbo" || clean === "whisper large v3 turbo" ||
+    clean === "whisper-1" || clean === "whisper"
   ) {
     return true;
   }

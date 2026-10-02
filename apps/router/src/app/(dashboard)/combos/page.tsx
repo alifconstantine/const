@@ -182,6 +182,7 @@ export default function CombosPage() {
         models: [
           { modelId: "gemini-3.8-flash", name: "Gemini 3.8 Flash (Managed)" },
           { modelId: "gemini-3.7-flash", name: "Gemini 3.7 Flash (Managed)" },
+          { modelId: "qwen-3.8-27b", name: "Qwen 3.8 27B (Managed)" },
         ],
       },
     ];

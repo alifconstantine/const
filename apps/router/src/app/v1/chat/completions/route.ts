@@ -137,6 +137,19 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    if (model.toLowerCase().includes("whisper")) {
+      return NextResponse.json(
+        {
+          error: {
+            message: `Model '${model}' is a speech-to-text audio model. Please use POST /v1/audio/transcriptions with multipart/form-data instead.`,
+            type: "invalid_request_error",
+            code: "invalid_endpoint_for_model",
+          },
+        },
+        { status: 400 }
+      );
+    }
+
     if (!messages || messages.length === 0) {
       return NextResponse.json(
         { error: { message: "The 'messages' array must not be empty." } },
