@@ -42,7 +42,15 @@ import { api } from "@const/backend/_generated/api";
 import { ImageLightbox } from "./image-lightbox";
 import { AttachedTaskBanner } from "./attached-task-banner";
 import type { BackgroundTaskItem } from "../../vite-env";
-import { getDefaultAgentMode } from "../../lib/conversation-store";
+import { getDefaultAgentMode, type ConversationItem } from "../../lib/conversation-store";
+import {
+  type ActiveAtToken,
+  type MentionCandidate,
+  type WorkspaceFileEntry,
+  activeAtToken,
+  searchMentionCandidates,
+} from "../../lib/mention-search";
+import { MentionPopover } from "./mention-popover";
 
 
 function formatTokenDisplay(tokens: number): string {
@@ -204,6 +212,7 @@ interface ChatCardProps {
   onStopTask?: (taskId: string) => void;
   mode?: "ask_before_changes" | "full_access";
   onModeChange?: (mode: "ask_before_changes" | "full_access") => void;
+  conversations?: ConversationItem[];
 }
 
 export function ChatCard({
@@ -224,6 +233,7 @@ export function ChatCard({
   onStopTask,
   mode: controlledMode,
   onModeChange,
+  conversations,
 }: ChatCardProps) {
   const [prompt, setPrompt] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -380,6 +390,65 @@ export function ChatCard({
       setCurrentProject("Outside Project");
     }
   }, [initialProject]);
+
+  // Mention & Context Autocomplete State
+  const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceFileEntry[]>([]);
+  const [mentionToken, setMentionToken] = useState<ActiveAtToken | null>(null);
+  const [mentionIndex, setMentionIndex] = useState(0);
+
+  useEffect(() => {
+    let isMounted = true;
+    if (!currentProject || currentProject === "Outside Project") {
+      setWorkspaceFiles([]);
+      return;
+    }
+    if (window.electron?.listFiles) {
+      window.electron
+        .listFiles(currentProject)
+        .then((res) => {
+          if (isMounted && Array.isArray(res)) {
+            setWorkspaceFiles(res);
+          }
+        })
+        .catch(() => {});
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [currentProject]);
+
+  const mentionCandidates = useMemo(() => {
+    if (!mentionToken) return [];
+    return searchMentionCandidates({
+      query: mentionToken.query,
+      quoted: mentionToken.quoted,
+      files: workspaceFiles,
+      conversations,
+      currentProject,
+      maxResults: 20,
+    });
+  }, [mentionToken, workspaceFiles, conversations, currentProject]);
+
+  const handleSelectMentionCandidate = (candidate: MentionCandidate) => {
+    if (!mentionToken || !candidate) return;
+    const before = prompt.slice(0, mentionToken.startCol);
+    const after = prompt.slice(mentionToken.endCol);
+    const ins = candidate.insertion;
+    const formattedIns = ins.endsWith(" ") || ins.endsWith("/") ? ins : `${ins} `;
+    const nextPrompt = `${before}${formattedIns}${after}`;
+    setPrompt(nextPrompt);
+    setMentionToken(null);
+    setMentionIndex(0);
+
+    const nextCursor = before.length + formattedIns.length;
+    requestAnimationFrame(() => {
+      if (textareaRef.current) {
+        textareaRef.current.focus();
+        textareaRef.current.setSelectionRange(nextCursor, nextCursor);
+        adjustHeight();
+      }
+    });
+  };
   const [isProjectOpen, setIsProjectOpen] = useState(false);
   const [searchWorkspace, setSearchWorkspace] = useState("");
   const [workspaces, setWorkspaces] = useState<string[]>(() => {
@@ -949,9 +1018,11 @@ export function ChatCard({
     setIsThinkingOpen(false);
     setIsContextOpen(false);
     setIsPlusOpen(false);
+    setMentionToken(null);
   };
 
-  const isAnyBottomMenuOpen = isPlusOpen || isModeOpen || isContextOpen || isModelOpen || isThinkingOpen;
+  const isAnyBottomMenuOpen =
+    isPlusOpen || isModeOpen || isContextOpen || isModelOpen || isThinkingOpen || Boolean(mentionToken);
 
   return (
     <div className="w-full max-w-full flex flex-col items-center gap-2 select-none min-w-0">
@@ -1094,7 +1165,18 @@ export function ChatCard({
             />
           )}
 
-          <div className="w-full px-3 sm:px-3.5 pt-2.5 pb-2.5 flex flex-col justify-between min-w-0">
+          <div className="w-full px-3 sm:px-3.5 pt-2.5 pb-2.5 flex flex-col justify-between min-w-0 relative">
+            {/* Mention Autocomplete Popover */}
+            {mentionToken && (
+              <MentionPopover
+                candidates={mentionCandidates}
+                selectedIndex={mentionIndex}
+                onSelect={handleSelectMentionCandidate}
+                onHover={(idx) => setMentionIndex(idx)}
+                query={mentionToken.query}
+              />
+            )}
+
             {/* Attachments Shelf (Square Cards for Images, Videos, PDFs, Docs) */}
             {attachments.length > 0 && (
               <div className="w-full flex items-center gap-2.5 pt-1.5 pb-2.5 px-0.5 overflow-x-auto select-none scrollbar-none">
@@ -1207,8 +1289,27 @@ export function ChatCard({
               ref={textareaRef}
               value={prompt}
               onChange={(e) => {
-                setPrompt(e.target.value);
+                const val = e.target.value;
+                setPrompt(val);
                 adjustHeight();
+                const cursor = e.target.selectionEnd ?? val.length;
+                const token = activeAtToken(val, cursor);
+                setMentionToken(token);
+                setMentionIndex(0);
+              }}
+              onClick={(e) => {
+                const cursor = (e.target as HTMLTextAreaElement).selectionEnd ?? prompt.length;
+                const token = activeAtToken(prompt, cursor);
+                setMentionToken(token);
+                setMentionIndex(0);
+              }}
+              onKeyUp={(e) => {
+                if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) {
+                  const cursor = (e.target as HTMLTextAreaElement).selectionEnd ?? prompt.length;
+                  const token = activeAtToken(prompt, cursor);
+                  setMentionToken(token);
+                  setMentionIndex(0);
+                }
               }}
               onPaste={handlePaste}
               rows={1}
@@ -1219,6 +1320,32 @@ export function ChatCard({
               }
               className="w-full resize-none bg-transparent text-[14px] leading-5 text-[#262626] dark:text-[#d4d4d4] placeholder:text-[#a9a9a9] dark:placeholder:text-[#5d5d5d] outline-none font-sans overflow-hidden py-0.5 block"
               onKeyDown={(e) => {
+                if (mentionToken && mentionCandidates.length > 0) {
+                  if (e.key === "ArrowDown") {
+                    e.preventDefault();
+                    setMentionIndex((prev) => (prev + 1) % mentionCandidates.length);
+                    return;
+                  }
+                  if (e.key === "ArrowUp") {
+                    e.preventDefault();
+                    setMentionIndex((prev) => (prev - 1 + mentionCandidates.length) % mentionCandidates.length);
+                    return;
+                  }
+                  if (e.key === "Enter" || e.key === "Tab") {
+                    e.preventDefault();
+                    const candidate = mentionCandidates[mentionIndex];
+                    if (candidate) {
+                      handleSelectMentionCandidate(candidate);
+                    }
+                    return;
+                  }
+                  if (e.key === "Escape") {
+                    e.preventDefault();
+                    setMentionToken(null);
+                    return;
+                  }
+                }
+
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();
                   handleSend();
@@ -1305,8 +1432,25 @@ export function ChatCard({
                       type="button"
                       onClick={() => {
                         setIsPlusOpen(false);
-                        setPrompt((prev) => (prev ? `${prev} @` : "@"));
-                        textareaRef.current?.focus();
+                        const currentVal = prompt;
+                        const cursor = textareaRef.current?.selectionEnd ?? currentVal.length;
+                        const before = currentVal.slice(0, cursor);
+                        const after = currentVal.slice(cursor);
+                        const needsPreSpace = before.length > 0 && !/\s$/.test(before);
+                        const insert = needsPreSpace ? " @" : "@";
+                        const nextVal = `${before}${insert}${after}`;
+                        setPrompt(nextVal);
+                        const nextCursor = before.length + insert.length;
+                        requestAnimationFrame(() => {
+                          if (textareaRef.current) {
+                            textareaRef.current.focus();
+                            textareaRef.current.setSelectionRange(nextCursor, nextCursor);
+                            adjustHeight();
+                            const token = activeAtToken(nextVal, nextCursor);
+                            setMentionToken(token);
+                            setMentionIndex(0);
+                          }
+                        });
                       }}
                       className="w-full px-2.5 py-2 flex items-center gap-2.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white text-xs transition-colors cursor-pointer group"
                     >

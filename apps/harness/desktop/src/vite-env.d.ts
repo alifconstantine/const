@@ -278,8 +278,10 @@ declare global {
           id: string;
           name: string;
           path: string;
+          parentDir?: string;
           fullPath: string;
           type: "code" | "image" | "doc" | "generic";
+          kind?: "file" | "directory";
         }>
       >;
       readFile?: (filePath: string) => Promise<{ content?: string; truncated?: boolean; error?: string }>;

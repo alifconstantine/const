@@ -2436,6 +2436,7 @@ function AuthenticatedContent({
                   onStopTask={handleStopBackgroundTask}
                   mode={currentMode}
                   onModeChange={handleModeChange}
+                  conversations={conversations}
                 />
               </div>
             </div>
@@ -2708,6 +2709,7 @@ function AuthenticatedContent({
                       onStopTask={handleStopBackgroundTask}
                       mode={currentMode}
                       onModeChange={handleModeChange}
+                      conversations={conversations}
                     />
                   )}
                 </SmoothCardMorph>

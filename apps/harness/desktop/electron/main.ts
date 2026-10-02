@@ -1137,16 +1137,27 @@ app.whenReady().then(() => {
     }
   );
 
-  // Workspace files scanning and shell open-path handlers for Command Palette
+  // Workspace files scanning and shell open-path handlers for Mentions & Palette
+  const workspaceFilesCache = new Map<string, { timestamp: number; data: any[] }>();
+
   ipcMain.handle("workspace:list-files", async (_event, workspacePath?: string) => {
     if (!workspacePath || !fs.existsSync(workspacePath)) return [];
+    
+    // Check 15-second cache
+    const cached = workspaceFilesCache.get(workspacePath);
+    if (cached && Date.now() - cached.timestamp < 15000) {
+      return cached.data;
+    }
+
     try {
       const results: Array<{
         id: string;
         name: string;
         path: string;
+        parentDir?: string;
         fullPath: string;
         type: "code" | "image" | "doc" | "generic";
+        kind: "file" | "directory";
       }> = [];
       const ignored = new Set([
         "node_modules",
@@ -1157,8 +1168,16 @@ app.whenReady().then(() => {
         ".turbo",
         ".cache",
         "out",
+        "coverage",
+        "target",
         ".idea",
         ".vscode",
+        ".venv",
+        "__pycache__",
+        ".pytest_cache",
+        ".mypy_cache",
+        ".gradle",
+        ".DS_Store",
       ]);
 
       const getFileType = (ext: string): "code" | "image" | "doc" | "generic" => {
@@ -1197,27 +1216,45 @@ app.whenReady().then(() => {
         return "generic";
       };
 
+      const MAX_DEPTH = 10;
+      const MAX_ENTRIES = 5000;
+
       const walk = (currentDir: string, depth: number) => {
-        if (depth > 4 || results.length >= 120) return;
+        if (depth > MAX_DEPTH || results.length >= MAX_ENTRIES) return;
         try {
           const entries = fs.readdirSync(currentDir, { withFileTypes: true });
           for (const entry of entries) {
-            if (results.length >= 120) break;
+            if (results.length >= MAX_ENTRIES) break;
             if (entry.name.startsWith(".") && entry.name !== ".env") continue;
             const fullPath = path.join(currentDir, entry.name);
+            const rawRel = path.relative(workspacePath, fullPath);
+            const relPath = rawRel.replace(/\\/g, "/");
+            const parentRaw = path.relative(workspacePath, currentDir);
+            const parentDir = parentRaw === "" || parentRaw === "." ? "" : parentRaw.replace(/\\/g, "/");
+
             if (entry.isDirectory()) {
               if (!ignored.has(entry.name)) {
+                results.push({
+                  id: fullPath,
+                  name: entry.name,
+                  path: relPath,
+                  parentDir,
+                  fullPath,
+                  type: "generic",
+                  kind: "directory",
+                });
                 walk(fullPath, depth + 1);
               }
             } else if (entry.isFile()) {
               const ext = path.extname(entry.name);
-              const relPath = path.relative(workspacePath, currentDir);
               results.push({
                 id: fullPath,
                 name: entry.name,
-                path: relPath || ".",
+                path: relPath,
+                parentDir,
                 fullPath,
                 type: getFileType(ext),
+                kind: "file",
               });
             }
           }
@@ -1225,6 +1262,7 @@ app.whenReady().then(() => {
       };
 
       walk(workspacePath, 0);
+      workspaceFilesCache.set(workspacePath, { timestamp: Date.now(), data: results });
       return results;
     } catch (err) {
       console.error("Failed to list workspace files:", err);
