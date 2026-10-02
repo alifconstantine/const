@@ -53,6 +53,8 @@ contextBridge.exposeInMainWorld("electron", {
     maxOutputTokens?: number;
   }) => ipcRenderer.invoke("agent:send-message", payload),
   abortAgent: (conversationId?: string) => ipcRenderer.invoke("agent:abort", conversationId),
+  updateMode: (payload: { mode: "ask_before_changes" | "full_access"; conversationId?: string }) =>
+    ipcRenderer.invoke("agent:update-mode", payload),
   respondApproval: (payload: {
     conversationId: string;
     approvalId: string;

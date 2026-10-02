@@ -673,6 +673,7 @@ app.whenReady().then(() => {
     conversationId: string;
     workspacePath: string;
     model: string;
+    mode?: "ask_before_changes" | "full_access";
     startedAt: number;
   }
   const activeSessions = new Map<string, ActiveAgentSession>();
@@ -795,6 +796,7 @@ app.whenReady().then(() => {
         conversationId: convoId,
         workspacePath: targetWorkspace,
         model,
+        mode: payload.mode || "ask_before_changes",
         startedAt: Date.now(),
       });
 
@@ -832,6 +834,7 @@ app.whenReady().then(() => {
             title: existingConvo?.title || "New Task",
             project: payload.workspacePath || "Outside Project",
             model,
+            mode: payload.mode || (activeSessions.get(convoId) as any)?.mode || existingConvo?.mode || "ask_before_changes",
             updatedAt: Date.now(),
             createdAt: existingConvo?.createdAt || Date.now(),
             messages: hasRichMessages ? existingConvo.messages : updatedMessages,
@@ -962,6 +965,48 @@ app.whenReady().then(() => {
         }
       }
       return { success: false, error: "Active session or approval not found" };
+    }
+  );
+
+  ipcMain.handle(
+    "agent:update-mode",
+    async (
+      _event,
+      payload: { mode: "ask_before_changes" | "full_access"; conversationId?: string }
+    ) => {
+      const { mode, conversationId } = payload;
+      let targetSession = conversationId ? activeSessions.get(conversationId) : undefined;
+      if (!targetSession && activeSessions.size === 1) {
+        targetSession = activeSessions.values().next().value;
+      }
+
+      let updated = false;
+      if (targetSession && targetSession.agent && typeof targetSession.agent.updateMode === "function") {
+        targetSession.agent.updateMode(mode);
+        (targetSession as any).mode = mode;
+        updated = true;
+      }
+
+      for (const [id, s] of activeSessions.entries()) {
+        if ((!conversationId || id === conversationId) && s.agent && typeof s.agent.updateMode === "function") {
+          s.agent.updateMode(mode);
+          (s as any).mode = mode;
+          updated = true;
+        }
+      }
+
+      if (conversationId) {
+        try {
+          const convo = conversationDb.getConversation(conversationId);
+          if (convo) {
+            convo.mode = mode;
+            convo.updatedAt = Date.now();
+            conversationDb.saveConversation(convo);
+          }
+        } catch {}
+      }
+
+      return { success: true, updated };
     }
   );
 

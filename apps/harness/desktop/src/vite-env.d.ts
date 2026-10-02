@@ -226,6 +226,10 @@ declare global {
         error?: string;
       }>;
       abortAgent: (conversationId?: string) => Promise<boolean>;
+      updateMode?: (payload: {
+        mode: "ask_before_changes" | "full_access";
+        conversationId?: string;
+      }) => Promise<{ success: boolean; updated?: boolean; pending?: boolean }>;
       respondApproval?: (payload: {
         conversationId: string;
         approvalId: string;

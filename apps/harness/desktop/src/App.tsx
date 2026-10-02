@@ -55,6 +55,7 @@ import {
   generateFallbackTitle,
   generateAiTitle,
   normalizeUiMessages,
+  getDefaultAgentMode,
   type ConversationItem,
 } from "./lib/conversation-store";
 import type {
@@ -174,6 +175,43 @@ function AuthenticatedContent({
   const [currentProject, setCurrentProject] = useState<string>(() => {
     return localStorage.getItem("const_harness_current_project") || "Outside Project";
   });
+  const [currentMode, setCurrentMode] = useState<"ask_before_changes" | "full_access">(() => {
+    return getDefaultAgentMode();
+  });
+
+  const handleModeChange = async (newMode: "ask_before_changes" | "full_access") => {
+    setCurrentMode(newMode);
+    try {
+      localStorage.setItem("const_harness_default_mode", newMode);
+    } catch {}
+
+    const targetConvoId = conversationIdRef.current || conversationId;
+    const stored = loadConversations();
+    const target = stored.find((c) => c.id === targetConvoId);
+    if (target) {
+      target.mode = newMode;
+      target.updatedAt = Date.now();
+      saveConversation(target);
+      setConversations(loadConversations());
+    }
+
+    if (newMode === "full_access") {
+      setPendingApprovals((prev) => {
+        if (!prev.has(targetConvoId)) return prev;
+        const next = new Map(prev);
+        next.delete(targetConvoId);
+        return next;
+      });
+    }
+
+    if (window.electron?.updateMode) {
+      await window.electron.updateMode({
+        mode: newMode,
+        conversationId: targetConvoId,
+      });
+    }
+  };
+
   const [activeModelItem, setActiveModelItem] = useState<ModelItem | null>(null);
   const [lastKnownLlmUsage, setLastKnownLlmUsage] = useState<{
     promptTokens: number;
@@ -1675,6 +1713,7 @@ function AuthenticatedContent({
       );
     }
 
+    const effectiveMode = mode || currentMode;
     const updatedConvo: ConversationItem = {
       id: conversationId,
       title: titleToUse || "New task",
@@ -1683,6 +1722,7 @@ function AuthenticatedContent({
       updatedAt: Date.now(),
       messages: currentStreamMessages,
       contextUsage: contextUsage,
+      mode: effectiveMode,
     };
     saveConversation(updatedConvo);
     setConversations(loadConversations());
@@ -1699,7 +1739,7 @@ function AuthenticatedContent({
           model,
           thinkingLevel,
           workspacePath: project,
-          mode,
+          mode: effectiveMode,
           conversationId,
           authToken: token || undefined,
           maxOutputTokens,
@@ -2002,6 +2042,7 @@ function AuthenticatedContent({
     setConversationId(`session_${Date.now()}`);
     setEditingPrompt("");
     setLastKnownLlmUsage(null);
+    setCurrentMode(getDefaultAgentMode());
     if (targetProject) {
       setCurrentProject(targetProject);
       localStorage.setItem("const_harness_current_project", targetProject);
@@ -2018,6 +2059,9 @@ function AuthenticatedContent({
       setConversationId(id);
       setConversationTitle(target?.title || "Task");
       setCurrentProject(target?.project || "Outside Project");
+      if (target?.mode) {
+        setCurrentMode(target.mode);
+      }
       setMessages([...activeRunningMsgs]);
       setEditingPrompt("");
       if (target?.contextUsage?.usedTokens) {
@@ -2045,6 +2089,9 @@ function AuthenticatedContent({
       setConversationId(target.id);
       setConversationTitle(target.title);
       setCurrentProject(target.project || "Outside Project");
+      if (target.mode) {
+        setCurrentMode(target.mode);
+      }
       setMessages(normalizeUiMessages(target.messages || []));
       setEditingPrompt("");
       if (target.contextUsage?.usedTokens) {
@@ -2278,6 +2325,8 @@ function AuthenticatedContent({
                   runningTasks={runningTasks}
                   onSelectTask={handleSelectRunningTask}
                   onStopTask={handleStopBackgroundTask}
+                  mode={currentMode}
+                  onModeChange={handleModeChange}
                 />
               </div>
             </div>
@@ -2547,6 +2596,8 @@ function AuthenticatedContent({
                       runningTasks={runningTasks}
                       onSelectTask={handleSelectRunningTask}
                       onStopTask={handleStopBackgroundTask}
+                      mode={currentMode}
+                      onModeChange={handleModeChange}
                     />
                   )}
                 </SmoothCardMorph>
