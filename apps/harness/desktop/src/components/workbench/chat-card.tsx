@@ -30,6 +30,7 @@ import {
   TooltipTrigger,
   TooltipContent,
   TooltipProvider,
+  toast,
 } from "@const/ui";
 import { useQuery } from "convex/react";
 import { api } from "@const/backend/_generated/api";
@@ -86,13 +87,74 @@ export function formatFileSize(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+export const MAX_ATTACHMENTS = 5;
+
 export interface AttachedFile {
   id: string;
   name: string;
   size: number;
   type: "image" | "video" | "pdf" | "markdown" | "code" | "document" | "other";
   url?: string;
+  base64?: string;
   path?: string;
+  imageIndex?: number;
+}
+
+export const readBase64 = (file: File): Promise<string> =>
+  new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = () => resolve("");
+    reader.readAsDataURL(file);
+  });
+
+export async function parseUploadedFiles(files: FileList | File[]): Promise<AttachedFile[]> {
+  const result: AttachedFile[] = [];
+  const list = Array.from(files);
+
+  for (let i = 0; i < list.length; i++) {
+    const file = list[i]!;
+    const ext = file.name.split(".").pop()?.toLowerCase() || "";
+    const fileType = (file.type || "").toLowerCase();
+    let type: AttachedFile["type"] = "other";
+
+    if (
+      fileType.startsWith("image/") ||
+      ["jpg", "jpeg", "png", "gif", "webp", "svg", "bmp", "avif"].includes(ext)
+    ) {
+      type = "image";
+    } else if (
+      fileType.startsWith("video/") ||
+      ["mp4", "webm", "mov", "mkv"].includes(ext)
+    ) {
+      type = "video";
+    } else if (fileType === "application/pdf" || ext === "pdf") {
+      type = "pdf";
+    } else if (["md", "markdown"].includes(ext)) {
+      type = "markdown";
+    } else if (
+      ["ts", "tsx", "js", "jsx", "json", "py", "rs", "go", "cpp", "c", "h", "css", "html", "sh", "sql"].includes(ext)
+    ) {
+      type = "code";
+    } else if (["txt", "doc", "docx", "xls", "xlsx", "csv", "rtf"].includes(ext)) {
+      type = "document";
+    }
+
+    const url = type === "image" || type === "video" ? URL.createObjectURL(file) : undefined;
+    const base64 = type === "image" ? await readBase64(file) : undefined;
+
+    result.push({
+      id: `file_${Date.now()}_${i}_${Math.random().toString(36).slice(2, 7)}`,
+      name: file.name,
+      size: file.size,
+      type,
+      url: url || base64,
+      base64,
+      path: (file as any).path,
+    });
+  }
+
+  return result;
 }
 
 export interface ConversationMetrics {
@@ -194,47 +256,105 @@ export function ChatCard({
     }
   }, [initialPrompt]);
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const [isDraggingOver, setIsDraggingOver] = useState(false);
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
-    const newAttached: AttachedFile[] = [];
-    Array.from(files).forEach((file) => {
-      const ext = file.name.split(".").pop()?.toLowerCase() || "";
-      let type: AttachedFile["type"] = "other";
-      if (["jpg", "jpeg", "png", "gif", "webp", "svg", "bmp"].includes(ext)) {
-        type = "image";
-      } else if (["mp4", "webm", "mov", "mkv"].includes(ext)) {
-        type = "video";
-      } else if (ext === "pdf") {
-        type = "pdf";
-      } else if (["md", "markdown"].includes(ext)) {
-        type = "markdown";
-      } else if (
-        ["ts", "tsx", "js", "jsx", "json", "py", "rs", "go", "cpp", "c", "h", "css", "html"].includes(ext)
-      ) {
-        type = "code";
-      } else if (["txt", "doc", "docx", "xls", "xlsx", "csv"].includes(ext)) {
-        type = "document";
-      }
 
-      const url = URL.createObjectURL(file);
-      newAttached.push({
-        id: `file_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-        name: file.name,
-        size: file.size,
-        type,
-        url,
-        path: (file as any).path,
-      });
-    });
+    const remainingSlots = MAX_ATTACHMENTS - attachments.length;
+    if (remainingSlots <= 0) {
+      toast.warning(`Maximum ${MAX_ATTACHMENTS} media attachments reached`);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      setIsPlusOpen(false);
+      return;
+    }
 
-    setAttachments((prev) => [...prev, ...newAttached]);
+    const fileList = Array.from(files);
+    if (fileList.length > remainingSlots) {
+      toast.warning(
+        `Only ${remainingSlots} more file(s) allowed (limit ${MAX_ATTACHMENTS}). Excess files were not uploaded.`
+      );
+    }
+
+    const filesToProcess = fileList.slice(0, remainingSlots);
+    const newAttached = await parseUploadedFiles(filesToProcess);
+
+    setAttachments((prev) => [...prev, ...newAttached].slice(0, MAX_ATTACHMENTS));
     setIsPlusOpen(false);
-    if (e.target) e.target.value = "";
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const removeAttachment = (id: string) => {
-    setAttachments((prev) => prev.filter((a) => a.id !== id));
+    setAttachments((prev) => {
+      const item = prev.find((a) => a.id === id);
+      if (item?.url && item.url.startsWith("blob:")) {
+        try {
+          URL.revokeObjectURL(item.url);
+        } catch {}
+      }
+      return prev.filter((a) => a.id !== id);
+    });
+  };
+
+  const handlePaste = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const clipboardFiles = e.clipboardData?.files;
+    if (clipboardFiles && clipboardFiles.length > 0) {
+      const remainingSlots = MAX_ATTACHMENTS - attachments.length;
+      if (remainingSlots <= 0) {
+        toast.warning(`Maximum ${MAX_ATTACHMENTS} media attachments reached`);
+        return;
+      }
+      e.preventDefault();
+      const fileList = Array.from(clipboardFiles);
+      if (fileList.length > remainingSlots) {
+        toast.warning(
+          `Only ${remainingSlots} more file(s) allowed (limit ${MAX_ATTACHMENTS}). Excess files were not uploaded.`
+        );
+      }
+      const filesToProcess = fileList.slice(0, remainingSlots);
+      const newAttached = await parseUploadedFiles(filesToProcess);
+      setAttachments((prev) => [...prev, ...newAttached].slice(0, MAX_ATTACHMENTS));
+    }
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!isDraggingOver) setIsDraggingOver(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+    setIsDraggingOver(false);
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDraggingOver(false);
+
+    const droppedFiles = e.dataTransfer?.files;
+    if (!droppedFiles || droppedFiles.length === 0) return;
+
+    const remainingSlots = MAX_ATTACHMENTS - attachments.length;
+    if (remainingSlots <= 0) {
+      toast.warning(`Maximum ${MAX_ATTACHMENTS} media attachments reached`);
+      return;
+    }
+
+    const fileList = Array.from(droppedFiles);
+    if (fileList.length > remainingSlots) {
+      toast.warning(
+        `Only ${remainingSlots} more file(s) allowed (limit ${MAX_ATTACHMENTS}). Excess files were not uploaded.`
+      );
+    }
+
+    const filesToProcess = fileList.slice(0, remainingSlots);
+    const newAttached = await parseUploadedFiles(filesToProcess);
+    setAttachments((prev) => [...prev, ...newAttached].slice(0, MAX_ATTACHMENTS));
   };
 
   // 1. Workspace / Project Selector State (Clean, zero dummy projects)
@@ -704,7 +824,7 @@ export function ChatCard({
 
   const handleSend = () => {
     if ((!prompt.trim() && attachments.length === 0) || isExecuting) return;
-    const text = prompt.trim();
+    const text = prompt.trim() || (attachments.length > 0 ? "Please analyze the attached media/file(s)." : "");
     const currentAttachments = [...attachments];
     setPrompt("");
     setAttachments([]);
@@ -909,11 +1029,15 @@ export function ChatCard({
 
         {/* AI Input Box: Background is #ffffff (light) / #2b2b2b (dark) with #262626 / #d4d4d4 text */}
         <div
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
           className={cn(
             "w-full bg-[#ffffff] dark:bg-[#2b2b2b] flex flex-col justify-between transition-colors focus-within:border-[#a9a9a9] dark:focus-within:border-[#555555] min-w-0 relative",
             compact
               ? "max-w-full rounded-2xl"
               : "rounded-2xl border border-[#e2e2e4] dark:border-[#383838] -mx-[1px] -mb-[1px] w-[calc(100%+2px)] max-w-[calc(100%+2px)]",
+            isDraggingOver && "ring-2 ring-primary/60 border-primary dark:border-primary/80 bg-primary/5",
             isAnyBottomMenuOpen ? "z-30" : "z-10"
           )}
         >
@@ -930,36 +1054,42 @@ export function ChatCard({
           <div className="w-full px-3 sm:px-3.5 pt-2.5 pb-2.5 flex flex-col justify-between min-w-0">
             {/* Attachments Shelf (Square Cards for Images, Videos, PDFs, Docs) */}
             {attachments.length > 0 && (
-            <div className="w-full flex items-center gap-2.5 pt-1.5 pb-2.5 px-0.5 overflow-x-auto select-none scrollbar-none">
-              <TooltipProvider delayDuration={150}>
-                {attachments.map((file) => {
-                  const isImage = file.type === "image";
-                  const isVideo = file.type === "video";
-                  const isMedia = isImage || isVideo;
-                  const ext = (file.name.split(".").pop() || "FILE").toUpperCase();
+              <div className="w-full flex items-center gap-2.5 pt-1.5 pb-2.5 px-0.5 overflow-x-auto select-none scrollbar-none">
+                <TooltipProvider delayDuration={150}>
+                  {attachments.map((file) => {
+                    const isImage = file.type === "image";
+                    const isVideo = file.type === "video";
+                    const isMedia = isImage || isVideo;
+                    const ext = (file.name.split(".").pop() || "FILE").toUpperCase();
+                    const mediaSrc = file.url || file.base64;
 
-                  return (
-                    <Tooltip key={file.id}>
-                      <TooltipTrigger asChild>
-                        <div
-                          onClick={() => setPreviewItem(file)}
-                          className={`relative w-20 h-20 group shrink-0 rounded-xl border border-[#e2e2e4] dark:border-[#383838] shadow-sm animate-in fade-in zoom-in-95 duration-100 bg-[#f4f4f6] dark:bg-[#1a1917] select-none cursor-pointer transition-all ${
-                            isMedia
-                              ? "hover:opacity-90 active:scale-[0.98]"
-                              : "hover:border-black/30 dark:hover:border-white/30"
-                          }`}
-                        >
-                          {isImage && file.url ? (
-                            <div className="w-full h-full rounded-xl overflow-hidden">
-                              <img
-                                src={file.url}
-                                alt={file.name}
-                                className="w-full h-full object-cover block"
-                              />
-                            </div>
-                          ) : isVideo ? (
-                            <div className="w-full h-full rounded-xl overflow-hidden bg-black relative">
-                              {file.url && (
+                    return (
+                      <Tooltip key={file.id}>
+                        <TooltipTrigger asChild>
+                          <div
+                            onClick={() => setPreviewItem(file)}
+                            className={cn(
+                              "relative group shrink-0 rounded-xl border border-[#e2e2e4] dark:border-[#383838] shadow-sm animate-in fade-in zoom-in-95 duration-100 bg-[#f4f4f6] dark:bg-[#1a1917] select-none cursor-pointer transition-all",
+                              isMedia
+                                ? "w-20 h-20 hover:opacity-90 active:scale-[0.98]"
+                                : "w-32 sm:w-36 h-20 hover:border-black/30 dark:hover:border-white/30"
+                            )}
+                          >
+                            {isImage && mediaSrc ? (
+                              <div className="w-full h-full rounded-xl overflow-hidden relative">
+                                <img
+                                  src={mediaSrc}
+                                  alt={file.name}
+                                  className="w-full h-full object-cover block"
+                                />
+                                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-1 pt-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                                  <p className="text-[8.5px] text-white font-medium truncate leading-tight px-0.5">
+                                    {file.name}
+                                  </p>
+                                </div>
+                              </div>
+                            ) : isVideo && file.url ? (
+                              <div className="w-full h-full rounded-xl overflow-hidden bg-black relative flex items-center justify-center">
                                 <video
                                   src={file.url}
                                   className="w-full h-full object-cover block pointer-events-none"
@@ -968,61 +1098,65 @@ export function ChatCard({
                                   autoPlay
                                   loop
                                 />
-                              )}
-                              <span className="absolute bottom-1 right-1 text-[8px] font-bold text-white bg-black/60 px-1 py-0.5 rounded uppercase tracking-wider font-mono">
-                                Video
-                              </span>
-                            </div>
-                          ) : (
-                            <div className="w-full h-full p-2 flex flex-col justify-between items-start text-left bg-[#f4f4f6] dark:bg-[#1a1917]/70 rounded-xl">
-                              <div className="flex items-center justify-between w-full">
-                                <span className="text-[9px] font-bold text-[#888888] dark:text-[#888888] tracking-wider uppercase font-mono">
-                                  {ext}
+                                <span className="absolute bottom-1 right-1 text-[8px] font-bold text-white bg-black/60 px-1 py-0.5 rounded uppercase tracking-wider font-mono">
+                                  Video
                                 </span>
-                                <FileText className="w-3.5 h-3.5 text-[#e79737] shrink-0" />
+                                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-1 pt-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
+                                  <p className="text-[8.5px] text-white font-medium truncate leading-tight px-0.5">
+                                    {file.name}
+                                  </p>
+                                </div>
                               </div>
-                              <div className="w-full min-w-0">
-                                <span className="text-[11px] font-medium text-[#262626] dark:text-[#d4d4d4] leading-tight w-full line-clamp-2 break-words block">
-                                  {file.name}
-                                </span>
-                                <span className="text-[8.5px] text-[#a9a9a9] dark:text-[#777777] font-mono mt-0.5 block truncate">
-                                  {formatFileSize(file.size)}
-                                </span>
+                            ) : (
+                              <div className="w-full h-full p-2 flex flex-col justify-between items-start text-left bg-[#f4f4f6] dark:bg-[#1a1917]/70 rounded-xl">
+                                <div className="flex items-center justify-between w-full">
+                                  <span className="text-[9px] font-bold text-[#888888] dark:text-[#888888] tracking-wider uppercase font-mono">
+                                    {ext}
+                                  </span>
+                                  <FileText className="w-3.5 h-3.5 text-[#e79737] shrink-0" />
+                                </div>
+                                <div className="w-full min-w-0">
+                                  <span className="text-[11px] font-medium text-[#262626] dark:text-[#d4d4d4] leading-tight w-full line-clamp-2 break-words block" title={file.name}>
+                                    {file.name}
+                                  </span>
+                                  <span className="text-[8.5px] text-[#a9a9a9] dark:text-[#777777] font-mono mt-0.5 block truncate">
+                                    {formatFileSize(file.size)}
+                                  </span>
+                                </div>
                               </div>
-                            </div>
-                          )}
+                            )}
 
-                          {/* Close / Remove button */}
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              removeAttachment(file.id);
-                            }}
-                            className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-white dark:bg-[#262626] shadow-md border border-[#e2e2e4] dark:border-[#444444] flex items-center justify-center cursor-pointer text-[#555555] dark:text-[#cccccc] hover:bg-[#e11d48] hover:text-white dark:hover:bg-[#e11d48] dark:hover:text-white dark:hover:border-[#e11d48] hover:scale-105 active:scale-95 transition-all z-20"
-                            title="Remove attachment"
-                            aria-label="Remove attachment"
-                          >
-                            <X className="w-3 h-3 stroke-[2.5]" />
-                          </button>
-                        </div>
-                      </TooltipTrigger>
-                      <TooltipContent
-                        side="top"
-                        sideOffset={6}
-                        className="z-50 max-w-[220px] bg-[#262626] dark:bg-[#1e1e1e] text-white dark:text-[#e0e0e0] text-[11px] px-2.5 py-1.5 rounded-lg shadow-2xl border border-black/10 dark:border-[#383838] select-none pointer-events-none break-all"
-                      >
-                        <div className="font-medium truncate max-w-[200px]">{file.name}</div>
-                        <div className="text-[9.5px] text-[#a0a0a0] font-mono mt-0.5">
-                          {formatFileSize(file.size)}
-                        </div>
-                      </TooltipContent>
-                    </Tooltip>
-                  );
-                })}
-              </TooltipProvider>
-            </div>
-          )}
+                            {/* Close / Remove button */}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                removeAttachment(file.id);
+                              }}
+                              className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-white dark:bg-[#262626] shadow-md border border-[#e2e2e4] dark:border-[#444444] flex items-center justify-center cursor-pointer text-[#555555] dark:text-[#cccccc] hover:bg-[#e11d48] hover:text-white dark:hover:bg-[#e11d48] dark:hover:text-white dark:hover:border-[#e11d48] hover:scale-105 active:scale-95 transition-all z-20"
+                              title="Remove attachment"
+                              aria-label="Remove attachment"
+                            >
+                              <X className="w-3 h-3 stroke-[2.5]" />
+                            </button>
+                          </div>
+                        </TooltipTrigger>
+                        <TooltipContent
+                          side="top"
+                          sideOffset={6}
+                          className="z-50 max-w-[220px] bg-[#262626] dark:bg-[#1e1e1e] text-white dark:text-[#e0e0e0] text-[11px] px-2.5 py-1.5 rounded-lg shadow-2xl border border-black/10 dark:border-[#383838] select-none pointer-events-none break-all"
+                        >
+                          <div className="font-medium truncate max-w-[200px]">{file.name}</div>
+                          <div className="text-[9.5px] text-[#a0a0a0] font-mono mt-0.5">
+                            {formatFileSize(file.size)}
+                          </div>
+                        </TooltipContent>
+                      </Tooltip>
+                    );
+                  })}
+                </TooltipProvider>
+              </div>
+            )}
 
           {/* Auto-growing Textarea with ScrollArea */}
           <ScrollArea className="w-full max-h-52 [&>div>div[style]]:!block pr-1.5">
@@ -1033,6 +1167,7 @@ export function ChatCard({
                 setPrompt(e.target.value);
                 adjustHeight();
               }}
+              onPaste={handlePaste}
               rows={1}
               placeholder={
                 compact
@@ -1079,6 +1214,7 @@ export function ChatCard({
                   ref={fileInputRef}
                   type="file"
                   multiple
+                  disabled={attachments.length >= MAX_ATTACHMENTS}
                   className="hidden"
                   onChange={handleFileChange}
                   accept="image/*,video/*,audio/*,.pdf,.md,.markdown,.txt,.json,.js,.jsx,.ts,.tsx,.py,.rs,.go,.cpp,.c,.h,.css,.html,.csv,.doc,.docx"
@@ -1094,14 +1230,31 @@ export function ChatCard({
                     {/* 1. Media */}
                     <button
                       type="button"
+                      disabled={attachments.length >= MAX_ATTACHMENTS}
                       onClick={() => {
                         setIsPlusOpen(false);
+                        if (attachments.length >= MAX_ATTACHMENTS) {
+                          toast.warning(`Maximum ${MAX_ATTACHMENTS} media attachments reached`);
+                          return;
+                        }
                         fileInputRef.current?.click();
                       }}
-                      className="w-full px-2.5 py-2 flex items-center gap-2.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white text-xs transition-colors cursor-pointer group"
+                      className={cn(
+                        "w-full px-2.5 py-2 flex items-center justify-between rounded-xl text-xs transition-colors cursor-pointer group",
+                        attachments.length >= MAX_ATTACHMENTS
+                          ? "opacity-50 cursor-not-allowed text-[#a9a9a9] dark:text-[#777777]"
+                          : "hover:bg-black/5 dark:hover:bg-white/5 text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white"
+                      )}
                     >
-                      <ImageIcon className="w-4 h-4 text-[#a9a9a9] dark:text-[#888888] group-hover:text-[#262626] dark:group-hover:text-white shrink-0" />
-                      <span className="text-[13px]">Media</span>
+                      <div className="flex items-center gap-2.5">
+                        <ImageIcon className="w-4 h-4 text-[#a9a9a9] dark:text-[#888888] group-hover:text-[#262626] dark:group-hover:text-white shrink-0" />
+                        <span className="text-[13px]">Media</span>
+                      </div>
+                      {attachments.length > 0 && (
+                        <span className="text-[10px] font-mono text-[#a9a9a9] dark:text-[#777777]">
+                          {attachments.length}/{MAX_ATTACHMENTS}
+                        </span>
+                      )}
                     </button>
 
                     {/* 2. Mentions */}
@@ -1668,7 +1821,7 @@ export function ChatCard({
       {/* Media Lightbox Preview Modal */}
       {previewItem && (
         <ImageLightbox
-          src={previewItem.url || ""}
+          src={previewItem.url || previewItem.base64 || ""}
           alt={previewItem.name}
           type={previewItem.type}
           fileSize={previewItem.size}

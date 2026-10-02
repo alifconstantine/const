@@ -797,7 +797,8 @@ function AuthenticatedContent({
   };
 
   const renderMessageAttachment = (att: AttachedFile) => {
-    if (att.type === "image" && att.url) {
+    const mediaSrc = att.url || att.base64;
+    if (att.type === "image" && mediaSrc) {
       return (
         <div
           key={att.id}
@@ -805,7 +806,7 @@ function AuthenticatedContent({
           className="group relative rounded-xl overflow-hidden border border-[#e2e2e4] dark:border-[#383838] hover:border-black/30 dark:hover:border-white/30 bg-[#f4f4f6] dark:bg-black/40 max-w-sm max-h-72 shadow-md cursor-pointer transition-all"
         >
           <img
-            src={att.url}
+            src={mediaSrc}
             alt={att.name}
             className="w-full h-full object-contain max-h-72"
           />
@@ -1695,10 +1696,14 @@ function AuthenticatedContent({
 
     setEditingPrompt("");
 
+    const effectivePrompt =
+      prompt.trim() ||
+      (attachments && attachments.length > 0 ? "Please analyze the attached media/file(s)." : "");
+
     const userMsg: ChatMessage = {
       id: `msg_${Date.now()}_user`,
       role: "user",
-      content: prompt,
+      content: effectivePrompt,
       timestamp: Date.now(),
       attachments,
     };
@@ -1767,10 +1772,24 @@ function AuthenticatedContent({
 
     if (window.electron?.sendMessage) {
       try {
-        const payloadMessages = currentStreamMessages.map((m) => ({
-          role: m.role,
-          content: m.content,
-        }));
+        const payloadMessages = currentStreamMessages.map((m) => {
+          let content = m.content;
+          if (m.role === "user" && m.attachments && m.attachments.length > 0) {
+            const hasExistingAttachmentSection = content.includes("[Attached media / Lampiran media:");
+            if (!hasExistingAttachmentSection) {
+              const attLines = m.attachments.map((att) => {
+                const pathInfo = att.path ? ` [Path: ${att.path}]` : "";
+                return `- ${att.type.toUpperCase()}: "${att.name}" (${formatFileSize(att.size)})${pathInfo}`;
+              });
+              const baseText = content.trim() ? content : "Please analyze the attached media/file(s).";
+              content = `${baseText}\n\n[Attached media / Lampiran media:\n${attLines.join("\n")}]`;
+            }
+          }
+          return {
+            role: m.role,
+            content,
+          };
+        });
 
         const res = await window.electron.sendMessage({
           messages: payloadMessages,
