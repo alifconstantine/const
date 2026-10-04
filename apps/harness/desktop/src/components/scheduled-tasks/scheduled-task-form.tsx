@@ -662,35 +662,37 @@ export function ScheduledTaskForm({
                                 />
                               </div>
 
-                              <div className="max-h-48 overflow-y-auto flex flex-col gap-0.5 py-0.5">
-                                {filteredWorkspaces.map((ws) => {
-                                  const wsName =
-                                    ws.replace(/\\/g, "/").split("/").filter(Boolean).pop() || ws;
-                                  return (
-                                    <button
-                                      key={ws}
-                                      type="button"
-                                      onClick={() => {
-                                        setWorkspacePath(ws);
-                                        setIsProjectOpen(false);
-                                      }}
-                                      className="w-full px-2.5 py-1.5 flex items-center justify-between text-xs text-[#d4d4d4] hover:text-white hover:bg-[#2b2b2b] rounded-lg transition-colors cursor-pointer"
-                                      title={ws}
-                                    >
-                                      <div className="flex items-center gap-2 truncate">
-                                        <Folder className="w-3.5 h-3.5 text-[#969696] shrink-0" />
-                                        <div className="flex flex-col text-left truncate">
-                                          <span className="truncate">{wsName}</span>
-                                          <span className="text-[10px] text-[#777777] truncate">{ws}</span>
+                              <ScrollArea className="max-h-48 pr-1" thumbClassName="bg-white/20 hover:bg-white/30">
+                                <div className="flex flex-col gap-0.5 py-0.5">
+                                  {filteredWorkspaces.map((ws) => {
+                                    const wsName =
+                                      ws.replace(/\\/g, "/").split("/").filter(Boolean).pop() || ws;
+                                    return (
+                                      <button
+                                        key={ws}
+                                        type="button"
+                                        onClick={() => {
+                                          setWorkspacePath(ws);
+                                          setIsProjectOpen(false);
+                                        }}
+                                        className="w-full px-2.5 py-1.5 flex items-center justify-between text-xs text-[#d4d4d4] hover:text-white hover:bg-[#2b2b2b] rounded-lg transition-colors cursor-pointer"
+                                        title={ws}
+                                      >
+                                        <div className="flex items-center gap-2 truncate">
+                                          <Folder className="w-3.5 h-3.5 text-[#969696] shrink-0" />
+                                          <div className="flex flex-col text-left truncate">
+                                            <span className="truncate">{wsName}</span>
+                                            <span className="text-[10px] text-[#777777] truncate">{ws}</span>
+                                          </div>
                                         </div>
-                                      </div>
-                                      {workspacePath === ws && (
-                                        <Check className="w-3.5 h-3.5 text-white shrink-0" />
-                                      )}
-                                    </button>
-                                  );
-                                })}
-                              </div>
+                                        {workspacePath === ws && (
+                                          <Check className="w-3.5 h-3.5 text-white shrink-0" />
+                                        )}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </ScrollArea>
 
                               <div className="h-[1px] bg-[#383838] my-1" />
                             </>
@@ -779,61 +781,63 @@ export function ScheduledTaskForm({
                           )}
                         </div>
 
-                        <div className="flex flex-col gap-1 max-h-56 overflow-y-auto pr-0.5">
-                          {groupedModels.map((group) => {
-                            const isExpanded = Boolean(expandedProviders[group.providerId]);
-                            return (
-                              <div key={group.providerId} className="flex flex-col">
-                                {isExpanded && (
-                                  <div className="pl-2.5 pr-1 py-0.5 border-l border-[#383838] ml-2 mb-1 flex flex-col gap-0.5">
-                                    {group.items.map((m) => {
-                                      const isSelected =
-                                        selectedModel === m.name || selectedModel === m.id;
-                                      return (
-                                        <button
-                                          key={m.id}
-                                          type="button"
-                                          onClick={() => {
-                                            setSelectedModel(m.name);
-                                            setIsModelOpen(false);
-                                          }}
-                                          className={`w-full px-2 py-1.5 flex items-center justify-between text-xs rounded-lg transition-colors cursor-pointer ${
-                                            isSelected
-                                              ? "bg-[#2b2b2b] text-white font-medium"
-                                              : "text-[#d4d4d4] hover:bg-[#2b2b2b] hover:text-white"
-                                          }`}
-                                        >
-                                          <span className="truncate">{m.name}</span>
-                                          {isSelected && (
-                                            <Check className="w-3.5 h-3.5 text-white shrink-0 ml-2" />
-                                          )}
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-                                )}
-
-                                <button
-                                  type="button"
-                                  onClick={() =>
-                                    setExpandedProviders((prev) => ({
-                                      ...prev,
-                                      [group.providerId]: !prev[group.providerId],
-                                    }))
-                                  }
-                                  className="w-full px-2 py-1 flex items-center justify-between text-xs font-medium text-[#d4d4d4] hover:text-white hover:bg-[#2b2b2b] rounded-lg transition-colors cursor-pointer"
-                                >
-                                  <span>{group.providerName}</span>
-                                  {isExpanded ? (
-                                    <ChevronDown className="w-3.5 h-3.5 text-[#969696]" />
-                                  ) : (
-                                    <ChevronUp className="w-3.5 h-3.5 text-[#969696]" />
+                        <ScrollArea className="max-h-56 pr-1" thumbClassName="bg-white/20 hover:bg-white/30">
+                          <div className="flex flex-col gap-1 pr-0.5">
+                            {groupedModels.map((group) => {
+                              const isExpanded = Boolean(expandedProviders[group.providerId]);
+                              return (
+                                <div key={group.providerId} className="flex flex-col">
+                                  {isExpanded && (
+                                    <div className="pl-2.5 pr-1 py-0.5 border-l border-[#383838] ml-2 mb-1 flex flex-col gap-0.5">
+                                      {group.items.map((m) => {
+                                        const isSelected =
+                                          selectedModel === m.name || selectedModel === m.id;
+                                        return (
+                                          <button
+                                            key={m.id}
+                                            type="button"
+                                            onClick={() => {
+                                              setSelectedModel(m.name);
+                                              setIsModelOpen(false);
+                                            }}
+                                            className={`w-full px-2 py-1.5 flex items-center justify-between text-xs rounded-lg transition-colors cursor-pointer ${
+                                              isSelected
+                                                ? "bg-[#2b2b2b] text-white font-medium"
+                                                : "text-[#d4d4d4] hover:bg-[#2b2b2b] hover:text-white"
+                                            }`}
+                                          >
+                                            <span className="truncate">{m.name}</span>
+                                            {isSelected && (
+                                              <Check className="w-3.5 h-3.5 text-white shrink-0 ml-2" />
+                                            )}
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
                                   )}
-                                </button>
-                              </div>
-                            );
-                          })}
-                        </div>
+
+                                  <button
+                                    type="button"
+                                    onClick={() =>
+                                      setExpandedProviders((prev) => ({
+                                        ...prev,
+                                        [group.providerId]: !prev[group.providerId],
+                                      }))
+                                    }
+                                    className="w-full px-2 py-1 flex items-center justify-between text-xs font-medium text-[#d4d4d4] hover:text-white hover:bg-[#2b2b2b] rounded-lg transition-colors cursor-pointer"
+                                  >
+                                    <span>{group.providerName}</span>
+                                    {isExpanded ? (
+                                      <ChevronDown className="w-3.5 h-3.5 text-[#969696]" />
+                                    ) : (
+                                      <ChevronUp className="w-3.5 h-3.5 text-[#969696]" />
+                                    )}
+                                  </button>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </ScrollArea>
                       </div>
                     )}
                   </div>

@@ -67,14 +67,14 @@ export function SegmentedToggle<T extends string = string>({
       ref={containerRef}
       role="tablist"
       className={cn(
-        "relative inline-flex items-center h-8 bg-[#222222] border border-[#383838] rounded-lg p-0.5 gap-0.5 select-none",
+        "relative inline-flex items-center h-8 bg-[#222222] border border-[#383838] rounded-full p-0.5 gap-0.5 select-none",
         className
       )}
     >
       {/* Smooth sliding pill indicator */}
       <div
         className={cn(
-          "absolute top-0.5 bottom-0.5 rounded-[6px] bg-[#2b2b2b] border border-[#383838]/80 shadow-[0_1px_2px_rgba(0,0,0,0.25)] pointer-events-none transition-all duration-200",
+          "absolute top-0.5 bottom-0.5 rounded-full bg-[#2b2b2b] border border-[#383838]/80 shadow-[0_1px_2px_rgba(0,0,0,0.25)] pointer-events-none transition-all duration-200",
           isReady ? "opacity-100" : "opacity-0"
         )}
         style={{
@@ -100,7 +100,7 @@ export function SegmentedToggle<T extends string = string>({
             role="tab"
             aria-selected={isActive}
             className={cn(
-              "relative z-10 h-full px-3.5 flex items-center justify-center rounded-[6px] text-[13px] font-medium transition-colors duration-150 cursor-pointer select-none",
+              "relative z-10 h-full px-3.5 flex items-center justify-center rounded-full text-[13px] font-medium transition-colors duration-150 cursor-pointer select-none",
               isActive ? "text-white" : "text-[#969696] hover:text-[#d4d4d4]"
             )}
             onClick={() => onChange(opt.id)}

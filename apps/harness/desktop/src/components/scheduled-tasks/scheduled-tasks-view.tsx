@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { ArrowLeft, Minus, Square, Copy, X } from "lucide-react";
-import { toast } from "@const/ui";
+import { toast, ScrollArea } from "@const/ui";
 import type { ScheduledTaskItem, ScheduledTaskRunHistory } from "../../vite-env";
 import {
   ScheduledTasksDashboard,
@@ -180,7 +180,7 @@ export function ScheduledTasksView({
   };
 
   return (
-    <div className="relative w-full h-full bg-[#161616] text-[#d4d4d4] flex flex-col overflow-y-auto select-none font-sans">
+    <div className="relative w-full h-full bg-[#161616] text-[#d4d4d4] flex flex-col select-none font-sans overflow-hidden">
       {/* Top Header Drag & Window Controls Strip */}
       <div
         className="h-10 shrink-0 flex items-center justify-between px-4 select-none relative z-30"
@@ -265,61 +265,63 @@ export function ScheduledTasksView({
         </div>
       </div>
 
-      {/* Main Subview Routing */}
-      {view === "dashboard" && (
-        <ScheduledTasksDashboard
-          tasks={tasks}
-          onCreateNew={() => {
-            setSelectedTask(null);
-            setFormTaskName("");
-            setPrefillValues(
-              currentWorkspacePath
-                ? { workspacePath: currentWorkspacePath, permissionPreset: "full_access" }
-                : { permissionPreset: "full_access" }
-            );
-            setView("create");
-          }}
-          onSelectTemplate={handleSelectTemplate}
-          onSelectTask={handleSelectTask}
-          onRunNow={(id) => void handleRunNow(id)}
-          onRefresh={() => void refreshTasks()}
-        />
-      )}
+      {/* Main Subview Routing wrapped in ScrollArea */}
+      <ScrollArea className="flex-1 w-full min-h-0" thumbClassName="bg-white/20 hover:bg-white/30">
+        {view === "dashboard" && (
+          <ScheduledTasksDashboard
+            tasks={tasks}
+            onCreateNew={() => {
+              setSelectedTask(null);
+              setFormTaskName("");
+              setPrefillValues(
+                currentWorkspacePath
+                  ? { workspacePath: currentWorkspacePath, permissionPreset: "full_access" }
+                  : { permissionPreset: "full_access" }
+              );
+              setView("create");
+            }}
+            onSelectTemplate={handleSelectTemplate}
+            onSelectTask={handleSelectTask}
+            onRunNow={(id) => void handleRunNow(id)}
+            onRefresh={() => void refreshTasks()}
+          />
+        )}
 
-      {view === "create" && (
-        <ScheduledTaskForm
-          initialValues={prefillValues}
-          isEditing={false}
-          onSubmit={(vals) => void handleCreateSubmit(vals)}
-          onCancel={() => {
-            setView("dashboard");
-            setFormTaskName("");
-          }}
-          onNameChange={setFormTaskName}
-        />
-      )}
+        {view === "create" && (
+          <ScheduledTaskForm
+            initialValues={prefillValues}
+            isEditing={false}
+            onSubmit={(vals) => void handleCreateSubmit(vals)}
+            onCancel={() => {
+              setView("dashboard");
+              setFormTaskName("");
+            }}
+            onNameChange={setFormTaskName}
+          />
+        )}
 
-      {(view === "settings" || view === "history") && selectedTask && (
-        <ScheduledTaskForm
-          task={selectedTask}
-          initialValues={selectedTask}
-          isEditing={true}
-          activeSubTab={view}
-          onSubTabChange={(tab) => setView(tab)}
-          onSubmit={(vals) => void handleUpdateSubmit(vals)}
-          onCancel={() => {
-            setView("dashboard");
-            setSelectedTask(null);
-            setFormTaskName("");
-          }}
-          onNameChange={setFormTaskName}
-          historyList={historyList}
-          onRunNow={(id) => void handleRunNow(id)}
-          onDeleteTask={(id) => void handleDeleteTask(id)}
-          onOpenSession={(id) => onOpenSession?.(id)}
-          onDeleteRun={(runId) => void handleDeleteRun(runId)}
-        />
-      )}
+        {(view === "settings" || view === "history") && selectedTask && (
+          <ScheduledTaskForm
+            task={selectedTask}
+            initialValues={selectedTask}
+            isEditing={true}
+            activeSubTab={view}
+            onSubTabChange={(tab) => setView(tab)}
+            onSubmit={(vals) => void handleUpdateSubmit(vals)}
+            onCancel={() => {
+              setView("dashboard");
+              setSelectedTask(null);
+              setFormTaskName("");
+            }}
+            onNameChange={setFormTaskName}
+            historyList={historyList}
+            onRunNow={(id) => void handleRunNow(id)}
+            onDeleteTask={(id) => void handleDeleteTask(id)}
+            onOpenSession={(id) => onOpenSession?.(id)}
+            onDeleteRun={(runId) => void handleDeleteRun(runId)}
+          />
+        )}
+      </ScrollArea>
     </div>
   );
 }

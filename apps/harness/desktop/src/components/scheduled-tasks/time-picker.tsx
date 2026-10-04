@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Clock, ChevronDown } from "lucide-react";
+import { ScrollArea } from "@const/ui";
 
 export interface TimePickerProps {
   value: string; // e.g. "09:00"
@@ -9,12 +10,23 @@ export interface TimePickerProps {
 export function TimePicker({ value, onChange }: TimePickerProps): React.JSX.Element {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const activeHourRef = useRef<HTMLButtonElement>(null);
+  const activeMinuteRef = useRef<HTMLButtonElement>(null);
 
   const [hours, minutes] = (value || "09:00").split(":");
   const curHour = hours || "09";
   const curMinute = minutes || "00";
 
   const [inputVal, setInputVal] = useState(value || "09:00");
+
+  useEffect(() => {
+    if (open) {
+      requestAnimationFrame(() => {
+        activeHourRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
+        activeMinuteRef.current?.scrollIntoView({ block: "center", behavior: "auto" });
+      });
+    }
+  }, [open]);
 
   useEffect(() => {
     setInputVal(value || "09:00");
@@ -98,48 +110,54 @@ export function TimePicker({ value, onChange }: TimePickerProps): React.JSX.Elem
             <span className="text-[11px] text-[#969696]">24h format</span>
           </div>
 
-          {/* Symmetrical Dual Column Picker */}
+          {/* Symmetrical Dual Column Picker with Radix ScrollArea */}
           <div className="flex items-start gap-1">
-            <div className="flex-1 flex flex-col">
+            <div className="flex-1 flex flex-col min-w-0">
               <div className="text-[10px] font-medium text-[#969696] mb-1 text-center uppercase">Hour</div>
-              <div className="max-h-36 overflow-y-auto flex flex-col gap-0.5 pr-0.5">
-                {hoursList.map((h) => (
-                  <button
-                    key={h}
-                    type="button"
-                    className={`py-1 rounded text-xs text-center transition-colors cursor-pointer ${
-                      h === curHour
-                        ? "bg-[#0066ff] text-white font-medium"
-                        : "text-[#d4d4d4] hover:bg-[#2b2b2b] hover:text-white"
-                    }`}
-                    onClick={() => handleHourSelect(h)}
-                  >
-                    {h}
-                  </button>
-                ))}
-              </div>
+              <ScrollArea className="h-36 pr-1" thumbClassName="bg-white/20 hover:bg-white/30">
+                <div className="flex flex-col gap-0.5">
+                  {hoursList.map((h) => (
+                    <button
+                      key={h}
+                      ref={h === curHour ? activeHourRef : undefined}
+                      type="button"
+                      className={`py-1 rounded text-xs text-center transition-colors cursor-pointer ${
+                        h === curHour
+                          ? "bg-[#0066ff] text-white font-medium"
+                          : "text-[#d4d4d4] hover:bg-[#2b2b2b] hover:text-white"
+                      }`}
+                      onClick={() => handleHourSelect(h)}
+                    >
+                      {h}
+                    </button>
+                  ))}
+                </div>
+              </ScrollArea>
             </div>
 
             <div className="w-[1px] h-36 bg-[#383838] mx-0.5" />
 
-            <div className="flex-1 flex flex-col">
+            <div className="flex-1 flex flex-col min-w-0">
               <div className="text-[10px] font-medium text-[#969696] mb-1 text-center uppercase">Min</div>
-              <div className="max-h-36 overflow-y-auto flex flex-col gap-0.5 pr-0.5">
-                {minutesList.map((m) => (
-                  <button
-                    key={m}
-                    type="button"
-                    className={`py-1 rounded text-xs text-center transition-colors cursor-pointer ${
-                      m === curMinute
-                        ? "bg-[#0066ff] text-white font-medium"
-                        : "text-[#d4d4d4] hover:bg-[#2b2b2b] hover:text-white"
-                    }`}
-                    onClick={() => handleMinuteSelect(m)}
-                  >
-                    {m}
-                  </button>
-                ))}
-              </div>
+              <ScrollArea className="h-36 pr-1" thumbClassName="bg-white/20 hover:bg-white/30">
+                <div className="flex flex-col gap-0.5">
+                  {minutesList.map((m) => (
+                    <button
+                      key={m}
+                      ref={m === curMinute ? activeMinuteRef : undefined}
+                      type="button"
+                      className={`py-1 rounded text-xs text-center transition-colors cursor-pointer ${
+                        m === curMinute
+                          ? "bg-[#0066ff] text-white font-medium"
+                          : "text-[#d4d4d4] hover:bg-[#2b2b2b] hover:text-white"
+                      }`}
+                      onClick={() => handleMinuteSelect(m)}
+                    >
+                      {m}
+                    </button>
+                  ))}
+                </div>
+              </ScrollArea>
             </div>
           </div>
         </div>
