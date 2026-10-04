@@ -6,3 +6,4 @@ export * from "./custom-dropdown";
 export * from "./custom-repeat-modal";
 export * from "./day-picker-grid";
 export * from "./time-picker";
+export * from "./segmented-toggle";

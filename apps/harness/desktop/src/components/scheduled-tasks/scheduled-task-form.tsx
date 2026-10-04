@@ -1,26 +1,28 @@
 import React, { useState, useRef, useEffect, useMemo } from "react";
 import {
-  ArrowLeft,
   Folder,
   FolderPlus,
   MessageSquare,
   Search,
   Check,
-  ShieldAlert,
   ChevronDown,
   ChevronUp,
   Settings,
   Trash2,
   Plus,
+  Play,
+  Info,
 } from "lucide-react";
 import { ScrollArea, cn } from "@const/ui";
 import { useQuery } from "convex/react";
 import { api } from "@const/backend/_generated/api";
-import type { ScheduledTaskItem, ScheduledTaskSchedule } from "../../vite-env";
+import type { ScheduledTaskItem, ScheduledTaskSchedule, ScheduledTaskRunHistory } from "../../vite-env";
 import { CustomDropdown } from "./custom-dropdown";
 import { TimePicker } from "./time-picker";
 import { DayPickerGrid } from "./day-picker-grid";
 import { CustomRepeatModal, type CustomRepeatConfig } from "./custom-repeat-modal";
+import { SegmentedToggle } from "./segmented-toggle";
+import { ScheduledTaskHistoryContent } from "./scheduled-task-history";
 
 export interface ScheduledTaskFormData {
   name: string;
@@ -33,10 +35,20 @@ export interface ScheduledTaskFormData {
 
 export interface ScheduledTaskFormProps {
   initialValues?: Partial<ScheduledTaskItem>;
+  task?: ScheduledTaskItem;
   isEditing?: boolean;
+  activeSubTab?: "settings" | "history";
+  onSubTabChange?: (tab: "settings" | "history") => void;
   onSubmit: (data: ScheduledTaskFormData) => void;
   onCancel: () => void;
   onSwitchToHistory?: () => void;
+  onSwitchToSettings?: () => void;
+  onNameChange?: (name: string) => void;
+  historyList?: ScheduledTaskRunHistory[];
+  onRunNow?: (taskId: string) => void;
+  onDeleteTask?: (taskId: string) => void;
+  onOpenSession?: (sessionId: string) => void;
+  onDeleteRun?: (runId: string) => void;
 }
 
 interface ModelItem {
@@ -69,10 +81,20 @@ function formatTokenDisplay(tokens: number): string {
 
 export function ScheduledTaskForm({
   initialValues,
+  task,
   isEditing = false,
+  activeSubTab: propActiveSubTab,
+  onSubTabChange,
   onSubmit,
   onCancel,
   onSwitchToHistory,
+  onSwitchToSettings,
+  onNameChange,
+  historyList,
+  onRunNow,
+  onDeleteTask,
+  onOpenSession,
+  onDeleteRun,
 }: ScheduledTaskFormProps): React.JSX.Element {
   const [name, setName] = useState(initialValues?.name || initialValues?.title || "");
   const [prompt, setPrompt] = useState(initialValues?.prompt || initialValues?.instructions || "");
@@ -112,7 +134,17 @@ export function ScheduledTaskForm({
   });
   const projectMenuRef = useRef<HTMLDivElement>(null);
 
-  // 2. Permission Mode: Scheduled tasks run unattended with full access
+  // 2. Permission Indicator state
+  const [isAccessInfoOpen, setIsAccessInfoOpen] = useState(false);
+  const accessInfoRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (initialValues?.name || initialValues?.title) {
+      onNameChange?.(initialValues.name || initialValues.title || "");
+    }
+  }, [initialValues, onNameChange]);
+
+  // Scheduled tasks run unattended with full access
   const mode = "full_access";
 
   // 3. Model Selector State (matching ChatCard)
@@ -190,7 +222,19 @@ export function ScheduledTaskForm({
   const [isModelOpen, setIsModelOpen] = useState(false);
   const modelMenuRef = useRef<HTMLDivElement>(null);
 
-  const [activeSubTab, setActiveSubTab] = useState<"settings" | "history">("settings");
+  const [internalSubTab, setInternalSubTab] = useState<"settings" | "history">("settings");
+  const activeSubTab = propActiveSubTab ?? internalSubTab;
+
+  const handleSubTabChange = (tab: "settings" | "history") => {
+    setInternalSubTab(tab);
+    onSubTabChange?.(tab);
+    if (tab === "history" && onSwitchToHistory) {
+      onSwitchToHistory();
+    }
+    if (tab === "settings" && onSwitchToSettings) {
+      onSwitchToSettings();
+    }
+  };
 
   // Load models from engine
   useEffect(() => {
@@ -231,6 +275,9 @@ export function ScheduledTaskForm({
       }
       if (modelMenuRef.current && !modelMenuRef.current.contains(e.target as Node)) {
         setIsModelOpen(false);
+      }
+      if (accessInfoRef.current && !accessInfoRef.current.contains(e.target as Node)) {
+        setIsAccessInfoOpen(false);
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -352,23 +399,6 @@ export function ScheduledTaskForm({
 
   return (
     <>
-      {/* Top-Left Corner Breadcrumb Navigation */}
-      <div className="absolute top-3.5 left-6 z-20 flex items-center gap-1.5 text-[13px] select-none">
-        <button
-          type="button"
-          className="inline-flex items-center gap-1.5 text-[#969696] hover:text-white hover:bg-[#222222] px-2 py-1 rounded-md transition-colors cursor-pointer"
-          onClick={onCancel}
-          title="Back to Scheduled Tasks"
-        >
-          <ArrowLeft className="w-3.5 h-3.5" />
-          <span>Scheduled Tasks</span>
-        </button>
-        <span className="text-[#5d5d5d] select-none">/</span>
-        <span className="text-[#d4d4d4] font-medium px-1">
-          {isEditing ? name || "Edit task" : "New task"}
-        </span>
-      </div>
-
       {/* Main Page Content */}
       <div className="w-full max-w-4xl mx-auto px-6 sm:px-10 py-12 flex flex-col select-none">
         <div className="mb-6">
@@ -382,62 +412,95 @@ export function ScheduledTaskForm({
 
         {/* Controls Bar */}
         <div className="flex items-center justify-between gap-4 mb-6">
-          <div className="inline-flex items-center bg-[#222222] border border-[#383838] rounded-lg p-0.5 gap-0.5">
-            <button
-              type="button"
-              className={`px-3 py-1.5 rounded-md text-[13px] font-medium transition-colors cursor-pointer ${
-                activeSubTab === "settings"
-                  ? "bg-[#2b2b2b] text-white"
-                  : "text-[#969696] hover:text-[#d4d4d4]"
-              }`}
-              onClick={() => setActiveSubTab("settings")}
-            >
-              Settings
-            </button>
-            <button
-              type="button"
-              className={`px-3 py-1.5 rounded-md text-[13px] font-medium transition-colors cursor-pointer ${
-                activeSubTab === "history"
-                  ? "bg-[#2b2b2b] text-white"
-                  : "text-[#969696] hover:text-[#d4d4d4]"
-              }`}
-              onClick={() => {
-                if (isEditing && onSwitchToHistory) {
-                  onSwitchToHistory();
-                } else {
-                  setActiveSubTab("history");
-                }
-              }}
-            >
-              History
-            </button>
-          </div>
+          <SegmentedToggle
+            value={activeSubTab}
+            onChange={handleSubTabChange}
+            options={[
+              { id: "settings", label: "Settings" },
+              { id: "history", label: "History" },
+            ]}
+          />
 
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              className="px-3.5 py-1.5 rounded-lg text-xs font-medium text-[#d4d4d4] hover:text-white bg-[#222222] hover:bg-[#2b2b2b] border border-[#383838] transition-colors cursor-pointer"
-              onClick={onCancel}
-            >
-              Cancel
-            </button>
-            {activeSubTab === "settings" && (
-              <button
-                type="button"
-                className="px-3.5 py-1.5 rounded-lg text-xs font-medium text-[#161616] bg-[#d4d4d4] hover:bg-white transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
-                onClick={() => handleSubmit()}
-                disabled={!name.trim() || !prompt.trim()}
-              >
-                {isEditing ? "Save changes" : "Create scheduled task"}
-              </button>
+            {activeSubTab === "settings" ? (
+              <div className="flex items-center gap-2 animate-in fade-in duration-150">
+                <button
+                  type="button"
+                  className="h-8 px-3.5 flex items-center justify-center rounded-lg text-xs font-medium text-[#d4d4d4] hover:text-white bg-[#222222] hover:bg-[#2b2b2b] border border-[#383838] transition-colors cursor-pointer"
+                  onClick={onCancel}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="h-8 px-3.5 flex items-center justify-center rounded-lg text-xs font-medium text-[#161616] bg-[#d4d4d4] hover:bg-white transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
+                  onClick={() => handleSubmit()}
+                  disabled={!name.trim() || !prompt.trim()}
+                >
+                  {isEditing ? "Save changes" : "Create scheduled task"}
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 animate-in fade-in duration-150">
+                {isEditing && (task?.id || initialValues?.id) && (
+                  <>
+                    {onRunNow && (
+                      <button
+                        type="button"
+                        className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#222222] hover:bg-[#2b2b2b] border border-[#383838] hover:border-[#484848] text-[#969696] hover:text-white transition-colors cursor-pointer"
+                        onClick={() => onRunNow((task?.id || initialValues?.id)!)}
+                        title="Run Now"
+                        aria-label="Run Now"
+                      >
+                        <Play className="w-3.5 h-3.5 fill-current" />
+                      </button>
+                    )}
+                    {onDeleteTask && (
+                      <button
+                        type="button"
+                        className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#222222] hover:bg-[#2b2b2b] border border-[#383838] hover:border-rose-900 text-[#969696] hover:text-rose-400 transition-colors cursor-pointer"
+                        onClick={() => {
+                          const titleToDelete = name || initialValues?.name || initialValues?.title || "this task";
+                          if (window.confirm(`Delete "${titleToDelete}"?`)) {
+                            onDeleteTask((task?.id || initialValues?.id)!);
+                          }
+                        }}
+                        title="Delete task"
+                        aria-label="Delete task"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </>
+                )}
+                {!isEditing && (
+                  <button
+                    type="button"
+                    className="h-8 px-3.5 flex items-center justify-center rounded-lg text-xs font-medium text-[#d4d4d4] hover:text-white bg-[#222222] hover:bg-[#2b2b2b] border border-[#383838] transition-colors cursor-pointer"
+                    onClick={onCancel}
+                  >
+                    Cancel
+                  </button>
+                )}
+              </div>
             )}
           </div>
         </div>
 
-        {/* If History sub-tab active on a new task with no runs yet */}
+        {/* Tab Content: History or Settings Form */}
         {activeSubTab === "history" ? (
-          <div className="bg-[#222222] border border-dashed border-[#383838] rounded-xl p-10 text-center text-[#969696] text-xs">
-            <span>No runs yet.</span>
+          <div className="animate-in fade-in duration-200">
+            {isEditing && historyList ? (
+              <ScheduledTaskHistoryContent
+                historyList={historyList}
+                onOpenSession={onOpenSession}
+                onDeleteRun={onDeleteRun}
+              />
+            ) : (
+              <div className="bg-[#222222] border border-dashed border-[#383838] rounded-xl p-10 text-center text-[#969696] text-xs">
+                <span>No runs yet.</span>
+              </div>
+            )}
           </div>
         ) : (
           /* Form Fields */
@@ -450,7 +513,10 @@ export function ScheduledTaskForm({
                 className="w-full bg-[#2b2b2b] border border-[#383838] rounded-lg px-3 py-2 text-[13px] text-white outline-none focus:border-[#5d5d5d] placeholder:text-[#5d5d5d] transition-colors"
                 placeholder="Untitled Scheduled Task"
                 value={name}
-                onChange={(e) => setName(e.target.value)}
+                onChange={(e) => {
+                  setName(e.target.value);
+                  onNameChange?.(e.target.value);
+                }}
                 required
               />
             </div>
@@ -551,9 +617,9 @@ export function ScheduledTaskForm({
             {/* Field: Instructions with Bottom Toolbar (Workspace, Permission, Model - exactly matching ChatCard) */}
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-medium text-[#969696]">Instructions</label>
-              <div className="bg-[#2b2b2b] border border-[#383838] rounded-xl overflow-hidden focus-within:border-[#5d5d5d] transition-colors flex flex-col">
+              <div className="bg-[#2b2b2b] border border-[#383838] rounded-xl focus-within:border-[#5d5d5d] transition-colors flex flex-col">
                 <textarea
-                  className="w-full min-h-[140px] bg-transparent text-[13px] text-white placeholder:text-[#5d5d5d] p-3 outline-none resize-y font-sans leading-relaxed"
+                  className="w-full min-h-[140px] bg-transparent text-[13px] text-white placeholder:text-[#5d5d5d] p-3 outline-none resize-y font-sans leading-relaxed rounded-t-xl"
                   placeholder="e.g. Review commits from the last 24 hours and summarize likely bugs and fixes"
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
@@ -561,7 +627,7 @@ export function ScheduledTaskForm({
                 />
 
                 {/* Embedded Toolbar matching ChatCard */}
-                <div className="flex items-center justify-between p-2 bg-[#222222] border-t border-[#383838] gap-2 flex-wrap text-xs">
+                <div className="flex items-center justify-between p-2 bg-[#222222] border-t border-[#383838] gap-2 flex-wrap text-xs rounded-b-xl">
                   <div className="flex items-center gap-2 flex-wrap">
                     {/* 1. Workspace / Project Selector (exact ChatCard pattern) */}
                     <div className="relative" ref={projectMenuRef}>
@@ -570,6 +636,7 @@ export function ScheduledTaskForm({
                         onClick={() => {
                           setIsProjectOpen((prev) => !prev);
                           setIsModelOpen(false);
+                          setIsAccessInfoOpen(false);
                         }}
                         className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[13px] bg-[#2b2b2b] hover:bg-[#383838] border border-[#383838] text-[#d4d4d4] hover:text-white transition-colors cursor-pointer"
                         title={workspacePath || "Work outside a project"}
@@ -656,13 +723,33 @@ export function ScheduledTaskForm({
                       )}
                     </div>
 
-                    {/* 2. Permission Indicator: Scheduled tasks run unattended with Full Access */}
-                    <div
-                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[13px] border bg-[#2b2b2b] border-[#e79737]/40 text-[#e79737] select-none"
-                      title="Scheduled tasks run autonomously in the background with Full Access"
-                    >
-                      <ShieldAlert className="w-3.5 h-3.5 text-[#e79737]" />
-                      <span>Full access</span>
+                    {/* 2. Permission Indicator: Scheduled tasks run unattended with Full Access (Info button in white) */}
+                    <div className="relative" ref={accessInfoRef}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsAccessInfoOpen((prev) => !prev);
+                          setIsProjectOpen(false);
+                          setIsModelOpen(false);
+                        }}
+                        className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-[#2b2b2b] hover:bg-[#383838] border border-[#383838] text-white hover:text-white transition-colors cursor-pointer"
+                        title="Full access: Scheduled tasks run autonomously in the background with full access"
+                        aria-label="Full access info"
+                      >
+                        <Info className="w-3.5 h-3.5 text-white" />
+                      </button>
+
+                      {isAccessInfoOpen && (
+                        <div className="absolute bottom-full mb-2 left-0 w-64 bg-[#222222] border border-[#383838] rounded-xl shadow-2xl p-2.5 z-50 flex flex-col text-left select-none animate-in fade-in zoom-in-95 duration-100">
+                          <div className="flex items-center gap-1.5 text-xs font-medium text-white mb-1">
+                            <Info className="w-3.5 h-3.5 text-white shrink-0" />
+                            <span>Full access</span>
+                          </div>
+                          <p className="text-[11px] text-[#969696] leading-relaxed">
+                            Scheduled tasks run autonomously in the background with full access permissions.
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -673,6 +760,7 @@ export function ScheduledTaskForm({
                       onClick={() => {
                         setIsModelOpen((prev) => !prev);
                         setIsProjectOpen(false);
+                        setIsAccessInfoOpen(false);
                       }}
                       className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[13px] bg-[#2b2b2b] hover:bg-[#383838] border border-[#383838] text-[#d4d4d4] hover:text-white transition-colors cursor-pointer"
                     >

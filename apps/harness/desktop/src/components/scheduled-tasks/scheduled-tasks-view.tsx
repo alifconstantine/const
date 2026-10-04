@@ -28,6 +28,7 @@ export function ScheduledTasksView({
   const [selectedTask, setSelectedTask] = useState<ScheduledTaskItem | null>(null);
   const [historyList, setHistoryList] = useState<ScheduledTaskRunHistory[]>([]);
   const [prefillValues, setPrefillValues] = useState<Partial<ScheduledTaskItem> | undefined>(undefined);
+  const [formTaskName, setFormTaskName] = useState("");
   const [isMaximized, setIsMaximized] = useState(false);
 
   // Window maximized state & listener
@@ -107,6 +108,7 @@ export function ScheduledTasksView({
 
   const handleSelectTemplate = (template: StarterTemplate) => {
     setSelectedTask(null);
+    setFormTaskName(template.title);
     setPrefillValues({
       name: template.title,
       prompt: template.instructions,
@@ -119,6 +121,7 @@ export function ScheduledTasksView({
 
   const handleSelectTask = (task: ScheduledTaskItem) => {
     setSelectedTask(task);
+    setFormTaskName(task.name || task.title || "");
     setView("settings");
   };
 
@@ -183,9 +186,9 @@ export function ScheduledTasksView({
         className="h-10 shrink-0 flex items-center justify-between px-4 select-none relative z-30"
         style={{ WebkitAppRegion: "drag" } as React.CSSProperties}
       >
-        {/* Left: Back to workspace if on dashboard */}
-        <div style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties}>
-          {view === "dashboard" && (
+        {/* Left: Back to workspace or Task Breadcrumb */}
+        <div style={{ WebkitAppRegion: "no-drag" } as React.CSSProperties} className="flex items-center gap-1.5 text-[13px]">
+          {view === "dashboard" ? (
             <button
               type="button"
               onClick={onBackToWorkspace}
@@ -194,6 +197,30 @@ export function ScheduledTasksView({
               <ArrowLeft className="w-3.5 h-3.5" />
               <span>Back to workspace</span>
             </button>
+          ) : (
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedTask(null);
+                  setFormTaskName("");
+                  setView("dashboard");
+                }}
+                className="inline-flex items-center gap-1.5 text-[#969696] hover:text-white hover:bg-[#222222] px-2 py-1 rounded-md transition-colors cursor-pointer"
+                title="Back to Scheduled Tasks"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span>Scheduled Tasks</span>
+              </button>
+              <span className="text-[#5d5d5d] select-none">/</span>
+              <span className="text-[#d4d4d4] font-medium px-1 truncate max-w-[240px]">
+                {view === "create"
+                  ? (formTaskName.trim() || "New task")
+                  : view === "history"
+                  ? (selectedTask?.name || selectedTask?.title || "History")
+                  : (formTaskName.trim() || selectedTask?.name || selectedTask?.title || "Edit task")}
+              </span>
+            </div>
           )}
         </div>
 
@@ -244,6 +271,7 @@ export function ScheduledTasksView({
           tasks={tasks}
           onCreateNew={() => {
             setSelectedTask(null);
+            setFormTaskName("");
             setPrefillValues(
               currentWorkspacePath
                 ? { workspacePath: currentWorkspacePath, permissionPreset: "full_access" }
@@ -263,36 +291,33 @@ export function ScheduledTasksView({
           initialValues={prefillValues}
           isEditing={false}
           onSubmit={(vals) => void handleCreateSubmit(vals)}
-          onCancel={() => setView("dashboard")}
+          onCancel={() => {
+            setView("dashboard");
+            setFormTaskName("");
+          }}
+          onNameChange={setFormTaskName}
         />
       )}
 
-      {view === "settings" && selectedTask && (
+      {(view === "settings" || view === "history") && selectedTask && (
         <ScheduledTaskForm
+          task={selectedTask}
           initialValues={selectedTask}
           isEditing={true}
+          activeSubTab={view}
+          onSubTabChange={(tab) => setView(tab)}
           onSubmit={(vals) => void handleUpdateSubmit(vals)}
           onCancel={() => {
             setView("dashboard");
             setSelectedTask(null);
+            setFormTaskName("");
           }}
-          onSwitchToHistory={() => setView("history")}
-        />
-      )}
-
-      {view === "history" && selectedTask && (
-        <ScheduledTaskHistory
-          task={selectedTask}
+          onNameChange={setFormTaskName}
           historyList={historyList}
           onRunNow={(id) => void handleRunNow(id)}
           onDeleteTask={(id) => void handleDeleteTask(id)}
           onOpenSession={(id) => onOpenSession?.(id)}
           onDeleteRun={(runId) => void handleDeleteRun(runId)}
-          onBack={() => {
-            setView("dashboard");
-            setSelectedTask(null);
-          }}
-          onSwitchToSettings={() => setView("settings")}
         />
       )}
     </div>
