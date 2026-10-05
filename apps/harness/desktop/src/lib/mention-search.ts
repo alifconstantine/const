@@ -63,6 +63,11 @@ export function activeAtToken(text: string, cursorPosition: number): ActiveAtTok
   if (cursorPosition < 0 || cursorPosition > text.length) return null;
   const beforeCursor = text.slice(0, cursorPosition);
 
+  // Exclude completed/bracketed mention tokens @[...]
+  if (/@[^\]\s]*\]$/.test(beforeCursor)) {
+    return null;
+  }
+
   // 1. Quoted mention: @"...
   const quotedMatch = /(?:^|\s)(@"([^"]*))$/u.exec(beforeCursor);
   if (quotedMatch && quotedMatch[1] !== undefined && quotedMatch[2] !== undefined) {
@@ -72,8 +77,8 @@ export function activeAtToken(text: string, cursorPosition: number): ActiveAtTok
     return { prefix, query, quoted: true, startCol, endCol: cursorPosition };
   }
 
-  // 2. Plain mention: @...
-  const plainMatch = /(?:^|\s)(@([^\s]*))$/u.exec(beforeCursor);
+  // 2. Plain mention: @... (excludes bracketed @[path])
+  const plainMatch = /(?:^|\s)(@([^\s\[][^\s]*|))$/u.exec(beforeCursor);
   if (plainMatch && plainMatch[1] !== undefined && plainMatch[2] !== undefined) {
     const prefix = plainMatch[1];
     const query = plainMatch[2];

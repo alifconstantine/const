@@ -52,6 +52,7 @@ import {
 } from "../../lib/mention-search";
 import { MentionPopover } from "./mention-popover";
 import { FileIcon } from "./file-icon";
+import { RichMentionEditor, type RichMentionEditorRef } from "./rich-mention-editor";
 
 
 function formatTokenDisplay(tokens: number): string {
@@ -251,39 +252,9 @@ export function ChatCard({
   onOpenFilePreview,
 }: ChatCardProps) {
   const [prompt, setPrompt] = useState("");
-  const [mentionedFiles, setMentionedFiles] = useState<MentionedItem[]>([]);
-  const [isAllSelected, setIsAllSelected] = useState(false);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const editorRef = useRef<RichMentionEditorRef>(null);
   const [isContextOpen, setIsContextOpen] = useState(false);
   const contextMenuRef = useRef<HTMLDivElement>(null);
-
-  const getFullSerializedText = () => {
-    const mentionTokens = mentionedFiles.map((m) => `@[${m.fullPath || m.path}]`);
-    const prefix = mentionTokens.join(" ");
-    if (prefix && prompt) {
-      return `${prefix} ${prompt}`;
-    }
-    return prefix || prompt;
-  };
-
-  const handleCopy = (e: React.ClipboardEvent) => {
-    if (isAllSelected && mentionedFiles.length > 0) {
-      e.preventDefault();
-      const fullText = getFullSerializedText();
-      e.clipboardData.setData("text/plain", fullText);
-    }
-  };
-
-  const handleCut = (e: React.ClipboardEvent) => {
-    if (isAllSelected && mentionedFiles.length > 0) {
-      e.preventDefault();
-      const fullText = getFullSerializedText();
-      e.clipboardData.setData("text/plain", fullText);
-      setMentionedFiles([]);
-      setPrompt("");
-      setIsAllSelected(false);
-    }
-  };
 
   // Attachments & Plus Menu State
   const [attachments, setAttachments] = useState<AttachedFile[]>([]);
@@ -292,7 +263,7 @@ export function ChatCard({
   const plusMenuRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
-    textareaRef.current?.focus();
+    editorRef.current?.focus();
     return () => {
       attachments.forEach((a) => {
         if (a.url && a.url.startsWith("blob:")) {
@@ -308,7 +279,7 @@ export function ChatCard({
     if (initialPrompt !== undefined) {
       setPrompt(initialPrompt);
       if (initialPrompt !== "") {
-        textareaRef.current?.focus();
+        editorRef.current?.focus();
       }
     }
   }, [initialPrompt]);
@@ -354,62 +325,23 @@ export function ChatCard({
     });
   };
 
-  const handlePaste = async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
-    const clipboardFiles = e.clipboardData?.files;
-    if (clipboardFiles && clipboardFiles.length > 0) {
-      const remainingSlots = MAX_ATTACHMENTS - attachments.length;
-      if (remainingSlots <= 0) {
-        toast.warning(`Maximum ${MAX_ATTACHMENTS} media attachments reached`);
-        return;
-      }
-      e.preventDefault();
-      const fileList = Array.from(clipboardFiles);
-      if (fileList.length > remainingSlots) {
-        toast.warning(
-          `Only ${remainingSlots} more file(s) allowed (limit ${MAX_ATTACHMENTS}). Excess files were not uploaded.`
-        );
-      }
-      const filesToProcess = fileList.slice(0, remainingSlots);
-      const newAttached = await parseUploadedFiles(filesToProcess);
-      setAttachments((prev) => [...prev, ...newAttached].slice(0, MAX_ATTACHMENTS));
+  const handlePasteFiles = async (files: FileList) => {
+    const remainingSlots = MAX_ATTACHMENTS - attachments.length;
+    if (remainingSlots <= 0) {
+      toast.warning(`Maximum ${MAX_ATTACHMENTS} media attachments reached`);
       return;
     }
 
-    // Check if pasted text contains mentions in the format @[path]
-    const pastedText = e.clipboardData?.getData("text/plain");
-    if (pastedText && /@\[([^\]]+)\]/.test(pastedText)) {
-      e.preventDefault();
-      const mentionMatches = Array.from(pastedText.matchAll(/@\[([^\]]+)\]/g));
-      const newMentions: MentionedItem[] = [];
-
-      for (const match of mentionMatches) {
-        const rawPath = match[1]?.trim();
-        if (!rawPath) continue;
-        const normalized = rawPath.replace(/\\/g, "/");
-        const isDir = normalized.endsWith("/");
-        const cleanName = normalized.split("/").filter(Boolean).pop() || rawPath;
-
-        newMentions.push({
-          id: `mention:${rawPath}`,
-          name: cleanName,
-          path: rawPath,
-          fullPath: rawPath,
-          kind: isDir ? "directory" : "file",
-        });
-      }
-
-      setMentionedFiles((prev) => {
-        const existing = new Set(prev.map((p) => p.fullPath || p.path));
-        const toAdd = newMentions.filter((m) => !existing.has(m.fullPath || m.path));
-        return [...prev, ...toAdd];
-      });
-
-      const remainingText = pastedText.replace(/@\[([^\]]+)\]/g, "").replace(/\s+/g, " ").trim();
-      if (remainingText) {
-        setPrompt((prev) => (prev ? `${prev} ${remainingText}` : remainingText));
-      }
-      adjustHeight();
+    const fileList = Array.from(files);
+    if (fileList.length > remainingSlots) {
+      toast.warning(
+        `Only ${remainingSlots} more file(s) allowed (limit ${MAX_ATTACHMENTS}). Excess files were not uploaded.`
+      );
     }
+
+    const filesToProcess = fileList.slice(0, remainingSlots);
+    const newAttached = await parseUploadedFiles(filesToProcess);
+    setAttachments((prev) => [...prev, ...newAttached].slice(0, MAX_ATTACHMENTS));
   };
 
   const handleDragOver = (e: React.DragEvent) => {
@@ -526,67 +458,16 @@ export function ChatCard({
   }, [mentionToken, workspaceFiles, allSessionMedia, conversations, currentProject]);
 
   const handleDrillDirectory = (candidate: MentionCandidate) => {
-    if (!mentionToken || !candidate || !candidate.drillPath) return;
-    const before = prompt.slice(0, mentionToken.startCol);
-    const after = prompt.slice(mentionToken.endCol);
-    const needsQuote = mentionToken.quoted || /\s/.test(candidate.drillPath);
-    const drillPrefix = needsQuote ? `@"${candidate.drillPath}` : `@${candidate.drillPath}`;
-    const nextPrompt = `${before}${drillPrefix}${after}`;
-    setPrompt(nextPrompt);
-
-    const nextCursor = before.length + drillPrefix.length;
-    requestAnimationFrame(() => {
-      if (textareaRef.current) {
-        textareaRef.current.focus();
-        textareaRef.current.setSelectionRange(nextCursor, nextCursor);
-        adjustHeight();
-        const nextToken = activeAtToken(nextPrompt, nextCursor);
-        setMentionToken(nextToken);
-        setMentionIndex(0);
-      }
-    });
+    if (!candidate || !candidate.drillPath) return;
+    editorRef.current?.drillDirectory(candidate);
+    setMentionIndex(0);
   };
 
   const handleSelectMentionCandidate = (candidate: MentionCandidate) => {
-    if (!mentionToken || !candidate) return;
-
-    // Clean up the @query token from prompt so the prompt remains tidy
-    const before = prompt.slice(0, mentionToken.startCol);
-    const after = prompt.slice(mentionToken.endCol);
-    const nextPrompt = `${before.trimEnd()} ${after.trimStart()}`.trim();
-    setPrompt(nextPrompt);
+    if (!candidate) return;
+    editorRef.current?.insertMention(candidate);
     setMentionToken(null);
     setMentionIndex(0);
-
-    // Register into mentionedFiles (Antigravity & Cursor style blue pills)
-    const cleanName = candidate.title.replace(/\/$/, "");
-    const targetPath = candidate.fullPath || candidate.insertion.replace(/^@"?|"?$/g, "");
-    const newMention: MentionedItem = {
-      id: candidate.id || `${candidate.kind}:${targetPath}`,
-      kind: candidate.kind,
-      name: cleanName,
-      path: targetPath,
-      fullPath: candidate.fullPath,
-      fileType: candidate.fileType,
-    };
-
-    setMentionedFiles((prev) => {
-      if (prev.some((m) => m.path === newMention.path || m.id === newMention.id || m.name === newMention.name)) {
-        return prev;
-      }
-      return [...prev, newMention];
-    });
-
-    requestAnimationFrame(() => {
-      if (textareaRef.current) {
-        textareaRef.current.focus();
-        adjustHeight();
-      }
-    });
-  };
-
-  const handleRemoveMention = (id: string) => {
-    setMentionedFiles((prev) => prev.filter((m) => m.id !== id));
   };
   const [isProjectOpen, setIsProjectOpen] = useState(false);
   const [searchWorkspace, setSearchWorkspace] = useState("");
@@ -1022,36 +903,7 @@ export function ChatCard({
     };
   }, []);
 
-  const adjustHeight = () => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
 
-    // Viewport element from Radix ScrollArea
-    const viewport = textarea.closest(
-      "[data-radix-scroll-area-viewport]"
-    ) as HTMLElement | null;
-    const prevScrollTop = viewport ? viewport.scrollTop : 0;
-
-    // Temporarily reset height to auto to measure accurate scrollHeight
-    textarea.style.height = "auto";
-    const nextHeight = Math.max(24, textarea.scrollHeight);
-    textarea.style.height = `${nextHeight}px`;
-
-    // Handle scroll position in viewport
-    if (viewport) {
-      const isNearBottom =
-        viewport.scrollHeight - viewport.clientHeight - prevScrollTop < 40;
-      if (isNearBottom) {
-        viewport.scrollTop = viewport.scrollHeight;
-      } else if (prevScrollTop > 0) {
-        viewport.scrollTop = prevScrollTop;
-      }
-    }
-  };
-
-  useEffect(() => {
-    adjustHeight();
-  }, [prompt]);
 
   const handleOpenFolder = async () => {
     setIsProjectOpen(false);
@@ -1071,15 +923,8 @@ export function ChatCard({
   };
 
   const handleSend = () => {
-    if ((!prompt.trim() && attachments.length === 0 && mentionedFiles.length === 0) || isExecuting) return;
-    let text = prompt.trim();
-
-    // If there are mentioned files/entities, prepend them formatted as @[path]
-    if (mentionedFiles.length > 0) {
-      const mentionTokens = mentionedFiles.map((m) => `@[${m.fullPath || m.path}]`);
-      const prefix = mentionTokens.join(" ");
-      text = text ? `${prefix} ${text}` : prefix;
-    }
+    let text = (editorRef.current?.getText() || prompt).trim();
+    if ((!text && attachments.length === 0) || isExecuting) return;
 
     if (!text && attachments.length > 0) {
       text = "Please analyze the attached media/file(s).";
@@ -1087,11 +932,8 @@ export function ChatCard({
 
     const currentAttachments = [...attachments];
     setPrompt("");
-    setMentionedFiles([]);
+    editorRef.current?.clear();
     setAttachments([]);
-    if (textareaRef.current) {
-      textareaRef.current.style.height = "24px";
-    }
     const matchedModel = models.find((m) => m.name === selectedModel || m.id === selectedModel);
     onSendMessage?.({
       prompt: text,
@@ -1436,194 +1278,71 @@ export function ChatCard({
             )}
 
           {/* Auto-growing Textarea with Inline Mentions matching Screenshot */}
-          <ScrollArea className="w-full max-h-52 [&>div>div[style]]:!block pr-1.5">
-            <div
-              onClick={() => {
-                textareaRef.current?.focus();
+          {/* Inline Rich Mention Editor matching Antigravity & Image 1 */}
+          <div
+            onClick={() => {
+              editorRef.current?.focus();
+            }}
+            className="w-full py-0.5 cursor-text"
+          >
+            <RichMentionEditor
+              ref={editorRef}
+              initialValue={prompt}
+              onSerializedChange={(val) => setPrompt(val)}
+              onMentionTokenChange={(token) => {
+                setMentionToken(token);
+                if (!token) setMentionIndex(0);
               }}
-              onCopy={handleCopy}
-              onCut={handleCut}
-              className="w-full min-h-[28px] flex flex-wrap items-center gap-x-2 gap-y-1 py-0.5 cursor-text text-[14px]"
-            >
-              {mentionedFiles.map((file) => {
-                const isDir = file.kind === "directory";
-                const isSession = file.kind === "session";
-                const isMedia = file.kind === "media" || file.fileType === "image";
-
-                return (
-                  <span
-                    key={file.id}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (file.kind === "session") return;
-                      const targetPath = file.fullPath || file.path;
-                      if (onOpenFilePreview) {
-                        onOpenFilePreview(targetPath);
-                      }
-                    }}
-                    className={cn(
-                      "inline-flex items-center gap-1.5 py-0.5 px-1.5 rounded select-none cursor-pointer group transition-colors",
-                      isAllSelected
-                        ? "bg-[#264f78] dark:bg-[#264f78] text-white ring-1 ring-blue-400"
-                        : "text-[#262626] dark:text-[#ececec] hover:bg-black/5 dark:hover:bg-white/10"
-                    )}
-                    title={`Click to preview ${file.name} in sidepanel`}
-                  >
-                    {isDir ? (
-                      <Folder className="w-3.5 h-3.5 text-[#888888] dark:text-[#a0a0a0] stroke-[1.75] shrink-0" />
-                    ) : isSession ? (
-                      <MessageSquare className="w-3.5 h-3.5 text-[#888888] dark:text-[#a0a0a0] stroke-[1.75] shrink-0" />
-                    ) : isMedia ? (
-                      <ImageIcon className="w-3.5 h-3.5 text-[#888888] dark:text-[#a0a0a0] stroke-[1.75] shrink-0" />
-                    ) : (
-                      <FileIcon filename={file.name} className="w-3.5 h-3.5 shrink-0" />
-                    )}
-
-                    <span className="leading-tight text-[13.5px] font-sans">
-                      {file.name}
-                    </span>
-
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleRemoveMention(file.id);
-                      }}
-                      className="opacity-0 group-hover:opacity-100 p-0.5 rounded hover:bg-red-500/20 text-[#888888] hover:text-red-500 transition-opacity ml-0.5"
-                      title="Remove mention"
-                    >
-                      <X className="w-3 h-3 stroke-[2]" />
-                    </button>
-                  </span>
-                );
-              })}
-
-              <textarea
-                ref={textareaRef}
-                value={prompt}
-                onChange={(e) => {
-                  if (isAllSelected) setIsAllSelected(false);
-                  const val = e.target.value;
-                  setPrompt(val);
-                  adjustHeight();
-                  const cursor = e.target.selectionEnd ?? val.length;
-                  const token = activeAtToken(val, cursor);
-                  setMentionToken(token);
-                  setMentionIndex(0);
-                }}
-                onClick={(e) => {
-                  if (isAllSelected) setIsAllSelected(false);
-                  const cursor = (e.target as HTMLTextAreaElement).selectionEnd ?? prompt.length;
-                  const token = activeAtToken(prompt, cursor);
-                  setMentionToken(token);
-                  setMentionIndex(0);
-                }}
-                onCopy={handleCopy}
-                onCut={handleCut}
-                onKeyUp={(e) => {
-                  if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) {
-                    if (isAllSelected) setIsAllSelected(false);
-                    const cursor = (e.target as HTMLTextAreaElement).selectionEnd ?? prompt.length;
-                    const token = activeAtToken(prompt, cursor);
-                    setMentionToken(token);
-                    setMentionIndex(0);
-                  }
-                }}
-                onPaste={handlePaste}
-                rows={1}
-                placeholder={
-                  mentionedFiles.length > 0
-                    ? ""
-                    : compact
-                    ? "Message or run a task... / commands, @ files or sessions"
-                    : "Ask Const anything, @ to add context, / for commands or capabilities"
-                }
-                className="flex-1 min-w-[120px] resize-none bg-transparent text-[14px] leading-5 text-[#262626] dark:text-[#d4d4d4] placeholder:text-[#a9a9a9] dark:placeholder:text-[#5d5d5d] outline-none font-sans overflow-hidden py-0.5 block"
-                onKeyDown={(e) => {
-                  // Select All (Ctrl+A / Cmd+A)
-                  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "a") {
-                    if (mentionedFiles.length > 0) {
-                      setIsAllSelected(true);
-                    }
-                    return;
-                  }
-
-                  // When everything is selected (mentions + prompt)
-                  if (isAllSelected) {
-                    if (e.key === "Backspace" || e.key === "Delete") {
-                      e.preventDefault();
-                      setMentionedFiles([]);
-                      setPrompt("");
-                      setIsAllSelected(false);
-                      return;
-                    }
-                    if (
-                      e.key === "Escape" ||
-                      e.key === "ArrowLeft" ||
-                      e.key === "ArrowRight" ||
-                      e.key === "ArrowUp" ||
-                      e.key === "ArrowDown"
-                    ) {
-                      setIsAllSelected(false);
-                    } else if (e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
-                      setMentionedFiles([]);
-                      setIsAllSelected(false);
-                    }
-                  }
-
-                  // If prompt is empty and user presses Backspace, delete the last mention!
-                  if (e.key === "Backspace" && !prompt && mentionedFiles.length > 0) {
+              onOpenFilePreview={onOpenFilePreview}
+              onSend={handleSend}
+              onPasteFiles={handlePasteFiles}
+              placeholder={
+                compact
+                  ? "Message or run a task... / commands, @ files or sessions"
+                  : "Ask Const anything, @ to add context, / for commands or capabilities"
+              }
+              disabled={isExecuting}
+              onKeyDown={(e) => {
+                if (mentionToken && mentionCandidates.length > 0) {
+                  if (e.key === "ArrowDown") {
                     e.preventDefault();
-                    setMentionedFiles((prev) => prev.slice(0, -1));
+                    setMentionIndex((prev) => (prev + 1) % mentionCandidates.length);
                     return;
                   }
-
-                  if (mentionToken && mentionCandidates.length > 0) {
-                    if (e.key === "ArrowDown") {
-                      e.preventDefault();
-                      setMentionIndex((prev) => (prev + 1) % mentionCandidates.length);
-                      return;
-                    }
-                    if (e.key === "ArrowUp") {
-                      e.preventDefault();
-                      setMentionIndex((prev) => (prev - 1 + mentionCandidates.length) % mentionCandidates.length);
-                      return;
-                    }
-                    if (e.key === "Tab") {
-                      e.preventDefault();
-                      const candidate = mentionCandidates[mentionIndex];
-                      if (candidate) {
-                        if (candidate.drill) {
-                          handleDrillDirectory(candidate);
-                        } else {
-                          handleSelectMentionCandidate(candidate);
-                        }
-                      }
-                      return;
-                    }
-                    if (e.key === "Enter") {
-                      e.preventDefault();
-                      const candidate = mentionCandidates[mentionIndex];
-                      if (candidate) {
+                  if (e.key === "ArrowUp") {
+                    e.preventDefault();
+                    setMentionIndex((prev) => (prev - 1 + mentionCandidates.length) % mentionCandidates.length);
+                    return;
+                  }
+                  if (e.key === "Tab") {
+                    e.preventDefault();
+                    const candidate = mentionCandidates[mentionIndex];
+                    if (candidate) {
+                      if (candidate.drill) {
+                        handleDrillDirectory(candidate);
+                      } else {
                         handleSelectMentionCandidate(candidate);
                       }
-                      return;
                     }
-                    if (e.key === "Escape") {
-                      e.preventDefault();
-                      setMentionToken(null);
-                      return;
-                    }
+                    return;
                   }
-
-                  if (e.key === "Enter" && !e.shiftKey) {
+                  if (e.key === "Enter") {
                     e.preventDefault();
-                    handleSend();
+                    const candidate = mentionCandidates[mentionIndex];
+                    if (candidate) {
+                      handleSelectMentionCandidate(candidate);
+                    }
+                    return;
                   }
-                }}
-              />
-            </div>
-          </ScrollArea>
+                  if (e.key === "Escape") {
+                    e.preventDefault();
+                    setMentionToken(null);
+                    return;
+                  }
+                }
+              }}
+            />
+          </div>
 
           {/* Bottom Actions Row: Plus, Hand/Shield, Context Window, Model Selector, Send Button */}
           <div className={cn("flex items-center justify-between pt-2.5 text-xs relative w-full min-w-0 gap-1.5", isAnyBottomMenuOpen ? "z-40" : "z-10")}>
@@ -1703,25 +1422,7 @@ export function ChatCard({
                       type="button"
                       onClick={() => {
                         setIsPlusOpen(false);
-                        const currentVal = prompt;
-                        const cursor = textareaRef.current?.selectionEnd ?? currentVal.length;
-                        const before = currentVal.slice(0, cursor);
-                        const after = currentVal.slice(cursor);
-                        const needsPreSpace = before.length > 0 && !/\s$/.test(before);
-                        const insert = needsPreSpace ? " @" : "@";
-                        const nextVal = `${before}${insert}${after}`;
-                        setPrompt(nextVal);
-                        const nextCursor = before.length + insert.length;
-                        requestAnimationFrame(() => {
-                          if (textareaRef.current) {
-                            textareaRef.current.focus();
-                            textareaRef.current.setSelectionRange(nextCursor, nextCursor);
-                            adjustHeight();
-                            const token = activeAtToken(nextVal, nextCursor);
-                            setMentionToken(token);
-                            setMentionIndex(0);
-                          }
-                        });
+                        editorRef.current?.insertAt();
                       }}
                       className="w-full px-2.5 py-2 flex items-center gap-2.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white text-xs transition-colors cursor-pointer group"
                     >
@@ -1734,8 +1435,7 @@ export function ChatCard({
                       type="button"
                       onClick={() => {
                         setIsPlusOpen(false);
-                        setPrompt((prev) => (prev ? `${prev} /` : "/"));
-                        textareaRef.current?.focus();
+                        editorRef.current?.insertCommand(" /");
                       }}
                       className="w-full px-2.5 py-2 flex items-center gap-2.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white text-xs transition-colors cursor-pointer group"
                     >
@@ -1748,8 +1448,7 @@ export function ChatCard({
                       type="button"
                       onClick={() => {
                         setIsPlusOpen(false);
-                        setPrompt((prev) => (prev ? `${prev} @browser ` : "@browser "));
-                        textareaRef.current?.focus();
+                        editorRef.current?.insertCommand(" @browser ");
                       }}
                       className="w-full px-2.5 py-2 flex items-center gap-2.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white text-xs transition-colors cursor-pointer group"
                     >
