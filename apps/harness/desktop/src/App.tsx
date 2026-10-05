@@ -40,6 +40,7 @@ import { SettingsView } from "./components/settings-view";
 import { ScheduledTasksView } from "./components/scheduled-tasks";
 import { CommandPaletteModal } from "./components/command-palette-modal";
 import { RightPane, type RightPaneTab, type RightPaneTabType, type BrowserSelectedElement } from "./components/right-pane";
+import { LoginTitleBar } from "./components/login-titlebar";
 import { useAppAuth } from "./components/convex-provider";
 import { useConversationWidth } from "./lib/theme";
 import {
@@ -3067,119 +3068,125 @@ export default function App() {
   // 2. Unauthenticated View: Redesigned Split Login Page with @const/ui
   // -------------------------------------------------------------
   return (
-    <div className="h-full max-h-full w-full overflow-hidden flex bg-background text-foreground selection:bg-primary selection:text-primary-foreground">
-      {/* Left Column: Sign-in Card */}
-      <div className="flex h-full w-full flex-col justify-between p-6 sm:p-8 lg:p-10 lg:w-1/2 overflow-hidden">
-        {/* Brand Mark */}
-        <div className="flex items-center gap-2.5 shrink-0">
-          <ConstLogoIcon size="sm" className="w-6 h-6 text-foreground shrink-0" />
-          <div className="flex items-center gap-2">
-            <span className="font-serif text-lg font-normal tracking-tight text-foreground">
-              Const
-            </span>
-            <span className="text-[10px] font-mono tracking-wider uppercase px-2 py-0.5 rounded-full bg-secondary text-muted-foreground border border-border/50">
-              Harness
-            </span>
+    <div className="h-full max-h-full w-full overflow-hidden flex flex-col bg-background text-foreground selection:bg-primary selection:text-primary-foreground">
+      {/* Top Header Drag & Window Controls Strip */}
+      <LoginTitleBar />
+
+      {/* Split Content Area */}
+      <div className="flex-1 min-h-0 w-full overflow-hidden flex">
+        {/* Left Column: Sign-in Card */}
+        <div className="flex h-full w-full flex-col justify-between p-6 sm:p-8 lg:p-10 lg:w-1/2 overflow-hidden">
+          {/* Brand Mark */}
+          <div className="flex items-center gap-2.5 shrink-0">
+            <ConstLogoIcon size="sm" className="w-6 h-6 text-foreground shrink-0" />
+            <div className="flex items-center gap-2">
+              <span className="font-serif text-lg font-normal tracking-tight text-foreground">
+                Const
+              </span>
+              <span className="text-[10px] font-mono tracking-wider uppercase px-2 py-0.5 rounded-full bg-secondary text-muted-foreground border border-border/50">
+                Harness
+              </span>
+            </div>
           </div>
-        </div>
 
-        {/* Center: Sign in content */}
-        <div className="my-auto mx-auto w-full max-w-sm shrink-0 py-2">
-          <h1 className="font-serif text-3xl font-normal tracking-tight text-foreground sm:text-4xl">
-            Sign in to Const Harness.
-          </h1>
-          <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-            Sign in to start building and debugging with native AI agents — no complex setup required.
-          </p>
+          {/* Center: Sign in content */}
+          <div className="my-auto mx-auto w-full max-w-sm shrink-0 py-2">
+            <h1 className="font-serif text-3xl font-normal tracking-tight text-foreground sm:text-4xl">
+              Sign in to Const Harness.
+            </h1>
+            <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+              Sign in to start building and debugging with native AI agents — no complex setup required.
+            </p>
 
-          <div className="mt-8 min-h-[148px]">
-            {!isWaitingAuth ? (
-              <Button
-                onClick={handleSignIn}
-                size="lg"
-                className="w-full h-12 rounded-xl text-sm font-medium gap-2 cursor-pointer transition-all active:scale-[0.99]"
-              >
-                <LogIn className="h-4 w-4" />
-                Sign in to Const Harness
-              </Button>
-            ) : (
-              <div className="space-y-3 animate-in fade-in duration-300">
-                {/* Button 1: Waiting state matching user reference image */}
-                <div className="w-full h-12 rounded-xl text-sm font-medium gap-2.5 flex items-center justify-center bg-[#222222] border border-[#383838] text-[#969696] select-none cursor-wait transition-all">
-                  <Loader2 className="h-4 w-4 animate-spin text-[#969696]" />
-                  <span>Waiting for Const authentication...</span>
-                </div>
-
-                {/* Button 2: Cancel button smoothly animated in */}
+            <div className="mt-8 min-h-[148px]">
+              {!isWaitingAuth ? (
                 <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleCancelAuth}
-                  className="w-full h-12 rounded-xl text-sm font-medium border border-[#383838] bg-[#2b2b2b] hover:bg-[#383838] text-[#d4d4d4] hover:text-white cursor-pointer transition-all active:scale-[0.99] animate-in fade-in slide-in-from-top-1 duration-200"
+                  onClick={handleSignIn}
+                  size="lg"
+                  className="w-full h-12 rounded-xl text-sm font-medium gap-2 cursor-pointer transition-all active:scale-[0.99]"
                 >
-                  Cancel
+                  <LogIn className="h-4 w-4" />
+                  Sign in to Const Harness
                 </Button>
+              ) : (
+                <div className="space-y-3 animate-in fade-in duration-300">
+                  {/* Button 1: Waiting state matching user reference image */}
+                  <div className="w-full h-12 rounded-xl text-sm font-medium gap-2.5 flex items-center justify-center bg-[#222222] border border-[#383838] text-[#969696] select-none cursor-wait transition-all">
+                    <Loader2 className="h-4 w-4 animate-spin text-[#969696]" />
+                    <span>Waiting for Const authentication...</span>
+                  </div>
 
-                {/* Manual token fallback */}
-                <div className="pt-2 text-center">
-                  {!showManualInput ? (
-                    <button
-                      type="button"
-                      onClick={() => setShowManualInput(true)}
-                      className="text-[11px] text-[#5d5d5d] hover:text-[#969696] underline underline-offset-4 cursor-pointer transition-colors"
-                    >
-                      Having trouble? Enter token manually
-                    </button>
-                  ) : (
-                    <form
-                      onSubmit={handleManualTokenSubmit}
-                      className="space-y-2 text-left mt-2 p-3 rounded-xl bg-[#222222] border border-[#383838] animate-in fade-in duration-200"
-                    >
-                      <label className="text-[11px] font-medium text-[#969696]">
-                        Paste authentication token:
-                      </label>
-                      <div className="flex gap-2">
-                        <input
-                          type="text"
-                          value={manualToken}
-                          onChange={(e) => setManualToken(e.target.value)}
-                          placeholder="eyJhbGciOi..."
-                          className="flex-1 h-9 px-3 text-xs bg-[#2b2b2b] border border-[#383838] rounded-xl text-[#d4d4d4] placeholder-[#5d5d5d] focus:outline-none focus:border-[#5d5d5d]"
-                        />
-                        <Button
-                          type="submit"
-                          size="sm"
-                          className="h-9 px-3 text-xs rounded-xl"
-                        >
-                          Verify
-                        </Button>
-                      </div>
-                    </form>
-                  )}
+                  {/* Button 2: Cancel button smoothly animated in */}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleCancelAuth}
+                    className="w-full h-12 rounded-xl text-sm font-medium border border-[#383838] bg-[#2b2b2b] hover:bg-[#383838] text-[#d4d4d4] hover:text-white cursor-pointer transition-all active:scale-[0.99] animate-in fade-in slide-in-from-top-1 duration-200"
+                  >
+                    Cancel
+                  </Button>
+
+                  {/* Manual token fallback */}
+                  <div className="pt-2 text-center">
+                    {!showManualInput ? (
+                      <button
+                        type="button"
+                        onClick={() => setShowManualInput(true)}
+                        className="text-[11px] text-[#5d5d5d] hover:text-[#969696] underline underline-offset-4 cursor-pointer transition-colors"
+                      >
+                        Having trouble? Enter token manually
+                      </button>
+                    ) : (
+                      <form
+                        onSubmit={handleManualTokenSubmit}
+                        className="space-y-2 text-left mt-2 p-3 rounded-xl bg-[#222222] border border-[#383838] animate-in fade-in duration-200"
+                      >
+                        <label className="text-[11px] font-medium text-[#969696]">
+                          Paste authentication token:
+                        </label>
+                        <div className="flex gap-2">
+                          <input
+                            type="text"
+                            value={manualToken}
+                            onChange={(e) => setManualToken(e.target.value)}
+                            placeholder="eyJhbGciOi..."
+                            className="flex-1 h-9 px-3 text-xs bg-[#2b2b2b] border border-[#383838] rounded-xl text-[#d4d4d4] placeholder-[#5d5d5d] focus:outline-none focus:border-[#5d5d5d]"
+                          />
+                          <Button
+                            type="submit"
+                            size="sm"
+                            className="h-9 px-3 text-xs rounded-xl"
+                          >
+                            Verify
+                          </Button>
+                        </div>
+                      </form>
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
+          </div>
+
+          {/* Bottom Footer */}
+          <div className="flex items-center justify-between pt-4 text-xs text-muted-foreground shrink-0">
+            <div className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-muted-foreground">
+              <Globe className="h-3.5 w-3.5" />
+              <span>English</span>
+            </div>
+            <span>© 2026 Const · All rights reserved.</span>
           </div>
         </div>
 
-        {/* Bottom Footer */}
-        <div className="flex items-center justify-between pt-4 text-xs text-muted-foreground shrink-0">
-          <div className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-muted-foreground">
-            <Globe className="h-3.5 w-3.5" />
-            <span>English</span>
+        {/* Right Column: Artwork image (Desktop only) */}
+        <div className="hidden lg:flex lg:w-1/2 h-full p-4 overflow-hidden items-center justify-center">
+          <div className="relative h-full w-full max-h-full overflow-hidden rounded-3xl border border-border shadow-inner">
+            <img
+              src={authArt}
+              alt="Const Harness Art"
+              className="h-full w-full object-cover select-none"
+            />
           </div>
-          <span>© 2026 Const · All rights reserved.</span>
-        </div>
-      </div>
-
-      {/* Right Column: Artwork image (Desktop only) */}
-      <div className="hidden lg:flex lg:w-1/2 h-full p-4 overflow-hidden items-center justify-center">
-        <div className="relative h-full w-full max-h-full overflow-hidden rounded-3xl border border-border shadow-inner">
-          <img
-            src={authArt}
-            alt="Const Harness Art"
-            className="h-full w-full object-cover select-none"
-          />
         </div>
       </div>
     </div>
