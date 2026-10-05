@@ -891,7 +891,7 @@ export const CONST_DEFAULT_TOOLS: NativeToolDefinition[] = [
     function: {
       name: "spawn_agent",
       description:
-        "Spawn an isolated background subagent to work autonomously on a specific subtask (e.g. research, code review, targeted refactoring). Keeps main context lean. Use 'agent_status' to check findings or 'kill_agent' to cancel.",
+        "Delegate a task to an isolated subagent (e.g. research, code review, targeted refactoring). By default, runs in the foreground, returns final findings directly in this tool call, and streams live progress to the UI. If run_in_background is true, runs asynchronously and returns an agent_id to inspect with agent_status. NEVER run bash 'sleep' to poll for subagents.",
       parameters: {
         type: "object",
         properties: {
@@ -906,6 +906,10 @@ export const CONST_DEFAULT_TOOLS: NativeToolDefinition[] = [
           role: {
             type: "string",
             description: "Optional role specialization ('research', 'reviewer', 'coder', or 'general'). Default: 'general'.",
+          },
+          run_in_background: {
+            type: "boolean",
+            description: "If true, runs the subagent in the background without waiting and returns immediately. Default is false (foreground: waits for completion and returns findings directly).",
           },
         },
         required: ["prompt"],

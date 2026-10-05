@@ -20,6 +20,7 @@ export interface SubAgentContext {
 export class SubAgentManager {
   private subagents = new Map<string, SubAgentItem>();
   private abortControllers = new Map<string, AbortController>();
+  private executionPromises = new Map<string, Promise<void>>();
 
   /**
    * Spawns a child subagent to perform an isolated background task.
@@ -51,10 +52,24 @@ export class SubAgentManager {
 
     context.onStarted?.(item);
 
-    // Run execution in background promise
-    this.runSubAgentExecution(item, options, context, abortController);
+    // Track execution promise
+    const execPromise = this.runSubAgentExecution(item, options, context, abortController);
+    this.executionPromises.set(id, execPromise);
 
     return item;
+  }
+
+  /**
+   * Waits for a subagent to complete execution (for synchronous/foreground delegation).
+   */
+  public async waitForSubAgent(id: string): Promise<SubAgentItem | undefined> {
+    const promise = this.executionPromises.get(id);
+    if (promise) {
+      try {
+        await promise;
+      } catch {}
+    }
+    return this.subagents.get(id);
   }
 
   private async runSubAgentExecution(
@@ -214,7 +229,16 @@ export const globalSubAgentManager = new SubAgentManager();
 // ---------------------------------------------------------------------------
 
 export async function executeSpawnAgent(
-  args: { prompt?: string; task?: string; description?: string; role?: string; model?: string },
+  args: {
+    prompt?: string;
+    task?: string;
+    description?: string;
+    role?: string;
+    model?: string;
+    run_in_background?: boolean;
+    async?: boolean;
+    detached?: boolean;
+  },
   workspacePath: string,
   callbacks?: SubAgentContext
 ): Promise<{ result: string; isError: boolean; agentId?: string }> {
@@ -225,6 +249,8 @@ export async function executeSpawnAgent(
       isError: true,
     };
   }
+
+  const runInBackground = args.run_in_background === true || args.async === true || args.detached === true;
 
   const agent = globalSubAgentManager.spawnSubAgent(
     {
@@ -243,10 +269,41 @@ export async function executeSpawnAgent(
     }
   );
 
+  if (runInBackground) {
+    return {
+      result: `Started background subagent [${agent.id}] (Role: ${agent.role}): "${agent.description}". Status: running (background). The subagent is working in the background. Use 'agent_status' with agent_id='${agent.id}' to inspect progress or output, or 'kill_agent' to cancel. Do NOT run bash 'sleep' to poll.`,
+      isError: false,
+      agentId: agent.id,
+    };
+  }
+
+  // Foreground (default): wait for subagent to finish and return its findings directly
+  const settled = (await globalSubAgentManager.waitForSubAgent(agent.id)) || agent;
+
+  if (settled.status === "failed") {
+    return {
+      result: `Started subagent [${settled.id}] (Role: ${settled.role}): "${settled.description}". Failed:\n${settled.error || "Unknown error"}`,
+      isError: true,
+      agentId: settled.id,
+    };
+  }
+
+  if (settled.status === "killed") {
+    return {
+      result: `Started subagent [${settled.id}] (Role: ${settled.role}): "${settled.description}". Cancelled/killed before finishing.`,
+      isError: true,
+      agentId: settled.id,
+    };
+  }
+
+  const durationSec = Math.round(
+    ((settled.endTime || Date.now()) - settled.startTime) / 1000
+  );
+
   return {
-    result: `Started subagent [${agent.id}] (Role: ${agent.role}): "${agent.description}". Status: running. The subagent is working in the background. Use 'agent_status' with agent_id='${agent.id}' to inspect progress or output, or 'kill_agent' to cancel.`,
+    result: `Started subagent [${settled.id}] (Role: ${settled.role}): "${settled.description}". Completed in ${durationSec}s.\n\nResult:\n${settled.result || "Subagent finished with no output."}`,
     isError: false,
-    agentId: agent.id,
+    agentId: settled.id,
   };
 }
 

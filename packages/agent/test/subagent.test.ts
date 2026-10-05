@@ -99,6 +99,7 @@ describe("Sub-Agent Engine & Tools", () => {
       expect(res.isError).toBe(false);
       expect(res.result).toContain("Started subagent");
       expect(res.result).toContain("Role: reviewer");
+      expect(res.result).toContain("Result:");
       expect(res.agentId).toBeDefined();
 
       // Check status of all subagents
@@ -115,6 +116,27 @@ describe("Sub-Agent Engine & Tools", () => {
       const killRes = executeKillAgent({ agent_id: res.agentId! });
       expect(killRes.isError).toBe(false);
       expect(killRes.result).toContain("Successfully terminated subagent");
+    });
+
+    it("should support background mode via run_in_background", async () => {
+      const res = await executeSpawnAgent(
+        {
+          prompt: "Async database migration check",
+          description: "Async check",
+          role: "research",
+          run_in_background: true,
+        },
+        process.cwd()
+      );
+
+      expect(res.isError).toBe(false);
+      expect(res.result).toContain("Status: running (background)");
+      expect(res.agentId).toBeDefined();
+
+      // Should be findable in agent_status
+      const statusRes = executeAgentStatus({ agent_id: res.agentId! });
+      expect(statusRes.isError).toBe(false);
+      expect(statusRes.result).toContain("RUNNING");
     });
   });
 

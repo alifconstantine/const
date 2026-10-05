@@ -374,6 +374,9 @@ Available tools:
 - find: Search for files and directories matching a glob pattern or filename (e.g. '*.ts', '**/*.json', 'src/**/*.tsx').
 - grep: Search file contents for regex or text patterns across files in the workspace.
 - mkdir: Explicitly create a new directory or folder structure recursively.
+- spawn_agent: Delegate tasks to an isolated subagent (research, code review, targeted refactoring). Runs in foreground by default, returns final findings directly in this tool call, and streams live progress to the UI.
+- agent_status: Check status and logs of subagents (when spawned with run_in_background: true).
+- kill_agent: Terminate an active subagent.
 
 
 CRITICAL CODE GENERATION & TOOL CALLING PROTOCOL:
@@ -399,7 +402,8 @@ CRITICAL LOOP PREVENTION & ERROR RECOVERY PROTOCOL:
   1. DO NOT repeat the exact same tool call with the same arguments.
   2. If 'edit' fails because 'old_content' was not found, call 'read' immediately to inspect the latest file content and exact lines before attempting another edit.
   3. If 'bash' fails with exit code != 0, examine stderr/stdout carefully to understand why it failed before trying an alternative fix.
-  4. If an operation is blocked or impossible, explain the blocker clearly to the user rather than repeating failing tool calls.${projectContext ? `\n\n<project_context>${projectContext}</project_context>` : ""}`;
+  4. If an operation is blocked or impossible, explain the blocker clearly to the user rather than repeating failing tool calls.
+  5. NEVER execute terminal 'sleep' commands (e.g. 'sleep 5', 'sleep 10') in bash or powershell to wait or poll for background tasks or subagents. Subagents run in the foreground by default and return their complete findings directly.${projectContext ? `\n\n<project_context>${projectContext}</project_context>` : ""}`;
 }
 
 export function buildLearnSystemPrompt(workspacePath: string, customPrompt?: string): string {
