@@ -104,46 +104,38 @@ export function MentionPopover({
                           }
                         }}
                         className={cn(
-                          "w-full px-3 py-2 flex items-center justify-between rounded-xl transition-colors cursor-pointer group text-left font-sans",
+                          "w-full h-9 px-3 flex items-center justify-between rounded-xl transition-colors cursor-pointer group text-left font-sans",
                           isSelected
-                            ? "bg-black/5 dark:bg-white/10 text-black dark:text-white"
-                            : "text-[#262626] dark:text-[#d4d4d4] hover:bg-black/5 dark:hover:bg-white/5"
+                            ? "bg-[#f0f0f2] dark:bg-[#303030] text-black dark:text-white"
+                            : "text-[#262626] dark:text-[#d4d4d4] hover:bg-[#f0f0f2] dark:hover:bg-[#2c2c2c] hover:text-black dark:hover:text-white"
                         )}
                       >
                         {/* Left: Icon and Name */}
                         <div className="flex items-center gap-2.5 min-w-0 flex-1 mr-2">
                           <CandidateIcon candidate={candidate} />
-                          <span
-                            className={cn(
-                              "text-[13px] leading-tight truncate",
-                              isSelected ? "font-medium" : "font-normal"
-                            )}
-                          >
+                          <span className="text-[13px] font-normal leading-tight truncate">
                             {candidate.title}
                           </span>
                         </div>
 
                         {/* Right: Browse folder Tab hint or subtle chevron for directories */}
                         {isDir ? (
-                          isSelected ? (
-                            <div
-                              role="button"
-                              tabIndex={-1}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onDrill?.(candidate);
-                              }}
-                              className="flex items-center gap-1.5 text-[11px] text-[#777777] dark:text-[#888888] hover:text-black dark:hover:text-white shrink-0 font-sans"
-                            >
-                              <span>Browse folder</span>
-                              <kbd className="px-1.5 py-0.5 text-[10px] font-sans bg-black/10 dark:bg-white/10 rounded border border-black/10 dark:border-white/10 text-[#666666] dark:text-[#a0a0a0]">
+                          <div
+                            role="button"
+                            tabIndex={-1}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onDrill?.(candidate);
+                            }}
+                            className="flex items-center gap-1.5 text-[11px] text-[#777777] dark:text-[#888888] hover:text-black dark:hover:text-white shrink-0 font-sans cursor-pointer"
+                          >
+                            {isSelected && (
+                              <kbd className="px-1.5 py-0.5 text-[9.5px] font-mono bg-black/5 dark:bg-white/10 rounded border border-black/10 dark:border-white/10 text-[#666666] dark:text-[#a0a0a0] leading-none">
                                 Tab
                               </kbd>
-                              <ChevronRight className="w-3.5 h-3.5 text-[#888888] dark:text-[#a0a0a0]" />
-                            </div>
-                          ) : (
-                            <ChevronRight className="w-3.5 h-3.5 text-[#a0a0a0] dark:text-[#555555] shrink-0" />
-                          )
+                            )}
+                            <ChevronRight className="w-3.5 h-3.5 text-[#888888] dark:text-[#777777]" />
+                          </div>
                         ) : candidate.subtitle ? (
                           <span className="text-[11px] text-[#888888] dark:text-[#777777] font-sans shrink-0 truncate max-w-[140px]">
                             {candidate.subtitle}
@@ -182,21 +174,16 @@ export function MentionPopover({
                           }
                         }}
                         className={cn(
-                          "w-full px-3 py-2 flex items-center justify-between rounded-xl transition-colors cursor-pointer group text-left font-sans",
+                          "w-full h-9 px-3 flex items-center justify-between rounded-xl transition-colors cursor-pointer group text-left font-sans",
                           isSelected
-                            ? "bg-black/5 dark:bg-white/10 text-black dark:text-white"
-                            : "text-[#262626] dark:text-[#d4d4d4] hover:bg-black/5 dark:hover:bg-white/5"
+                            ? "bg-[#f0f0f2] dark:bg-[#303030] text-black dark:text-white"
+                            : "text-[#262626] dark:text-[#d4d4d4] hover:bg-[#f0f0f2] dark:hover:bg-[#2c2c2c] hover:text-black dark:hover:text-white"
                         )}
                       >
                         {/* Left: Speech Icon and Title */}
                         <div className="flex items-center gap-2.5 min-w-0 flex-1 mr-2">
                           <CandidateIcon candidate={candidate} />
-                          <span
-                            className={cn(
-                              "text-[13px] leading-tight truncate",
-                              isSelected ? "font-medium" : "font-normal"
-                            )}
-                          >
+                          <span className="text-[13px] font-normal leading-tight truncate">
                             {candidate.title}
                           </span>
                         </div>
