@@ -192,5 +192,11 @@ export {
 	type CheckpointItem,
 	type RollbackResult,
 	type RestoreCheckpointResult,
+	SubAgentManager,
+	globalSubAgentManager,
+	executeSpawnAgent,
+	executeAgentStatus,
+	executeKillAgent,
+	type SubAgentItem,
 } from "./const/index.ts";
 

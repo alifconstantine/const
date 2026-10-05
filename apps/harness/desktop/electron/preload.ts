@@ -151,6 +151,7 @@ contextBridge.exposeInMainWorld("electron", {
   listBackgroundTasks: () => ipcRenderer.invoke("tasks:list"),
   killBackgroundTask: (taskId: string) => ipcRenderer.invoke("tasks:kill", taskId),
   getBackgroundTaskLogs: (taskId: string) => ipcRenderer.invoke("tasks:get-output", taskId),
+  killSubAgent: (agentId: string) => ipcRenderer.invoke("subagents:kill", agentId),
   onBackgroundTaskEvent: (callback: (event: any) => void) => {
     const handler = (_event: any, payload: any) => callback(payload);
     ipcRenderer.on("task:event", handler);

@@ -4,7 +4,14 @@ import path from "node:path";
 import os from "node:os";
 import { spawn, type ChildProcess } from "node:child_process";
 import type { FileMutationRecord } from "./mutation-ledger.js";
-import type { TodoItem, QuestionItem, BackgroundTaskItem, NativeToolDefinition } from "./types.js";
+import type {
+  TodoItem,
+  QuestionItem,
+  BackgroundTaskItem,
+  NativeToolDefinition,
+  SubAgentItem,
+  AgentConfig,
+} from "./types.js";
 import { executeLspQuery, type LspOperation } from "./lsp.js";
 import { executeAstGrep } from "./ast-grep.js";
 import { executeWebSearch, executeWebFetch } from "./web.js";
@@ -15,6 +22,12 @@ import {
   createCheckpoint,
   restoreCheckpoint,
 } from "./checkpoint.js";
+import {
+  executeSpawnAgent,
+  executeAgentStatus,
+  executeKillAgent,
+  globalSubAgentManager,
+} from "./subagent.js";
 
 export interface ExecuteToolOptions {
   signal?: AbortSignal;
@@ -25,6 +38,11 @@ export interface ExecuteToolOptions {
   onTaskStarted?: (task: BackgroundTaskItem) => void;
   onTaskStopped?: (taskId: string, code: number | null) => void;
   allowOutsideWorkspace?: boolean;
+  onSubAgentStarted?: (agent: SubAgentItem) => void;
+  onSubAgentUpdated?: (agent: SubAgentItem) => void;
+  onSubAgentFinished?: (agentId: string, result?: string, error?: string) => void;
+  onSubAgentKilled?: (agentId: string) => void;
+  parentConfig?: AgentConfig;
 }
 
 // ---------------------------------------------------------------------------
@@ -865,6 +883,67 @@ export const CONST_DEFAULT_TOOLS: NativeToolDefinition[] = [
               "Optional specific mutation ID to roll back.",
           },
         },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "spawn_agent",
+      description:
+        "Spawn an isolated background subagent to work autonomously on a specific subtask (e.g. research, code review, targeted refactoring). Keeps main context lean. Use 'agent_status' to check findings or 'kill_agent' to cancel.",
+      parameters: {
+        type: "object",
+        properties: {
+          prompt: {
+            type: "string",
+            description: "The complete instruction and task description for the subagent.",
+          },
+          description: {
+            type: "string",
+            description: "Short human-readable summary of the subagent's objective (e.g. 'Research SQLite auth schema').",
+          },
+          role: {
+            type: "string",
+            description: "Optional role specialization ('research', 'reviewer', 'coder', or 'general'). Default: 'general'.",
+          },
+        },
+        required: ["prompt"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "agent_status",
+      description:
+        "Check the status, latest activity, and final findings of running or completed subagents. If agent_id is omitted, lists all subagents.",
+      parameters: {
+        type: "object",
+        properties: {
+          agent_id: {
+            type: "string",
+            description: "Optional ID of a specific subagent to inspect.",
+          },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "kill_agent",
+      description:
+        "Terminate an active subagent running in the background.",
+      parameters: {
+        type: "object",
+        properties: {
+          agent_id: {
+            type: "string",
+            description: "The ID of the subagent to terminate.",
+          },
+        },
+        required: ["agent_id"],
       },
     },
   },
@@ -4537,6 +4616,77 @@ export async function executeNativeTool(
       } catch (err: any) {
         return {
           result: `rollback_mutation error: ${err.message}`,
+          isError: true,
+        };
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // Tool: spawn_agent (aliases: spawnagent, subagent, delegatetask)
+    // -----------------------------------------------------------------------
+    if (
+      normalizedTool === "spawnagent" ||
+      normalizedTool === "subagent" ||
+      normalizedTool === "delegatetask"
+    ) {
+      try {
+        const res = await executeSpawnAgent(
+          args,
+          workspacePath,
+          {
+            workspacePath,
+            parentConfig: options.parentConfig,
+            onStarted: options.onSubAgentStarted,
+            onUpdated: options.onSubAgentUpdated,
+            onFinished: options.onSubAgentFinished,
+            onKilled: options.onSubAgentKilled,
+          }
+        );
+        return {
+          result: res.result,
+          isError: res.isError,
+        };
+      } catch (err: any) {
+        return {
+          result: `spawn_agent error: ${err.message}`,
+          isError: true,
+        };
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // Tool: agent_status (aliases: agentstatus, subagentstatus, listagents)
+    // -----------------------------------------------------------------------
+    if (
+      normalizedTool === "agentstatus" ||
+      normalizedTool === "subagentstatus" ||
+      normalizedTool === "listagents"
+    ) {
+      try {
+        const res = executeAgentStatus(args);
+        return res;
+      } catch (err: any) {
+        return {
+          result: `agent_status error: ${err.message}`,
+          isError: true,
+        };
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // Tool: kill_agent (aliases: killagent, subagentkill, terminateagent)
+    // -----------------------------------------------------------------------
+    if (
+      normalizedTool === "killagent" ||
+      normalizedTool === "subagentkill" ||
+      normalizedTool === "terminateagent"
+    ) {
+      try {
+        const res = executeKillAgent(args, options.onSubAgentKilled);
+        return res;
+      } catch (err: any) {
+        return {
+          result: `kill_agent error: ${err.message}`,
           isError: true,
         };
       }

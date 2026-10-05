@@ -1502,6 +1502,19 @@ export class ConstAgent {
               onTaskStopped: (taskId, code) => {
                 onEvent({ type: "task_stopped", taskId, code });
               },
+              onSubAgentStarted: (agent) => {
+                onEvent({ type: "subagent_started", agent });
+              },
+              onSubAgentUpdated: (agent) => {
+                onEvent({ type: "subagent_updated", agent });
+              },
+              onSubAgentFinished: (agentId, result, error) => {
+                onEvent({ type: "subagent_finished", agentId, result, error });
+              },
+              onSubAgentKilled: (agentId) => {
+                onEvent({ type: "subagent_killed", agentId });
+              },
+              parentConfig: this.config,
             }
           );
 

@@ -98,6 +98,20 @@ export interface BackgroundTaskItem {
   output?: string[];
 }
 
+export interface SubAgentItem {
+  id: string;
+  parentId?: string;
+  description: string;
+  prompt: string;
+  role?: string;
+  status: "running" | "completed" | "failed" | "killed";
+  startTime: number;
+  endTime?: number;
+  logs: string[];
+  result?: string;
+  error?: string;
+}
+
 export interface AgentEventMap {
   token: { token: string };
   token_reset: {};
@@ -115,6 +129,10 @@ export interface AgentEventMap {
   ask_question: { toolCallId: string; questions: QuestionItem[] };
   task_started: { task: BackgroundTaskItem };
   task_stopped: { taskId: string; code: number | null };
+  subagent_started: { agent: SubAgentItem };
+  subagent_updated: { agent: SubAgentItem };
+  subagent_finished: { agentId: string; result?: string; error?: string };
+  subagent_killed: { agentId: string };
 }
 
 export type AgentEvent = {

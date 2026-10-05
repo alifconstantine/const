@@ -8,6 +8,7 @@ import {
   DEFAULT_MODELS,
   rollbackFileMutation,
   globalTaskManager,
+  globalSubAgentManager,
   type ConstAgentMessage as AgentMessage,
   type FileMutationRecord,
 } from "@const/agent";
@@ -711,6 +712,10 @@ app.whenReady().then(() => {
   ipcMain.handle("tasks:get-output", async (_event, taskId: string) => {
     const task = globalTaskManager.getTask(taskId);
     return task ? task.logs : [];
+  });
+
+  ipcMain.handle("subagents:kill", async (_event, agentId: string) => {
+    return globalSubAgentManager.killSubAgent(agentId);
   });
 
   ipcMain.handle(

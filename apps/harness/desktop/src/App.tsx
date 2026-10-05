@@ -33,6 +33,7 @@ import { ExecutionTrace, MutationsSummaryCard } from "./components/workbench/exe
 import { ApprovalCard, SmoothCardMorph } from "./components/workbench/approval-card";
 import { QuestionCard } from "./components/workbench/question-card";
 import { FloatingTodoCard } from "./components/workbench/floating-todo-card";
+import { FloatingSubAgentCard } from "./components/workbench/floating-subagent-card";
 import { ReviewDialog } from "./components/workbench/review-dialog";
 import { RenameTaskDialog } from "./components/workbench/rename-task-dialog";
 import { TrajectoryDialog } from "./components/workbench/trajectory-dialog";
@@ -67,6 +68,7 @@ import type {
   BackgroundTaskItem,
   TodoItem,
   QuestionItem,
+  SubAgentItem,
 } from "./vite-env";
 import authArt from "./assets/auth-art.jpg";
 
@@ -728,6 +730,51 @@ function AuthenticatedContent({
     }
     return null;
   }, [conversationTodos, conversationId, messages]);
+
+  const [conversationSubAgents, setConversationSubAgents] = useState<Map<string, SubAgentItem[]>>(new Map());
+
+  const activeSubAgents = useMemo(() => {
+    const fromMap = conversationSubAgents.get(conversationId);
+    if (fromMap && fromMap.length > 0) return fromMap;
+    const foundAgents: SubAgentItem[] = [];
+    for (const msg of messages) {
+      if (msg && msg.role === "assistant" && msg.traceSteps) {
+        for (const st of msg.traceSteps) {
+          if (st && st.name === "spawn_agent" && st.args?.role) {
+            const agentId = (st.result as any)?.agentId || st.toolCallId || st.id;
+            if (!foundAgents.some((a) => a.id === agentId)) {
+              foundAgents.push({
+                id: agentId,
+                role: st.args.role,
+                description: st.args.role,
+                prompt: st.args.prompt || "",
+                status: "completed",
+                startTime: Date.now(),
+                endTime: Date.now(),
+                logs: [],
+              });
+            }
+          }
+        }
+      }
+    }
+    return foundAgents.length > 0 ? foundAgents : null;
+  }, [conversationSubAgents, conversationId, messages]);
+
+  const handleKillSubAgent = async (agentId: string) => {
+    if (window.electron?.killSubAgent) {
+      await window.electron.killSubAgent(agentId);
+    }
+    setConversationSubAgents((prev) => {
+      const next = new Map(prev);
+      const list = next.get(conversationId) || [];
+      next.set(
+        conversationId,
+        list.map((a) => (a.id === agentId ? { ...a, status: "killed", endTime: Date.now() } : a))
+      );
+      return next;
+    });
+  };
 
   const handleAnswerQuestion = async (toolCallId: string, answer: any) => {
     setPendingQuestions((prev) => {
@@ -1532,6 +1579,54 @@ function AuthenticatedContent({
       } else if (event.type === "task_stopped") {
         if (event.taskId) {
           setRunningTasks((prev) => prev.filter((t) => t.id !== event.taskId));
+        }
+      } else if (event.type === "subagent_started") {
+        if (event.agent) {
+          setConversationSubAgents((prev) => {
+            const next = new Map(prev);
+            const list = next.get(targetConvoId) || [];
+            const filtered = list.filter((a) => a.id !== event.agent!.id);
+            next.set(targetConvoId, [...filtered, event.agent!]);
+            return next;
+          });
+        }
+      } else if (event.type === "subagent_updated") {
+        if (event.agent) {
+          setConversationSubAgents((prev) => {
+            const next = new Map(prev);
+            const list = next.get(targetConvoId) || [];
+            const idx = list.findIndex((a) => a.id === event.agent!.id);
+            if (idx >= 0) {
+              const updatedList = [...list];
+              updatedList[idx] = { ...updatedList[idx]!, ...event.agent! };
+              next.set(targetConvoId, updatedList);
+            } else {
+              next.set(targetConvoId, [...list, event.agent!]);
+            }
+            return next;
+          });
+        }
+      } else if (event.type === "subagent_finished" || event.type === "subagent_killed") {
+        const agentId = event.agentId || event.agent?.id;
+        if (agentId) {
+          setConversationSubAgents((prev) => {
+            const next = new Map(prev);
+            const list = next.get(targetConvoId) || [];
+            const status = event.type === "subagent_killed" ? "killed" : "completed";
+            const updatedList = list.map((a) =>
+              a.id === agentId
+                ? {
+                    ...a,
+                    status: (status as any),
+                    result: event.result ?? a.result,
+                    error: event.error ?? a.error,
+                    endTime: Date.now(),
+                  }
+                : a
+            );
+            next.set(targetConvoId, updatedList);
+            return next;
+          });
         }
       } else if (event.type === "done") {
         setRunningConvoIds((prev) => {
@@ -2469,12 +2564,24 @@ function AuthenticatedContent({
               scrollContainerRef={chatScrollRef}
             />
 
-            {/* Floating Todo List Card matching Image 1 */}
-            {activeTodos && activeTodos.length > 0 && (
-              <FloatingTodoCard
-                todos={activeTodos}
-                isExecuting={isExecuting}
-              />
+            {/* Top-Right Floating Cards: Todo & Sub-Agents */}
+            {((activeTodos && activeTodos.length > 0) || (activeSubAgents && activeSubAgents.length > 0)) && (
+              <div className="absolute top-4 right-6 z-30 flex flex-col gap-2.5 items-end pointer-events-none">
+                {activeTodos && activeTodos.length > 0 && (
+                  <FloatingTodoCard
+                    todos={activeTodos}
+                    isExecuting={isExecuting}
+                    className="!static !top-auto !right-auto pointer-events-auto"
+                  />
+                )}
+                {activeSubAgents && activeSubAgents.length > 0 && (
+                  <FloatingSubAgentCard
+                    subagents={activeSubAgents}
+                    onKillAgent={handleKillSubAgent}
+                    className="pointer-events-auto"
+                  />
+                )}
+              </div>
             )}
 
             {/* Scrollable Message Stream with @const/ui ScrollArea */}

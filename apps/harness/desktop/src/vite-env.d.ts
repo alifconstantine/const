@@ -92,6 +92,20 @@ export interface BackgroundTaskItem {
   output?: string[];
 }
 
+export interface SubAgentItem {
+  id: string;
+  parentId?: string;
+  description: string;
+  prompt: string;
+  role?: string;
+  status: "running" | "completed" | "failed" | "killed";
+  startTime: number;
+  endTime?: number;
+  logs: string[];
+  result?: string;
+  error?: string;
+}
+
 export interface AgentStreamEvent {
   conversationId?: string;
   type:
@@ -110,7 +124,11 @@ export interface AgentStreamEvent {
     | "todo_update"
     | "ask_question"
     | "task_started"
-    | "task_stopped";
+    | "task_stopped"
+    | "subagent_started"
+    | "subagent_updated"
+    | "subagent_finished"
+    | "subagent_killed";
   token?: string;
   thinking?: string;
   toolCallId?: string;
@@ -144,6 +162,8 @@ export interface AgentStreamEvent {
   questions?: QuestionItem[];
   task?: BackgroundTaskItem;
   taskId?: string;
+  agent?: SubAgentItem;
+  agentId?: string;
   code?: number | null;
 }
 
@@ -317,6 +337,7 @@ declare global {
       listBackgroundTasks?: () => Promise<BackgroundTaskItem[]>;
       killBackgroundTask?: (taskId: string) => Promise<boolean>;
       getBackgroundTaskLogs?: (taskId: string) => Promise<string[]>;
+      killSubAgent?: (agentId: string) => Promise<boolean>;
       onBackgroundTaskEvent?: (
         callback: (event: {
           type: "output" | "status";
