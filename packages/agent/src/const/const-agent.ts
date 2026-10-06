@@ -374,9 +374,9 @@ Available tools:
 - find: Search for files and directories matching a glob pattern or filename (e.g. '*.ts', '**/*.json', 'src/**/*.tsx').
 - grep: Search file contents for regex or text patterns across files in the workspace.
 - mkdir: Explicitly create a new directory or folder structure recursively.
-- spawn_agent: Delegate tasks to an isolated subagent (research, code review, targeted refactoring). Runs in foreground by default, returns final findings directly in this tool call, and streams live progress to the UI.
-- agent_status: Check status and logs of subagents (when spawned with run_in_background: true).
-- kill_agent: Terminate an active subagent.
+- task: Delegate work to an isolated subagent. Runs synchronously in foreground by default, returning complete findings inside a <task-result> envelope, and streams live progress to the UI. Specialist personas: 'scout' (strictly read-only codebase research/exploration and broad pattern search), 'reviewer' (code review for quality, logic, and security analysis), or 'task' (focused worker with full write/edit capabilities). (Alias: spawn_agent).
+- agent_status: Check status, activity logs, or findings of running or completed subagents (when spawned with run_in_background: true).
+- kill_agent: Terminate an active running subagent.
 
 
 CRITICAL CODE GENERATION & TOOL CALLING PROTOCOL:

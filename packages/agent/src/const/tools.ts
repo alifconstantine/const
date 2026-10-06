@@ -889,23 +889,54 @@ export const CONST_DEFAULT_TOOLS: NativeToolDefinition[] = [
   {
     type: "function",
     function: {
+      name: "task",
+      description:
+        "Delegate work to an isolated subagent. Execution runs synchronously in foreground and blocks until work finishes, returning a <task-result> envelope with complete output. Progress is streamed live to the UI. Choose an agent persona: 'scout' (fast read-only research/code exploration), 'reviewer' (code review and quality/security analysis), or 'task' (worker for editing and implementing changes).",
+      parameters: {
+        type: "object",
+        properties: {
+          task: {
+            type: "string",
+            description: "Complete, self-contained instructions and acceptance criteria for the subagent.",
+          },
+          agent: {
+            type: "string",
+            enum: ["scout", "reviewer", "task"],
+            description: "The specialist subagent persona to spawn: 'scout' (read-only research/code search), 'reviewer' (code review/bug detection), or 'task' (general worker with full edit/write tools). Default: 'task'.",
+          },
+          name: {
+            type: "string",
+            description: "Optional short identifier or label for this task (e.g. 'AuthAudit', 'DbResearch').",
+          },
+          run_in_background: {
+            type: "boolean",
+            description: "If true, runs the subagent in background without waiting. Default is false (blocks until finished).",
+          },
+        },
+        required: ["task"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
       name: "spawn_agent",
       description:
-        "Delegate a task to an isolated subagent (e.g. research, code review, targeted refactoring). By default, runs in the foreground, returns final findings directly in this tool call, and streams live progress to the UI. If run_in_background is true, runs asynchronously and returns an agent_id to inspect with agent_status. NEVER run bash 'sleep' to poll for subagents.",
+        "Delegate a task to an isolated subagent (alias for 'task'). Runs in the foreground by default, returning a <task-result> envelope with complete findings, and streams live progress to the UI. NEVER run bash 'sleep' to poll for subagents.",
       parameters: {
         type: "object",
         properties: {
           prompt: {
             type: "string",
-            description: "The complete instruction and task description for the subagent.",
+            description: "The complete instruction and task description for the subagent (same as 'task').",
           },
           description: {
             type: "string",
-            description: "Short human-readable summary of the subagent's objective (e.g. 'Research SQLite auth schema').",
+            description: "Short human-readable summary or name of the subagent's objective.",
           },
           role: {
             type: "string",
-            description: "Optional role specialization ('research', 'reviewer', 'coder', or 'general'). Default: 'general'.",
+            description: "Specialist persona: 'scout' (or 'research' for read-only exploration), 'reviewer' (code review), or 'task' (or 'coder' for worker). Default: 'task'.",
           },
           run_in_background: {
             type: "boolean",
@@ -4626,9 +4657,10 @@ export async function executeNativeTool(
     }
 
     // -----------------------------------------------------------------------
-    // Tool: spawn_agent (aliases: spawnagent, subagent, delegatetask)
+    // Tool: task / spawn_agent (aliases: task, spawnagent, subagent, delegatetask)
     // -----------------------------------------------------------------------
     if (
+      normalizedTool === "task" ||
       normalizedTool === "spawnagent" ||
       normalizedTool === "subagent" ||
       normalizedTool === "delegatetask"
@@ -4640,6 +4672,7 @@ export async function executeNativeTool(
           {
             workspacePath,
             parentConfig: options.parentConfig,
+            availableTools: CONST_DEFAULT_TOOLS,
             onStarted: options.onSubAgentStarted,
             onUpdated: options.onSubAgentUpdated,
             onFinished: options.onSubAgentFinished,
@@ -4652,7 +4685,7 @@ export async function executeNativeTool(
         };
       } catch (err: any) {
         return {
-          result: `spawn_agent error: ${err.message}`,
+          result: `task error: ${err.message}`,
           isError: true,
         };
       }

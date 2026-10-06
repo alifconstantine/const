@@ -740,14 +740,21 @@ function AuthenticatedContent({
     for (const msg of messages) {
       if (msg && msg.role === "assistant" && msg.traceSteps) {
         for (const st of msg.traceSteps) {
-          if (st && st.name === "spawn_agent" && st.args?.role) {
+          if (
+            st &&
+            (st.name === "task" || st.name === "spawn_agent" || st.name === "subagent") &&
+            (st.args?.agent || st.args?.role || st.args?.task || st.args?.prompt)
+          ) {
+            const role = (st.args.agent || st.args.role || "task") as string;
+            const description = (st.args.name || st.args.description || role) as string;
+            const prompt = (st.args.task || st.args.prompt || "") as string;
             const agentId = (st.result as any)?.agentId || st.toolCallId || st.id;
             if (!foundAgents.some((a) => a.id === agentId)) {
               foundAgents.push({
                 id: agentId,
-                role: st.args.role,
-                description: st.args.role,
-                prompt: st.args.prompt || "",
+                role,
+                description,
+                prompt,
                 status: "completed",
                 startTime: Date.now(),
                 endTime: Date.now(),

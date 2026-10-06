@@ -1,5 +1,86 @@
-import type { SubAgentItem, AgentConfig, AgentMessage } from "./types.js";
+import type { SubAgentItem, AgentConfig, AgentMessage, NativeToolDefinition } from "./types.js";
 import { ConstAgent } from "./const-agent.js";
+
+export type SubAgentRole = "scout" | "reviewer" | "task";
+
+export function normalizeAgentRole(role?: string): SubAgentRole {
+  if (!role) return "task";
+  const lower = role.toLowerCase().trim();
+  if (lower === "scout" || lower === "research" || lower === "explorer" || lower === "investigate") {
+    return "scout";
+  }
+  if (lower === "reviewer" || lower === "review" || lower === "audit" || lower === "security") {
+    return "reviewer";
+  }
+  return "task";
+}
+
+export function buildSubAgentSystemPrompt(
+  role: SubAgentRole,
+  description: string,
+  workspacePath: string
+): string {
+  const normalizedCwd = workspacePath.replace(/\\/g, "/");
+
+  if (role === "scout") {
+    return `§ Role: scout (READ-ONLY)
+You are 'scout', a specialized exploratory codebase research and pattern analysis subagent operating in '${normalizedCwd}'.
+Your assignment is to rapidly investigate the codebase, find relevant code, trace architectural connections, and return structured findings.
+
+STRICT OPERATING CONSTRAINTS:
+- You operate as STRICTLY READ-ONLY. You CANNOT write, edit, or delete files, and you CANNOT execute state-changing git or build commands.
+- You have access only to read-only tools: read, grep, find, ls, web_search, web_fetch, lsp, ast_grep.
+- Never output conversational greetings or chat filler ("Hello", "Certainly!").
+- User cannot see your intermediate turns; your output will be returned directly to the parent agent.
+- Return structured findings:
+  1. Summary: Brief summary of findings and conclusions
+  2. Files: Project-relative paths examined with relevant code references and line numbers (e.g. path/to/file.ts:12-34)
+  3. Architecture: How the relevant pieces connect
+  4. Details/Report: Concrete code excerpts or answers matching the assignment.`;
+  }
+
+  if (role === "reviewer") {
+    return `§ Role: reviewer
+You are 'reviewer', a specialized code review subagent for quality, logic correctness, and security analysis operating in '${normalizedCwd}'.
+Your assignment is to inspect git diffs, file modifications, and syntax to detect provable bugs, security flaws, edge cases, and performance regressions.
+
+STRICT OPERATING CONSTRAINTS:
+- Report only provable issues with concrete file paths and line ranges.
+- Do not make vague suggestions or question design choices unless they cause concrete bugs.
+- Never output conversational greetings or chat filler.
+- User cannot see your intermediate turns; your output will be returned directly to the parent agent.
+- Return structured findings:
+  1. Verdict: Overall assessment of code correctness
+  2. Findings: Priority-ranked issues (file_path, line range, trigger condition, provable impact)
+  3. Suggestions: Concrete replacement code or fixes where applicable.`;
+  }
+
+  return `§ Role: task (Worker)
+You are 'task', a focused worker subagent operating in '${normalizedCwd}'.
+Your assignment is to execute the assigned task thoroughly and directly.
+- Hyperfocus on the assigned task and acceptance criteria.
+- Edit files, create required code, run tests or commands as needed.
+- Be concise; avoid conversational greetings or chat filler.
+- When finished, return a direct summary of all modifications and results.`;
+}
+
+export function formatTaskResultEnvelope(options: {
+  id: string;
+  agent: string;
+  status: "completed" | "cancelled" | "failed";
+  durationSec: number;
+  output: string;
+  error?: string;
+}): string {
+  const durationStr = `${options.durationSec}s`;
+  if (options.status === "failed") {
+    return `<task-result id="${options.id}" agent="${options.agent}" status="failed" duration="${durationStr}">\n<error>\n${options.error || options.output || "Unknown failure"}\n</error>\n</task-result>`;
+  }
+  if (options.status === "cancelled") {
+    return `<task-result id="${options.id}" agent="${options.agent}" status="cancelled" duration="${durationStr}">\n<abort-reason>Subagent was terminated/cancelled before completing.</abort-reason>\n</task-result>`;
+  }
+  return `<task-result id="${options.id}" agent="${options.agent}" status="completed" duration="${durationStr}">\n<output>\n${options.output || "(no output)"}\n</output>\n</task-result>`;
+}
 
 export interface SpawnSubAgentOptions {
   prompt: string;
@@ -11,6 +92,7 @@ export interface SpawnSubAgentOptions {
 export interface SubAgentContext {
   workspacePath: string;
   parentConfig?: AgentConfig;
+  availableTools?: NativeToolDefinition[];
   onStarted?: (agent: SubAgentItem) => void;
   onUpdated?: (agent: SubAgentItem) => void;
   onFinished?: (agentId: string, result?: string, error?: string) => void;
@@ -30,7 +112,7 @@ export class SubAgentManager {
     context: SubAgentContext
   ): SubAgentItem {
     const id = `agent_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
-    const role = (options.role || "general").toLowerCase().trim();
+    const role = normalizeAgentRole(options.role);
     const description = (
       options.description ||
       options.prompt.slice(0, 80).replace(/[\r\n]+/g, " ")
@@ -80,22 +162,39 @@ export class SubAgentManager {
   ): Promise<void> {
     try {
       if (context.parentConfig && context.parentConfig.baseUrl) {
-        // Build subagent specialized system prompt
-        const roleInstructions =
-          options.role === "research"
-            ? "You are a research subagent. Use web search, documentation queries, and file reading to investigate thoroughly. Provide concise, factual summaries without modifying codebase files."
-            : options.role === "reviewer"
-            ? "You are a code review subagent. Inspect git diffs, file modifications, and syntax to detect bugs, security flaws, and performance issues."
-            : options.role === "coder"
-            ? "You are a coding subagent. Perform precision code edits, create required files, and verify syntax carefully."
-            : "You are a focused subagent assisting the parent agent with a delegated task.";
+        const canonicalRole = normalizeAgentRole(options.role);
+        const systemPrompt = buildSubAgentSystemPrompt(
+          canonicalRole,
+          item.description,
+          context.workspacePath
+        );
+
+        // Filter tools for the subagent based on persona (matching oh-my-pi)
+        const baseTools = context.availableTools || context.parentConfig.tools || [];
+        let childTools: NativeToolDefinition[] | undefined;
+        if (baseTools.length > 0) {
+          if (canonicalRole === "scout") {
+            // Read-only tools only
+            const READ_ONLY_TOOLS = ["read", "grep", "find", "ls", "web_search", "web_fetch", "lsp", "ast_grep"];
+            childTools = baseTools.filter((t) => READ_ONLY_TOOLS.includes(t.function.name));
+          } else if (canonicalRole === "reviewer") {
+            // Read-only + non-destructive git inspection tools
+            const REVIEWER_TOOLS = ["read", "grep", "find", "ls", "bash", "powershell", "lsp", "ast_grep", "web_search", "web_fetch"];
+            childTools = baseTools.filter((t) => REVIEWER_TOOLS.includes(t.function.name));
+          } else {
+            // Worker agent: all tools except subagent spawning (prevents infinite recursive spawns)
+            const SUBAGENT_TOOLS = ["task", "spawn_agent", "kill_agent", "agent_status"];
+            childTools = baseTools.filter((t) => !SUBAGENT_TOOLS.includes(t.function.name));
+          }
+        }
 
         const childConfig: AgentConfig = {
           baseUrl: context.parentConfig.baseUrl,
           apiKey: context.parentConfig.apiKey,
           model: options.model || context.parentConfig.model,
           workspacePath: context.workspacePath,
-          systemPrompt: `[DELEGATED SUBAGENT: ${item.description}]\nRole: ${item.role || "general"}\n${roleInstructions}\n\nDeliver a direct, concise, and self-contained final answer to the parent agent.`,
+          systemPrompt,
+          tools: childTools,
           maxTurns: 25,
           mode: "full_access", // Delegated child runs without interactive confirmation prompts
         };
@@ -105,7 +204,7 @@ export class SubAgentManager {
         const initialMessages: AgentMessage[] = [
           {
             role: "user",
-            content: options.prompt,
+            content: `Complete assignment thoroughly:\n\n${options.prompt}`,
             timestamp: Date.now(),
           },
         ];
@@ -228,40 +327,51 @@ export const globalSubAgentManager = new SubAgentManager();
 // Tool Handlers
 // ---------------------------------------------------------------------------
 
+export interface ExecuteTaskToolArgs {
+  task?: string;
+  prompt?: string;
+  assignment?: string;
+  agent?: string;
+  role?: string;
+  name?: string;
+  description?: string;
+  label?: string;
+  model?: string;
+  run_in_background?: boolean;
+  async?: boolean;
+  detached?: boolean;
+}
+
 export async function executeSpawnAgent(
-  args: {
-    prompt?: string;
-    task?: string;
-    description?: string;
-    role?: string;
-    model?: string;
-    run_in_background?: boolean;
-    async?: boolean;
-    detached?: boolean;
-  },
+  args: ExecuteTaskToolArgs,
   workspacePath: string,
   callbacks?: SubAgentContext
 ): Promise<{ result: string; isError: boolean; agentId?: string }> {
-  const prompt = args.prompt || args.task;
+  const prompt = args.task || args.prompt || args.assignment;
   if (!prompt || typeof prompt !== "string" || !prompt.trim()) {
     return {
-      result: "Error: Missing 'prompt' parameter for spawn_agent. Specify the task description for the subagent.",
+      result: "Error: Missing 'task' (or 'prompt') parameter. Specify instructions for the subagent.",
       isError: true,
     };
   }
+
+  const roleArg = args.agent || args.role;
+  const canonicalRole = normalizeAgentRole(roleArg);
+  const description = args.name || args.description || args.label;
 
   const runInBackground = args.run_in_background === true || args.async === true || args.detached === true;
 
   const agent = globalSubAgentManager.spawnSubAgent(
     {
       prompt: prompt.trim(),
-      description: args.description,
-      role: args.role,
+      description,
+      role: canonicalRole,
       model: args.model,
     },
     {
       workspacePath,
       parentConfig: callbacks?.parentConfig,
+      availableTools: callbacks?.availableTools,
       onStarted: callbacks?.onStarted,
       onUpdated: callbacks?.onUpdated,
       onFinished: callbacks?.onFinished,
@@ -271,7 +381,7 @@ export async function executeSpawnAgent(
 
   if (runInBackground) {
     return {
-      result: `Started background subagent [${agent.id}] (Role: ${agent.role}): "${agent.description}". Status: running (background). The subagent is working in the background. Use 'agent_status' with agent_id='${agent.id}' to inspect progress or output, or 'kill_agent' to cancel. Do NOT run bash 'sleep' to poll.`,
+      result: `<task-result id="${agent.id}" agent="${agent.role}" status="running" duration="0s">\n<notice>Subagent is running in the background. Use 'agent_status' or 'kill_agent' with id='${agent.id}' if needed. Do NOT run bash 'sleep' to wait.</notice>\n</task-result>`,
       isError: false,
       agentId: agent.id,
     };
@@ -279,33 +389,27 @@ export async function executeSpawnAgent(
 
   // Foreground (default): wait for subagent to finish and return its findings directly
   const settled = (await globalSubAgentManager.waitForSubAgent(agent.id)) || agent;
-
-  if (settled.status === "failed") {
-    return {
-      result: `Started subagent [${settled.id}] (Role: ${settled.role}): "${settled.description}". Failed:\n${settled.error || "Unknown error"}`,
-      isError: true,
-      agentId: settled.id,
-    };
-  }
-
-  if (settled.status === "killed") {
-    return {
-      result: `Started subagent [${settled.id}] (Role: ${settled.role}): "${settled.description}". Cancelled/killed before finishing.`,
-      isError: true,
-      agentId: settled.id,
-    };
-  }
-
   const durationSec = Math.round(
     ((settled.endTime || Date.now()) - settled.startTime) / 1000
   );
 
+  const envelope = formatTaskResultEnvelope({
+    id: settled.id,
+    agent: settled.role || canonicalRole,
+    status: settled.status === "killed" ? "cancelled" : settled.status === "failed" ? "failed" : "completed",
+    durationSec,
+    output: settled.result || "Completed with no output.",
+    error: settled.error,
+  });
+
   return {
-    result: `Started subagent [${settled.id}] (Role: ${settled.role}): "${settled.description}". Completed in ${durationSec}s.\n\nResult:\n${settled.result || "Subagent finished with no output."}`,
-    isError: false,
+    result: envelope,
+    isError: settled.status === "failed" || settled.status === "killed",
     agentId: settled.id,
   };
 }
+
+export const executeTaskTool = executeSpawnAgent;
 
 export function executeAgentStatus(args: {
   agent_id?: string;
@@ -316,10 +420,8 @@ export function executeAgentStatus(args: {
   if (agentId) {
     const agent = globalSubAgentManager.getSubAgent(agentId.trim());
     if (!agent) {
-      const all = globalSubAgentManager.listSubAgents();
-      const available = all.map((a) => `${a.id} (${a.status})`).join(", ");
       return {
-        result: `Subagent '${agentId}' not found. Available subagents: [${available || "none"}]`,
+        result: `<task-result id="${agentId}" status="not_found">\n<error>Subagent '${agentId}' not found.</error>\n</task-result>`,
         isError: true,
       };
     }
@@ -327,20 +429,18 @@ export function executeAgentStatus(args: {
     const durationSec = Math.round(
       ((agent.endTime || Date.now()) - agent.startTime) / 1000
     );
-    let output = `Subagent [${agent.id}] (${agent.role || "general"})\nStatus: ${agent.status.toUpperCase()} (${durationSec}s elapsed)\nGoal: ${agent.description}`;
 
-    if (agent.result) {
-      output += `\n\nFinal Output:\n${agent.result}`;
-    } else if (agent.error) {
-      output += `\n\nError:\n${agent.error}`;
-    }
-
-    if (agent.logs.length > 0) {
-      output += `\n\nRecent Activity:\n${agent.logs.slice(-10).map((l) => `- ${l}`).join("\n")}`;
-    }
+    const envelope = formatTaskResultEnvelope({
+      id: agent.id,
+      agent: agent.role || "task",
+      status: agent.status === "killed" ? "cancelled" : agent.status === "failed" ? "failed" : "completed",
+      durationSec,
+      output: agent.result || (agent.logs.length > 0 ? `Recent activity:\n${agent.logs.slice(-5).map((l) => `- ${l}`).join("\n")}` : `Subagent status: ${agent.status}`),
+      error: agent.error,
+    });
 
     return {
-      result: output,
+      result: envelope,
       isError: agent.status === "failed",
     };
   }
