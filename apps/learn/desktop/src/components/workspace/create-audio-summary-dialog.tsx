@@ -9,8 +9,9 @@ import {
   ArrowRight,
   Settings,
   Volume2,
+  Search,
 } from "lucide-react";
-import { Dialog, DialogContent, ScrollArea, cn } from "@const/ui";
+import { Dialog, DialogContent, ScrollArea, Popover, PopoverTrigger, PopoverContent, cn } from "@const/ui";
 import { useI18n } from "../../lib/i18n";
 import type { LocalSource } from "../../lib/db";
 import {
@@ -19,6 +20,7 @@ import {
   POPULAR_INWORLD_VOICES,
   getCachedVoices,
 } from "../../lib/voice";
+import { INWORLD_SUPPORTED_LANGUAGES } from "./create-video-summary-dialog";
 
 export interface CreateAudioSummaryDialogProps {
   open: boolean;
@@ -37,14 +39,7 @@ export interface CreateAudioSummaryDialogProps {
   onOpenModelsSettings?: () => void;
 }
 
-const LANGUAGE_OPTIONS = [
-  { id: "id-ID", label: "Bahasa Indonesia (id-ID)" },
-  { id: "en-US", label: "English (US) (en-US)" },
-  { id: "en-GB", label: "English (UK) (en-GB)" },
-  { id: "ja-JP", label: "Japanese (ja-JP)" },
-  { id: "ko-KR", label: "Korean (ko-KR)" },
-  { id: "zh-CN", label: "Chinese (zh-CN)" },
-];
+type ActiveDropdown = "source" | "model" | "voice" | "language" | null;
 
 export function CreateAudioSummaryDialog({
   open,
@@ -59,7 +54,13 @@ export function CreateAudioSummaryDialog({
   const [lengthMode, setLengthMode] = useState<"short" | "long" | "auto">("auto");
   const [customPrompt, setCustomPrompt] = useState("");
   const [selectedSourceIds, setSelectedSourceIds] = useState<string[]>([]);
-  const [isSourceDropdownOpen, setIsSourceDropdownOpen] = useState(false);
+
+  // Search queries for dropdowns
+  const [voiceSearch, setVoiceSearch] = useState<string>("");
+  const [languageSearch, setLanguageSearch] = useState<string>("");
+
+  // Track which custom studio dropdown is currently open
+  const [openDropdown, setOpenDropdown] = useState<ActiveDropdown>(null);
 
   // Voice state
   const [voiceModel, setVoiceModel] = useState("inworld-tts-2");
@@ -87,19 +88,71 @@ export function CreateAudioSummaryDialog({
     return INWORLD_MODELS;
   }, [hasInworldKey]);
 
-  // Close dropdown on outside click
+  const isModelSelected = Boolean(voiceModel && voiceModel.trim().length > 0);
+
+  // Filter voices by search query
+  const filteredVoices = useMemo(() => {
+    if (!voiceSearch.trim()) return availableVoices;
+    const q = voiceSearch.toLowerCase().trim();
+    return availableVoices.filter(
+      (v) =>
+        v.name.toLowerCase().includes(q) ||
+        v.id.toLowerCase().includes(q) ||
+        (v.gender && v.gender.toLowerCase().includes(q)) ||
+        (v.description && v.description.toLowerCase().includes(q))
+    );
+  }, [availableVoices, voiceSearch]);
+
+  // Filter languages by search query
+  const filteredLanguages = useMemo(() => {
+    if (!languageSearch.trim()) return INWORLD_SUPPORTED_LANGUAGES;
+    const q = languageSearch.toLowerCase().trim();
+    return INWORLD_SUPPORTED_LANGUAGES.filter(
+      (l) => l.label.toLowerCase().includes(q) || l.id.toLowerCase().includes(q)
+    );
+  }, [languageSearch]);
+
+  // Close dropdowns on outside click
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement;
       if (!target.closest("[data-studio-dropdown]")) {
-        setIsSourceDropdownOpen(false);
+        setOpenDropdown(null);
       }
     };
-    if (isSourceDropdownOpen) {
+    if (openDropdown === "source") {
       document.addEventListener("mousedown", handleClickOutside);
       return () => document.removeEventListener("mousedown", handleClickOutside);
     }
-  }, [isSourceDropdownOpen]);
+  }, [openDropdown]);
+
+  // Reset dropdown and search states when dialog closes
+  useEffect(() => {
+    if (!open) {
+      setOpenDropdown(null);
+      setVoiceSearch("");
+      setLanguageSearch("");
+    }
+  }, [open]);
+
+  // When model is changed, sync voice ID default if not present
+  useEffect(() => {
+    if (isModelSelected && !voiceId && availableVoices.length > 0) {
+      setVoiceId(availableVoices[0]?.id || "Ashley");
+    }
+  }, [voiceModel, availableVoices, voiceId, isModelSelected]);
+
+  // Helper labels
+  const selectedVoiceObj = availableVoices.find((v) => v.id === voiceId);
+  const selectedVoiceDisplay = selectedVoiceObj
+    ? `${selectedVoiceObj.name}${selectedVoiceObj.gender ? ` (${selectedVoiceObj.gender})` : ""}`
+    : voiceId || t("videoSelectVoicePrompt");
+
+  const selectedModelObj = availableModels.find((m) => m.id === voiceModel);
+  const selectedModelDisplay = selectedModelObj?.name || voiceModel || t("videoSelectModelPrompt");
+
+  const selectedLangObj = INWORLD_SUPPORTED_LANGUAGES.find((l) => l.id === audioLanguage);
+  const selectedLangDisplay = selectedLangObj?.label || audioLanguage || t("videoSelectLanguagePrompt");
 
   // Sync initial selections
   useEffect(() => {
@@ -194,7 +247,7 @@ export function CreateAudioSummaryDialog({
                 <div className="relative">
                   <button
                     type="button"
-                    onClick={() => setIsSourceDropdownOpen(!isSourceDropdownOpen)}
+                    onClick={() => setOpenDropdown(openDropdown === "source" ? null : "source")}
                     className="w-full h-9 px-3 rounded-xl bg-[#222222] border border-[#2b2b2b] hover:border-[#383838] flex items-center justify-between text-xs text-left cursor-pointer transition-colors"
                   >
                     <span className="text-white font-medium truncate">
@@ -208,12 +261,12 @@ export function CreateAudioSummaryDialog({
                     <ChevronDown
                       className={cn(
                         "h-3.5 w-3.5 text-[#888888] shrink-0 transition-transform duration-150",
-                        isSourceDropdownOpen ? "rotate-180 text-white" : ""
+                        openDropdown === "source" ? "rotate-180 text-white" : ""
                       )}
                     />
                   </button>
 
-                  {isSourceDropdownOpen && (
+                  {openDropdown === "source" && (
                     <div className="absolute top-full mt-1.5 left-0 right-0 z-30 bg-[#222222] border border-[#2b2b2b] rounded-xl p-2 shadow-2xl animate-in fade-in-0 zoom-in-95 duration-100">
                       <ScrollArea className="max-h-48 w-full" viewportClassName="space-y-1 pr-1">
                         <button
@@ -381,70 +434,293 @@ export function CreateAudioSummaryDialog({
                 ) : null}
 
                 {/* Dropdowns */}
-                <div className="grid grid-cols-3 gap-2.5">
-                  {/* Voice Model */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                  {/* Voice Model Custom Popover */}
                   <div className="space-y-1">
                     <label className="text-[10.5px] font-medium text-[#888888]">
                       {t("audioVoiceModel")}
                     </label>
-                    <select
-                      disabled={!hasInworldKey}
-                      value={voiceModel}
-                      onChange={(e) => setVoiceModel(e.target.value)}
-                      className="w-full h-8 px-2 rounded-lg bg-[#222222] border border-[#2b2b2b] text-xs text-white disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus:border-[#444444]"
+                    <Popover
+                      modal={true}
+                      open={openDropdown === "model"}
+                      onOpenChange={(isOpen) => setOpenDropdown(isOpen ? "model" : null)}
                     >
-                      {availableModels.length === 0 ? (
-                        <option value="">{t("noModels")}</option>
-                      ) : (
-                        availableModels.map((m) => (
-                          <option key={m.id} value={m.id}>
-                            {m.name}
-                          </option>
-                        ))
-                      )}
-                    </select>
+                      <PopoverTrigger asChild>
+                        <button
+                          type="button"
+                          disabled={!hasInworldKey}
+                          className="w-full h-8 px-2.5 rounded-lg bg-[#2b2b2b] border border-[#383838] hover:border-[#444444] disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-between text-xs text-white cursor-pointer transition-colors text-left"
+                        >
+                          <span className="truncate">{selectedModelDisplay}</span>
+                          <ChevronDown
+                            className={cn(
+                              "h-3 w-3 text-[#888888] shrink-0 transition-transform duration-150",
+                              openDropdown === "model" ? "rotate-180 text-white" : ""
+                            )}
+                          />
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent
+                        side="top"
+                        align="start"
+                        sideOffset={6}
+                        avoidCollisions={false}
+                        className="w-[var(--radix-popover-trigger-width)] min-w-[200px] max-w-[300px] p-1.5 bg-[#222222] border border-[#2b2b2b] rounded-xl text-white shadow-2xl z-[60]"
+                      >
+                        <ScrollArea className="max-h-52 w-full" viewportClassName="space-y-1 pr-1">
+                          {(availableModels.length > 0
+                            ? availableModels
+                            : [
+                                { id: "inworld-tts-2", name: "Inworld TTS-2" },
+                                { id: "inworld-tts-2-flash", name: "Inworld TTS-2 Flash" },
+                                { id: "inworld-tts-1.5-max", name: "Inworld TTS-1.5 Max" },
+                                { id: "inworld-tts-1.5-mini", name: "Inworld TTS-1.5 Mini" },
+                              ]
+                          ).map((m) => {
+                            const isSelected = voiceModel === m.id;
+                            return (
+                              <button
+                                key={m.id}
+                                type="button"
+                                onClick={() => {
+                                  setVoiceModel(m.id);
+                                  setOpenDropdown(null);
+                                }}
+                                className={cn(
+                                  "w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs cursor-pointer transition-colors text-left",
+                                  isSelected
+                                    ? "bg-[#2b2b2b] text-white font-medium"
+                                    : "hover:bg-[#282828] text-[#cccccc] hover:text-white"
+                                )}
+                              >
+                                <span className="truncate pr-2">{m.name}</span>
+                                {isSelected && <Check className="h-3.5 w-3.5 text-white shrink-0 ml-2" />}
+                              </button>
+                            );
+                          })}
+                        </ScrollArea>
+                      </PopoverContent>
+                    </Popover>
                   </div>
 
-                  {/* Voice ID */}
+                  {/* Voice ID Custom Popover with Search & ScrollArea */}
                   <div className="space-y-1">
                     <label className="text-[10.5px] font-medium text-[#888888]">
                       {t("audioVoiceId")}
                     </label>
-                    <select
-                      disabled={!hasInworldKey}
-                      value={voiceId}
-                      onChange={(e) => setVoiceId(e.target.value)}
-                      className="w-full h-8 px-2 rounded-lg bg-[#222222] border border-[#2b2b2b] text-xs text-white disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus:border-[#444444]"
+                    <Popover
+                      modal={true}
+                      open={openDropdown === "voice"}
+                      onOpenChange={(isOpen) => {
+                        if (isOpen) {
+                          setVoiceSearch("");
+                          setOpenDropdown("voice");
+                        } else {
+                          setOpenDropdown(null);
+                        }
+                      }}
                     >
-                      {availableVoices.length === 0 ? (
-                        <option value="">{t("noVoices")}</option>
-                      ) : (
-                        availableVoices.map((v) => (
-                          <option key={v.id} value={v.id}>
-                            {v.name} {v.gender ? `(${v.gender})` : ""}
-                          </option>
-                        ))
-                      )}
-                    </select>
+                      <PopoverTrigger asChild>
+                        <button
+                          type="button"
+                          disabled={!hasInworldKey || !isModelSelected}
+                          className={cn(
+                            "w-full h-8 px-2.5 rounded-lg border flex items-center justify-between text-xs cursor-pointer transition-colors text-left",
+                            !isModelSelected || !hasInworldKey
+                              ? "bg-[#222222] border-[#2b2b2b] text-[#666666] opacity-50 cursor-not-allowed"
+                              : "bg-[#2b2b2b] border-[#383838] hover:border-[#444444] text-white"
+                          )}
+                        >
+                          <span className="truncate">
+                            {!isModelSelected ? t("videoSelectModelFirst") : selectedVoiceDisplay}
+                          </span>
+                          <ChevronDown
+                            className={cn(
+                              "h-3 w-3 text-[#888888] shrink-0 transition-transform duration-150",
+                              openDropdown === "voice" ? "rotate-180 text-white" : ""
+                            )}
+                          />
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent
+                        side="top"
+                        align="start"
+                        sideOffset={6}
+                        avoidCollisions={false}
+                        className="w-[var(--radix-popover-trigger-width)] min-w-[260px] max-w-[340px] p-2 bg-[#222222] border border-[#2b2b2b] rounded-xl text-white shadow-2xl z-[60]"
+                      >
+                        {/* Search Input */}
+                        <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-[#181818] border border-[#333333] mb-1.5">
+                          <Search className="h-3.5 w-3.5 text-[#888888] shrink-0" />
+                          <input
+                            type="text"
+                            value={voiceSearch}
+                            onChange={(e) => setVoiceSearch(e.target.value)}
+                            placeholder={t("videoSearchVoicePlaceholder")}
+                            className="w-full bg-transparent text-xs text-white placeholder:text-[#666666] focus:outline-none font-sans"
+                            autoFocus
+                          />
+                          {voiceSearch && (
+                            <button
+                              type="button"
+                              onClick={() => setVoiceSearch("")}
+                              className="text-[#888888] hover:text-white cursor-pointer"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          )}
+                        </div>
+
+                        {/* ScrollArea with max-height using packages/ui/src/components/ui/scroll-area.tsx */}
+                        <ScrollArea className="max-h-56 w-full" viewportClassName="space-y-1 pr-1">
+                          {filteredVoices.length === 0 ? (
+                            <div className="py-4 text-center text-xs text-[#888888]">
+                              {t("videoNoVoicesFound")}
+                            </div>
+                          ) : (
+                            filteredVoices.map((v) => {
+                              const isSelected = voiceId === v.id;
+                              return (
+                                <button
+                                  key={v.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setVoiceId(v.id);
+                                    setOpenDropdown(null);
+                                  }}
+                                  className={cn(
+                                    "w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs text-left cursor-pointer transition-colors",
+                                    isSelected
+                                      ? "bg-[#2b2b2b] text-white font-medium"
+                                      : "hover:bg-[#282828] text-[#cccccc] hover:text-white"
+                                  )}
+                                >
+                                  <div className="flex flex-col min-w-0 pr-2">
+                                    <div className="flex items-center gap-1.5">
+                                      <span className="font-semibold text-white truncate">{v.name}</span>
+                                      {v.gender && (
+                                        <span className="text-[9px] px-1.5 py-0.2 rounded bg-[#333333] text-[#aaaaaa]">
+                                          {v.gender}
+                                        </span>
+                                      )}
+                                    </div>
+                                    {v.description && (
+                                      <span className="text-[10px] text-[#777777] truncate mt-0.5">
+                                        {v.description}
+                                      </span>
+                                    )}
+                                  </div>
+                                  {isSelected && <Check className="h-3.5 w-3.5 text-white shrink-0 ml-2" />}
+                                </button>
+                              );
+                            })
+                          )}
+                        </ScrollArea>
+                      </PopoverContent>
+                    </Popover>
                   </div>
 
-                  {/* Audio Language */}
+                  {/* Audio Language Custom Popover with Search & ScrollArea */}
                   <div className="space-y-1">
                     <label className="text-[10.5px] font-medium text-[#888888]">
                       {t("audioLanguage")}
                     </label>
-                    <select
-                      disabled={!hasInworldKey}
-                      value={audioLanguage}
-                      onChange={(e) => setAudioLanguage(e.target.value)}
-                      className="w-full h-8 px-2 rounded-lg bg-[#222222] border border-[#2b2b2b] text-xs text-white disabled:opacity-40 disabled:cursor-not-allowed focus:outline-none focus:border-[#444444]"
+                    <Popover
+                      modal={true}
+                      open={openDropdown === "language"}
+                      onOpenChange={(isOpen) => {
+                        if (isOpen) {
+                          setLanguageSearch("");
+                          setOpenDropdown("language");
+                        } else {
+                          setOpenDropdown(null);
+                        }
+                      }}
                     >
-                      {LANGUAGE_OPTIONS.map((lang) => (
-                        <option key={lang.id} value={lang.id}>
-                          {lang.label}
-                        </option>
-                      ))}
-                    </select>
+                      <PopoverTrigger asChild>
+                        <button
+                          type="button"
+                          disabled={!hasInworldKey}
+                          className={cn(
+                            "w-full h-8 px-2.5 rounded-lg border flex items-center justify-between text-xs cursor-pointer transition-colors text-left",
+                            !hasInworldKey
+                              ? "bg-[#222222] border-[#2b2b2b] text-[#666666] opacity-50 cursor-not-allowed"
+                              : "bg-[#2b2b2b] border-[#383838] hover:border-[#444444] text-white"
+                          )}
+                        >
+                          <span className="truncate">
+                            {selectedLangDisplay}
+                          </span>
+                          <ChevronDown
+                            className={cn(
+                              "h-3 w-3 text-[#888888] shrink-0 transition-transform duration-150",
+                              openDropdown === "language" ? "rotate-180 text-white" : ""
+                            )}
+                          />
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent
+                        side="top"
+                        align="end"
+                        sideOffset={6}
+                        avoidCollisions={false}
+                        className="w-[var(--radix-popover-trigger-width)] min-w-[240px] max-w-[320px] p-2 bg-[#222222] border border-[#2b2b2b] rounded-xl text-white shadow-2xl z-[60]"
+                      >
+                        {/* Search Input */}
+                        <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg bg-[#181818] border border-[#333333] mb-1.5">
+                          <Search className="h-3.5 w-3.5 text-[#888888] shrink-0" />
+                          <input
+                            type="text"
+                            value={languageSearch}
+                            onChange={(e) => setLanguageSearch(e.target.value)}
+                            placeholder={t("videoSearchLanguagePlaceholder")}
+                            className="w-full bg-transparent text-xs text-white placeholder:text-[#666666] focus:outline-none font-sans"
+                            autoFocus
+                          />
+                          {languageSearch && (
+                            <button
+                              type="button"
+                              onClick={() => setLanguageSearch("")}
+                              className="text-[#888888] hover:text-white cursor-pointer"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          )}
+                        </div>
+
+                        {/* ScrollArea with max-height */}
+                        <ScrollArea className="max-h-56 w-full" viewportClassName="space-y-1 pr-1">
+                          {filteredLanguages.length === 0 ? (
+                            <div className="py-4 text-center text-xs text-[#888888]">
+                              {t("videoNoLanguagesFound")}
+                            </div>
+                          ) : (
+                            filteredLanguages.map((lang) => {
+                              const isSelected = audioLanguage === lang.id;
+                              return (
+                                <button
+                                  key={lang.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setAudioLanguage(lang.id);
+                                    setOpenDropdown(null);
+                                  }}
+                                  className={cn(
+                                    "w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs text-left cursor-pointer transition-colors",
+                                    isSelected
+                                      ? "bg-[#2b2b2b] text-white font-medium"
+                                      : "hover:bg-[#282828] text-[#cccccc] hover:text-white"
+                                  )}
+                                >
+                                  <span className="truncate pr-2">{lang.label}</span>
+                                  {isSelected && <Check className="h-3.5 w-3.5 text-white shrink-0 ml-2" />}
+                                </button>
+                              );
+                            })
+                          )}
+                        </ScrollArea>
+                      </PopoverContent>
+                    </Popover>
                   </div>
                 </div>
               </div>
