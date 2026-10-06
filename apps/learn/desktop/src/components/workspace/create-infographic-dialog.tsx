@@ -1,10 +1,8 @@
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   X,
   Check,
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
   BarChart3,
   FileText,
   AlertCircle,
@@ -38,25 +36,6 @@ export type InfographicOrientation = "landscape" | "portrait" | "square";
 export type InfographicDetailLevel = "brief" | "standard" | "detailed";
 type ActiveDropdown = "source" | "orientation" | "language" | "model" | null;
 
-interface StyleCardDef {
-  id: string;
-  label: string;
-}
-
-// Visual styles catalog (thumbnail slots are left blank as placeholders for user assets)
-const getStyleCards = (t: (key: any) => string): StyleCardDef[] => [
-  { id: "auto", label: t("styleAutoSelect") },
-  { id: "clean_modern", label: t("styleCleanModern") },
-  { id: "sketch_notes", label: t("styleSketchNotes") },
-  { id: "vector", label: t("styleVectorMinimalist") },
-  { id: "editorial", label: t("styleEditorial") },
-  { id: "kawaii", label: t("styleKawaii") },
-  { id: "clay", label: t("styleClaymation") },
-  { id: "anime", label: t("styleAnime") },
-  { id: "3d_photorealistic", label: t("style3dPhotorealistic") },
-  { id: "retro_comic", label: t("styleRetroComic") },
-];
-
 export function CreateInfographicDialog({
   open,
   onOpenChange,
@@ -69,9 +48,7 @@ export function CreateInfographicDialog({
   // Form states
   const [selectedLanguage, setSelectedLanguage] = useState<"id" | "en">(language === "id" ? "id" : "en");
   const [orientation, setOrientation] = useState<InfographicOrientation>("landscape");
-  const [selectedStyle, setSelectedStyle] = useState<string>("auto");
   const [detailLevel, setDetailLevel] = useState<InfographicDetailLevel>("standard");
-  const styleCards = useMemo(() => getStyleCards(t), [t]);
   const [customDescription, setCustomDescription] = useState("");
 
   // Source selections
@@ -97,11 +74,6 @@ export function CreateInfographicDialog({
       return () => document.removeEventListener("mousedown", handleClickOutside);
     }
   }, [openDropdown]);
-
-  // Carousel ref for styles
-  const stylesCarouselRef = useRef<HTMLDivElement>(null);
-  const [canScrollLeft, setCanScrollLeft] = useState(false);
-  const [canScrollRight, setCanScrollRight] = useState(true);
 
   // Load configured image providers
   const imageConfig = useMemo(() => {
@@ -152,33 +124,6 @@ export function CreateInfographicDialog({
     }
   }, [open, allAvailableModels, imageConfig, sources]);
 
-  // Check carousel scroll availability
-  const checkScroll = () => {
-    const el = stylesCarouselRef.current;
-    if (el) {
-      setCanScrollLeft(el.scrollLeft > 10);
-      setCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 10);
-    }
-  };
-
-  useEffect(() => {
-    checkScroll();
-  }, [open]);
-
-  const handleScrollRight = () => {
-    if (stylesCarouselRef.current) {
-      stylesCarouselRef.current.scrollBy({ left: 240, behavior: "smooth" });
-      setTimeout(checkScroll, 250);
-    }
-  };
-
-  const handleScrollLeft = () => {
-    if (stylesCarouselRef.current) {
-      stylesCarouselRef.current.scrollBy({ left: -240, behavior: "smooth" });
-      setTimeout(checkScroll, 250);
-    }
-  };
-
   const handleToggleSource = (sourceId: string) => {
     setSelectedSourceIds((prev) =>
       prev.includes(sourceId) ? prev.filter((id) => id !== sourceId) : [...prev, sourceId]
@@ -217,7 +162,7 @@ export function CreateInfographicDialog({
         selectedSourceIds.length > 0 ? selectedSourceIds : sources.map((s) => s.id),
       language: selectedLanguage,
       orientation,
-      style: selectedStyle,
+      style: "auto",
       detailLevel,
       customDescription: customDescription.trim() || undefined,
       providerId: selectedProviderId,
@@ -411,84 +356,7 @@ export function CreateInfographicDialog({
                 </div>
               </div>
 
-              {/* 2. Visual Style (Gaya Visual - Blank asset placeholders) */}
-              <div className="space-y-1.5">
-                <div className="flex items-center justify-between">
-                  <label className="text-[11.5px] font-medium text-[#999999]">
-                    {t("selectVisualStyle")}
-                  </label>
-                  <div className="flex items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={handleScrollLeft}
-                      disabled={!canScrollLeft}
-                      className="h-6 w-6 rounded-lg bg-[#222222] border border-[#2b2b2b] hover:border-[#383838] text-[#888888] hover:text-white disabled:opacity-30 disabled:hover:border-[#2b2b2b] disabled:hover:text-[#888888] disabled:cursor-not-allowed flex items-center justify-center transition-colors cursor-pointer"
-                      title={t("scrollLeft")}
-                    >
-                      <ChevronLeft className="h-3.5 w-3.5" />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleScrollRight}
-                      disabled={!canScrollRight}
-                      className="h-6 w-6 rounded-lg bg-[#222222] border border-[#2b2b2b] hover:border-[#383838] text-[#888888] hover:text-white disabled:opacity-30 disabled:hover:border-[#2b2b2b] disabled:hover:text-[#888888] disabled:cursor-not-allowed flex items-center justify-center transition-colors cursor-pointer"
-                      title={t("scrollRight")}
-                    >
-                      <ChevronRight className="h-3.5 w-3.5" />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="relative group">
-                  <div
-                    ref={stylesCarouselRef}
-                    onScroll={checkScroll}
-                    className="flex items-center gap-2.5 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden pb-1 pt-0.5 scroll-smooth"
-                  >
-                    {styleCards.map((style) => {
-                      const isSelected = selectedStyle === style.id;
-                      return (
-                        <button
-                          key={style.id}
-                          type="button"
-                          onClick={() => setSelectedStyle(style.id)}
-                          className="flex flex-col items-center gap-1.5 shrink-0 cursor-pointer text-left focus:outline-none"
-                        >
-                          <div
-                            className={cn(
-                              "w-24 h-16 rounded-xl overflow-hidden relative transition-all border flex items-center justify-center",
-                              isSelected
-                                ? "bg-[#2b2b2b] border-white/80 ring-1 ring-white/40 text-white shadow-xs"
-                                : "bg-[#222222] border-[#2e2e2e] hover:border-[#383838] text-[#555555] hover:text-[#777777]"
-                            )}
-                          >
-                            {/* Kosongan: Clean minimalist placeholder box for future assets */}
-                            <div className="w-8 h-6 rounded-md border border-dashed border-current/40 flex items-center justify-center opacity-40">
-                              <ImageIcon className="w-3.5 h-3.5 stroke-[1.5]" />
-                            </div>
-
-                            {isSelected && (
-                              <div className="absolute top-1.5 right-1.5 h-4 w-4 rounded-full bg-white text-black flex items-center justify-center shadow-xs">
-                                <Check className="h-2.5 w-2.5 stroke-[3]" />
-                              </div>
-                            )}
-                          </div>
-                          <span
-                            className={cn(
-                              "text-[10.5px] font-medium tracking-tight text-center truncate max-w-24",
-                              isSelected ? "text-white font-semibold" : "text-[#888888]"
-                            )}
-                          >
-                            {style.label}
-                          </span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-
-              {/* 3. Tingkat Detail & Bahasa */}
+              {/* 2. Tingkat Detail & Bahasa */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                 {/* Tingkat Detail */}
                 <div className="space-y-1.5">
@@ -591,7 +459,7 @@ export function CreateInfographicDialog({
                 </div>
               </div>
 
-              {/* 4. Model Gambar AI (Card matching Video Summary style) */}
+              {/* 3. Model Gambar AI (Card matching Video Summary style) */}
               <div
                 className={cn(
                   "p-3.5 rounded-xl bg-[#1c1c1c] border border-[#2b2b2b] space-y-3 relative",
@@ -721,7 +589,7 @@ export function CreateInfographicDialog({
                 )}
               </div>
 
-              {/* 5. Deskripsi Tambahan / Instruksi Khusus + Preset Chips */}
+              {/* 4. Deskripsi Tambahan / Instruksi Khusus + Preset Chips */}
               <div className="space-y-1.5">
                 <label className="text-[11.5px] font-medium text-[#999999]">
                   {t("customInstructionsOptional")}
