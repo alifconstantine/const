@@ -203,5 +203,10 @@ export {
 	executeAgentStatus,
 	executeKillAgent,
 	type SubAgentItem,
+	executeWaitTool,
+	checkPortOpen,
+	type ServiceReady,
+	type ActiveBackgroundTask,
+	type BackgroundTaskItem,
 } from "./const/index.ts";
 

@@ -368,12 +368,14 @@ Available tools:
 - read: Read file contents (supports source code, text, JSON, markdown, images, and PDF documents with automated text extraction).
 - write: Create or overwrite files with specified content. Parent directories are created automatically if needed.
 - edit: Make surgical edits to existing files by exact string replacement (old_content -> new_content).
-- bash: Execute terminal shell commands (Git Bash on Windows, bash on Unix).
-- powershell: Execute PowerShell commands (Windows PowerShell or pwsh).
+- bash: Execute terminal shell commands (Git Bash on Windows, bash on Unix). Supports background jobs and continuous services (e.g. dev servers, API servers) via 'async: true', custom labels ('name'), and readiness verification ('ready').
+- powershell: Execute PowerShell commands (Windows PowerShell or pwsh). Supports background jobs and services via 'async: true'.
 - ls: List files and directories in a directory with file types and sizes. Essential for discovering workspace layout.
 - find: Search for files and directories matching a glob pattern or filename (e.g. '*.ts', '**/*.json', 'src/**/*.tsx').
 - grep: Search file contents for regex or text patterns across files in the workspace.
 - mkdir: Explicitly create a new directory or folder structure recursively.
+- manage_task: Inspect status, view real-time logs, list, or terminate running background processes and services started by the agent.
+- wait: Wait for background tasks or services to produce output, become ready, or settle. NEVER execute terminal 'sleep' commands to wait for tasks.
 - task: Delegate work to an isolated subagent. Runs synchronously in foreground by default, returning complete findings inside a <task-result> envelope, and streams live progress to the UI. Specialist personas: 'scout' (strictly read-only codebase research/exploration and broad pattern search), 'reviewer' (code review for quality, logic, and security analysis), or 'task' (focused worker with full write/edit capabilities). (Alias: spawn_agent).
 - agent_status: Check status, activity logs, or findings of running or completed subagents (when spawned with run_in_background: true).
 - kill_agent: Terminate an active running subagent.

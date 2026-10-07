@@ -3,6 +3,7 @@ import fsSync from "node:fs";
 import path from "node:path";
 import os from "node:os";
 import { spawn, type ChildProcess } from "node:child_process";
+import net from "node:net";
 import type { FileMutationRecord } from "./mutation-ledger.js";
 import type {
   TodoItem,
@@ -325,7 +326,7 @@ export const CONST_DEFAULT_TOOLS: NativeToolDefinition[] = [
     function: {
       name: "bash",
       description:
-        "Execute a shell command in the workspace directory (using Git Bash on Windows or bash on Unix). Returns standard output, standard error, and exit status.",
+        "Execute a shell command in the workspace directory (using Git Bash on Windows or bash on Unix). Returns standard output, standard error, and exit status. Supports background execution via 'async: true' and long-running services (dev servers, daemons) with readiness verification via 'ready'.",
       parameters: {
         type: "object",
         properties: {
@@ -335,7 +336,37 @@ export const CONST_DEFAULT_TOOLS: NativeToolDefinition[] = [
           },
           timeout: {
             type: "number",
-            description: "Optional timeout in seconds (defaults to 60).",
+            description: "Optional timeout in seconds (defaults to 60, use 0 for infinite/watcher).",
+          },
+          cwd: {
+            type: "string",
+            description: "Optional working directory for command execution.",
+          },
+          async: {
+            type: "boolean",
+            description: "If true, runs command as a background job/service without blocking. Returns immediate task ID. Use 'wait' or 'manage_task' to monitor or stop.",
+          },
+          name: {
+            type: "string",
+            description: "Optional identifier or friendly name for this background job or service (e.g. 'dev-server', 'vite', 'backend').",
+          },
+          ready: {
+            type: "object",
+            description: "Optional readiness criteria before returning. Waits for port to open or log pattern to appear before continuing.",
+            properties: {
+              port: {
+                type: "number",
+                description: "TCP port number to wait for (e.g. 3000, 5173, 8080).",
+              },
+              log: {
+                type: "string",
+                description: "Regex pattern in stdout/stderr to indicate server is ready (e.g. 'ready in', 'Local:').",
+              },
+              timeout: {
+                type: "number",
+                description: "Maximum seconds to wait for readiness (defaults to 30).",
+              },
+            },
           },
         },
         required: ["command"],
@@ -446,7 +477,7 @@ export const CONST_DEFAULT_TOOLS: NativeToolDefinition[] = [
     function: {
       name: "powershell",
       description:
-        "Execute a PowerShell command (Windows PowerShell or pwsh). Returns standard output, standard error, and exit status.",
+        "Execute a PowerShell command (Windows PowerShell or pwsh). Returns standard output, standard error, and exit status. Supports background execution via 'async: true' and long-running services (dev servers, daemons) with readiness verification via 'ready'.",
       parameters: {
         type: "object",
         properties: {
@@ -456,7 +487,37 @@ export const CONST_DEFAULT_TOOLS: NativeToolDefinition[] = [
           },
           timeout: {
             type: "number",
-            description: "Optional timeout in seconds (defaults to 60).",
+            description: "Optional timeout in seconds (defaults to 60, use 0 for infinite/watcher).",
+          },
+          cwd: {
+            type: "string",
+            description: "Optional working directory for command execution.",
+          },
+          async: {
+            type: "boolean",
+            description: "If true, runs command as a background process/service without blocking. Returns immediate task ID. Use 'wait' or 'manage_task' to monitor or stop.",
+          },
+          name: {
+            type: "string",
+            description: "Optional identifier or friendly name for this background job or service (e.g. 'dev-server', 'vite', 'backend').",
+          },
+          ready: {
+            type: "object",
+            description: "Optional readiness criteria before returning. Waits for port to open or log pattern to appear before continuing.",
+            properties: {
+              port: {
+                type: "number",
+                description: "TCP port number to wait for (e.g. 3000, 5173, 8080).",
+              },
+              log: {
+                type: "string",
+                description: "Regex pattern in stdout/stderr to indicate server is ready (e.g. 'ready in', 'Local:').",
+              },
+              timeout: {
+                type: "number",
+                description: "Maximum seconds to wait for readiness (defaults to 30).",
+              },
+            },
           },
         },
         required: ["command"],
@@ -625,10 +686,31 @@ export const CONST_DEFAULT_TOOLS: NativeToolDefinition[] = [
           },
           task_id: {
             type: "string",
-            description: "The task ID to inspect or terminate (required for 'status' and 'kill').",
+            description: "The task ID or name to inspect or terminate (required for 'status' and 'kill').",
           },
         },
         required: ["action"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "wait",
+      description:
+        "Wait for background jobs or services to produce output, become ready, or complete. If task_id is omitted, blocks on any active background task started by the agent. NEVER run bash 'sleep' to wait for tasks.",
+      parameters: {
+        type: "object",
+        properties: {
+          task_id: {
+            type: "string",
+            description: "Optional task ID or name to wait for.",
+          },
+          timeout: {
+            type: "number",
+            description: "Maximum seconds to wait (defaults to 30).",
+          },
+        },
       },
     },
   },
@@ -2902,8 +2984,42 @@ export function isDevServerCommand(cmd: string): boolean {
 // Background Process Manager (Supports long-running dev servers & daemons)
 // ---------------------------------------------------------------------------
 
+export function checkPortOpen(port: number, host = "127.0.0.1", timeoutMs = 500): Promise<boolean> {
+  return new Promise((resolve) => {
+    const socket = new net.Socket();
+    let settled = false;
+    const finish = (open: boolean) => {
+      if (settled) return;
+      settled = true;
+      socket.destroy();
+      resolve(open);
+    };
+    socket.setTimeout(timeoutMs);
+    socket.once("connect", () => finish(true));
+    socket.once("timeout", () => finish(false));
+    socket.once("error", () => finish(false));
+    try {
+      socket.connect(port, host);
+    } catch {
+      finish(false);
+    }
+  });
+}
+
+export interface ServiceReady {
+  log?: string;
+  port?: number;
+  host?: string;
+  timeout?: number;
+}
+
+export interface StartTaskOptions {
+  name?: string;
+}
+
 export interface ActiveBackgroundTask {
   id: string;
+  name?: string;
   command: string;
   cwd: string;
   pid?: number;
@@ -2912,6 +3028,7 @@ export interface ActiveBackgroundTask {
   exitCode: number | null;
   logs: string[];
   child?: ChildProcess;
+  port?: number;
 }
 
 export type BackgroundTaskListener = (event: {
@@ -2926,7 +3043,7 @@ export class BackgroundProcessManager {
   private tasks: Map<string, ActiveBackgroundTask> = new Map();
   private listeners: Set<BackgroundTaskListener> = new Set();
 
-  public startTask(command: string, cwd: string): ActiveBackgroundTask {
+  public startTask(command: string, cwd: string, options?: StartTaskOptions): ActiveBackgroundTask {
     const taskId = `task_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
     const shellCfg = getShellConfig();
     const child = spawn(shellCfg.shell, [...shellCfg.args, command], {
@@ -2938,6 +3055,7 @@ export class BackgroundProcessManager {
 
     const task: ActiveBackgroundTask = {
       id: taskId,
+      name: options?.name,
       command,
       cwd,
       pid: child.pid,
@@ -2954,6 +3072,16 @@ export class BackgroundProcessManager {
         if (line) {
           task.logs.push(line);
           if (task.logs.length > 5000) task.logs.shift();
+
+          // Auto-detect port from common dev server output
+          const portMatch = line.match(
+            /(?:https?:\/\/(?:localhost|127\.0\.0\.1):|port\s+|listening\s+on\s+(?:port\s+)?)(\d{2,5})/i
+          );
+          if (portMatch && portMatch[1] && !task.port) {
+            const p = parseInt(portMatch[1], 10);
+            if (p > 0 && p < 65536) task.port = p;
+          }
+
           this.emit({ type: "output", taskId, data: line });
         }
       }
@@ -2979,23 +3107,87 @@ export class BackgroundProcessManager {
     return task;
   }
 
+  public async waitForReady(
+    taskId: string,
+    readyCfg?: ServiceReady
+  ): Promise<{ ready: boolean; port?: number; error?: string }> {
+    const task = this.tasks.get(taskId);
+    if (!task) return { ready: false, error: "Task not found" };
+
+    const timeoutMs = (readyCfg?.timeout || 20) * 1000;
+    const startTime = Date.now();
+    const targetHost = readyCfg?.host || "127.0.0.1";
+
+    while (Date.now() - startTime < timeoutMs) {
+      if (task.status === "failed") {
+        return {
+          ready: false,
+          error: task.logs.slice(-5).join("\n") || "Process failed to start",
+        };
+      }
+      if (task.status === "completed" && task.exitCode !== 0) {
+        return {
+          ready: false,
+          error: `Process exited with code ${task.exitCode}:\n${task.logs.slice(-5).join("\n")}`,
+        };
+      }
+
+      // Check port readiness if specified or detected
+      const probePort = readyCfg?.port || task.port;
+      if (probePort) {
+        const isOpen = await checkPortOpen(probePort, targetHost, 300);
+        if (isOpen) {
+          task.port = probePort;
+          return { ready: true, port: probePort };
+        }
+      }
+
+      // Check log pattern if specified
+      if (readyCfg?.log) {
+        const regex = new RegExp(readyCfg.log, "i");
+        if (task.logs.some((l) => regex.test(l))) {
+          return { ready: true, port: task.port };
+        }
+      }
+
+      // Auto-detect dev server ready phrases
+      const isAutoReady = task.logs.some((l) =>
+        /(?:ready in|Local:\s+http|vite\s+v\d+|compiled successfully|server running at|listening on)/i.test(l)
+      );
+      if (isAutoReady) {
+        return { ready: true, port: task.port };
+      }
+
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+
+    return { ready: task.status === "running", port: task.port };
+  }
+
   public listTasks(): BackgroundTaskItem[] {
     return Array.from(this.tasks.values()).map((t) => ({
       id: t.id,
+      name: t.name,
       command: t.command,
       pid: t.pid,
       status: t.status,
       startTime: t.startTime,
       output: t.logs.slice(-20),
+      port: t.port,
     }));
   }
 
-  public getTask(taskId: string): ActiveBackgroundTask | undefined {
-    return this.tasks.get(taskId);
+  public getTask(taskIdOrName: string): ActiveBackgroundTask | undefined {
+    const direct = this.tasks.get(taskIdOrName);
+    if (direct) return direct;
+    const lower = taskIdOrName.toLowerCase().trim();
+    return Array.from(this.tasks.values()).find(
+      (t) => t.id === taskIdOrName || (t.name && t.name.toLowerCase() === lower)
+    );
   }
 
-  public killTask(taskId: string): boolean {
-    const task = this.tasks.get(taskId);
+  public killTask(taskIdOrName: string): boolean {
+    const task = this.getTask(taskIdOrName);
     if (!task) return false;
     if (task.status !== "running") return true;
 
@@ -3005,7 +3197,7 @@ export class BackgroundProcessManager {
       }
       task.status = "completed";
       task.logs.push("[Process terminated by user/AI request]");
-      this.emit({ type: "status", taskId, status: "completed", code: null });
+      this.emit({ type: "status", taskId: task.id, status: "completed", code: null });
       return true;
     } catch {
       return false;
@@ -3027,6 +3219,95 @@ export class BackgroundProcessManager {
 }
 
 export const globalTaskManager = new BackgroundProcessManager();
+
+export async function executeWaitTool(
+  args: { task_id?: string; id?: string; name?: string; timeout?: number },
+  signal?: AbortSignal
+): Promise<{ result: string; isError: boolean }> {
+  const targetId = args.task_id || args.id || args.name;
+  const timeoutSec = typeof args.timeout === "number" ? Math.max(1, args.timeout) : 30;
+  const timeoutMs = timeoutSec * 1000;
+
+  const allTasks = globalTaskManager.listTasks();
+  const runningTasks = allTasks.filter((t) => t.status === "running");
+
+  if (targetId) {
+    const task = globalTaskManager.getTask(targetId);
+    if (!task) {
+      return {
+        result: `<task-result id="${targetId}" status="not_found">\n<error>Background task '${targetId}' not found.</error>\n</task-result>`,
+        isError: true,
+      };
+    }
+    if (task.status !== "running") {
+      const output = task.logs.slice(-10).join("\n") || "(No recent output)";
+      const durationSec = Math.round((Date.now() - task.startTime) / 1000);
+      return {
+        result: `<task-result id="${task.id}" name="${task.name || ""}" status="${task.status}" duration="${durationSec}s">\n<output>\n${output}\n</output>\n</task-result>`,
+        isError: task.status === "failed",
+      };
+    }
+
+    // Wait until task settles or new log arrives or timeout
+    const initialLogCount = task.logs.length;
+    const startTime = Date.now();
+    while (Date.now() - startTime < timeoutMs) {
+      if (signal?.aborted) {
+        return { result: "[Wait aborted by signal]", isError: false };
+      }
+      const currentStatus: string = task.status;
+      if (currentStatus !== "running" || task.logs.length > initialLogCount + 2) {
+        break;
+      }
+      await new Promise((r) => setTimeout(r, 250));
+    }
+
+    const durationSec = Math.round((Date.now() - task.startTime) / 1000);
+    const output = task.logs.slice(-10).join("\n") || `Status: ${task.status}`;
+    const finalStatus: string = task.status;
+    return {
+      result: `<task-result id="${task.id}" name="${task.name || ""}" status="${finalStatus}" duration="${durationSec}s">\n<output>\n${output}\n</output>\n</task-result>`,
+      isError: finalStatus === "failed",
+    };
+  }
+
+  // No specific task ID: wait on any running background task
+  const firstRunning = runningTasks[0];
+  if (!firstRunning) {
+    return {
+      result: "Nothing to wait for: no background task or service is running.",
+      isError: false,
+    };
+  }
+
+  // Wait for any running task to produce output or settle
+  const startTime = Date.now();
+  const initialCounts = new Map(runningTasks.map((t) => [t.id, t.output?.length || 0]));
+  let activeTask: BackgroundTaskItem = firstRunning;
+
+  while (Date.now() - startTime < timeoutMs) {
+    if (signal?.aborted) {
+      return { result: "[Wait aborted by signal]", isError: false };
+    }
+    const currentList = globalTaskManager.listTasks();
+    const settledOrNew = currentList.find(
+      (t) => t.status !== "running" || (t.output?.length || 0) > (initialCounts.get(t.id) || 0)
+    );
+    if (settledOrNew) {
+      activeTask = settledOrNew;
+      break;
+    }
+    await new Promise((r) => setTimeout(r, 250));
+  }
+
+  const durationSec = Math.round((Date.now() - activeTask.startTime) / 1000);
+  const taskObj = globalTaskManager.getTask(activeTask.id);
+  const output = taskObj?.logs.slice(-8).join("\n") || `Status: ${activeTask.status}`;
+  return {
+    result: `<task-result id="${activeTask.id}" name="${activeTask.name || ""}" status="${activeTask.status}" duration="${durationSec}s">\n<output>\n${output}\n</output>\n</task-result>`,
+    isError: (activeTask.status as string) === "failed",
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Unified Diff Patcher (Unified standard Git diff applicator)
@@ -3692,25 +3973,67 @@ export async function executeNativeTool(
 
       const shellCfg = getShellConfig();
 
-      // Check if caller explicitly requested background daemon execution
-      if (args.is_daemon || args.isDaemon || args.background) {
-        const bgTask = globalTaskManager.startTask(cmd, executionCwd);
+      const isDevServer = isDevServerCommand(cmd);
+      const isAsyncRequested =
+        args.async === true ||
+        args.run_in_background === true ||
+        args.is_daemon === true ||
+        args.isDaemon === true ||
+        args.background === true;
+
+      // Handle async background execution or dev servers
+      if (isAsyncRequested || isDevServer) {
+        const taskName = (typeof args.name === "string" ? args.name : undefined) || (isDevServer ? "dev-server" : undefined);
+        const readyCfg: ServiceReady | undefined = args.ready && typeof args.ready === "object"
+          ? {
+              port: typeof args.ready.port === "number" ? args.ready.port : undefined,
+              log: typeof args.ready.log === "string" ? args.ready.log : undefined,
+              host: typeof args.ready.host === "string" ? args.ready.host : undefined,
+              timeout: typeof args.ready.timeout === "number" ? args.ready.timeout : undefined,
+            }
+          : undefined;
+
+        const bgTask = globalTaskManager.startTask(cmd, executionCwd, { name: taskName });
         options.onTaskStarted?.({
           id: bgTask.id,
+          name: bgTask.name,
           command: bgTask.command,
           pid: bgTask.pid,
           startTime: bgTask.startTime,
           status: bgTask.status,
           output: bgTask.logs,
+          port: bgTask.port,
         });
+
+        // If readiness criteria requested OR auto-detected dev server, wait for network/log readiness
+        if (readyCfg || isDevServer) {
+          const waitResult = await globalTaskManager.waitForReady(bgTask.id, readyCfg);
+          const durationSec = Math.round((Date.now() - bgTask.startTime) / 1000);
+
+          if (!waitResult.ready && bgTask.status === "failed") {
+            const errLogs = bgTask.logs.slice(-6).join("\n");
+            return {
+              result: `<task-result id="${bgTask.id}" name="${bgTask.name || ""}" status="failed" duration="${durationSec}s">\n<error>\nService failed to start:\n${errLogs}\n</error>\n</task-result>`,
+              isError: true,
+            };
+          }
+
+          const portInfo = bgTask.port ? `\nLocal URL: http://localhost:${bgTask.port}` : "";
+          const recentLogs = bgTask.logs.slice(-5).join("\n");
+          return {
+            result: `<task-result id="${bgTask.id}" name="${bgTask.name || "service"}" status="running" duration="${durationSec}s">\n<output>\nBackground service started successfully and verified readiness.${portInfo}\nPID: ${bgTask.pid ?? "unknown"}\nCommand: ${cmd}\n\nRecent logs:\n${recentLogs}\n\n(Notice: Service is running continuously in the background. Use 'manage_task' or 'wait' with id='${bgTask.id}' to inspect logs or terminate).\n</output>\n</task-result>`,
+            isError: false,
+          };
+        }
+
+        // Standard async background task without waiting
         return {
-          result: `Started background task [${bgTask.id}] (PID: ${bgTask.pid ?? "unknown"}): '${cmd}'. It is now running in the background. Use 'manage_task' to check status, view logs, or kill it.`,
+          result: `<task-result id="${bgTask.id}" name="${bgTask.name || ""}" status="running" duration="0s">\n<notice>Started background task [${bgTask.id}] (PID: ${bgTask.pid ?? "unknown"}): '${cmd}'. It is running in the background. Use 'manage_task' to check status, view logs, or kill it, or 'wait' to await completion.</notice>\n</task-result>`,
           isError: false,
         };
       }
 
       const isBuildOrInstall = /(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?(?:build|install|add|compile|test)|(?:tsc|cargo\s+build|dotnet\s+build)/i.test(cmd);
-      const isDevServer = isDevServerCommand(cmd);
       const defaultTimeoutSec = isBuildOrInstall ? 180 : (isDevServer ? 30 : 60);
       const timeoutMs = (typeof args.timeout === "number" ? args.timeout : defaultTimeoutSec) * 1000;
 
@@ -4032,6 +4355,63 @@ export async function executeNativeTool(
       }
       const isBuildOrInstall = /(?:npm|pnpm|yarn|bun)\s+(?:run\s+)?(?:build|install|add|compile|test)|(?:tsc|cargo\s+build|dotnet\s+build)/i.test(cmd);
       const isDevServer = isDevServerCommand(cmd);
+      const isAsyncRequested =
+        args.async === true ||
+        args.run_in_background === true ||
+        args.is_daemon === true ||
+        args.isDaemon === true ||
+        args.background === true;
+
+      // Handle async background execution or dev servers
+      if (isAsyncRequested || isDevServer) {
+        const taskName = (typeof args.name === "string" ? args.name : undefined) || (isDevServer ? "dev-server" : undefined);
+        const readyCfg: ServiceReady | undefined = args.ready && typeof args.ready === "object"
+          ? {
+              port: typeof args.ready.port === "number" ? args.ready.port : undefined,
+              log: typeof args.ready.log === "string" ? args.ready.log : undefined,
+              host: typeof args.ready.host === "string" ? args.ready.host : undefined,
+              timeout: typeof args.ready.timeout === "number" ? args.ready.timeout : undefined,
+            }
+          : undefined;
+
+        const bgTask = globalTaskManager.startTask(cmd, executionCwd, { name: taskName });
+        options.onTaskStarted?.({
+          id: bgTask.id,
+          name: bgTask.name,
+          command: bgTask.command,
+          pid: bgTask.pid,
+          startTime: bgTask.startTime,
+          status: bgTask.status,
+          output: bgTask.logs,
+          port: bgTask.port,
+        });
+
+        if (readyCfg || isDevServer) {
+          const waitResult = await globalTaskManager.waitForReady(bgTask.id, readyCfg);
+          const durationSec = Math.round((Date.now() - bgTask.startTime) / 1000);
+
+          if (!waitResult.ready && bgTask.status === "failed") {
+            const errLogs = bgTask.logs.slice(-6).join("\n");
+            return {
+              result: `<task-result id="${bgTask.id}" name="${bgTask.name || ""}" status="failed" duration="${durationSec}s">\n<error>\nService failed to start:\n${errLogs}\n</error>\n</task-result>`,
+              isError: true,
+            };
+          }
+
+          const portInfo = bgTask.port ? `\nLocal URL: http://localhost:${bgTask.port}` : "";
+          const recentLogs = bgTask.logs.slice(-5).join("\n");
+          return {
+            result: `<task-result id="${bgTask.id}" name="${bgTask.name || "service"}" status="running" duration="${durationSec}s">\n<output>\nBackground service started successfully and verified readiness.${portInfo}\nPID: ${bgTask.pid ?? "unknown"}\nCommand: ${cmd}\n\nRecent logs:\n${recentLogs}\n\n(Notice: Service is running continuously in the background. Use 'manage_task' or 'wait' with id='${bgTask.id}' to inspect logs or terminate).\n</output>\n</task-result>`,
+            isError: false,
+          };
+        }
+
+        return {
+          result: `<task-result id="${bgTask.id}" name="${bgTask.name || ""}" status="running" duration="0s">\n<notice>Started background task [${bgTask.id}] (PID: ${bgTask.pid ?? "unknown"}): '${cmd}'. It is running in the background. Use 'manage_task' to check status, view logs, or kill it, or 'wait' to await completion.</notice>\n</task-result>`,
+          isError: false,
+        };
+      }
+
       const defaultTimeoutSec = isBuildOrInstall ? 180 : (isDevServer ? 30 : 60);
       const timeoutMs = (typeof args.timeout === "number" ? args.timeout : defaultTimeoutSec) * 1000;
 
@@ -4264,15 +4644,14 @@ export async function executeNativeTool(
           };
         }
         const formatted = tasks
-          .map(
-            (t) =>
-              `- Task ID: ${t.id} | Command: '${t.command}' | Status: ${t.status} | PID: ${
-                t.pid ?? "unknown"
-              }`
-          )
+          .map((t) => {
+            const nameLabel = t.name ? ` [${t.name}]` : "";
+            const portLabel = t.port ? ` | Port: ${t.port}` : "";
+            return `- Task ID: ${t.id}${nameLabel} | Status: ${t.status.toUpperCase()} | PID: ${t.pid ?? "unknown"}${portLabel} | Command: '${t.command}'`;
+          })
           .join("\n");
         return {
-          result: `Background Tasks:\n${formatted}`,
+          result: `Background Tasks (${tasks.length}):\n${formatted}`,
           isError: false,
         };
       }
@@ -4287,16 +4666,15 @@ export async function executeNativeTool(
         const task = globalTaskManager.getTask(taskId);
         if (!task) {
           return {
-            result: `Task not found: '${taskId}'`,
+            result: `<task-result id="${taskId}" status="not_found">\n<error>Background task '${taskId}' not found.</error>\n</task-result>`,
             isError: true,
           };
         }
         const tailLogs = task.logs.slice(-30).join("\n");
+        const durationSec = Math.round((Date.now() - task.startTime) / 1000);
         return {
-          result: `Task '${task.id}' [${task.status}] (PID: ${
-            task.pid ?? "unknown"
-          }):\nCommand: ${task.command}\n\nRecent output:\n${tailLogs || "(no output yet)"}`,
-          isError: false,
+          result: `<task-result id="${task.id}" name="${task.name || ""}" status="${task.status}" duration="${durationSec}s">\n<output>\nCommand: ${task.command}\nPID: ${task.pid ?? "unknown"}${task.port ? `\nPort: ${task.port}` : ""}\n\nRecent logs:\n${tailLogs || "(no output yet)"}\n</output>\n</task-result>`,
+          isError: task.status === "failed",
         };
       }
 
@@ -4307,16 +4685,18 @@ export async function executeNativeTool(
             isError: true,
           };
         }
-        const success = globalTaskManager.killTask(taskId);
+        const task = globalTaskManager.getTask(taskId);
+        const resolvedId = task ? task.id : taskId;
+        const success = globalTaskManager.killTask(resolvedId);
         if (success) {
-          options.onTaskStopped?.(taskId, null);
+          options.onTaskStopped?.(resolvedId, null);
           return {
-            result: `Successfully stopped task '${taskId}'.`,
+            result: `<task-result id="${resolvedId}" status="completed">\n<output>Successfully stopped background task '${resolvedId}'.</output>\n</task-result>`,
             isError: false,
           };
         }
         return {
-          result: `Failed to stop task '${taskId}' or task was not found.`,
+          result: `<task-result id="${taskId}" status="failed">\n<error>Failed to stop task '${taskId}' or task was not found.</error>\n</task-result>`,
           isError: true,
         };
       }
@@ -4325,6 +4705,25 @@ export async function executeNativeTool(
         result: `Unknown action '${action}'. Available actions: list, status, kill.`,
         isError: true,
       };
+    }
+
+    // -----------------------------------------------------------------------
+    // Tool: wait (aliases: waittask, await_task)
+    // -----------------------------------------------------------------------
+    if (
+      normalizedTool === "wait" ||
+      normalizedTool === "waittask" ||
+      normalizedTool === "awaittask"
+    ) {
+      try {
+        const res = await executeWaitTool(args, signal);
+        return res;
+      } catch (err: any) {
+        return {
+          result: `wait error: ${err.message}`,
+          isError: true,
+        };
+      }
     }
 
     // -----------------------------------------------------------------------

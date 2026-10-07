@@ -91,11 +91,13 @@ export interface QuestionItem {
 
 export interface BackgroundTaskItem {
   id: string;
+  name?: string;
   command: string;
   pid?: number;
   startTime: number;
   status: "running" | "completed" | "failed";
   output?: string[];
+  port?: number;
 }
 
 export interface SubAgentItem {
