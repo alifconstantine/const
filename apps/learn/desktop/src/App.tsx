@@ -9,6 +9,7 @@ import { LearnWorkspace } from "./components/workspace/learn-workspace";
 import { localDb } from "./lib/db";
 import { useI18n } from "./lib/i18n";
 import { TitleBar } from "./components/title-bar";
+import { SettingsView } from "./components/settings/settings-view";
 import { openExternalUrl } from "./lib/open-external";
 import authArt from "./assets/auth-art.jpg";
 
@@ -23,6 +24,41 @@ function AuthenticatedContent({
   const user = useQuery(api.auth.queries.currentUser, {});
   const [activeLearnId, setActiveLearnId] = useState<string | null>(null);
   const [openAddSourceOnLoad, setOpenAddSourceOnLoad] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [settingsTab, setSettingsTab] = useState<string>("general");
+
+  const handleOpenSettings = (tab: string = "general") => {
+    setSettingsTab(tab);
+    setIsSettingsOpen(true);
+  };
+
+  // Listen for const:open-settings event dispatched by TitleBar or other components
+  useEffect(() => {
+    const onOpenSettings = (e?: Event) => {
+      const customEvent = e as CustomEvent<{ tab?: string }>;
+      const tab = customEvent?.detail?.tab || "general";
+      handleOpenSettings(tab);
+    };
+
+    window.addEventListener("const:open-settings", onOpenSettings);
+    return () => {
+      window.removeEventListener("const:open-settings", onOpenSettings);
+    };
+  }, []);
+
+  // Global keyboard shortcut: Cmd+, or Ctrl+, to toggle settings modal
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === ",") {
+        e.preventDefault();
+        setIsSettingsOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
 
   // When outside of a workspace (e.g. HomePage), route any intercepted URLs directly
   // to the user's default system browser via Electron openExternal
@@ -49,39 +85,52 @@ function AuthenticatedContent({
     setOpenAddSourceOnLoad(false);
   };
 
-  if (activeLearnId) {
-    return (
-      <LearnWorkspace
-        learnId={activeLearnId}
-        initialSourceModalOpen={openAddSourceOnLoad}
-        onBack={handleBackToHome}
-        onCreateNew={async () => {
-          const id = await localDb.createLearn({
-            title: t("untitledNotebook"),
-            emoji: "book",
-            permissionMode: "ask_before_changes",
-          });
-          const initialSessionId = await localDb.createSession(id, t("initialSessionTitle"));
-          try {
-            localStorage.setItem(`const_learn_active_session_${id}`, initialSessionId);
-          } catch {}
-          setActiveLearnId(id);
-          setOpenAddSourceOnLoad(true);
-        }}
+  return (
+    <>
+      {activeLearnId ? (
+        <LearnWorkspace
+          learnId={activeLearnId}
+          initialSourceModalOpen={openAddSourceOnLoad}
+          onBack={handleBackToHome}
+          onCreateNew={async () => {
+            const id = await localDb.createLearn({
+              title: t("untitledNotebook"),
+              emoji: "book",
+              permissionMode: "ask_before_changes",
+            });
+            const initialSessionId = await localDb.createSession(id, t("initialSessionTitle"));
+            try {
+              localStorage.setItem(`const_learn_active_session_${id}`, initialSessionId);
+            } catch {}
+            setActiveLearnId(id);
+            setOpenAddSourceOnLoad(true);
+          }}
+          onOpenSettings={handleOpenSettings}
+          user={user}
+          onSignOut={onSignOut}
+          onSwitchAccount={onSwitchAccount}
+        />
+      ) : (
+        <LearnHome
+          onOpenLearn={handleOpenLearn}
+          onOpenSettings={handleOpenSettings}
+          user={user}
+          onSignOut={onSignOut}
+          onSwitchAccount={onSwitchAccount}
+        />
+      )}
+
+      {/* Settings Modal (Antigravity Style Pop-up) */}
+      <SettingsView
+        open={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        onBackToWorkspace={() => setIsSettingsOpen(false)}
+        initialTab={settingsTab}
         user={user}
         onSignOut={onSignOut}
         onSwitchAccount={onSwitchAccount}
       />
-    );
-  }
-
-  return (
-    <LearnHome
-      onOpenLearn={handleOpenLearn}
-      user={user}
-      onSignOut={onSignOut}
-      onSwitchAccount={onSwitchAccount}
-    />
+    </>
   );
 }
 

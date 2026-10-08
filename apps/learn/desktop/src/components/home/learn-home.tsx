@@ -60,7 +60,6 @@ import { DesktopUpdateBadge } from "./desktop-update-badge";
 import { SourcesView } from "./sources-view";
 import { ModelsView } from "./views/models-view";
 import { McpToolsView } from "./views/mcp-tools-view";
-import { SettingsView } from "../settings/settings-view";
 import { CreateLearnDialog } from "./dialogs/create-learn-dialog";
 import { CreateCollectionDialog } from "./dialogs/create-collection-dialog";
 import { ManageCollectionDialog } from "./dialogs/manage-collection-dialog";
@@ -72,6 +71,7 @@ import type { UserProfile } from "../navbar";
 
 interface LearnHomeProps {
   onOpenLearn?: (learnId: string, openAddSource?: boolean) => void;
+  onOpenSettings?: (tab?: string) => void;
   user?: UserProfile | null;
   onSignOut?: () => void;
   onSwitchAccount?: () => void;
@@ -174,6 +174,7 @@ function getArtifactConfig(type: string, isZip?: boolean): ArtifactConfig {
 
 export function LearnHome({
   onOpenLearn,
+  onOpenSettings,
   user,
   onSignOut,
   onSwitchAccount,
@@ -183,10 +184,19 @@ export function LearnHome({
   // Navigation & Shell State
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [activeTab, setActiveTab] = useState<HomeNavTab>("learns");
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [searchQuery, setSearchQuery] = useState("");
   const [activeCollectionId, setActiveCollectionId] = useState<string | null>(null);
+
+  const handleOpenSettingsTab = (tab: string = "general") => {
+    if (onOpenSettings) {
+      onOpenSettings(tab);
+    } else {
+      window.dispatchEvent(
+        new CustomEvent("const:open-settings", { detail: { tab } })
+      );
+    }
+  };
 
   // Artifacts View & Filter States
   const [artifactViewMode, setArtifactViewMode] = useState<"grid" | "list">("grid");
@@ -702,7 +712,6 @@ export function LearnHome({
       setEditingCollection(null);
       setIsCreateCollectionOpen(true);
     };
-    const onOpenSettings = () => setIsSettingsOpen(true);
     const onOpenWorkspaceFolder = async (e: Event) => {
       const detail = (e as CustomEvent).detail;
       if (detail?.folderPath) {
@@ -727,31 +736,17 @@ export function LearnHome({
     window.addEventListener("const:toggle-sidebar", onToggleSidebar);
     window.addEventListener("const:new-learn", onNewLearn);
     window.addEventListener("const:new-collection", onNewCollection);
-    window.addEventListener("const:open-settings", onOpenSettings);
     window.addEventListener("const:open-workspace-folder", onOpenWorkspaceFolder);
 
     return () => {
       window.removeEventListener("const:toggle-sidebar", onToggleSidebar);
       window.removeEventListener("const:new-learn", onNewLearn);
       window.removeEventListener("const:new-collection", onNewCollection);
-      window.removeEventListener("const:open-settings", onOpenSettings);
       window.removeEventListener("const:open-workspace-folder", onOpenWorkspaceFolder);
     };
   }, [onOpenLearn, t]);
 
   const renderSidebarToggle = () => null;
-
-  // If Settings view is triggered
-  if (isSettingsOpen) {
-    return (
-      <SettingsView
-        onBackToWorkspace={() => setIsSettingsOpen(false)}
-        user={user}
-        onSignOut={onSignOut}
-        onSwitchAccount={onSwitchAccount}
-      />
-    );
-  }
 
   return (
     <div className="h-full w-full flex bg-secondary/60 dark:bg-[#121212] text-foreground overflow-hidden select-none">
@@ -774,7 +769,7 @@ export function LearnHome({
               setEditingCollection(null);
               setIsCreateCollectionOpen(true);
             }}
-            onOpenSettings={() => setIsSettingsOpen(true)}
+            onOpenSettings={() => handleOpenSettingsTab("general")}
             user={user}
             onSignOut={onSignOut}
             onSwitchAccount={onSwitchAccount}
@@ -1863,7 +1858,7 @@ export function LearnHome({
             {/* TAB: MODELS                                                  */}
             {/* ============================================================ */}
             {activeTab === "models" && (
-              <ModelsView onOpenSettings={() => setIsSettingsOpen(true)} />
+              <ModelsView onOpenSettings={() => handleOpenSettingsTab("models")} />
             )}
 
             {/* ============================================================ */}

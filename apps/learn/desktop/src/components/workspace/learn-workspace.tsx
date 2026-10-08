@@ -51,7 +51,6 @@ import { CreateInfographicDialog } from "./create-infographic-dialog";
 import { CreateReportDialog } from "./create-report-dialog";
 import { CreateCheatSheetDialog } from "./create-cheatsheet-dialog";
 import { WorkspaceTitle } from "./workspace-title";
-import { SettingsView } from "../settings/settings-view";
 import { ErrorBoundary } from "../ui/error-boundary";
 import { STUDIO_TOOLS } from "./studio-panel";
 import { buildGroundedContext } from "../../lib/grounding/context-builder";
@@ -72,6 +71,7 @@ interface LearnWorkspaceProps {
   initialSourceModalOpen?: boolean;
   onBack: () => void;
   onCreateNew?: () => void;
+  onOpenSettings?: (tab?: string) => void;
   user?: any;
   onSignOut?: () => void;
   onSwitchAccount?: () => void;
@@ -82,6 +82,7 @@ export function LearnWorkspace({
   initialSourceModalOpen = false,
   onBack,
   onCreateNew,
+  onOpenSettings,
   user,
   onSignOut,
   onSwitchAccount,
@@ -426,19 +427,23 @@ export function LearnWorkspace({
   const [sourcesWidth, setSourcesWidth] = useState<number>(() => getResponsiveWidths().sources);
   const [studioWidth, setStudioWidth] = useState<number>(() => getResponsiveWidths().studio);
   const [isManualWidth, setIsManualWidth] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [settingsInitialTab, setSettingsInitialTab] = useState<string>("general");
   const [isMindMapDialogOpen, setIsMindMapDialogOpen] = useState(false);
+
+  const handleOpenSettingsTab = (tab: string = "general") => {
+    if (onOpenSettings) {
+      onOpenSettings(tab);
+    } else {
+      window.dispatchEvent(
+        new CustomEvent("const:open-settings", { detail: { tab } })
+      );
+    }
+  };
 
   const responsiveDefaults = getResponsiveWidths();
   const isLayoutModified =
     sourcesWidth !== responsiveDefaults.sources || studioWidth !== responsiveDefaults.studio;
 
   useEffect(() => {
-    const onOpenSettings = () => {
-      setSettingsInitialTab("general");
-      setIsSettingsOpen(true);
-    };
     const onToggleSidebar = () => {
       setIsSourcesCollapsed((prev) => !prev);
     };
@@ -450,12 +455,10 @@ export function LearnWorkspace({
       }
     };
 
-    window.addEventListener("const:open-settings", onOpenSettings);
     window.addEventListener("const:toggle-sidebar", onToggleSidebar);
     window.addEventListener("const:new-learn", onNewLearn);
 
     return () => {
-      window.removeEventListener("const:open-settings", onOpenSettings);
       window.removeEventListener("const:toggle-sidebar", onToggleSidebar);
       window.removeEventListener("const:new-learn", onNewLearn);
     };
@@ -1616,10 +1619,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
               {/* Settings */}
               <DropdownMenuItem
                 className="cursor-pointer flex items-center gap-2 text-xs py-2 px-2.5 text-muted-foreground hover:text-foreground"
-                onClick={() => {
-                  setSettingsInitialTab("general");
-                  setIsSettingsOpen(true);
-                }}
+                onClick={() => handleOpenSettingsTab("general")}
               >
                 <Settings className="h-4 w-4" />
                 <span>{t("settings")}</span>
@@ -1761,8 +1761,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
           onAddSource={() => setIsAddSourceOpen(true)}
           onOpenBrowser={handleOpenBrowser}
           onOpenSettings={(tab) => {
-            setSettingsInitialTab(tab || "models");
-            setIsSettingsOpen(true);
+            handleOpenSettingsTab(tab || "models");
           }}
           onSelectPromptChip={(prompt) => {
             console.log("Selected prompt chip:", prompt);
@@ -1877,8 +1876,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
         sources={sources || []}
         onGenerate={handleGenerateStudioArtifact}
         onOpenModelsSettings={() => {
-          setSettingsInitialTab("models");
-          setIsSettingsOpen(true);
+          handleOpenSettingsTab("models");
         }}
       />
 
@@ -1889,8 +1887,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
         sources={sources || []}
         onGenerate={handleGenerateVideoSummary}
         onOpenSettings={() => {
-          setSettingsInitialTab("models");
-          setIsSettingsOpen(true);
+          handleOpenSettingsTab("models");
         }}
       />
 
@@ -1909,8 +1906,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
         sources={sources || []}
         onGenerate={handleGenerateInfographic}
         onOpenImageSettings={() => {
-          setSettingsInitialTab("models");
-          setIsSettingsOpen(true);
+          handleOpenSettingsTab("models");
         }}
       />
 
@@ -1929,19 +1925,6 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
         sources={sources || []}
         onGenerate={handleGenerateCheatSheet}
       />
-
-      {/* Settings Modal / Overlay */}
-      {isSettingsOpen && (
-        <div className="fixed inset-0 z-50 bg-background">
-          <SettingsView
-            initialTab={settingsInitialTab}
-            onBackToWorkspace={() => setIsSettingsOpen(false)}
-            user={user}
-            onSignOut={onSignOut}
-            onSwitchAccount={onSwitchAccount}
-          />
-        </div>
-      )}
     </div>
   );
 }
