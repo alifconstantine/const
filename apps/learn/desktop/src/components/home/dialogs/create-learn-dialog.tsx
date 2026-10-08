@@ -58,6 +58,7 @@ export function CreateLearnDialog({
 
   const [title, setTitle] = useState(initialData?.title ?? "");
   const [selectedEmoji, setSelectedEmoji] = useState(getInitialIcon(initialData?.emoji));
+  const [hoveredEmoji, setHoveredEmoji] = useState<string | null>(null);
   const [selectedCollectionId, setSelectedCollectionId] = useState<string | undefined>(
     initialData?.collectionIds?.[0]
   );
@@ -71,6 +72,7 @@ export function CreateLearnDialog({
     if (open) {
       setTitle(initialData?.title ?? "");
       setSelectedEmoji(getInitialIcon(initialData?.emoji));
+      setHoveredEmoji(null);
       setSelectedCollectionId(initialData?.collectionIds?.[0]);
       setProjectPath(initialData?.projectPath ?? "");
       setPermissionMode(initialData?.permissionMode ?? "ask_before_changes");
@@ -110,7 +112,8 @@ export function CreateLearnDialog({
     }
   };
 
-  const isEdit = !!initialData;
+  const isEdit = Boolean(initialData?.id);
+  const activeIconDef = LEARN_ICONS.find((i) => i.id === (hoveredEmoji || selectedEmoji));
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -125,9 +128,14 @@ export function CreateLearnDialog({
 
           {/* Clean Modern Icon Selector (8 cols x 2 rows) */}
           <div>
-            <label className="text-[12px] font-medium text-muted-foreground mb-1.5 block">
-              {t("learnIcon") || t("pickIconEmoji")}
-            </label>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-[12px] font-medium text-muted-foreground block">
+                {t("learnIcon") || t("pickIconEmoji")}
+              </label>
+              <span className="text-[11px] text-muted-foreground/80 font-sans capitalize">
+                {activeIconDef?.label}
+              </span>
+            </div>
             <div className="grid grid-cols-8 gap-1.5 p-2 rounded-xl bg-secondary/40 border border-border/60 w-full justify-items-center">
               {LEARN_ICONS.map((item) => {
                 const IconComponent = item.icon;
@@ -137,10 +145,12 @@ export function CreateLearnDialog({
                     key={item.id}
                     type="button"
                     onClick={() => setSelectedEmoji(item.id)}
+                    onMouseEnter={() => setHoveredEmoji(item.id)}
+                    onMouseLeave={() => setHoveredEmoji(null)}
                     className={`h-8 w-8 rounded-lg flex items-center justify-center transition-all cursor-pointer ${
                       isSelected
                         ? "bg-foreground text-background shadow-xs scale-105"
-                        : "text-muted-foreground hover:text-foreground hover:bg-secondary border border-transparent hover:border-border/50"
+                        : "text-muted-foreground hover:text-foreground hover:bg-foreground/10 hover:scale-105 active:scale-95 border border-transparent"
                     }`}
                     title={item.label}
                     aria-label={item.label}

@@ -511,6 +511,12 @@ export function LearnHome({
         emoji: data.emoji,
         projectPath: data.projectPath,
         permissionMode: data.permissionMode,
+        collectionIds:
+          data.collectionId !== undefined
+            ? data.collectionId
+              ? [data.collectionId]
+              : []
+            : undefined,
       });
     } else {
       const colId = data.collectionId || targetCollectionIdForNewLearn || (activeCollectionId ?? undefined);

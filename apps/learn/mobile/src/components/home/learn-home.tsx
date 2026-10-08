@@ -262,20 +262,11 @@ export function LearnHome({
   const [isSettingsSheetOpen, setIsSettingsSheetOpen] = useState(false);
   const [isUpdateSheetOpen, setIsUpdateSheetOpen] = useState(false);
 
-  const handleCreateNewLearn = async (collectionId?: string) => {
-    const targetColId = collectionId || activeCollectionId || undefined;
-    if (onOpenLearn) {
-      const id = await localDb.createLearn({
-        title: t("untitledNotebook"),
-        emoji: "📘",
-        collectionId: targetColId,
-      });
-      onOpenLearn(id, true);
-    } else {
-      setEditingLearn(null);
-      setTargetCollectionIdForNewLearn(targetColId || null);
-      setIsCreateLearnOpen(true);
-    }
+  const handleCreateNewLearn = (collectionId?: string) => {
+    const targetColId = collectionId || activeCollectionId || null;
+    setEditingLearn(null);
+    setTargetCollectionIdForNewLearn(targetColId);
+    setIsCreateLearnOpen(true);
   };
 
   const handleImportLearns = async (learnIds: string[]) => {
@@ -565,16 +556,25 @@ export function LearnHome({
         title: data.title,
         description: data.description,
         emoji: data.emoji,
+        collectionIds:
+          data.collectionId !== undefined
+            ? data.collectionId
+              ? [data.collectionId]
+              : []
+            : undefined,
       });
     } else {
       const colId = data.collectionId || targetCollectionIdForNewLearn || (activeCollectionId ?? undefined);
-      await localDb.createLearn({
+      const newId = await localDb.createLearn({
         title: data.title,
         description: data.description,
         emoji: data.emoji,
         collectionId: colId,
       });
       setTargetCollectionIdForNewLearn(null);
+      if (onOpenLearn && newId) {
+        onOpenLearn(newId, false);
+      }
     }
   };
 
