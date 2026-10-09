@@ -23,6 +23,13 @@ contextBridge.exposeInMainWorld("electron", {
   },
   openExternal: (url: string) => ipcRenderer.invoke("auth:open-external", url),
   openDirectoryDialog: () => ipcRenderer.invoke("dialog:open-directory"),
+  setThemeMode: (mode: "system" | "light" | "dark") =>
+    ipcRenderer.invoke("window:set-theme-mode", mode),
+  onSystemThemeChange: (callback: (mode: "dark" | "light") => void) => {
+    const handler = (_event: any, mode: "dark" | "light") => callback(mode);
+    ipcRenderer.on("theme:system-changed", handler);
+    return () => ipcRenderer.removeListener("theme:system-changed", handler);
+  },
   minimize: () => ipcRenderer.send("window:minimize"),
   maximize: () => ipcRenderer.send("window:maximize"),
   close: () => ipcRenderer.send("window:close"),

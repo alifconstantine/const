@@ -169,6 +169,8 @@ declare global {
         }) => Promise<{ success: boolean; exists?: boolean; mp4Path?: string; mp4Url?: string; error?: string }>;
         onRenderProgress?: (callback: (data: { artifactId: string; chunk: string }) => void) => () => void;
       };
+      setThemeMode?: (mode: "system" | "light" | "dark") => Promise<any>;
+      onSystemThemeChange?: (callback: (mode: "dark" | "light") => void) => () => void;
       minimize?: () => void;
       maximize?: () => void;
       close?: () => void;
@@ -182,7 +184,8 @@ declare global {
         reload?: () => void;
         setZoomLevel?: (level: number) => Promise<void>;
         getZoomLevel?: () => Promise<number>;
-        setTitleBarOverlay?: (options: { color?: string; symbolColor?: string; height?: number }) => Promise<void>;
+        setThemeMode?: (mode: "system" | "light" | "dark") => Promise<any>;
+        setTitleBarOverlay?: (options: { color?: string; symbolColor?: string; height?: number; themeMode?: "system" | "light" | "dark" }) => Promise<void>;
         onMaximizedChange?: (callback: (max: boolean) => void) => () => void;
       };
       updater?: {

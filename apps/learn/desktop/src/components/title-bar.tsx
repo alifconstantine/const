@@ -34,16 +34,19 @@ export function TitleBar({ className, onOpenFolder }: TitleBarProps) {
     if (!isWin || !window.electron?.window?.setTitleBarOverlay) return;
 
     const updateOverlay = () => {
+      const saved = (localStorage.getItem("theme") as "system" | "light" | "dark") || "system";
+      const activeTheme = theme || saved;
       const isDark =
-        document.documentElement.classList.contains("dark") ||
-        theme === "dark" ||
-        (theme === "system" &&
-          window.matchMedia("(prefers-color-scheme: dark)").matches);
+        activeTheme === "dark" ||
+        (activeTheme === "system" &&
+          (window.matchMedia("(prefers-color-scheme: dark)").matches ||
+            document.documentElement.classList.contains("dark")));
 
       window.electron?.window?.setTitleBarOverlay?.({
         color: isDark ? "#161616" : "#ffffff",
         symbolColor: isDark ? "#a1a1aa" : "#3f3f46",
         height: 36,
+        themeMode: activeTheme,
       });
     };
 

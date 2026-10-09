@@ -378,6 +378,7 @@ function createWindow() {
   nativeTheme.on("updated", () => {
     if (win && !win.isDestroyed()) {
       win.setBackgroundColor(nativeTheme.shouldUseDarkColors ? "#0c0c0c" : "#ffffff");
+      win.webContents.send("theme:system-changed", nativeTheme.shouldUseDarkColors ? "dark" : "light");
     }
   });
 
@@ -432,6 +433,26 @@ app.whenReady().then(() => {
       return win.webContents.getZoomFactor();
     }
     return 1.0;
+  });
+  ipcMain.handle("window:set-theme-mode", (_event, mode: "system" | "light" | "dark") => {
+    try {
+      if (mode === "system") {
+        nativeTheme.themeSource = "system";
+      } else if (mode === "dark") {
+        nativeTheme.themeSource = "dark";
+      } else if (mode === "light") {
+        nativeTheme.themeSource = "light";
+      }
+
+      if (win && !win.isDestroyed()) {
+        const dark = nativeTheme.shouldUseDarkColors;
+        win.setBackgroundColor(dark ? "#0c0c0c" : "#ffffff");
+      }
+      return { isDark: nativeTheme.shouldUseDarkColors, themeSource: nativeTheme.themeSource };
+    } catch (err) {
+      console.error("[Electron Main] Failed to setThemeMode:", err);
+      return { error: String(err) };
+    }
   });
 
   // Dialog handler

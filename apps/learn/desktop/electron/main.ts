@@ -523,6 +523,7 @@ app.on("second-instance", (_event, commandLine) => {
             });
           } catch {}
         }
+        win.webContents.send("theme:system-changed", dark ? "dark" : "light");
       }
     });
 
@@ -632,16 +633,59 @@ app.on("second-instance", (_event, commandLine) => {
   });
 
   ipcMain.handle(
+    "window:set-theme-mode",
+    (_event, mode: "system" | "light" | "dark") => {
+      try {
+        if (mode === "system") {
+          nativeTheme.themeSource = "system";
+        } else if (mode === "dark") {
+          nativeTheme.themeSource = "dark";
+        } else if (mode === "light") {
+          nativeTheme.themeSource = "light";
+        }
+
+        if (win && !win.isDestroyed()) {
+          const dark = nativeTheme.shouldUseDarkColors;
+          win.setBackgroundColor(dark ? "#161616" : "#ffffff");
+          if (process.platform === "win32") {
+            try {
+              win.setTitleBarOverlay?.({
+                color: dark ? "#161616" : "#ffffff",
+                symbolColor: dark ? "#a1a1aa" : "#3f3f46",
+                height: 36,
+              });
+            } catch {}
+          }
+        }
+        return { isDark: nativeTheme.shouldUseDarkColors, themeSource: nativeTheme.themeSource };
+      } catch (err) {
+        console.error("[Electron Main] Failed to setThemeMode:", err);
+        return { error: String(err) };
+      }
+    }
+  );
+
+  ipcMain.handle(
     "window:set-title-bar-overlay",
-    (_event, options: { color?: string; symbolColor?: string; height?: number }) => {
+    (_event, options: { color?: string; symbolColor?: string; height?: number; themeMode?: "system" | "light" | "dark" }) => {
       try {
         if (win && !win.isDestroyed() && process.platform === "win32") {
-          const isDark = options?.color === "#161616";
-          nativeTheme.themeSource = isDark ? "dark" : "light";
-          win.setBackgroundColor(isDark ? "#161616" : "#ffffff");
+          if (options?.themeMode === "system") {
+            nativeTheme.themeSource = "system";
+          } else if (options?.themeMode === "dark") {
+            nativeTheme.themeSource = "dark";
+          } else if (options?.themeMode === "light") {
+            nativeTheme.themeSource = "light";
+          }
+
+          const shouldUseDark = nativeTheme.shouldUseDarkColors;
+          const targetColor = options?.color || (shouldUseDark ? "#161616" : "#ffffff");
+          const targetSymbol = options?.symbolColor || (shouldUseDark ? "#a1a1aa" : "#3f3f46");
+
+          win.setBackgroundColor(targetColor);
           win.setTitleBarOverlay?.({
-            color: options?.color || (isDark ? "#161616" : "#ffffff"),
-            symbolColor: options?.symbolColor || (isDark ? "#a1a1aa" : "#3f3f46"),
+            color: targetColor,
+            symbolColor: targetSymbol,
             height: options?.height || 36,
           });
         }

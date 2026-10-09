@@ -170,6 +170,13 @@ contextBridge.exposeInMainWorld("electron", {
     exportPdf: (payload: { title: string; htmlContent: string }) =>
       ipcRenderer.invoke("cheatsheet:export-pdf", payload),
   },
+  setThemeMode: (mode: "system" | "light" | "dark") =>
+    ipcRenderer.invoke("window:set-theme-mode", mode),
+  onSystemThemeChange: (callback: (mode: "dark" | "light") => void) => {
+    const handler = (_event: any, mode: "dark" | "light") => callback(mode);
+    ipcRenderer.on("theme:system-changed", handler);
+    return () => ipcRenderer.removeListener("theme:system-changed", handler);
+  },
   minimize: () => ipcRenderer.send("window:minimize"),
   maximize: () => ipcRenderer.send("window:maximize"),
   close: () => ipcRenderer.send("window:close"),
@@ -183,7 +190,9 @@ contextBridge.exposeInMainWorld("electron", {
     reload: () => ipcRenderer.send("window:reload"),
     setZoomLevel: (level: number) => ipcRenderer.invoke("window:set-zoom-level", level),
     getZoomLevel: () => ipcRenderer.invoke("window:get-zoom-level"),
-    setTitleBarOverlay: (options: { color?: string; symbolColor?: string; height?: number }) =>
+    setThemeMode: (mode: "system" | "light" | "dark") =>
+      ipcRenderer.invoke("window:set-theme-mode", mode),
+    setTitleBarOverlay: (options: { color?: string; symbolColor?: string; height?: number; themeMode?: "system" | "light" | "dark" }) =>
       ipcRenderer.invoke("window:set-title-bar-overlay", options),
     onMaximizedChange: (callback: (max: boolean) => void) => {
       const handler = (_event: any, max: boolean) => callback(max);

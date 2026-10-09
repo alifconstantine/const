@@ -209,6 +209,8 @@ declare global {
       };
       setZoomFactor?: (factor: number) => void;
       getZoomFactor?: () => number;
+      setThemeMode?: (mode: "system" | "light" | "dark") => Promise<any>;
+      onSystemThemeChange?: (callback: (mode: "dark" | "light") => void) => () => void;
       openExternal: (url: string) => Promise<boolean>;
       openDirectoryDialog: () => Promise<string | null>;
       minimize?: () => void;

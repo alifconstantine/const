@@ -28,8 +28,23 @@ export function applyTheme(theme: Theme = "system") {
 export function setSavedTheme(theme: Theme) {
   if (typeof window === "undefined") return;
   localStorage.setItem("theme", theme);
+
+  // Sync to Electron nativeTheme if running in Electron environment
+  const electron = (window as any).electron;
+  if (electron?.setThemeMode) {
+    electron.setThemeMode(theme);
+  }
+
   applyTheme(theme);
   window.dispatchEvent(new CustomEvent("const-theme-change", { detail: theme }));
+
+  // When switching to system, re-apply after brief delay in case Electron/Chromium
+  // needs a tick to update prefers-color-scheme media query
+  if (theme === "system") {
+    setTimeout(() => {
+      applyTheme("system");
+    }, 50);
+  }
 }
 
 export function useTheme(): [Theme, (theme: Theme) => void] {
@@ -192,6 +207,13 @@ export function initThemeListener() {
   if (typeof window === "undefined") return () => {};
 
   const currentTheme = getSavedTheme();
+
+  // Sync initial theme to Electron
+  const electron = (window as any).electron;
+  if (electron?.setThemeMode) {
+    electron.setThemeMode(currentTheme);
+  }
+
   applyTheme(currentTheme);
 
   const currentZoom = getSavedZoom();
@@ -213,5 +235,20 @@ export function initThemeListener() {
   };
 
   mediaQuery.addEventListener("change", handleChange);
-  return () => mediaQuery.removeEventListener("change", handleChange);
+
+  // Also listen for Electron native-theme changes if bridged
+  let cleanupElectron: (() => void) | undefined;
+  if (electron?.onSystemThemeChange) {
+    cleanupElectron = electron.onSystemThemeChange(() => {
+      const active = getSavedTheme();
+      if (active === "system") {
+        applyTheme("system");
+      }
+    });
+  }
+
+  return () => {
+    mediaQuery.removeEventListener("change", handleChange);
+    cleanupElectron?.();
+  };
 }
