@@ -1314,21 +1314,47 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
   const [isDraggingSources, setIsDraggingSources] = useState(false);
   const [isDraggingStudio, setIsDraggingStudio] = useState(false);
 
-  // Drag resizing for Sources panel
+  useEffect(() => {
+    return () => {
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+  }, []);
+
+  // Drag resizing for Sources panel with rAF & global pointer locks
   const handleSourcesMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
     setIsManualWidth(true);
     setIsDraggingSources(true);
     const startX = e.clientX;
     const startWidth = sourcesWidth;
+    let rafId: number | null = null;
+    let latestClientX = startX;
+
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+
+    const updateWidth = () => {
+      const delta = latestClientX - startX;
+      setSourcesWidth(clampSourcesWidth(startWidth + delta));
+      rafId = null;
+    };
 
     const onMouseMove = (moveEvent: MouseEvent) => {
-      const delta = moveEvent.clientX - startX;
-      setSourcesWidth(clampSourcesWidth(startWidth + delta));
+      latestClientX = moveEvent.clientX;
+      if (!rafId) {
+        rafId = requestAnimationFrame(updateWidth);
+      }
     };
 
     const onMouseUp = () => {
+      if (rafId) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
       setIsDraggingSources(false);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
       window.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("mouseup", onMouseUp);
     };
@@ -1337,21 +1363,40 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
     window.addEventListener("mouseup", onMouseUp);
   };
 
-  // Drag resizing for Studio panel (expanded max width to support comfortable webview browsing)
+  // Drag resizing for Studio panel with rAF & global pointer locks
   const handleStudioMouseDown = (e: React.MouseEvent) => {
     e.preventDefault();
     setIsManualWidth(true);
     setIsDraggingStudio(true);
     const startX = e.clientX;
     const startWidth = studioWidth;
+    let rafId: number | null = null;
+    let latestClientX = startX;
+
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+
+    const updateWidth = () => {
+      const delta = startX - latestClientX;
+      setStudioWidth(clampStudioWidth(startWidth + delta));
+      rafId = null;
+    };
 
     const onMouseMove = (moveEvent: MouseEvent) => {
-      const delta = startX - moveEvent.clientX;
-      setStudioWidth(clampStudioWidth(startWidth + delta));
+      latestClientX = moveEvent.clientX;
+      if (!rafId) {
+        rafId = requestAnimationFrame(updateWidth);
+      }
     };
 
     const onMouseUp = () => {
+      if (rafId) {
+        cancelAnimationFrame(rafId);
+        rafId = null;
+      }
       setIsDraggingStudio(false);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
       window.removeEventListener("mousemove", onMouseMove);
       window.removeEventListener("mouseup", onMouseUp);
     };
@@ -1718,7 +1763,15 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
       </header>
 
       {/* 3-Column Floating Cards Body Layout */}
-      <div className="flex-1 flex overflow-hidden p-2 sm:p-2.5 gap-1.5 sm:gap-2 bg-background">
+      <div className="flex-1 flex overflow-hidden p-2 sm:p-2.5 gap-1.5 sm:gap-2 bg-background relative">
+        {/* Fullscreen transparent dragging overlay to prevent iframes/webviews from intercepting mouse events */}
+        {(isDraggingSources || isDraggingStudio) && (
+          <div
+            className="fixed inset-0 z-50 cursor-col-resize select-none"
+            style={{ userSelect: "none", pointerEvents: "auto" }}
+          />
+        )}
+
         {/* Left Column: Sumber */}
         <SourcesPanel
           learnId={learnId}
@@ -1744,12 +1797,22 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
             setSourcesWidth(getResponsiveWidths().sources);
           }}
           className={cn(
-            "w-1.5 hover:w-2 -mx-1 sm:-mx-1.5 h-full cursor-col-resize z-20 group flex items-center justify-center transition-all duration-200 ease-out select-none shrink-0",
+            "w-1.5 hover:w-2 -mx-1 sm:-mx-1.5 h-full cursor-col-resize z-20 group flex items-center justify-center transition-all duration-200 ease-out select-none shrink-0 relative",
+            isDraggingSources && "w-2",
             isSourcesCollapsed ? "w-0 opacity-0 pointer-events-none -mx-0 overflow-hidden" : "opacity-100"
           )}
           title="Drag to resize / Double-click to reset"
         >
-          <div className="w-0.5 h-7 rounded-full bg-border/40 group-hover:bg-primary/70 group-hover:h-12 transition-all" />
+          {/* Extended invisible hit area */}
+          <div className="absolute inset-y-0 -left-1 -right-1 cursor-col-resize" />
+          <div
+            className={cn(
+              "w-0.5 rounded-full transition-all",
+              isDraggingSources
+                ? "bg-primary h-14 w-1 shadow-xs"
+                : "h-7 bg-border/40 group-hover:bg-primary/70 group-hover:h-12"
+            )}
+          />
         </div>
 
         {/* Center Column: Socratic Chat */}
@@ -1780,12 +1843,22 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
             setStudioWidth(getResponsiveWidths().studio);
           }}
           className={cn(
-            "w-1.5 hover:w-2 -mx-1 sm:-mx-1.5 h-full cursor-col-resize z-20 group flex items-center justify-center transition-all duration-200 ease-out select-none shrink-0",
+            "w-1.5 hover:w-2 -mx-1 sm:-mx-1.5 h-full cursor-col-resize z-20 group flex items-center justify-center transition-all duration-200 ease-out select-none shrink-0 relative",
+            isDraggingStudio && "w-2",
             isStudioCollapsed ? "w-0 opacity-0 pointer-events-none -mx-0 overflow-hidden" : "opacity-100"
           )}
           title="Drag to resize / Double-click to reset"
         >
-          <div className="w-0.5 h-7 rounded-full bg-border/40 group-hover:bg-primary/70 group-hover:h-12 transition-all" />
+          {/* Extended invisible hit area */}
+          <div className="absolute inset-y-0 -left-1 -right-1 cursor-col-resize" />
+          <div
+            className={cn(
+              "w-0.5 rounded-full transition-all",
+              isDraggingStudio
+                ? "bg-primary h-14 w-1 shadow-xs"
+                : "h-7 bg-border/40 group-hover:bg-primary/70 group-hover:h-12"
+            )}
+          />
         </div>
 
         {/* Right Column: Dual Studio & Preview RightPane */}

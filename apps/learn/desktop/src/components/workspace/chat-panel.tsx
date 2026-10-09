@@ -302,22 +302,22 @@ export function ChatPanel({
 
   // Observe container width for adaptive responsive UI (heading & chat input)
   const panelRef = useRef<HTMLElement>(null);
-  const [panelWidth, setPanelWidth] = useState<number>(600);
+  const [isCompact, setIsCompact] = useState<boolean>(false);
 
   useEffect(() => {
     if (!panelRef.current) return;
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
-        if (entry.contentRect.width > 0) {
-          setPanelWidth(entry.contentRect.width);
+        const width = entry.contentRect.width;
+        if (width > 0) {
+          const compact = width < 480;
+          setIsCompact((prev) => (prev !== compact ? compact : prev));
         }
       }
     });
     observer.observe(panelRef.current);
     return () => observer.disconnect();
   }, []);
-
-  const isCompact = panelWidth < 480;
 
   // Sync mutations to parent workspace (for Preview/Review tab)
   const prevMutationsRef = useRef<FileMutationRecord[]>([]);

@@ -5,7 +5,6 @@ import {
   Layers,
   SquarePen,
   ChevronRight,
-  Plus,
   Package,
   FileText,
   Download,
@@ -21,10 +20,8 @@ import {
   AudioLines,
   Video,
   BarChart3,
-  Table2,
   FileSpreadsheet,
   BookOpen,
-  Loader2,
 } from "lucide-react";
 import {
   cn,
@@ -54,7 +51,7 @@ import { ReportViewer } from "./report-viewer";
 import { CheatSheetViewer } from "./cheatsheet-viewer";
 import { STUDIO_TOOLS } from "../workspace/studio-panel";
 import { useI18n } from "../../lib/i18n";
-import type { RightPaneTab, RightPaneTabType, BrowserSelectedElement } from "./types";
+import type { RightPaneTab, RightPaneTabType } from "./types";
 import type { FileMutationRecord } from "@const/agent";
 import { type LocalArtifact, type AudioSummaryData, type VideoSummaryData, type SlideDeckData, type InfographicData, type ReportData, type CheatSheetData } from "../../lib/db";
 
@@ -551,9 +548,15 @@ export function RightPane({
 
       {/* Expanded Content View (Staggered dissolve to prevent icon collision) */}
       <div
-        style={{ width: `${width || 400}px`, minWidth: `${width || 400}px` }}
+        style={{
+          width: isCollapsed ? `${width || 400}px` : "100%",
+          minWidth: isCollapsed ? `${width || 400}px` : undefined,
+        }}
         className={cn(
-          "h-full flex flex-col absolute top-0 right-0 origin-top-right transition-all ease-out",
+          "h-full flex flex-col absolute top-0 right-0 origin-top-right",
+          isResizing
+            ? "transition-none"
+            : "transition-[opacity,transform] ease-out",
           isCollapsed
             ? "opacity-0 scale-[0.98] pointer-events-none duration-150 delay-0"
             : "opacity-100 scale-100 pointer-events-auto duration-200 delay-100"

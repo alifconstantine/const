@@ -181,9 +181,15 @@ export function SourcesPanel({
 
       {/* Expanded Content View (Staggered dissolve to prevent icon collision) */}
       <div
-        style={{ width: `${width || 330}px`, minWidth: `${width || 330}px` }}
+        style={{
+          width: isCollapsed ? `${width || 330}px` : "100%",
+          minWidth: isCollapsed ? `${width || 330}px` : undefined,
+        }}
         className={cn(
-          "h-full flex flex-col absolute top-0 left-0 origin-top-left transition-all ease-out",
+          "h-full flex flex-col absolute top-0 left-0 origin-top-left",
+          isResizing
+            ? "transition-none"
+            : "transition-[opacity,transform] ease-out",
           isCollapsed
             ? "opacity-0 scale-[0.98] pointer-events-none duration-150 delay-0"
             : "opacity-100 scale-100 pointer-events-auto duration-200 delay-100"
