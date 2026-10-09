@@ -5,6 +5,7 @@ import {
   AvatarImage,
   AvatarFallback,
   ScrollArea,
+  Skeleton,
   useTheme,
   toast,
   cn,
@@ -30,7 +31,13 @@ import {
   AlertCircle,
   Settings,
   Info,
+  Coins,
+  Layers,
+  Zap,
 } from "lucide-react";
+import { useQuery } from "convex/react";
+import { api } from "@const/backend/_generated/api";
+import { useAppAuth } from "../convex-provider";
 import { getUserInitials, type UserProfile } from "../navbar";
 import { useI18n, LANGUAGE_OPTIONS } from "../../lib/i18n";
 import {
@@ -38,6 +45,11 @@ import {
   getResetCountdown,
   type ComposioUsageRecord,
 } from "../../lib/composio-usage";
+import {
+  calculateQuotaMetrics,
+  formatTokens,
+  formatTokenAmount,
+} from "../../lib/quota";
 import { DefaultModelsSettings } from "./default-models-settings";
 
 export interface SettingsViewProps {
@@ -222,6 +234,32 @@ export function SettingsView({
     toast.success(t("activeModelChanged", { modelId }));
   };
 
+  const auth = useAppAuth?.() || { token: null };
+  const isAuthenticated = !!auth?.token;
+
+  // Sub-tab selection: "llm" | "composio" | "all"
+  const [usageSubTab, setUsageSubTab] = useState<"llm" | "composio" | "all">("llm");
+  const [timeRange, setTimeRange] = useState<"today" | "7d" | "30d" | "90d" | "all">("7d");
+
+  const tzOffset = useMemo(() => {
+    return typeof window !== "undefined" ? new Date().getTimezoneOffset() : 0;
+  }, []);
+
+  // Live Convex Queries for LLM Gateway Telemetry & Free Weekly Quota
+  const userQuota = useQuery(
+    api.router.quotas.getUserQuota,
+    isAuthenticated ? {} : "skip"
+  );
+
+  const analytics = useQuery(
+    api.router.logs.getDashboardAnalytics,
+    isAuthenticated ? { timeRange, tzOffset } : "skip"
+  );
+
+  const quotaMetrics = useMemo(() => {
+    return calculateQuotaMetrics(userQuota);
+  }, [userQuota]);
+
   // Usage calculations
   const usedCount = usage.used || 0;
   const limitCount = usage.limit || 300;
@@ -245,22 +283,49 @@ export function SettingsView({
   const isExceeded = usedCount >= limitCount;
   const isWarning = !isExceeded && usagePercent >= 75;
 
-  const statusBadge = isExceeded ? (
-    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
-      <AlertCircle className="w-3.5 h-3.5" />
-      {t("statusExceeded")}
-    </span>
-  ) : isWarning ? (
-    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
-      <Clock className="w-3.5 h-3.5" />
-      {t("statusWarning")}
-    </span>
-  ) : (
-    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-      <CheckCircle2 className="w-3.5 h-3.5" />
-      {t("statusSafe")}
-    </span>
-  );
+  const statusBadge = useMemo(() => {
+    if (usageSubTab === "composio") {
+      return isExceeded ? (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
+          <AlertCircle className="w-3.5 h-3.5" />
+          {t("statusExceeded")}
+        </span>
+      ) : isWarning ? (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+          <Clock className="w-3.5 h-3.5" />
+          {t("statusWarning")}
+        </span>
+      ) : (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+          <CheckCircle2 className="w-3.5 h-3.5" />
+          {t("statusSafe")}
+        </span>
+      );
+    }
+
+    if (quotaMetrics.isCapped) {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
+          <AlertCircle className="w-3.5 h-3.5" />
+          Limit Reached
+        </span>
+      );
+    }
+    if (quotaMetrics.isCritical || quotaMetrics.isLow) {
+      return (
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
+          <Clock className="w-3.5 h-3.5" />
+          Low Quota
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+        <CheckCircle2 className="w-3.5 h-3.5" />
+        {quotaMetrics.formattedRemaining} left
+      </span>
+    );
+  }, [usageSubTab, isExceeded, isWarning, quotaMetrics, t]);
 
   const navCategories = [
     {
@@ -652,140 +717,426 @@ export function SettingsView({
               />
             ) : activeTab === "usage" ? (
               /* --------------------------------------------------------- */
-              /* Usage & Limits Tab                                        */
+              /* Usage & Limits Tab (LLM Tokens & Composio MCP)            */
               /* --------------------------------------------------------- */
-              <div className="max-w-3xl space-y-5 pb-6">
-                {/* Main Quota Hero Card */}
-                <div className="p-5 rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#222222] shadow-xs space-y-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div>
-                      <span className="text-[11px] font-medium uppercase tracking-wider text-[#737373] dark:text-[#969696]">
-                        Composio MCP Tool Calls
-                      </span>
-                      <div className="flex items-baseline gap-2 mt-1">
-                        <span className="text-3xl font-semibold tracking-tight text-[#262626] dark:text-white font-sans tabular-nums">
-                          {usedCount}
-                        </span>
-                        <span className="text-sm font-medium text-[#737373] dark:text-[#969696] font-sans tabular-nums">
-                          / {limitCount} {t("toolCallsUsed").toLowerCase()}
-                        </span>
-                      </div>
-                    </div>
+              <div className="max-w-3xl space-y-6 pb-6">
+                {/* Sub-Header Bar: Category Switcher & Time Range Filter */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2 border-b border-[#dedee2] dark:border-[#2f2f2f]">
+                  {/* Category Pills: LLM & Tokens vs Composio MCP vs Overview */}
+                  <div className="inline-flex p-1 rounded-xl bg-[#ebebed] dark:bg-[#1f1f1f] border border-[#dedee2] dark:border-[#333333] items-center gap-1 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setUsageSubTab("llm")}
+                      className={cn(
+                        "px-3 py-1.5 text-xs rounded-lg transition-all cursor-pointer flex items-center gap-1.5 outline-none font-medium",
+                        usageSubTab === "llm"
+                          ? "bg-[#ffffff] dark:bg-[#333333] text-[#262626] dark:text-white shadow-2xs font-semibold"
+                          : "text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-[#d4d4d4]"
+                      )}
+                    >
+                      <Brain className="w-3.5 h-3.5" />
+                      <span>{t("llmTokensUsage") || "LLM & Tokens"}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setUsageSubTab("composio")}
+                      className={cn(
+                        "px-3 py-1.5 text-xs rounded-lg transition-all cursor-pointer flex items-center gap-1.5 outline-none font-medium",
+                        usageSubTab === "composio"
+                          ? "bg-[#ffffff] dark:bg-[#333333] text-[#262626] dark:text-white shadow-2xs font-semibold"
+                          : "text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-[#d4d4d4]"
+                      )}
+                    >
+                      <Box className="w-3.5 h-3.5" />
+                      <span>{t("composioMcpUsage") || "Composio MCP"}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setUsageSubTab("all")}
+                      className={cn(
+                        "px-3 py-1.5 text-xs rounded-lg transition-all cursor-pointer flex items-center gap-1.5 outline-none font-medium",
+                        usageSubTab === "all"
+                          ? "bg-[#ffffff] dark:bg-[#333333] text-[#262626] dark:text-white shadow-2xs font-semibold"
+                          : "text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-[#d4d4d4]"
+                      )}
+                    >
+                      <Layers className="w-3.5 h-3.5" />
+                      <span>{t("overviewAll") || "Overview"}</span>
+                    </button>
+                  </div>
 
-                    <div className="flex items-center gap-3">
-                      <div className="text-right">
-                        <span className="text-[11px] text-[#737373] dark:text-[#969696] block">
-                          {t("toolCallsRemaining")}
-                        </span>
-                        <span
+                  {/* Time Range Filter Pills (active for LLM or Overview, matching Const Router) */}
+                  {(usageSubTab === "llm" || usageSubTab === "all") && (
+                    <div className="flex items-center gap-1 bg-[#ebebed] dark:bg-[#1f1f1f] p-1 rounded-full border border-[#dedee2] dark:border-[#333333] self-start sm:self-auto">
+                      {[
+                        { label: "Today", value: "today" },
+                        { label: "7D", value: "7d" },
+                        { label: "30D", value: "30d" },
+                        { label: "90D", value: "90d" },
+                        { label: "All", value: "all" },
+                      ].map((item) => (
+                        <button
+                          key={item.value}
+                          type="button"
+                          onClick={() => setTimeRange(item.value as any)}
                           className={cn(
-                            "text-xl font-semibold font-sans tabular-nums",
-                            isExceeded
-                              ? "text-rose-500"
-                              : isWarning
-                              ? "text-amber-500"
-                              : "text-[#262626] dark:text-white"
+                            "px-2.5 py-0.5 text-[11px] font-sans rounded-full transition-colors cursor-pointer",
+                            timeRange === item.value
+                              ? "bg-[#262626] text-white dark:bg-white dark:text-[#161616] font-medium shadow-xs"
+                              : "text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white"
                           )}
                         >
-                          {remainingCount}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Progress Bar Gauge */}
-                  <div className="space-y-2">
-                    <div className="h-2 w-full bg-[#e5e5e8] dark:bg-[#2b2b2b] rounded-full overflow-hidden">
-                      <div
-                        className={cn(
-                          "h-full rounded-full transition-all duration-500 ease-out",
-                          isExceeded
-                            ? "bg-rose-500"
-                            : isWarning
-                            ? "bg-amber-500"
-                            : "bg-emerald-500"
-                        )}
-                        style={{ width: `${usagePercent}%` }}
-                      />
-                    </div>
-                    <div className="flex items-center justify-between text-[11px] text-[#737373] dark:text-[#969696] font-sans tabular-nums">
-                      <span>0 call</span>
-                      <span>{usagePercent}% kuota terpakai</span>
-                      <span>{limitCount} calls</span>
-                    </div>
-                  </div>
-
-                  {/* Reset Information Row */}
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between pt-3 border-t border-[#dedee2] dark:border-[#383838] text-xs text-[#737373] dark:text-[#969696] gap-2">
-                    <div className="flex items-center gap-2">
-                      <Clock className="w-4 h-4 shrink-0 text-[#737373] dark:text-[#969696]" />
-                      <span>
-                        {t("resetsIn")}{" "}
-                        <strong className="text-[#262626] dark:text-white font-semibold">
-                          {countdown.formatted}
-                        </strong>
-                      </span>
-                    </div>
-                    <span className="text-[11px] font-sans tabular-nums">
-                      Reset: {resetDateFormatted}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Recent Activity Log */}
-                <div className="p-5 rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#222222] shadow-2xs space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-medium uppercase tracking-wider text-[#737373] dark:text-[#969696]">
-                      {t("recentActivity")}
-                    </span>
-                    <span className="text-[11px] font-sans tabular-nums text-[#737373] dark:text-[#969696]">
-                      {(usage.recentCalls || []).length} aktivitas
-                    </span>
-                  </div>
-
-                  {(!usage.recentCalls || usage.recentCalls.length === 0) ? (
-                    <div className="py-6 text-center text-xs text-[#737373] dark:text-[#969696]">
-                      {t("noRecentActivity")}
-                    </div>
-                  ) : (
-                    <div className="divide-y divide-[#dedee2] dark:divide-[#383838] max-h-56 overflow-y-auto pr-1">
-                      {usage.recentCalls.slice(0, 15).map((call) => (
-                        <div
-                          key={call.id}
-                          className="py-2.5 flex items-center justify-between text-xs gap-3"
-                        >
-                          <div className="min-w-0 flex-1 flex items-center gap-2">
-                            <span
-                              className={cn(
-                                "w-2 h-2 rounded-full shrink-0",
-                                call.success ? "bg-emerald-500" : "bg-rose-500"
-                              )}
-                            />
-                            <span className="font-sans text-xs text-[#262626] dark:text-white truncate">
-                              {call.toolSlug}
-                            </span>
-                          </div>
-                          <span className="text-[11px] font-sans tabular-nums text-[#737373] dark:text-[#969696] shrink-0">
-                            {new Date(call.timestamp).toLocaleTimeString([], {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                              second: "2-digit",
-                            })}
-                          </span>
-                        </div>
+                          {item.label}
+                        </button>
                       ))}
                     </div>
                   )}
                 </div>
 
-                {/* Quota Policy Note */}
-                <div className="p-4 rounded-xl bg-[#ebebed]/60 dark:bg-[#1c1c1c] border border-[#dedee2] dark:border-[#383838] flex items-start gap-3 text-xs text-[#737373] dark:text-[#969696]">
-                  <Info className="w-4 h-4 text-[#262626] dark:text-white shrink-0 mt-0.5" />
-                  <div>
-                    <p className="font-medium text-[#262626] dark:text-white mb-0.5">{t("resetSchedule")}</p>
-                    <p className="leading-relaxed text-[11px]">{t("limitPolicyInfo")}</p>
+                {/* ------------------------------------------------------- */}
+                {/* SECTION 1: LLM & Token Consumption (from apps/router)  */}
+                {/* ------------------------------------------------------- */}
+                {(usageSubTab === "llm" || usageSubTab === "all") && (
+                  <div className="space-y-4">
+                    {usageSubTab === "all" && (
+                      <div className="flex items-center gap-2 pt-1 text-xs font-semibold uppercase tracking-wider text-[#737373] dark:text-[#969696]">
+                        <Brain className="w-4 h-4 text-indigo-500" />
+                        <span>LLM Gateway & Token Usage</span>
+                      </div>
+                    )}
+
+                    {/* Free Weekly Quota Hero Card (Matching QuotaCard in router) */}
+                    <div className="p-5 rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#222222] shadow-xs space-y-4">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2.5">
+                          <div className="h-8 w-8 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center border border-indigo-500/20 shrink-0">
+                            <Zap className="h-4 w-4 stroke-[1.75]" />
+                          </div>
+                          <div>
+                            <span className="text-sm font-semibold text-[#262626] dark:text-white tracking-tight">
+                              {t("freeWeeklyQuota") || "Free Weekly Quota"}
+                            </span>
+                            <span className="text-[11px] text-[#737373] dark:text-[#969696] block">
+                              Const Router AI Gateway
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#ebebed] dark:bg-[#1b1b1b] border border-[#dedee2] dark:border-[#383838] text-[11px] font-sans text-[#737373] dark:text-[#969696] tabular-nums shrink-0">
+                          <Clock className="h-3 w-3" />
+                          <span>{t("resetsIn") || "Resets in"} {quotaMetrics.resetsInText}</span>
+                        </div>
+                      </div>
+
+                      {/* Main Numbers: Remaining Left, % Remaining Right */}
+                      <div className="space-y-3 pt-1">
+                        <div className="flex items-baseline justify-between gap-2">
+                          <div>
+                            <div className="text-3xl font-semibold tracking-tight text-[#262626] dark:text-white font-sans tabular-nums leading-none">
+                              {quotaMetrics.formattedRemaining}
+                            </div>
+                            <div className="text-xs text-[#737373] dark:text-[#969696] font-sans pt-1">
+                              {t("tokenLeft") || "token left"}
+                            </div>
+                          </div>
+
+                          <div className="text-right">
+                            <div className="text-2xl font-semibold tracking-tight text-[#262626] dark:text-white font-sans tabular-nums leading-none">
+                              {quotaMetrics.percentRemaining.toFixed(0)}%
+                            </div>
+                            <div className="text-[11px] text-[#737373] dark:text-[#969696] font-sans pt-1">
+                              {t("tokensRemaining") || "remaining"}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Progress Bar */}
+                        <div className="h-2.5 w-full bg-[#e5e5e8] dark:bg-[#2b2b2b] rounded-full overflow-hidden border border-[#dedee2]/60 dark:border-[#383838] p-[1.5px]">
+                          <div
+                            className={cn(
+                              "h-full rounded-full transition-all duration-700 ease-out",
+                              quotaMetrics.barColor
+                            )}
+                            style={{ width: `${quotaMetrics.percentRemaining}%` }}
+                          />
+                        </div>
+
+                        {/* Used vs Limit Detail */}
+                        <div className="flex items-center justify-between text-xs text-[#737373] dark:text-[#969696] font-sans tabular-nums pt-0.5">
+                          <span>
+                            <strong className="font-medium text-[#262626] dark:text-white">
+                              {quotaMetrics.formattedUsed}
+                            </strong>{" "}
+                            {language === "id" ? "digunakan" : "used"}
+                          </span>
+                          <span>
+                            {language === "id" ? "dari" : "of"}{" "}
+                            <strong className="font-medium text-[#262626] dark:text-white">
+                              {quotaMetrics.formattedLimit}
+                            </strong>{" "}
+                            limit
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* 3 KPI Token Cards in Grid (Total Tokens, Input Tokens, Output Tokens) */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      {/* Card 1: Total Tokens */}
+                      <div className="p-4 rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#222222] shadow-2xs flex flex-col justify-between">
+                        <div className="flex items-center justify-between pb-2">
+                          <span className="text-[11px] text-[#737373] dark:text-[#969696] font-medium uppercase tracking-wider">
+                            {t("totalTokens") || "Total Tokens"}
+                          </span>
+                          <div className="h-7 w-7 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center border border-amber-500/20">
+                            <Coins className="h-3.5 w-3.5 stroke-[1.75]" />
+                          </div>
+                        </div>
+                        <div className="space-y-0.5">
+                          {analytics ? (
+                            <div className="text-2xl font-semibold tracking-tight text-[#262626] dark:text-white font-sans tabular-nums">
+                              {formatTokens(analytics.kpi.totalTokens)}
+                            </div>
+                          ) : (
+                            <Skeleton className="h-7 w-20 rounded my-0.5" />
+                          )}
+                          <p className="text-[11px] text-[#737373] dark:text-[#969696] font-sans">
+                            <span className="tabular-nums font-medium text-[#262626] dark:text-white">
+                              {analytics?.kpi.totalRequests.toLocaleString() ?? 0}
+                            </span>{" "}
+                            {t("requestsLogged") || "requests logged"}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Card 2: Input Tokens */}
+                      <div className="p-4 rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#222222] shadow-2xs flex flex-col justify-between">
+                        <div className="flex items-center justify-between pb-2">
+                          <span className="text-[11px] text-[#737373] dark:text-[#969696] font-medium uppercase tracking-wider">
+                            {t("inputTokens") || "Input Tokens"}
+                          </span>
+                          <div className="h-7 w-7 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-500/20">
+                            <Layers className="h-3.5 w-3.5 stroke-[1.75]" />
+                          </div>
+                        </div>
+                        <div className="space-y-0.5">
+                          {analytics ? (
+                            <div className="text-2xl font-semibold tracking-tight text-[#262626] dark:text-white font-sans tabular-nums">
+                              {formatTokens(analytics.kpi.promptTokens)}
+                            </div>
+                          ) : (
+                            <Skeleton className="h-7 w-20 rounded my-0.5" />
+                          )}
+                          <p className="text-[11px] text-[#737373] dark:text-[#969696] font-sans">
+                            {t("promptPayload") || "Prompt context payload"}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Card 3: Output Tokens */}
+                      <div className="p-4 rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#222222] shadow-2xs flex flex-col justify-between">
+                        <div className="flex items-center justify-between pb-2">
+                          <span className="text-[11px] text-[#737373] dark:text-[#969696] font-medium uppercase tracking-wider">
+                            {t("outputTokens") || "Output Tokens"}
+                          </span>
+                          <div className="h-7 w-7 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-500/20">
+                            <Zap className="h-3.5 w-3.5 stroke-[1.75]" />
+                          </div>
+                        </div>
+                        <div className="space-y-0.5">
+                          {analytics ? (
+                            <div className="text-2xl font-semibold tracking-tight text-[#262626] dark:text-white font-sans tabular-nums">
+                              {formatTokens(analytics.kpi.completionTokens)}
+                            </div>
+                          ) : (
+                            <Skeleton className="h-7 w-20 rounded my-0.5" />
+                          )}
+                          <p className="text-[11px] text-[#737373] dark:text-[#969696] font-sans">
+                            {t("generatedTokens") || "Generated response tokens"}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Model Breakdown List (if available in logs) */}
+                    {analytics?.modelBreakdown && analytics.modelBreakdown.length > 0 && (
+                      <div className="p-4 rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#222222] shadow-2xs space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[11px] font-medium uppercase tracking-wider text-[#737373] dark:text-[#969696]">
+                            Model Breakdown ({analytics.modelBreakdown.length})
+                          </span>
+                          <span className="text-[11px] font-sans text-[#737373] dark:text-[#969696]">
+                            {timeRange.toUpperCase()}
+                          </span>
+                        </div>
+                        <div className="divide-y divide-[#dedee2] dark:divide-[#383838]">
+                          {analytics.modelBreakdown.slice(0, 5).map((m) => (
+                            <div key={m.model} className="py-2 flex items-center justify-between text-xs gap-3">
+                              <div className="min-w-0 flex items-center gap-2">
+                                <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 shrink-0" />
+                                <span className="font-medium text-[#262626] dark:text-white truncate">
+                                  {m.model}
+                                </span>
+                              </div>
+                              <div className="flex items-center gap-3 shrink-0 text-[11px] font-sans tabular-nums text-[#737373] dark:text-[#969696]">
+                                <span>{m.requests} req</span>
+                                <span className="font-medium text-[#262626] dark:text-white">
+                                  {formatTokens(m.totalTokens)} tok
+                                </span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
-                </div>
+                )}
+
+                {/* ------------------------------------------------------- */}
+                {/* SECTION 2: Composio MCP Tool Calls Quota                */}
+                {/* ------------------------------------------------------- */}
+                {(usageSubTab === "composio" || usageSubTab === "all") && (
+                  <div className="space-y-4">
+                    {usageSubTab === "all" && (
+                      <div className="flex items-center gap-2 pt-2 text-xs font-semibold uppercase tracking-wider text-[#737373] dark:text-[#969696]">
+                        <Box className="w-4 h-4 text-emerald-500" />
+                        <span>Composio MCP Tool Calls</span>
+                      </div>
+                    )}
+
+                    {/* Main Composio Quota Hero Card */}
+                    <div className="p-5 rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#222222] shadow-xs space-y-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div>
+                          <span className="text-[11px] font-medium uppercase tracking-wider text-[#737373] dark:text-[#969696]">
+                            Composio MCP Tool Calls
+                          </span>
+                          <div className="flex items-baseline gap-2 mt-1">
+                            <span className="text-3xl font-semibold tracking-tight text-[#262626] dark:text-white font-sans tabular-nums">
+                              {usedCount}
+                            </span>
+                            <span className="text-sm font-medium text-[#737373] dark:text-[#969696] font-sans tabular-nums">
+                              / {limitCount} {t("toolCallsUsed").toLowerCase()}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          <div className="text-right">
+                            <span className="text-[11px] text-[#737373] dark:text-[#969696] block">
+                              {t("toolCallsRemaining")}
+                            </span>
+                            <span
+                              className={cn(
+                                "text-xl font-semibold font-sans tabular-nums",
+                                isExceeded
+                                  ? "text-rose-500"
+                                  : isWarning
+                                  ? "text-amber-500"
+                                  : "text-[#262626] dark:text-white"
+                              )}
+                            >
+                              {remainingCount}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Progress Bar Gauge */}
+                      <div className="space-y-2">
+                        <div className="h-2 w-full bg-[#e5e5e8] dark:bg-[#2b2b2b] rounded-full overflow-hidden">
+                          <div
+                            className={cn(
+                              "h-full rounded-full transition-all duration-500 ease-out",
+                              isExceeded
+                                ? "bg-rose-500"
+                                : isWarning
+                                ? "bg-amber-500"
+                                : "bg-emerald-500"
+                            )}
+                            style={{ width: `${usagePercent}%` }}
+                          />
+                        </div>
+                        <div className="flex items-center justify-between text-[11px] text-[#737373] dark:text-[#969696] font-sans tabular-nums">
+                          <span>0 call</span>
+                          <span>{usagePercent}% kuota terpakai</span>
+                          <span>{limitCount} calls</span>
+                        </div>
+                      </div>
+
+                      {/* Reset Information Row */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between pt-3 border-t border-[#dedee2] dark:border-[#383838] text-xs text-[#737373] dark:text-[#969696] gap-2">
+                        <div className="flex items-center gap-2">
+                          <Clock className="w-4 h-4 shrink-0 text-[#737373] dark:text-[#969696]" />
+                          <span>
+                            {t("resetsIn")}{" "}
+                            <strong className="text-[#262626] dark:text-white font-semibold">
+                              {countdown.formatted}
+                            </strong>
+                          </span>
+                        </div>
+                        <span className="text-[11px] font-sans tabular-nums">
+                          Reset: {resetDateFormatted}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Recent Activity Log */}
+                    <div className="p-5 rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#222222] shadow-2xs space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[11px] font-medium uppercase tracking-wider text-[#737373] dark:text-[#969696]">
+                          {t("recentActivity")}
+                        </span>
+                        <span className="text-[11px] font-sans tabular-nums text-[#737373] dark:text-[#969696]">
+                          {(usage.recentCalls || []).length} aktivitas
+                        </span>
+                      </div>
+
+                      {(!usage.recentCalls || usage.recentCalls.length === 0) ? (
+                        <div className="py-6 text-center text-xs text-[#737373] dark:text-[#969696]">
+                          {t("noRecentActivity")}
+                        </div>
+                      ) : (
+                        <div className="divide-y divide-[#dedee2] dark:divide-[#383838] max-h-56 overflow-y-auto pr-1">
+                          {usage.recentCalls.slice(0, 15).map((call) => (
+                            <div
+                              key={call.id}
+                              className="py-2.5 flex items-center justify-between text-xs gap-3"
+                            >
+                              <div className="min-w-0 flex-1 flex items-center gap-2">
+                                <span
+                                  className={cn(
+                                    "w-2 h-2 rounded-full shrink-0",
+                                    call.success ? "bg-emerald-500" : "bg-rose-500"
+                                  )}
+                                />
+                                <span className="font-sans text-xs text-[#262626] dark:text-white truncate">
+                                  {call.toolSlug}
+                                </span>
+                              </div>
+                              <span className="text-[11px] font-sans tabular-nums text-[#737373] dark:text-[#969696] shrink-0">
+                                {new Date(call.timestamp).toLocaleTimeString([], {
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                  second: "2-digit",
+                                })}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Quota Policy Note */}
+                    <div className="p-4 rounded-xl bg-[#ebebed]/60 dark:bg-[#1c1c1c] border border-[#dedee2] dark:border-[#383838] flex items-start gap-3 text-xs text-[#737373] dark:text-[#969696]">
+                      <Info className="w-4 h-4 text-[#262626] dark:text-white shrink-0 mt-0.5" />
+                      <div>
+                        <p className="font-medium text-[#262626] dark:text-white mb-0.5">{t("resetSchedule")}</p>
+                        <p className="leading-relaxed text-[11px]">{t("limitPolicyInfo")}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             ) : null}
           </ScrollArea>
