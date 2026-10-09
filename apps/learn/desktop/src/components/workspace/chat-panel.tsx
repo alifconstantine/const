@@ -377,7 +377,7 @@ export function ChatPanel({
   } | null>(null);
   const [isMultiline, setIsMultiline] = useState(false);
 
-  // Real-time Voice Input via Groq Cloud Whisper API
+  // Real-time Voice Input via Const Router Whisper API
   const {
     isListening: isVoiceListening,
     isTranscribing: isVoiceTranscribing,
@@ -2870,7 +2870,7 @@ export function ChatPanel({
       );
     }
 
-    // 0. If actively transcribing audio via Groq Whisper: show loading pill
+    // 0. If actively transcribing audio via Const Router Whisper: show loading pill
     if (isVoiceTranscribing) {
       return (
         <VoiceInput

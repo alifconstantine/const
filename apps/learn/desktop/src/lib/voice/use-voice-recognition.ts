@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { toast } from "@const/ui";
-import { transcribeAudioWithGroq } from "./groq-whisper";
+import { transcribeAudio } from "./whisper";
 
 export interface UseVoiceRecognitionOptions {
   language?: string; // 'id' | 'en' | 'auto'
@@ -137,10 +137,10 @@ export function useVoiceRecognition({
             return;
           }
 
-          // Transcribe via Groq Whisper API
+          // Transcribe via Const Router Whisper API
           setIsTranscribing(true);
           try {
-            const { text } = await transcribeAudioWithGroq({
+            const { text } = await transcribeAudio({
               audioBlob,
               language,
               prompt,
@@ -153,9 +153,9 @@ export function useVoiceRecognition({
               onTranscript?.(fullResult);
             }
           } catch (err: any) {
-            console.error("[Groq Whisper Transcription Error]", err);
+            console.error("[Voice Transcription Error]", err);
             const msg = err?.message || "Gagal mentranskripsi audio";
-            toast.error(`Groq Whisper: ${msg}`);
+            toast.error(`Suara: ${msg}`);
             onError?.(msg);
           } finally {
             setIsTranscribing(false);
