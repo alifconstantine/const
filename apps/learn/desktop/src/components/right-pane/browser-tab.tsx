@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -12,24 +12,22 @@ import {
   RotateCcw,
   AlertCircle,
   Globe,
-  Search,
-  BookOpen,
-  GraduationCap,
-  FileText,
-  Bot,
   Code2,
   ZoomIn,
   ZoomOut,
   Volume2,
   VolumeX,
+  PlusCircle,
+  CheckCircle2,
 } from "lucide-react";
-import type { RightPaneTab, BrowserSelectedElement } from "./types";
+import type { RightPaneTab, AddSourceFromBrowserParams } from "./types";
 import { useI18n } from "../../lib/i18n";
 
-interface BrowserTabProps {
+export interface BrowserTabProps {
   tab: RightPaneTab;
   onUpdateTab?: (tabId: string, updates: Partial<RightPaneTab>) => void;
-  onSelectElementForChat?: (element: BrowserSelectedElement) => void;
+  onAddSource?: (params: AddSourceFromBrowserParams) => Promise<any> | void;
+  existingSourceUrls?: Set<string>;
 }
 
 type ResponsivePreset = "responsive" | "mobile" | "mobile-lg" | "tablet" | "desktop";
@@ -51,10 +49,12 @@ const RESPONSIVE_PRESETS: PresetConfig[] = [
 
 function normalizeUrl(input: any): string {
   if (typeof input !== "string" || !input.trim() || input === "[object Object]") {
-    return "";
+    return "https://www.google.com";
   }
   const trimmed = input.trim();
-  if (!trimmed || trimmed === "[object Object]" || trimmed === "about:blank") return "";
+  if (!trimmed || trimmed === "[object Object]" || trimmed === "about:blank") {
+    return "https://www.google.com";
+  }
 
   // Check localhost / 127.0.0.1
   if (/^(localhost|127\.0\.0\.1)(:\d+)?(\/.*)?$/i.test(trimmed)) {
@@ -75,16 +75,28 @@ function normalizeUrl(input: any): string {
   return `https://www.google.com/search?q=${encodeURIComponent(trimmed)}`;
 }
 
-export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: BrowserTabProps) {
-  const { language } = useI18n();
-  const rawInitial = typeof tab.url === "string" && tab.url && tab.url !== "[object Object]" ? tab.url.trim() : "";
+export function BrowserTab({
+  tab,
+  onUpdateTab,
+  onAddSource,
+  existingSourceUrls,
+}: BrowserTabProps) {
+  const { t, language } = useI18n();
+  const rawInitial =
+    typeof tab.url === "string" && tab.url && tab.url !== "[object Object]"
+      ? tab.url.trim()
+      : "https://www.google.com";
   const initialUrlRef = useRef<string>(rawInitial);
   const [currentUrl, setCurrentUrl] = useState<string>(rawInitial);
   const [addressBarInput, setAddressBarInput] = useState<string>(rawInitial);
+  const [pageTitle, setPageTitle] = useState<string>(tab.title || "");
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [canGoBack, setCanGoBack] = useState<boolean>(false);
   const [canGoForward, setCanGoForward] = useState<boolean>(false);
   const [loadError, setLoadError] = useState<{ code: number; desc: string; url: string } | null>(null);
+
+  // Ingestion to Sources state
+  const [isAddingSource, setIsAddingSource] = useState<boolean>(false);
 
   // Responsive Size Preset
   const [selectedPreset, setSelectedPreset] = useState<ResponsivePreset>("responsive");
@@ -99,10 +111,14 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
   // Zoom controls
   const [zoomLevel, setZoomLevel] = useState<number>(100);
 
-  // Element Picker Mode
-  const [isElementPickerActive, setIsElementPickerActive] = useState<boolean>(false);
-
   const webviewRef = useRef<any>(null);
+
+  // Check if current URL is already added to notebook sources
+  const isCurrentUrlSaved = Boolean(
+    currentUrl &&
+    existingSourceUrls &&
+    existingSourceUrls.has(currentUrl.trim().replace(/\/$/, "").toLowerCase())
+  );
 
   // Sync mute with tab.isMuted
   useEffect(() => {
@@ -117,13 +133,13 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
   useEffect(() => {
     if (tab.url !== undefined && typeof tab.url === "string" && tab.url !== "[object Object]") {
       const trimmed = tab.url.trim();
-      if (trimmed !== currentUrl) {
+      if (trimmed && trimmed !== currentUrl) {
         setCurrentUrl(trimmed);
         setAddressBarInput(trimmed);
         if (!initialUrlRef.current) {
           initialUrlRef.current = trimmed;
         }
-        if (webviewRef.current && trimmed) {
+        if (webviewRef.current) {
           try {
             webviewRef.current.loadURL(normalizeUrl(trimmed));
           } catch (e) {
@@ -151,13 +167,6 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
   // Webview navigation helpers
   const handleNavigate = (targetUrl: string) => {
     const resolved = normalizeUrl(targetUrl);
-    if (!resolved) {
-      setAddressBarInput("");
-      setCurrentUrl("");
-      setLoadError(null);
-      onUpdateTab?.(tab.id, { url: "", title: language === "id" ? "Peramban Web" : "Web Browser", favicon: undefined });
-      return;
-    }
     setAddressBarInput(resolved);
     setCurrentUrl(resolved);
     setLoadError(null);
@@ -256,191 +265,73 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
     } catch {}
   };
 
-  // Toggle interactive DOM element inspector
-  const toggleElementPicker = useCallback(() => {
-    if (!webviewRef.current) return;
-
-    if (isElementPickerActive) {
-      // Deactivate
-      setIsElementPickerActive(false);
-      webviewRef.current.executeJavaScript(`
-        if (window.__harnessPickerCleanup) {
-          window.__harnessPickerCleanup();
-        }
-      `);
-    } else {
-      // Activate
-      setIsElementPickerActive(true);
-      const inspectorScript = `
+  // Add current webpage (or user selected text) into Notebook Sources
+  const handleAddPageToSources = async () => {
+    if (!webviewRef.current || !onAddSource || isAddingSource) return;
+    setIsAddingSource(true);
+    try {
+      const extractionScript = `
         (function() {
-          if (window.__harnessPickerActive) return;
-          window.__harnessPickerActive = true;
-
-          const oldOverlay = document.getElementById('__harness_inspector_overlay');
-          if (oldOverlay) oldOverlay.remove();
-          const oldTooltip = document.getElementById('__harness_inspector_tooltip');
-          if (oldTooltip) oldTooltip.remove();
-
-          const overlay = document.createElement('div');
-          overlay.id = '__harness_inspector_overlay';
-          overlay.style.position = 'fixed';
-          overlay.style.pointerEvents = 'none';
-          overlay.style.border = '2px solid #3b82f6';
-          overlay.style.backgroundColor = 'rgba(59, 130, 246, 0.12)';
-          overlay.style.zIndex = '2147483646';
-          overlay.style.boxSizing = 'border-box';
-          overlay.style.borderRadius = '3px';
-          overlay.style.display = 'none';
-          overlay.style.transition = 'all 0.05s ease-out';
-
-          const tooltip = document.createElement('div');
-          tooltip.id = '__harness_inspector_tooltip';
-          tooltip.style.position = 'fixed';
-          tooltip.style.pointerEvents = 'none';
-          tooltip.style.backgroundColor = '#10141d';
-          tooltip.style.border = '1px solid #2d3748';
-          tooltip.style.borderRadius = '10px';
-          tooltip.style.padding = '8px 12px';
-          tooltip.style.color = '#ffffff';
-          tooltip.style.fontFamily = '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
-          tooltip.style.fontSize = '12px';
-          tooltip.style.lineHeight = '1.4';
-          tooltip.style.zIndex = '2147483647';
-          tooltip.style.boxShadow = '0 10px 25px -5px rgba(0, 0, 0, 0.6), 0 8px 10px -6px rgba(0, 0, 0, 0.4)';
-          tooltip.style.display = 'none';
-          tooltip.style.maxWidth = '300px';
-
-          document.body.appendChild(overlay);
-          document.body.appendChild(tooltip);
-
-          let currentTarget = null;
-
-          function rgbToHex(rgb) {
-            if (!rgb) return '#000000';
-            if (rgb.startsWith('#')) return rgb;
-            const match = rgb.match(/^rgba?\\((\\d+),\\s*(\\d+),\\s*(\\d+)/i);
-            if (!match) return rgb;
-            return '#' + [match[1], match[2], match[3]].map(x => {
-              const hex = parseInt(x).toString(16);
-              return hex.length === 1 ? '0' + hex : hex;
-            }).join('');
-          }
-
-          function getSelector(el) {
-            if (!el || el === document.body) return 'body';
-            if (el.id) return '#' + el.id;
-            let path = el.tagName.toLowerCase();
-            if (el.className && typeof el.className === 'string') {
-              const classes = el.className.trim().split(/\\s+/).filter(Boolean);
-              if (classes.length > 0) {
-                path += '.' + classes.slice(0, 2).join('.');
-              }
+          try {
+            var selection = window.getSelection() ? window.getSelection().toString().trim() : '';
+            var h1 = document.querySelector('h1');
+            var title = document.title || (h1 ? h1.innerText : '') || window.location.hostname;
+            var url = window.location.href;
+            
+            var targetEl = document.querySelector('article') || document.querySelector('main') || document.body;
+            var text = '';
+            if (targetEl) {
+              var clone = targetEl.cloneNode(true);
+              var removeSelectors = ['script', 'style', 'noscript', 'iframe', 'svg', 'header', 'footer', 'nav'];
+              removeSelectors.forEach(function(sel) {
+                var els = clone.querySelectorAll(sel);
+                for (var i = 0; i < els.length; i++) {
+                  els[i].remove();
+                }
+              });
+              text = (clone.innerText || clone.textContent || '').trim();
             }
-            if (el.parentElement && el.parentElement !== document.body) {
-              const parentPath = getSelector(el.parentElement);
-              if (parentPath && !parentPath.includes('>')) {
-                path = parentPath + ' > ' + path;
-              }
-            }
-            return path;
-          }
-
-          function onMouseMove(e) {
-            const el = document.elementFromPoint(e.clientX, e.clientY);
-            if (!el || el === overlay || el === tooltip) return;
-            currentTarget = el;
-
-            const rect = el.getBoundingClientRect();
-            overlay.style.display = 'block';
-            overlay.style.top = rect.top + 'px';
-            overlay.style.left = rect.left + 'px';
-            overlay.style.width = rect.width + 'px';
-            overlay.style.height = rect.height + 'px';
-
-            const style = window.getComputedStyle(el);
-            const colorHex = rgbToHex(style.color);
-            const fontInfo = Math.round(parseFloat(style.fontSize) || 12) + 'px ' + (style.fontFamily.split(',')[0].replace(/['"]/g, '') || 'sans-serif');
-            const dimensions = Math.round(rect.width) + 'x' + Math.round(rect.height);
-
-            tooltip.innerHTML = \`
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; gap: 16px;">
-                <span style="font-weight: 700; color: #ffffff; font-size: 13px;">\${el.tagName.toLowerCase()}</span>
-                <span style="font-weight: 700; color: #ffffff; font-size: 12px; font-family: monospace;">\${dimensions}</span>
-              </div>
-              <div style="display: flex; gap: 10px; font-size: 11px; margin-bottom: 3px; align-items: center;">
-                <span style="color: #8892b0; min-width: 32px;">Color</span>
-                <span style="display: inline-flex; align-items: center; gap: 4px; font-weight: 700; color: #ffffff; font-family: monospace;">
-                  <span style="display: inline-block; width: 8px; height: 8px; border-radius: 2px; background: \${colorHex}; border: 1px solid #4a5568;"></span>
-                  \${colorHex}
-                </span>
-              </div>
-              <div style="display: flex; gap: 10px; font-size: 11px; overflow: hidden; align-items: center;">
-                <span style="color: #8892b0; min-width: 32px;">Font</span>
-                <span style="color: #ffffff; font-weight: 600; text-overflow: ellipsis; overflow: hidden; white-space: nowrap;">\${fontInfo}</span>
-              </div>
-            \`;
-
-            tooltip.style.display = 'block';
-            let tipTop = rect.bottom + 8;
-            if (tipTop + 90 > window.innerHeight) {
-              tipTop = Math.max(8, rect.top - 85);
-            }
-            let tipLeft = Math.max(8, Math.min(rect.left, window.innerWidth - 280));
-            tooltip.style.top = tipTop + 'px';
-            tooltip.style.left = tipLeft + 'px';
-          }
-
-          function onClick(e) {
-            if (!currentTarget) return;
-            e.preventDefault();
-            e.stopPropagation();
-
-            const el = currentTarget;
-            const rect = el.getBoundingClientRect();
-            const style = window.getComputedStyle(el);
-            const payload = {
-              tag: el.tagName.toLowerCase(),
-              id: el.id || '',
-              className: typeof el.className === 'string' ? el.className : '',
-              selector: getSelector(el),
-              rect: { width: Math.round(rect.width), height: Math.round(rect.height) },
-              color: rgbToHex(style.color),
-              font: Math.round(parseFloat(style.fontSize) || 12) + 'px ' + style.fontFamily,
-              textSnippet: (el.innerText || '').slice(0, 120).trim(),
-              htmlSnippet: el.outerHTML ? el.outerHTML.slice(0, 300) : '',
-              url: window.location.href,
+            return {
+              title: title,
+              url: url,
+              selection: selection,
+              content: selection ? selection : text
             };
-
-            cleanup();
-            console.log('__HARNESS_ELEMENT_PICK__:' + JSON.stringify(payload));
+          } catch(e) {
+            return {
+              title: document.title || '',
+              url: window.location.href,
+              selection: '',
+              content: document.body ? document.body.innerText : ''
+            };
           }
-
-          function onKeyDown(e) {
-            if (e.key === 'Escape') {
-              cleanup();
-              console.log('__HARNESS_ELEMENT_CANCEL__');
-            }
-          }
-
-          function cleanup() {
-            window.__harnessPickerActive = false;
-            document.removeEventListener('mousemove', onMouseMove, true);
-            document.removeEventListener('click', onClick, true);
-            document.removeEventListener('keydown', onKeyDown, true);
-            if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
-            if (tooltip.parentNode) tooltip.parentNode.removeChild(tooltip);
-            window.__harnessPickerCleanup = null;
-          }
-
-          window.__harnessPickerCleanup = cleanup;
-          document.addEventListener('mousemove', onMouseMove, true);
-          document.addEventListener('click', onClick, true);
-          document.addEventListener('keydown', onKeyDown, true);
-        })();
+        })()
       `;
-      webviewRef.current.executeJavaScript(inspectorScript);
+
+      let extracted: any = null;
+      try {
+        extracted = await webviewRef.current.executeJavaScript(extractionScript);
+      } catch (err) {
+        console.warn("Failed to extract content via executeJavaScript:", err);
+      }
+
+      const finalUrl = extracted?.url || currentUrl;
+      const finalTitle = extracted?.title || pageTitle || tab.title || finalUrl;
+      const finalContent = extracted?.content || "";
+      const isSelection = Boolean(extracted?.selection);
+
+      await onAddSource({
+        url: finalUrl,
+        title: finalTitle,
+        content: finalContent,
+        isSelection,
+      });
+    } catch (err: any) {
+      console.error("Error adding page to sources:", err);
+    } finally {
+      setIsAddingSource(false);
     }
-  }, [isElementPickerActive]);
+  };
 
   // Wire up webview native events
   useEffect(() => {
@@ -486,6 +377,7 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
 
     const handlePageTitleUpdated = (e: any) => {
       if (e.title) {
+        setPageTitle(e.title);
         onUpdateTab?.(tab.id, { title: e.title });
       }
     };
@@ -524,22 +416,6 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
       onUpdateTab?.(tab.id, { isAudible });
     };
 
-    const handleConsoleMessage = (e: any) => {
-      const msg = e.message || "";
-      if (msg.startsWith("__HARNESS_ELEMENT_PICK__:")) {
-        try {
-          const raw = msg.replace("__HARNESS_ELEMENT_PICK__:", "");
-          const data: BrowserSelectedElement = JSON.parse(raw);
-          setIsElementPickerActive(false);
-          onSelectElementForChat?.(data);
-        } catch (err) {
-          console.error("Failed to parse picked element:", err);
-        }
-      } else if (msg.startsWith("__HARNESS_ELEMENT_CANCEL__")) {
-        setIsElementPickerActive(false);
-      }
-    };
-
     webview.addEventListener("did-start-loading", handleDidStartLoading);
     webview.addEventListener("did-stop-loading", handleDidStopLoading);
     webview.addEventListener("did-navigate", handleDidNavigate);
@@ -550,7 +426,6 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
     webview.addEventListener("new-window", handleNewWindow);
     webview.addEventListener("media-started-playing", handleMediaStartedPlaying);
     webview.addEventListener("media-paused", handleMediaPaused);
-    webview.addEventListener("console-message", handleConsoleMessage);
 
     return () => {
       webview.removeEventListener("did-start-loading", handleDidStartLoading);
@@ -563,20 +438,12 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
       webview.removeEventListener("new-window", handleNewWindow);
       webview.removeEventListener("media-started-playing", handleMediaStartedPlaying);
       webview.removeEventListener("media-paused", handleMediaPaused);
-      webview.removeEventListener("console-message", handleConsoleMessage);
     };
-  }, [tab.id, onUpdateTab, onSelectElementForChat, currentUrl]);
+  }, [tab.id, onUpdateTab, currentUrl]);
 
   // Viewport preset style
   const activePresetConfig = RESPONSIVE_PRESETS.find((p) => p.id === selectedPreset);
   const isCustomWidth = activePresetConfig && activePresetConfig.width;
-
-  const quickLinks = [
-    { label: "Google", icon: Search, url: "https://www.google.com" },
-    { label: "Wikipedia", icon: BookOpen, url: "https://www.wikipedia.org" },
-    { label: "Google Scholar", icon: GraduationCap, url: "https://scholar.google.com" },
-    { label: "arXiv.org", icon: FileText, url: "https://arxiv.org" },
-  ];
 
   return (
     <div className="flex-1 w-full h-full flex flex-col bg-background text-foreground select-none overflow-hidden relative font-sans">
@@ -615,17 +482,15 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
         </button>
 
         {/* Reload / Stop Button */}
-        {currentUrl ? (
-          <button
-            type="button"
-            onClick={handleReloadOrStop}
-            className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
-            title={isLoading ? (language === "id" ? "Hentikan muat" : "Stop loading") : (language === "id" ? "Muat ulang" : "Reload")}
-            aria-label="Reload or stop"
-          >
-            {isLoading ? <X className="w-3.5 h-3.5" /> : <RotateCw className="w-3.5 h-3.5" />}
-          </button>
-        ) : null}
+        <button
+          type="button"
+          onClick={handleReloadOrStop}
+          className="w-7 h-7 rounded-md flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-muted transition-colors cursor-pointer"
+          title={isLoading ? (language === "id" ? "Hentikan muat" : "Stop loading") : (language === "id" ? "Muat ulang" : "Reload")}
+          aria-label="Reload or stop"
+        >
+          {isLoading ? <X className="w-3.5 h-3.5" /> : <RotateCw className="w-3.5 h-3.5" />}
+        </button>
 
         {/* Address Bar Form */}
         <form
@@ -647,12 +512,7 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
             {addressBarInput && (
               <button
                 type="button"
-                onClick={() => {
-                  setAddressBarInput("");
-                  if (currentUrl) {
-                    handleNavigate("");
-                  }
-                }}
+                onClick={() => setAddressBarInput("")}
                 className="w-4 h-4 flex items-center justify-center text-muted-foreground hover:text-foreground rounded transition-colors ml-1 cursor-pointer"
                 title="Clear"
               >
@@ -705,30 +565,39 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
           )}
         </div>
 
-        {/* Select Page Element for Chat Button */}
+        {/* Add Page to Sources Button */}
         <button
           type="button"
-          onClick={toggleElementPicker}
-          disabled={!currentUrl}
-          className={`w-7 h-7 rounded-md flex items-center justify-center transition-colors cursor-pointer ${
-            isElementPickerActive
-              ? "bg-primary text-primary-foreground shadow-[0_0_12px_rgba(59,130,246,0.6)]"
-              : currentUrl
-              ? "text-muted-foreground hover:text-foreground hover:bg-muted"
-              : "text-muted-foreground/40 cursor-not-allowed"
+          onClick={handleAddPageToSources}
+          disabled={!currentUrl || isAddingSource}
+          className={`h-7 px-2.5 rounded-lg flex items-center gap-1.5 transition-all text-xs font-medium cursor-pointer shrink-0 ${
+            isCurrentUrlSaved
+              ? "bg-emerald-500/15 text-emerald-500 hover:bg-emerald-500/25 border border-emerald-500/30"
+              : isAddingSource
+              ? "bg-primary/20 text-primary cursor-wait"
+              : "bg-primary text-primary-foreground hover:bg-primary/90 shadow-xs"
           }`}
           title={
-            isElementPickerActive
-              ? language === "id"
-                ? "Pemilih elemen aktif (Klik elemen atau Esc untuk batal)"
-                : "Element picker active (Click element or Esc to cancel)"
-              : language === "id"
-              ? "Pilih elemen halaman untuk tanya ke AI"
-              : "Select page element for chat"
+            isCurrentUrlSaved
+              ? t("savedInSources")
+              : t("addPageToSources")
           }
-          aria-label="Select element for chat"
+          aria-label={t("addPageToSources")}
         >
-          <Bot className="w-3.5 h-3.5" />
+          {isAddingSource ? (
+            <RotateCw className="w-3.5 h-3.5 animate-spin" />
+          ) : isCurrentUrlSaved ? (
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+          ) : (
+            <PlusCircle className="w-3.5 h-3.5" />
+          )}
+          <span>
+            {isAddingSource
+              ? t("saving")
+              : isCurrentUrlSaved
+              ? t("saved")
+              : t("add")}
+          </span>
         </button>
 
         {/* Audio Mute Quick Toggle */}
@@ -850,83 +719,23 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
       </div>
 
       {/* 2. Main Body Viewport */}
-      <div className="flex-1 w-full h-[calc(100%-40px)] min-h-0 relative overflow-hidden flex flex-col items-center justify-center bg-background">
-        {!currentUrl ? (
-          /* Blank / New Tab Landing State ("namun dengan tidak buka apa apa") */
-          <div className="flex-1 w-full h-full flex flex-col items-center justify-center p-6 text-center select-none overflow-y-auto">
-            <div className="w-14 h-14 rounded-2xl bg-sky-500/10 border border-sky-500/20 flex items-center justify-center text-sky-500 mb-4 shadow-xs">
-              <Globe className="w-7 h-7 stroke-[1.6]" />
-            </div>
-
-            <h3 className="text-base font-semibold text-foreground mb-1.5 tracking-tight font-sans">
-              {language === "id" ? "Peramban Riset Web" : "Web Research Browser"}
-            </h3>
-            <p className="text-xs text-muted-foreground max-w-sm leading-relaxed mb-6">
-              {language === "id"
-                ? "Jelajahi referensi, baca jurnal, atau buka sumber web langsung di samping ruang belajar Anda."
-                : "Explore references, read documentation, or view web sources alongside your learning workspace."}
-            </p>
-
-            {/* Quick Search Form */}
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                handleNavigate(addressBarInput);
-              }}
-              className="w-full max-w-md mb-6"
-            >
-              <div className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-card border border-border focus-within:border-primary shadow-xs transition-all">
-                <Search className="w-4 h-4 text-muted-foreground shrink-0" />
-                <input
-                  type="text"
-                  value={addressBarInput}
-                  onChange={(e) => setAddressBarInput(e.target.value)}
-                  placeholder={language === "id" ? "Masukkan kata kunci atau alamat web..." : "Search web or enter address..."}
-                  className="flex-1 bg-transparent text-foreground outline-none text-xs font-sans placeholder:text-muted-foreground/50"
-                  autoFocus
-                />
-                <button
-                  type="submit"
-                  className="px-2.5 py-1 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-medium transition-colors cursor-pointer"
-                >
-                  {language === "id" ? "Buka" : "Go"}
-                </button>
-              </div>
-            </form>
-
-            {/* Quick Links Chips */}
-            <div className="flex flex-col items-center gap-2">
-              <span className="text-[11px] text-muted-foreground/80 uppercase tracking-wider font-semibold">
-                {language === "id" ? "Tautan Cepat" : "Quick Links"}
-              </span>
-              <div className="flex flex-wrap items-center justify-center gap-2">
-                {quickLinks.map((link) => {
-                  const Icon = link.icon;
-                  return (
-                    <button
-                      key={link.label}
-                      type="button"
-                      onClick={() => handleNavigate(link.url)}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-card hover:bg-secondary/70 border border-border hover:border-border/80 text-xs text-foreground transition-all cursor-pointer shadow-2xs"
-                    >
-                      <Icon className="w-3.5 h-3.5 text-sky-500" />
-                      <span>{link.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        ) : loadError ? (
+      <div className="flex-1 w-full h-[calc(100%-40px)] min-h-0 relative overflow-hidden flex flex-col bg-background">
+        {loadError ? (
           /* Error State */
-          <div className="flex-1 w-full h-full flex flex-col items-center justify-center p-6 text-center">
-            <div className="w-12 h-12 rounded-2xl bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-500 dark:text-red-400 mb-3">
+          <div className="flex-1 w-full h-full flex flex-col items-center justify-center p-6 text-center max-w-sm mx-auto">
+            <div className="w-12 h-12 rounded-2xl bg-destructive/10 border border-destructive/20 flex items-center justify-center text-destructive mb-3 shadow-2xs">
               <AlertCircle className="w-6 h-6" />
             </div>
             <h3 className="text-sm font-semibold text-foreground mb-1">
-              {language === "id" ? "Tidak Dapat Memuat Halaman" : "Unable to load page"}
+              {loadError.url.includes("localhost") || loadError.url.includes("127.0.0.1")
+                ? language === "id"
+                  ? "Server lokal belum berjalan"
+                  : "Local server not running"
+                : language === "id"
+                ? "Tidak dapat memuat halaman"
+                : "Unable to load page"}
             </h3>
-            <p className="text-xs text-muted-foreground mb-4 leading-relaxed max-w-sm">
+            <p className="text-xs text-muted-foreground mb-4 leading-relaxed">
               {loadError.desc}
             </p>
             <div className="flex items-center gap-2">
@@ -940,10 +749,10 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
               </button>
               <button
                 type="button"
-                onClick={() => handleNavigate("")}
+                onClick={() => handleNavigate("https://www.google.com")}
                 className="px-3 py-1.5 rounded-lg bg-secondary hover:bg-secondary/80 text-muted-foreground hover:text-foreground text-xs transition-colors cursor-pointer"
               >
-                {language === "id" ? "Ke Beranda" : "Go to Home"}
+                {language === "id" ? "Ke Google" : "Go to Google"}
               </button>
             </div>
           </div>
@@ -963,7 +772,7 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
           >
             <webview
               ref={webviewRef}
-              src={initialUrlRef.current || currentUrl}
+              src={initialUrlRef.current || currentUrl || "https://www.google.com"}
               partition="persist:const_browser"
               allowpopups={true}
               webpreferences="contextIsolation=yes, backgroundThrottling=no, autoplayPolicy=no-user-gesture-required"

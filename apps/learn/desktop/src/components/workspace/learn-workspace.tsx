@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db, localDb } from "../../lib/db";
 import {
@@ -63,6 +63,8 @@ import {
   generateReportArtifact,
   generateCheatSheetArtifact,
 } from "../../lib/studio/generator";
+import { fetchWebContent } from "../../lib/sources/web-fetcher";
+import type { AddSourceFromBrowserParams } from "../right-pane";
 import type { FileMutationRecord } from "@const/agent";
 import type { LocalArtifact } from "../../lib/db";
 
@@ -476,10 +478,16 @@ export function LearnWorkspace({
     setRightPaneMode("preview");
     setIsOpeningNewTab(false);
 
+    const defaultUrl = "https://www.google.com";
+    const resolvedUrl =
+      typeof initialUrl === "string" && initialUrl.trim() && initialUrl !== "[object Object]"
+        ? initialUrl.trim()
+        : defaultUrl;
+
     const existingBrowser = rightPaneTabs.find((t) => t.type === "browser");
     if (existingBrowser) {
       if (initialUrl && initialUrl !== existingBrowser.url) {
-        handleUpdateTab(existingBrowser.id, { url: initialUrl });
+        handleUpdateTab(existingBrowser.id, { url: resolvedUrl });
       }
       setActiveRightPaneTabId(existingBrowser.id);
     } else {
@@ -487,7 +495,7 @@ export function LearnWorkspace({
         id: `browser_${Date.now()}`,
         type: "browser",
         title: t("webBrowser"),
-        url: initialUrl || "", // Tidak buka apa-apa di awal sesuai permintaan user
+        url: resolvedUrl,
       };
       setRightPaneTabs((prev) => [...prev, browserTab]);
       setActiveRightPaneTabId(browserTab.id);
@@ -509,6 +517,64 @@ export function LearnWorkspace({
       setIsManualWidth(true);
     } else if (studioWidth !== responsiveDefaults.studio) {
       setIsManualWidth(true);
+    }
+  };
+
+  const existingSourceUrls = useMemo(() => {
+    const urls = new Set<string>();
+    sources?.forEach((s) => {
+      if (s.url) {
+        urls.add(s.url.trim().replace(/\/$/, "").toLowerCase());
+      }
+    });
+    return urls;
+  }, [sources]);
+
+  const handleAddSourceFromBrowser = async ({
+    url,
+    title,
+    content,
+    isSelection,
+  }: AddSourceFromBrowserParams) => {
+    if (!learnId) return;
+    const currentCount = sources?.length || 0;
+    if (currentCount >= 100) {
+      toast.error(t("maxSourcesReached", { count: 100 }));
+      return;
+    }
+
+    try {
+      let finalContent = content;
+      if (!finalContent || finalContent.trim().length < 40) {
+        try {
+          const fetched = await fetchWebContent(url);
+          if (fetched?.content) {
+            finalContent = fetched.content;
+          }
+        } catch {}
+      }
+
+      const cleanTitle = title?.trim() || url;
+      const sourceTitle = isSelection
+        ? `${cleanTitle} (${language === "id" ? "Kutipan" : "Quote"})`
+        : cleanTitle;
+
+      const sourceId = await localDb.createSource({
+        learnId,
+        title: sourceTitle,
+        type: "url",
+        url,
+        content: finalContent || `Konten dari ${url}`,
+        size: new Blob([finalContent || url]).size,
+        includedInChat: true,
+      });
+
+      toast.success(
+        t("sourceSavedSuccess", { title: sourceTitle.slice(0, 35) })
+      );
+      return sourceId;
+    } catch (err: any) {
+      toast.error(err.message || t("failedAddSource"));
     }
   };
 
@@ -1909,6 +1975,8 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
             generatingArtifacts={generatingArtifacts}
             onSelectArtifact={handleOpenStudioArtifact}
             onExplainInChat={(prompt) => setPendingStudioPrompt(prompt)}
+            onAddSourceFromBrowser={handleAddSourceFromBrowser}
+            existingSourceUrls={existingSourceUrls}
           />
         </ErrorBoundary>
       </div>

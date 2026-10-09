@@ -42,6 +42,7 @@ export const translations = {
     editCollection: "Edit Folder",
     moreOptions: "More options",
     saving: "Saving...",
+    saved: "Saved",
     update: "Update",
 
     // Selection & Batch Actions
@@ -1288,6 +1289,10 @@ export const translations = {
     videoSummaryCreatedSuccess: "Video summary created successfully!",
     presentationCreatedSuccess: "Presentation slides created successfully!",
     webBrowser: "Web Browser",
+    addPageToSources: "Add page to Sources",
+    addSelectionToSources: "Add selection to Sources",
+    savedInSources: "In Sources (Click to update)",
+    sourceSavedSuccess: 'Saved to Sources: "{title}"',
     newNote: "New Note",
     noteConvertedToSourceSuccess: "Note converted to source successfully!",
     studyNoteSummaryDefault: "Study Note: Summary",
@@ -1395,6 +1400,7 @@ export const translations = {
     editCollection: "Ubah Folder",
     moreOptions: "Opsi lainnya",
     saving: "Menyimpan...",
+    saved: "Tersimpan",
     update: "Perbarui",
 
     // Selection & Batch Actions
@@ -2641,6 +2647,10 @@ export const translations = {
     videoSummaryCreatedSuccess: "Ringkasan video berhasil dibuat!",
     presentationCreatedSuccess: "Presentasi berhasil disusun!",
     webBrowser: "Peramban Web",
+    addPageToSources: "Tambahkan halaman ke Sumber",
+    addSelectionToSources: "Tambahkan teks terpilih ke Sumber",
+    savedInSources: "Sudah di Sumber (Klik untuk perbarui)",
+    sourceSavedSuccess: 'Berhasil ditambahkan ke Sumber: "{title}"',
     newNote: "Catatan Baru",
     noteConvertedToSourceSuccess: "Catatan berhasil dikonversikan menjadi sumber!",
     studyNoteSummaryDefault: "Catatan: Ringkasan Sumber",

@@ -51,7 +51,7 @@ import { ReportViewer } from "./report-viewer";
 import { CheatSheetViewer } from "./cheatsheet-viewer";
 import { STUDIO_TOOLS } from "../workspace/studio-panel";
 import { useI18n } from "../../lib/i18n";
-import type { RightPaneTab, RightPaneTabType } from "./types";
+import type { RightPaneTab, RightPaneTabType, AddSourceFromBrowserParams } from "./types";
 import type { FileMutationRecord } from "@const/agent";
 import { type LocalArtifact, type AudioSummaryData, type VideoSummaryData, type SlideDeckData, type InfographicData, type ReportData, type CheatSheetData } from "../../lib/db";
 
@@ -96,6 +96,8 @@ export interface RightPaneProps {
   onConvertToSource?: (art: any) => void;
   onGenerateNote?: (art: LocalArtifact) => void;
   onExplainInChat?: (prompt: string) => void;
+  onAddSourceFromBrowser?: (params: AddSourceFromBrowserParams) => Promise<any> | void;
+  existingSourceUrls?: Set<string>;
 }
 
 export function RightPane({
@@ -130,6 +132,8 @@ export function RightPane({
   onConvertToSource,
   onGenerateNote,
   onExplainInChat,
+  onAddSourceFromBrowser,
+  existingSourceUrls,
 }: RightPaneProps) {
   const { t } = useI18n();
 
@@ -207,12 +211,8 @@ export function RightPane({
         <BrowserTab
           tab={tab}
           onUpdateTab={onUpdateTab}
-          onSelectElementForChat={(element) => {
-            if (onExplainInChat) {
-              const prompt = `Tolong jelaskan atau analisa elemen <${element.tag}> dari ${element.url}:\nSelector: ${element.selector}\nKonten: "${element.textSnippet}"\n\`\`\`html\n${element.htmlSnippet}\n\`\`\``;
-              onExplainInChat(prompt);
-            }
-          }}
+          onAddSource={onAddSourceFromBrowser}
+          existingSourceUrls={existingSourceUrls}
         />
       );
     }

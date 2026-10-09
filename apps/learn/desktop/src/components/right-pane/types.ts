@@ -42,3 +42,11 @@ export interface BrowserSelectedElement {
   htmlSnippet?: string;
   url: string;
 }
+
+export interface AddSourceFromBrowserParams {
+  url: string;
+  title: string;
+  content: string;
+  isSelection?: boolean;
+}
+
