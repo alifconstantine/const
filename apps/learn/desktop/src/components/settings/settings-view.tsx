@@ -23,7 +23,6 @@ import {
   Check,
   ShieldCheck,
   Globe,
-  Brain,
   LogOut,
   ArrowLeftRight,
   Clock,
@@ -277,26 +276,9 @@ export function SettingsView({
     }
   );
 
-  // Determine status color and label (normal status badge)
+  // Determine status thresholds
   const isExceeded = usedCount >= limitCount;
   const isWarning = !isExceeded && usagePercent >= 75;
-
-  const statusBadge = isExceeded ? (
-    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
-      <AlertCircle className="w-3.5 h-3.5" />
-      {t("statusExceeded")}
-    </span>
-  ) : isWarning ? (
-    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20">
-      <Clock className="w-3.5 h-3.5" />
-      {t("statusWarning")}
-    </span>
-  ) : (
-    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-medium bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-      <CheckCircle2 className="w-3.5 h-3.5" />
-      {t("statusSafe")}
-    </span>
-  );
 
   const navCategories = [
     {
@@ -456,8 +438,32 @@ export function SettingsView({
               </p>
             </div>
 
-            <div className="flex items-center gap-2">
-              {activeTab === "usage" && statusBadge}
+            <div className="flex items-center gap-2.5">
+              {activeTab === "usage" && (
+                <div className="flex items-center gap-1 bg-[#ebebed] dark:bg-[#1f1f1f] p-1 rounded-full border border-[#dedee2] dark:border-[#333333] shrink-0">
+                  {[
+                    { label: "Today", value: "today" },
+                    { label: "7D", value: "7d" },
+                    { label: "30D", value: "30d" },
+                    { label: "90D", value: "90d" },
+                    { label: "All", value: "all" },
+                  ].map((item) => (
+                    <button
+                      key={item.value}
+                      type="button"
+                      onClick={() => setTimeRange(item.value as any)}
+                      className={cn(
+                        "px-2.5 py-0.5 text-[11px] font-sans rounded-full transition-colors cursor-pointer",
+                        timeRange === item.value
+                          ? "bg-[#262626] text-white dark:bg-white dark:text-[#161616] font-medium shadow-xs"
+                          : "text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white"
+                      )}
+                    >
+                      {item.label}
+                    </button>
+                  ))}
+                </div>
+              )}
               <button
                 type="button"
                 onClick={handleClose}
@@ -688,50 +694,12 @@ export function SettingsView({
               /* --------------------------------------------------------- */
               /* Usage & Limits Tab (LLM Tokens & Composio MCP Unified)   */
               /* --------------------------------------------------------- */
-              <div className="max-w-3xl space-y-6 pb-6">
-                {/* Header Bar: Telemetry Window & Time Range Filter */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#dedee2] dark:border-[#2f2f2f]">
-                  <div>
-                    <span className="text-xs font-semibold text-[#262626] dark:text-white">
-                      {t("usageSettings")}
-                    </span>
-                    <span className="text-[11px] text-[#737373] dark:text-[#969696] block">
-                      {t("usageSubtitle")}
-                    </span>
-                  </div>
-
-                  {/* Time Range Filter Pills */}
-                  <div className="flex items-center gap-1 bg-[#ebebed] dark:bg-[#1f1f1f] p-1 rounded-full border border-[#dedee2] dark:border-[#333333] self-start sm:self-auto shrink-0">
-                    {[
-                      { label: "Today", value: "today" },
-                      { label: "7D", value: "7d" },
-                      { label: "30D", value: "30d" },
-                      { label: "90D", value: "90d" },
-                      { label: "All", value: "all" },
-                    ].map((item) => (
-                      <button
-                        key={item.value}
-                        type="button"
-                        onClick={() => setTimeRange(item.value as any)}
-                        className={cn(
-                          "px-2.5 py-0.5 text-[11px] font-sans rounded-full transition-colors cursor-pointer",
-                          timeRange === item.value
-                            ? "bg-[#262626] text-white dark:bg-white dark:text-[#161616] font-medium shadow-xs"
-                            : "text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white"
-                        )}
-                      >
-                        {item.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
+              <div className="max-w-3xl space-y-6 pb-6 pt-1">
                 {/* ------------------------------------------------------- */}
                 {/* SECTION 1: LLM Gateway & Token Usage                    */}
                 {/* ------------------------------------------------------- */}
                 <div className="space-y-4">
-                  <div className="flex items-center gap-2 pt-1 text-xs font-semibold uppercase tracking-wider text-[#737373] dark:text-[#969696]">
-                    <Brain className="w-4 h-4 text-indigo-500" />
+                  <div className="text-xs font-semibold uppercase tracking-wider text-[#737373] dark:text-[#969696]">
                     <span>{t("llmSectionTitle")}</span>
                   </div>
 
@@ -739,7 +707,7 @@ export function SettingsView({
                   <div className="p-5 rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#222222] shadow-xs space-y-4">
                     <div className="flex items-center justify-between gap-3">
                       <div className="flex items-center gap-2.5">
-                        <div className="h-8 w-8 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center border border-indigo-500/20 shrink-0">
+                        <div className="h-8 w-8 rounded-xl bg-[#ebebed] dark:bg-[#2b2b2b] text-[#262626] dark:text-white flex items-center justify-center border border-[#dedee2] dark:border-[#383838] shrink-0">
                           <Zap className="h-4 w-4 stroke-[1.75]" />
                         </div>
                         <div>
@@ -818,7 +786,7 @@ export function SettingsView({
                         <span className="text-[11px] text-[#737373] dark:text-[#969696] font-medium uppercase tracking-wider">
                           {t("totalTokens")}
                         </span>
-                        <div className="h-7 w-7 rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center border border-amber-500/20">
+                        <div className="h-7 w-7 rounded-lg bg-[#ebebed] dark:bg-[#2b2b2b] text-[#262626] dark:text-white flex items-center justify-center border border-[#dedee2] dark:border-[#383838]">
                           <Coins className="h-3.5 w-3.5 stroke-[1.75]" />
                         </div>
                       </div>
@@ -845,7 +813,7 @@ export function SettingsView({
                         <span className="text-[11px] text-[#737373] dark:text-[#969696] font-medium uppercase tracking-wider">
                           {t("inputTokens")}
                         </span>
-                        <div className="h-7 w-7 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center border border-blue-500/20">
+                        <div className="h-7 w-7 rounded-lg bg-[#ebebed] dark:bg-[#2b2b2b] text-[#262626] dark:text-white flex items-center justify-center border border-[#dedee2] dark:border-[#383838]">
                           <Layers className="h-3.5 w-3.5 stroke-[1.75]" />
                         </div>
                       </div>
@@ -869,7 +837,7 @@ export function SettingsView({
                         <span className="text-[11px] text-[#737373] dark:text-[#969696] font-medium uppercase tracking-wider">
                           {t("outputTokens")}
                         </span>
-                        <div className="h-7 w-7 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center border border-emerald-500/20">
+                        <div className="h-7 w-7 rounded-lg bg-[#ebebed] dark:bg-[#2b2b2b] text-[#262626] dark:text-white flex items-center justify-center border border-[#dedee2] dark:border-[#383838]">
                           <Zap className="h-3.5 w-3.5 stroke-[1.75]" />
                         </div>
                       </div>
@@ -903,7 +871,7 @@ export function SettingsView({
                         {analytics.modelBreakdown.slice(0, 5).map((m) => (
                           <div key={m.model} className="py-2 flex items-center justify-between text-xs gap-3">
                             <div className="min-w-0 flex items-center gap-2">
-                              <span className="w-1.5 h-1.5 rounded-full bg-indigo-500 shrink-0" />
+                              <span className="w-1.5 h-1.5 rounded-full bg-[#737373] dark:bg-[#969696] shrink-0" />
                               <span className="font-medium text-[#262626] dark:text-white truncate">
                                 {m.model}
                               </span>
@@ -925,8 +893,7 @@ export function SettingsView({
                 {/* SECTION 2: Composio MCP Tool Calls Quota                */}
                 {/* ------------------------------------------------------- */}
                 <div className="space-y-4 pt-2">
-                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-[#737373] dark:text-[#969696]">
-                    <Box className="w-4 h-4 text-emerald-500" />
+                  <div className="text-xs font-semibold uppercase tracking-wider text-[#737373] dark:text-[#969696]">
                     <span>{t("composioSectionTitle")}</span>
                   </div>
 
