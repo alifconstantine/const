@@ -1366,6 +1366,50 @@ export const CONST_LEARN_TOOLS: NativeToolDefinition[] = [
       },
     },
   },
+  {
+    type: "function",
+    function: {
+      name: "web_search",
+      description:
+        "Search the web using Const Search for up-to-date academic resources, journal articles, scientific references, real-time facts, curriculum updates, or educational materials.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: {
+            type: "string",
+            description: "Search query text.",
+          },
+          num_results: {
+            type: "number",
+            description: "Number of search results to return (default: 5).",
+          },
+        },
+        required: ["query"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "web_fetch",
+      description:
+        "Fetch web content from a URL (HTTP/HTTPS) and convert HTML to clean, readable Markdown. Strips scripts, styles, and unwanted markup while preserving text, headings, code blocks, and tables for study research.",
+      parameters: {
+        type: "object",
+        properties: {
+          url: {
+            type: "string",
+            description: "The full web URL to fetch.",
+          },
+          max_chars: {
+            type: "number",
+            description: "Maximum characters of content to return (default: 30000).",
+          },
+        },
+        required: ["url"],
+      },
+    },
+  },
 ];
 
 // ---------------------------------------------------------------------------

@@ -15,6 +15,7 @@ import {
   Check,
   ListTodo,
   RotateCcw,
+  Globe,
 } from "lucide-react";
 import { ScrollArea, cn, BrandLogo, getConnectorForTool, type ConnectorMetadata } from "@const/ui";
 import { FileIcon } from "./file-icon";
@@ -305,17 +306,32 @@ export function ExecutionTrace({
                 );
               }
 
-              // F. Exploration & Search (grep, search, find)
+              // F. Exploration & Search (grep, search, find, web_search)
               if (
                 norm === "grep" ||
                 norm === "grepsearch" ||
                 norm === "search" ||
+                norm === "websearch" ||
                 norm === "find" ||
                 norm === "findbyname"
               ) {
                 return (
                   <GrepSearchCard
                     key={step.id || `exp_${idx}`}
+                    tool={step}
+                  />
+                );
+              }
+
+              // F2. Web Fetch (web_fetch, webfetch, fetchurl)
+              if (
+                norm === "webfetch" ||
+                norm === "fetchurl" ||
+                norm === "readurl"
+              ) {
+                return (
+                  <WebFetchCard
+                    key={step.id || `fetch_${idx}`}
                     tool={step}
                   />
                 );
@@ -612,6 +628,8 @@ function GrepSearchCard({ tool }: { tool: TraceStep | DisplayToolCall }) {
   }
 
   const hasResult = Boolean(tool.result);
+  const normName = (tool.name || "").toLowerCase().replace(/[-_]/g, "");
+  const isWeb = normName.includes("web") || normName.includes("online");
 
   return (
     <div className="w-full min-w-0 flex flex-col my-0.5">
@@ -621,8 +639,12 @@ function GrepSearchCard({ tool }: { tool: TraceStep | DisplayToolCall }) {
           hasResult ? "cursor-pointer" : ""
         }`}
       >
-        <Search className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-        <span className="shrink-0">Searched</span>
+        {isWeb ? (
+          <Globe className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+        ) : (
+          <Search className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+        )}
+        <span className="shrink-0">{isWeb ? "Searched web" : "Searched"}</span>
         <span className="text-foreground font-medium truncate">
           *{query}*
         </span>
@@ -630,6 +652,63 @@ function GrepSearchCard({ tool }: { tool: TraceStep | DisplayToolCall }) {
           {resultCount && (
             <span className="text-muted-foreground text-xs font-sans tabular-nums">{resultCount}</span>
           )}
+          {hasResult && (
+            <ChevronDown
+              className="w-3 h-3 text-muted-foreground transition-transform duration-200 ease-out"
+              style={{ transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)" }}
+            />
+          )}
+        </div>
+      </div>
+
+      {hasResult && (
+        <SmoothCollapse isOpen={isOpen}>
+          <div className="mt-1 p-2 rounded-xl bg-secondary/80 border border-border text-xs font-mono select-text">
+            <ScrollArea className="max-h-40 w-full text-[11px] text-muted-foreground">
+              <pre className="whitespace-pre-wrap">
+                {typeof tool.result === "string"
+                  ? tool.result.slice(0, 1500)
+                  : JSON.stringify(tool.result, null, 2)}
+              </pre>
+            </ScrollArea>
+          </div>
+        </SmoothCollapse>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 3b. Web Fetch Card: "Fetched web *url*" + click to expand
+// ---------------------------------------------------------------------------
+function WebFetchCard({ tool }: { tool: TraceStep | DisplayToolCall }) {
+  const [isOpen, setIsOpen] = useState(false);
+
+  let url = "";
+  if (tool.args) {
+    if (typeof tool.args === "string") {
+      url = tool.args;
+    } else {
+      url = tool.args.url || tool.args.link || tool.args.href || "";
+    }
+  }
+
+  const hasResult = Boolean(tool.result);
+
+  return (
+    <div className="w-full min-w-0 flex flex-col my-0.5">
+      <div
+        onClick={() => hasResult && setIsOpen((prev) => !prev)}
+        className={`flex items-center gap-2 py-1 px-1.5 rounded-md hover:bg-muted text-[13px] text-muted-foreground min-w-0 select-none ${
+          hasResult ? "cursor-pointer" : ""
+        }`}
+      >
+        <Globe className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+        <span className="shrink-0">Fetched web</span>
+        <span className="text-foreground font-medium truncate">
+          {url}
+        </span>
+        <div className="ml-auto flex items-center gap-1.5 shrink-0">
           {hasResult && (
             <ChevronDown
               className="w-3 h-3 text-muted-foreground transition-transform duration-200 ease-out"
