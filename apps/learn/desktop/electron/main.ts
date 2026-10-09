@@ -66,6 +66,24 @@ if (!fs.existsSync(learnWorkspacesDir)) {
   } catch {}
 }
 
+// Optional runtime environment variables loader (e.g. from ~/.const/learn/.env or current working directory)
+try {
+  const envCandidates = [
+    path.join(learnHomeDir, ".env"),
+    path.resolve(__dirname, "../.env"),
+    path.resolve(__dirname, "../../.env"),
+    path.resolve(process.cwd(), ".env"),
+  ];
+  for (const envFile of envCandidates) {
+    if (fs.existsSync(envFile) && (process as any).loadEnvFile) {
+      (process as any).loadEnvFile(envFile);
+      break;
+    }
+  }
+} catch {
+  // Ignore env loading errors
+}
+
 const composioUsageFile = path.join(learnHomeDir, "composio-usage.json");
 const WEEKLY_TOOL_CALL_LIMIT = 300;
 
