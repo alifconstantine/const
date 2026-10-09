@@ -12,6 +12,7 @@ import {
   SlidersHorizontal,
   Palette,
   Bot,
+  Box,
   Activity,
   Sun,
   Moon,
@@ -34,6 +35,7 @@ import {
   getResetCountdown,
   type ComposioUsageRecord,
 } from "../../lib/composio-usage";
+import { DefaultModelsSettings } from "./default-models-settings";
 
 interface MobileSettingsViewProps {
   onBack: () => void;
@@ -149,7 +151,7 @@ export function MobileSettingsView({
     { id: "general", label: t("generalSettings"), icon: SlidersHorizontal },
     { id: "usage", label: t("usage"), icon: Activity },
     { id: "appearance", label: t("theme"), icon: Palette },
-    { id: "models", label: "Models", icon: Bot },
+    { id: "models", label: t("models") || "Models", icon: Box },
   ] as const;
 
   // Sliding Tab Refs & Indicator (Matching ModelSelectionSheet & McpToolsSheet)
@@ -246,7 +248,7 @@ export function MobileSettingsView({
               {activeTab === "general" && t("generalSettings")}
               {activeTab === "usage" && t("usageSettings")}
               {activeTab === "appearance" && t("theme")}
-              {activeTab === "models" && "AI Models"}
+              {activeTab === "models" && (t("models") || "Models")}
             </p>
           </div>
         </div>
@@ -584,67 +586,14 @@ export function MobileSettingsView({
           </div>
         )}
 
-        {/* TAB: AI MODELS */}
+        {/* TAB: MODELS */}
         {activeTab === "models" && (
-          <div className="space-y-2.5">
-            {MOBILE_BUILTIN_MODELS.map((model) => {
-              const isSelected = activeModel === model.id;
-              return (
-                <div
-                  key={model.id}
-                  onClick={() => handleSelectModel(model.id)}
-                  className={cn(
-                    "p-3.5 rounded-2xl border transition-all cursor-pointer flex items-start justify-between gap-3",
-                    isSelected
-                      ? "border-primary bg-secondary/50 shadow-2xs"
-                      : "border-border/60 bg-card hover:bg-secondary/30"
-                  )}
-                >
-                  <div className="min-w-0 flex-1 space-y-1">
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <h4 className="text-xs font-semibold text-foreground">
-                        {model.name}
-                      </h4>
-                      {model.isDefault && (
-                        <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-secondary text-foreground font-medium">
-                          Default
-                        </span>
-                      )}
-                      {model.supportsThinking && (
-                        <span className="inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 font-medium">
-                          <Brain className="w-2.5 h-2.5" />
-                          Thinking
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-[11px] text-muted-foreground leading-relaxed line-clamp-2">
-                      {language === "id" ? model.descId : model.descEn}
-                    </p>
-                    <div className="flex items-center gap-2 text-[10px] font-sans tabular-nums text-muted-foreground pt-0.5">
-                      <span>{model.contextWindow}</span>
-                      <span>•</span>
-                      <span>{model.maxOutput}</span>
-                    </div>
-                  </div>
-
-                  <div className="shrink-0 pt-0.5">
-                    <div
-                      className={cn(
-                        "w-4 h-4 rounded-full border flex items-center justify-center transition-colors",
-                        isSelected
-                          ? "border-primary bg-primary"
-                          : "border-muted-foreground/40"
-                      )}
-                    >
-                      {isSelected && (
-                        <div className="w-1.5 h-1.5 rounded-full bg-background" />
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+          <DefaultModelsSettings
+            onOpenModels={() => {
+              onBack();
+              window.dispatchEvent(new CustomEvent("const:open-models-sheet"));
+            }}
+          />
         )}
       </div>
     </div>

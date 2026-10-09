@@ -12,6 +12,7 @@ import {
   SlidersHorizontal,
   Palette,
   Bot,
+  Box,
   ArrowLeftRight,
   LogOut,
   BarChart2,
@@ -22,6 +23,7 @@ import {
   CheckCircle2,
   Info,
 } from "lucide-react";
+import { DefaultModelsSettings } from "../../settings/default-models-settings";
 import {
   getStoredComposioUsage,
   getResetCountdown,
@@ -386,7 +388,7 @@ export function MobileSettingsSheet({
                 : "text-muted-foreground hover:text-foreground"
             )}
           >
-            <Bot className="w-3.5 h-3.5" />
+            <Box className="w-3.5 h-3.5" />
             <span>{t("tabModels")}</span>
           </button>
 
@@ -582,86 +584,14 @@ export function MobileSettingsSheet({
             </div>
           )}
 
-          {/* 3. AI MODELS */}
+          {/* 3. MODELS */}
           {activeTab === "models" && (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between px-0.5">
-                <div>
-                  <h3 className="text-xs font-semibold text-foreground">
-                    {t("availableAiModels")}
-                  </h3>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">
-                    {t("aiModelsSubtitle")}
-                  </p>
-                </div>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary text-muted-foreground border border-border shrink-0">
-                  {BUILTIN_MODELS.length} {t("tabModels")}
-                </span>
-              </div>
-
-              <div className="space-y-2">
-                {BUILTIN_MODELS.map((model) => {
-                  const isSelected = activeModel === model.id;
-                  return (
-                    <div
-                      key={model.id}
-                      onClick={() => handleSelectModel(model.id)}
-                      className={cn(
-                        "p-3.5 rounded-2xl border transition-all cursor-pointer flex items-start justify-between gap-3",
-                        isSelected
-                          ? "border-foreground/40 bg-secondary text-foreground shadow-2xs"
-                          : "border-border hover:border-foreground/20 bg-card hover:bg-secondary/40 text-card-foreground"
-                      )}
-                    >
-                      <div className="min-w-0 flex-1 space-y-1">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <h4 className="text-xs font-semibold text-foreground">
-                            {model.name}
-                          </h4>
-                          {model.isDefault && (
-                            <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-secondary-foreground/10 text-foreground font-medium border border-border/50">
-                              Default
-                            </span>
-                          )}
-                          {model.supportsThinking && (
-                            <span className="inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 font-medium">
-                              <Brain className="w-2.5 h-2.5" />
-                              Thinking
-                            </span>
-                          )}
-                        </div>
-
-                        <p className="text-[11px] text-muted-foreground leading-relaxed">
-                          {language === "id" ? model.descId : model.descEn}
-                        </p>
-
-                        <div className="flex items-center gap-2 pt-0.5 text-[10px] font-sans tabular-nums text-muted-foreground">
-                          <span>{model.contextWindow}</span>
-                          <span>•</span>
-                          <span>{model.maxOutput}</span>
-                        </div>
-                      </div>
-
-                      {/* Radio Selection Indicator */}
-                      <div className="shrink-0 pt-0.5">
-                        <div
-                          className={cn(
-                            "w-4 h-4 rounded-full border flex items-center justify-center transition-colors",
-                            isSelected
-                              ? "border-foreground bg-foreground"
-                              : "border-muted-foreground/40 bg-transparent"
-                          )}
-                        >
-                          {isSelected && (
-                            <div className="w-1.5 h-1.5 rounded-full bg-background" />
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+            <DefaultModelsSettings
+              onOpenModels={() => {
+                onClose();
+                window.dispatchEvent(new CustomEvent("const:open-models-sheet"));
+              }}
+            />
           )}
 
           {/* 4. USAGE (COMPOSIO MCP TOOL CALLS & LOCAL STORAGE) */}

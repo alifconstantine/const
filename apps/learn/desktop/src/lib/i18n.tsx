@@ -564,6 +564,7 @@ export const translations = {
     themeLightDesc: "Canvas #f8f8f8",
     themeDarkDesc: "Canvas #161616 (Studio)",
     aiModelsSubtitle: "Choose default AI model or manage the reasoning router used during learning.",
+    modelsSettingsSubtitle: "Choose default AI models for LLM, Voice, and Image.",
     activeModelChanged: "Active model changed to {modelId}",
 
     // Tools & Execution Trace
@@ -1435,7 +1436,7 @@ export const translations = {
     chat: "Obrolan",
     collections: "Folder",
     artifacts: "Artefak",
-    models: "Model AI",
+    models: "Models",
     mcpTools: "MCP Tools",
     learningSources: "Sumber Pembelajaran",
     addFirstSource: "Tambah sumber pertama",
@@ -1916,6 +1917,7 @@ export const translations = {
     themeLightDesc: "Kanvas #f8f8f8",
     themeDarkDesc: "Kanvas #161616 (Studio)",
     aiModelsSubtitle: "Pilih model AI bawaan atau atur router penalaran yang digunakan selama proses belajar.",
+    modelsSettingsSubtitle: "Pilih model AI default untuk LLM, Voice, dan Image.",
     activeModelChanged: "Model aktif diubah menjadi {modelId}",
 
     // Tools & Execution Trace
@@ -2276,7 +2278,7 @@ export const translations = {
     mobileSettingsSubtitle: "Sesuaikan preferensi aplikasi, bahasa, dan konfigurasi.",
     tabGeneral: "Umum",
     tabTheme: "Tampilan",
-    tabModels: "Model",
+    tabModels: "Models",
     tabUsage: "Usage",
     selectUiLanguage: "Pilih bahasa tampilan",
     builtinModelsDesc: "Setiap model dioptimalkan untuk tugas berbeda, dari analisis teks mendalam hingga sintesis visual.",

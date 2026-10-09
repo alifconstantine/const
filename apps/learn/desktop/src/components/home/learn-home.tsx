@@ -739,16 +739,24 @@ export function LearnHome({
       }
     };
 
+    const onNavigateTab = (e: any) => {
+      if (e.detail?.tab) {
+        setActiveTab(e.detail.tab);
+      }
+    };
+
     window.addEventListener("const:toggle-sidebar", onToggleSidebar);
     window.addEventListener("const:new-learn", onNewLearn);
     window.addEventListener("const:new-collection", onNewCollection);
     window.addEventListener("const:open-workspace-folder", onOpenWorkspaceFolder);
+    window.addEventListener("const:navigate-tab", onNavigateTab);
 
     return () => {
       window.removeEventListener("const:toggle-sidebar", onToggleSidebar);
       window.removeEventListener("const:new-learn", onNewLearn);
       window.removeEventListener("const:new-collection", onNewCollection);
       window.removeEventListener("const:open-workspace-folder", onOpenWorkspaceFolder);
+      window.removeEventListener("const:navigate-tab", onNavigateTab);
     };
   }, [onOpenLearn, t]);
 

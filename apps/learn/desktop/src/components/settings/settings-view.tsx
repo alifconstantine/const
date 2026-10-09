@@ -14,6 +14,7 @@ import {
   SlidersHorizontal,
   Palette,
   Bot,
+  Box,
   Activity,
   Sun,
   Moon,
@@ -37,6 +38,7 @@ import {
   getResetCountdown,
   type ComposioUsageRecord,
 } from "../../lib/composio-usage";
+import { DefaultModelsSettings } from "./default-models-settings";
 
 export interface SettingsViewProps {
   open?: boolean;
@@ -266,7 +268,7 @@ export function SettingsView({
       items: [
         { id: "general", label: t("generalSettings") || "General", icon: SlidersHorizontal },
         { id: "appearance", label: t("theme") || "Appearance", icon: Palette },
-        { id: "models", label: "AI Models", icon: Bot },
+        { id: "models", label: t("models") || "Models", icon: Box },
       ],
     },
     {
@@ -408,13 +410,13 @@ export function SettingsView({
                 {activeTab === "general" && t("generalSettings")}
                 {activeTab === "usage" && (t("usageSettings") || "Usage & Limits")}
                 {activeTab === "appearance" && (t("theme") || "Appearance")}
-                {activeTab === "models" && "AI Models"}
+                {activeTab === "models" && (t("models") || "Models")}
               </h1>
               <p className="mt-1 text-xs text-[#737373] dark:text-[#969696]">
                 {activeTab === "general" && t("generalSettingsSubtitle")}
                 {activeTab === "usage" && t("usageSubtitle")}
                 {activeTab === "appearance" && t("appearanceSubtitle")}
-                {activeTab === "models" && t("aiModelsSubtitle")}
+                {activeTab === "models" && (t("modelsSettingsSubtitle") || t("aiModelsSubtitle"))}
               </p>
             </div>
 
@@ -638,67 +640,16 @@ export function SettingsView({
               </div>
             ) : activeTab === "models" ? (
               /* --------------------------------------------------------- */
-              /* AI Models Settings Tab                                    */
+              /* Models Settings Tab (Default AI for LLM, Voice, & Image)  */
               /* --------------------------------------------------------- */
-              <div className="flex flex-col gap-3 max-w-2xl pb-6">
-                {BUILTIN_MODELS.map((model) => {
-                  const isSelected = activeModel === model.id;
-                  return (
-                    <div
-                      key={model.id}
-                      onClick={() => handleSelectModel(model.id)}
-                      className={cn(
-                        "p-4 rounded-xl border transition-all cursor-pointer flex items-start justify-between gap-4",
-                        isSelected
-                          ? "border-[#262626] dark:border-white bg-[#ffffff] dark:bg-[#222222] shadow-xs"
-                          : "border-[#dedee2] dark:border-[#383838] hover:border-[#b0b0b4] dark:hover:border-[#4a4a4a] bg-[#f9f9fb] dark:bg-[#1a1a1a]"
-                      )}
-                    >
-                      <div className="min-w-0 flex-1 space-y-1">
-                        <div className="flex items-center gap-2">
-                          <h4 className="text-sm font-semibold text-[#262626] dark:text-white">
-                            {model.name}
-                          </h4>
-                          {model.isDefault && (
-                            <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#e2e2e5] dark:bg-[#383838] text-[#262626] dark:text-white font-medium">
-                              Default
-                            </span>
-                          )}
-                          {model.supportsThinking && (
-                            <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 font-medium">
-                              <Brain className="w-2.5 h-2.5" />
-                              Thinking
-                            </span>
-                          )}
-                        </div>
-                        <p className="text-xs text-[#737373] dark:text-[#969696] leading-relaxed">
-                          {language === "id" ? model.descId : model.descEn}
-                        </p>
-                        <div className="flex items-center gap-3 pt-1 text-[11px] font-sans tabular-nums text-[#737373] dark:text-[#969696]">
-                          <span>{model.contextWindow}</span>
-                          <span>•</span>
-                          <span>{model.maxOutput}</span>
-                        </div>
-                      </div>
-
-                      <div className="shrink-0 pt-0.5">
-                        <div
-                          className={cn(
-                            "w-4 h-4 rounded-full border flex items-center justify-center transition-colors",
-                            isSelected
-                              ? "border-[#262626] dark:border-white bg-[#262626] dark:bg-white"
-                              : "border-[#737373] dark:border-[#969696]"
-                          )}
-                        >
-                          {isSelected && (
-                            <div className="w-1.5 h-1.5 rounded-full bg-white dark:bg-black" />
-                          )}
-                        </div>
-                      </div>
-                    </div>
+              <DefaultModelsSettings
+                onOpenModels={() => {
+                  handleClose();
+                  window.dispatchEvent(
+                    new CustomEvent("const:navigate-tab", { detail: { tab: "models" } })
                   );
-                })}
-              </div>
+                }}
+              />
             ) : activeTab === "usage" ? (
               /* --------------------------------------------------------- */
               /* Usage & Limits Tab                                        */

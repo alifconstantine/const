@@ -262,6 +262,16 @@ export function LearnHome({
   const [isSettingsSheetOpen, setIsSettingsSheetOpen] = useState(false);
   const [isUpdateSheetOpen, setIsUpdateSheetOpen] = useState(false);
 
+  useEffect(() => {
+    const handleOpenModelsSheet = () => {
+      setIsModelSheetOpen(true);
+    };
+    window.addEventListener("const:open-models-sheet", handleOpenModelsSheet);
+    return () => {
+      window.removeEventListener("const:open-models-sheet", handleOpenModelsSheet);
+    };
+  }, []);
+
   const handleCreateNewLearn = (collectionId?: string) => {
     const targetColId = collectionId || activeCollectionId || null;
     setEditingLearn(null);
@@ -1731,9 +1741,9 @@ export function LearnHome({
               />
             )}
 
-            {/* Child 1: Model AI */}
+            {/* Child 1: Models */}
             <MenuItem
-              label="Model AI"
+              label={t("models") || "Models"}
               icon={<Box size={20} strokeWidth={1.8} className="text-white" />}
               onClick={() => {
                 setIsFluidMenuExpanded(false);
