@@ -1899,6 +1899,7 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
           onExternalPromptConsumed={() => setPendingStudioPrompt(null)}
           onOpenFileDiff={handleOpenFileDiff}
           onMutationsChange={setSessionMutations}
+          onOpenStudioArtifact={handleOpenStudioArtifact}
         />
 
         {/* Right Resize Handle */}

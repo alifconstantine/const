@@ -16,6 +16,8 @@ import {
   ListTodo,
   RotateCcw,
   Globe,
+  Bookmark,
+  Sparkles,
 } from "lucide-react";
 import { ScrollArea, cn, BrandLogo, getConnectorForTool, type ConnectorMetadata } from "@const/ui";
 import { FileIcon } from "./file-icon";
@@ -62,6 +64,8 @@ export interface ExecutionTraceProps {
   onOpenFileDiff?: (record: FileMutationRecord) => void;
   showMutationsSummary?: boolean;
   onOpenBrowser?: (url: string) => void;
+  onOpenStudioArtifact?: (artifact: any) => void;
+  onOpenSourcePreview?: (source: any) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -106,6 +110,8 @@ export function ExecutionTrace({
   onOpenFileDiff,
   showMutationsSummary = false,
   onOpenBrowser,
+  onOpenStudioArtifact,
+  onOpenSourcePreview,
 }: ExecutionTraceProps) {
   // Auto-open while executing to view progress live; auto-close when finished
   const [isMainOpen, setIsMainOpen] = useState(isExecuting);
@@ -246,6 +252,33 @@ export function ExecutionTrace({
                     key={step.id || `q_${idx}`}
                     step={step}
                     onAnswer={onAnswerQuestion}
+                  />
+                );
+              }
+
+              // A1. Save/Add Source (add_source)
+              if (norm === "addsource" || norm === "createsource" || norm === "savesource") {
+                return (
+                  <AddSourceCard
+                    key={step.id || `src_${idx}`}
+                    tool={step}
+                    onOpenBrowser={onOpenBrowser}
+                    onOpenSourcePreview={onOpenSourcePreview}
+                  />
+                );
+              }
+
+              // A2. Create Studio Artifact (create_studio_artifact)
+              if (
+                norm === "createstudioartifact" ||
+                norm === "createartifact" ||
+                norm === "createstudyartifact"
+              ) {
+                return (
+                  <StudioArtifactCard
+                    key={step.id || `art_${idx}`}
+                    tool={step}
+                    onOpenStudioArtifact={onOpenStudioArtifact}
                   />
                 );
               }
@@ -1994,6 +2027,224 @@ function MutationRowItem({
           </button>
         ) : null}
       </div>
+    </div>
+  );
+}
+
+function AddSourceCard({
+  tool,
+  onOpenBrowser,
+  onOpenSourcePreview,
+}: {
+  tool: TraceStep | DisplayToolCall;
+  onOpenBrowser?: (url: string) => void;
+  onOpenSourcePreview?: (source: any) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const isRunning = tool.status === "running" || (!tool.result && !tool.isError);
+  const title = tool.args?.title || tool.args?.name || "Source";
+  const type = String(tool.args?.type || "text").toLowerCase();
+  const url = tool.args?.url;
+  const content = tool.args?.content;
+
+  return (
+    <div className="w-full flex flex-col my-0.5 font-sans">
+      <div
+        onClick={() => setIsOpen((prev) => !prev)}
+        className="flex items-center justify-between py-1 px-1.5 rounded-md hover:bg-muted text-[13px] text-muted-foreground select-none cursor-pointer group"
+      >
+        <div className="flex items-center gap-2 min-w-0 pr-2">
+          <Bookmark className="w-3.5 h-3.5 text-primary shrink-0" />
+          <span className="text-foreground font-medium truncate text-xs">
+            {title}
+          </span>
+          <span className="text-[10px] px-1.5 py-0.2 rounded bg-primary/10 text-primary border border-primary/20 font-medium shrink-0 uppercase">
+            {type}
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5 shrink-0 text-xs">
+          {isRunning ? (
+            <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
+          ) : tool.isError ? (
+            <AlertCircle className="w-3.5 h-3.5 text-destructive" />
+          ) : (
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+          )}
+          <ChevronDown
+            className={cn(
+              "w-3 h-3 text-muted-foreground transition-transform duration-200",
+              isOpen && "rotate-180"
+            )}
+          />
+        </div>
+      </div>
+      <SmoothCollapse isOpen={isOpen}>
+        <div className="flex flex-col gap-2 p-2 mt-1 rounded-md bg-secondary/50 border border-border text-xs text-foreground">
+          {url && (
+            <div className="flex items-center justify-between gap-2">
+              <span className="truncate text-muted-foreground text-[11px]">{url}</span>
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenBrowser ? onOpenBrowser(url) : window.open(url, "_blank");
+                }}
+                className="shrink-0 flex items-center gap-1 px-2 py-0.5 rounded bg-primary text-primary-foreground text-[11px] hover:opacity-90 transition-opacity cursor-pointer"
+              >
+                <span>Buka URL</span>
+                <ExternalLink className="w-3 h-3" />
+              </button>
+            </div>
+          )}
+          {content && (
+            <div className="max-h-40 overflow-y-auto whitespace-pre-wrap font-mono text-[11px] text-muted-foreground bg-background/50 p-2 rounded border border-border/50">
+              {content.slice(0, 800)}
+              {content.length > 800 && "..."}
+            </div>
+          )}
+          {onOpenSourcePreview && (
+            <div className="flex justify-end pt-1">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenSourcePreview({
+                    id: "preview_source",
+                    title,
+                    type,
+                    url,
+                    content,
+                  });
+                }}
+                className="flex items-center gap-1 px-2 py-0.5 rounded bg-secondary hover:bg-secondary/80 border border-border text-[11px] text-foreground transition-all cursor-pointer"
+              >
+                <span>Lihat Dokumen</span>
+                <ArrowRight className="w-3 h-3" />
+              </button>
+            </div>
+          )}
+        </div>
+      </SmoothCollapse>
+    </div>
+  );
+}
+
+function StudioArtifactCard({
+  tool,
+  onOpenStudioArtifact,
+}: {
+  tool: TraceStep | DisplayToolCall;
+  onOpenStudioArtifact?: (artifact: any) => void;
+}) {
+  const [isOpen, setIsOpen] = useState(false);
+  const isRunning = tool.status === "running" || (!tool.result && !tool.isError);
+  const title = tool.args?.title || "Studio Artifact";
+  const artifactType = String(tool.args?.artifact_type || tool.args?.type || "artifact").toLowerCase();
+  const data = tool.args?.data || {};
+
+  const countLabel =
+    artifactType === "flashcard"
+      ? `${data?.cards?.length || 0} Cards`
+      : artifactType === "quiz"
+      ? `${data?.questions?.length || 0} Questions`
+      : artifactType === "mind_map"
+      ? `Mind Map`
+      : artifactType === "cheatsheet"
+      ? `${data?.cards?.length || 0} Sections`
+      : artifactType;
+
+  return (
+    <div className="w-full flex flex-col my-0.5 font-sans">
+      <div
+        onClick={() => setIsOpen((prev) => !prev)}
+        className="flex items-center justify-between py-1 px-1.5 rounded-md hover:bg-muted text-[13px] text-muted-foreground select-none cursor-pointer group"
+      >
+        <div className="flex items-center gap-2 min-w-0 pr-2">
+          <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+          <span className="text-foreground font-medium truncate text-xs">
+            {title}
+          </span>
+          <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-500/10 text-amber-500 border border-amber-500/20 font-medium shrink-0 uppercase">
+            {countLabel}
+          </span>
+        </div>
+        <div className="flex items-center gap-1.5 shrink-0 text-xs">
+          {isRunning ? (
+            <Loader2 className="w-3.5 h-3.5 animate-spin text-muted-foreground" />
+          ) : tool.isError ? (
+            <AlertCircle className="w-3.5 h-3.5 text-destructive" />
+          ) : (
+            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+          )}
+          <ChevronDown
+            className={cn(
+              "w-3 h-3 text-muted-foreground transition-transform duration-200",
+              isOpen && "rotate-180"
+            )}
+          />
+        </div>
+      </div>
+      <SmoothCollapse isOpen={isOpen}>
+        <div className="flex flex-col gap-2 p-2.5 mt-1 rounded-md bg-secondary/50 border border-border text-xs text-foreground">
+          <div className="flex items-center justify-between gap-2">
+            <span className="font-medium text-xs text-foreground">
+              {title}
+            </span>
+            {onOpenStudioArtifact && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onOpenStudioArtifact({
+                    title,
+                    type: artifactType,
+                    data,
+                    status: "completed",
+                  });
+                }}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-primary text-primary-foreground font-medium text-xs hover:opacity-90 transition-opacity cursor-pointer shadow-xs"
+              >
+                <span>Buka di Studio</span>
+                <ArrowRight className="w-3 h-3" />
+              </button>
+            )}
+          </div>
+          <div className="text-[11.5px] text-muted-foreground">
+            {artifactType === "flashcard" && Array.isArray(data?.cards) && (
+              <div className="flex flex-col gap-1 max-h-36 overflow-y-auto mt-1">
+                {data.cards.slice(0, 5).map((c: any, i: number) => (
+                  <div key={i} className="p-1.5 rounded bg-background/50 border border-border/40 text-[11px]">
+                    <span className="font-semibold text-foreground">Q: </span>
+                    {c.front}
+                  </div>
+                ))}
+                {data.cards.length > 5 && (
+                  <span className="text-[10px] text-muted-foreground">+{data.cards.length - 5} kartu lainnya...</span>
+                )}
+              </div>
+            )}
+            {artifactType === "quiz" && Array.isArray(data?.questions) && (
+              <div className="flex flex-col gap-1 max-h-36 overflow-y-auto mt-1">
+                {data.questions.slice(0, 3).map((q: any, i: number) => (
+                  <div key={i} className="p-1.5 rounded bg-background/50 border border-border/40 text-[11px]">
+                    <span className="font-semibold text-foreground">{i + 1}. </span>
+                    {q.question}
+                  </div>
+                ))}
+                {data.questions.length > 3 && (
+                  <span className="text-[10px] text-muted-foreground">+{data.questions.length - 3} soal lainnya...</span>
+                )}
+              </div>
+            )}
+            {artifactType === "mind_map" && data?.root && (
+              <div className="p-1.5 rounded bg-background/50 border border-border/40 text-[11px]">
+                <span className="font-semibold text-foreground">Topik Inti: </span>
+                {data.root.label || title}
+              </div>
+            )}
+          </div>
+        </div>
+      </SmoothCollapse>
     </div>
   );
 }

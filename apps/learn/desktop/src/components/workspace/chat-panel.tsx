@@ -95,6 +95,7 @@ interface ChatPanelProps {
   onOpenFileDiff?: (record: FileMutationRecord) => void;
   onMutationsChange?: (mutations: FileMutationRecord[]) => void;
   onOpenBrowser?: (url: string) => void;
+  onOpenStudioArtifact?: (artifact: any) => void;
 }
 
 interface DisplayMessage {
@@ -295,6 +296,7 @@ export function ChatPanel({
   onOpenFileDiff,
   onMutationsChange,
   onOpenBrowser,
+  onOpenStudioArtifact,
 }: ChatPanelProps) {
   const { t, language } = useI18n();
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
@@ -602,10 +604,22 @@ export function ChatPanel({
     }
   }, []);
 
-  const models: ModelConfig[] = availableModels;
+  const models: ModelConfig[] = useMemo(() => {
+    return availableModels.filter((m) => {
+      const id = (m.id || "").toLowerCase().trim();
+      const name = (m.displayName || "").toLowerCase().trim();
+      return (
+        id !== "const-search" &&
+        name !== "const search" &&
+        !id.includes("whisper") &&
+        !id.includes("transcription")
+      );
+    });
+  }, [availableModels]);
+
   const currentModel = useMemo(() => {
-    return availableModels.find((m) => m.id === selectedModelId) || availableModels[0] || DEFAULT_MODELS[0]!;
-  }, [availableModels, selectedModelId]);
+    return models.find((m) => m.id === selectedModelId) || models[0] || DEFAULT_MODELS[0]!;
+  }, [models, selectedModelId]);
 
   const currentThinkingLevels = useMemo(() => {
     return currentModel?.thinkingLevels || (currentModel?.supportsThinking ? ["low", "medium", "high"] : []);
@@ -613,7 +627,7 @@ export function ChatPanel({
 
   const groupedModels = useMemo(() => {
     const map = new Map<string, { providerId: string; providerName: string; items: ModelConfig[] }>();
-    for (const m of availableModels) {
+    for (const m of models) {
       const { providerId, providerName } = getModelProviderInfo(m);
       if (!map.has(providerId)) {
         map.set(providerId, { providerId, providerName, items: [] });
@@ -621,7 +635,7 @@ export function ChatPanel({
       map.get(providerId)!.items.push(m);
     }
     return Array.from(map.values());
-  }, [availableModels]);
+  }, [models]);
 
   const filteredGroupedModels = useMemo(() => {
     const q = searchModelQuery.toLowerCase().trim();
@@ -1235,6 +1249,50 @@ export function ChatPanel({
               });
               updated.traceSteps = steps;
             }
+          }
+        } else if (event.type === "source_created") {
+          if (event.source && learnId) {
+            localDb
+              .createSource({
+                learnId,
+                title: event.source.title || "Untitled Source",
+                type: event.source.type || "text",
+                url: event.source.url,
+                path: event.source.path,
+                content: event.source.content,
+                includedInChat: true,
+              })
+              .then(() => {
+                toast.success(
+                  language === "id"
+                    ? `Sumber "${event.source.title}" berhasil disimpan ke Sources!`
+                    : `Source "${event.source.title}" saved to Sources!`
+                );
+              })
+              .catch(console.error);
+          }
+        } else if (event.type === "artifact_created") {
+          if (event.artifact && learnId) {
+            localDb
+              .createArtifact({
+                learnId,
+                title: event.artifact.title || "Untitled Artifact",
+                type: event.artifact.type,
+                data: event.artifact.data,
+                status: "completed",
+                content:
+                  typeof event.artifact.data === "string"
+                    ? event.artifact.data
+                    : JSON.stringify(event.artifact.data),
+              })
+              .then(() => {
+                toast.success(
+                  language === "id"
+                    ? `Artifact Studio "${event.artifact.title}" berhasil dibuat!`
+                    : `Studio Artifact "${event.artifact.title}" created!`
+                );
+              })
+              .catch(console.error);
           }
         } else if (event.type === "error") {
           setActiveApproval(null);
@@ -3688,6 +3746,8 @@ export function ChatPanel({
                     onRollbackAll={(recs) => handleRollbackAll(recs, msg.id)}
                     onOpenFileDiff={onOpenFileDiff}
                     onOpenBrowser={onOpenBrowser}
+                    onOpenStudioArtifact={onOpenStudioArtifact}
+                    onOpenSourcePreview={(src) => setSelectedSourceForPreview(src)}
                   />
 
                   {/* Formatted Markdown Content Bubble */}

@@ -44,6 +44,9 @@ export interface ExecuteToolOptions {
   onSubAgentFinished?: (agentId: string, result?: string, error?: string) => void;
   onSubAgentKilled?: (agentId: string) => void;
   parentConfig?: AgentConfig;
+  learnId?: string;
+  onSourceCreated?: (source: any) => void;
+  onArtifactCreated?: (artifact: any) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -1407,6 +1410,71 @@ export const CONST_LEARN_TOOLS: NativeToolDefinition[] = [
           },
         },
         required: ["url"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "add_source",
+      description:
+        "Save a research finding, external URL reference, or self-synthesized study knowledge note as a permanent source in the current workspace. Use this when the user asks to save research or when critical learning material should be preserved for grounding and study.",
+      parameters: {
+        type: "object",
+        properties: {
+          title: {
+            type: "string",
+            description: "Concise, descriptive title for the source.",
+          },
+          type: {
+            type: "string",
+            enum: ["url", "text", "file"],
+            description:
+              "Source type: 'url' for web links, 'text' for AI knowledge notes/study synthesis, 'file' for workspace documents.",
+          },
+          content: {
+            type: "string",
+            description:
+              "The complete content, excerpt, or Markdown summary of the source.",
+          },
+          url: {
+            type: "string",
+            description: "The web URL if type is 'url' (optional).",
+          },
+        },
+        required: ["title", "type", "content"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "create_studio_artifact",
+      description:
+        "Generate and add an educational study artifact directly into the workspace Studio. Supports interactive flashcards, quizzes, mind maps, cheat sheets, reports, and slide decks. Automatically populates the Studio tab so the user can study or review it.",
+      parameters: {
+        type: "object",
+        properties: {
+          artifact_type: {
+            type: "string",
+            enum: ["flashcard", "quiz", "mind_map", "cheatsheet", "report", "slides"],
+            description: "The type of studio learning artifact to create.",
+          },
+          title: {
+            type: "string",
+            description: "Title of the study artifact.",
+          },
+          topic: {
+            type: "string",
+            description: "Topic or subject covered by this artifact.",
+          },
+          data: {
+            type: "object",
+            description:
+              "The structured artifact data according to its type (e.g. for flashcard: { cards: [{ front, back, hint }] }; for quiz: { questions: [{ question, options, correctIndex, explanation }] }; for mind_map: { root: { label, children: [...] } }; for cheatsheet: { cards: [{ title, badge, content }] }).",
+          },
+        },
+        required: ["artifact_type", "title", "data"],
       },
     },
   },
@@ -4914,6 +4982,159 @@ export async function executeNativeTool(
           isError: true,
         };
       }
+    }
+
+    // -----------------------------------------------------------------------
+    // Tool: add_source (aliases: addsource, savesource, createsource)
+    // -----------------------------------------------------------------------
+    if (
+      normalizedTool === "addsource" ||
+      normalizedTool === "savesource" ||
+      normalizedTool === "createsource"
+    ) {
+      const title = String(args.title || args.name || "Untitled Source").trim();
+      const rawType = String(args.type || args.source_type || "text").toLowerCase().trim();
+      const type = rawType === "url" || rawType === "file" || rawType === "text" ? rawType : "text";
+      const content = String(args.content || args.text || args.markdown || "").trim();
+      const url = args.url ? String(args.url).trim() : undefined;
+      const pathArg = args.path ? String(args.path).trim() : undefined;
+
+      if (!title) {
+        return {
+          result: "Error: Missing 'title' parameter for add_source.",
+          isError: true,
+        };
+      }
+      if (!content && !url && !pathArg) {
+        return {
+          result: "Error: Source requires either 'content', 'url', or 'path'.",
+          isError: true,
+        };
+      }
+
+      const sourceId = `source_${Math.random().toString(36).substring(2, 9)}${Date.now().toString(36)}`;
+      const sourceRecord = {
+        id: sourceId,
+        learnId: options.learnId || "default",
+        title,
+        type,
+        url,
+        path: pathArg,
+        content: content || (url ? `Source content from ${url}` : undefined),
+        includedInChat: true,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+      };
+
+      if (options.onSourceCreated) {
+        options.onSourceCreated(sourceRecord);
+      }
+
+      return {
+        result: `Successfully added ${type.toUpperCase()} source: "${title}" to workspace. It is now indexed and available in the Sources panel.`,
+        isError: false,
+      };
+    }
+
+    // -----------------------------------------------------------------------
+    // Tool: create_studio_artifact (aliases: createstudioartifact, createartifact, createstudyartifact)
+    // -----------------------------------------------------------------------
+    if (
+      normalizedTool === "createstudioartifact" ||
+      normalizedTool === "createartifact" ||
+      normalizedTool === "createstudyartifact"
+    ) {
+      const artifactType = String(args.artifact_type || args.type || "flashcard").toLowerCase().trim();
+      const title = String(args.title || `${artifactType} Artifact`).trim();
+      const rawData = args.data || args.content || {};
+
+      let normalizedData: any = typeof rawData === "object" ? { ...rawData } : {};
+
+      if (artifactType === "flashcard" || artifactType === "flashcards") {
+        const rawCards = Array.isArray(normalizedData.cards) ? normalizedData.cards : [];
+        normalizedData = {
+          title,
+          topic: args.topic || title,
+          sourceCount: 1,
+          cards: rawCards.map((c: any, i: number) => ({
+            id: c.id || `card_${i + 1}`,
+            front: c.front || c.question || `Card ${i + 1}`,
+            back: c.back || c.answer || "",
+            hint: c.hint || undefined,
+          })),
+        };
+      } else if (artifactType === "quiz") {
+        const rawQuestions = Array.isArray(normalizedData.questions) ? normalizedData.questions : [];
+        normalizedData = {
+          title,
+          topic: args.topic || title,
+          difficulty: args.difficulty || "medium",
+          sourceCount: 1,
+          questions: rawQuestions.map((q: any, i: number) => ({
+            id: q.id || `q_${i + 1}`,
+            question: q.question || `Question ${i + 1}`,
+            options: Array.isArray(q.options) ? q.options : ["Option A", "Option B", "Option C", "Option D"],
+            correctAnswer: typeof q.correctAnswer === "number" ? q.correctAnswer : typeof q.correctIndex === "number" ? q.correctIndex : 0,
+            explanation: q.explanation || "",
+          })),
+        };
+      } else if (artifactType === "mind_map" || artifactType === "mindmap") {
+        const root = normalizedData.root || {
+          id: "root",
+          label: title,
+          children: Array.isArray(normalizedData.nodes) ? normalizedData.nodes : [],
+        };
+        normalizedData = {
+          title,
+          topic: args.topic || title,
+          root,
+          sourceCount: 1,
+        };
+      } else if (artifactType === "cheatsheet" || artifactType === "cheat_sheet") {
+        const rawCards = Array.isArray(normalizedData.cards) ? normalizedData.cards : [];
+        normalizedData = {
+          title,
+          topic: args.topic || title,
+          coverageMode: "auto",
+          sourceCount: 1,
+          cards: rawCards.map((c: any, i: number) => ({
+            id: c.id || `card_${i + 1}`,
+            title: c.title || `Concept ${i + 1}`,
+            badge: c.badge || undefined,
+            content: c.content || "",
+          })),
+        };
+      }
+
+      const artifactId = `art_${Math.random().toString(36).substring(2, 9)}${Date.now().toString(36)}`;
+      const resolvedType =
+        artifactType === "mindmap"
+          ? "mind_map"
+          : artifactType === "flashcards"
+          ? "flashcard"
+          : artifactType === "cheat_sheet"
+          ? "cheatsheet"
+          : artifactType;
+
+      const artifactRecord = {
+        id: artifactId,
+        learnId: options.learnId || "default",
+        title,
+        type: resolvedType,
+        data: normalizedData,
+        status: "completed",
+        updatedAt: Date.now(),
+        createdAt: Date.now(),
+      };
+
+      if (options.onArtifactCreated) {
+        options.onArtifactCreated(artifactRecord);
+      }
+
+      return {
+        result: `Successfully created ${resolvedType} artifact: "${title}" in Studio! The user can now open and study it directly in the Studio tab.`,
+        isError: false,
+      };
     }
 
     // -----------------------------------------------------------------------

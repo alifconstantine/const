@@ -1521,6 +1521,13 @@ export class ConstAgent {
                 onEvent({ type: "subagent_killed", agentId });
               },
               parentConfig: this.config,
+              learnId: this.config.learnId,
+              onSourceCreated: (source) => {
+                onEvent({ type: "source_created", source });
+              },
+              onArtifactCreated: (artifact) => {
+                onEvent({ type: "artifact_created", artifact });
+              },
             }
           );
 

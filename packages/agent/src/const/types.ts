@@ -135,6 +135,8 @@ export interface AgentEventMap {
   subagent_updated: { agent: SubAgentItem };
   subagent_finished: { agentId: string; result?: string; error?: string };
   subagent_killed: { agentId: string };
+  source_created: { source: any };
+  artifact_created: { artifact: any };
 }
 
 export type AgentEvent = {
@@ -158,6 +160,7 @@ export interface AgentConfig {
   tools?: NativeToolDefinition[];
   systemPrompt?: string;
   workspacePath?: string;
+  learnId?: string;
   maxTurns?: number;
   mode?: "ask_before_changes" | "full_access";
   initialAllowedTools?: Set<string> | string[];

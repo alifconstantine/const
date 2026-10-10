@@ -321,10 +321,25 @@ function loadUserConfig(): UserConfig {
       if (
         !merged.activeModel ||
         merged.activeModel === "Const" ||
+        merged.activeModel === "const-search" ||
+        merged.activeModel === "Const Search" ||
         merged.activeModel.includes("(Const Router)") ||
         merged.activeModel.includes("(Native)")
       ) {
         merged.activeModel = "gemini-3.8-flash";
+      }
+
+      if (merged.customModels && Array.isArray(merged.customModels)) {
+        merged.customModels = merged.customModels.filter((m) => {
+          const id = (m.id || "").toLowerCase().trim();
+          const name = (m.displayName || "").toLowerCase().trim();
+          return (
+            id !== "const-search" &&
+            name !== "const search" &&
+            !id.includes("whisper") &&
+            !id.includes("transcription")
+          );
+        });
       }
 
       if (!merged.providers.const) {
@@ -1166,7 +1181,16 @@ app.on("second-instance", (_event, commandLine) => {
       if (res.ok) {
         const json: any = await res.json();
         if (json && Array.isArray(json.data) && json.data.length > 0) {
-          remoteModels = json.data.map((m: any) => {
+          remoteModels = json.data
+            .filter((m: any) => {
+              const id = (m.id || "").toLowerCase().trim();
+              const name = (m.name || m.display_name || "").toLowerCase().trim();
+              if (id === "const-search" || name === "const search" || id.includes("whisper")) return false;
+              if (m.type === "search" || m.category === "search" || m.type === "audio" || m.category === "stt") return false;
+              if (m.endpoint === "/v1/search" || m.endpoint === "/v1/audio/transcriptions") return false;
+              return true;
+            })
+            .map((m: any) => {
             const supportsThinking = Boolean(
               m.supports_thinking || m.supportsThinking || m.supports_reasoning
             );
@@ -1198,7 +1222,13 @@ app.on("second-instance", (_event, commandLine) => {
 
     const baseModels = remoteModels.length > 0 ? remoteModels : DEFAULT_MODELS;
 
-    const custom = (config.customModels || []).map((m) => ({
+    const custom = (config.customModels || [])
+      .filter((m) => {
+        const id = (m.id || "").toLowerCase().trim();
+        const name = (m.displayName || "").toLowerCase().trim();
+        return id !== "const-search" && name !== "const search" && !id.includes("whisper");
+      })
+      .map((m) => ({
       id: m.id,
       displayName: m.displayName || m.id,
       provider: m.provider || "custom",
@@ -1380,6 +1410,14 @@ app.on("second-instance", (_event, commandLine) => {
           `\nWhen the student asks to create a presentation, slides, infographic, or visual document in Canva, invoke 'canva_mcp_generate_design' with the prompt/topic and designType='presentation'. The backend will automatically generate the slides and instantiate a real presentation in the student's Canva account, returning 'edit_url' and 'view_url'. After the tool completes, present the presentation title, number of slides, and clickable links clearly to the student!`;
       }
 
+      effectiveSystemPrompt =
+        (effectiveSystemPrompt || "") +
+        `\n\n[STUDIO & SOURCES INTEGRATION]:` +
+        `\nYou have dedicated educational capabilities to save sources and build interactive studio study materials:` +
+        `\n1. 'add_source': Whenever the student asks to save research/notes, or when you synthesize comprehensive knowledge, formulas, or study notes, invoke 'add_source' with type='text' (for notes) or type='url' (for web links). This immediately saves the source to the Sources panel!` +
+        `\n2. 'create_studio_artifact': When the student asks to create study materials (e.g. flashcards, quiz, mind map, cheatsheet, report, or slide deck), invoke 'create_studio_artifact' with the complete structured data! The workspace Studio tab will automatically populate with your generated artifact so the user can study it interactively.` +
+        `\n3. 'web_search' & 'web_fetch': Search live web resources and fetch full article contents for deep grounding whenever current facts or references are needed.`;
+
       const agentTools = [...CONST_LEARN_TOOLS, ...activeComposioTools];
 
       const sessionKey = payload.learnId || "default";
@@ -1390,6 +1428,7 @@ app.on("second-instance", (_event, commandLine) => {
         apiKey,
         model,
         workspacePath: targetWorkspace,
+        learnId: payload.learnId,
         preset: "learn",
         tools: agentTools,
         systemPrompt: effectiveSystemPrompt,

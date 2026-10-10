@@ -50,7 +50,21 @@ export async function fetchRemoteModels(
     }
 
     const mapped: AiModel[] = rawList
-      .filter((item) => item && (item.id || item.name))
+      .filter((item) => {
+        if (!item || (!item.id && !item.name)) return false;
+        const id = String(item.id || item.name).toLowerCase().trim();
+        const name = String(item.name || item.id).toLowerCase().trim();
+        if (id === "const-search" || name === "const search" || id.includes("whisper") || id.includes("transcription")) {
+          return false;
+        }
+        if (item.type === "search" || item.category === "search" || item.type === "audio" || item.category === "stt") {
+          return false;
+        }
+        if (item.endpoint === "/v1/search" || item.endpoint === "/v1/audio/transcriptions") {
+          return false;
+        }
+        return true;
+      })
       .map((item) => {
         const id = String(item.id || item.name);
         const name = String(item.name || item.id);

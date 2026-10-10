@@ -32,10 +32,22 @@ export function getStoredAiConfig(): AiConfigState {
     }
   } catch {}
 
+  // Sanitize providers to remove const-search and audio models
+  providers = providers.map((p) => ({
+    ...p,
+    models: (p.models || []).filter((m) => {
+      const id = (m.id || "").toLowerCase();
+      return id !== "const-search" && !id.includes("whisper") && !id.includes("transcription");
+    }),
+  }));
+
   const activeProviderId =
     localStorage.getItem(STORAGE_KEY_ACTIVE_PROVIDER) || "const-router";
-  const activeModelId =
+  let activeModelId =
     localStorage.getItem(STORAGE_KEY_ACTIVE_MODEL) || "gemini-3.8-flash";
+  if (activeModelId === "const-search" || activeModelId.includes("whisper")) {
+    activeModelId = "gemini-3.8-flash";
+  }
 
   return {
     providers,
