@@ -140,6 +140,14 @@ export const translations = {
     deleteLearnConfirm: "This action cannot be undone. All research notes and conversations will be deleted.",
     deleteCollectionTitle: "Delete Folder \"{name}\"?",
     deleteCollectionConfirm: "Learns in this folder will not be deleted, only unlinked from this folder.",
+    deleteWorkspaceTitle: "Delete Workspace \"{title}\"?",
+    deleteWorkspaceConfirm: "This action cannot be undone. All sources, notes, conversations, and studio artifacts in this workspace will be permanently deleted.",
+    deleteWorkspaceWarningDesc: "All notes, attached sources, chat history, and studio artifacts created in this workspace will be permanently deleted.",
+    workspaceDeletedSuccess: "Workspace deleted successfully.",
+    failedDeleteWorkspace: "Failed to delete workspace.",
+    collectionDeletedSuccess: "Folder deleted successfully.",
+    batchDeleteSuccess: "Selected items deleted successfully.",
+    deleting: "Deleting...",
 
     // Workspace: Sources Panel
     sourcesPanelTitle: "Sources",
@@ -1526,6 +1534,14 @@ export const translations = {
     deleteLearnConfirm: "Tindakan ini tidak dapat dibatalkan. Seluruh catatan riset dan percakapan akan dihapus.",
     deleteCollectionTitle: "Hapus Folder \"{name}\"?",
     deleteCollectionConfirm: "Materi belajar di dalam folder ini tidak akan dihapus, hanya tautan foldernya yang dilepaskan.",
+    deleteWorkspaceTitle: "Hapus Workspace \"{title}\"?",
+    deleteWorkspaceConfirm: "Tindakan ini tidak dapat dibatalkan. Seluruh sumber, catatan, percakapan, dan artefak studio di workspace ini akan dihapus secara permanen.",
+    deleteWorkspaceWarningDesc: "Seluruh catatan, sumber referensi, riwayat percakapan, dan artefak studio di dalam workspace ini akan dihapus secara permanen.",
+    workspaceDeletedSuccess: "Workspace berhasil dihapus.",
+    failedDeleteWorkspace: "Gagal menghapus workspace.",
+    collectionDeletedSuccess: "Folder berhasil dihapus.",
+    batchDeleteSuccess: "Item yang dipilih berhasil dihapus.",
+    deleting: "Menghapus...",
 
     // Workspace: Sources Panel
     sourcesPanelTitle: "Sumber",

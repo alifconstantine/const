@@ -563,25 +563,82 @@ export const localDb = {
 
   async deleteLearn(id: string) {
     await db.transaction("rw", [db.learns, db.artifacts, db.messages, db.sessions, db.sources], async () => {
-      await db.artifacts.where("learnId").equals(id).delete();
+      // 1. Delete all artifacts linked to this learnId (both index and data payload)
+      const artifactIds = await db.artifacts
+        .filter((a) => a.learnId === id || a.data?.learnId === id)
+        .primaryKeys();
+      if (artifactIds.length > 0) {
+        await db.artifacts.bulkDelete(artifactIds);
+      }
+
+      // 2. Delete all chat messages
       await db.messages.where("learnId").equals(id).delete();
+
+      // 3. Delete all chat sessions
       await db.sessions.where("learnId").equals(id).delete();
+
+      // 4. Delete all sources
       await db.sources.where("learnId").equals(id).delete();
+
+      // 5. Delete the workspace record
       await db.learns.delete(id);
     });
+
+    // 6. Clean up localStorage cache
+    try {
+      if (typeof localStorage !== "undefined") {
+        localStorage.removeItem(`const_learn_active_session_${id}`);
+      }
+    } catch {}
+
+    // 7. Clean up workspace directory on disk in Electron if present
+    try {
+      const electron = (window as any)?.electron;
+      if (electron?.deleteWorkspacePath) {
+        await electron.deleteWorkspacePath(id);
+      }
+    } catch (err) {
+      console.warn("Could not delete workspace directory on disk:", err);
+    }
   },
 
   async batchDeleteLearns(ids: string[]) {
     if (ids.length === 0) return;
+    const idSet = new Set(ids);
     await db.transaction("rw", [db.learns, db.artifacts, db.messages, db.sessions, db.sources], async () => {
+      const artifactIds = await db.artifacts
+        .filter((a) => (a.learnId && idSet.has(a.learnId)) || (a.data?.learnId && idSet.has(a.data.learnId)))
+        .primaryKeys();
+      if (artifactIds.length > 0) {
+        await db.artifacts.bulkDelete(artifactIds);
+      }
+
       for (const id of ids) {
-        await db.artifacts.where("learnId").equals(id).delete();
         await db.messages.where("learnId").equals(id).delete();
         await db.sessions.where("learnId").equals(id).delete();
         await db.sources.where("learnId").equals(id).delete();
       }
       await db.learns.bulkDelete(ids);
     });
+
+    try {
+      if (typeof localStorage !== "undefined") {
+        for (const id of ids) {
+          localStorage.removeItem(`const_learn_active_session_${id}`);
+        }
+      }
+    } catch {}
+
+    try {
+      const electron = (window as any)?.electron;
+      if (electron?.deleteWorkspacePath) {
+        for (const id of ids) {
+          await electron.deleteWorkspacePath(id);
+        }
+      }
+    } catch (err) {
+      console.warn("Could not batch delete workspace directories on disk:", err);
+    }
   },
 
   async toggleCollection(learnId: string, collectionId: string) {

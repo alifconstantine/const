@@ -1048,6 +1048,21 @@ app.on("second-instance", (_event, commandLine) => {
     return targetDir;
   });
 
+  ipcMain.handle("workspace:delete-dir", async (_event, learnId?: string) => {
+    if (!learnId) return { success: false, error: "learnId is required" };
+    try {
+      const folderName = learnId.replace(/[^a-zA-Z0-9_-]/g, "_");
+      const targetDir = path.join(learnWorkspacesDir, folderName);
+      if (fs.existsSync(targetDir)) {
+        fs.rmSync(targetDir, { recursive: true, force: true });
+      }
+      return { success: true };
+    } catch (err: any) {
+      console.warn("[Electron Main] Failed to delete workspace dir:", err);
+      return { success: false, error: err?.message };
+    }
+  });
+
   // Dedicated Loopback Auth Login Handlers
   ipcMain.handle("auth:start-login", async (_event, options?: { accountsUrl?: string; action?: string }) => {
     try {

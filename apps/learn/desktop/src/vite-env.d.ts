@@ -51,6 +51,7 @@ declare global {
       openDirectoryDialog: () => Promise<string | null>;
       openFileDialog?: (options?: { multiple?: boolean }) => Promise<string[] | null>;
       getDefaultWorkspacePath?: (learnId?: string) => Promise<string>;
+      deleteWorkspacePath?: (learnId: string) => Promise<{ success: boolean; error?: string }>;
       startAuth?: (options?: {
         accountsUrl?: string;
         action?: string;

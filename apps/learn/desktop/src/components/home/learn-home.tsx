@@ -12,6 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuLabel,
   cn,
+  toast,
 } from "@const/ui";
 import {
   Search,
@@ -266,7 +267,14 @@ export function LearnHome({
     type: "learn" | "collection" | "batch";
     id?: string;
     title: string;
-    description: string;
+    description?: string;
+    itemPreview?: {
+      title: string;
+      description?: string;
+      emoji?: string;
+      sourcesCount?: number;
+    };
+    warningText?: string;
   } | null>(null);
 
   // Multi-Select States
@@ -572,27 +580,35 @@ export function LearnHome({
 
   const handleExecuteDelete = async () => {
     if (!deleteTarget) return;
-    if (deleteTarget.type === "learn") {
-      if (deleteTarget.id) {
-        await localDb.deleteLearn(deleteTarget.id);
-      }
-    } else if (deleteTarget.type === "collection") {
-      if (deleteTarget.id) {
-        await localDb.deleteCollection(deleteTarget.id);
-        if (activeCollectionId === deleteTarget.id) {
-          setActiveCollectionId(null);
+    try {
+      if (deleteTarget.type === "learn") {
+        if (deleteTarget.id) {
+          await localDb.deleteLearn(deleteTarget.id);
+          toast.success(t("workspaceDeletedSuccess"));
         }
+      } else if (deleteTarget.type === "collection") {
+        if (deleteTarget.id) {
+          await localDb.deleteCollection(deleteTarget.id);
+          if (activeCollectionId === deleteTarget.id) {
+            setActiveCollectionId(null);
+          }
+          toast.success(t("collectionDeletedSuccess"));
+        }
+      } else if (deleteTarget.type === "batch") {
+        if (selectedLearnIds.size > 0) {
+          await localDb.batchDeleteLearns(Array.from(selectedLearnIds));
+          setSelectedLearnIds(new Set());
+        }
+        if (selectedCollectionIds.size > 0) {
+          await localDb.batchDeleteCollections(Array.from(selectedCollectionIds));
+          setSelectedCollectionIds(new Set());
+        }
+        setIsSelectionMode(false);
+        toast.success(t("batchDeleteSuccess"));
       }
-    } else if (deleteTarget.type === "batch") {
-      if (selectedLearnIds.size > 0) {
-        await localDb.batchDeleteLearns(Array.from(selectedLearnIds));
-        setSelectedLearnIds(new Set());
-      }
-      if (selectedCollectionIds.size > 0) {
-        await localDb.batchDeleteCollections(Array.from(selectedCollectionIds));
-        setSelectedCollectionIds(new Set());
-      }
-      setIsSelectionMode(false);
+    } catch (err: any) {
+      console.error("Failed to execute delete:", err);
+      toast.error(t("failedDeleteWorkspace"));
     }
   };
 
@@ -992,8 +1008,14 @@ export function LearnHome({
                           setDeleteTarget({
                             type: "learn",
                             id: l.id,
-                            title: t("deleteLearnTitle", { title: l.title }),
-                            description: t("deleteLearnConfirm"),
+                            title: t("deleteWorkspaceTitle", { title: l.title }),
+                            itemPreview: {
+                              title: l.title,
+                              description: l.description,
+                              emoji: l.emoji,
+                              sourcesCount: l.sourcesCount,
+                            },
+                            warningText: t("deleteWorkspaceWarningDesc"),
                           })
                         }
                       />
@@ -1263,8 +1285,14 @@ export function LearnHome({
                             setDeleteTarget({
                               type: "learn",
                               id: l.id,
-                              title: t("deleteLearnTitle", { title: l.title }),
-                              description: t("deleteLearnConfirm"),
+                              title: t("deleteWorkspaceTitle", { title: l.title }),
+                              itemPreview: {
+                                title: l.title,
+                                description: l.description,
+                                emoji: l.emoji,
+                                sourcesCount: l.sourcesCount,
+                              },
+                              warningText: t("deleteWorkspaceWarningDesc"),
                             })
                           }
                         />
@@ -2069,6 +2097,8 @@ export function LearnHome({
           }}
           title={deleteTarget.title}
           description={deleteTarget.description}
+          itemPreview={deleteTarget.itemPreview}
+          warningText={deleteTarget.warningText}
           onConfirm={handleExecuteDelete}
         />
       )}

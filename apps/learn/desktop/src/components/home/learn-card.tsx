@@ -179,8 +179,11 @@ export function LearnCard({
               </DropdownMenuItem>
               <DropdownMenuSeparator className="my-1 bg-border" />
               <DropdownMenuItem
-                className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2 text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 dark:hover:bg-rose-500/10 focus:bg-rose-500/10 focus:text-rose-600"
-                onClick={() => onDelete?.(learn)}
+                className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2 text-rose-500 dark:text-rose-400 hover:bg-rose-500/10 dark:hover:bg-rose-500/10 focus:bg-rose-500/10 focus:text-rose-500"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete?.(learn);
+                }}
               >
                 <Trash2 className="h-3.5 w-3.5" />
                 <span>{t("delete")}</span>
@@ -261,8 +264,11 @@ export function LearnCard({
               </DropdownMenuItem>
               <DropdownMenuSeparator className="my-1 bg-border" />
               <DropdownMenuItem
-                className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2 text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 dark:hover:bg-rose-500/10 focus:bg-rose-500/10 focus:text-rose-600"
-                onClick={() => onDelete?.(learn)}
+                className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2 text-rose-500 dark:text-rose-400 hover:bg-rose-500/10 dark:hover:bg-rose-500/10 focus:bg-rose-500/10 focus:text-rose-500"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete?.(learn);
+                }}
               >
                 <Trash2 className="h-3.5 w-3.5" />
                 <span>{t("delete")}</span>
