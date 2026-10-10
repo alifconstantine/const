@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo } from "react";
 import {
-  ConstLogoIcon,
   Avatar,
   AvatarImage,
   AvatarFallback,
@@ -316,13 +315,11 @@ export function SettingsView({
         {/* Left Sidebar inside Modal (Antigravity Pop-up Style)       */}
         {/* ----------------------------------------------------------- */}
         <aside className="w-[220px] sm:w-[240px] h-full flex flex-col justify-between shrink-0 bg-[#f4f4f6] dark:bg-[#222222] border-r border-[#dedee2] dark:border-[#383838] p-3 select-none">
-          {/* Top Branding Strip */}
-          <div className="flex items-center gap-2 px-2.5 py-1.5 shrink-0 mb-1">
-            <ConstLogoIcon size="sm" className="w-5 h-5 text-[#262626] dark:text-white" />
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs font-semibold text-[#262626] dark:text-white tracking-tight">Const Learn</span>
-              <span className="text-[10px] font-sans font-medium px-1.5 py-0.2 rounded bg-[#e2e2e5] dark:bg-[#383838] text-[#555555] dark:text-[#a0a0a0]">Settings</span>
-            </div>
+          {/* Top Heading */}
+          <div className="px-2.5 pt-1 pb-2 shrink-0 mb-1">
+            <h2 className="text-sm font-semibold text-[#262626] dark:text-white tracking-tight">
+              {t("settings") || "Settings"}
+            </h2>
           </div>
 
           {/* Navigation Categories using Radix ScrollArea */}
