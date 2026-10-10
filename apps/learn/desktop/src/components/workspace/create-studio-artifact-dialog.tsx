@@ -192,35 +192,36 @@ export function CreateStudioArtifactDialog({
               </div>
 
               {/* Row: Jumlah Pertanyaan & Tingkat Kesulitan */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 items-start">
                 {/* Jumlah Pertanyaan */}
                 <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <label className="text-[11.5px] font-medium text-[#999999]">
+                  <div className="flex items-center justify-between h-5">
+                    <label className="text-[11.5px] font-medium text-[#999999] leading-none">
                       {artifactType === "quiz" ? t("numberOfQuestions") : t("numberOfCards")}
                     </label>
                     {countMode === "custom" && (
-                      <span className="text-[10px] text-[#777777]">1 - 50</span>
+                      <span className="text-[10px] text-[#777777] leading-none">1 - 50</span>
                     )}
                   </div>
-                  <div className="inline-flex w-full rounded-xl bg-[#222222] border border-[#2b2b2b] p-0.5">
+                  <div className="grid grid-cols-3 w-full rounded-xl bg-[#222222] border border-[#2b2b2b] p-0.5 h-9 items-center">
                     <button
                       type="button"
                       onClick={() => setCountMode("5")}
                       className={cn(
-                        "flex-1 py-1.5 rounded-lg text-xs transition-all cursor-pointer",
+                        "h-full flex items-center justify-center gap-1 rounded-lg text-xs transition-all cursor-pointer",
                         countMode === "5"
                           ? "bg-[#2b2b2b] text-white shadow-xs font-semibold"
                           : "text-[#888888] hover:text-[#cccccc]"
                       )}
                     >
-                      5
+                      {countMode === "5" && <Check className="h-3 w-3 text-white stroke-[2.5]" />}
+                      <span>5</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => setCountMode("10")}
                       className={cn(
-                        "flex-1 py-1.5 rounded-lg text-xs transition-all cursor-pointer flex items-center justify-center gap-1",
+                        "h-full flex items-center justify-center gap-1 rounded-lg text-xs transition-all cursor-pointer",
                         countMode === "10"
                           ? "bg-[#2b2b2b] text-white shadow-xs font-semibold"
                           : "text-[#888888] hover:text-[#cccccc]"
@@ -233,7 +234,7 @@ export function CreateStudioArtifactDialog({
                       type="button"
                       onClick={() => setCountMode("custom")}
                       className={cn(
-                        "flex-1 py-1.5 rounded-lg text-xs transition-all cursor-pointer flex items-center justify-center gap-1",
+                        "h-full flex items-center justify-center gap-1 rounded-lg text-xs transition-all cursor-pointer",
                         countMode === "custom"
                           ? "bg-[#2b2b2b] text-white shadow-xs font-semibold"
                           : "text-[#888888] hover:text-[#cccccc]"
@@ -271,27 +272,30 @@ export function CreateStudioArtifactDialog({
 
                 {/* Tingkat Kesulitan */}
                 <div className="space-y-1.5">
-                  <label className="text-[11.5px] font-medium text-[#999999]">
-                    {t("difficultyLevel")}
-                  </label>
-                  <div className="inline-flex w-full rounded-xl bg-[#222222] border border-[#2b2b2b] p-0.5">
+                  <div className="flex items-center justify-between h-5">
+                    <label className="text-[11.5px] font-medium text-[#999999] leading-none">
+                      {t("difficultyLevel")}
+                    </label>
+                  </div>
+                  <div className="grid grid-cols-3 w-full rounded-xl bg-[#222222] border border-[#2b2b2b] p-0.5 h-9 items-center">
                     <button
                       type="button"
                       onClick={() => setDifficulty("easy")}
                       className={cn(
-                        "flex-1 py-1.5 rounded-lg text-xs transition-all cursor-pointer",
+                        "h-full flex items-center justify-center gap-1 rounded-lg text-xs transition-all cursor-pointer",
                         difficulty === "easy"
                           ? "bg-[#2b2b2b] text-white shadow-xs font-semibold"
                           : "text-[#888888] hover:text-[#cccccc]"
                       )}
                     >
-                      {t("difficultyEasy")}
+                      {difficulty === "easy" && <Check className="h-3 w-3 text-white stroke-[2.5]" />}
+                      <span>{t("difficultyEasy")}</span>
                     </button>
                     <button
                       type="button"
                       onClick={() => setDifficulty("medium")}
                       className={cn(
-                        "flex-1 py-1.5 rounded-lg text-xs transition-all cursor-pointer flex items-center justify-center gap-1",
+                        "h-full flex items-center justify-center gap-1 rounded-lg text-xs transition-all cursor-pointer",
                         difficulty === "medium"
                           ? "bg-[#2b2b2b] text-white shadow-xs font-semibold"
                           : "text-[#888888] hover:text-[#cccccc]"
@@ -304,13 +308,14 @@ export function CreateStudioArtifactDialog({
                       type="button"
                       onClick={() => setDifficulty("hard")}
                       className={cn(
-                        "flex-1 py-1.5 rounded-lg text-xs transition-all cursor-pointer",
+                        "h-full flex items-center justify-center gap-1 rounded-lg text-xs transition-all cursor-pointer",
                         difficulty === "hard"
                           ? "bg-[#2b2b2b] text-white shadow-xs font-semibold"
                           : "text-[#888888] hover:text-[#cccccc]"
                       )}
                     >
-                      {t("difficultyHard")}
+                      {difficulty === "hard" && <Check className="h-3 w-3 text-white stroke-[2.5]" />}
+                      <span>{t("difficultyHard")}</span>
                     </button>
                   </div>
                 </div>

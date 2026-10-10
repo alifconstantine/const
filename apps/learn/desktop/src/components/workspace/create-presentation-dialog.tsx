@@ -158,14 +158,6 @@ export function CreatePresentationDialog({
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
           <ScrollArea className="flex-1 min-h-0 w-full px-5 py-2">
             <div className="space-y-4 pb-2">
-              {/* Concept Box */}
-              <div className="p-3.5 rounded-xl bg-[#222222] border border-[#2b2b2b] flex items-start gap-3">
-                <Presentation className="h-4 w-4 text-white shrink-0 mt-0.5" />
-                <div className="text-xs text-[#d4d4d4] leading-relaxed">
-                  {t("presentationConceptBox")}
-                </div>
-              </div>
-
               {/* Source Scope Dropdown (consistent with Video Summary) */}
               <div className="space-y-1.5 relative" data-studio-dropdown>
                 <label className="text-[11.5px] font-medium text-[#999999]">
