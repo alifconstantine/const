@@ -159,45 +159,47 @@ export function CreateLearnDialog({
           </div>
 
           {/* Folder (Collection) Assignment (borderless) */}
-          <div className="space-y-1.5">
-            <label className="text-xs font-medium text-foreground/80 flex items-center gap-1.5">
-              <Folder className="h-3.5 w-3.5 text-primary shrink-0" />
-              <span>{t("collectionCategoryOptional")}</span>
-            </label>
-            {collections.length > 0 ? (
-              <Select
-                value={selectedCollectionId || "none"}
-                onValueChange={(val) =>
-                  setSelectedCollectionId(val === "none" ? undefined : val)
-                }
-              >
-                <SelectTrigger className="w-full h-10 px-3 rounded-xl bg-secondary/50 border-none text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring shadow-none">
-                  <SelectValue placeholder={t("noCollection")} />
-                </SelectTrigger>
-                <SelectContent className="max-h-56 z-50 rounded-xl border border-border/60 bg-popover text-popover-foreground shadow-lg">
-                  <SelectItem value="none" className="text-xs py-2 cursor-pointer">
-                    <div className="flex items-center gap-2">
-                      <Folder className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                      <span>{t("noCollection")}</span>
-                    </div>
-                  </SelectItem>
-                  {collections.map((col) => (
-                    <SelectItem key={col.id} value={col.id} className="text-xs py-2 cursor-pointer">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <ModuleIcon icon={col.emoji} className="w-3.5 h-3.5 text-foreground/80 shrink-0" />
-                        <span className="truncate">{col.name}</span>
+          {!isEdit && (
+            <div className="space-y-1.5">
+              <label className="text-xs font-medium text-foreground/80 flex items-center gap-1.5">
+                <Folder className="h-3.5 w-3.5 text-primary shrink-0" />
+                <span>{t("collectionCategoryOptional")}</span>
+              </label>
+              {collections.length > 0 ? (
+                <Select
+                  value={selectedCollectionId || "none"}
+                  onValueChange={(val) =>
+                    setSelectedCollectionId(val === "none" ? undefined : val)
+                  }
+                >
+                  <SelectTrigger className="w-full h-10 px-3 rounded-xl bg-secondary/50 border-none text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring shadow-none">
+                    <SelectValue placeholder={t("noCollection")} />
+                  </SelectTrigger>
+                  <SelectContent className="max-h-56 z-50 rounded-xl border border-border/60 bg-popover text-popover-foreground shadow-lg">
+                    <SelectItem value="none" className="text-xs py-2 cursor-pointer">
+                      <div className="flex items-center gap-2">
+                        <Folder className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                        <span>{t("noCollection")}</span>
                       </div>
                     </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            ) : (
-              <div className="h-10 px-3 rounded-xl bg-secondary/30 border-none text-xs text-muted-foreground flex items-center gap-2 select-none">
-                <Folder className="h-3.5 w-3.5 text-muted-foreground/60 shrink-0" />
-                <span>{t("noCollection")}</span>
-              </div>
-            )}
-          </div>
+                    {collections.map((col) => (
+                      <SelectItem key={col.id} value={col.id} className="text-xs py-2 cursor-pointer">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <ModuleIcon icon={col.emoji} className="w-3.5 h-3.5 text-foreground/80 shrink-0" />
+                          <span className="truncate">{col.name}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="h-10 px-3 rounded-xl bg-secondary/30 border-none text-xs text-muted-foreground flex items-center gap-2 select-none">
+                  <Folder className="h-3.5 w-3.5 text-muted-foreground/60 shrink-0" />
+                  <span>{t("noCollection")}</span>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Dialog Footer (borderless) */}
           <DialogFooter className="pt-2 flex flex-row gap-2 justify-end">

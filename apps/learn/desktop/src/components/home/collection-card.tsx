@@ -128,17 +128,27 @@ export function CollectionCard({
                   <MoreVertical className="h-4 w-4" />
                 </button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-44 p-1.5 shadow-md">
+              <DropdownMenuContent
+                align="end"
+                className="w-44 p-1.5 shadow-md"
+                onClick={(e) => e.stopPropagation()}
+              >
                 <DropdownMenuItem
                   className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2"
-                  onClick={() => onClick?.(collection)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onClick?.(collection);
+                  }}
                 >
                   <FolderOpen className="h-3.5 w-3.5" />
                   <span>{t("openCollection")}</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2"
-                  onClick={() => onEdit?.(collection)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onEdit?.(collection);
+                  }}
                 >
                   <Edit3 className="h-3.5 w-3.5" />
                   <span>{t("editCollection")}</span>
@@ -146,7 +156,10 @@ export function CollectionCard({
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2 text-destructive focus:text-destructive"
-                  onClick={() => onDelete?.(collection)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDelete?.(collection);
+                  }}
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                   <span>{t("delete")}</span>
@@ -195,17 +208,27 @@ export function CollectionCard({
                 <MoreVertical className="h-4 w-4" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-44 p-1.5 shadow-md">
+            <DropdownMenuContent
+              align="end"
+              className="w-44 p-1.5 shadow-md"
+              onClick={(e) => e.stopPropagation()}
+            >
               <DropdownMenuItem
                 className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2"
-                onClick={() => onClick?.(collection)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onClick?.(collection);
+                }}
               >
                 <FolderOpen className="h-3.5 w-3.5" />
                 <span>{t("openCollection")}</span>
               </DropdownMenuItem>
               <DropdownMenuItem
                 className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2"
-                onClick={() => onEdit?.(collection)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEdit?.(collection);
+                }}
               >
                 <Edit3 className="h-3.5 w-3.5" />
                 <span>{t("editCollection")}</span>
@@ -213,7 +236,10 @@ export function CollectionCard({
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2 text-destructive focus:text-destructive"
-                onClick={() => onDelete?.(collection)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete?.(collection);
+                }}
               >
                 <Trash2 className="h-3.5 w-3.5" />
                 <span>{t("delete")}</span>

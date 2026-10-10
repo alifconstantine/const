@@ -113,12 +113,11 @@ export function CreateLearnDialog({
   };
 
   const isEdit = Boolean(initialData?.id);
-  const activeIconDef = LEARN_ICONS.find((i) => i.id === (hoveredEmoji || selectedEmoji));
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-full max-w-[440px] p-5 rounded-2xl border border-border/80 bg-card text-card-foreground shadow-2xl overflow-hidden outline-none focus:outline-none focus-visible:outline-none ring-0 focus-visible:ring-0">
-        <form onSubmit={handleSubmit} className="space-y-3.5 w-full min-w-0">
+      <DialogContent className={`w-full ${isEdit ? "max-w-[420px]" : "max-w-[440px]"} p-5 rounded-2xl border border-border/80 bg-card text-card-foreground shadow-2xl overflow-hidden outline-none focus:outline-none focus-visible:outline-none ring-0 focus-visible:ring-0`}>
+        <form onSubmit={handleSubmit} className="space-y-4 w-full min-w-0">
           <DialogHeader className="pb-0.5">
             <DialogTitle className="font-serif text-base font-medium tracking-tight text-foreground flex items-center gap-2">
               <BookOpen className="h-4 w-4 text-primary shrink-0" />
@@ -128,14 +127,9 @@ export function CreateLearnDialog({
 
           {/* Clean Modern Icon Selector (8 cols x 2 rows) */}
           <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="text-[12px] font-medium text-muted-foreground block">
-                {t("learnIcon") || t("pickIconEmoji")}
-              </label>
-              <span className="text-[11px] text-muted-foreground/80 font-sans capitalize">
-                {activeIconDef?.label}
-              </span>
-            </div>
+            <label className="text-[12px] font-medium text-muted-foreground mb-1.5 block">
+              {t("learnIcon")}
+            </label>
             <div className="grid grid-cols-8 gap-1.5 p-2 rounded-xl bg-secondary/40 border border-border/60 w-full justify-items-center">
               {LEARN_ICONS.map((item) => {
                 const IconComponent = item.icon;
@@ -145,12 +139,10 @@ export function CreateLearnDialog({
                     key={item.id}
                     type="button"
                     onClick={() => setSelectedEmoji(item.id)}
-                    onMouseEnter={() => setHoveredEmoji(item.id)}
-                    onMouseLeave={() => setHoveredEmoji(null)}
                     className={`h-8 w-8 rounded-lg flex items-center justify-center transition-all cursor-pointer ${
                       isSelected
                         ? "bg-foreground text-background shadow-xs scale-105"
-                        : "text-muted-foreground hover:text-foreground hover:bg-foreground/10 hover:scale-105 active:scale-95 border border-transparent"
+                        : "text-muted-foreground hover:text-foreground hover:bg-secondary border border-transparent hover:border-border/50"
                     }`}
                     title={item.label}
                     aria-label={item.label}
@@ -177,146 +169,150 @@ export function CreateLearnDialog({
             />
           </div>
 
-          {/* Project Folder / Workspace Selection */}
-          <div className="space-y-1">
-            <div className="flex items-center justify-between">
-              <label className="text-[12px] font-medium text-muted-foreground flex items-center gap-1.5">
-                <Folder className="h-3.5 w-3.5 text-primary shrink-0" />
-                <span>{t("workspacePathLabel")}</span>
-              </label>
-              {projectPath && (
-                <button
-                  type="button"
-                  onClick={() => setProjectPath("")}
-                  className="text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-0.5 cursor-pointer"
-                >
-                  <X className="h-3 w-3" />
-                  <span>{t("resetDefault")}</span>
-                </button>
-              )}
-            </div>
+          {!isEdit && (
+            <>
+              {/* Project Folder / Workspace Selection */}
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <label className="text-[12px] font-medium text-muted-foreground flex items-center gap-1.5">
+                    <Folder className="h-3.5 w-3.5 text-primary shrink-0" />
+                    <span>{t("workspacePathLabel")}</span>
+                  </label>
+                  {projectPath && (
+                    <button
+                      type="button"
+                      onClick={() => setProjectPath("")}
+                      className="text-[11px] text-muted-foreground hover:text-foreground flex items-center gap-0.5 cursor-pointer"
+                    >
+                      <X className="h-3 w-3" />
+                      <span>{t("resetDefault")}</span>
+                    </button>
+                  )}
+                </div>
 
-            <div className="flex items-center gap-1.5 w-full min-w-0">
-              <div
-                className="flex-1 min-w-0 h-8 px-2.5 rounded-xl bg-secondary/40 border border-border/70 text-[12px] text-foreground flex items-center overflow-hidden"
-                title={projectPath || t("workspacePathPlaceholder")}
-              >
-                <span className="truncate">
-                  {projectPath ? projectPath : t("workspacePathPlaceholder")}
-                </span>
+                <div className="flex items-center gap-1.5 w-full min-w-0">
+                  <div
+                    className="flex-1 min-w-0 h-8 px-2.5 rounded-xl bg-secondary/40 border border-border/70 text-[12px] text-foreground flex items-center overflow-hidden"
+                    title={projectPath || t("workspacePathPlaceholder")}
+                  >
+                    <span className="truncate">
+                      {projectPath ? projectPath : t("workspacePathPlaceholder")}
+                    </span>
+                  </div>
+
+                  {window.electron?.openDirectoryDialog && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={handleSelectFolder}
+                      className="rounded-xl h-8 px-2.5 text-[12px] gap-1.5 shrink-0 cursor-pointer border-border/70"
+                    >
+                      <FolderOpen className="h-3.5 w-3.5 text-muted-foreground" />
+                      <span>{t("selectFolder")}</span>
+                    </Button>
+                  )}
+                </div>
+                <p className="text-[11px] text-muted-foreground/70 leading-normal">
+                  {projectPath
+                    ? t("agentWorkspaceNotice")
+                    : t("defaultWorkspaceNotice")}
+                </p>
               </div>
 
-              {window.electron?.openDirectoryDialog && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleSelectFolder}
-                  className="rounded-xl h-8 px-2.5 text-[12px] gap-1.5 shrink-0 cursor-pointer border-border/70"
-                >
-                  <FolderOpen className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span>{t("selectFolder")}</span>
-                </Button>
-              )}
-            </div>
-            <p className="text-[11px] text-muted-foreground/70 leading-normal">
-              {projectPath
-                ? t("agentWorkspaceNotice")
-                : t("defaultWorkspaceNotice")}
-            </p>
-          </div>
-
-          {/* Permission Mode Selection */}
-          <div className="space-y-1.5">
-            <label className="text-[12px] font-medium text-muted-foreground block">
-              {t("permissionModeLabel")}
-            </label>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setPermissionMode("ask_before_changes")}
-                className={`p-2.5 rounded-xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
-                  permissionMode === "ask_before_changes"
-                    ? "border-primary bg-primary/5 shadow-xs"
-                    : "border-border/70 bg-secondary/20 hover:bg-secondary/40"
-                }`}
-              >
-                <div className="flex items-center justify-between w-full mb-1">
-                  <Hand className="h-4 w-4 text-foreground shrink-0" />
-                  {permissionMode === "ask_before_changes" && (
-                    <Check className="h-3.5 w-3.5 text-primary shrink-0" />
-                  )}
-                </div>
-                <div>
-                  <div className="text-[12px] font-medium text-foreground">
-                    {t("askBeforeChanges")}
-                  </div>
-                  <div className="text-[10.5px] text-muted-foreground leading-tight mt-0.5">
-                    {t("askBeforeChangesDesc")}
-                  </div>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setPermissionMode("full_access")}
-                className={`p-2.5 rounded-xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
-                  permissionMode === "full_access"
-                    ? "border-amber-500/60 bg-amber-500/10 shadow-xs"
-                    : "border-border/70 bg-secondary/20 hover:bg-secondary/40"
-                }`}
-              >
-                <div className="flex items-center justify-between w-full mb-1">
-                  <ShieldAlert className="h-4 w-4 text-amber-500 shrink-0" />
-                  {permissionMode === "full_access" && (
-                    <Check className="h-3.5 w-3.5 text-amber-500 shrink-0" />
-                  )}
-                </div>
-                <div>
-                  <div className="text-[12px] font-medium text-foreground">
-                    {t("fullAccess")}
-                  </div>
-                  <div className="text-[10.5px] text-muted-foreground leading-tight mt-0.5">
-                    {t("fullAccessDesc")}
-                  </div>
-                </div>
-              </button>
-            </div>
-          </div>
-
-          {/* Collection Assignment */}
-          {!isEdit && collections.length > 0 && (
-            <div className="space-y-1.5">
-              <label className="text-[12px] font-medium text-muted-foreground block">
-                {t("collectionCategoryOptional")}
-              </label>
-              <Select
-                value={selectedCollectionId || "none"}
-                onValueChange={(val) =>
-                  setSelectedCollectionId(val === "none" ? undefined : val)
-                }
-              >
-                <SelectTrigger className="w-full h-8 px-2.5 rounded-xl bg-secondary/40 border border-border/70 text-[12px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring">
-                  <SelectValue placeholder={t("noCollection")} />
-                </SelectTrigger>
-                <SelectContent className="max-h-56 z-50 rounded-xl border-border bg-popover text-popover-foreground shadow-lg">
-                  <SelectItem value="none" className="text-xs py-2 cursor-pointer">
-                    <div className="flex items-center gap-2">
-                      <Folder className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                      <span>{t("noCollection")}</span>
+              {/* Permission Mode Selection */}
+              <div className="space-y-1.5">
+                <label className="text-[12px] font-medium text-muted-foreground block">
+                  {t("permissionModeLabel")}
+                </label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setPermissionMode("ask_before_changes")}
+                    className={`p-2.5 rounded-xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
+                      permissionMode === "ask_before_changes"
+                        ? "border-primary bg-primary/5 shadow-xs"
+                        : "border-border/70 bg-secondary/20 hover:bg-secondary/40"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between w-full mb-1">
+                      <Hand className="h-4 w-4 text-foreground shrink-0" />
+                      {permissionMode === "ask_before_changes" && (
+                        <Check className="h-3.5 w-3.5 text-primary shrink-0" />
+                      )}
                     </div>
-                  </SelectItem>
-                  {collections.map((col) => (
-                    <SelectItem key={col.id} value={col.id} className="text-xs py-2 cursor-pointer">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <ModuleIcon icon={col.emoji} className="w-3.5 h-3.5 text-foreground/80 shrink-0" />
-                        <span className="truncate">{col.name}</span>
+                    <div>
+                      <div className="text-[12px] font-medium text-foreground">
+                        {t("askBeforeChanges")}
                       </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+                      <div className="text-[10.5px] text-muted-foreground leading-tight mt-0.5">
+                        {t("askBeforeChangesDesc")}
+                      </div>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setPermissionMode("full_access")}
+                    className={`p-2.5 rounded-xl border text-left flex flex-col justify-between transition-all cursor-pointer ${
+                      permissionMode === "full_access"
+                        ? "border-amber-500/60 bg-amber-500/10 shadow-xs"
+                        : "border-border/70 bg-secondary/20 hover:bg-secondary/40"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between w-full mb-1">
+                      <ShieldAlert className="h-4 w-4 text-amber-500 shrink-0" />
+                      {permissionMode === "full_access" && (
+                        <Check className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                      )}
+                    </div>
+                    <div>
+                      <div className="text-[12px] font-medium text-foreground">
+                        {t("fullAccess")}
+                      </div>
+                      <div className="text-[10.5px] text-muted-foreground leading-tight mt-0.5">
+                        {t("fullAccessDesc")}
+                      </div>
+                    </div>
+                  </button>
+                </div>
+              </div>
+
+              {/* Collection Assignment */}
+              {collections.length > 0 && (
+                <div className="space-y-1.5">
+                  <label className="text-[12px] font-medium text-muted-foreground block">
+                    {t("collectionCategoryOptional")}
+                  </label>
+                  <Select
+                    value={selectedCollectionId || "none"}
+                    onValueChange={(val) =>
+                      setSelectedCollectionId(val === "none" ? undefined : val)
+                    }
+                  >
+                    <SelectTrigger className="w-full h-8 px-2.5 rounded-xl bg-secondary/40 border border-border/70 text-[12px] text-foreground focus:outline-none focus:ring-1 focus:ring-ring">
+                      <SelectValue placeholder={t("noCollection")} />
+                    </SelectTrigger>
+                    <SelectContent className="max-h-56 z-50 rounded-xl border-border bg-popover text-popover-foreground shadow-lg">
+                      <SelectItem value="none" className="text-xs py-2 cursor-pointer">
+                        <div className="flex items-center gap-2">
+                          <Folder className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                          <span>{t("noCollection")}</span>
+                        </div>
+                      </SelectItem>
+                      {collections.map((col) => (
+                        <SelectItem key={col.id} value={col.id} className="text-xs py-2 cursor-pointer">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <ModuleIcon icon={col.emoji} className="w-3.5 h-3.5 text-foreground/80 shrink-0" />
+                            <span className="truncate">{col.name}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+            </>
           )}
 
           <DialogFooter className="pt-2 gap-2 flex flex-row items-center justify-end sm:justify-end">

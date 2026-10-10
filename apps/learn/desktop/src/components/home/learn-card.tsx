@@ -7,7 +7,7 @@ import {
   DropdownMenuSeparator,
   Checkbox,
 } from "@const/ui";
-import { MoreVertical, FolderPlus, FolderMinus, Edit3, Trash2, ExternalLink, FileText } from "lucide-react";
+import { MoreVertical, FolderMinus, Edit3, Trash2, ExternalLink, FileText } from "lucide-react";
 import { LocalLearn } from "../../lib/db";
 import { useI18n } from "../../lib/i18n";
 import { LearnIcon } from "./learn-icon";
@@ -146,25 +146,28 @@ export function LearnCard({
                 <MoreVertical className="h-4 w-4" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48 p-1.5 shadow-xl bg-popover border-border text-popover-foreground">
+            <DropdownMenuContent
+              align="end"
+              className="w-48 p-1.5 shadow-xl bg-popover border-border text-popover-foreground"
+              onClick={(e) => e.stopPropagation()}
+            >
               <DropdownMenuItem
                 className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2 hover:bg-secondary"
-                onClick={() => onClick?.(learn)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onClick?.(learn);
+                }}
               >
                 <ExternalLink className="h-3.5 w-3.5" />
                 <span>{t("openLearn")}</span>
               </DropdownMenuItem>
-              <DropdownMenuItem
-                className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2 hover:bg-secondary"
-                onClick={() => onManageCollections?.(learn)}
-              >
-                <FolderPlus className="h-3.5 w-3.5" />
-                <span>{t("manageCollections")}</span>
-              </DropdownMenuItem>
               {onRemoveFromCollection && (
                 <DropdownMenuItem
                   className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2 hover:bg-secondary text-amber-600 dark:text-amber-400"
-                  onClick={() => onRemoveFromCollection(learn)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRemoveFromCollection(learn);
+                  }}
                 >
                   <FolderMinus className="h-3.5 w-3.5" />
                   <span>{t("removeFromModule")}</span>
@@ -172,7 +175,10 @@ export function LearnCard({
               )}
               <DropdownMenuItem
                 className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2 hover:bg-secondary"
-                onClick={() => onEdit?.(learn)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEdit?.(learn);
+                }}
               >
                 <Edit3 className="h-3.5 w-3.5" />
                 <span>{t("editLearn")}</span>
@@ -231,25 +237,28 @@ export function LearnCard({
                 <MoreVertical className="h-4 w-4" />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-48 p-1.5 shadow-xl bg-popover border-border text-popover-foreground">
+            <DropdownMenuContent
+              align="end"
+              className="w-48 p-1.5 shadow-xl bg-popover border-border text-popover-foreground"
+              onClick={(e) => e.stopPropagation()}
+            >
               <DropdownMenuItem
                 className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2 hover:bg-secondary"
-                onClick={() => onClick?.(learn)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onClick?.(learn);
+                }}
               >
                 <ExternalLink className="h-3.5 w-3.5" />
                 <span>{t("openLearn")}</span>
               </DropdownMenuItem>
-              <DropdownMenuItem
-                className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2 hover:bg-secondary"
-                onClick={() => onManageCollections?.(learn)}
-              >
-                <FolderPlus className="h-3.5 w-3.5" />
-                <span>{t("manageCollections")}</span>
-              </DropdownMenuItem>
               {onRemoveFromCollection && (
                 <DropdownMenuItem
                   className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2 hover:bg-secondary text-amber-600 dark:text-amber-400"
-                  onClick={() => onRemoveFromCollection(learn)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onRemoveFromCollection(learn);
+                  }}
                 >
                   <FolderMinus className="h-3.5 w-3.5" />
                   <span>{t("removeFromModule")}</span>
@@ -257,7 +266,10 @@ export function LearnCard({
               )}
               <DropdownMenuItem
                 className="cursor-pointer text-xs py-2 px-2.5 flex items-center gap-2 hover:bg-secondary"
-                onClick={() => onEdit?.(learn)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEdit?.(learn);
+                }}
               >
                 <Edit3 className="h-3.5 w-3.5" />
                 <span>{t("editLearn")}</span>
