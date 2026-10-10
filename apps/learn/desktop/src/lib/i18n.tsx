@@ -904,8 +904,12 @@ export const translations = {
     configSavedCount: "Configuration saved ({count} servers).",
     configCopiedToClipboard: "Configuration copied to clipboard!",
     connectorDisconnectedNotice: "{name} disconnected successfully.",
+    failedDisconnectNotice: "Failed to disconnect {name}.",
     serverEnabledNotice: "Server enabled.",
     serverDisabledNotice: "Server disabled.",
+    serverRefreshFailedCount: "{count} MCP server(s) failed reachability check.",
+    mcpInvalidUrl: "Server URL must be a valid HTTP or HTTPS address.",
+    mcpInvalidTimeout: "Timeout must be a positive number.",
 
     // Mobile Settings Specific
     general: "General",
@@ -2286,8 +2290,12 @@ export const translations = {
     configSavedCount: "Konfigurasi disimpan ({count} server).",
     configCopiedToClipboard: "Konfigurasi disalin ke clipboard!",
     connectorDisconnectedNotice: "{name} berhasil dinonaktifkan.",
+    failedDisconnectNotice: "Gagal memutuskan koneksi {name}.",
     serverEnabledNotice: "Server diaktifkan.",
     serverDisabledNotice: "Server dinonaktifkan.",
+    serverRefreshFailedCount: "{count} server MCP tidak dapat dijangkau.",
+    mcpInvalidUrl: "URL server harus berupa alamat HTTP atau HTTPS yang valid.",
+    mcpInvalidTimeout: "Timeout harus berupa angka positif.",
 
     // Mobile Settings Specific
     general: "Umum",

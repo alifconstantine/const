@@ -255,11 +255,19 @@ export function McpToolsView() {
 
     try {
       if (isActive) {
-        await disconnectConnector(connector.id);
-        setConnectedIds(getConnectedConnectorIds());
-        toast.success(t("connectorDisconnectedNotice", { name: connector.name }));
+        const disconnected = await disconnectConnector(connector.id);
+        if (disconnected) {
+          setConnectedIds(getConnectedConnectorIds());
+          toast.success(t("connectorDisconnectedNotice", { name: connector.name }));
+        } else {
+          toast.error(t("failedDisconnectNotice", { name: connector.name }));
+        }
       } else {
         const res = await connectConnector(connector);
+        if (!res || !res.success) {
+          toast.error(res?.message || t("failedChangeConnectionStatus"));
+          return;
+        }
         setConnectedIds(getConnectedConnectorIds());
         if (res.message) {
           toast.success(res.message);
@@ -281,12 +289,37 @@ export function McpToolsView() {
 
   // Custom MCP Handlers
   const handleToggleServer = (serverId: string, nextChecked: boolean) => {
+    const target = mcpConfig.servers.find((s) => s.id === serverId);
+    if (nextChecked && target) {
+      if (target.transport === "stdio" && !target.command?.trim()) {
+        toast.error(t("mcpCommandRequired"));
+        return;
+      }
+      if (target.transport === "http" || target.transport === "sse") {
+        if (!target.url?.trim()) {
+          toast.error(t("mcpUrlRequired"));
+          return;
+        }
+        try {
+          const parsed = new URL(target.url);
+          if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+            toast.error(t("mcpInvalidUrl"));
+            return;
+          }
+        } catch {
+          toast.error(t("mcpInvalidUrl"));
+          return;
+        }
+      }
+    }
+
     const updated = mcpConfig.servers.map((s) => {
       if (s.id === serverId) {
         return {
           ...s,
           enabled: nextChecked,
           status: (nextChecked ? "ready" : "disabled") as any,
+          errorMessage: undefined,
         };
       }
       return s;
@@ -297,14 +330,72 @@ export function McpToolsView() {
     toast.success(nextChecked ? t("serverEnabledNotice") : t("serverDisabledNotice"));
   };
 
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
     setIsRefreshing(true);
-    setTimeout(() => {
-      setIsRefreshing(false);
-      setMcpConfig(getStoredMcpConfig());
+    try {
+      const currentConfig = getStoredMcpConfig();
+      let failedCount = 0;
+
+      const checkedServers = await Promise.all(
+        currentConfig.servers.map(async (server) => {
+          if (server.enabled === false) {
+            return { ...server, status: "disabled" as const, errorMessage: undefined };
+          }
+
+          // Reachability check for HTTP / SSE
+          if (server.transport === "http" || server.transport === "sse") {
+            if (!server.url) {
+              failedCount++;
+              return { ...server, status: "error" as const, errorMessage: "Missing server URL" };
+            }
+            try {
+              const controller = new AbortController();
+              const timeoutId = setTimeout(() => controller.abort(), 3000);
+              await fetch(server.url, {
+                method: "HEAD",
+                mode: "no-cors",
+                signal: controller.signal,
+              });
+              clearTimeout(timeoutId);
+              return { ...server, status: "ready" as const, errorMessage: undefined };
+            } catch (fetchErr: any) {
+              failedCount++;
+              const msg =
+                fetchErr?.name === "AbortError"
+                  ? "Connection timed out"
+                  : fetchErr?.message || "Unreachable";
+              return { ...server, status: "error" as const, errorMessage: msg };
+            }
+          }
+
+          // Stdio reachability check
+          if (server.transport === "stdio") {
+            if (!server.command?.trim()) {
+              failedCount++;
+              return { ...server, status: "error" as const, errorMessage: "Missing command" };
+            }
+            return { ...server, status: "ready" as const, errorMessage: undefined };
+          }
+
+          return { ...server, status: "ready" as const, errorMessage: undefined };
+        })
+      );
+
+      const nextConfig = { ...currentConfig, servers: checkedServers };
+      setMcpConfig(nextConfig);
+      saveStoredMcpConfig(nextConfig);
       setConnectedIds(getConnectedConnectorIds());
-      toast.success(t("serverStatusRefreshed"));
-    }, 500);
+
+      if (failedCount > 0) {
+        toast.error(t("serverRefreshFailedCount", { count: failedCount }));
+      } else {
+        toast.success(t("serverStatusRefreshed"));
+      }
+    } catch {
+      toast.error(t("serverRefreshFailedCount", { count: 1 }));
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   const handleOpenNewServer = () => {
@@ -358,12 +449,42 @@ export function McpToolsView() {
             .replace(/[^a-z0-9_-]/g, "-");
 
         const isStdio = parsed.type === "stdio" || (!parsed.url && parsed.command);
+        const transport = (parsed.type || parsed.transport || (isStdio ? "stdio" : "http")) as McpTransport;
+
+        if (transport === "stdio" && !parsed.command?.trim()) {
+          toast.error(t("mcpCommandRequired"));
+          return;
+        }
+
+        if (transport === "http" || transport === "sse") {
+          if (!parsed.url?.trim()) {
+            toast.error(t("mcpUrlRequired"));
+            return;
+          }
+          try {
+            const parsedUrl = new URL(parsed.url);
+            if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
+              toast.error(t("mcpInvalidUrl"));
+              return;
+            }
+          } catch {
+            toast.error(t("mcpInvalidUrl"));
+            return;
+          }
+        }
+
+        const timeoutMs = parsed.timeoutMs ? Number(parsed.timeoutMs) : formData.timeoutMs;
+        if (isNaN(timeoutMs) || timeoutMs <= 0) {
+          toast.error(t("mcpInvalidTimeout"));
+          return;
+        }
+
         const serverObj: McpServerConfig = {
           id,
           name: parsed.name || formData.name,
-          transport: (parsed.type || parsed.transport || (isStdio ? "stdio" : "http")) as McpTransport,
+          transport,
           scope: parsed.scope || formData.scope,
-          timeoutMs: parsed.timeoutMs || formData.timeoutMs,
+          timeoutMs,
           protocolVersion: parsed.protocolVersion || formData.protocolVersion,
           command: parsed.command || (isStdio ? "npx" : undefined),
           args: Array.isArray(parsed.args) ? parsed.args : [],
@@ -403,14 +524,32 @@ export function McpToolsView() {
       return;
     }
 
+    const timeout = Number(formData.timeoutMs);
+    if (isNaN(timeout) || timeout <= 0) {
+      toast.error(t("mcpInvalidTimeout"));
+      return;
+    }
+
     if (formData.transport === "stdio" && !formData.command.trim()) {
       toast.error(t("mcpCommandRequired"));
       return;
     }
 
-    if ((formData.transport === "http" || formData.transport === "sse") && !formData.url.trim()) {
-      toast.error(t("mcpUrlRequired"));
-      return;
+    if (formData.transport === "http" || formData.transport === "sse") {
+      if (!formData.url.trim()) {
+        toast.error(t("mcpUrlRequired"));
+        return;
+      }
+      try {
+        const parsedUrl = new URL(formData.url.trim());
+        if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
+          toast.error(t("mcpInvalidUrl"));
+          return;
+        }
+      } catch {
+        toast.error(t("mcpInvalidUrl"));
+        return;
+      }
     }
 
     let parsedHeaders: Record<string, string> = {};
@@ -445,7 +584,7 @@ export function McpToolsView() {
       name: formData.name.trim(),
       transport: formData.transport,
       scope: formData.scope,
-      timeoutMs: Number(formData.timeoutMs) || 30000,
+      timeoutMs: timeout,
       protocolVersion: formData.protocolVersion,
       command: formData.transport === "stdio" ? formData.command.trim() : undefined,
       args:
@@ -959,6 +1098,7 @@ export function McpToolsView() {
                   {mcpConfig.servers.map((server) => {
                     const isEnabled = server.enabled !== false;
                     const isStdio = server.transport === "stdio";
+                    const isError = server.status === "error";
                     const detailText = isStdio
                       ? `stdio · ${server.command || "npx"} ${(server.args || []).join(" ")}`
                       : `${server.transport} · ${server.url || ""}`;
@@ -967,7 +1107,12 @@ export function McpToolsView() {
                       <div
                         key={server.id}
                         onClick={() => handleEditServer(server)}
-                        className="group p-3.5 sm:p-4 rounded-2xl border border-border/80 bg-card/60 hover:bg-secondary/30 hover:border-foreground/20 transition-all cursor-pointer flex items-center justify-between gap-4 shadow-2xs"
+                        className={cn(
+                          "group p-3.5 sm:p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between gap-4 shadow-2xs",
+                          isError
+                            ? "border-rose-500/40 bg-rose-500/5 hover:bg-rose-500/10 hover:border-rose-500/60"
+                            : "border-border/80 bg-card/60 hover:bg-secondary/30 hover:border-foreground/20"
+                        )}
                       >
                         <div className="flex items-center gap-3.5 min-w-0">
                           <div className="w-10 h-10 rounded-xl bg-secondary/80 border border-border/80 flex items-center justify-center relative shrink-0">
@@ -975,8 +1120,13 @@ export function McpToolsView() {
                             <span
                               className={cn(
                                 "w-2.5 h-2.5 rounded-full ring-2 ring-card absolute -bottom-0.5 -right-0.5 transition-colors",
-                                isEnabled ? "bg-amber-400" : "bg-muted-foreground/40"
+                                isError
+                                  ? "bg-rose-500 animate-pulse"
+                                  : isEnabled
+                                  ? "bg-emerald-500"
+                                  : "bg-muted-foreground/40"
                               )}
+                              title={isError ? server.errorMessage || "Error" : isEnabled ? "Active" : "Disabled"}
                             />
                           </div>
 
@@ -990,9 +1140,21 @@ export function McpToolsView() {
                                   {server.scope}
                                 </span>
                               )}
+                              {isError && (
+                                <span className="text-[10px] px-1.5 py-0.2 rounded bg-rose-500/10 text-rose-500 font-sans border border-rose-500/20">
+                                  Error
+                                </span>
+                              )}
                             </div>
-                            <p className="text-xs text-muted-foreground font-sans truncate max-w-sm sm:max-w-xl">
-                              {detailText}
+                            <p
+                              className={cn(
+                                "text-xs font-sans truncate max-w-sm sm:max-w-xl",
+                                isError ? "text-rose-500/90 font-medium" : "text-muted-foreground"
+                              )}
+                            >
+                              {isError && server.errorMessage
+                                ? `${detailText} — ${server.errorMessage}`
+                                : detailText}
                             </p>
                           </div>
                         </div>

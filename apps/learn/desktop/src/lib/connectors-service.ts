@@ -87,18 +87,30 @@ export async function connectConnector(
         };
       } else if (ipcRes?.error) {
         throw new Error(ipcRes.error);
+      } else if (ipcRes && !ipcRes.success) {
+        throw new Error(`Gagal menginisialisasi otorisasi ${connector.name}.`);
       }
     } catch (ipcErr: any) {
       console.warn("[Composio IPC Connect Warning]", ipcErr);
-      // If IPC failed with explicit message, throw to inform user
-      if (ipcErr?.message && !ipcErr.message.includes("not found")) {
+      // If IPC failed with explicit message other than missing method, throw to inform user
+      if (
+        ipcErr?.message &&
+        !ipcErr.message.toLowerCase().includes("not a function") &&
+        !ipcErr.message.toLowerCase().includes("is not defined")
+      ) {
         throw ipcErr;
       }
     }
   }
 
   // 2. Direct HTTP REST fallback (for web preview / fallback)
-  if (apiKey && connector.authType !== "No Auth") {
+  if (connector.authType !== "No Auth") {
+    if (!apiKey) {
+      throw new Error(
+        `Composio API Key belum dikonfigurasi untuk menghubungkan ${connector.name}. Silakan tambahkan COMPOSIO_API_KEY di file .env atau Pengaturan.`
+      );
+    }
+
     // 2a. Create or resume session
     const sessRes = await fetch("https://backend.composio.dev/api/v3.1/tool_router/session", {
       method: "POST",
@@ -114,7 +126,7 @@ export async function connectConnector(
 
     if (!sessRes.ok) {
       const errTxt = await sessRes.text();
-      throw new Error(`Gagal membuat sesi Composio: ${errTxt}`);
+      throw new Error(`Gagal membuat sesi Composio (${sessRes.status}): ${errTxt}`);
     }
 
     const sessData = await sessRes.json();
@@ -138,7 +150,7 @@ export async function connectConnector(
 
     if (!linkRes.ok) {
       const errTxt = await linkRes.text();
-      throw new Error(`Gagal mendapatkan link otorisasi: ${errTxt}`);
+      throw new Error(`Gagal mendapatkan link otorisasi (${linkRes.status}): ${errTxt}`);
     }
 
     const linkData = await linkRes.json();
@@ -166,7 +178,7 @@ export async function connectConnector(
     throw new Error("Composio tidak mengembalikan URL redirect otorisasi.");
   }
 
-  // Fallback for No-Auth tools
+  // Fallback ONLY for No-Auth tools
   saveConnectedConnectorIds([...current, connector.id]);
   return {
     success: true,
@@ -178,26 +190,30 @@ export async function connectConnector(
  * Disconnects an app and deletes the remote connected account if present.
  */
 export async function disconnectConnector(connectorId: string): Promise<boolean> {
-  const current = getConnectedConnectorIds();
-  saveConnectedConnectorIds(current.filter((id) => id !== connectorId));
+  try {
+    const current = getConnectedConnectorIds();
+    saveConnectedConnectorIds(current.filter((id) => id !== connectorId));
 
-  const storedCa = localStorage.getItem(`composio_ca_${connectorId}`);
-  if (storedCa) {
-    localStorage.removeItem(`composio_ca_${connectorId}`);
-    if ((window as any).electron?.composio?.disconnectAccount) {
-      (window as any).electron.composio
-        .disconnectAccount({ accountId: storedCa })
-        .catch(() => {});
-    } else {
-      const apiKey = getComposioApiKey();
-      if (apiKey) {
-        fetch(`https://backend.composio.dev/api/v3.1/connected_accounts/${storedCa}`, {
-          method: "DELETE",
-          headers: { "x-api-key": apiKey },
-        }).catch(() => {});
+    const storedCa = localStorage.getItem(`composio_ca_${connectorId}`);
+    if (storedCa) {
+      localStorage.removeItem(`composio_ca_${connectorId}`);
+      if ((window as any).electron?.composio?.disconnectAccount) {
+        await (window as any).electron.composio
+          .disconnectAccount({ accountId: storedCa })
+          .catch(() => {});
+      } else {
+        const apiKey = getComposioApiKey();
+        if (apiKey) {
+          await fetch(`https://backend.composio.dev/api/v3.1/connected_accounts/${storedCa}`, {
+            method: "DELETE",
+            headers: { "x-api-key": apiKey },
+          }).catch(() => {});
+        }
       }
     }
+    return true;
+  } catch (err) {
+    console.error("[disconnectConnector Error]", err);
+    return false;
   }
-
-  return true;
 }

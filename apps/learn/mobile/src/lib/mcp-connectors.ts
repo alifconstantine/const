@@ -21,7 +21,8 @@ export interface McpServerConfig {
   enabled?: boolean;
   isDefault?: boolean;
   isCustom?: boolean;
-  status?: "ready" | "needs_auth" | "disabled";
+  status?: "ready" | "needs_auth" | "disabled" | "error";
+  errorMessage?: string;
 }
 
 export interface McpConfigurationState {
@@ -153,11 +154,27 @@ export function importMcpJson(jsonString: string): McpConfigurationState {
   try {
     const parsed = JSON.parse(jsonString);
     const mcpServers = parsed.mcpServers || parsed;
+    if (!mcpServers || typeof mcpServers !== "object" || Array.isArray(mcpServers)) {
+      throw new Error('Format JSON mcpServers tidak valid (harus berupa objek "mcpServers").');
+    }
     const servers: McpServerConfig[] = [];
 
     for (const [id, val] of Object.entries<any>(mcpServers)) {
       if (val && typeof val === "object") {
         const isHttp = Boolean(val.url);
+        if (!isHttp && !val.command) {
+          throw new Error(`Server "${id}" wajib memiliki properti "command" (stdio) atau "url" (http/sse).`);
+        }
+
+        if (isHttp && val.url) {
+          try {
+            const u = new URL(val.url);
+            if (!["http:", "https:"].includes(u.protocol)) throw new Error();
+          } catch {
+            throw new Error(`Server "${id}" memiliki URL tidak valid: "${val.url}". Harus berupa HTTP/HTTPS.`);
+          }
+        }
+
         servers.push({
           id,
           name: val.name || id.charAt(0).toUpperCase() + id.slice(1).replace(/[-_]/g, " "),
@@ -179,7 +196,7 @@ export function importMcpJson(jsonString: string): McpConfigurationState {
 
     return { servers };
   } catch (err: any) {
-    throw new Error(`Invalid MCP JSON syntax: ${err?.message || String(err)}`);
+    throw new Error(`Format JSON MCP tidak valid: ${err?.message || String(err)}`);
   }
 }
 
