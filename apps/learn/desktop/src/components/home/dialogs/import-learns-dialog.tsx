@@ -14,6 +14,7 @@ import {
 import { FolderInput, Search, X, CheckSquare, Square } from "lucide-react";
 import { LocalLearn, LocalCollection } from "../../../lib/db";
 import { useI18n } from "../../../lib/i18n";
+import { LearnIcon } from "../learn-icon";
 
 interface ImportLearnsDialogProps {
   open: boolean;
@@ -118,21 +119,15 @@ export function ImportLearnsDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-full max-w-[480px] p-5 rounded-2xl border border-border/80 bg-card text-card-foreground outline-none focus:outline-none focus-visible:outline-none ring-0 focus-visible:ring-0 overflow-hidden">
+      <DialogContent className="w-full max-w-[480px] p-5 rounded-2xl border border-border/80 bg-card text-card-foreground outline-none focus:outline-none focus-visible:outline-none ring-0 focus-visible:ring-0 overflow-hidden shadow-xl">
         <form onSubmit={handleSubmit} className="space-y-4 w-full min-w-0">
           <DialogHeader className="pb-1">
-            <DialogTitle className="font-serif text-base font-medium tracking-tight text-foreground flex items-center gap-2">
+            <DialogTitle className="font-sans text-base font-medium tracking-tight text-foreground flex items-center gap-2">
               <FolderInput className="h-4 w-4 text-primary shrink-0" />
-              <span>
-                {isId
-                  ? `Import Learn ke "${collection.name}"`
-                  : `Import Learn into "${collection.name}"`}
-              </span>
+              <span>{t("importLearnsDialogTitle", { name: collection.name })}</span>
             </DialogTitle>
-            <p className="text-[12px] text-muted-foreground mt-0.5">
-              {isId
-                ? "Pilih materi belajar yang ingin ditambahkan ke dalam folder ini."
-                : "Select notebooks to add into this folder."}
+            <p className="text-[12px] text-muted-foreground mt-0.5 font-sans">
+              {t("importLearnsDialogDesc")}
             </p>
           </DialogHeader>
 
@@ -143,8 +138,8 @@ export function ImportLearnsDialog({
               <Input
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder={isId ? "Cari materi belajar..." : "Search notebooks..."}
-                className="h-8 pl-8 pr-7 text-[12px] rounded-xl bg-secondary/40 border-border/70 focus-visible:ring-1 focus-visible:ring-ring w-full"
+                placeholder={t("searchNotebooksPlaceholder")}
+                className="h-8 pl-8 pr-7 text-[12px] rounded-xl bg-secondary/40 border-border/70 focus-visible:ring-1 focus-visible:ring-ring w-full font-sans"
                 autoFocus
               />
               {searchQuery && (
@@ -159,15 +154,11 @@ export function ImportLearnsDialog({
             </div>
 
             {availableToImport.length > 0 && (
-              <div className="flex items-center justify-between text-[11px] text-muted-foreground px-0.5">
+              <div className="flex items-center justify-between text-[11px] text-muted-foreground px-0.5 font-sans">
                 <span>
                   {selectedIds.size > 0
-                    ? isId
-                      ? `${selectedIds.size} dipilih`
-                      : `${selectedIds.size} selected`
-                    : isId
-                    ? `${availableToImport.length} materi dapat diimpor`
-                    : `${availableToImport.length} notebooks available`}
+                    ? t("selectedCount", { count: selectedIds.size })
+                    : t("notebooksAvailableToImport", { count: availableToImport.length })}
                 </span>
                 <button
                   type="button"
@@ -177,12 +168,12 @@ export function ImportLearnsDialog({
                   {allAvailableSelected ? (
                     <>
                       <Square className="h-3 w-3" />
-                      <span>{isId ? "Batal Pilih Semua" : "Deselect All"}</span>
+                      <span>{t("deselectAll")}</span>
                     </>
                   ) : (
                     <>
                       <CheckSquare className="h-3 w-3" />
-                      <span>{isId ? "Pilih Semua" : "Select All"}</span>
+                      <span>{t("selectAll")}</span>
                     </>
                   )}
                 </button>
@@ -193,14 +184,10 @@ export function ImportLearnsDialog({
           {/* Learn list in ScrollArea */}
           <ScrollArea className="max-h-[300px] rounded-xl border border-border/60 bg-secondary/20 p-1.5">
             {filteredLearns.length === 0 ? (
-              <div className="text-center py-8 px-4 text-[12px] text-muted-foreground">
+              <div className="text-center py-8 px-4 text-[12px] text-muted-foreground font-sans">
                 {searchQuery
-                  ? isId
-                    ? `Tidak ada materi yang cocok dengan "${searchQuery}".`
-                    : `No notebooks matching "${searchQuery}".`
-                  : isId
-                  ? "Belum ada materi belajar yang tersedia."
-                  : "No notebooks available to import."}
+                  ? t("noLearnsMatchSearchQuery", { query: searchQuery })
+                  : t("noLearnsAvailableToImport")}
               </div>
             ) : (
               <div className="space-y-1">
@@ -226,11 +213,11 @@ export function ImportLearnsDialog({
                     >
                       <div className="flex items-center gap-2.5 min-w-0 flex-1 pr-2">
                         <div
-                          className={`h-7 w-7 rounded-lg flex items-center justify-center text-sm shrink-0 border border-border/40 ${
+                          className={`h-7 w-7 rounded-lg flex items-center justify-center shrink-0 border border-border/40 text-foreground ${
                             isSelected ? "bg-primary/20 text-primary" : "bg-secondary/70"
                           }`}
                         >
-                          {learn.emoji || "📘"}
+                          <LearnIcon icon={learn.emoji} className="w-3.5 h-3.5 text-foreground/90" />
                         </div>
                         <div className="min-w-0 flex-1">
                           <p
@@ -252,9 +239,9 @@ export function ImportLearnsDialog({
                         {isAlreadyInCollection ? (
                           <Badge
                             variant="secondary"
-                            className="text-[10px] py-0 px-2 h-5 font-normal rounded-full"
+                            className="text-[10px] py-0 px-2 h-5 font-normal rounded-full font-sans"
                           >
-                            {isId ? "Sudah di folder" : "Already added"}
+                            {t("alreadyInFolder")}
                           </Badge>
                         ) : (
                           <div
@@ -283,20 +270,18 @@ export function ImportLearnsDialog({
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
-              className="rounded-full cursor-pointer h-8 px-3.5 text-[12px] border-border/70"
+              className="rounded-xl cursor-pointer h-8 px-3.5 text-[12px] border-border/70"
             >
               {t("cancel")}
             </Button>
             <Button
               type="submit"
               disabled={selectedIds.size === 0 || isSubmitting}
-              className="rounded-full cursor-pointer h-8 px-4 text-[12px] font-medium"
+              className="rounded-xl cursor-pointer h-8 px-4 text-[12px] font-medium"
             >
               {isSubmitting
                 ? t("saving")
-                : isId
-                ? `Tambahkan ke Koleksi (${selectedIds.size})`
-                : `Add to Collection (${selectedIds.size})`}
+                : t("addCountToFolder", { count: selectedIds.size })}
             </Button>
           </DialogFooter>
         </form>

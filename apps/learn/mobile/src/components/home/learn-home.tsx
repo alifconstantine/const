@@ -11,6 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuLabel,
   cn,
+  toast,
 } from "@const/ui";
 import {
   Search,
@@ -1823,10 +1824,27 @@ export function LearnHome({
           }}
           learnId={managingLearn.id}
           learnTitle={managingLearn.title}
-          currentCollectionIds={managingLearn.collectionIds}
+          currentCollectionIds={
+            allLearns.find((l) => l.id === managingLearn.id)?.collectionIds ??
+            managingLearn.collectionIds ??
+            []
+          }
           collections={collections}
           onToggle={async (learnId, collectionId) => {
+            const currentIds =
+              allLearns.find((l) => l.id === learnId)?.collectionIds ??
+              managingLearn.collectionIds ??
+              [];
+            const isCurrentlyIn = currentIds.includes(collectionId);
             await localDb.toggleCollection(learnId, collectionId);
+            const targetFolder = collections.find((c) => c.id === collectionId);
+            if (targetFolder) {
+              if (isCurrentlyIn) {
+                toast.success(t("learnRemovedFromFolderToast", { folder: targetFolder.name }));
+              } else {
+                toast.success(t("learnAddedToFolderToast", { folder: targetFolder.name }));
+              }
+            }
           }}
           onCreateNewCollection={() => {
             setEditingCollection(null);

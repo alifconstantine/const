@@ -37,7 +37,8 @@ export const translations = {
     clickToRename: "Click to rename",
     openLearn: "Open Learn",
     openCollection: "Open Folder",
-    manageCollections: "Manage Folders",
+    manageCollections: "Organize into Folders...",
+    organizeFolders: "Organize into Folders...",
     editLearn: "Edit Learn",
     editCollection: "Edit Folder",
     moreOptions: "More options",
@@ -503,9 +504,24 @@ export const translations = {
     collectionDescPlaceholder: "Unit for related study notebooks",
 
     // Dialogs: Manage Folder
-    manageCollectionsDialogTitle: "Manage Folders",
-    manageCollectionsFor: "Notebook: {title}",
+    manageCollectionsDialogTitle: "Organize into Folders",
+    manageCollectionsFor: "Choose folders that include \"{title}\"",
     noCollectionsYet: "No folders created yet.",
+    inThisFolder: "In this folder",
+    notInFolder: "Not added",
+    learnAddedToFolderToast: "Added to folder \"{folder}\"",
+    learnRemovedFromFolderToast: "Removed from folder \"{folder}\"",
+
+    // Dialogs: Import Learns
+    importLearnsDialogTitle: "Import into \"{name}\"",
+    importLearnsDialogDesc: "Select notebooks to add into this folder.",
+    searchNotebooksPlaceholder: "Search notebooks...",
+    notebooksAvailableToImport: "{count} notebooks available",
+    selectedCount: "{count} selected",
+    noLearnsAvailableToImport: "No notebooks available to import.",
+    noLearnsMatchSearchQuery: "No notebooks match \"{query}\".",
+    alreadyInFolder: "Already in folder",
+    addCountToFolder: "Add to Folder ({count})",
 
     // Sources View
     sourcesViewTitle: "Sources",
@@ -1426,7 +1442,8 @@ export const translations = {
     clickToRename: "Klik untuk mengubah judul",
     openLearn: "Buka Learn",
     openCollection: "Buka Folder",
-    manageCollections: "Kelola Folder",
+    manageCollections: "Atur Folder...",
+    organizeFolders: "Atur Folder...",
     editLearn: "Ubah Learn",
     editCollection: "Ubah Folder",
     moreOptions: "Opsi lainnya",
@@ -1892,9 +1909,24 @@ export const translations = {
     collectionDescPlaceholder: "Kelompok materi untuk topik tertentu",
 
     // Dialogs: Manage Folder
-    manageCollectionsDialogTitle: "Kelola Folder",
-    manageCollectionsFor: "Materi: {title}",
+    manageCollectionsDialogTitle: "Atur Masuk ke Folder",
+    manageCollectionsFor: "Pilih folder yang memuat \"{title}\"",
     noCollectionsYet: "Belum ada folder yang dibuat.",
+    inThisFolder: "Di folder ini",
+    notInFolder: "Belum ditambahkan",
+    learnAddedToFolderToast: "Berhasil ditambahkan ke folder \"{folder}\"",
+    learnRemovedFromFolderToast: "Dikeluarkan dari folder \"{folder}\"",
+
+    // Dialogs: Import Learns
+    importLearnsDialogTitle: "Import ke \"{name}\"",
+    importLearnsDialogDesc: "Pilih materi belajar yang ingin dimasukkan ke folder ini.",
+    searchNotebooksPlaceholder: "Cari materi belajar...",
+    notebooksAvailableToImport: "{count} materi dapat diimpor",
+    selectedCount: "{count} dipilih",
+    noLearnsAvailableToImport: "Belum ada materi belajar yang tersedia.",
+    noLearnsMatchSearchQuery: "Tidak ada materi yang cocok dengan \"{query}\".",
+    alreadyInFolder: "Sudah di folder",
+    addCountToFolder: "Tambahkan ke Folder ({count})",
 
     // Sources View
     sourcesViewTitle: "Sumber",

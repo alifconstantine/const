@@ -48,12 +48,20 @@ export const LEARN_ICONS: LearnIconDef[] = [
 export const LEGACY_EMOJI_TO_LEARN_ICON: Record<string, string> = {
   "📘": "book",
   "📚": "book",
+  "📖": "book",
+  "📕": "book",
+  "📗": "book",
+  "📓": "book",
+  "📒": "book",
   "📝": "book",
   "💻": "code",
+  "🖥️": "code",
+  "⌨️": "code",
   "🎓": "graduation",
   "🧠": "brain",
   "💡": "lightbulb",
   "🚀": "rocket",
+  "🛸": "rocket",
   "🔬": "atom",
   "🧬": "atom",
   "🧪": "flask",
@@ -65,10 +73,16 @@ export const LEGACY_EMOJI_TO_LEARN_ICON: Record<string, string> = {
   "🎯": "target",
   "🏆": "target",
   "⚡": "special",
+  "✨": "special",
+  "⭐": "special",
+  "🌟": "special",
+  "🔥": "rocket",
   "sparkles": "special",
   "🎨": "palette",
   "📊": "chart",
+  "📈": "chart",
   "📁": "folder",
+  "📂": "folder",
 };
 
 const DEFAULT_LEARN_ICON_DEF: LearnIconDef = {
@@ -120,9 +134,5 @@ export function LearnIcon({
     return <IconComponent className={className} />;
   }
 
-  return (
-    <span className="inline-flex items-center justify-center text-sm leading-none select-none">
-      {icon}
-    </span>
-  );
+  return <Fallback className={className} />;
 }

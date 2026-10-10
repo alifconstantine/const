@@ -47,15 +47,26 @@ export const MODULE_ICONS: ModuleIconDef[] = [
 
 export const LEGACY_EMOJI_TO_ICON: Record<string, string> = {
   "📁": "folder",
+  "📂": "folder",
   "📚": "book",
+  "📖": "book",
+  "📕": "book",
+  "📗": "book",
+  "📓": "book",
   "🔬": "atom",
   "💻": "code",
+  "🖥️": "code",
   "🎯": "target",
   "🚀": "rocket",
+  "🛸": "rocket",
+  "🔥": "rocket",
   "🧪": "flask",
   "📊": "chart",
   "🎨": "palette",
   "⚡": "special",
+  "✨": "special",
+  "⭐": "special",
+  "🌟": "special",
   "sparkles": "special",
   "🧠": "brain",
   "💡": "lightbulb",
@@ -102,5 +113,5 @@ export function ModuleIcon({ icon, className = "w-4 h-4" }: ModuleIconProps) {
     return <IconComponent className={className} />;
   }
 
-  return <span className="inline-flex items-center justify-center text-sm leading-none">{icon}</span>;
+  return <Folder className={className} />;
 }

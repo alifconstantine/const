@@ -48,6 +48,7 @@ import {
   Type,
   Check,
   ChevronDown,
+  ListFilter,
 } from "lucide-react";
 
 import { LearnCard, LearnItem } from "./learn-card";
@@ -1364,11 +1365,7 @@ export function LearnHome({
                               className="h-8 w-8 p-0 rounded-xl border-border/70 hover:bg-secondary text-muted-foreground hover:text-foreground cursor-pointer flex items-center justify-center"
                               title={t("sortBy")}
                             >
-                              {folderSortDirection === "asc" ? (
-                                <ArrowUp className="w-3.5 h-3.5" />
-                              ) : (
-                                <ArrowDown className="w-3.5 h-3.5" />
-                              )}
+                              <ListFilter className="w-3.5 h-3.5" />
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-52 p-1.5 shadow-md">
@@ -1962,10 +1959,27 @@ export function LearnHome({
           }}
           learnId={managingLearn.id}
           learnTitle={managingLearn.title}
-          currentCollectionIds={managingLearn.collectionIds}
+          currentCollectionIds={
+            allLearns.find((l) => l.id === managingLearn.id)?.collectionIds ??
+            managingLearn.collectionIds ??
+            []
+          }
           collections={collections}
           onToggle={async (learnId, collectionId) => {
+            const currentIds =
+              allLearns.find((l) => l.id === learnId)?.collectionIds ??
+              managingLearn.collectionIds ??
+              [];
+            const isCurrentlyIn = currentIds.includes(collectionId);
             await localDb.toggleCollection(learnId, collectionId);
+            const targetFolder = collections.find((c) => c.id === collectionId);
+            if (targetFolder) {
+              if (isCurrentlyIn) {
+                toast.success(t("learnRemovedFromFolderToast", { folder: targetFolder.name }));
+              } else {
+                toast.success(t("learnAddedToFolderToast", { folder: targetFolder.name }));
+              }
+            }
           }}
           onCreateNewCollection={() => {
             setEditingCollection(null);

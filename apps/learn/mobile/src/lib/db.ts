@@ -519,7 +519,7 @@ export const localDb = {
       id,
       title: data.title.trim() || "Untitled notebook",
       description: data.description?.trim(),
-      emoji: data.emoji || "📘",
+      emoji: data.emoji || "book",
       collectionIds: data.collectionId ? [data.collectionId] : [],
       sourcesCount: 0,
       projectPath: data.projectPath?.trim(),
