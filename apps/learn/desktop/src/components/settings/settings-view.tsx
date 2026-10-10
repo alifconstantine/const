@@ -314,7 +314,7 @@ export function SettingsView({
         {/* ----------------------------------------------------------- */}
         {/* Left Sidebar inside Modal (Antigravity Pop-up Style)       */}
         {/* ----------------------------------------------------------- */}
-        <aside className="w-[220px] sm:w-[240px] h-full flex flex-col justify-between shrink-0 bg-[#f4f4f6] dark:bg-[#222222] border-r border-[#dedee2] dark:border-[#383838] p-3 select-none">
+        <aside className="w-[220px] sm:w-[240px] h-full flex flex-col shrink-0 bg-[#f4f4f6] dark:bg-[#222222] border-r border-[#dedee2] dark:border-[#383838] p-3 select-none">
           {/* Top Heading */}
           <div className="px-2.5 pt-1 pb-2 shrink-0 mb-1">
             <h2 className="text-sm font-semibold text-[#262626] dark:text-white tracking-tight">
@@ -375,43 +375,6 @@ export function SettingsView({
               ))}
             </div>
           </ScrollArea>
-
-          {/* Bottom Section: User Profile & Actions */}
-          <div className="flex flex-col gap-1.5 pt-2 shrink-0">
-            <div className="flex items-center justify-between px-2 py-1.5 rounded-xl hover:bg-[#e9e9ec] dark:hover:bg-[#2b2b2b] transition-colors mt-0.5">
-              <div className="flex items-center gap-2.5 min-w-0">
-                <Avatar className="h-7 w-7 rounded-full bg-[#e2e2e5] dark:bg-[#383838] border border-[#dedee2] dark:border-[#383838] shrink-0">
-                  {user?.image ? (
-                    <AvatarImage
-                      src={user.image}
-                      alt={user?.name || "User"}
-                      className="object-cover"
-                    />
-                  ) : (
-                    <AvatarFallback className="text-[11px] font-semibold text-[#262626] dark:text-white bg-[#e2e2e5] dark:bg-[#383838]">
-                      {initials}
-                    </AvatarFallback>
-                  )}
-                </Avatar>
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-medium text-[#262626] dark:text-white truncate">
-                    {user?.name || "Const User"}
-                  </p>
-                  <p className="text-[10px] text-[#737373] dark:text-[#969696] truncate">
-                    {user?.email || "Workspace"}
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setActiveTab("general")}
-                className="p-1 rounded-md text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white transition-colors cursor-pointer outline-none focus:outline-none"
-                title="Account Settings"
-              >
-                <Settings className="w-3.5 h-3.5" />
-              </button>
-            </div>
-          </div>
         </aside>
 
         {/* ----------------------------------------------------------- */}
