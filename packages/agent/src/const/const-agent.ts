@@ -660,6 +660,9 @@ export class ConstAgent {
     let consecutiveStreamRetries = 0;
     let consecutivePlanningTurns = 0;
     let consecutiveDraftCutoffs = 0;
+    let consecutiveEmptyRetries = 0;
+    const MAX_EMPTY_RETRIES = 5;
+    const STREAM_STALL_TIMEOUT_MS = 35_000;
     const maxTurns = this.config.maxTurns || 200;
     const workspacePath = this.config.workspacePath || process.cwd();
     const toolCallHistory: Array<{ name: string; argsHash: string; isError: boolean }> = [];
@@ -820,9 +823,57 @@ export class ConstAgent {
         const streamFilter = new ThinkingStreamFilter();
         const toolCallsMap: Map<number, { id: string; name: string; arguments: string }> = new Map();
 
+        const readWithTimeout = <T>(
+          streamReader: ReadableStreamDefaultReader<T>,
+          timeoutMs: number,
+          abortSignal?: AbortSignal
+        ): Promise<ReadableStreamReadResult<T>> => {
+          return new Promise((resolve, reject) => {
+            let timer: ReturnType<typeof setTimeout> | null = null;
+            let finished = false;
+
+            const onAbort = () => {
+              if (finished) return;
+              finished = true;
+              if (timer) clearTimeout(timer);
+              reject(new DOMException("The operation was aborted.", "AbortError"));
+            };
+
+            if (abortSignal?.aborted) {
+              return onAbort();
+            }
+
+            timer = setTimeout(() => {
+              if (finished) return;
+              finished = true;
+              abortSignal?.removeEventListener("abort", onAbort);
+              reject(new Error(`Stream stalled: no data received for ${Math.round(timeoutMs / 1000)}s`));
+            }, timeoutMs);
+
+            abortSignal?.addEventListener("abort", onAbort, { once: true });
+
+            streamReader.read().then(
+              (res) => {
+                if (finished) return;
+                finished = true;
+                if (timer) clearTimeout(timer);
+                abortSignal?.removeEventListener("abort", onAbort);
+                resolve(res);
+              },
+              (err) => {
+                if (finished) return;
+                finished = true;
+                if (timer) clearTimeout(timer);
+                abortSignal?.removeEventListener("abort", onAbort);
+                reject(err);
+              }
+            );
+          });
+        };
+
         try {
           while (true) {
-            const { done, value } = await reader.read();
+            const { done, value } = await readWithTimeout(reader, STREAM_STALL_TIMEOUT_MS, signal);
             if (done) break;
 
             hasReceivedAnyData = true;
@@ -911,14 +962,16 @@ export class ConstAgent {
           if (signal?.aborted || streamErr.name === "AbortError") {
             throw streamErr;
           }
-          if (consecutiveStreamRetries < 3) {
-            consecutiveStreamRetries++;
+          if (consecutiveEmptyRetries < MAX_EMPTY_RETRIES) {
+            consecutiveEmptyRetries++;
             currentTurn--;
-            const backoffMs = Math.min(1000 * Math.pow(2, consecutiveStreamRetries - 1), 4000);
+            const backoffMs =
+              Math.min(1000 * Math.pow(2, consecutiveEmptyRetries - 1), 6000) +
+              Math.floor(Math.random() * 400);
             onEvent({
               type: "status",
               status: "thinking",
-              message: `Stream read interrupted (${streamErr.message || "connection drop"}). Reconnecting turn (attempt ${consecutiveStreamRetries}/3 in ${backoffMs / 1000}s)...`,
+              message: `Koneksi stream terputus (${streamErr.message || "stream drop"}). Mengulang otomatis (percobaan ${consecutiveEmptyRetries}/${MAX_EMPTY_RETRIES} dalam ${(backoffMs / 1000).toFixed(1)}s)...`,
             });
             await new Promise((resolve) => setTimeout(resolve, backoffMs));
             continue;
@@ -1046,80 +1099,69 @@ export class ConstAgent {
           }
         }
 
-        // Handle case where model paused after thinking without emitting tool calls or content
-        if (toolCalls.length === 0 && !turnContent) {
-          // If no content, no thinking, and no tool calls arrived, check if it's an abrupt stream drop
-          if (!turnThinking && !hasReceivedAnyData && consecutiveStreamRetries < 3) {
-            consecutiveStreamRetries++;
-            currentTurn--; // Don't consume a turn on connection drop
-            const backoffMs = Math.min(1000 * Math.pow(2, consecutiveStreamRetries - 1), 4000);
-            onEvent({
-              type: "status",
-              status: "thinking",
-              message: `Stream connection interrupted. Reconnecting (attempt ${consecutiveStreamRetries}/3 in ${backoffMs / 1000}s)...`,
-            });
-            await new Promise((resolve) => setTimeout(resolve, backoffMs));
-            continue;
-          }
+        const hasActionableOutput = toolCalls.length > 0 || turnContent.trim().length > 0;
+        const hasThinking = turnThinking.trim().length > 0;
 
-          // If stream closed with zero data received across all retry attempts, report error instead of done
-          if (!turnThinking && !hasReceivedAnyData) {
-            const timeoutErrMsg =
-              "Connection to model provider timed out or dropped with no response. Please verify network connectivity and retry.";
-            onEvent({ type: "error", error: timeoutErrMsg });
-            onEvent({ type: "status", status: "error", message: timeoutErrMsg });
-            conversationHistory.push({
-              role: "assistant",
-              content: timeoutErrMsg,
-              timestamp: Date.now(),
-            });
-            return conversationHistory;
-          }
-
-          if (turnThinking && currentTurn < maxTurns && consecutivePlanningTurns < 3) {
+        if (hasActionableOutput) {
+          consecutiveEmptyRetries = 0;
+          consecutiveStreamRetries = 0;
+        } else {
+          // Model produced no actionable text and no tool calls!
+          if (hasThinking && currentTurn < maxTurns && consecutivePlanningTurns < 3) {
             consecutivePlanningTurns++;
-            // Model generated internal reasoning but paused before calling tools or outputting text.
-            // Retain the native reasoning on the assistant message so the multi-turn context
-            // is preserved natively with reasoning_content without synthetic text pollution.
             const thinkingStepMsg: AgentMessage = {
               role: "assistant",
-              content: "I have analyzed the workspace requirements and completed the implementation plan. Proceeding now to invoke the required tool calls.",
+              content: "I have analyzed the workspace requirements and completed the plan. Proceeding now to execute required actions.",
               thinking: turnThinking,
               timestamp: Date.now(),
             };
             conversationHistory.push(thinkingStepMsg);
 
-            // Maintain strictly alternating user/assistant turns in API payload
             conversationHistory.push({
               role: "user",
               content:
                 turnFinishReason === "length"
-                  ? "Output token limit reached during planning. Without further reasoning, immediately invoke the required tool call (such as 'write' or 'edit')."
-                  : "Proceed immediately with the required tool calls (e.g. 'write' or 'edit') based on your analysis to complete the task.",
+                  ? "Output token limit reached during planning. Without further reasoning, immediately provide your final answer or invoke the required tool call."
+                  : "You completed internal analysis but stopped without actionable output. Continue immediately with your response to the user or invoke the next required tool call.",
               timestamp: Date.now(),
             });
 
             onEvent({
               type: "status",
               status: "thinking",
-              message: "Planning concluded. Proceeding directly to tool execution...",
+              message: "Analisis selesai tanpa output. Mengarahkan model untuk memberikan respon final...",
             });
             continue;
           }
 
-          if (turnFinishReason === "length") {
-            turnContent =
-              "The response reached the model token limit. Please ask to continue or break down the request into smaller parts.";
-          } else if (turnThinking) {
-            turnContent = `Completed thinking analysis:\n\n${turnThinking.slice(0, 500)}...\n\nPlease confirm if you would like me to proceed with creating the requested files.`;
-          } else {
-            turnContent =
-              "No response was received from the model provider. Please verify provider connectivity or retry your request.";
+          if (consecutiveEmptyRetries < MAX_EMPTY_RETRIES) {
+            consecutiveEmptyRetries++;
+            currentTurn--; // Don't consume a conversational turn on empty response
+            const backoffMs =
+              Math.min(1000 * Math.pow(2, consecutiveEmptyRetries - 1), 6000) +
+              Math.floor(Math.random() * 400);
+
+            onEvent({
+              type: "status",
+              status: "thinking",
+              message: `Model tidak memberikan respon. Mengulang otomatis (percobaan ${consecutiveEmptyRetries}/${MAX_EMPTY_RETRIES} dalam ${(backoffMs / 1000).toFixed(1)}s)...`,
+            });
+
+            await new Promise((resolve) => setTimeout(resolve, backoffMs));
+            continue;
           }
-          onEvent({ type: "token", token: turnContent });
-        } else {
-          // Reset retry counter on successful data receipt
-          consecutiveStreamRetries = 0;
+
+          // Capped after MAX_EMPTY_RETRIES
+          const exhaustedErrMsg =
+            `Model tidak memberikan respon setelah ${MAX_EMPTY_RETRIES}x percobaan. Silakan periksa koneksi atau coba pilih model lain di dropdown.`;
+          onEvent({ type: "error", error: exhaustedErrMsg });
+          onEvent({ type: "status", status: "error", message: exhaustedErrMsg });
+          conversationHistory.push({
+            role: "assistant",
+            content: exhaustedErrMsg,
+            timestamp: Date.now(),
+          });
+          return conversationHistory;
         }
 
         if (toolCalls.length > 0) {

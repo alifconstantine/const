@@ -606,6 +606,7 @@ export async function streamChatCompletion({
   let accumulatedContent = "";
   let accumulatedThinking = "";
   const accumulatedToolCalls: Map<number, { id: string; name: string; argsStr: string }> = new Map();
+  const decoder = new TextDecoder("utf-8");
 
   const executeFetch = async (targetEndpoint: string, customBody?: any) => {
     return await fetch(targetEndpoint, {
@@ -617,95 +618,187 @@ export async function streamChatCompletion({
   };
 
   try {
-    let res: Response;
+    const MAX_ATTEMPTS = 5;
+    const STREAM_STALL_TIMEOUT_MS = 35_000;
+    let attempt = 0;
+
+    while (attempt < MAX_ATTEMPTS) {
+    if (signal?.aborted) return;
+    attempt++;
+    accumulatedContent = "";
+    accumulatedThinking = "";
+    accumulatedToolCalls.clear();
+
     try {
-      res = await executeFetch(endpoint);
-    } catch (fetchErr: any) {
-      // If relative proxy failed or direct failed, attempt fallback between /v1 and direct URL
-      if (baseUrl === "/v1") {
+      let res: Response;
+      try {
+        res = await executeFetch(endpoint);
+      } catch (fetchErr: any) {
+        // If relative proxy failed or direct failed, attempt fallback between /v1 and direct URL
+        if (baseUrl === "/v1") {
+          endpoint = "https://router.const.web.id/v1/chat/completions";
+          res = await executeFetch(endpoint);
+        } else {
+          endpoint = "/v1/chat/completions";
+          res = await executeFetch(endpoint);
+        }
+      }
+      if (!res.ok && endpoint.startsWith("/v1")) {
         endpoint = "https://router.const.web.id/v1/chat/completions";
         res = await executeFetch(endpoint);
-      } else {
-        endpoint = "/v1/chat/completions";
-        res = await executeFetch(endpoint);
       }
-    }
-    if (!res.ok && endpoint.startsWith("/v1")) {
-      endpoint = "https://router.const.web.id/v1/chat/completions";
-      res = await executeFetch(endpoint);
-    }
 
-    if (!res.ok) {
-      const errorBody = await res.text().catch(() => "");
-      let parsedMessage = errorBody;
-      try {
-        const errJson = JSON.parse(errorBody);
-        if (errJson.error?.message) {
-          parsedMessage = errJson.error.message;
-        }
-      } catch {}
-      throw new Error(`HTTP ${res.status}: ${parsedMessage || res.statusText}`);
-    }
-
-    if (!res.body) {
-      throw new Error("Response body is null");
-    }
-
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder("utf-8");
-    let buffer = "";
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      buffer = lines.pop() || "";
-
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed.startsWith("data:")) continue;
-        const dataStr = trimmed.slice(5).trim();
-        if (dataStr === "[DONE]") continue;
-
+      if (!res.ok) {
+        const errorBody = await res.text().catch(() => "");
+        let parsedMessage = errorBody;
         try {
-          const json = JSON.parse(dataStr);
-          const delta = json.choices?.[0]?.delta;
-          if (!delta) continue;
+          const errJson = JSON.parse(errorBody);
+          if (errJson.error?.message) {
+            parsedMessage = errJson.error.message;
+          }
+        } catch {}
+        throw new Error(`HTTP ${res.status}: ${parsedMessage || res.statusText}`);
+      }
 
-          // Process thinking / reasoning tokens
-          if (delta.reasoning_content) {
-            accumulatedThinking += delta.reasoning_content;
-            onThinking?.(delta.reasoning_content);
+      if (!res.body) {
+        throw new Error("Response body is null");
+      }
+
+      const reader = res.body.getReader();
+      let buffer = "";
+
+      const readWithTimeout = <T>(
+        streamReader: ReadableStreamDefaultReader<T>,
+        timeoutMs: number,
+        abortSignal?: AbortSignal
+      ): Promise<ReadableStreamReadResult<T>> => {
+        return new Promise((resolve, reject) => {
+          let timer: ReturnType<typeof setTimeout> | null = null;
+          let finished = false;
+
+          const onAbort = () => {
+            if (finished) return;
+            finished = true;
+            if (timer) clearTimeout(timer);
+            reject(new DOMException("The operation was aborted.", "AbortError"));
+          };
+
+          if (abortSignal?.aborted) {
+            return onAbort();
           }
 
-          // Process tool calls if emitted by model
-          if (delta.tool_calls && Array.isArray(delta.tool_calls)) {
-            for (const tc of delta.tool_calls) {
-              const idx = tc.index ?? 0;
-              const existing = accumulatedToolCalls.get(idx) || {
-                id: tc.id || `call_${Date.now()}_${idx}`,
-                name: tc.function?.name || "",
-                argsStr: "",
-              };
-              if (tc.id) existing.id = tc.id;
-              if (tc.function?.name) existing.name = tc.function.name;
-              if (tc.function?.arguments) existing.argsStr += tc.function.arguments;
-              accumulatedToolCalls.set(idx, existing);
+          timer = setTimeout(() => {
+            if (finished) return;
+            finished = true;
+            abortSignal?.removeEventListener("abort", onAbort);
+            reject(new Error(`Stream stalled: no data received for ${Math.round(timeoutMs / 1000)}s`));
+          }, timeoutMs);
+
+          abortSignal?.addEventListener("abort", onAbort, { once: true });
+
+          streamReader.read().then(
+            (res) => {
+              if (finished) return;
+              finished = true;
+              if (timer) clearTimeout(timer);
+              abortSignal?.removeEventListener("abort", onAbort);
+              resolve(res);
+            },
+            (err) => {
+              if (finished) return;
+              finished = true;
+              if (timer) clearTimeout(timer);
+              abortSignal?.removeEventListener("abort", onAbort);
+              reject(err);
             }
-          }
+          );
+        });
+      };
 
-          // Process final content tokens
-          if (delta.content) {
-            accumulatedContent += delta.content;
-            onToken?.(delta.content);
+      while (true) {
+        const { done, value } = await readWithTimeout(reader, STREAM_STALL_TIMEOUT_MS, signal);
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed.startsWith("data:")) continue;
+          const dataStr = trimmed.slice(5).trim();
+          if (dataStr === "[DONE]") continue;
+
+          try {
+            const json = JSON.parse(dataStr);
+            const delta = json.choices?.[0]?.delta;
+            if (!delta) continue;
+
+            // Process thinking / reasoning tokens
+            if (delta.reasoning_content) {
+              accumulatedThinking += delta.reasoning_content;
+              onThinking?.(delta.reasoning_content);
+            }
+
+            // Process tool calls if emitted by model
+            if (delta.tool_calls && Array.isArray(delta.tool_calls)) {
+              for (const tc of delta.tool_calls) {
+                const idx = tc.index ?? 0;
+                const existing = accumulatedToolCalls.get(idx) || {
+                  id: tc.id || `call_${Date.now()}_${idx}`,
+                  name: tc.function?.name || "",
+                  argsStr: "",
+                };
+                if (tc.id) existing.id = tc.id;
+                if (tc.function?.name) existing.name = tc.function.name;
+                if (tc.function?.arguments) existing.argsStr += tc.function.arguments;
+                accumulatedToolCalls.set(idx, existing);
+              }
+            }
+
+            // Process final content tokens
+            if (delta.content) {
+              accumulatedContent += delta.content;
+              onToken?.(delta.content);
+            }
+          } catch {
+            // ignore partial JSON parse errors
           }
-        } catch {
-          // ignore partial JSON parse errors
         }
       }
+
+      // Check for empty completion
+      const hasActionableOutput = accumulatedContent.trim().length > 0 || accumulatedToolCalls.size > 0;
+      if (!hasActionableOutput) {
+        if (attempt < MAX_ATTEMPTS) {
+          const backoffMs = Math.min(1000 * Math.pow(2, attempt - 1), 6000) + Math.floor(Math.random() * 400);
+          onThinking?.(`\n[Model tidak memberikan respon. Mengulang otomatis (percobaan ${attempt + 1}/${MAX_ATTEMPTS})...]\n`);
+          await new Promise((resolve) => setTimeout(resolve, backoffMs));
+          continue;
+        }
+        throw new Error(`Model tidak memberikan respon setelah ${MAX_ATTEMPTS}x percobaan. Silakan coba lagi atau gunakan model lain.`);
+      }
+
+      // Got actionable output, exit retry loop!
+      break;
+    } catch (err: any) {
+      if (err.name === "AbortError" || signal?.aborted) {
+        onDone?.(accumulatedContent, accumulatedThinking, []);
+        return;
+      }
+      if (attempt < MAX_ATTEMPTS) {
+        const backoffMs = Math.min(1000 * Math.pow(2, attempt - 1), 6000) + Math.floor(Math.random() * 400);
+        onThinking?.(`\n[Koneksi terputus (${err.message || "stream error"}). Mengulang otomatis (percobaan ${attempt + 1}/${MAX_ATTEMPTS})...]\n`);
+        await new Promise((resolve) => setTimeout(resolve, backoffMs));
+        continue;
+      }
+      if (onError) {
+        onError(err);
+        return;
+      }
+      throw err;
     }
+  }
 
     // Handle tool call execution loop if model requested tool execution
     if (accumulatedToolCalls.size > 0) {
