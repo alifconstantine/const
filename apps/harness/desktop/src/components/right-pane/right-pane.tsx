@@ -9,6 +9,7 @@ import { FileDiffTab } from "./file-diff-tab";
 import { FilePreviewTab } from "./file-preview-tab";
 import { BrowserTab } from "./browser-tab";
 import { SubagentTab } from "./subagent-tab";
+import { SideChatTab } from "./side-chat-tab";
 import type { RightPaneTab, RightPaneTabType, BrowserSelectedElement } from "./types";
 import type { FileMutationRecord, SubAgentItem } from "../../vite-env";
 
@@ -37,6 +38,11 @@ interface RightPaneProps {
   onDraggingChange?: (isDragging: boolean) => void;
   subagents?: SubAgentItem[];
   onKillAgent?: (agentId: string) => void;
+  parentMessages?: any[];
+  parentConversationTitle?: string;
+  parentConversationId?: string;
+  defaultModel?: string;
+  onInsertToMainPrompt?: (text: string) => void;
 }
 
 export function RightPane({
@@ -64,6 +70,11 @@ export function RightPane({
   onDraggingChange,
   subagents,
   onKillAgent,
+  parentMessages,
+  parentConversationTitle,
+  parentConversationId,
+  defaultModel,
+  onInsertToMainPrompt,
 }: RightPaneProps) {
   const isDraggingRef = useRef(false);
   const startXRef = useRef(0);
@@ -132,13 +143,19 @@ export function RightPane({
         );
       case "side_conversation":
         return (
-          <div className="flex-1 w-full h-full p-4 text-white flex flex-col items-center justify-center text-center">
-            <MessageSquare className="w-8 h-8 mb-2 text-neutral-500 opacity-60" />
-            <h4 className="text-sm font-medium text-neutral-300 mb-1">Side Conversation</h4>
-            <p className="text-xs text-neutral-500 max-w-xs">
-              Open a separate scratchpad conversation alongside your main thread.
-            </p>
-          </div>
+          <SideChatTab
+            tab={tab}
+            parentMessages={parentMessages}
+            parentConversationTitle={parentConversationTitle}
+            parentConversationId={parentConversationId}
+            defaultModel={defaultModel}
+            onOpenFilePreview={onOpenFilePreview}
+            onOpenFileDiff={onOpenFileDiff}
+            onRollbackFile={onRollbackFile}
+            onRollbackAll={onRollbackAll}
+            onInsertToMainPrompt={onInsertToMainPrompt}
+            onUpdateTab={onUpdateTab}
+          />
         );
       case "browser":
         return (

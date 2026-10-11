@@ -157,11 +157,23 @@ function createMentionBadgeElement(
  * so they never trigger autocomplete when the caret is adjacent to them.
  */
 function serializeContainer(container: Node, forActiveToken = false): string {
+  // If container only has a lone <br> (Chromium default empty container)
+  const firstChild = container.childNodes[0];
+  if (
+    container.childNodes.length === 1 &&
+    firstChild &&
+    firstChild.nodeType === Node.ELEMENT_NODE &&
+    (firstChild as HTMLElement).tagName === "BR"
+  ) {
+    return "";
+  }
+
   let result = "";
 
   function walk(node: Node) {
     if (node.nodeType === Node.TEXT_NODE) {
-      result += node.nodeValue || "";
+      // Normalize non-breaking spaces (\u00A0) from contenteditable to standard space
+      result += (node.nodeValue || "").replace(/\u00A0/g, " ");
     } else if (node.nodeType === Node.ELEMENT_NODE) {
       const el = node as HTMLElement;
       if (el.getAttribute("data-mention-token") === "true") {
@@ -177,6 +189,11 @@ function serializeContainer(container: Node, forActiveToken = false): string {
         // If it's a div block inserted on enter
         if (result.length > 0 && !result.endsWith("\n")) {
           result += "\n";
+        }
+        // If div contains only a single BR (empty line), the newline is already represented
+        const child0 = el.childNodes[0];
+        if (el.childNodes.length === 1 && child0 && (child0 as HTMLElement).tagName === "BR") {
+          return;
         }
         node.childNodes.forEach(walk);
       } else {
@@ -208,6 +225,9 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
     const editorRef = useRef<HTMLDivElement>(null);
     const [isEmpty, setIsEmpty] = useState(true);
     const savedRangeRef = useRef<Range | null>(null);
+    const isComposingRef = useRef(false);
+    const lastEmittedValueRef = useRef<string>(initialValue || "");
+    const lastPropValueRef = useRef<string>(initialValue || "");
 
     const saveSelection = useCallback(() => {
       const sel = window.getSelection();
@@ -225,27 +245,36 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
 
       const serialized = serializeContainer(editor);
       const hasBadges = editor.querySelector("[data-mention-token]") !== null;
-      const textEmpty = !serialized.trim() && !hasBadges;
+      const textEmpty = serialized.length === 0 && !hasBadges;
       setIsEmpty(textEmpty);
 
+      lastEmittedValueRef.current = serialized;
       onSerializedChange?.(serialized);
 
       // Check activeAtToken based on cursor position
-      const sel = window.getSelection();
-      if (sel && sel.rangeCount > 0 && editor.contains(sel.anchorNode)) {
-        const range = sel.getRangeAt(0);
-        const preRange = document.createRange();
-        preRange.selectNodeContents(editor);
-        preRange.setEnd(range.startContainer, range.startOffset);
+      try {
+        const sel = window.getSelection();
+        if (sel && sel.rangeCount > 0 && editor.contains(sel.anchorNode)) {
+          const range = sel.getRangeAt(0);
+          if (editor.contains(range.startContainer)) {
+            const preRange = document.createRange();
+            preRange.selectNodeContents(editor);
+            preRange.setEnd(range.startContainer, range.startOffset);
 
-        const fragment = preRange.cloneContents();
-        const temp = document.createElement("div");
-        temp.appendChild(fragment);
-        const textBeforeCaret = serializeContainer(temp, true);
+            const fragment = preRange.cloneContents();
+            const temp = document.createElement("div");
+            temp.appendChild(fragment);
+            const textBeforeCaret = serializeContainer(temp, true);
 
-        const token = activeAtToken(textBeforeCaret, textBeforeCaret.length);
-        onMentionTokenChange?.(token);
-      } else {
+            const token = activeAtToken(textBeforeCaret, textBeforeCaret.length);
+            onMentionTokenChange?.(token);
+          } else {
+            onMentionTokenChange?.(null);
+          }
+        } else {
+          onMentionTokenChange?.(null);
+        }
+      } catch {
         onMentionTokenChange?.(null);
       }
     }, [onSerializedChange, onMentionTokenChange]);
@@ -258,6 +287,7 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
         editor.innerHTML = "";
         if (!text) {
           setIsEmpty(true);
+          lastEmittedValueRef.current = "";
           onSerializedChange?.("");
           return;
         }
@@ -293,37 +323,88 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
           editor.appendChild(document.createTextNode(remainder));
         }
 
-        syncContent();
+        const hasBadges = editor.querySelector("[data-mention-token]") !== null;
+        setIsEmpty(text.length === 0 && !hasBadges);
+        lastEmittedValueRef.current = text;
+        onSerializedChange?.(text);
       },
-      [onOpenFilePreview, syncContent, onSerializedChange]
+      [onOpenFilePreview, onSerializedChange]
     );
 
     useEffect(() => {
-      if (initialValue !== undefined) {
-        const current = editorRef.current ? serializeContainer(editorRef.current) : "";
-        if (current !== initialValue) {
-          setEditorFromSerializedText(initialValue);
-        }
+      if (initialValue === undefined) return;
+      if (initialValue === lastPropValueRef.current) return;
+      lastPropValueRef.current = initialValue;
+
+      // If matches what we already emitted from user typing, do nothing
+      if (initialValue === lastEmittedValueRef.current) {
+        return;
       }
+
+      const editor = editorRef.current;
+      const current = editor ? serializeContainer(editor) : "";
+      if (current === initialValue) {
+        lastEmittedValueRef.current = initialValue;
+        return;
+      }
+
+      // If user is actively typing, don't let lagging state updates overwrite
+      const isFocused = editor && (document.activeElement === editor || editor.contains(document.activeElement));
+      if (isFocused && initialValue !== "" && current.startsWith(initialValue)) {
+        return;
+      }
+
+      lastEmittedValueRef.current = initialValue;
+      setEditorFromSerializedText(initialValue);
     }, [initialValue, setEditorFromSerializedText]);
 
     useImperativeHandle(
       ref,
       () => ({
         focus: () => {
-          editorRef.current?.focus();
+          const editor = editorRef.current;
+          if (!editor) return;
+          editor.focus();
+          const sel = window.getSelection();
+          if (!sel || sel.rangeCount === 0 || !editor.contains(sel.anchorNode)) {
+            const range = document.createRange();
+            range.selectNodeContents(editor);
+            range.collapse(false);
+            sel?.removeAllRanges();
+            sel?.addRange(range);
+            savedRangeRef.current = range.cloneRange();
+          }
         },
         clear: () => {
           if (editorRef.current) {
             editorRef.current.innerHTML = "";
-            syncContent();
+            lastEmittedValueRef.current = "";
+            lastPropValueRef.current = "";
+            setIsEmpty(true);
+            onSerializedChange?.("");
+            onMentionTokenChange?.(null);
+            savedRangeRef.current = null;
           }
         },
         getText: () => {
           return editorRef.current ? serializeContainer(editorRef.current) : "";
         },
         setText: (text: string) => {
+          lastEmittedValueRef.current = text;
+          lastPropValueRef.current = text;
           setEditorFromSerializedText(text);
+          if (editorRef.current) {
+            editorRef.current.focus();
+            const range = document.createRange();
+            range.selectNodeContents(editorRef.current);
+            range.collapse(false);
+            const sel = window.getSelection();
+            if (sel) {
+              sel.removeAllRanges();
+              sel.addRange(range);
+            }
+            savedRangeRef.current = range.cloneRange();
+          }
         },
         getElement: () => editorRef.current,
         insertAt: () => {
@@ -332,8 +413,16 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
           editor.focus();
 
           const sel = window.getSelection();
-          if (!sel || sel.rangeCount === 0) return;
-          const range = savedRangeRef.current || sel.getRangeAt(0);
+          let range: Range;
+          if (savedRangeRef.current && editor.contains(savedRangeRef.current.startContainer)) {
+            range = savedRangeRef.current;
+          } else if (sel && sel.rangeCount > 0 && editor.contains(sel.getRangeAt(0).startContainer)) {
+            range = sel.getRangeAt(0);
+          } else {
+            range = document.createRange();
+            range.selectNodeContents(editor);
+            range.collapse(false);
+          }
 
           // Insert " @" or "@"
           const preRange = document.createRange();
@@ -350,8 +439,8 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
 
           range.setStartAfter(textNode);
           range.setEndAfter(textNode);
-          sel.removeAllRanges();
-          sel.addRange(range);
+          sel?.removeAllRanges();
+          sel?.addRange(range);
           saveSelection();
           syncContent();
         },
@@ -361,15 +450,23 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
           editor.focus();
 
           const sel = window.getSelection();
-          if (!sel || sel.rangeCount === 0) return;
-          const range = savedRangeRef.current || sel.getRangeAt(0);
+          let range: Range;
+          if (savedRangeRef.current && editor.contains(savedRangeRef.current.startContainer)) {
+            range = savedRangeRef.current;
+          } else if (sel && sel.rangeCount > 0 && editor.contains(sel.getRangeAt(0).startContainer)) {
+            range = sel.getRangeAt(0);
+          } else {
+            range = document.createRange();
+            range.selectNodeContents(editor);
+            range.collapse(false);
+          }
 
           const textNode = document.createTextNode(cmd);
           range.insertNode(textNode);
           range.setStartAfter(textNode);
           range.setEndAfter(textNode);
-          sel.removeAllRanges();
-          sel.addRange(range);
+          sel?.removeAllRanges();
+          sel?.addRange(range);
           saveSelection();
           syncContent();
         },
@@ -379,15 +476,23 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
           editor.focus();
 
           const sel = window.getSelection();
-          if (!sel || sel.rangeCount === 0) return;
-          const range = savedRangeRef.current || sel.getRangeAt(0);
+          let range: Range;
+          if (savedRangeRef.current && editor.contains(savedRangeRef.current.startContainer)) {
+            range = savedRangeRef.current;
+          } else if (sel && sel.rangeCount > 0 && editor.contains(sel.getRangeAt(0).startContainer)) {
+            range = sel.getRangeAt(0);
+          } else {
+            range = document.createRange();
+            range.selectNodeContents(editor);
+            range.collapse(false);
+          }
 
           const textNode = document.createTextNode(text);
           range.insertNode(textNode);
           range.setStartAfter(textNode);
           range.setEndAfter(textNode);
-          sel.removeAllRanges();
-          sel.addRange(range);
+          sel?.removeAllRanges();
+          sel?.addRange(range);
           saveSelection();
           syncContent();
         },
@@ -397,9 +502,16 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
           editor.focus();
 
           const sel = window.getSelection();
-          if (!sel || sel.rangeCount === 0) return;
-
-          let range = savedRangeRef.current || sel.getRangeAt(0);
+          let range: Range;
+          if (savedRangeRef.current && editor.contains(savedRangeRef.current.startContainer)) {
+            range = savedRangeRef.current;
+          } else if (sel && sel.rangeCount > 0 && editor.contains(sel.getRangeAt(0).startContainer)) {
+            range = sel.getRangeAt(0);
+          } else {
+            range = document.createRange();
+            range.selectNodeContents(editor);
+            range.collapse(false);
+          }
 
           // Find and replace active @token in text node
           if (range.startContainer.nodeType === Node.TEXT_NODE) {
@@ -430,8 +542,8 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
 
           range.setStartAfter(spaceNode);
           range.setEndAfter(spaceNode);
-          sel.removeAllRanges();
-          sel.addRange(range);
+          sel?.removeAllRanges();
+          sel?.addRange(range);
 
           saveSelection();
           syncContent();
@@ -443,8 +555,16 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
           editor.focus();
 
           const sel = window.getSelection();
-          if (!sel || sel.rangeCount === 0) return;
-          const range = savedRangeRef.current || sel.getRangeAt(0);
+          let range: Range;
+          if (savedRangeRef.current && editor.contains(savedRangeRef.current.startContainer)) {
+            range = savedRangeRef.current;
+          } else if (sel && sel.rangeCount > 0 && editor.contains(sel.getRangeAt(0).startContainer)) {
+            range = sel.getRangeAt(0);
+          } else {
+            range = document.createRange();
+            range.selectNodeContents(editor);
+            range.collapse(false);
+          }
 
           if (range.startContainer.nodeType === Node.TEXT_NODE) {
             const node = range.startContainer;
@@ -467,8 +587,8 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
               range.insertNode(textNode);
               range.setStartAfter(textNode);
               range.setEndAfter(textNode);
-              sel.removeAllRanges();
-              sel.addRange(range);
+              sel?.removeAllRanges();
+              sel?.addRange(range);
 
               saveSelection();
               syncContent();
@@ -476,7 +596,7 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
           }
         },
       }),
-      [onOpenFilePreview, saveSelection, setEditorFromSerializedText, syncContent]
+      [onOpenFilePreview, saveSelection, setEditorFromSerializedText, syncContent, onMentionTokenChange]
     );
 
     const handleCopy = (e: React.ClipboardEvent<HTMLDivElement>) => {
@@ -591,6 +711,11 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
       onKeyDown?.(e);
       if (e.defaultPrevented) return;
 
+      // Do nothing during active IME composition
+      if (e.nativeEvent.isComposing || (e as any).keyCode === 229) {
+        return;
+      }
+
       // Handle Backspace deleting mention badge atomically
       if (e.key === "Backspace") {
         const sel = window.getSelection();
@@ -602,7 +727,25 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
             const prev = range.startContainer.previousSibling;
             if (prev && prev.nodeType === Node.ELEMENT_NODE && (prev as HTMLElement).dataset.mentionToken) {
               e.preventDefault();
+              const prevPrev = prev.previousSibling;
+              const parent = prev.parentNode;
               prev.remove();
+              if (parent) {
+                const newRange = document.createRange();
+                if (prevPrev && prevPrev.nodeType === Node.TEXT_NODE) {
+                  newRange.setStart(prevPrev, (prevPrev.nodeValue || "").length);
+                  newRange.collapse(true);
+                } else if (range.startContainer.nodeType === Node.TEXT_NODE) {
+                  newRange.setStart(range.startContainer, 0);
+                  newRange.collapse(true);
+                } else {
+                  newRange.setStart(parent, 0);
+                  newRange.collapse(true);
+                }
+                sel.removeAllRanges();
+                sel.addRange(newRange);
+                savedRangeRef.current = newRange.cloneRange();
+              }
               syncContent();
               return;
             }
@@ -613,7 +756,22 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
             const prev = range.startContainer.childNodes[range.startOffset - 1];
             if (prev && prev.nodeType === Node.ELEMENT_NODE && (prev as HTMLElement).dataset.mentionToken) {
               e.preventDefault();
+              const prevPrev = prev.previousSibling;
+              const parent = prev.parentNode;
               prev.remove();
+              if (parent) {
+                const newRange = document.createRange();
+                if (prevPrev && prevPrev.nodeType === Node.TEXT_NODE) {
+                  newRange.setStart(prevPrev, (prevPrev.nodeValue || "").length);
+                  newRange.collapse(true);
+                } else {
+                  newRange.setStart(parent, Math.max(0, range.startOffset - 1));
+                  newRange.collapse(true);
+                }
+                sel.removeAllRanges();
+                sel.addRange(newRange);
+                savedRangeRef.current = newRange.cloneRange();
+              }
               syncContent();
               return;
             }
@@ -629,7 +787,7 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
     };
 
     return (
-      <div className="relative w-full min-h-[28px] flex items-center">
+      <div className="relative w-full min-h-[28px] flex flex-col justify-start">
         {isEmpty && (
           <div className="absolute top-0.5 left-0 pointer-events-none select-none text-[14px] leading-5 text-[#a9a9a9] dark:text-[#5d5d5d] font-sans">
             {placeholder}
@@ -640,7 +798,19 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
           ref={editorRef}
           contentEditable={!disabled}
           suppressContentEditableWarning
+          spellCheck={false}
+          autoCorrect="off"
+          autoCapitalize="off"
+          onCompositionStart={() => {
+            isComposingRef.current = true;
+          }}
+          onCompositionEnd={() => {
+            isComposingRef.current = false;
+            saveSelection();
+            syncContent();
+          }}
           onInput={() => {
+            if (isComposingRef.current) return;
             saveSelection();
             syncContent();
           }}

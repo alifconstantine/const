@@ -502,6 +502,8 @@ function AuthenticatedContent({
       cwd: resolvedCwd,
       project: currentProject,
       conversationId,
+      parentConversationId: conversationId,
+      model: activeModelItem?.id || activeModelItem?.name || "gemini-3.8-flash",
     };
     setRightPaneTabs((prev) => [...prev, newTab]);
     setActiveRightPaneTabId(newTab.id);
@@ -2886,7 +2888,14 @@ function AuthenticatedContent({
                     onSelectElementForChat={handleSelectElementForChat}
                     subagents={activeSubAgents || []}
                     onKillAgent={handleKillSubAgent}
+                    parentMessages={messages}
+                    parentConversationTitle={conversationTitle}
+                    parentConversationId={conversationId}
+                    defaultModel={activeModelItem?.id || activeModelItem?.name || "gemini-3.8-flash"}
                     onOpenFilePreview={handleOpenFilePreview}
+                    onInsertToMainPrompt={(text) => {
+                      setEditingPrompt((prev) => (prev ? `${prev}\n\n${text}` : text));
+                    }}
                   />
                 </div>
               </div>

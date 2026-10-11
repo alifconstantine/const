@@ -520,3 +520,69 @@ export function formatRelativeTime(timestamp: number): string {
   if (minutes >= 1) return `${minutes}m`;
   return "now";
 }
+
+export interface SideConversationItem {
+  id: string;
+  parentConversationId: string;
+  title: string;
+  project: string;
+  createdAt: number;
+  updatedAt: number;
+  messages: any[];
+  model?: string;
+  thinkingLevel?: string;
+  mode?: "ask_before_changes" | "full_access";
+}
+
+const SIDE_STORAGE_PREFIX = "const_harness_side_chat_";
+
+export function loadSideConversations(parentConversationId: string): SideConversationItem[] {
+  if (!parentConversationId) return [];
+  try {
+    const raw = localStorage.getItem(`${SIDE_STORAGE_PREFIX}${parentConversationId}`);
+    if (!raw) return [];
+    return JSON.parse(raw);
+  } catch {
+    return [];
+  }
+}
+
+export function loadSideConversation(
+  parentConversationId: string,
+  sideId: string
+): SideConversationItem | null {
+  const list = loadSideConversations(parentConversationId);
+  return list.find((c) => c.id === sideId) || null;
+}
+
+export function saveSideConversation(sideConvo: SideConversationItem): void {
+  if (!sideConvo.parentConversationId) return;
+  try {
+    const list = loadSideConversations(sideConvo.parentConversationId);
+    const idx = list.findIndex((c) => c.id === sideConvo.id);
+    const updated = { ...sideConvo, updatedAt: Date.now() };
+    if (idx >= 0) {
+      list[idx] = updated;
+    } else {
+      list.push(updated);
+    }
+    localStorage.setItem(
+      `${SIDE_STORAGE_PREFIX}${sideConvo.parentConversationId}`,
+      JSON.stringify(list)
+    );
+  } catch (err) {
+    console.warn("[ConversationStore] Failed to save side conversation:", err);
+  }
+}
+
+export function deleteSideConversation(parentConversationId: string, sideId: string): void {
+  if (!parentConversationId) return;
+  try {
+    const list = loadSideConversations(parentConversationId).filter((c) => c.id !== sideId);
+    localStorage.setItem(
+      `${SIDE_STORAGE_PREFIX}${parentConversationId}`,
+      JSON.stringify(list)
+    );
+  } catch {}
+}
+

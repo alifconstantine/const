@@ -32,6 +32,10 @@ export interface RightPaneTab {
   isMuted?: boolean;
   subAgentId?: string;
   subAgent?: any;
+  parentConversationId?: string;
+  sideChatId?: string;
+  model?: string;
+  thinkingLevel?: string;
 }
 
 export interface BrowserSelectedElement {

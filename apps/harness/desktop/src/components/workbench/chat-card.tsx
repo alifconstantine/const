@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useMemo } from "react";
+import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import {
   Folder,
   ChevronDown,
@@ -24,6 +24,7 @@ import {
   Brain,
   Gauge,
   Database,
+  Box,
 } from "lucide-react";
 import {
   ScrollArea,
@@ -217,6 +218,7 @@ interface ChatCardProps {
   conversations?: ConversationItem[];
   sessionMedia?: AttachedFile[];
   onOpenFilePreview?: (filePath: string) => void;
+  forceIconOnly?: boolean;
 }
 
 export interface MentionedItem {
@@ -250,7 +252,25 @@ export function ChatCard({
   conversations,
   sessionMedia,
   onOpenFilePreview,
+  forceIconOnly = false,
 }: ChatCardProps) {
+  const cardContainerRef = useRef<HTMLDivElement>(null);
+  const [containerNarrow, setContainerNarrow] = useState(false);
+
+  useEffect(() => {
+    const el = cardContainerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        setContainerNarrow(entry.contentRect.width < 500);
+      }
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  const isNarrow = forceIconOnly || containerNarrow;
+
   const [prompt, setPrompt] = useState("");
   const editorRef = useRef<RichMentionEditorRef>(null);
   const [isContextOpen, setIsContextOpen] = useState(false);
@@ -280,6 +300,7 @@ export function ChatCard({
       setPrompt(initialPrompt);
       if (initialPrompt !== "") {
         editorRef.current?.focus();
+        editorRef.current?.setText(initialPrompt);
       }
     }
   }, [initialPrompt]);
@@ -409,6 +430,15 @@ export function ChatCard({
   const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceFileEntry[]>([]);
   const [mentionToken, setMentionToken] = useState<ActiveAtToken | null>(null);
   const [mentionIndex, setMentionIndex] = useState(0);
+
+  const handleSerializedChange = useCallback((val: string) => {
+    setPrompt(val);
+  }, []);
+
+  const handleMentionTokenChange = useCallback((token: ActiveAtToken | null) => {
+    setMentionToken(token);
+    if (!token) setMentionIndex(0);
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -1019,7 +1049,10 @@ export function ChatCard({
     isPlusOpen || isModeOpen || isContextOpen || isModelOpen || isThinkingOpen || Boolean(mentionToken);
 
   return (
-    <div className="w-full max-w-full flex flex-col items-center gap-2 select-none min-w-0">
+    <div
+      ref={cardContainerRef}
+      className="w-full max-w-full flex flex-col items-center gap-2 select-none min-w-0"
+    >
       {/* Unified Card */}
       <div
         className={`w-full max-w-full rounded-2xl border border-[#e2e2e4] dark:border-[#383838] select-none transition-colors shadow-sm dark:shadow-none min-w-0 ${
@@ -1287,12 +1320,9 @@ export function ChatCard({
           >
             <RichMentionEditor
               ref={editorRef}
-              initialValue={prompt}
-              onSerializedChange={(val) => setPrompt(val)}
-              onMentionTokenChange={(token) => {
-                setMentionToken(token);
-                if (!token) setMentionIndex(0);
-              }}
+              initialValue={initialPrompt || ""}
+              onSerializedChange={handleSerializedChange}
+              onMentionTokenChange={handleMentionTokenChange}
               onOpenFilePreview={onOpenFilePreview}
               onSend={handleSend}
               onPasteFiles={handlePasteFiles}
@@ -1468,26 +1498,34 @@ export function ChatCard({
                     closeAllMenus();
                     setIsModeOpen(next);
                   }}
-                  className={`inline-flex items-center gap-1 sm:gap-1.5 px-1.5 sm:px-2 py-1 rounded-md text-[13px] font-normal transition-colors cursor-pointer min-w-0 max-w-[155px] ${
+                  className={cn(
+                    "inline-flex items-center transition-colors cursor-pointer",
+                    isNarrow
+                      ? "w-7 h-7 justify-center rounded-md"
+                      : "gap-1 sm:gap-1.5 px-1.5 sm:px-2 py-1 rounded-md text-[13px] font-normal min-w-0 max-w-[155px]",
                     mode === "full_access"
                       ? "text-[#e79737] hover:bg-[#e79737]/10"
                       : "text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5"
-                  }`}
+                  )}
                   title={mode === "full_access" ? "Full access" : "Ask before changes"}
                 >
                   {mode === "full_access" ? (
-                    <ShieldAlert className="w-3.5 h-3.5 text-[#e79737] stroke-[1.75] shrink-0" />
+                    <ShieldAlert className="w-4 h-4 text-[#e79737] stroke-[1.75] shrink-0" />
                   ) : (
-                    <Hand className="w-3.5 h-3.5 text-[#a9a9a9] dark:text-[#5d5d5d] stroke-[1.75] shrink-0" />
+                    <Hand className="w-4 h-4 text-[#a9a9a9] dark:text-[#d4d4d4] stroke-[1.75] shrink-0" />
                   )}
-                  <span className="truncate min-w-0">
-                    {mode === "full_access" ? "Full access" : "Ask before changes"}
-                  </span>
-                  <ChevronDown
-                    className={`w-3 h-3 ml-0.5 shrink-0 ${
-                      mode === "full_access" ? "text-[#e79737]" : "text-[#a9a9a9] dark:text-[#5d5d5d]"
-                    }`}
-                  />
+                  {!isNarrow && (
+                    <>
+                      <span className="truncate min-w-0">
+                        {mode === "full_access" ? "Full access" : "Ask before changes"}
+                      </span>
+                      <ChevronDown
+                        className={`w-3 h-3 ml-0.5 shrink-0 ${
+                          mode === "full_access" ? "text-[#e79737]" : "text-[#a9a9a9] dark:text-[#5d5d5d]"
+                        }`}
+                      />
+                    </>
+                  )}
                 </button>
 
                 {/* Mode Selector Popover (Only 2 items: Ask before changes & Full access) */}
@@ -1718,11 +1756,22 @@ export function ChatCard({
                     if (next) setSearchModelQuery("");
                     setIsModelOpen(next);
                   }}
-                  className="inline-flex items-center gap-1 px-1.5 py-1 rounded-md text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 text-[13px] font-normal transition-colors cursor-pointer min-w-0 max-w-[120px] sm:max-w-[180px] md:max-w-[240px]"
-                  title={currentModelItem?.name || selectedModel || "Gemini 3.8 Flash"}
+                  className={cn(
+                    "inline-flex items-center transition-colors cursor-pointer text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 text-[13px] font-normal",
+                    isNarrow
+                      ? "w-7 h-7 justify-center rounded-md"
+                      : "gap-1 px-1.5 py-1 rounded-md min-w-0 max-w-[120px] sm:max-w-[180px] md:max-w-[240px]"
+                  )}
+                  title={`Model: ${currentModelItem?.name || selectedModel || "Gemini 3.8 Flash"}`}
                 >
-                  <span className="truncate min-w-0">{currentModelItem?.name || selectedModel || "Gemini 3.8 Flash"}</span>
-                  <ChevronDown className="w-3 h-3 text-[#a9a9a9] dark:text-[#5d5d5d] ml-0.5 shrink-0" />
+                  {isNarrow ? (
+                    <Box className="w-4 h-4 text-[#a9a9a9] dark:text-[#d4d4d4] stroke-[1.75] shrink-0" />
+                  ) : (
+                    <>
+                      <span className="truncate min-w-0">{currentModelItem?.name || selectedModel || "Gemini 3.8 Flash"}</span>
+                      <ChevronDown className="w-3 h-3 text-[#a9a9a9] dark:text-[#5d5d5d] ml-0.5 shrink-0" />
+                    </>
+                  )}
                 </button>
 
                 {/* Model Selector Popover */}
@@ -1867,13 +1916,22 @@ export function ChatCard({
                       closeAllMenus();
                       setIsThinkingOpen(next);
                     }}
-                    className="inline-flex items-center gap-1 px-1.5 py-1 rounded-md text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 text-[13px] font-normal transition-colors cursor-pointer shrink-0"
+                    className={cn(
+                      "inline-flex items-center transition-colors cursor-pointer text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 text-[13px] font-normal shrink-0",
+                      isNarrow
+                        ? "w-7 h-7 justify-center rounded-md"
+                        : "gap-1 px-1.5 py-1 rounded-md"
+                    )}
                     title={`Thinking effort: ${thinkingLevel}`}
                     aria-label={`Thinking effort: ${thinkingLevel}`}
                   >
-                    <Brain className="w-3.5 h-3.5 text-[#a9a9a9] dark:text-[#888888] shrink-0" />
-                    <span className="capitalize">{thinkingLevel === "xhigh" ? "XHigh" : thinkingLevel}</span>
-                    <ChevronDown className="w-3 h-3 text-[#a9a9a9] dark:text-[#5d5d5d] ml-0.5 shrink-0" />
+                    <Brain className="w-4 h-4 text-[#a9a9a9] dark:text-[#d4d4d4] stroke-[1.75] shrink-0" />
+                    {!isNarrow && (
+                      <>
+                        <span className="capitalize">{thinkingLevel === "xhigh" ? "XHigh" : thinkingLevel}</span>
+                        <ChevronDown className="w-3 h-3 text-[#a9a9a9] dark:text-[#5d5d5d] ml-0.5 shrink-0" />
+                      </>
+                    )}
                   </button>
 
                   {/* Thinking Level Popover Dropdown */}
