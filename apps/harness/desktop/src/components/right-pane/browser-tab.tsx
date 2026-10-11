@@ -551,7 +551,7 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
   return (
     <div className="flex-1 w-full h-full flex flex-col bg-[#0f0f0f] text-white select-none overflow-hidden relative">
       {/* 1. Top Browser Navigation Toolbar (Matching Image 1:1) */}
-      <div className="h-10 w-full bg-[#181818] border-b border-[#282828] flex items-center px-2 gap-1.5 shrink-0 z-20">
+      <div className="h-10 w-full bg-[#181818] border-b border-[#282828] flex items-center px-2 gap-1.5 shrink-0 z-10">
         {/* Back Button */}
         <button
           type="button"

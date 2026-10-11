@@ -186,7 +186,7 @@ export function RightPane({
       />
 
       {/* Main Tab Body (Persistent Stack keeping tabs alive in DOM) */}
-      <div className="flex-1 w-full h-[calc(100%-40px)] min-h-0 relative overflow-hidden flex flex-col bg-[#ffffff] dark:bg-[#141414]">
+      <div className="flex-1 w-full h-[calc(100%-40px)] min-h-0 relative overflow-hidden flex flex-col bg-[#ffffff] dark:bg-[#141414] z-10">
         {isOpeningNewTab || tabs.length === 0 || !activeTab ? (
           /* Empty / New Tab Picker matching Image 2 1:1 */
           <OpenTabView onSelectTabType={onOpenTabType} />

@@ -191,9 +191,9 @@ export function TabHeader({
   );
 
   return (
-    <div className="h-10 w-full border-b border-[#dedee2] dark:border-[#282828] bg-[#fbfbfb] dark:bg-[#141414] flex items-center px-2 shrink-0 select-none relative z-20">
+    <div className="h-10 w-full border-b border-[#dedee2] dark:border-[#282828] bg-[#fbfbfb] dark:bg-[#141414] flex items-center px-2 shrink-0 select-none relative z-30">
       {/* 1. Leftmost: ChevronsDown Button for Searching / Switching Open Tabs */}
-      <div className="relative shrink-0" ref={dropdownRef}>
+      <div className={`relative shrink-0 ${isDropdownOpen ? "z-50" : ""}`} ref={dropdownRef}>
         <button
           type="button"
           onClick={() => {
