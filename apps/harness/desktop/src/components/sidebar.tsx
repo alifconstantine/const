@@ -274,6 +274,25 @@ export function Sidebar({
     }
   };
 
+  useEffect(() => {
+    const handleOpenModal = () => {
+      handleOpenArchiveModal();
+    };
+    window.addEventListener("const:open-archive-modal", handleOpenModal);
+    return () => window.removeEventListener("const:open-archive-modal", handleOpenModal);
+  }, []);
+
+  useEffect(() => {
+    if (!isArchiveModalOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setIsArchiveModalOpen(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isArchiveModalOpen]);
+
   const handleUnarchiveSession = async (id: string) => {
     await unarchiveConversation(id);
     onUnarchiveConversation?.(id);
@@ -1536,142 +1555,166 @@ export function Sidebar({
         </DropdownMenu>
       </div>
 
-      {/* 1. Archived Sessions Modal (matching const-harness) */}
-      <Dialog open={isArchiveModalOpen} onOpenChange={setIsArchiveModalOpen}>
-        <DialogContent className="w-[min(560px,calc(100vw-32px))] max-w-[560px] bg-white dark:bg-[#1e1e1e] border border-[#e2e2e4] dark:border-[#383838] text-[#262626] dark:text-[#d4d4d4] p-0 rounded-2xl shadow-2xl overflow-hidden">
-          <DialogHeader className="px-5 pt-4 pb-3 border-b border-[#e2e2e4] dark:border-[#333333]">
-            <DialogTitle className="text-sm font-semibold flex items-center gap-2 text-[#161616] dark:text-white">
-              <Archive className="w-4 h-4 text-[#a9a9a9] dark:text-[#888888]" />
-              <span>Archived Sessions</span>
-              {archivedSessions.length > 0 && (
-                <span className="text-xs px-2 py-0.5 rounded-full bg-[#f0f0f2] dark:bg-[#2a2a2a] text-[#262626] dark:text-[#888888] font-sans tabular-nums">
-                  {archivedSessions.length}
-                </span>
-              )}
-            </DialogTitle>
-          </DialogHeader>
-
-          <div className="p-4 flex flex-col gap-3 w-full min-w-0 overflow-hidden">
-            {archivedSessions.length > 0 && (
-              <div className="relative w-full min-w-0">
-                <Search className="w-3.5 h-3.5 text-[#a9a9a9] dark:text-[#777777] absolute left-3 top-1/2 -translate-y-1/2" />
-                <input
-                  type="text"
-                  value={archiveSearchQuery}
-                  onChange={(e) => setArchiveSearchQuery(e.target.value)}
-                  placeholder="Search archived sessions..."
-                  className="w-full pl-9 pr-8 py-1.5 text-xs bg-[#f4f4f6] dark:bg-[#282828] border border-[#e2e2e4] dark:border-[#383838] rounded-lg text-[#262626] dark:text-[#d4d4d4] placeholder-[#a9a9a9] dark:placeholder-[#777777] focus:outline-none focus:border-[#a9a9a9] dark:focus:border-[#555555]"
-                />
-                {archiveSearchQuery && (
-                  <button
-                    type="button"
-                    onClick={() => setArchiveSearchQuery("")}
-                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#a9a9a9] dark:text-[#777777] hover:text-[#262626] dark:hover:text-white p-0.5"
-                  >
-                    <X className="w-3.5 h-3.5" />
-                  </button>
+      {/* 1. Archived Sessions Modal (matching Settings pop-up smooth animation & style) */}
+      {isArchiveModalOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 dark:bg-black/60 backdrop-blur-xs select-none p-4 sm:p-6 animate-in fade-in duration-150"
+          onClick={() => setIsArchiveModalOpen(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Archived Sessions"
+        >
+          <div
+            className="w-[min(560px,calc(100vw-32px))] max-w-[560px] max-h-[85vh] bg-white dark:bg-[#1e1e1e] border border-[#e2e2e4] dark:border-[#383838] text-[#262626] dark:text-[#d4d4d4] rounded-2xl shadow-2xl dark:shadow-[0_24px_70px_rgba(0,0,0,0.7)] overflow-hidden flex flex-col font-sans outline-none focus:outline-none focus-visible:outline-none ring-0 animate-in fade-in zoom-in-[0.985] duration-150"
+            onClick={(e) => e.stopPropagation()}
+            tabIndex={-1}
+          >
+            {/* Header: aligned flex header matching Settings style */}
+            <div className="flex items-center justify-between px-5 py-3.5 border-b border-[#e2e2e4] dark:border-[#333333] shrink-0">
+              <div className="flex items-center gap-2 text-sm font-semibold text-[#161616] dark:text-white">
+                <Archive className="w-4 h-4 text-[#a9a9a9] dark:text-[#888888]" />
+                <span>Archived Sessions</span>
+                {archivedSessions.length > 0 && (
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-[#f0f0f2] dark:bg-[#2a2a2a] text-[#262626] dark:text-[#888888] font-sans tabular-nums">
+                    {archivedSessions.length}
+                  </span>
                 )}
               </div>
-            )}
+              <button
+                type="button"
+                onClick={() => setIsArchiveModalOpen(false)}
+                className="p-1.5 rounded-lg text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white hover:bg-[#f0f0f2] dark:hover:bg-[#2b2b2b] transition-colors cursor-pointer outline-none focus:outline-none shrink-0"
+                title="Close (Esc)"
+                aria-label="Close"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
 
-            <div className="w-full min-w-0 max-h-80 overflow-y-auto overflow-x-hidden flex flex-col gap-1.5 pr-1">
-              {isArchiveLoading ? (
-                <div className="py-8 text-center text-xs text-[#a9a9a9] dark:text-[#777777]">Loading archived sessions...</div>
-              ) : archivedSessions.length === 0 ? (
-                <div className="py-12 flex flex-col items-center justify-center gap-2 text-[#a9a9a9] dark:text-[#777777]">
-                  <Archive className="w-8 h-8 opacity-40" />
-                  <span className="text-xs">No archived conversations</span>
+            <div className="p-4 flex flex-col gap-3 w-full min-w-0 overflow-hidden flex-1">
+              {archivedSessions.length > 0 && (
+                <div className="relative w-full min-w-0">
+                  <Search className="w-3.5 h-3.5 text-[#a9a9a9] dark:text-[#777777] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={archiveSearchQuery}
+                    onChange={(e) => setArchiveSearchQuery(e.target.value)}
+                    placeholder="Search archived sessions..."
+                    className="w-full pl-9 pr-8 py-1.5 text-xs bg-[#f4f4f6] dark:bg-[#282828] border border-[#e2e2e4] dark:border-[#383838] rounded-lg text-[#262626] dark:text-[#d4d4d4] placeholder-[#a9a9a9] dark:placeholder-[#777777] focus:outline-none focus:border-[#a9a9a9] dark:focus:border-[#555555]"
+                  />
+                  {archiveSearchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setArchiveSearchQuery("")}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#a9a9a9] dark:text-[#777777] hover:text-[#262626] dark:hover:text-white p-1 rounded-md hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer flex items-center justify-center"
+                      title="Clear search"
+                      aria-label="Clear search"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
-              ) : filteredArchivedSessions.length === 0 ? (
-                <div className="py-8 text-center text-xs text-[#a9a9a9] dark:text-[#777777]">No matching archived conversations</div>
-              ) : (
-                filteredArchivedSessions.map((convo) => (
-                  <div
-                    key={convo.id}
-                    onClick={() => {
-                      setIsArchiveModalOpen(false);
-                      onSelectConversation?.(convo.id);
-                    }}
-                    className="w-full min-w-0 flex items-center justify-between gap-3 p-2.5 rounded-xl bg-[#f4f4f6] dark:bg-[#242424] hover:bg-[#eaeaea] dark:hover:bg-[#2c2c2c] border border-transparent hover:border-[#e2e2e4] dark:hover:border-[#383838] transition-all group cursor-pointer"
-                  >
-                    <div className="min-w-0 flex-1 flex flex-col gap-0.5 overflow-hidden">
-                      <p
-                        className="text-xs font-medium text-[#262626] dark:text-[#d4d4d4] truncate block"
-                        title={convo.title || "Untitled task"}
+              )}
+
+              <div className="w-full min-w-0 max-h-80 overflow-y-auto overflow-x-hidden flex flex-col gap-1.5 pr-1">
+                {isArchiveLoading ? (
+                  <div className="py-8 text-center text-xs text-[#a9a9a9] dark:text-[#777777]">Loading archived sessions...</div>
+                ) : archivedSessions.length === 0 ? (
+                  <div className="py-12 flex flex-col items-center justify-center gap-2 text-[#a9a9a9] dark:text-[#777777]">
+                    <Archive className="w-8 h-8 opacity-40" />
+                    <span className="text-xs">No archived conversations</span>
+                  </div>
+                ) : filteredArchivedSessions.length === 0 ? (
+                  <div className="py-8 text-center text-xs text-[#a9a9a9] dark:text-[#777777]">No matching archived conversations</div>
+                ) : (
+                  filteredArchivedSessions.map((convo) => (
+                    <div
+                      key={convo.id}
+                      onClick={() => {
+                        setIsArchiveModalOpen(false);
+                        onSelectConversation?.(convo.id);
+                      }}
+                      className="w-full min-w-0 flex items-center justify-between gap-3 p-2.5 rounded-xl bg-[#f4f4f6] dark:bg-[#242424] hover:bg-[#eaeaea] dark:hover:bg-[#2c2c2c] border border-transparent hover:border-[#e2e2e4] dark:hover:border-[#383838] transition-all group cursor-pointer"
+                    >
+                      <div className="min-w-0 flex-1 flex flex-col gap-0.5 overflow-hidden">
+                        <p
+                          className="text-xs font-medium text-[#262626] dark:text-[#d4d4d4] truncate block"
+                          title={convo.title || "Untitled task"}
+                        >
+                          {getCleanConversationTitle(convo.title)}
+                        </p>
+                        <div className="flex items-center gap-2 text-[11px] text-[#a9a9a9] dark:text-[#777777]">
+                          <span className="truncate max-w-[140px]">
+                            {getProjectDisplayName(convo.project)}
+                          </span>
+                          <span>•</span>
+                          <span className="shrink-0">{formatRelativeTime(convo.updatedAt || convo.createdAt)}</span>
+                        </div>
+                      </div>
+
+                      <div
+                        className="flex items-center gap-1.5 shrink-0 ml-2"
+                        onClick={(e) => e.stopPropagation()}
                       >
-                        {getCleanConversationTitle(convo.title)}
-                      </p>
-                      <div className="flex items-center gap-2 text-[11px] text-[#a9a9a9] dark:text-[#777777]">
-                        <span className="truncate max-w-[140px]">
-                          {getProjectDisplayName(convo.project)}
-                        </span>
-                        <span>•</span>
-                        <span className="shrink-0">{formatRelativeTime(convo.updatedAt || convo.createdAt)}</span>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setIsArchiveModalOpen(false);
+                            onSelectConversation?.(convo.id);
+                          }}
+                          className="h-7 px-2.5 text-xs bg-white dark:bg-[#2b2b2b] border-[#e2e2e4] dark:border-[#383838] hover:bg-[#eaeaea] dark:hover:bg-[#383838] text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white shrink-0 cursor-pointer"
+                        >
+                          Open
+                        </Button>
+
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button
+                              type="button"
+                              onClick={(e) => e.stopPropagation()}
+                              className="p-1.5 rounded-lg hover:bg-[#dedee2] dark:hover:bg-[#383838] text-[#a9a9a9] dark:text-[#888888] hover:text-[#262626] dark:hover:text-white transition-colors cursor-pointer outline-none shrink-0"
+                              title="More actions"
+                            >
+                              <MoreHorizontal className="w-3.5 h-3.5" />
+                            </button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent
+                            align="end"
+                            className="w-40 bg-white dark:bg-[#222222] border-[#e2e2e4] dark:border-[#383838] text-[#262626] dark:text-[#d4d4d4] p-1 rounded-xl shadow-xl z-50 text-xs"
+                          >
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleUnarchiveSession(convo.id);
+                              }}
+                              className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer hover:bg-black/5 dark:hover:bg-[#303030] text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white"
+                            >
+                              <ArchiveRestore className="w-3.5 h-3.5" />
+                              <span>Unarchive session</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleOpenDelete(convo);
+                              }}
+                              className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer hover:bg-red-500/10 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>Delete session</span>
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </div>
-
-                    <div
-                      className="flex items-center gap-1.5 shrink-0 ml-2"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setIsArchiveModalOpen(false);
-                          onSelectConversation?.(convo.id);
-                        }}
-                        className="h-7 px-2.5 text-xs bg-white dark:bg-[#2b2b2b] border-[#e2e2e4] dark:border-[#383838] hover:bg-[#eaeaea] dark:hover:bg-[#383838] text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white shrink-0 cursor-pointer"
-                      >
-                        Open
-                      </Button>
-
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <button
-                            type="button"
-                            onClick={(e) => e.stopPropagation()}
-                            className="p-1.5 rounded-lg hover:bg-[#dedee2] dark:hover:bg-[#383838] text-[#a9a9a9] dark:text-[#888888] hover:text-[#262626] dark:hover:text-white transition-colors cursor-pointer outline-none shrink-0"
-                            title="More actions"
-                          >
-                            <MoreHorizontal className="w-3.5 h-3.5" />
-                          </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent
-                          align="end"
-                          className="w-40 bg-white dark:bg-[#222222] border-[#e2e2e4] dark:border-[#383838] text-[#262626] dark:text-[#d4d4d4] p-1 rounded-xl shadow-xl z-50 text-xs"
-                        >
-                          <DropdownMenuItem
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleUnarchiveSession(convo.id);
-                            }}
-                            className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer hover:bg-black/5 dark:hover:bg-[#303030] text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white"
-                          >
-                            <ArchiveRestore className="w-3.5 h-3.5" />
-                            <span>Unarchive session</span>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleOpenDelete(convo);
-                            }}
-                            className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg cursor-pointer hover:bg-red-500/10 text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                            <span>Delete session</span>
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </div>
-                ))
-              )}
+                  ))
+                )}
+              </div>
             </div>
           </div>
-        </DialogContent>
-      </Dialog>
+        </div>
+      )}
 
       {/* 2. Rename Task Dialog */}
       <Dialog open={renameTarget !== null} onOpenChange={(open) => !open && setRenameTarget(null)}>
