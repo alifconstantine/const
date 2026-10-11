@@ -168,6 +168,7 @@ export interface AgentConfig {
   maxTokens?: number;
   maxOutputTokens?: number;
   onAskQuestion?: (toolCallId: string, questions: QuestionItem[]) => Promise<any>;
+  browserHandler?: (toolName: string, args: Record<string, any>) => Promise<{ result: any; isError: boolean }>;
 }
 
 export type ConstAgentMessage = AgentMessage;

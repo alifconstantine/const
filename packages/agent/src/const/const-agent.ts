@@ -169,6 +169,14 @@ const VALID_FALLBACK_TOOLS = new Set([
   "google_forms_manage",
   "youtube_search_and_transcribe",
   "code_interpreter",
+  "browser_navigate",
+  "browser_snapshot",
+  "browser_click",
+  "browser_type",
+  "browser_key",
+  "browser_scroll",
+  "browser_screenshot",
+  "browser_request_help",
 ]);
 
 export function extractFallbackToolCalls(content: string): ToolCall[] {
@@ -380,6 +388,22 @@ Available tools:
 - task: Delegate work to an isolated subagent. Runs synchronously in foreground by default, returning complete findings inside a <task-result> envelope, and streams live progress to the UI. Specialist personas: 'scout' (strictly read-only codebase research/exploration and broad pattern search), 'reviewer' (code review for quality, logic, and security analysis), or 'task' (focused worker with full write/edit capabilities). (Alias: spawn_agent).
 - agent_status: Check status, activity logs, or findings of running or completed subagents (when spawned with run_in_background: true).
 - kill_agent: Terminate an active running subagent.
+- browser_navigate: Navigate the native desktop browser to a URL (e.g. 'http://localhost:3000'), or 'back', 'forward', 'reload'.
+- browser_snapshot: Capture an interactive DOM snapshot of the page with semantic element refs like [e1], [e2].
+- browser_click: Click an interactive element by its semantic ref (e.g. 'e1') or (x, y) coordinates.
+- browser_type: Type text into an input or textarea element by its ref (e.g. 'e2'). Supports clearing text and pressing Enter.
+- browser_key: Send keyboard keys or shortcuts ('Enter', 'Tab', 'Escape', 'ArrowDown').
+- browser_scroll: Scroll the page vertically or horizontally, or scroll an element into view.
+- browser_screenshot: Capture a visual screenshot of the active browser viewport.
+- browser_request_help: Ask the human user to take control for CAPTCHAs, 2FA verification, or sensitive passwords.
+
+NATIVE BROWSER AUTOMATION PROTOCOL:
+- You have direct, live control over the native browser in the desktop pane.
+- When asked to test, view, or interact with web applications (e.g. localhost servers, documentation, or websites):
+  1. Use 'browser_navigate' to load the URL.
+  2. Use 'browser_snapshot' to inspect interactive elements and obtain their stable refs ([e1], [e2], ...).
+  3. Use 'browser_click' and 'browser_type' using the element refs to interact with the UI.
+  4. If a human check (CAPTCHA, 2FA, OTP, or secret password) appears, call 'browser_request_help' with a clear reason so the user can take the wheel and hand it back.
 
 SUB-AGENT DELEGATION PROTOCOL:
 - You can spawn multiple subagents (maximum 5 subagents per multi-step workflow) to divide modular tasks cleanly.
@@ -554,19 +578,26 @@ async function fetchWithRetry(
         throw err;
       }
 
+      const causeMsg = err.cause?.message || err.cause?.code || "";
+      const rawReason = err.message || "Network connection failed";
+      const reason = causeMsg && !rawReason.includes(causeMsg)
+        ? `${rawReason} (${causeMsg})`
+        : rawReason;
+
       if (attempt < maxRetries) {
         attempt++;
         const delayMs =
           Math.min(initialDelayMs * Math.pow(2, attempt - 1), maxDelayMs) +
           Math.floor(Math.random() * 300);
-        const reason = err.message || "Network connection failed";
         options.onRetry?.(attempt, maxRetries, reason);
 
         await new Promise((resolve) => setTimeout(resolve, delayMs));
         continue;
       }
 
-      throw err;
+      const finalError = new Error(reason);
+      (finalError as any).cause = err.cause || err;
+      throw finalError;
     }
   }
 }
@@ -1599,6 +1630,7 @@ export class ConstAgent {
               onArtifactCreated: (artifact) => {
                 onEvent({ type: "artifact_created", artifact });
               },
+              browserHandler: this.config.browserHandler,
             }
           );
 

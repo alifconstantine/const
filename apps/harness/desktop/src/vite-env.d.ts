@@ -349,6 +349,34 @@ declare global {
           code?: number | null;
         }) => void
       ) => () => void;
+      browser?: {
+        registerTab: (tabId: string, guestContentsId: number) => Promise<boolean>;
+        unregisterTab: (tabId: string) => Promise<boolean>;
+        setActiveTab: (tabId: string) => Promise<boolean>;
+        getControl: () => Promise<{
+          holder: "bot" | "human";
+          since: string;
+          requested: boolean;
+          requestedAt?: string;
+          reason?: string;
+          secretWanted?: string;
+          secretRef?: string;
+          secretSnapshotId?: number;
+        }>;
+        takeControl: () => Promise<any>;
+        releaseControl: () => Promise<any>;
+        supplySecret: (text: string) => Promise<{ success: boolean; characters: number }>;
+        navigate: (url: string) => Promise<{ url: string; title: string }>;
+        snapshot: () => Promise<any>;
+        click: (args: any) => Promise<any>;
+        type: (args: any) => Promise<any>;
+        key: (args: any) => Promise<any>;
+        scroll: (args: any) => Promise<any>;
+        screenshot: (args?: any) => Promise<any>;
+        onControlChanged: (callback: (state: any) => void) => () => void;
+        onAiAction: (callback: (action: any) => void) => () => void;
+        onOpenTabRequest?: (callback: (data: { url: string }) => void) => () => void;
+      };
     };
   }
 }

@@ -47,6 +47,22 @@ export interface ExecuteToolOptions {
   learnId?: string;
   onSourceCreated?: (source: any) => void;
   onArtifactCreated?: (artifact: any) => void;
+  browserHandler?: BrowserToolHandler;
+}
+
+export type BrowserToolHandler = (
+  toolName: string,
+  args: Record<string, any>
+) => Promise<{ result: any; isError: boolean }>;
+
+let globalBrowserToolHandler: BrowserToolHandler | null = null;
+
+export function registerGlobalBrowserToolHandler(handler: BrowserToolHandler | null) {
+  globalBrowserToolHandler = handler;
+}
+
+export function getGlobalBrowserToolHandler(): BrowserToolHandler | null {
+  return globalBrowserToolHandler;
 }
 
 // ---------------------------------------------------------------------------
@@ -246,10 +262,219 @@ export function isAllowedInternalPath(targetPath: string): boolean {
 }
 
 // ---------------------------------------------------------------------------
+// Native Browser Tools (OpenBot & oh-my-pi inspired Electron Webview control)
+// ---------------------------------------------------------------------------
+
+export const BROWSER_NAVIGATE_TOOL: NativeToolDefinition = {
+  type: "function",
+  function: {
+    name: "browser_navigate",
+    description:
+      "Navigate the native desktop browser to a specified URL, or go back/forward/reload. Returns the new URL and page title.",
+    parameters: {
+      type: "object",
+      properties: {
+        url: {
+          type: "string",
+          description: "The full URL to navigate to (e.g. 'https://github.com' or 'http://localhost:3000'), or 'back', 'forward', 'reload'.",
+        },
+      },
+      required: ["url"],
+    },
+  },
+};
+
+export const BROWSER_SNAPSHOT_TOOL: NativeToolDefinition = {
+  type: "function",
+  function: {
+    name: "browser_snapshot",
+    description:
+      "Extract a semantic accessibility & interactive DOM snapshot of the active browser page. Interactive elements (links, buttons, inputs) are tagged with short refs like [e1], [e2] which you can use directly with browser_click or browser_type.",
+    parameters: {
+      type: "object",
+      properties: {},
+    },
+  },
+};
+
+export const BROWSER_CLICK_TOOL: NativeToolDefinition = {
+  type: "function",
+  function: {
+    name: "browser_click",
+    description:
+      "Click on an interactive element by its semantic ref (e.g. 'e1', 'e2' from browser_snapshot) or directly at (x, y) coordinates. Visual cursor ripples show the click action.",
+    parameters: {
+      type: "object",
+      properties: {
+        ref: {
+          type: "string",
+          description: "The element ref ID from browser_snapshot (e.g. 'e1', 'e2'). Recommended.",
+        },
+        x: {
+          type: "number",
+          description: "Optional absolute X pixel coordinate if clicking by position.",
+        },
+        y: {
+          type: "number",
+          description: "Optional absolute Y pixel coordinate if clicking by position.",
+        },
+        button: {
+          type: "string",
+          enum: ["left", "right", "middle"],
+          description: "Mouse button to click (default: 'left').",
+        },
+        clickCount: {
+          type: "number",
+          description: "Number of clicks: 1 for single click, 2 for double click (default: 1).",
+        },
+      },
+    },
+  },
+};
+
+export const BROWSER_TYPE_TOOL: NativeToolDefinition = {
+  type: "function",
+  function: {
+    name: "browser_type",
+    description:
+      "Type text into an input or textarea element by its semantic ref (e.g. 'e2') or the currently focused element. Can automatically clear existing text and press Enter.",
+    parameters: {
+      type: "object",
+      properties: {
+        text: {
+          type: "string",
+          description: "The text to type into the field.",
+        },
+        ref: {
+          type: "string",
+          description: "The target element ref ID from browser_snapshot (e.g. 'e2').",
+        },
+        clear: {
+          type: "boolean",
+          description: "Whether to clear existing text before typing (default: true).",
+        },
+        submit: {
+          type: "boolean",
+          description: "Whether to press Enter after typing to submit the form (default: false).",
+        },
+      },
+      required: ["text"],
+    },
+  },
+};
+
+export const BROWSER_KEY_TOOL: NativeToolDefinition = {
+  type: "function",
+  function: {
+    name: "browser_key",
+    description:
+      "Send a keyboard key or shortcut to the active browser page (e.g. 'Enter', 'Tab', 'Escape', 'Backspace', 'ArrowDown', 'PageDown').",
+    parameters: {
+      type: "object",
+      properties: {
+        key: {
+          type: "string",
+          description: "The key name to press (e.g. 'Enter', 'Tab', 'Escape', 'ArrowDown').",
+        },
+        modifiers: {
+          type: "array",
+          items: { type: "string" },
+          description: "Optional keyboard modifiers (e.g. ['Control'], ['Shift'], ['Alt']).",
+        },
+      },
+      required: ["key"],
+    },
+  },
+};
+
+export const BROWSER_SCROLL_TOOL: NativeToolDefinition = {
+  type: "function",
+  function: {
+    name: "browser_scroll",
+    description:
+      "Scroll the active browser page or container vertically or horizontally by delta pixels, or scroll to bring a specific element ref into view.",
+    parameters: {
+      type: "object",
+      properties: {
+        deltaY: {
+          type: "number",
+          description: "Vertical scroll amount in pixels (positive scrolls down, negative scrolls up). Default: 500.",
+        },
+        deltaX: {
+          type: "number",
+          description: "Horizontal scroll amount in pixels (default: 0).",
+        },
+        ref: {
+          type: "string",
+          description: "Optional element ref ID to scroll directly into view.",
+        },
+      },
+    },
+  },
+};
+
+export const BROWSER_SCREENSHOT_TOOL: NativeToolDefinition = {
+  type: "function",
+  function: {
+    name: "browser_screenshot",
+    description:
+      "Capture a screenshot of the visible browser viewport. Returns image metadata and preview.",
+    parameters: {
+      type: "object",
+      properties: {
+        quality: {
+          type: "number",
+          description: "JPEG/PNG quality from 1 to 100 (default: 80).",
+        },
+      },
+    },
+  },
+};
+
+export const BROWSER_REQUEST_HELP_TOOL: NativeToolDefinition = {
+  type: "function",
+  function: {
+    name: "browser_request_help",
+    description:
+      "Pause automated browser actions and ask the human user to take control (e.g. to solve CAPTCHA, complete 2FA / OTP verification, or enter sensitive credentials). The user will see a banner and take over until handing control back to you.",
+    parameters: {
+      type: "object",
+      properties: {
+        reason: {
+          type: "string",
+          description: "Detailed reason why human intervention is required (e.g. 'Please complete Cloudflare Turnstile CAPTCHA', 'Please sign in with your Google account').",
+        },
+        secretWanted: {
+          type: "string",
+          description: "If requesting a password or secret to be typed, the label of the credential (e.g. 'Master Password', 'API Secret').",
+        },
+        ref: {
+          type: "string",
+          description: "Optional target element ref where the secret should be entered.",
+        },
+      },
+      required: ["reason"],
+    },
+  },
+};
+
+export const NATIVE_BROWSER_TOOLS: NativeToolDefinition[] = [
+  BROWSER_NAVIGATE_TOOL,
+  BROWSER_SNAPSHOT_TOOL,
+  BROWSER_CLICK_TOOL,
+  BROWSER_TYPE_TOOL,
+  BROWSER_KEY_TOOL,
+  BROWSER_SCROLL_TOOL,
+  BROWSER_SCREENSHOT_TOOL,
+  BROWSER_REQUEST_HELP_TOOL,
+];
+
+// ---------------------------------------------------------------------------
 // Native Tool Definitions (Pi Standard 4 Core Tools + Aliases)
 // ---------------------------------------------------------------------------
 
 export const CONST_DEFAULT_TOOLS: NativeToolDefinition[] = [
+  ...NATIVE_BROWSER_TOOLS,
   {
     type: "function",
     function: {
@@ -3732,6 +3957,27 @@ export async function executeNativeTool(
     }
 
     const normalizedTool = toolName.toLowerCase().replace(/[-_]/g, "");
+
+    // -----------------------------------------------------------------------
+    // Native Browser Tools (OpenBot & oh-my-pi inspired)
+    // -----------------------------------------------------------------------
+    if (
+      normalizedTool.startsWith("browser") ||
+      toolName.startsWith("browser_")
+    ) {
+      const handler =
+        options.browserHandler ||
+        options.parentConfig?.browserHandler ||
+        getGlobalBrowserToolHandler();
+      if (!handler) {
+        return {
+          result:
+            "The native desktop browser is not connected or open. Please open the Browser tab in the right pane to interact with web pages directly.",
+          isError: true,
+        };
+      }
+      return await handler(toolName, args);
+    }
 
     // -----------------------------------------------------------------------
     // Tool: read (aliases: read_file, cat)

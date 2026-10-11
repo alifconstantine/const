@@ -24,6 +24,7 @@ import {
   type ScheduledTaskItem,
   type ScheduledTaskSchedule,
 } from "./scheduled-tasks";
+import { browserController, type ControlState } from "./browser-controller";
 
 // Initialize ~/.const/harness directory hierarchy (.gemini/antigravity aligned)
 const constHomeDir = path.join(os.homedir(), ".const");
@@ -815,6 +816,9 @@ app.whenReady().then(() => {
               });
             }
           });
+        },
+        browserHandler: async (toolName, args) => {
+          return await browserController.executeTool(toolName, args);
         },
       });
 
@@ -1652,6 +1656,91 @@ app.whenReady().then(() => {
       return true;
     }
     return false;
+  });
+
+  // ---------------------------------------------------------------------------
+  // Browser Control IPC Handlers (OpenBot / oh-my-pi architecture)
+  // ---------------------------------------------------------------------------
+  browserController.setCallbacks({
+    onStateChange: (state: ControlState) => {
+      if (win && !win.isDestroyed()) {
+        win.webContents.send("browser:control-changed", state);
+      }
+    },
+    onAiAction: (action: { type: string; details?: any }) => {
+      if (win && !win.isDestroyed()) {
+        win.webContents.send("browser:ai-action", action);
+      }
+    },
+    onTabOpenRequest: async (url: string) => {
+      if (win && !win.isDestroyed()) {
+        win.webContents.send("browser:open-tab-request", { url });
+        return "browser-tab-default";
+      }
+      return null;
+    },
+  });
+
+  ipcMain.handle(
+    "browser:register-tab",
+    async (_event, payload: { tabId: string; guestContentsId: number }) => {
+      browserController.registerWebview(payload.tabId, payload.guestContentsId);
+      return true;
+    }
+  );
+
+  ipcMain.handle("browser:unregister-tab", async (_event, tabId: string) => {
+    browserController.unregisterWebview(tabId);
+    return true;
+  });
+
+  ipcMain.handle("browser:set-active-tab", async (_event, tabId: string) => {
+    browserController.setActiveTab(tabId);
+    return true;
+  });
+
+  ipcMain.handle("browser:get-control", async () => {
+    return browserController.getControl();
+  });
+
+  ipcMain.handle("browser:take-control", async () => {
+    return browserController.takeControl();
+  });
+
+  ipcMain.handle("browser:release-control", async () => {
+    return browserController.releaseControl();
+  });
+
+  ipcMain.handle("browser:supply-secret", async (_event, text: string) => {
+    return await browserController.supplySecret(text);
+  });
+
+  ipcMain.handle("browser:navigate", async (_event, url: string) => {
+    return await browserController.navigate(url);
+  });
+
+  ipcMain.handle("browser:snapshot", async () => {
+    return await browserController.snapshot();
+  });
+
+  ipcMain.handle("browser:click", async (_event, args: any) => {
+    return await browserController.click(args);
+  });
+
+  ipcMain.handle("browser:type", async (_event, args: any) => {
+    return await browserController.type(args);
+  });
+
+  ipcMain.handle("browser:key", async (_event, args: any) => {
+    return await browserController.key(args);
+  });
+
+  ipcMain.handle("browser:scroll", async (_event, args: any) => {
+    return await browserController.scroll(args);
+  });
+
+  ipcMain.handle("browser:screenshot", async (_event, args: any) => {
+    return await browserController.screenshot(args);
   });
 
   createWindow();
