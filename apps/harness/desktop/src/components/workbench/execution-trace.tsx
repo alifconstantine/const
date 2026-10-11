@@ -11,6 +11,7 @@ import {
   FileSearch,
   ShieldAlert,
   HelpCircle,
+  Bot,
 } from "lucide-react";
 import { ScrollArea, cn } from "@const/ui";
 import type { FileMutationRecord, TraceStep } from "../../vite-env";
@@ -42,6 +43,7 @@ export interface ExecutionTraceProps {
   onOpenFileDiff?: (record: FileMutationRecord) => void;
   onOpenFilePreview?: (filePath: string, content?: string) => void;
   onAnswerQuestion?: (toolCallId: string, answer: any) => void;
+  onOpenSubAgent?: (step: TraceStep) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -88,6 +90,7 @@ export function ExecutionTrace({
   onOpenFileDiff,
   onOpenFilePreview,
   onAnswerQuestion,
+  onOpenSubAgent,
 }: ExecutionTraceProps) {
   // Default: Open while executing to view progress live; automatically closed when worked/finished
   const [isMainOpen, setIsMainOpen] = useState(isExecuting);
@@ -209,6 +212,22 @@ export function ExecutionTrace({
               // A. Todo Write / Checklist (Rendered in floating card at top-right, not in working process)
               if (norm === "todowrite" || norm === "todo") {
                 return null;
+              }
+
+              // A2. SubAgent Delegation (task, spawn_agent, subagent, delegatetask)
+              if (
+                norm === "task" ||
+                norm === "spawnagent" ||
+                norm === "subagent" ||
+                norm === "delegatetask"
+              ) {
+                return (
+                  <SubAgentTraceItem
+                    key={step.id || `subagent_${idx}`}
+                    tool={step}
+                    onOpenSubAgent={onOpenSubAgent}
+                  />
+                );
               }
 
               // B. Ask Question (Image 2: "? Asking questions" while pending, "? Asked N questions ⌄" when answered)
@@ -901,6 +920,69 @@ function ExplorationItem({
             </ScrollArea>
           </div>
         </SmoothCollapse>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// SubAgent Delegation Trace Item (Image 2 & 3)
+// Monochrome studio styling: [Bot] SubAgent <role> · <Title> [Status]
+// ---------------------------------------------------------------------------
+function SubAgentTraceItem({
+  tool,
+  onOpenSubAgent,
+}: {
+  tool: TraceStep;
+  onOpenSubAgent?: (step: TraceStep) => void;
+}) {
+  const args = tool.args || {};
+  const rawRole = (args.agent || args.role || "task") as string;
+  const role = rawRole.toLowerCase().trim() === "task" ? "general-purpose" : rawRole;
+  const title =
+    args.name ||
+    args.description ||
+    args.label ||
+    (typeof args.task === "string"
+      ? args.task.slice(0, 70).replace(/[\r\n]+/g, " ")
+      : typeof args.prompt === "string"
+      ? args.prompt.slice(0, 70).replace(/[\r\n]+/g, " ")
+      : "Delegated subagent task");
+
+  const resultStr = typeof tool.result === "string" ? tool.result : "";
+  const isFailed = Boolean(
+    tool.isError ||
+      resultStr.includes('status="failed"') ||
+      resultStr.includes('status="cancelled"') ||
+      resultStr.includes('<error>')
+  );
+  const isRunning = !tool.result && !tool.isError;
+
+  return (
+    <div
+      onClick={() => onOpenSubAgent?.(tool)}
+      className="flex items-center gap-2 py-1 px-1.5 rounded-md hover:bg-white/5 text-[13px] text-[#888888] min-w-0 select-none cursor-pointer group transition-colors"
+      title="Click to view subagent execution in sidebar"
+    >
+      <Bot className="w-3.5 h-3.5 text-[#969696] shrink-0" />
+      <span className="text-[#ffffff] font-medium text-xs shrink-0">SubAgent</span>
+      <span className="text-[11px] font-sans px-1.5 py-0.2 rounded bg-[#1e1e20] border border-[#2e2e2e] text-[#a0a0a0] shrink-0">
+        {role}
+      </span>
+      <span className="text-[#5d5d5d] shrink-0">·</span>
+      <span className="text-[#d4d4d4] group-hover:text-white transition-colors truncate text-xs flex-1 min-w-0 font-normal">
+        {title}
+      </span>
+      {isFailed && (
+        <span className="text-[11px] font-sans text-red-400/90 shrink-0 ml-auto font-medium">
+          Failed
+        </span>
+      )}
+      {isRunning && (
+        <span className="text-[11px] font-sans text-[#ff9900]/90 shrink-0 ml-auto flex items-center gap-1 font-medium">
+          <Loader2 className="w-2.5 h-2.5 animate-spin" />
+          Running
+        </span>
       )}
     </div>
   );

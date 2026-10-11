@@ -213,7 +213,17 @@ export class SubAgentManager {
           if (abortController.signal.aborted) return;
 
           if (event.type === "tool_call") {
-            const toolSummary = `Executed ${event.toolName}`;
+            const rawArgs = (event as any).args;
+            const target =
+              rawArgs?.path ||
+              rawArgs?.filePath ||
+              rawArgs?.targetFile ||
+              rawArgs?.file ||
+              (rawArgs?.command ? String(rawArgs.command).slice(0, 40) : "") ||
+              (rawArgs?.query ? String(rawArgs.query).slice(0, 30) : "");
+            const toolSummary = target
+              ? `${event.toolName} · ${target}`
+              : `Executed ${event.toolName}`;
             item.logs.push(toolSummary);
             if (item.logs.length > 50) item.logs.shift();
             context.onUpdated?.(item);
@@ -308,6 +318,30 @@ export class SubAgentManager {
   }
 
   /**
+   * Terminate all running subagents immediately.
+   */
+  public killAllRunningSubAgents(onKilled?: (agentId: string) => void): number {
+    let killedCount = 0;
+    for (const [id, item] of this.subagents.entries()) {
+      if (item.status === "running") {
+        const controller = this.abortControllers.get(id);
+        if (controller) {
+          try {
+            controller.abort();
+          } catch {}
+          this.abortControllers.delete(id);
+        }
+        item.status = "killed";
+        item.endTime = Date.now();
+        item.logs.push("Terminated when chat execution stopped");
+        onKilled?.(id);
+        killedCount++;
+      }
+    }
+    return killedCount;
+  }
+
+  /**
    * Clear all subagents from memory (testing/reset).
    */
   public clearSubAgents(): void {
@@ -322,6 +356,10 @@ export class SubAgentManager {
 }
 
 export const globalSubAgentManager = new SubAgentManager();
+
+export function killAllRunningSubAgents(onKilled?: (agentId: string) => void): number {
+  return globalSubAgentManager.killAllRunningSubAgents(onKilled);
+}
 
 // ---------------------------------------------------------------------------
 // Tool Handlers
@@ -360,6 +398,17 @@ export async function executeSpawnAgent(
   const description = args.name || args.description || args.label;
 
   const runInBackground = args.run_in_background === true || args.async === true || args.detached === true;
+
+  // Maximum 5 concurrent subagents guard
+  const runningCount = globalSubAgentManager
+    .listSubAgents()
+    .filter((a) => a.status === "running").length;
+  if (runningCount >= 5) {
+    return {
+      result: "Error: Maximum limit of 5 concurrent subagents reached. Please wait for running subagents to complete or terminate them before spawning new ones.",
+      isError: true,
+    };
+  }
 
   const agent = globalSubAgentManager.spawnSubAgent(
     {

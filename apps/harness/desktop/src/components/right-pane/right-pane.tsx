@@ -8,8 +8,9 @@ import { ReviewTab } from "./review-tab";
 import { FileDiffTab } from "./file-diff-tab";
 import { FilePreviewTab } from "./file-preview-tab";
 import { BrowserTab } from "./browser-tab";
+import { SubagentTab } from "./subagent-tab";
 import type { RightPaneTab, RightPaneTabType, BrowserSelectedElement } from "./types";
-import type { FileMutationRecord } from "../../vite-env";
+import type { FileMutationRecord, SubAgentItem } from "../../vite-env";
 
 interface RightPaneProps {
   width: number;
@@ -29,10 +30,13 @@ interface RightPaneProps {
   onRollbackFile?: (record: FileMutationRecord) => Promise<any> | void;
   onRollbackAll?: (records: FileMutationRecord[]) => Promise<any> | void;
   onOpenFileDiff?: (record: FileMutationRecord) => void;
+  onOpenFilePreview?: (filePath: string) => void;
   onStopTask?: (taskId: string) => void;
   onUpdateTab?: (tabId: string, updates: Partial<RightPaneTab>) => void;
   onSelectElementForChat?: (element: BrowserSelectedElement) => void;
   onDraggingChange?: (isDragging: boolean) => void;
+  subagents?: SubAgentItem[];
+  onKillAgent?: (agentId: string) => void;
 }
 
 export function RightPane({
@@ -53,10 +57,13 @@ export function RightPane({
   onRollbackFile,
   onRollbackAll,
   onOpenFileDiff,
+  onOpenFilePreview,
   onStopTask,
   onUpdateTab,
   onSelectElementForChat,
   onDraggingChange,
+  subagents,
+  onKillAgent,
 }: RightPaneProps) {
   const isDraggingRef = useRef(false);
   const startXRef = useRef(0);
@@ -114,6 +121,15 @@ export function RightPane({
         return <FileDiffTab tab={tab} onRollbackFile={onRollbackFile} />;
       case "file_preview":
         return <FilePreviewTab tab={tab} />;
+      case "subagent":
+        return (
+          <SubagentTab
+            tab={tab}
+            subagents={subagents}
+            onKillAgent={onKillAgent}
+            onOpenFilePreview={onOpenFilePreview}
+          />
+        );
       case "side_conversation":
         return (
           <div className="flex-1 w-full h-full p-4 text-white flex flex-col items-center justify-center text-center">

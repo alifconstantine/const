@@ -12,6 +12,7 @@ import {
   Layers,
   Volume2,
   VolumeX,
+  Bot,
 } from "lucide-react";
 import { FileIcon } from "../workbench/file-icon";
 import type { RightPaneTab, RightPaneTabType } from "./types";
@@ -42,6 +43,8 @@ function getTabIcon(type: RightPaneTabType) {
       return Globe;
     case "task_output":
       return Activity;
+    case "subagent":
+      return Bot;
     default:
       return SquareTerminal;
   }

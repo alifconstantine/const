@@ -5,6 +5,7 @@ import {
   executeTaskTool,
   executeAgentStatus,
   executeKillAgent,
+  killAllRunningSubAgents,
   normalizeAgentRole,
   formatTaskResultEnvelope,
 } from "../src/const/subagent.js";
@@ -233,6 +234,70 @@ describe("Sub-Agent Engine & Tools (oh-my-pi architecture)", () => {
       expect(spawnRes.isError).toBe(false);
       expect(spawnRes.result).toContain('<task-result id="');
       expect(spawnRes.result).toContain('agent="reviewer" status="completed"');
+    });
+
+    it("should reject spawning more than 5 concurrent running subagents", async () => {
+      // Spawn 5 running background subagents
+      for (let i = 1; i <= 5; i++) {
+        const res = await executeTaskTool(
+          {
+            task: `Background worker ${i}`,
+            run_in_background: true,
+          },
+          process.cwd()
+        );
+        expect(res.isError).toBe(false);
+      }
+
+      // 6th subagent attempt must be blocked
+      const blockedRes = await executeTaskTool(
+        {
+          task: "6th worker attempting to run",
+          run_in_background: true,
+        },
+        process.cwd()
+      );
+
+      expect(blockedRes.isError).toBe(true);
+      expect(blockedRes.result).toContain("Maximum limit of 5 concurrent subagents reached");
+    });
+
+    it("should terminate all running subagents at once when execution is stopped", async () => {
+      // Spawn 3 running background subagents
+      const ids: string[] = [];
+      for (let i = 1; i <= 3; i++) {
+        const res = await executeTaskTool(
+          {
+            task: `Worker to cancel ${i}`,
+            run_in_background: true,
+          },
+          process.cwd()
+        );
+        expect(res.isError).toBe(false);
+        const match = res.result.match(/id="([^"]+)"/);
+        expect(match).not.toBeNull();
+        ids.push(match![1]);
+      }
+
+      // Verify all 3 are running
+      const initialList = globalSubAgentManager.listSubAgents();
+      const runningBefore = initialList.filter((a) => a.status === "running");
+      expect(runningBefore.length).toBe(3);
+
+      // Stop/kill all running subagents
+      const killedCount = killAllRunningSubAgents();
+      expect(killedCount).toBe(3);
+
+      // Verify all 3 are marked killed
+      for (const id of ids) {
+        const agent = globalSubAgentManager.getSubAgent(id);
+        expect(agent?.status).toBe("killed");
+      }
+
+      // No running subagents left
+      const afterList = globalSubAgentManager.listSubAgents();
+      const runningAfter = afterList.filter((a) => a.status === "running");
+      expect(runningAfter.length).toBe(0);
     });
   });
 });

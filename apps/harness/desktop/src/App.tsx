@@ -32,8 +32,8 @@ import { MarkdownContent } from "./components/workbench/markdown-content";
 import { ExecutionTrace, MutationsSummaryCard } from "./components/workbench/execution-trace";
 import { ApprovalCard, SmoothCardMorph } from "./components/workbench/approval-card";
 import { QuestionCard } from "./components/workbench/question-card";
-import { FloatingTodoCard } from "./components/workbench/floating-todo-card";
-import { FloatingSubAgentCard } from "./components/workbench/floating-subagent-card";
+import { FloatingWorkbenchCard } from "./components/workbench/floating-workbench-card";
+import { ChatMessageItem } from "./components/workbench/chat-message-item";
 import { ReviewDialog } from "./components/workbench/review-dialog";
 import { RenameTaskDialog } from "./components/workbench/rename-task-dialog";
 import { TrajectoryDialog } from "./components/workbench/trajectory-dialog";
@@ -781,6 +781,73 @@ function AuthenticatedContent({
       );
       return next;
     });
+  };
+
+  const handleOpenSubAgent = (subAgent: SubAgentItem) => {
+    const tabId = `subagent_${subAgent.id}`;
+    const existingTab = rightPaneTabs.find((t) => t.id === tabId || t.subAgentId === subAgent.id);
+    if (existingTab) {
+      setActiveRightPaneTabId(existingTab.id);
+      setIsRightSidebarOpen(true);
+      return;
+    }
+
+    const index = activeSubAgents?.findIndex((a) => a.id === subAgent.id) ?? -1;
+    const numPrefix = index >= 0 ? `Sub-agent ${index + 1}: ` : "Sub-agent: ";
+    const displayTitle = subAgent.description.toLowerCase().startsWith("sub-agent")
+      ? subAgent.description
+      : `${numPrefix}${subAgent.description.slice(0, 30)}`;
+
+    const newTab: RightPaneTab = {
+      id: tabId,
+      type: "subagent",
+      title: displayTitle,
+      subAgentId: subAgent.id,
+      subAgent,
+      createdAt: Date.now(),
+    };
+
+    setRightPaneTabs((prev) => [...prev, newTab]);
+    setActiveRightPaneTabId(newTab.id);
+    setIsRightSidebarOpen(true);
+  };
+
+  const handleOpenSubAgentFromTrace = (step: any) => {
+    const args = step.args || {};
+    const title =
+      args.name ||
+      args.description ||
+      args.label ||
+      (typeof args.task === "string" ? args.task.slice(0, 50) : "Subagent Task");
+
+    const matching = activeSubAgents?.find(
+      (a) =>
+        (step.id && a.id.includes(step.id)) ||
+        (step.toolCallId && a.id.includes(step.toolCallId)) ||
+        a.description === title ||
+        (a.prompt && typeof args.task === "string" && a.prompt.includes(args.task.slice(0, 30)))
+    );
+
+    if (matching) {
+      handleOpenSubAgent(matching);
+      return;
+    }
+
+    const tabId = `subagent_${step.id || Date.now()}`;
+    const fallbackAgent: SubAgentItem = {
+      id: step.id || `agent_${Date.now()}`,
+      description: title,
+      prompt: args.task || args.prompt || title,
+      role: args.agent || args.role || "task",
+      status: step.isError ? "failed" : step.result ? "completed" : "running",
+      startTime: Date.now() - 5000,
+      endTime: step.result || step.isError ? Date.now() : undefined,
+      logs: [`Spawned with role '${args.agent || args.role || "task"}'`],
+      result: typeof step.result === "string" ? step.result : undefined,
+      error: step.isError ? (typeof step.result === "string" ? step.result : "Failed") : undefined,
+    };
+
+    handleOpenSubAgent(fallbackAgent);
   };
 
   const handleAnswerQuestion = async (toolCallId: string, answer: any) => {
@@ -2105,6 +2172,32 @@ function AuthenticatedContent({
       return next;
     });
 
+    // 1b. Immediately mark running subagents as killed in UI
+    setConversationSubAgents((prev) => {
+      const next = new Map(prev);
+      const list = next.get(currentId) || [];
+      if (list.length > 0) {
+        next.set(
+          currentId,
+          list.map((a) =>
+            a.status === "running"
+              ? { ...a, status: "killed", endTime: Date.now() }
+              : a
+          )
+        );
+      }
+      return next;
+    });
+
+    // Terminate running subagents via IPC
+    if (window.electron?.killSubAgent && activeSubAgents) {
+      for (const sa of activeSubAgents) {
+        if (sa.status === "running") {
+          window.electron.killSubAgent(sa.id).catch(() => {});
+        }
+      }
+    }
+
     // 2. Capture and freeze execution duration
     const startTime =
       (idToAbort ? executionStartTimeMapRef.current.get(idToAbort) : undefined) ||
@@ -2571,23 +2664,17 @@ function AuthenticatedContent({
               scrollContainerRef={chatScrollRef}
             />
 
-            {/* Top-Right Floating Cards: Todo & Sub-Agents */}
+            {/* Top-Right Floating Card: Unified Todo & Sub-Agents */}
             {((activeTodos && activeTodos.length > 0) || (activeSubAgents && activeSubAgents.length > 0)) && (
               <div className="absolute top-4 right-6 z-30 flex flex-col gap-2.5 items-end pointer-events-none">
-                {activeTodos && activeTodos.length > 0 && (
-                  <FloatingTodoCard
-                    todos={activeTodos}
-                    isExecuting={isExecuting}
-                    className="!static !top-auto !right-auto pointer-events-auto"
-                  />
-                )}
-                {activeSubAgents && activeSubAgents.length > 0 && (
-                  <FloatingSubAgentCard
-                    subagents={activeSubAgents}
-                    onKillAgent={handleKillSubAgent}
-                    className="pointer-events-auto"
-                  />
-                )}
+                <FloatingWorkbenchCard
+                  todos={activeTodos || []}
+                  subagents={activeSubAgents || []}
+                  isExecuting={isExecuting}
+                  onSelectSubAgent={handleOpenSubAgent}
+                  onKillAgent={handleKillSubAgent}
+                  className="pointer-events-auto"
+                />
               </div>
             )}
 
@@ -2600,141 +2687,30 @@ function AuthenticatedContent({
               <div className={cn("w-full max-w-full mx-auto px-3.5 sm:px-6 md:px-8 py-6 flex flex-col gap-6", streamWidthClass)}>
                 {messages.map((msg, idx) => (
                   <div key={msg.id} data-chat-anchor-key={msg.id} className="w-full flex flex-col">
-                    {msg.role === "user" ? (
-                      <div className="w-full flex flex-col items-end group">
-                        {/* Attached Files (if any) */}
-                        {msg.attachments && msg.attachments.length > 0 && (
-                          <div className={cn("flex flex-wrap gap-2 mb-2 justify-end", userBubbleWidthClass)}>
-                            {msg.attachments.map((att) => renderMessageAttachment(att))}
-                          </div>
-                        )}
-                        {/* User message bubble (Image 2 collapsed, Image 3 expanded on click, closes on click outside) */}
-                        {(() => {
-                          const isLongPrompt = msg.content.length > 250 || msg.content.split("\n").length > 4;
-                          const isExpanded = expandedUserMessageId === msg.id;
+                    <ChatMessageItem
+                      message={msg}
+                      idx={idx}
+                      isExecuting={isExecuting && idx === messages.length - 1}
+                      liveDurationMs={liveDurationMs}
+                      activeApproval={activeApproval}
+                      expandedUserMessageId={expandedUserMessageId}
+                      onToggleExpandUserMessage={(id) => setExpandedUserMessageId(id)}
+                      copiedId={copiedId}
+                      onCopyMessage={handleCopyMessage}
+                      onEditMessage={handleEditMessage}
+                      onRollback={handleRollback}
+                      onRollbackAll={handleRollbackAll}
+                      onAnswerQuestion={handleAnswerQuestion}
+                      onOpenFileDiff={handleOpenFileDiff}
+                      onOpenFilePreview={handleOpenFilePreview}
+                      onOpenReview={handleOpenReview}
+                      onOpenSubAgent={handleOpenSubAgentFromTrace}
+                      renderAttachment={renderMessageAttachment}
+                      userBubbleWidthClass={userBubbleWidthClass}
+                    />
 
-                          return (
-                            <div
-                              data-expanded-prompt={msg.id}
-                              onClick={() => {
-                                const sel = window.getSelection();
-                                if (sel && sel.toString().trim().length > 0) return;
-                                // Only expand if currently collapsed; closing is handled by clicking outside
-                                if (isLongPrompt && !isExpanded) {
-                                  setExpandedUserMessageId(msg.id);
-                                }
-                              }}
-                              className={cn(
-                                "w-full rounded-2xl bg-[#f0f0f0] dark:bg-[#222222] border border-[#e2e2e4] dark:border-[#383838] px-4 py-3 text-[14px] text-[#262626] dark:text-[#ececec] select-text leading-relaxed whitespace-pre-wrap break-words [overflow-wrap:anywhere] [word-break:break-word] shadow-xs overflow-hidden transition-all duration-200",
-                                userBubbleWidthClass,
-                                isLongPrompt && !isExpanded && "cursor-pointer hover:border-[#b0b0b0] dark:hover:border-[#484848]"
-                              )}
-                            >
-                              {isLongPrompt ? (
-                                <ScrollArea
-                                  className={cn(
-                                    "w-full transition-[max-height] duration-200 ease-in-out",
-                                    isExpanded ? "max-h-[380px]" : "max-h-24"
-                                  )}
-                                  viewportClassName="[&>div[style]]:!block"
-                                >
-                                  <div className="pr-2">
-                                    <MarkdownContent
-                                      content={msg.content}
-                                      onOpenFilePreview={handleOpenFilePreview}
-                                      className="space-y-1 text-[14px]"
-                                    />
-                                  </div>
-                                </ScrollArea>
-                              ) : (
-                                <div>
-                                  <MarkdownContent
-                                    content={msg.content}
-                                    onOpenFilePreview={handleOpenFilePreview}
-                                    className="space-y-1 text-[14px]"
-                                  />
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })()}
-                        {/* User hover action bar: Timestamp, Copy, Edit */}
-                        <div className="flex items-center gap-2 pt-1.5 opacity-0 group-hover:opacity-100 transition-opacity text-xs text-[#a9a9a9] dark:text-[#888888] select-none">
-                          <span className="text-[11px] font-sans tabular-nums text-[#a9a9a9] dark:text-[#777777]">
-                            {formatMessageTimestamp(msg.timestamp)}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => handleCopyMessage(msg.id, msg.content)}
-                            className="p-1 rounded hover:bg-black/5 dark:hover:bg-white/10 hover:text-[#262626] dark:hover:text-white transition-colors cursor-pointer"
-                            title="Copy message"
-                          >
-                            {copiedId === msg.id ? (
-                              <Check className="w-3.5 h-3.5 text-[#4ade80]" />
-                            ) : (
-                              <Copy className="w-3.5 h-3.5" />
-                            )}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => handleEditMessage(msg.content)}
-                            className="p-1 rounded hover:bg-black/5 dark:hover:bg-white/10 hover:text-[#262626] dark:hover:text-white transition-colors cursor-pointer"
-                            title="Edit message"
-                          >
-                            <Pencil className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="w-full flex flex-col gap-2.5 group">
-                        <ExecutionTrace
-                          thinking={msg.thinking}
-                          toolCalls={msg.toolCalls}
-                          traceSteps={msg.traceSteps}
-                          mutations={msg.mutations}
-                          isExecuting={isExecuting && idx === messages.length - 1}
-                          pendingApprovalToolCallId={
-                            isExecuting && idx === messages.length - 1
-                              ? activeApproval?.toolCallId
-                              : undefined
-                          }
-                          durationMs={
-                            isExecuting && idx === messages.length - 1
-                              ? liveDurationMs
-                              : msg.durationMs
-                          }
-                          onRollback={handleRollback}
-                          onRollbackAll={handleRollbackAll}
-                          onAnswerQuestion={handleAnswerQuestion}
-                          onOpenFileDiff={handleOpenFileDiff}
-                          onOpenFilePreview={handleOpenFilePreview}
-                          onOpenReview={() => handleOpenReview(msg.mutations)}
-                        />
-
-                        {/* Formatted Markdown Content */}
-                        {msg.content ? (
-                          <div className="px-0.5">
-                            <MarkdownContent
-                              content={msg.content}
-                              onOpenFilePreview={handleOpenFilePreview}
-                            />
-                          </div>
-                        ) : null}
-
-                        {/* Requirement: Changed Files Summary Card at the bottom of the message only after all output is finished */}
-                        {!(isExecuting && idx === messages.length - 1) && msg.mutations && msg.mutations.length > 0 && (
-                          <MutationsSummaryCard
-                            mutations={msg.mutations}
-                            isExecuting={false}
-                            onRollback={handleRollback}
-                            onRollbackAll={handleRollbackAll}
-                            onOpenReview={() => handleOpenReview(msg.mutations)}
-                            onOpenFileDiff={handleOpenFileDiff}
-                          />
-                        )}
-
-                        {/* Assistant hover action bar: Copy, Good, Bad, and Timestamp */}
-                        {!isExecuting && msg.content && (
+                    {/* Assistant hover action bar: Copy, Good, Bad, and Timestamp */}
+                    {!isExecuting && msg.role === "assistant" && msg.content && (
                           <div className="flex items-center gap-1.5 pt-1 opacity-0 group-hover:opacity-100 transition-opacity text-xs text-[#a9a9a9] dark:text-[#888888] select-none">
                             <button
                               type="button"
@@ -2779,8 +2755,6 @@ function AuthenticatedContent({
                             </span>
                           </div>
                         )}
-                      </div>
-                    )}
                   </div>
                 ))}
                 <div ref={messagesEndRef} />
@@ -2910,6 +2884,9 @@ function AuthenticatedContent({
                     onStopTask={handleStopBackgroundTask}
                     onUpdateTab={handleUpdateTab}
                     onSelectElementForChat={handleSelectElementForChat}
+                    subagents={activeSubAgents || []}
+                    onKillAgent={handleKillSubAgent}
+                    onOpenFilePreview={handleOpenFilePreview}
                   />
                 </div>
               </div>

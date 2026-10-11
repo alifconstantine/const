@@ -202,6 +202,7 @@ export {
 	type SubAgentRole,
 	executeAgentStatus,
 	executeKillAgent,
+	killAllRunningSubAgents,
 	type SubAgentItem,
 	executeWaitTool,
 	checkPortOpen,

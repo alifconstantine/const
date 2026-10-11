@@ -19,6 +19,7 @@ import {
   resolveSafePath,
   isPathWithinWorkspace,
 } from "./tools.js";
+import { globalSubAgentManager, formatTaskResultEnvelope } from "./subagent.js";
 
 function parseToolArguments(rawArgs: any): Record<string, any> {
   if (!rawArgs) return {};
@@ -380,6 +381,17 @@ Available tools:
 - agent_status: Check status, activity logs, or findings of running or completed subagents (when spawned with run_in_background: true).
 - kill_agent: Terminate an active running subagent.
 
+SUB-AGENT DELEGATION PROTOCOL:
+- You can spawn multiple subagents (maximum 5 subagents per multi-step workflow) to divide modular tasks cleanly.
+- When spawning multiple subagents, ALWAYS name them clearly with sequential numeric prefixes in the 'name' or 'description' argument:
+  e.g. 'Sub-agent 1: Implementasi Navbar dan Hero Section', 'Sub-agent 2: Implementasi About Us Section', ..., up to 'Sub-agent 5: <Task Title>'.
+- Assign distinct roles ('scout', 'reviewer', or 'task') and provide a comprehensive, self-contained prompt specifying exact files and acceptance criteria for each subagent.
+- STRICT FILE PARTITIONING: To avoid file write collisions, locks, or failures, each subagent MUST work on separate, dedicated files or component directories (e.g. Sub-agent 1 creates 'sections/1-hero.html', Sub-agent 2 creates 'sections/2-about.html'). NEVER assign two subagents to modify the same file concurrently!
+- PARALLEL VS SEQUENTIAL DELEGATION:
+  * BATCH / PARALLEL (Recommended for independent tasks): When tasks are independent (e.g. creating distinct component sections, separate pages, or decoupled utilities), invoke all subagent 'task' calls TOGETHER in a single turn. The engine will execute them concurrently in parallel (up to 5 subagents at the exact same time).
+  * SEQUENTIAL (For dependent pipeline tasks): When a subsequent task strictly depends on the findings or output of a previous task (e.g., Sub-agent 1 scout investigates codebase -> reports back -> Sub-agent 2 implements -> Sub-agent 3 reviews), invoke them sequentially across turns.
+- Subagents report their completed deliverables directly in a <task-result> envelope back to you.
+
 
 CRITICAL CODE GENERATION & TOOL CALLING PROTOCOL:
 - When the user asks you to create or modify code, files, or applications (e.g. "buat web", "buat index.html", "create file"):
@@ -629,6 +641,10 @@ export class ConstAgent {
         this.abortController.abort();
       } catch {}
     }
+    // Immediately terminate any running subagents
+    try {
+      globalSubAgentManager.killAllRunningSubAgents();
+    } catch {}
     for (const [id, resolver] of this.pendingApprovals.entries()) {
       try {
         resolver({
@@ -1232,6 +1248,13 @@ export class ConstAgent {
           message: `Executing ${toolCalls.length} tool(s)...`,
         });
 
+        const isSubAgentToolName = (name?: string) => {
+          const norm = (name || "").toLowerCase().replace(/[-_]/g, "");
+          return norm === "task" || norm === "spawnagent" || norm === "subagent" || norm === "delegatetask";
+        };
+        const subagentCallsCount = toolCalls.filter((tc) => isSubAgentToolName(tc.function?.name)).length;
+        const spawnedParallelAgents: string[] = [];
+
         for (const tc of toolCalls) {
           if (signal.aborted || this._isCancelled) {
             throw new Error("User cancelled agent execution.");
@@ -1523,9 +1546,15 @@ export class ConstAgent {
             isAlreadyAllowed ||
             approvedThisTurn;
 
+          const isTaskTool = isSubAgentToolName(tc.function.name);
+          const shouldRunParallel = isTaskTool && subagentCallsCount > 1;
+          const effectiveArgs = shouldRunParallel
+            ? { ...parsedArgs, run_in_background: true }
+            : parsedArgs;
+
           const { result, isError } = await executeNativeTool(
             tc.function.name,
-            parsedArgs,
+            effectiveArgs,
             workspacePath,
             {
               signal,
@@ -1600,8 +1629,64 @@ export class ConstAgent {
             isError: Boolean(isError),
           });
 
+          if (shouldRunParallel) {
+            const match = typeof result === "string" ? result.match(/id="([^"]+)"/) : null;
+            if (match && match[1]) {
+              spawnedParallelAgents.push(match[1]);
+            }
+          }
+
           if (signal.aborted || this._isCancelled) {
             throw new Error("User cancelled agent execution.");
+          }
+        }
+
+        // If multiple subagents were spawned in parallel, wait for all of them to complete
+        if (spawnedParallelAgents.length > 0) {
+          onEvent({
+            type: "status",
+            status: "calling_tool",
+            message: `Running ${spawnedParallelAgents.length} subagents in parallel...`,
+          });
+
+          await Promise.all(
+            spawnedParallelAgents.map((id) => globalSubAgentManager.waitForSubAgent(id))
+          );
+
+          if (signal.aborted || this._isCancelled) {
+            throw new Error("User cancelled agent execution.");
+          }
+
+          // Finalize task result envelopes for each subagent in conversationHistory
+          for (const agentId of spawnedParallelAgents) {
+            const agent = globalSubAgentManager.getSubAgent(agentId);
+            if (agent) {
+              const histIdx = conversationHistory.findIndex(
+                (m) => m.role === "tool" && typeof m.content === "string" && m.content.includes(agentId)
+              );
+              if (histIdx !== -1) {
+                const durationSec = Math.round(
+                  ((agent.endTime || Date.now()) - agent.startTime) / 1000
+                );
+                const finalEnvelope = formatTaskResultEnvelope({
+                  id: agent.id,
+                  agent: agent.role || "task",
+                  status:
+                    agent.status === "killed"
+                      ? "cancelled"
+                      : agent.status === "failed"
+                      ? "failed"
+                      : "completed",
+                  durationSec,
+                  output: agent.result || "Completed with no output.",
+                  error: agent.error,
+                });
+                const targetMsg = conversationHistory[histIdx];
+                if (targetMsg) {
+                  targetMsg.content = finalEnvelope;
+                }
+              }
+            }
           }
         }
       }

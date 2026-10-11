@@ -916,6 +916,19 @@ app.whenReady().then(() => {
       }
     } catch {}
 
+    // Terminate any active sub-agents
+    try {
+      globalSubAgentManager.killAllRunningSubAgents((id) => {
+        if (win && !win.isDestroyed()) {
+          win.webContents.send("agent:subagent-updated", {
+            id,
+            status: "killed",
+            endTime: Date.now(),
+          });
+        }
+      });
+    } catch {}
+
     const safeConvoId =
       typeof targetConvoId === "string" && targetConvoId.trim().length > 0
         ? targetConvoId.trim()

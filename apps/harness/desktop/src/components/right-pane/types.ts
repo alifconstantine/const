@@ -7,7 +7,8 @@ export type RightPaneTabType =
   | "file_preview"
   | "terminal"
   | "browser"
-  | "task_output";
+  | "task_output"
+  | "subagent";
 
 export interface RightPaneTab {
   id: string;
@@ -29,6 +30,8 @@ export interface RightPaneTab {
   favicon?: string;
   isAudible?: boolean;
   isMuted?: boolean;
+  subAgentId?: string;
+  subAgent?: any;
 }
 
 export interface BrowserSelectedElement {
