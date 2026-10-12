@@ -188,7 +188,7 @@ export function CreateLearnDialog({
               </button>
 
               {isIconOpen && (
-                <div className="absolute right-0 top-full mt-1.5 w-[280px] sm:w-[308px] rounded-2xl border border-border/80 bg-popover text-popover-foreground shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                <div className="absolute right-0 top-full mt-1.5 w-[280px] sm:w-[308px] rounded-2xl border border-border/80 bg-popover text-popover-foreground shadow-2xl z-50 overflow-hidden origin-top-right animate-in fade-in-0 zoom-in-[0.98] slide-in-from-top-1 duration-150 ease-out">
                   <ScrollArea className="h-[180px] w-full" viewportClassName="p-2 pr-3">
                     <div className="grid grid-cols-4 gap-1.5">
                       {LEARN_ICONS.map((item) => {
@@ -266,7 +266,7 @@ export function CreateLearnDialog({
               </button>
 
               {isFolderOpen && (
-                <div className="absolute left-0 right-0 top-full mt-1.5 rounded-2xl border border-border/80 bg-popover text-popover-foreground shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                <div className="absolute left-0 right-0 top-full mt-1.5 rounded-2xl border border-border/80 bg-popover text-popover-foreground shadow-2xl z-50 overflow-hidden origin-top animate-in fade-in-0 zoom-in-[0.98] slide-in-from-top-1 duration-150 ease-out">
                   <ScrollArea className="max-h-48 w-full" viewportClassName="p-1.5">
                     <div className="flex flex-col gap-0.5">
                       <button

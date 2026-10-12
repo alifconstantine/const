@@ -234,7 +234,7 @@ export function CreateLearnDialog({
               </button>
 
               {isIconOpen && (
-                <div className="absolute right-0 top-full mt-1.5 w-[300px] sm:w-[320px] rounded-2xl border border-border bg-popover text-popover-foreground shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                <div className="absolute right-0 top-full mt-1.5 w-[300px] sm:w-[320px] rounded-2xl border border-border bg-popover text-popover-foreground shadow-2xl z-50 overflow-hidden origin-top-right animate-in fade-in-0 zoom-in-[0.98] slide-in-from-top-1 duration-150 ease-out">
                   <ScrollArea className="h-[180px] w-full" viewportClassName="p-2 pr-3">
                     <div className="grid grid-cols-4 gap-1.5">
                       {LEARN_ICONS.map((item) => {
@@ -374,7 +374,7 @@ export function CreateLearnDialog({
                   </button>
 
                   {isPermissionOpen && (
-                    <div className="absolute left-0 top-full mt-1.5 w-72 max-w-[calc(100vw-32px)] bg-popover border border-border rounded-2xl shadow-2xl p-1.5 z-50 flex flex-col gap-0.5 text-left select-none animate-in fade-in zoom-in-95 duration-100">
+                    <div className="absolute left-0 top-full mt-1.5 w-72 max-w-[calc(100vw-32px)] bg-popover border border-border rounded-2xl shadow-2xl p-1.5 z-50 flex flex-col gap-0.5 text-left select-none origin-top-left animate-in fade-in-0 zoom-in-[0.98] slide-in-from-top-1 duration-150 ease-out">
                       {/* 1. Ask before changes */}
                       <button
                         type="button"
@@ -474,7 +474,7 @@ export function CreateLearnDialog({
                   </button>
 
                   {isFolderOpen && (
-                    <div className="absolute right-0 top-full mt-1.5 w-full min-w-[200px] rounded-2xl border border-border bg-popover text-popover-foreground shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+                    <div className="absolute right-0 top-full mt-1.5 w-full min-w-[200px] rounded-2xl border border-border bg-popover text-popover-foreground shadow-2xl z-50 overflow-hidden origin-top-right animate-in fade-in-0 zoom-in-[0.98] slide-in-from-top-1 duration-150 ease-out">
                       <ScrollArea className="max-h-48 w-full" viewportClassName="p-1.5">
                         <div className="flex flex-col gap-0.5">
                           <button
