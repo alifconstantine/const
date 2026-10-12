@@ -111,6 +111,46 @@ interface ChatMessage {
   attachments?: AttachedFile[];
 }
 
+interface ConversationRightPaneState {
+  isOpen: boolean;
+  tabs: RightPaneTab[];
+  activeTabId: string | null;
+  reviewMutations?: FileMutationRecord[] | null;
+}
+
+const getStoredRightPaneState = (convoId: string): ConversationRightPaneState | null => {
+  if (!convoId) return null;
+  try {
+    const raw = localStorage.getItem(`const_harness_right_pane_${convoId}`);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (typeof parsed === "object" && parsed !== null) {
+        return {
+          isOpen: Boolean(parsed.isOpen),
+          tabs: Array.isArray(parsed.tabs) ? parsed.tabs : [],
+          activeTabId: typeof parsed.activeTabId === "string" ? parsed.activeTabId : null,
+          reviewMutations: Array.isArray(parsed.reviewMutations) ? parsed.reviewMutations : null,
+        };
+      }
+    }
+  } catch {}
+  return null;
+};
+
+const storeRightPaneState = (convoId: string, state: ConversationRightPaneState) => {
+  if (!convoId) return;
+  try {
+    localStorage.setItem(`const_harness_right_pane_${convoId}`, JSON.stringify(state));
+  } catch {}
+};
+
+const removeStoredRightPaneState = (convoId: string) => {
+  if (!convoId) return;
+  try {
+    localStorage.removeItem(`const_harness_right_pane_${convoId}`);
+  } catch {}
+};
+
 function AuthenticatedContent({
   onSignOut,
   onSwitchAccount,
@@ -238,11 +278,31 @@ function AuthenticatedContent({
     totalTokens: number;
   } | null>(null);
 
-  // Right Sidebar (Side Pane) state & tab management
-  const [isRightSidebarOpen, setIsRightSidebarOpen] = useState<boolean>(() => {
-    const saved = localStorage.getItem("const_harness_right_sidebar_open");
-    return saved ? JSON.parse(saved) : false;
-  });
+  // Right Sidebar (Side Pane) state & tab management - initialized closed on startup
+  const [isRightSidebarOpen, setIsRightSidebarOpen] = useState<boolean>(false);
+  const [rightPaneTabs, setRightPaneTabs] = useState<RightPaneTab[]>([]);
+  const [activeRightPaneTabId, setActiveRightPaneTabId] = useState<string | null>(null);
+  const [sidebarReviewMutations, setSidebarReviewMutations] = useState<FileMutationRecord[] | null>(null);
+  const [isOpeningNewTab, setIsOpeningNewTab] = useState<boolean>(false);
+  const [isDraggingRightSidebar, setIsDraggingRightSidebar] = useState<boolean>(false);
+
+  // Per-conversation right pane cache and live state references
+  const convoRightPaneMapRef = useRef<Map<string, ConversationRightPaneState>>(new Map());
+  const isRightSidebarOpenRef = useRef(isRightSidebarOpen);
+  isRightSidebarOpenRef.current = isRightSidebarOpen;
+  const rightPaneTabsRef = useRef(rightPaneTabs);
+  rightPaneTabsRef.current = rightPaneTabs;
+  const activeRightPaneTabIdRef = useRef<string | null>(activeRightPaneTabId);
+  activeRightPaneTabIdRef.current = activeRightPaneTabId;
+  const sidebarReviewMutationsRef = useRef(sidebarReviewMutations);
+  sidebarReviewMutationsRef.current = sidebarReviewMutations;
+
+  // Cleanup legacy global open state on mount so it never forces sidepanel open at startup
+  useEffect(() => {
+    try {
+      localStorage.removeItem("const_harness_right_sidebar_open");
+    } catch {}
+  }, []);
 
   // Minimum width protection for main content column (matching apps/learn protection)
   const MIN_MAIN_CONTENT_WIDTH = 460;
@@ -270,18 +330,65 @@ function AuthenticatedContent({
     const maxAllowed = Math.max(300, windowWidth - 256 - 460 - 32);
     return Math.min(Math.max(initial, 300), maxAllowed);
   });
-  const [rightPaneTabs, setRightPaneTabs] = useState<RightPaneTab[]>([]);
-  const [activeRightPaneTabId, setActiveRightPaneTabId] = useState<string | null>(null);
-  const [isOpeningNewTab, setIsOpeningNewTab] = useState<boolean>(false);
-  const [isDraggingRightSidebar, setIsDraggingRightSidebar] = useState<boolean>(false);
-
-  useEffect(() => {
-    localStorage.setItem("const_harness_right_sidebar_open", JSON.stringify(isRightSidebarOpen));
-  }, [isRightSidebarOpen]);
 
   useEffect(() => {
     localStorage.setItem("const_harness_right_sidebar_width", String(rightSidebarWidth));
   }, [rightSidebarWidth]);
+
+  // Auto-save active conversation's right pane state whenever it changes
+  useEffect(() => {
+    if (!conversationId) return;
+    const state: ConversationRightPaneState = {
+      isOpen: isRightSidebarOpen,
+      tabs: rightPaneTabs,
+      activeTabId: activeRightPaneTabId,
+      reviewMutations: sidebarReviewMutations,
+    };
+    convoRightPaneMapRef.current.set(conversationId, state);
+    storeRightPaneState(conversationId, state);
+  }, [conversationId, isRightSidebarOpen, rightPaneTabs, activeRightPaneTabId, sidebarReviewMutations]);
+
+  const saveCurrentConversationRightPaneState = useCallback(() => {
+    const currentId = conversationIdRef.current;
+    if (!currentId) return;
+    const state: ConversationRightPaneState = {
+      isOpen: isRightSidebarOpenRef.current,
+      tabs: rightPaneTabsRef.current,
+      activeTabId: activeRightPaneTabIdRef.current,
+      reviewMutations: sidebarReviewMutationsRef.current,
+    };
+    convoRightPaneMapRef.current.set(currentId, state);
+    storeRightPaneState(currentId, state);
+  }, []);
+
+  const restoreConversationRightPaneState = useCallback((targetConvoId: string) => {
+    if (!targetConvoId) return;
+    const state =
+      convoRightPaneMapRef.current.get(targetConvoId) ||
+      getStoredRightPaneState(targetConvoId) ||
+      {
+        isOpen: false,
+        tabs: [],
+        activeTabId: null,
+        reviewMutations: null,
+      };
+
+    convoRightPaneMapRef.current.set(targetConvoId, state);
+    setIsRightSidebarOpen(state.isOpen);
+    setRightPaneTabs(state.tabs || []);
+    setActiveRightPaneTabId(state.activeTabId || null);
+    setSidebarReviewMutations(state.reviewMutations || null);
+    setIsOpeningNewTab(false);
+
+    if (state.activeTabId) {
+      const activeBrowserTab = state.tabs?.find(
+        (t) => t.id === state.activeTabId && t.type === "browser"
+      );
+      if (activeBrowserTab) {
+        window.electron?.browser?.setActiveTab(activeBrowserTab.id);
+      }
+    }
+  }, []);
 
   // Window resize protection (matching apps/learn)
   useEffect(() => {
@@ -401,9 +508,6 @@ function AuthenticatedContent({
     setActiveRightPaneTabId(newTab.id);
     setIsOpeningNewTab(false);
   };
-
-  const activeRightPaneTabIdRef = useRef<string | null>(activeRightPaneTabId);
-  activeRightPaneTabIdRef.current = activeRightPaneTabId;
 
   const handleOpenBrowser = useCallback(
     (initialUrl?: any, options?: { tabId?: string; newTab?: boolean }) => {
@@ -593,8 +697,6 @@ function AuthenticatedContent({
   useEffect(() => {
     messagesRef.current = messages;
   }, [messages]);
-
-  const [sidebarReviewMutations, setSidebarReviewMutations] = useState<FileMutationRecord[] | null>(null);
 
   const allSessionMutations = useMemo(() => {
     const list: FileMutationRecord[] = [];
@@ -2453,6 +2555,8 @@ function AuthenticatedContent({
   };
 
   const handleNewChat = (targetProject?: any) => {
+    saveCurrentConversationRightPaneState();
+
     setIsScheduledTasksOpen(false);
     setIsSettingsOpen(false);
     setIsRenameDialogOpen(false);
@@ -2465,7 +2569,21 @@ function AuthenticatedContent({
     setEditingPrompt("");
     setLastKnownLlmUsage(null);
     setCurrentMode(getDefaultAgentMode());
+
+    // Reset right pane for fresh new chat session - default closed
+    const freshRightPane: ConversationRightPaneState = {
+      isOpen: false,
+      tabs: [],
+      activeTabId: null,
+      reviewMutations: null,
+    };
+    convoRightPaneMapRef.current.set(newSessionId, freshRightPane);
+    storeRightPaneState(newSessionId, freshRightPane);
+    setIsRightSidebarOpen(false);
+    setRightPaneTabs([]);
+    setActiveRightPaneTabId(null);
     setSidebarReviewMutations(null);
+    setIsOpeningNewTab(false);
 
     // Only update project if targetProject is a valid string, not a MouseEvent or "[object Object]"
     if (
@@ -2481,13 +2599,18 @@ function AuthenticatedContent({
   };
 
   const handleSelectConversation = async (id: string) => {
+    if (id === conversationIdRef.current) return;
     setIsScheduledTasksOpen(false);
+
+    // Save outgoing conversation right pane state
+    saveCurrentConversationRightPaneState();
 
     // If this conversation is currently executing in background, restore its live session messages
     const activeRunningMsgs = activeSessionMessagesRef.current.get(id);
     if (activeRunningMsgs) {
       let target = conversations.find((c) => c.id === id);
       setConversationId(id);
+      conversationIdRef.current = id;
       setConversationTitle(target?.title || "Task");
       setCurrentProject(target?.project || "Outside Project");
       if (target?.mode) {
@@ -2504,6 +2627,7 @@ function AuthenticatedContent({
       } else {
         setLastKnownLlmUsage(null);
       }
+      restoreConversationRightPaneState(id);
       return;
     }
 
@@ -2518,6 +2642,7 @@ function AuthenticatedContent({
     }
     if (target) {
       setConversationId(target.id);
+      conversationIdRef.current = target.id;
       setConversationTitle(target.title);
       setCurrentProject(target.project || "Outside Project");
       if (target.mode) {
@@ -2534,11 +2659,14 @@ function AuthenticatedContent({
       } else {
         setLastKnownLlmUsage(null);
       }
+      restoreConversationRightPaneState(target.id);
     }
   };
 
   const handleDeleteConversation = (id: string) => {
     deleteConversation(id);
+    convoRightPaneMapRef.current.delete(id);
+    removeStoredRightPaneState(id);
     const updated = loadConversations();
     setConversations(updated);
     if (id === conversationId) {
