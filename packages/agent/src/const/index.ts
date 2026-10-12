@@ -5,4 +5,11 @@ export * from "./mutation-ledger.js";
 export * from "./checkpoint.js";
 export * from "./subagent.js";
 export * from "./const-agent.js";
-
+export * from "./edit-engine.js";
+export * from "./bash-interceptor.js";
+export * from "./output-spooler.js";
+export * from "./jfind.js";
+export * from "./memory.js";
+export * from "./eval.js";
+export * from "./ast-edit.js";
+export * from "./gh.js";

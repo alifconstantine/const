@@ -304,6 +304,8 @@ export function ExecutionTrace({
                 norm === "ls" ||
                 norm === "find" ||
                 norm === "findbyname" ||
+                norm === "jfind" ||
+                norm === "semanticsearch" ||
                 norm === "grep" ||
                 norm === "grepsearch" ||
                 norm === "search"
@@ -1124,7 +1126,14 @@ function GenericToolItem({ tool }: { tool: TraceToolCall | TraceStep }) {
         targetArg = "compact";
       }
     } else {
-      targetArg = tool.args.path || tool.args.command || "";
+      targetArg =
+        tool.args.query ||
+        tool.args.path ||
+        tool.args.command ||
+        (tool.args.op ? `${tool.args.op} ${tool.args.pr || tool.args.repo || ""}`.trim() : "") ||
+        (tool.args.thoughts ? String(tool.args.thoughts).slice(0, 40) : "") ||
+        (tool.args.code ? String(tool.args.code).slice(0, 40) : "") ||
+        "";
     }
   }
 

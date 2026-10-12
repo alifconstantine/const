@@ -30,6 +30,14 @@ import {
   formatTaskResultEnvelope,
   globalSubAgentManager,
 } from "./subagent.js";
+import { performFuzzyEdit, applyLooseUnifiedDiff } from "./edit-engine.js";
+import { checkBashInterception } from "./bash-interceptor.js";
+import { spoolLargeOutput } from "./output-spooler.js";
+import { executeJFind } from "./jfind.js";
+import { executeRetain, executeRecall, executeReflect } from "./memory.js";
+import { executeEval } from "./eval.js";
+import { executeAstEdit } from "./ast-edit.js";
+import { executeGhTool } from "./gh.js";
 
 export interface ExecuteToolOptions {
   signal?: AbortSignal;
@@ -261,6 +269,14 @@ export function isAllowedInternalPath(targetPath: string): boolean {
   const constHome = isCaseInsensitive ? path.join(os.homedir(), ".const").toLowerCase() : path.join(os.homedir(), ".const");
 
   return normTarget.startsWith(constHome);
+}
+
+export function isProbablyBinary(buffer: Buffer): boolean {
+  const checkLen = Math.min(buffer.length, 1024);
+  for (let i = 0; i < checkLen; i++) {
+    if (buffer[i] === 0) return true;
+  }
+  return false;
 }
 
 // ---------------------------------------------------------------------------
@@ -1553,6 +1569,260 @@ export const CONST_DEFAULT_TOOLS: NativeToolDefinition[] = [
           },
         },
         required: ["agent_id"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "think",
+      description:
+        "Private scratchpad to record internal thoughts, reasoning steps, or plan trade-offs without showing them directly to the user. Ideal when designing complex architecture or breaking down tricky problems.",
+      parameters: {
+        type: "object",
+        properties: {
+          thoughts: {
+            type: "string",
+            description: "Private scratchpad thought process.",
+          },
+        },
+        required: ["thoughts"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "jfind",
+      description:
+        "Semantic Grep & Code Passage Search (inspired by oh-my-pi). Describe a code behavior, feature, or function logically (e.g. 'OAuth token refresh', 'parse unified diff', 'manage active jobs') and retrieve the most relevant file passages, line ranges, and code snippets scored by relevance.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: {
+            type: "string",
+            description: "Natural language description of what the code does.",
+          },
+          path: {
+            type: "string",
+            description: "Optional folder path to restrict search (defaults to workspace root).",
+          },
+          keywords: {
+            type: "array",
+            items: { type: "string" },
+            description: "Optional specific keywords or symbol names to boost scoring.",
+          },
+          limit: {
+            type: "number",
+            description: "Maximum number of ranked code passages to return (default: 6).",
+          },
+        },
+        required: ["query"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "retain",
+      description:
+        "Store important architectural facts, conventions, user preferences, or decisions into durable long-term memory across chat sessions.",
+      parameters: {
+        type: "object",
+        properties: {
+          items: {
+            type: "array",
+            description: "Array of memory items to retain.",
+            items: {
+              type: "object",
+              properties: {
+                content: {
+                  type: "string",
+                  description: "Information or fact to remember.",
+                },
+                context: {
+                  type: "string",
+                  description: "Optional background or source context.",
+                },
+                scope: {
+                  type: "string",
+                  enum: ["project", "global"],
+                  description: "Memory scope: 'project' (current workspace) or 'global' (cross-project knowledge).",
+                },
+              },
+              required: ["content"],
+            },
+          },
+        },
+        required: ["items"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "recall",
+      description:
+        "Search long-term memory for previously retained facts, architectural decisions, or user preferences.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: {
+            type: "string",
+            description: "Natural language search query to recall relevant memories.",
+          },
+          scope: {
+            type: "string",
+            enum: ["project", "global", "all"],
+            description: "Scope filter (default: 'all').",
+          },
+          limit: {
+            type: "number",
+            description: "Maximum memories to return (default: 10).",
+          },
+        },
+        required: ["query"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "reflect",
+      description:
+        "Synthesize an overview or answer a question using relevant entries stored in long-term memory.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: {
+            type: "string",
+            description: "Question or topic to reflect upon based on retained memory.",
+          },
+          context: {
+            type: "string",
+            description: "Optional additional context to guide reflection.",
+          },
+        },
+        required: ["query"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "eval",
+      description:
+        "In-Memory Persistent Code Evaluation / REPL (inspired by oh-my-pi). Execute JavaScript/TypeScript or Python code in-memory with persistent variables across calls. Captures stdout, console logs, and return value without polluting the filesystem.",
+      parameters: {
+        type: "object",
+        properties: {
+          code: {
+            type: "string",
+            description: "The code snippet to evaluate.",
+          },
+          language: {
+            type: "string",
+            enum: ["javascript", "typescript", "python"],
+            description: "Language of the code snippet (default: 'javascript').",
+          },
+          session_id: {
+            type: "string",
+            description: "Optional REPL session ID to share state/variables (default: 'default').",
+          },
+          timeout: {
+            type: "number",
+            description: "Execution timeout in seconds (default: 15).",
+          },
+        },
+        required: ["code"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "ast_edit",
+      description:
+        "Structural AST Code Rewriting (inspired by oh-my-pi). Apply pattern rewrites ($PATTERN -> $REPLACEMENT) across one or more files using AST metavariables (e.g. '$VAR', 'function $NAME($$$ARGS)'), ignoring whitespace differences. Automatically records file mutations for rollback.",
+      parameters: {
+        type: "object",
+        properties: {
+          ops: {
+            type: "array",
+            description: "List of AST rewrite operations to perform.",
+            items: {
+              type: "object",
+              properties: {
+                pat: {
+                  type: "string",
+                  description: "Structural AST pattern to find (supports metavariables like $NAME, $$$ARGS).",
+                },
+                out: {
+                  type: "string",
+                  description: "Replacement AST template using the matched metavariables.",
+                },
+              },
+              required: ["pat", "out"],
+            },
+          },
+          paths: {
+            type: "array",
+            items: { type: "string" },
+            description: "Files, directories, or glob paths to apply the structural rewrite to.",
+          },
+          dry_run: {
+            type: "boolean",
+            description: "If true, previews rewrites without writing changes to disk.",
+          },
+        },
+        required: ["ops", "paths"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "gh",
+      description:
+        "Interact directly with GitHub pull requests, issues, Actions CI runs, and repositories without writing complex curl or shell scripts. Supports PR diff viewing, PR branch checkout, workflow run status, and issue/PR searching.",
+      parameters: {
+        type: "object",
+        properties: {
+          op: {
+            type: "string",
+            enum: [
+              "pr_diff",
+              "pr_checkout",
+              "run_watch",
+              "search_issues",
+              "search_prs",
+              "search_code",
+              "repo_view"
+            ],
+            description: "The GitHub operation to execute.",
+          },
+          repo: {
+            type: "string",
+            description: "Optional repository in 'owner/repo' format (defaults to current repository).",
+          },
+          pr: {
+            type: "string",
+            description: "PR number, branch name, or full PR URL (for 'pr_diff' and 'pr_checkout').",
+          },
+          query: {
+            type: "string",
+            description: "Search query for search operations.",
+          },
+          limit: {
+            type: "number",
+            description: "Maximum results to return (default: 10).",
+          },
+          run: {
+            type: "string",
+            description: "Action run ID to view (for 'run_watch').",
+          },
+        },
+        required: ["op"],
       },
     },
   },
@@ -4419,26 +4689,60 @@ export async function executeNativeTool(
           };
         }
 
-        // 3. Regular Text & Code Files
+        // 3. Binary File Sniffing (prevent binary garble from polluting LLM context)
+        if (stat.size > 0) {
+          const fileHandle = await fs.open(filePath, "r");
+          const sampleBuf = Buffer.alloc(Math.min(1024, stat.size));
+          await fileHandle.read(sampleBuf, 0, sampleBuf.length, 0);
+          await fileHandle.close();
+
+          if (isProbablyBinary(sampleBuf)) {
+            if (ext === ".db" || ext === ".sqlite" || ext === ".sqlite3") {
+              return {
+                result: `[SQLite Database: ${path.basename(filePath)} | Size: ${(stat.size / 1024).toFixed(1)} KB]\nThis is a binary SQLite database file. Query using an SQLite script or eval.`,
+                isError: false,
+              };
+            }
+            return {
+              result: `[Binary File: ${path.basename(filePath)} | Size: ${(stat.size / 1024).toFixed(1)} KB]\nCannot display binary file as text.`,
+              isError: false,
+            };
+          }
+        }
+
+        // 4. Regular Text & Code Files with Progressive Truncation Metadata
         const content = await fs.readFile(filePath, "utf-8");
         const lines = content.split(/\r?\n/);
 
         // Handle offset & limit (1-indexed)
         const offset = typeof args.offset === "number" && args.offset > 0 ? args.offset - 1 : 0;
-        const limit = typeof args.limit === "number" && args.limit > 0 ? args.limit : lines.length;
+        const defaultLimit = 350;
+        const hasExplicitLimit = typeof args.limit === "number" && args.limit > 0;
+        const limit = hasExplicitLimit ? args.limit : defaultLimit;
 
+        const isTruncatedByLines = !hasExplicitLimit && lines.length > defaultLimit;
         const selectedLines = lines.slice(offset, offset + limit);
-        const slicedText = selectedLines.join("\n");
+        const endLine = Math.min(lines.length, offset + selectedLines.length);
 
-        const maxChars = 50000;
-        if (slicedText.length > maxChars) {
-          const truncated =
-            slicedText.slice(0, maxChars) +
-            `\n\n[... Content truncated at ${maxChars} characters (Total: ${lines.length} lines) ...]`;
-          return { result: truncated, isError: false };
+        let outputText = selectedLines.join("\n");
+        const maxChars = 40000;
+        let isCharTruncated = false;
+
+        if (outputText.length > maxChars) {
+          outputText = outputText.slice(0, maxChars);
+          isCharTruncated = true;
         }
 
-        return { result: slicedText, isError: false };
+        if (isTruncatedByLines || isCharTruncated || offset > 0 || hasExplicitLimit) {
+          const metaNotice = `<meta lines="${offset + 1}-${endLine}" total="${lines.length}" truncated="${isTruncatedByLines || isCharTruncated}" />\n`;
+          let footerNotice = "";
+          if (isTruncatedByLines || isCharTruncated) {
+            footerNotice = `\n\n[... File view truncated at line ${endLine} of ${lines.length}. Use 'read' with offset=${endLine + 1} to continue reading ...]`;
+          }
+          return { result: `${metaNotice}${outputText}${footerNotice}`, isError: false };
+        }
+
+        return { result: outputText, isError: false };
       } catch (err: any) {
         if (err.code === "ENOENT") {
           const parentDir = path.dirname(filePath);
@@ -4578,98 +4882,38 @@ export async function executeNativeTool(
         ? filePath
         : path.relative(workspacePath, filePath);
 
-      // 1. Direct match
-      if (fileText.includes(oldContent)) {
-        const updated = fileText.replace(oldContent, newContent);
-        await fs.writeFile(filePath, updated, "utf-8");
+      const editResult = performFuzzyEdit(fileText, oldContent, newContent, {
+        allowMultiple: args.allow_multiple === true || args.allowMultiple === true,
+      });
 
-        notifyFileMutation(
-          {
-            id: `mut_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-            stepIndex: options.stepIndex ?? 0,
-            operation: "modify",
-            absolutePath: filePath,
-            filePath: filePath,
-            targetFile: editDisplayPath || filePath,
-            previousContent: fileText,
-            newContent: updated,
-            timestamp: Date.now(),
-          },
-          options
-        );
-
+      if (!editResult.success || !editResult.resultText) {
+        const totalLines = fileText.split(/\r?\n/).length;
         return {
-          result: `Successfully edited '${path.basename(filePath)}'. Replaced ${oldContent.length} characters with ${newContent.length} characters.`,
-          isError: false,
+          result: `[EDIT FAILED]: Could not edit '${path.basename(filePath)}' (${totalLines} lines).\nReason: ${editResult.error || "'old_content' not found in file."}\nAction Required: Use the 'read' tool to inspect the latest file contents around your target area before attempting another edit.`,
+          isError: true,
         };
       }
 
-      // 2. CRLF <-> LF tolerant matching
-      const originalEol = fileText.includes("\r\n") ? "\r\n" : "\n";
-      const normalizedFileText = fileText.replace(/\r\n/g, "\n");
-      const normalizedOld = oldContent.replace(/\r\n/g, "\n");
+      await fs.writeFile(filePath, editResult.resultText, "utf-8");
 
-      if (normalizedFileText.includes(normalizedOld)) {
-        const updated = normalizedFileText.replace(normalizedOld, newContent.replace(/\r\n/g, "\n"));
-        const finalContent = originalEol === "\r\n" ? updated.replace(/\n/g, "\r\n") : updated;
-        await fs.writeFile(filePath, finalContent, "utf-8");
+      notifyFileMutation(
+        {
+          id: `mut_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+          stepIndex: options.stepIndex ?? 0,
+          operation: "modify",
+          absolutePath: filePath,
+          filePath: filePath,
+          targetFile: editDisplayPath || filePath,
+          previousContent: fileText,
+          newContent: editResult.resultText,
+          timestamp: Date.now(),
+        },
+        options
+      );
 
-        notifyFileMutation(
-          {
-            id: `mut_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-            stepIndex: options.stepIndex ?? 0,
-            operation: "modify",
-            absolutePath: filePath,
-            filePath: filePath,
-            targetFile: editDisplayPath || filePath,
-            previousContent: fileText,
-            newContent: finalContent,
-            timestamp: Date.now(),
-          },
-          options
-        );
-
-        return {
-          result: `Successfully edited '${path.basename(filePath)}' (line-endings normalized).`,
-          isError: false,
-        };
-      }
-
-      // 3. Trim trailing whitespace tolerant matching (Pi standard)
-      const trimTrailing = (s: string) => s.split("\n").map((l) => l.trimEnd()).join("\n");
-      const trimmedFileText = trimTrailing(normalizedFileText);
-      const trimmedOld = trimTrailing(normalizedOld);
-
-      if (trimmedFileText.includes(trimmedOld)) {
-        const updated = trimmedFileText.replace(trimmedOld, trimTrailing(newContent.replace(/\r\n/g, "\n")));
-        const finalContent = originalEol === "\r\n" ? updated.replace(/\n/g, "\r\n") : updated;
-        await fs.writeFile(filePath, finalContent, "utf-8");
-
-        notifyFileMutation(
-          {
-            id: `mut_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
-            stepIndex: options.stepIndex ?? 0,
-            operation: "modify",
-            absolutePath: filePath,
-            filePath: filePath,
-            targetFile: editDisplayPath || filePath,
-            previousContent: fileText,
-            newContent: finalContent,
-            timestamp: Date.now(),
-          },
-          options
-        );
-
-        return {
-          result: `Successfully edited '${path.basename(filePath)}' (whitespace-tolerant matching).`,
-          isError: false,
-        };
-      }
-
-      const totalLines = fileText.split(/\r?\n/).length;
       return {
-        result: `[EDIT FAILED]: 'old_content' not found in '${path.basename(filePath)}' (file has ${totalLines} lines).\nReason: Exact match failed. The target content may have different indentation, whitespace, or may have already been modified.\nAction Required: Use the 'read' tool to inspect the latest file contents around your target area before attempting another edit. Do NOT repeat the exact same edit arguments without verifying the file.`,
-        isError: true,
+        result: `Successfully edited '${path.basename(filePath)}' (matched via ${editResult.matchType || "fuzzy engine"}, replaced ${editResult.replacementsCount || 1} occurrence(s)).`,
+        isError: false,
       };
     }
 
@@ -4687,6 +4931,14 @@ export async function executeNativeTool(
       if (!cmd) {
         return {
           result: "Error: No command provided to execute.",
+          isError: true,
+        };
+      }
+
+      const interception = checkBashInterception(cmd);
+      if (interception.intercepted) {
+        return {
+          result: interception.message || "Command intercepted by security or workflow policy.",
           isError: true,
         };
       }
@@ -4784,12 +5036,8 @@ export async function executeNativeTool(
       if (stdout) output += stdout;
       if (stderr) output += (output ? "\n" : "") + stderr;
 
-      const MAX_OUTPUT_CHARS = 50000;
-      if (output.length > MAX_OUTPUT_CHARS) {
-        const head = output.slice(0, 25000);
-        const tail = output.slice(-20000);
-        output = `${head}\n\n... [Output truncated: ${output.length} total characters. Showing first 25,000 and last 20,000 characters] ...\n\n${tail}`;
-      }
+      const spooled = await spoolLargeOutput(output, workspacePath, { prefix: "bash" });
+      output = spooled.output;
 
       const isFailed = exitCode !== 0 && exitCode !== null;
       if (isFailed) {
@@ -5066,6 +5314,14 @@ export async function executeNativeTool(
         };
       }
 
+      const interception = checkBashInterception(cmd);
+      if (interception.intercepted) {
+        return {
+          result: interception.message || "Command intercepted by security or workflow policy.",
+          isError: true,
+        };
+      }
+
       const rawCwd = args.cwd || args.working_directory || args.workdir || args.path;
       const targetCwd = rawCwd ? resolveSafePath(rawCwd, workspacePath) : workspacePath;
       const executionCwd = fsSync.existsSync(targetCwd) && fsSync.statSync(targetCwd).isDirectory()
@@ -5162,12 +5418,8 @@ export async function executeNativeTool(
       if (stdout) output += stdout;
       if (stderr) output += (output ? "\n" : "") + stderr;
 
-      const MAX_OUTPUT_CHARS = 50000;
-      if (output.length > MAX_OUTPUT_CHARS) {
-        const head = output.slice(0, 25000);
-        const tail = output.slice(-20000);
-        output = `${head}\n\n... [Output truncated: ${output.length} total characters. Showing first 25,000 and last 20,000 characters] ...\n\n${tail}`;
-      }
+      const spooled = await spoolLargeOutput(output, workspacePath, { prefix: "powershell" });
+      output = spooled.output;
 
       const isFailed = exitCode !== 0 && exitCode !== null;
       if (isFailed) {
@@ -5317,7 +5569,7 @@ export async function executeNativeTool(
       }
 
       const originalContent = await fs.readFile(filePath, "utf-8");
-      const { success, resultText, error } = applyUnifiedDiff(originalContent, patchContent);
+      const { success, resultText, error } = applyLooseUnifiedDiff(originalContent, patchContent);
 
       if (!success || resultText === undefined) {
         return {
@@ -6052,8 +6304,12 @@ export async function executeNativeTool(
       }
 
       const pyCfg = resolvePythonConfig();
-      const tempFileName = `_const_script_${Date.now()}_${Math.random().toString(36).slice(2, 6)}.py`;
-      const tempScriptPath = path.join(workspacePath, tempFileName);
+      const tempDir = path.join(workspacePath, ".const", "tmp");
+      try {
+        await fs.mkdir(tempDir, { recursive: true });
+      } catch {}
+      const tempFileName = `script_${Date.now()}_${Math.random().toString(36).slice(2, 6)}.py`;
+      const tempScriptPath = path.join(tempDir, tempFileName);
 
       const beforeRunTime = Date.now();
 
@@ -6065,7 +6321,7 @@ export async function executeNativeTool(
 
         const { stdout, stderr, exitCode } = await runProcess(
           pyCfg.command,
-          [...pyCfg.args, tempFileName],
+          [...pyCfg.args, tempScriptPath],
           {
             cwd: workspacePath,
             signal,
@@ -6088,7 +6344,6 @@ export async function executeNativeTool(
         try {
           const files = await fs.readdir(workspacePath);
           for (const file of files) {
-            if (file === tempFileName) continue;
             const ext = path.extname(file).toLowerCase();
             if ([".png", ".svg", ".jpg", ".jpeg", ".html"].includes(ext)) {
               try {
@@ -6123,6 +6378,206 @@ export async function executeNativeTool(
     }
 
     // -----------------------------------------------------------------------
+    // Tool: think (private scratchpad)
+    // -----------------------------------------------------------------------
+    if (normalizedTool === "think" || normalizedTool === "scratchpad") {
+      const thoughts = String(args.thoughts || args.thought || "").trim();
+      return {
+        result: thoughts ? "(Thoughts recorded to private scratchpad)" : "(Empty scratchpad)",
+        isError: false,
+      };
+    }
+
+    // -----------------------------------------------------------------------
+    // Tool: jfind (semantic grep / passage search)
+    // -----------------------------------------------------------------------
+    if (normalizedTool === "jfind" || normalizedTool === "semanticsearch" || normalizedTool === "passagesearch") {
+      const query = String(args.query || args.prompt || args.search || "").trim();
+      if (!query) {
+        return {
+          result: "Error: Missing 'query' parameter for semantic search.",
+          isError: true,
+        };
+      }
+      const rawKeywords: string[] = Array.isArray(args.keywords)
+        ? args.keywords.map(String)
+        : typeof args.grep_keywords === "string"
+        ? [args.grep_keywords]
+        : Array.isArray(args.grep_keywords)
+        ? args.grep_keywords.map(String)
+        : [];
+      const searchRes = await executeJFind(
+        {
+          query,
+          path: args.path,
+          keywords: rawKeywords,
+          limit: typeof args.limit === "number" ? args.limit : 6,
+        },
+        workspacePath
+      );
+      return {
+        result: searchRes.formatted,
+        isError: false,
+      };
+    }
+
+    // -----------------------------------------------------------------------
+    // Tool: retain (store long-term memory)
+    // -----------------------------------------------------------------------
+    if (normalizedTool === "retain" || normalizedTool === "remember" || normalizedTool === "savememory") {
+      const items = Array.isArray(args.items)
+        ? args.items
+        : args.content
+        ? [{ content: args.content, context: args.context, scope: args.scope }]
+        : [];
+      const retainRes = await executeRetain(items, workspacePath);
+      return {
+        result: retainRes.message,
+        isError: !retainRes.success,
+      };
+    }
+
+    // -----------------------------------------------------------------------
+    // Tool: recall (search long-term memory)
+    // -----------------------------------------------------------------------
+    if (normalizedTool === "recall" || normalizedTool === "searchmemory") {
+      const query = String(args.query || args.prompt || "").trim();
+      const recallRes = await executeRecall(query, workspacePath, {
+        scope: args.scope,
+        limit: typeof args.limit === "number" ? args.limit : 10,
+      });
+      return {
+        result: recallRes.formatted,
+        isError: false,
+      };
+    }
+
+    // -----------------------------------------------------------------------
+    // Tool: reflect (synthesize memory)
+    // -----------------------------------------------------------------------
+    if (normalizedTool === "reflect" || normalizedTool === "reflectmemory") {
+      const query = String(args.query || args.prompt || "").trim();
+      const reflectRes = await executeReflect(query, workspacePath, args.context);
+      return {
+        result: reflectRes.formatted,
+        isError: false,
+      };
+    }
+
+    // -----------------------------------------------------------------------
+    // Tool: eval (in-memory code REPL)
+    // -----------------------------------------------------------------------
+    if (normalizedTool === "eval" || normalizedTool === "repl") {
+      const code = String(args.code || args.script || "").trim();
+      if (!code) {
+        return {
+          result: "Error: Missing 'code' parameter to evaluate.",
+          isError: true,
+        };
+      }
+      const evalRes = await executeEval(
+        {
+          code,
+          language: args.language,
+          sessionId: args.session_id || options.conversationId,
+          timeoutMs: typeof args.timeout === "number" ? args.timeout * 1000 : 15000,
+        },
+        workspacePath,
+        signal
+      );
+      return {
+        result: evalRes.formatted,
+        isError: evalRes.isError,
+      };
+    }
+
+    // -----------------------------------------------------------------------
+    // Tool: ast_edit (structural AST code rewrite)
+    // -----------------------------------------------------------------------
+    if (normalizedTool === "astedit" || normalizedTool === "ast_edit") {
+      const rawOps = Array.isArray(args.ops) ? args.ops : [];
+      const rawPaths = Array.isArray(args.paths) ? args.paths : args.path ? [args.path] : [];
+
+      if (rawOps.length === 0) {
+        return {
+          result: "Error: Missing 'ops' array for ast_edit. Provide operations with 'pat' (pattern) and 'out' (replacement).",
+          isError: true,
+        };
+      }
+      if (rawPaths.length === 0) {
+        return {
+          result: "Error: Missing 'paths' parameter for ast_edit.",
+          isError: true,
+        };
+      }
+
+      const astRes = await executeAstEdit(
+        {
+          ops: rawOps,
+          paths: rawPaths,
+          dryRun: args.dry_run === true,
+        },
+        workspacePath,
+        signal
+      );
+
+      // Notify file mutations for rollback ledger
+      if (!args.dry_run) {
+        for (const f of astRes.files) {
+          const abs = path.resolve(workspacePath, f.path);
+          notifyFileMutation(
+            {
+              id: `mut_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+              stepIndex: options.stepIndex ?? 0,
+              operation: "modify",
+              absolutePath: abs,
+              filePath: abs,
+              targetFile: f.path,
+              previousContent: f.originalContent,
+              newContent: f.newContent,
+              timestamp: Date.now(),
+            },
+            options
+          );
+        }
+      }
+
+      return {
+        result: astRes.formatted,
+        isError: false,
+      };
+    }
+
+    // -----------------------------------------------------------------------
+    // Tool: gh (GitHub operations)
+    // -----------------------------------------------------------------------
+    if (normalizedTool === "gh" || normalizedTool === "github") {
+      const op = args.op || args.operation;
+      if (!op) {
+        return {
+          result: "Error: Missing 'op' parameter for GitHub tool. (e.g. 'pr_diff', 'pr_checkout', 'run_watch', 'search_issues', 'search_prs', 'search_code', 'repo_view').",
+          isError: true,
+        };
+      }
+      const ghRes = await executeGhTool(
+        {
+          op: op as any,
+          repo: typeof args.repo === "string" ? args.repo : undefined,
+          pr: args.pr !== undefined ? String(args.pr) : undefined,
+          query: typeof args.query === "string" ? args.query : undefined,
+          limit: typeof args.limit === "number" ? args.limit : undefined,
+          run: typeof args.run === "string" ? args.run : undefined,
+        },
+        workspacePath,
+        signal
+      );
+      return {
+        result: ghRes.output,
+        isError: ghRes.isError,
+      };
+    }
+
+    // -----------------------------------------------------------------------
     // Composio Connector Tools (Canva MCP, Google Suite, YouTube, Sandbox)
     // -----------------------------------------------------------------------
     if (
@@ -6142,7 +6597,7 @@ export async function executeNativeTool(
     }
 
     return {
-      result: `Tool '${toolName}' is not recognized. Available tools: read, write, edit, run_python, run_command, bash, powershell, ls, find, grep, mkdir, todo_write, ask_question, apply_patch, manage_task, canva_mcp_generate_design, google_sheets_manage, google_docs_manage, google_slides_manage, google_drive_search, google_tasks_manage, google_classroom_manage, google_forms_manage, youtube_search_and_transcribe.`,
+      result: `Tool '${toolName}' is not recognized. Available tools: read, write, edit, bash, powershell, run_command, ls, find, grep, mkdir, todo_write, ask_question, apply_patch, manage_task, wait, lsp, ast_grep, ast_edit, jfind, retain, recall, reflect, eval, gh, think, task, agent_status, kill_agent, run_python.`,
       isError: true,
     };
   } catch (err: any) {
