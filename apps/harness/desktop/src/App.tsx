@@ -1160,9 +1160,156 @@ function AuthenticatedContent({
     toast.success(type === "good" ? "Response marked as helpful" : "Feedback recorded");
   };
 
-  const handleEditMessage = (content: string) => {
-    setEditingPrompt(content);
-    toast.info("Message loaded into prompt for editing");
+  const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
+
+  const handleStartEditMessage = (id: string) => {
+    if (isExecuting) return;
+    setEditingMessageId(id);
+  };
+
+  const handleCancelEditMessage = () => {
+    setEditingMessageId(null);
+  };
+
+  const handleSubmitEditMessage = async (
+    messageId: string,
+    newContent: string,
+    messageIdx: number,
+    attachments?: AttachedFile[]
+  ) => {
+    if (isExecuting) {
+      toast.warning("Please wait or stop the current task before editing a message");
+      return;
+    }
+
+    const trimmed = newContent.trim();
+    if (!trimmed && (!attachments || attachments.length === 0)) {
+      toast.error("Message content cannot be empty");
+      return;
+    }
+
+    // 1. Gather all file mutations from this turn onwards that have not been rolled back
+    const mutationsToRevert: FileMutationRecord[] = [];
+    for (let i = messageIdx; i < messages.length; i++) {
+      const msg = messages[i];
+      if (msg?.mutations && Array.isArray(msg.mutations)) {
+        for (const m of msg.mutations) {
+          if (!m.rolledBack) {
+            mutationsToRevert.push(m);
+          }
+        }
+      }
+    }
+
+    // 2. Perform automated file rollback in reverse chronological order
+    if (mutationsToRevert.length > 0 && window.electron?.rollbackFile) {
+      let revertedCount = 0;
+      for (const rec of [...mutationsToRevert].reverse()) {
+        try {
+          const res = await window.electron.rollbackFile(rec);
+          if (res?.success) revertedCount++;
+        } catch {}
+      }
+      if (revertedCount > 0) {
+        toast.info(`Reverted ${revertedCount} previous file change(s)`);
+      }
+    }
+
+    // 3. Truncate conversation history: preserve history strictly before messageIdx
+    const targetMsg = messages[messageIdx];
+    const updatedUserMsg: ChatMessage = {
+      id: targetMsg?.id || messageId || `msg_${Date.now()}_user`,
+      role: "user",
+      content: trimmed || (attachments && attachments.length > 0 ? "Please analyze the attached media/file(s)." : ""),
+      timestamp: Date.now(),
+      attachments: attachments !== undefined ? attachments : targetMsg?.attachments,
+    };
+
+    const assistantPlaceholder: ChatMessage = {
+      id: `msg_${Date.now()}_assistant`,
+      role: "assistant",
+      content: "",
+      thinking: "",
+      traceSteps: [],
+      toolCalls: [],
+      mutations: [],
+      timestamp: Date.now(),
+    };
+
+    const preservedHistory = messages.slice(0, messageIdx);
+    const newStreamMessages = [...preservedHistory, updatedUserMsg];
+    const initialSessionMsgs = [...newStreamMessages, assistantPlaceholder];
+
+    setMessages(initialSessionMsgs);
+    setEditingMessageId(null);
+    setRunningConvoIds((prev) => new Set(prev).add(conversationId));
+    executionStartTimeMapRef.current.set(conversationId, Date.now());
+    activeSessionMessagesRef.current.set(conversationId, initialSessionMsgs);
+    setLiveDurationMs(0);
+
+    // Persist updated conversation to disk
+    const stored = loadConversations();
+    const target = stored.find((c) => c.id === conversationId);
+    if (target) {
+      target.messages = newStreamMessages;
+      target.updatedAt = Date.now();
+      saveConversation(target);
+      setConversations(loadConversations());
+    }
+
+    // 4. Dispatch re-run request to AI agent with clean context
+    if (window.electron?.sendMessage) {
+      try {
+        const payloadMessages = newStreamMessages.map((m) => {
+          let content = m.content;
+          if (m.role === "user" && m.attachments && m.attachments.length > 0) {
+            const hasExistingAttachmentSection = content.includes("[Attached media / Lampiran media:");
+            if (!hasExistingAttachmentSection) {
+              const attLines = m.attachments.map((att: any) => {
+                const pathInfo = att.path ? ` [Path: ${att.path}]` : "";
+                return `- ${att.type.toUpperCase()}: "${att.name}" (${formatFileSize(att.size)})${pathInfo}`;
+              });
+              const baseText = content.trim() ? content : "Please analyze the attached media/file(s).";
+              content = `${baseText}\n\n[Attached media / Lampiran media:\n${attLines.join("\n")}]`;
+            }
+          }
+          return {
+            role: m.role,
+            content,
+          };
+        });
+
+        const res = await window.electron.sendMessage({
+          messages: payloadMessages,
+          model: activeModelItem?.id || activeModelItem?.name,
+          thinkingLevel: undefined,
+          workspacePath: currentProject === "Outside Project" ? undefined : currentProject,
+          mode: currentMode,
+          conversationId,
+          authToken: token || undefined,
+        });
+
+        if (!res.success && res.error) {
+          if (!res.aborted && !res.error.toLowerCase().includes("cancelled") && !res.error.toLowerCase().includes("abort")) {
+            toast.error(res.error);
+          }
+          setRunningConvoIds((prev) => {
+            const next = new Set(prev);
+            next.delete(conversationId);
+            return next;
+          });
+          activeSessionMessagesRef.current.delete(conversationId);
+        }
+      } catch (err: any) {
+        toast.error(err?.message || "Failed to send edited message");
+        setRunningConvoIds((prev) => {
+          const next = new Set(prev);
+          next.delete(conversationId);
+          return next;
+        });
+        activeSessionMessagesRef.current.delete(conversationId);
+      }
+    }
   };
 
   const renderMessageAttachment = (att: AttachedFile) => {
@@ -2561,6 +2708,7 @@ function AuthenticatedContent({
     setIsSettingsOpen(false);
     setIsRenameDialogOpen(false);
     setIsTrajectoryOpen(false);
+    setEditingMessageId(null);
     setMessages([]);
     setConversationTitle("");
     const newSessionId = `session_${Date.now()}`;
@@ -2601,6 +2749,7 @@ function AuthenticatedContent({
   const handleSelectConversation = async (id: string) => {
     if (id === conversationIdRef.current) return;
     setIsScheduledTasksOpen(false);
+    setEditingMessageId(null);
 
     // Save outgoing conversation right pane state
     saveCurrentConversationRightPaneState();
@@ -2944,7 +3093,10 @@ function AuthenticatedContent({
                       onToggleExpandUserMessage={(id) => setExpandedUserMessageId(id)}
                       copiedId={copiedId}
                       onCopyMessage={handleCopyMessage}
-                      onEditMessage={handleEditMessage}
+                      isEditing={editingMessageId === msg.id}
+                      onStartEdit={handleStartEditMessage}
+                      onCancelEdit={handleCancelEditMessage}
+                      onSubmitEdit={handleSubmitEditMessage}
                       onRollback={handleRollback}
                       onRollbackAll={handleRollbackAll}
                       onAnswerQuestion={handleAnswerQuestion}

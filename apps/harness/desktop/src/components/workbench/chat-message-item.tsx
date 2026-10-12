@@ -4,6 +4,7 @@ import { ScrollArea, cn } from "@const/ui";
 import type { FileMutationRecord, TraceStep } from "../../vite-env";
 import { MarkdownContent } from "./markdown-content";
 import { ExecutionTrace, MutationsSummaryCard } from "./execution-trace";
+import { InlineMessageEditor } from "./inline-message-editor";
 
 export interface ChatMessage {
   id: string;
@@ -35,6 +36,10 @@ export interface ChatMessageItemProps {
   copiedId?: string | null;
   onCopyMessage?: (id: string, content: string) => void;
   onEditMessage?: (content: string) => void;
+  isEditing?: boolean;
+  onStartEdit?: (messageId: string) => void;
+  onCancelEdit?: () => void;
+  onSubmitEdit?: (messageId: string, newContent: string, messageIdx: number, attachments?: any[]) => void;
   onRollback?: (record: FileMutationRecord) => void;
   onRollbackAll?: (records: FileMutationRecord[]) => void;
   onAnswerQuestion?: (toolCallId: string, answer: any) => void;
@@ -64,6 +69,10 @@ export function ChatMessageItem({
   copiedId,
   onCopyMessage,
   onEditMessage,
+  isEditing = false,
+  onStartEdit,
+  onCancelEdit,
+  onSubmitEdit,
   onRollback,
   onRollbackAll,
   onAnswerQuestion,
@@ -78,6 +87,24 @@ export function ChatMessageItem({
   if (!message) return null;
 
   if (message.role === "user") {
+    if (isEditing) {
+      return (
+        <div className="w-full flex flex-col items-end group">
+          <InlineMessageEditor
+            initialContent={message.content || ""}
+            initialAttachments={message.attachments}
+            onSubmit={(newContent, newAttachments) => {
+              onSubmitEdit?.(message.id, newContent, idx, newAttachments);
+            }}
+            onCancel={() => {
+              onCancelEdit?.();
+            }}
+            userBubbleWidthClass={userBubbleWidthClass}
+          />
+        </div>
+      );
+    }
+
     const isLongPrompt =
       (message.content || "").length > 250 || (message.content || "").split("\n").length > 4;
     const isExpanded = expandedUserMessageId === message.id;
@@ -136,7 +163,7 @@ export function ChatMessageItem({
         </div>
 
         {/* User action bar (Copy, Edit, Timestamp) - hidden in read-only mode */}
-        {!isReadOnly && (
+        {!isReadOnly && !isEditing && (
           <div className="flex items-center gap-2 pt-1.5 opacity-0 group-hover:opacity-100 transition-opacity text-xs text-[#a9a9a9] dark:text-[#888888] select-none">
             {message.timestamp && (
               <span className="text-[11px] font-sans tabular-nums text-[#a9a9a9] dark:text-[#777777]">
@@ -157,10 +184,16 @@ export function ChatMessageItem({
                 )}
               </button>
             )}
-            {onEditMessage && (
+            {!isExecuting && (onStartEdit || onEditMessage) && (
               <button
                 type="button"
-                onClick={() => onEditMessage(message.content)}
+                onClick={() => {
+                  if (onStartEdit) {
+                    onStartEdit(message.id);
+                  } else {
+                    onEditMessage?.(message.content);
+                  }
+                }}
                 className="p-1 rounded hover:bg-black/5 dark:hover:bg-white/10 hover:text-[#262626] dark:hover:text-white transition-colors cursor-pointer"
                 title="Edit message"
               >
