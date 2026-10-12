@@ -16,6 +16,14 @@ import {
   BarChart3,
   Layers,
   Folder,
+  Globe,
+  Terminal,
+  Database,
+  FileText,
+  Music,
+  Video,
+  Briefcase,
+  Shield,
   type LucideIcon,
 } from "lucide-react";
 
@@ -43,6 +51,14 @@ export const LEARN_ICONS: LearnIconDef[] = [
   { id: "chart", label: "Data", labelEn: "Data", icon: BarChart3 },
   { id: "layers", label: "Arsitektur", labelEn: "Architecture", icon: Layers },
   { id: "folder", label: "Folder", labelEn: "Folder", icon: Folder },
+  { id: "globe", label: "Global", labelEn: "Global", icon: Globe },
+  { id: "terminal", label: "Terminal", labelEn: "Terminal", icon: Terminal },
+  { id: "database", label: "Basis Data", labelEn: "Database", icon: Database },
+  { id: "document", label: "Dokumen", labelEn: "Document", icon: FileText },
+  { id: "music", label: "Audio", labelEn: "Audio", icon: Music },
+  { id: "video", label: "Video", labelEn: "Video", icon: Video },
+  { id: "briefcase", label: "Bisnis", labelEn: "Business", icon: Briefcase },
+  { id: "shield", label: "Keamanan", labelEn: "Security", icon: Shield },
 ];
 
 export const LEGACY_EMOJI_TO_LEARN_ICON: Record<string, string> = {
