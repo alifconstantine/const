@@ -31,7 +31,6 @@ import {
   RotateCw,
   Plus,
   Minus,
-  Type,
   RotateCcw,
   Trash2,
   Eye,
@@ -59,7 +58,6 @@ import {
   MAX_ZOOM,
   DEFAULT_ZOOM,
   ZOOM_STEP,
-  ZOOM_OPTIONS,
 } from "../lib/theme";
 
 export interface SettingsViewProps {
@@ -1013,94 +1011,65 @@ export function SettingsView({
                     </div>
 
                     {/* Font Size & Interface Scale row */}
-                    <div className="flex flex-col gap-3 pt-4 border-t border-[#dedee2] dark:border-[#383838]">
-                      <div className="flex items-center justify-between gap-4">
-                        <div className="flex flex-col">
-                          <span className="text-[13px] font-medium text-[#262626] dark:text-white flex items-center gap-1.5">
-                            <Type className="w-3.5 h-3.5 text-[#737373] dark:text-[#969696]" />
-                            Font Size & Interface Scale
-                          </span>
-                          <span className="text-[11px] text-[#737373] dark:text-[#969696] mt-0.5">
-                            Adjust font size and UI scale across the entire application (Min {MIN_ZOOM}%, Max {MAX_ZOOM}%).
-                          </span>
-                        </div>
-
-                        {/* Stepper Control: [-] [100%] [+] and Reset button */}
-                        <div className="flex items-center gap-2 shrink-0">
-                          <div className="inline-flex p-0.5 rounded-lg bg-[#ebebed] dark:bg-[#1b1b1b] border border-[#dedee2] dark:border-[#383838] items-center gap-0.5 shrink-0">
-                            <button
-                              type="button"
-                              disabled={zoom <= MIN_ZOOM}
-                              onClick={() => setZoom(Math.max(MIN_ZOOM, zoom - ZOOM_STEP))}
-                              className={cn(
-                                "p-1.5 rounded-md transition-all flex items-center justify-center outline-none focus:outline-none",
-                                zoom <= MIN_ZOOM
-                                  ? "opacity-30 cursor-not-allowed text-[#a9a9a9] dark:text-[#666666]"
-                                  : "cursor-pointer text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white hover:bg-[#ffffff] dark:hover:bg-[#383838] shadow-2xs"
-                              )}
-                              title={`Decrease font size (${Math.max(MIN_ZOOM, zoom - ZOOM_STEP)}%)`}
-                            >
-                              <Minus className="w-3.5 h-3.5" />
-                            </button>
-
-                            <span className="min-w-[48px] text-center text-[12px] font-medium font-sans tabular-nums text-[#262626] dark:text-white select-none px-1">
-                              {zoom}%
-                            </span>
-
-                            <button
-                              type="button"
-                              disabled={zoom >= MAX_ZOOM}
-                              onClick={() => setZoom(Math.min(MAX_ZOOM, zoom + ZOOM_STEP))}
-                              className={cn(
-                                "p-1.5 rounded-md transition-all flex items-center justify-center outline-none focus:outline-none",
-                                zoom >= MAX_ZOOM
-                                  ? "opacity-30 cursor-not-allowed text-[#a9a9a9] dark:text-[#666666]"
-                                  : "cursor-pointer text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white hover:bg-[#ffffff] dark:hover:bg-[#383838] shadow-2xs"
-                              )}
-                              title={`Increase font size (${Math.min(MAX_ZOOM, zoom + ZOOM_STEP)}%)`}
-                            >
-                              <Plus className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-
-                          {zoom !== DEFAULT_ZOOM && (
-                            <button
-                              type="button"
-                              onClick={() => setZoom(DEFAULT_ZOOM)}
-                              className="px-2.5 py-1 text-[11px] font-medium rounded-lg text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white hover:bg-[#ebebed] dark:hover:bg-[#2e2e2e] transition-colors cursor-pointer flex items-center gap-1.5 border border-transparent hover:border-[#dedee2] dark:hover:border-[#383838]"
-                              title="Reset font size to default (100%)"
-                            >
-                              <RotateCcw className="w-3 h-3" />
-                              <span>Reset</span>
-                            </button>
-                          )}
-                        </div>
+                    <div className="flex items-center justify-between gap-4 pt-4 border-t border-[#dedee2] dark:border-[#383838]">
+                      <div className="flex flex-col">
+                        <span className="text-[13px] font-medium text-[#262626] dark:text-white">
+                          Font Size & Interface Scale
+                        </span>
+                        <span className="text-[11px] text-[#737373] dark:text-[#969696] mt-0.5">
+                          Adjust font size and UI scale across the entire application (Min {MIN_ZOOM}%, Max {MAX_ZOOM}%).
+                        </span>
                       </div>
 
-                      {/* Quick Preset Options */}
-                      <div className="flex items-center gap-1.5 pt-1">
-                        <span className="text-[11px] text-[#737373] dark:text-[#969696] mr-1 select-none">
-                          Presets:
-                        </span>
-                        {ZOOM_OPTIONS.map((item) => {
-                          const isSelected = zoom === item.value;
-                          return (
-                            <button
-                              key={item.value}
-                              type="button"
-                              onClick={() => setZoom(item.value)}
-                              className={cn(
-                                "px-2.5 py-1 text-[11px] rounded-md transition-all cursor-pointer outline-none focus:outline-none border",
-                                isSelected
-                                  ? "bg-[#ffffff] dark:bg-[#383838] border-[#dedee2] dark:border-[#484848] text-[#262626] dark:text-white shadow-2xs font-medium"
-                                  : "border-transparent bg-[#ebebed]/60 dark:bg-[#1b1b1b] text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-[#d4d4d4] hover:bg-[#ebebed] dark:hover:bg-[#282828]"
-                              )}
-                              title={`Set font size & scale to ${item.label}`}
-                            >
-                              {item.label}
-                            </button>
-                          );
-                        })}
+                      {/* Stepper Control: [-] [100%] [+] and Reset button */}
+                      <div className="flex items-center gap-2 shrink-0">
+                        <div className="inline-flex p-0.5 rounded-lg bg-[#ebebed] dark:bg-[#1b1b1b] border border-[#dedee2] dark:border-[#383838] items-center gap-0.5 shrink-0">
+                          <button
+                            type="button"
+                            disabled={zoom <= MIN_ZOOM}
+                            onClick={() => setZoom(Math.max(MIN_ZOOM, zoom - ZOOM_STEP))}
+                            className={cn(
+                              "p-1.5 rounded-md transition-all flex items-center justify-center outline-none focus:outline-none",
+                              zoom <= MIN_ZOOM
+                                ? "opacity-30 cursor-not-allowed text-[#a9a9a9] dark:text-[#666666]"
+                                : "cursor-pointer text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white hover:bg-[#ffffff] dark:hover:bg-[#383838] shadow-2xs"
+                            )}
+                            title={`Decrease font size (${Math.max(MIN_ZOOM, zoom - ZOOM_STEP)}%)`}
+                          >
+                            <Minus className="w-3.5 h-3.5" />
+                          </button>
+
+                          <span className="min-w-[48px] text-center text-[12px] font-medium font-sans tabular-nums text-[#262626] dark:text-white select-none px-1">
+                            {zoom}%
+                          </span>
+
+                          <button
+                            type="button"
+                            disabled={zoom >= MAX_ZOOM}
+                            onClick={() => setZoom(Math.min(MAX_ZOOM, zoom + ZOOM_STEP))}
+                            className={cn(
+                              "p-1.5 rounded-md transition-all flex items-center justify-center outline-none focus:outline-none",
+                              zoom >= MAX_ZOOM
+                                ? "opacity-30 cursor-not-allowed text-[#a9a9a9] dark:text-[#666666]"
+                                : "cursor-pointer text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white hover:bg-[#ffffff] dark:hover:bg-[#383838] shadow-2xs"
+                            )}
+                            title={`Increase font size (${Math.min(MAX_ZOOM, zoom + ZOOM_STEP)}%)`}
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+
+                        {zoom !== DEFAULT_ZOOM && (
+                          <button
+                            type="button"
+                            onClick={() => setZoom(DEFAULT_ZOOM)}
+                            className="px-2.5 py-1 text-[11px] font-medium rounded-lg text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white hover:bg-[#ebebed] dark:hover:bg-[#2e2e2e] transition-colors cursor-pointer flex items-center gap-1.5 border border-transparent hover:border-[#dedee2] dark:hover:border-[#383838]"
+                            title="Reset font size to default (100%)"
+                          >
+                            <RotateCcw className="w-3 h-3" />
+                            <span>Reset</span>
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
