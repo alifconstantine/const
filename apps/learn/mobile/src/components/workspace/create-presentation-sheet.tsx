@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState } from "react";
 import {
   X,
   Presentation,
@@ -23,26 +23,20 @@ export interface CreatePresentationSheetProps {
   }) => void;
 }
 
-const getProviders = (t: (key: any) => string) => [
+const PROVIDERS = [
   {
     id: "native" as const,
     name: "Const Native",
-    tagline: t("constNativeTagline"),
-    badge: t("recommended"),
     logoId: null,
   },
   {
     id: "canva" as const,
-    name: "Canva MCP",
-    tagline: t("canvaMcpTagline"),
-    badge: "Canva AI",
+    name: "Canva",
     logoId: "canva",
   },
   {
     id: "slides" as const,
-    name: "Google Slides",
-    tagline: t("googleSlidesTagline"),
-    badge: "Google Suite",
+    name: "Slides",
     logoId: "google-slides",
   },
 ];
@@ -54,7 +48,6 @@ export function CreatePresentationSheet({
   onGenerate,
 }: CreatePresentationSheetProps) {
   const { t } = useI18n();
-  const providers = useMemo(() => getProviders(t), [t]);
 
   const [provider, setProvider] = useState<"native" | "canva" | "slides">("native");
   const [lengthMode, setLengthMode] = useState<"short" | "medium" | "long" | "auto">("auto");
@@ -205,61 +198,35 @@ export function CreatePresentationSheet({
             )}
           </div>
 
-          {/* Section 2: Presentation Engine (Native, Canva, Google Slides) */}
+          {/* Section 2: Presentation Engine (Native, Canva, Slides) */}
           <div className="space-y-1.5">
             <label className="text-[11.5px] font-medium text-[#999999]">
               {t("presentationEngine")}
             </label>
-            <div className="grid grid-cols-1 gap-2">
-              {providers.map((p) => {
+            <div className="grid grid-cols-3 gap-2">
+              {PROVIDERS.map((p) => {
                 const isSelected = provider === p.id;
                 return (
-                  <div
+                  <button
                     key={p.id}
+                    type="button"
                     onClick={() => setProvider(p.id)}
                     className={cn(
-                      "p-3 rounded-xl border flex items-center gap-3 cursor-pointer transition-all",
+                      "px-2.5 py-2.5 rounded-xl border text-left flex items-center justify-center gap-2 cursor-pointer transition-all",
                       isSelected
                         ? "bg-[#252525] border-white/40 shadow-sm text-white"
-                        : "bg-[#181818] border-[#262626] hover:bg-[#1e1e1e] text-[#888888]"
+                        : "bg-[#1f1f1f] border-[#2c2c2c] hover:border-[#383838] opacity-80 hover:opacity-100 text-[#888888]"
                     )}
                   >
-                    <div
-                      className={cn(
-                        "h-8 w-8 rounded-lg flex items-center justify-center shrink-0",
-                        isSelected ? "bg-[#2c2c2c]" : "bg-[#202020]"
-                      )}
-                    >
-                      {p.logoId ? (
-                        <BrandLogo id={p.logoId} size="xs" className="w-5 h-5 rounded-md p-0.5 border-0 shadow-none bg-transparent" />
-                      ) : (
-                        <Presentation className="h-4 w-4 text-white" />
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-xs font-semibold text-white">
-                          {p.name}
-                        </span>
-                        <span className="text-[9px] font-sans px-1.5 py-0.2 rounded-full bg-white/5 border border-white/10 text-[#888888]">
-                          {p.badge}
-                        </span>
-                      </div>
-                      <p className="text-[10px] text-[#888888] truncate mt-0.5">
-                        {p.tagline}
-                      </p>
-                    </div>
-                    <div
-                      className={cn(
-                        "h-4 w-4 rounded-full border flex items-center justify-center shrink-0 transition-colors",
-                        isSelected
-                          ? "border-white bg-white text-black"
-                          : "border-[#444449] bg-transparent"
-                      )}
-                    >
-                      {isSelected && <div className="w-1.5 h-1.5 rounded-full bg-black" />}
-                    </div>
-                  </div>
+                    {p.logoId ? (
+                      <BrandLogo id={p.logoId} size="xs" className="w-5 h-5 rounded-md p-0.5 border-0 shadow-none bg-transparent shrink-0" />
+                    ) : (
+                      <Presentation className="h-4 w-4 text-white shrink-0" />
+                    )}
+                    <span className="text-xs font-semibold text-white truncate">
+                      {p.name}
+                    </span>
+                  </button>
                 );
               })}
             </div>

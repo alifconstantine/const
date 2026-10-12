@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import {
   X,
   Check,
@@ -24,26 +24,20 @@ export interface CreatePresentationDialogProps {
   }) => void;
 }
 
-const getProviders = (t: (key: any) => string) => [
+const PROVIDERS = [
   {
     id: "native" as const,
     name: "Const Native",
-    tagline: t("constNativeTagline"),
-    badge: t("recommended"),
     logoId: null,
   },
   {
     id: "canva" as const,
-    name: "Canva MCP",
-    tagline: t("canvaMcpTagline"),
-    badge: "Canva AI",
+    name: "Canva",
     logoId: "canva",
   },
   {
     id: "slides" as const,
-    name: "Google Slides",
-    tagline: t("googleSlidesTagline"),
-    badge: "Google Suite",
+    name: "Slides",
     logoId: "google-slides",
   },
 ];
@@ -55,7 +49,6 @@ export function CreatePresentationDialog({
   onGenerate,
 }: CreatePresentationDialogProps) {
   const { t } = useI18n();
-  const providers = useMemo(() => getProviders(t), [t]);
 
   // Sources selection
   const [selectedSourceIds, setSelectedSourceIds] = useState<string[]>([]);
@@ -246,8 +239,8 @@ export function CreatePresentationDialog({
                 <label className="text-[11.5px] font-medium text-[#999999]">
                   {t("presentationEngine")}
                 </label>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                  {providers.map((p) => {
+                <div className="grid grid-cols-3 gap-2.5">
+                  {PROVIDERS.map((p) => {
                     const isSelected = provider === p.id;
                     return (
                       <button
@@ -255,34 +248,18 @@ export function CreatePresentationDialog({
                         type="button"
                         onClick={() => setProvider(p.id)}
                         className={cn(
-                          "p-3 rounded-xl border text-left flex flex-col justify-between transition-all cursor-pointer relative overflow-hidden",
+                          "px-3.5 py-2.5 rounded-xl border text-left flex items-center gap-2.5 transition-all cursor-pointer",
                           isSelected
                             ? "bg-[#252525] border-white/40 shadow-lg text-white"
                             : "bg-[#1f1f1f] border-[#2c2c2c] hover:border-[#383838] opacity-80 hover:opacity-100 text-[#888888]"
                         )}
                       >
-                        <div>
-                          <div className="flex items-center justify-between mb-2">
-                            {p.logoId ? (
-                              <BrandLogo id={p.logoId} size="xs" className="w-5 h-5 rounded-md p-0.5 border-0 shadow-none bg-transparent" />
-                            ) : (
-                              <Presentation className="h-4 w-4 text-white" />
-                            )}
-                            <span className="text-[9px] font-sans uppercase px-1.5 py-0.5 rounded bg-[#2e2e2e] text-[#aaa]">
-                              {p.badge}
-                            </span>
-                          </div>
-                          <div className="text-xs font-semibold text-white mb-1">{p.name}</div>
-                          <div className="text-[10.5px] text-[#888] leading-tight line-clamp-2">
-                            {p.tagline}
-                          </div>
-                        </div>
-
-                        {isSelected && (
-                          <div className="absolute top-2.5 right-2.5">
-                            <div className="h-1.5 w-1.5 rounded-full bg-white animate-pulse" />
-                          </div>
+                        {p.logoId ? (
+                          <BrandLogo id={p.logoId} size="xs" className="w-5 h-5 rounded-md p-0.5 border-0 shadow-none bg-transparent shrink-0" />
+                        ) : (
+                          <Presentation className="h-4 w-4 text-white shrink-0" />
                         )}
+                        <span className="text-xs font-semibold text-white truncate">{p.name}</span>
                       </button>
                     );
                   })}
