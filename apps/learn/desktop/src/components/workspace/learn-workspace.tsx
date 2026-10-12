@@ -260,7 +260,7 @@ export function LearnWorkspace({
         setActiveRightPaneTabId("review");
       }
     } else if (type === "browser") {
-      handleOpenBrowser();
+      handleOpenBrowser(undefined, { newTab: true });
     } else if (type === "file_preview") {
       const previewTab: RightPaneTab = {
         id: `preview_${Date.now()}`,
@@ -473,7 +473,10 @@ export function LearnWorkspace({
     setStudioWidth(defaults.studio);
   };
 
-  const handleOpenBrowser = (initialUrl?: string) => {
+  const handleOpenBrowser = (
+    initialUrl?: string,
+    options?: { tabId?: string; newTab?: boolean }
+  ) => {
     setIsStudioCollapsed(false);
     setRightPaneMode("preview");
     setIsOpeningNewTab(false);
@@ -484,22 +487,48 @@ export function LearnWorkspace({
         ? initialUrl.trim()
         : defaultUrl;
 
-    const existingBrowser = rightPaneTabs.find((t) => t.type === "browser");
-    if (existingBrowser) {
-      if (initialUrl && initialUrl !== existingBrowser.url) {
-        handleUpdateTab(existingBrowser.id, { url: resolvedUrl });
+    setRightPaneTabs((prev) => {
+      const browserTabs = prev.filter((t) => t.type === "browser");
+      let targetTab: RightPaneTab | undefined;
+
+      if (!options?.newTab) {
+        if (options?.tabId) {
+          targetTab = browserTabs.find((t) => t.id === options.tabId);
+        }
+        if (!targetTab && activeRightPaneTabId) {
+          targetTab = browserTabs.find((t) => t.id === activeRightPaneTabId);
+        }
+        if (!targetTab && browserTabs.length > 0) {
+          // Default to the last (most recently opened) browser tab
+          targetTab = browserTabs[browserTabs.length - 1];
+        }
       }
-      setActiveRightPaneTabId(existingBrowser.id);
-    } else {
+
+      if (targetTab) {
+        const nextId = targetTab.id;
+        setActiveRightPaneTabId(nextId);
+        window.electron?.browser?.setActiveTab(nextId).catch(() => {});
+        if (initialUrl && resolvedUrl !== targetTab.url) {
+          return prev.map((t) =>
+            t.id === nextId ? { ...t, url: resolvedUrl } : t
+          );
+        }
+        return prev;
+      }
+
+      const newId =
+        options?.tabId ||
+        `browser_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`;
       const browserTab: RightPaneTab = {
-        id: `browser_${Date.now()}`,
+        id: newId,
         type: "browser",
         title: t("webBrowser"),
         url: resolvedUrl,
       };
-      setRightPaneTabs((prev) => [...prev, browserTab]);
-      setActiveRightPaneTabId(browserTab.id);
-    }
+      setActiveRightPaneTabId(newId);
+      window.electron?.browser?.setActiveTab(newId).catch(() => {});
+      return [...prev, browserTab];
+    });
 
     // Sesuaikan lebar studio/preview agar browser lebih luas dan nyaman (memicu isLayoutModified & tombol refresh di heading)
     const responsiveDefaults = getResponsiveWidths();
@@ -519,6 +548,36 @@ export function LearnWorkspace({
       setIsManualWidth(true);
     }
   };
+
+  // Sync active browser tab selection with main process BrowserController
+  useEffect(() => {
+    if (!activeRightPaneTabId) return;
+    const activeTab = rightPaneTabs.find((t) => t.id === activeRightPaneTabId);
+    if (activeTab?.type === "browser") {
+      window.electron?.browser?.setActiveTab(activeTab.id).catch(() => {});
+    }
+  }, [activeRightPaneTabId, rightPaneTabs]);
+
+  // Listen for AI BrowserController requests to auto-open or focus a browser tab
+  useEffect(() => {
+    const browserApi = window.electron?.browser;
+    if (!browserApi?.onOpenTabRequest) return;
+    const unsub = browserApi.onOpenTabRequest((payload) => {
+      if (typeof payload === "string") {
+        handleOpenBrowser(payload);
+      } else if (payload && typeof payload === "object") {
+        handleOpenBrowser(payload.url, {
+          tabId: payload.tabId,
+          newTab: payload.newTab,
+        });
+      } else {
+        handleOpenBrowser();
+      }
+    });
+    return () => {
+      unsub();
+    };
+  }, [activeRightPaneTabId, studioWidth]);
 
   const existingSourceUrls = useMemo(() => {
     const urls = new Set<string>();
@@ -588,7 +647,7 @@ export function LearnWorkspace({
     return () => {
       unsubscribe?.();
     };
-  }, []);
+  }, [activeRightPaneTabId, studioWidth]);
 
   const handleOpenStudioArtifact = (art: LocalArtifact) => {
     setIsStudioCollapsed(false);

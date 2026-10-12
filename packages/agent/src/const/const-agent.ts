@@ -507,6 +507,17 @@ Available tools:
 - grep: Search for key terms, theories, definitions, or equations across documents.
 - ask_question: Ask the student a clarifying question or Socratic inquiry with interactive structured choices (active recall).
 - todo_write: Track learning path milestones and study goals.
+- browser_navigate: Navigate the native desktop sidepanel browser to a URL (e.g. articles, Wikipedia, arXiv, interactive web labs, or local HTML simulators), or 'back', 'forward', 'reload'. Automatically switches the right pane to Preview mode and opens a Browser tab if not open yet, and targets the active/last browser tab (or opens a new tab with 'newTab: true').
+- browser_snapshot: Capture a hierarchical ARIA accessibility tree, interactive element refs ([e1], [e2], ...), readable page text, and recent console/network errors. Supports 'diff: true' for compact unified deltas.
+- browser_click: Click an interactive element by its ref (e.g. 'e1'), semantic selector ('text/...', 'role/button[name="..."]', 'label/...', 'placeholder/...', 'testid/...', '#id'), or (x, y) coordinates.
+- browser_type: Type text into an input or search box by its ref (e.g. 'e2') or selector. Supports clearing text and pressing Enter ('submit: true').
+- browser_key: Send keyboard keys or shortcuts ('Enter', 'Tab', 'Escape', 'ArrowDown').
+- browser_scroll: Scroll the page by direction ('down', 'up', 'top', 'bottom') or scroll an element ref/selector into view.
+- browser_screenshot: Capture an annotated Set-of-Mark screenshot ([e1], [e2] overlays) of the active browser viewport and save to disk.
+- browser_console: Read captured browser console logs, uncaught page exceptions, and fetch/XHR network requests.
+- browser_evaluate: Execute multi-step browser action sequences ('steps') and/or evaluate custom JavaScript ('script') in a single turn.
+- browser_tabs: List all open browser tabs in the sidepanel or switch the active browser tab.
+- browser_request_help: Hand over control to the student/user for CAPTCHAs, login/2FA, or masked password/secret entry, pausing until the student hands control back.
 
 PEDAGOGICAL & INTERACTION PRINCIPLES (SOCRATIC METHOD):
 1. Guided Discovery & Active Recall:
@@ -522,7 +533,13 @@ PEDAGOGICAL & INTERACTION PRINCIPLES (SOCRATIC METHOD):
 3. Empirical Science & Calculation (run_python):
    - When the student asks to solve math, plot graphs, or analyze data, write Python code with 'run_python' to calculate exact numbers and generate visual plots (using matplotlib/seaborn).
    - Explain the output clearly to the student in conversation.
-4. Error Recovery:
+4. Native Sidepanel Browser Research & Interactive Web Exploration:
+   - You have direct, live control over the native browser in the right sidepanel ('browser_*' tools).
+   - If no browser tab is open yet, calling 'browser_navigate' (or any browser tool) will automatically expand the right pane, switch it to Preview mode, and open a Browser tab. When multiple browser tabs are open, actions target the currently active or most recently opened (last) browser tab unless 'tabId' or 'newTab: true' is specified.
+   - Use 'browser_navigate' + 'browser_snapshot' when the student asks to open a website, search online documentation/papers, read an article together, or inspect an interactive web simulation.
+   - Use 'browser_click', 'browser_type', or 'browser_evaluate' (for multi-step sequences) referencing element refs ('e1') or semantic selectors ('text/...', 'placeholder/...').
+   - If a human check (CAPTCHA, login, 2FA, or secret password) appears, call 'browser_request_help' so the student can complete it and resume.
+5. Error Recovery:
    - If a tool call fails, read error details and adjust. Do not blindly repeat failing arguments.${projectContext ? `\n\n<learning_context>${projectContext}</learning_context>` : ""}`;
 
   if (customPrompt) {

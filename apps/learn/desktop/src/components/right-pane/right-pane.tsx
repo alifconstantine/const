@@ -98,6 +98,14 @@ export interface RightPaneProps {
   onExplainInChat?: (prompt: string) => void;
   onAddSourceFromBrowser?: (params: AddSourceFromBrowserParams) => Promise<any> | void;
   existingSourceUrls?: Set<string>;
+  onSelectElementForChat?: (info: {
+    tag: string;
+    id?: string;
+    className?: string;
+    text?: string;
+    url?: string;
+    selector?: string;
+  }) => void;
 }
 
 export function RightPane({
@@ -134,6 +142,7 @@ export function RightPane({
   onExplainInChat,
   onAddSourceFromBrowser,
   existingSourceUrls,
+  onSelectElementForChat,
 }: RightPaneProps) {
   const { t } = useI18n();
 
@@ -213,6 +222,18 @@ export function RightPane({
           onUpdateTab={onUpdateTab}
           onAddSource={onAddSourceFromBrowser}
           existingSourceUrls={existingSourceUrls}
+          onSelectElementForChat={(info) => {
+            if (onSelectElementForChat) {
+              onSelectElementForChat(info);
+            } else if (onExplainInChat) {
+              const idPart = info.id ? `#${info.id}` : "";
+              const classPart = info.className
+                ? `.${info.className.split(/\s+/).slice(0, 2).join(".")}`
+                : "";
+              const snippet = `[Browser Element: <${info.tag}${idPart}${classPart}>${info.text ? ` "${info.text}"` : ""}${info.url ? ` on ${info.url}` : ""}] `;
+              onExplainInChat(snippet);
+            }
+          }}
         />
       );
     }
@@ -951,9 +972,10 @@ export function RightPane({
           <div
             className={cn(
               "flex-1 w-full h-full min-h-0 flex flex-col overflow-hidden bg-background animate-in fade-in duration-200",
-              mode === "preview" ? "flex" : "hidden"
+              mode === "preview"
+                ? "flex"
+                : "invisible pointer-events-none absolute inset-0 -z-10"
             )}
-            style={{ display: mode === "preview" ? "flex" : "none" }}
           >
             {/* Harness Tab Header with +, Search Dropdown, Drag & Drop */}
             <TabHeader
@@ -980,14 +1002,25 @@ export function RightPane({
 
               {tabs.map((tab) => {
                 const isTabActive = !isOpeningNewTab && tab.id === activeTabId;
+                const keepLayoutWhenHidden = tab.type === "browser";
                 return (
                   <div
                     key={tab.id}
                     className={cn(
                       "w-full h-full min-h-0",
-                      isTabActive ? "flex flex-col flex-1" : "hidden"
+                      isTabActive
+                        ? "flex flex-col flex-1"
+                        : keepLayoutWhenHidden
+                        ? "flex flex-col flex-1 invisible pointer-events-none absolute inset-0 -z-10"
+                        : "hidden"
                     )}
-                    style={{ display: isTabActive ? "flex" : "none" }}
+                    style={
+                      isTabActive
+                        ? { display: "flex" }
+                        : keepLayoutWhenHidden
+                        ? { display: "flex", visibility: "hidden" }
+                        : { display: "none" }
+                    }
                   >
                     {renderTabContent(tab)}
                   </div>

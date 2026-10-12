@@ -1967,6 +1967,7 @@ export const CONST_LEARN_TOOLS: NativeToolDefinition[] = [
       },
     },
   },
+  ...NATIVE_BROWSER_TOOLS,
 ];
 
 // ---------------------------------------------------------------------------

@@ -387,6 +387,16 @@ export function ExecutionTrace({
                 );
               }
 
+              // G2. Native Browser Automation (browser_navigate, browser_snapshot, browser_click, etc.)
+              if (norm.startsWith("browser")) {
+                return (
+                  <BrowserToolCard
+                    key={step.id || `browser_${idx}`}
+                    tool={step}
+                  />
+                );
+              }
+
               // H. Generic fallback
               return <GenericToolItem key={step.id || `other_${idx}`} tool={step} />;
             }
@@ -758,6 +768,97 @@ function WebFetchCard({ tool }: { tool: TraceStep | DisplayToolCall }) {
               <pre className="whitespace-pre-wrap">
                 {typeof tool.result === "string"
                   ? tool.result.slice(0, 1500)
+                  : JSON.stringify(tool.result, null, 2)}
+              </pre>
+            </ScrollArea>
+          </div>
+        </SmoothCollapse>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 3c. Native Browser Automation Card: "Navigated to ...", "Captured ARIA snapshot", etc.
+// ---------------------------------------------------------------------------
+function BrowserToolCard({ tool }: { tool: TraceStep | DisplayToolCall }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const norm = (tool.name || "").toLowerCase().replace(/[-_]/g, "");
+  const args = typeof tool.args === "object" && tool.args ? tool.args : {};
+
+  let actionLabel = "Browser action";
+  let detailLabel = "";
+
+  if (norm === "browsernavigate") {
+    actionLabel = "Navigated browser";
+    detailLabel = args.url || "";
+  } else if (norm === "browsersnapshot") {
+    actionLabel = args.diff ? "Captured ARIA diff" : "Captured ARIA snapshot";
+    detailLabel = args.selector || "";
+  } else if (norm === "browserclick") {
+    actionLabel = "Clicked element";
+    detailLabel = args.ref ? `[${args.ref}]` : args.selector || (args.x !== undefined ? `(${args.x}, ${args.y})` : "");
+  } else if (norm === "browsertype") {
+    actionLabel = "Typed into";
+    detailLabel = `${args.ref ? `[${args.ref}]` : args.selector || "input"}${args.text ? ` "${String(args.text).slice(0, 36)}"` : ""}`;
+  } else if (norm === "browserkey") {
+    actionLabel = "Pressed key";
+    detailLabel = args.key || "";
+  } else if (norm === "browserscroll") {
+    actionLabel = "Scrolled page";
+    detailLabel = args.ref ? `[${args.ref}]` : args.direction || "down";
+  } else if (norm === "browserscreenshot") {
+    actionLabel = "Captured Set-of-Mark screenshot";
+    detailLabel = args.annotate === false ? "(clean)" : "(annotated)";
+  } else if (norm === "browserconsole") {
+    actionLabel = "Inspected browser console & network";
+    detailLabel = args.level || "";
+  } else if (norm === "browserevaluate") {
+    actionLabel = Array.isArray(args.steps)
+      ? `Executed ${args.steps.length} browser steps`
+      : "Evaluated script in browser";
+  } else if (norm === "browsertabs") {
+    actionLabel = args.action === "switch" ? "Switched browser tab" : "Listed browser tabs";
+    detailLabel = args.tabId || "";
+  } else if (norm === "browserrequesthelp") {
+    actionLabel = "Requested human assistance";
+    detailLabel = args.reason || args.secretWanted || "";
+  }
+
+  const hasResult = Boolean(tool.result);
+
+  return (
+    <div className="w-full min-w-0 flex flex-col my-0.5">
+      <div
+        onClick={() => hasResult && setIsOpen((prev) => !prev)}
+        className={`flex items-center gap-2 py-1 px-1.5 rounded-md hover:bg-muted text-[13px] text-muted-foreground min-w-0 select-none ${
+          hasResult ? "cursor-pointer" : ""
+        }`}
+      >
+        <Globe className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+        <span className="shrink-0">{actionLabel}</span>
+        {detailLabel && (
+          <span className="text-foreground font-medium truncate">
+            {detailLabel}
+          </span>
+        )}
+        <div className="ml-auto flex items-center gap-1.5 shrink-0">
+          {hasResult && (
+            <ChevronDown
+              className="w-3 h-3 text-muted-foreground transition-transform duration-200 ease-out"
+              style={{ transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)" }}
+            />
+          )}
+        </div>
+      </div>
+
+      {hasResult && (
+        <SmoothCollapse isOpen={isOpen}>
+          <div className="mt-1 p-2 rounded-xl bg-secondary/80 border border-border text-xs font-mono select-text">
+            <ScrollArea className="max-h-48 w-full text-[11px] text-muted-foreground">
+              <pre className="whitespace-pre-wrap">
+                {typeof tool.result === "string"
+                  ? tool.result.slice(0, 2000)
                   : JSON.stringify(tool.result, null, 2)}
               </pre>
             </ScrollArea>

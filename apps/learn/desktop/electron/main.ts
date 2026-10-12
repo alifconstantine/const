@@ -10,6 +10,7 @@ import {
   CONST_LEARN_TOOLS,
   COMPOSIO_TOOL_MAP,
   getComposioToolBySlugOrId,
+  registerGlobalBrowserToolHandler,
   type AgentMessage,
   type FileMutationRecord,
   type NativeToolDefinition,
@@ -19,6 +20,11 @@ import {
   stopLoopbackAuthServer,
   registerLinuxProtocolHandler,
 } from "./auth-server.js";
+import { browserController, type ControlState } from "./browser-controller.js";
+
+registerGlobalBrowserToolHandler((toolName, args) =>
+  browserController.executeTool(toolName, args)
+);
 
 // Top-level crash guards to prevent unexpected termination or silent app exits
 process.on("uncaughtException", (err) => {
@@ -1427,11 +1433,12 @@ app.on("second-instance", (_event, commandLine) => {
 
       effectiveSystemPrompt =
         (effectiveSystemPrompt || "") +
-        `\n\n[STUDIO & SOURCES INTEGRATION]:` +
-        `\nYou have dedicated educational capabilities to save sources and build interactive studio study materials:` +
+        `\n\n[STUDIO, SOURCES & SIDEPANEL BROWSER INTEGRATION]:` +
+        `\nYou have dedicated educational capabilities to save sources, build interactive studio study materials, and control the native sidepanel browser:` +
         `\n1. 'add_source': Whenever the student asks to save research/notes, or when you synthesize comprehensive knowledge, formulas, or study notes, invoke 'add_source' with type='text' (for notes) or type='url' (for web links). This immediately saves the source to the Sources panel!` +
         `\n2. 'create_studio_artifact': When the student asks to create study materials (e.g. flashcards, quiz, mind map, cheatsheet, report, or slide deck), invoke 'create_studio_artifact' with the complete structured data! The workspace Studio tab will automatically populate with your generated artifact so the user can study it interactively.` +
-        `\n3. 'web_search' & 'web_fetch': Search live web resources and fetch full article contents for deep grounding whenever current facts or references are needed.`;
+        `\n3. 'web_search' & 'web_fetch': Search live web resources and fetch full article contents for deep grounding whenever current facts or references are needed.` +
+        `\n4. Native Sidepanel Browser ('browser_navigate', 'browser_snapshot', 'browser_click', 'browser_type', 'browser_key', 'browser_scroll', 'browser_screenshot', 'browser_console', 'browser_evaluate', 'browser_tabs', 'browser_request_help'): When the student asks to open a webpage in the browser, browse Wikipedia/arXiv/docs together, or interact with a live web app/simulation in the right sidepanel, invoke 'browser_navigate' (which automatically expands the right pane into Preview mode and opens/targets the active or last Browser tab) followed by 'browser_snapshot' to inspect the ARIA accessibility tree and interactive element refs ([e1], [e2], ...).`;
 
       const agentTools = [...CONST_LEARN_TOOLS, ...activeComposioTools];
 
@@ -1451,6 +1458,7 @@ app.on("second-instance", (_event, commandLine) => {
         initialAllowedTools,
         thinkingLevel: payload.thinkingLevel as any,
         maxOutputTokens: payload.maxOutputTokens ?? (modelDef as any)?.maxOutputTokens,
+        browserHandler: (toolName, args) => browserController.executeTool(toolName, args),
         onAskQuestion: (toolCallId, questionData) => {
           return new Promise((resolve) => {
             pendingQuestions.set(toolCallId, resolve);
@@ -2658,6 +2666,103 @@ app.on("second-instance", (_event, commandLine) => {
       }
     }
   );
+
+  // ---------------------------------------------------------------------------
+  // Browser Control IPC Handlers (OpenBot / oh-my-pi architecture)
+  // ---------------------------------------------------------------------------
+  browserController.setCallbacks({
+    onStateChange: (state: ControlState) => {
+      if (win && !win.isDestroyed()) {
+        win.webContents.send("browser:control-changed", state);
+      }
+    },
+    onAiAction: (action: { type: string; details?: any }) => {
+      if (win && !win.isDestroyed()) {
+        win.webContents.send("browser:ai-action", action);
+      }
+    },
+    onTabOpenRequest: async (payload: { url: string; tabId?: string; newTab?: boolean }) => {
+      if (win && !win.isDestroyed()) {
+        win.webContents.send("browser:open-tab-request", payload);
+        return payload.tabId || "browser-tab-default";
+      }
+      return null;
+    },
+  });
+
+  ipcMain.handle(
+    "browser:register-tab",
+    async (_event, payload: { tabId: string; guestContentsId: number }) => {
+      browserController.registerWebview(payload.tabId, payload.guestContentsId);
+      return true;
+    }
+  );
+
+  ipcMain.handle("browser:unregister-tab", async (_event, tabId: string) => {
+    browserController.unregisterWebview(tabId);
+    return true;
+  });
+
+  ipcMain.handle("browser:set-active-tab", async (_event, tabId: string) => {
+    browserController.setActiveTab(tabId);
+    return true;
+  });
+
+  ipcMain.handle("browser:list-tabs", async () => {
+    return browserController.listTabs();
+  });
+
+  ipcMain.handle("browser:get-control", async () => {
+    return browserController.getControl();
+  });
+
+  ipcMain.handle("browser:take-control", async () => {
+    return browserController.takeControl();
+  });
+
+  ipcMain.handle("browser:release-control", async () => {
+    return browserController.releaseControl();
+  });
+
+  ipcMain.handle("browser:supply-secret", async (_event, text: string) => {
+    return await browserController.supplySecret(text);
+  });
+
+  ipcMain.handle("browser:navigate", async (_event, url: string) => {
+    return await browserController.navigate(url);
+  });
+
+  ipcMain.handle("browser:snapshot", async (_event, args?: any) => {
+    return await browserController.snapshot(args);
+  });
+
+  ipcMain.handle("browser:click", async (_event, args: any) => {
+    return await browserController.click(args);
+  });
+
+  ipcMain.handle("browser:type", async (_event, args: any) => {
+    return await browserController.type(args);
+  });
+
+  ipcMain.handle("browser:key", async (_event, args: any) => {
+    return await browserController.key(args);
+  });
+
+  ipcMain.handle("browser:scroll", async (_event, args: any) => {
+    return await browserController.scroll(args);
+  });
+
+  ipcMain.handle("browser:screenshot", async (_event, args?: any) => {
+    return await browserController.screenshot(args);
+  });
+
+  ipcMain.handle("browser:console", async (_event, args?: any) => {
+    return await browserController.readConsoleAndNetwork(args);
+  });
+
+  ipcMain.handle("browser:evaluate", async (_event, args: any) => {
+    return await browserController.evaluate(args);
+  });
 
   app.whenReady().then(() => {
     // Register protocol handler for streaming local video, audio, pdf, and html artifacts

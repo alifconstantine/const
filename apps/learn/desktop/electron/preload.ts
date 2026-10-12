@@ -206,5 +206,44 @@ contextBridge.exposeInMainWorld("electron", {
     checkForUpdates: () => ipcRenderer.invoke("updater:check"),
     quitAndInstall: () => ipcRenderer.send("updater:quit-and-install"),
   },
+  browser: {
+    registerTab: (tabId: string, guestContentsId: number) =>
+      ipcRenderer.invoke("browser:register-tab", { tabId, guestContentsId }),
+    unregisterTab: (tabId: string) =>
+      ipcRenderer.invoke("browser:unregister-tab", tabId),
+    setActiveTab: (tabId: string) =>
+      ipcRenderer.invoke("browser:set-active-tab", tabId),
+    listTabs: () => ipcRenderer.invoke("browser:list-tabs"),
+    getControl: () => ipcRenderer.invoke("browser:get-control"),
+    takeControl: () => ipcRenderer.invoke("browser:take-control"),
+    releaseControl: () => ipcRenderer.invoke("browser:release-control"),
+    supplySecret: (text: string) => ipcRenderer.invoke("browser:supply-secret", text),
+    navigate: (url: string) => ipcRenderer.invoke("browser:navigate", url),
+    snapshot: (args?: any) => ipcRenderer.invoke("browser:snapshot", args),
+    click: (args: any) => ipcRenderer.invoke("browser:click", args),
+    type: (args: any) => ipcRenderer.invoke("browser:type", args),
+    key: (args: any) => ipcRenderer.invoke("browser:key", args),
+    scroll: (args: any) => ipcRenderer.invoke("browser:scroll", args),
+    screenshot: (args?: any) => ipcRenderer.invoke("browser:screenshot", args),
+    console: (args?: any) => ipcRenderer.invoke("browser:console", args),
+    evaluate: (args: any) => ipcRenderer.invoke("browser:evaluate", args),
+    onControlChanged: (callback: (state: any) => void) => {
+      const handler = (_event: any, state: any) => callback(state);
+      ipcRenderer.on("browser:control-changed", handler);
+      return () => ipcRenderer.removeListener("browser:control-changed", handler);
+    },
+    onAiAction: (callback: (action: any) => void) => {
+      const handler = (_event: any, action: any) => callback(action);
+      ipcRenderer.on("browser:ai-action", handler);
+      return () => ipcRenderer.removeListener("browser:ai-action", handler);
+    },
+    onOpenTabRequest: (
+      callback: (payload: { url: string; tabId?: string; newTab?: boolean } | string) => void
+    ) => {
+      const handler = (_event: any, payload: any) => callback(payload);
+      ipcRenderer.on("browser:open-tab-request", handler);
+      return () => ipcRenderer.removeListener("browser:open-tab-request", handler);
+    },
+  },
 });
 

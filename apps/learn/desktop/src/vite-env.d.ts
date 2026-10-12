@@ -193,6 +193,50 @@ declare global {
         checkForUpdates?: () => Promise<{ hasUpdate: boolean; version?: string }>;
         quitAndInstall?: () => void;
       };
+      browser?: {
+        registerTab: (tabId: string, guestContentsId: number) => Promise<boolean>;
+        unregisterTab: (tabId: string) => Promise<boolean>;
+        setActiveTab: (tabId: string) => Promise<boolean>;
+        listTabs: () => Promise<
+          Array<{
+            tabId: string;
+            guestContentsId: number;
+            url: string;
+            title: string;
+            isActive: boolean;
+            isLast: boolean;
+            registeredAt: number;
+            lastUsedAt: number;
+          }>
+        >;
+        getControl: () => Promise<{
+          holder: "bot" | "human";
+          since: string;
+          requested: boolean;
+          requestedAt?: string;
+          reason?: string;
+          secretWanted?: string;
+          secretRef?: string;
+          secretSnapshotId?: number;
+        }>;
+        takeControl: () => Promise<any>;
+        releaseControl: () => Promise<any>;
+        supplySecret: (text: string) => Promise<{ success: boolean; characters: number }>;
+        navigate: (url: string) => Promise<any>;
+        snapshot: (args?: any) => Promise<any>;
+        click: (args: any) => Promise<any>;
+        type: (args: any) => Promise<any>;
+        key: (args: any) => Promise<any>;
+        scroll: (args: any) => Promise<any>;
+        screenshot: (args?: any) => Promise<any>;
+        console: (args?: any) => Promise<any>;
+        evaluate: (args: any) => Promise<any>;
+        onControlChanged: (callback: (state: any) => void) => () => void;
+        onAiAction: (callback: (action: any) => void) => () => void;
+        onOpenTabRequest: (
+          callback: (payload: { url: string; tabId?: string; newTab?: boolean } | string) => void
+        ) => () => void;
+      };
     };
   }
 }

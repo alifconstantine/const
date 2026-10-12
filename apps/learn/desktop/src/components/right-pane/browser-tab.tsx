@@ -19,6 +19,10 @@ import {
   VolumeX,
   PlusCircle,
   CheckCircle2,
+  Bot,
+  Hand,
+  KeyRound,
+  Sparkles,
 } from "lucide-react";
 import type { RightPaneTab, AddSourceFromBrowserParams } from "./types";
 import { useI18n } from "../../lib/i18n";
@@ -28,6 +32,14 @@ export interface BrowserTabProps {
   onUpdateTab?: (tabId: string, updates: Partial<RightPaneTab>) => void;
   onAddSource?: (params: AddSourceFromBrowserParams) => Promise<any> | void;
   existingSourceUrls?: Set<string>;
+  onSelectElementForChat?: (info: {
+    tag: string;
+    id?: string;
+    className?: string;
+    text?: string;
+    url?: string;
+    selector?: string;
+  }) => void;
 }
 
 type ResponsivePreset = "responsive" | "mobile" | "mobile-lg" | "tablet" | "desktop";
@@ -80,6 +92,7 @@ export function BrowserTab({
   onUpdateTab,
   onAddSource,
   existingSourceUrls,
+  onSelectElementForChat,
 }: BrowserTabProps) {
   const { t, language } = useI18n();
   const rawInitial =
@@ -111,6 +124,25 @@ export function BrowserTab({
   // Zoom controls
   const [zoomLevel, setZoomLevel] = useState<number>(100);
 
+  // AI / Human Control State (OpenBot / oh-my-pi architecture)
+  const [controlState, setControlState] = useState<{
+    holder: "bot" | "human";
+    since: string;
+    requested: boolean;
+    reason?: string;
+    secretWanted?: string;
+  }>({
+    holder: "bot",
+    since: new Date().toISOString(),
+    requested: false,
+  });
+  const [secretInput, setSecretInput] = useState<string>("");
+  const [isSubmittingSecret, setIsSubmittingSecret] = useState<boolean>(false);
+
+  // Element Picker ("Select Element for Chat") state
+  const [isPickerActive, setIsPickerActive] = useState<boolean>(false);
+  const pickerTokenRef = useRef<string>("");
+
   const webviewRef = useRef<any>(null);
 
   // Check if current URL is already added to notebook sources
@@ -119,6 +151,147 @@ export function BrowserTab({
     existingSourceUrls &&
     existingSourceUrls.has(currentUrl.trim().replace(/\/$/, "").toLowerCase())
   );
+
+  // Subscribe to AI Control state updates from main process
+  useEffect(() => {
+    const browserApi = window.electron?.browser;
+    if (!browserApi) return;
+
+    browserApi.getControl().then((state) => {
+      if (state) setControlState(state);
+    }).catch(() => {});
+
+    const unsubControl = browserApi.onControlChanged((state) => {
+      if (state) setControlState(state);
+    });
+
+    return () => {
+      unsubControl();
+    };
+  }, []);
+
+  const handleToggleControl = async () => {
+    const browserApi = window.electron?.browser;
+    if (!browserApi) return;
+    if (controlState.holder === "bot") {
+      const next = await browserApi.takeControl();
+      if (next) setControlState(next);
+    } else {
+      const next = await browserApi.releaseControl();
+      if (next) setControlState(next);
+    }
+  };
+
+  const handleSupplySecret = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!secretInput.trim() || isSubmittingSecret) return;
+    const browserApi = window.electron?.browser;
+    if (!browserApi) return;
+    setIsSubmittingSecret(true);
+    try {
+      await browserApi.supplySecret(secretInput);
+      setSecretInput("");
+    } catch (err) {
+      console.error("Failed to supply secret:", err);
+    } finally {
+      setIsSubmittingSecret(false);
+    }
+  };
+
+  const handleToggleElementPicker = async () => {
+    const webview = webviewRef.current;
+    if (!webview) return;
+
+    if (isPickerActive) {
+      setIsPickerActive(false);
+      pickerTokenRef.current = "";
+      try {
+        await webview.executeJavaScript(`
+          if (window.__constCleanupElementPicker) {
+            window.__constCleanupElementPicker();
+          }
+        `);
+      } catch {}
+      return;
+    }
+
+    const token = Math.random().toString(36).slice(2) + Date.now().toString(36);
+    pickerTokenRef.current = token;
+    setIsPickerActive(true);
+    try {
+      await webview.executeJavaScript(`
+        (function() {
+          if (window.__constCleanupElementPicker) {
+            window.__constCleanupElementPicker();
+          }
+          const token = ${JSON.stringify(token)};
+          const overlay = document.createElement('div');
+          overlay.id = '__const_picker_overlay';
+          overlay.style.cssText = 'position:fixed;pointer-events:none;z-index:2147483647;border:2px solid #10b981;background:rgba(16,185,129,0.12);border-radius:4px;transition:all 0.05s ease;display:none;';
+          const badge = document.createElement('div');
+          badge.style.cssText = 'position:absolute;top:-22px;left:0;background:#10b981;color:#09090b;font-family:monospace;font-size:10px;font-weight:700;padding:2px 6px;border-radius:3px;white-space:nowrap;';
+          overlay.appendChild(badge);
+          document.body.appendChild(overlay);
+
+          function onMove(e) {
+            const el = document.elementFromPoint(e.clientX, e.clientY);
+            if (!el || el === overlay || el === document.body || el === document.documentElement) {
+              overlay.style.display = 'none';
+              return;
+            }
+            const r = el.getBoundingClientRect();
+            overlay.style.display = 'block';
+            overlay.style.left = r.left + 'px';
+            overlay.style.top = r.top + 'px';
+            overlay.style.width = r.width + 'px';
+            overlay.style.height = r.height + 'px';
+            const idPart = el.id ? '#' + el.id : '';
+            badge.textContent = el.tagName.toLowerCase() + idPart;
+          }
+
+          function onClick(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            const el = document.elementFromPoint(e.clientX, e.clientY);
+            if (el) {
+              const info = {
+                tag: el.tagName.toLowerCase(),
+                id: el.id || undefined,
+                className: typeof el.className === 'string' ? el.className.trim().slice(0, 120) : undefined,
+                text: (el.innerText || el.textContent || '').trim().replace(/\\s+/g, ' ').slice(0, 200),
+                url: window.location.href,
+                selector: el.id ? '#' + el.id : el.tagName.toLowerCase()
+              };
+              console.log('__CONST_PICKED_ELEMENT__:' + token + ':' + JSON.stringify(info));
+            }
+            cleanup();
+          }
+
+          function onKeyDown(e) {
+            if (e.key === 'Escape') {
+              console.log('__CONST_PICKED_CANCEL__:' + token);
+              cleanup();
+            }
+          }
+
+          function cleanup() {
+            window.removeEventListener('mousemove', onMove, true);
+            window.removeEventListener('click', onClick, true);
+            window.removeEventListener('keydown', onKeyDown, true);
+            overlay.remove();
+            delete window.__constCleanupElementPicker;
+          }
+
+          window.__constCleanupElementPicker = cleanup;
+          window.addEventListener('mousemove', onMove, true);
+          window.addEventListener('click', onClick, true);
+          window.addEventListener('keydown', onKeyDown, true);
+        })();
+      `);
+    } catch (err) {
+      setIsPickerActive(false);
+    }
+  };
 
   // Sync mute with tab.isMuted
   useEffect(() => {
@@ -333,10 +506,42 @@ export function BrowserTab({
     }
   };
 
-  // Wire up webview native events
+  // Wire up webview native events + AI BrowserController registration
   useEffect(() => {
     const webview = webviewRef.current;
     if (!webview) return;
+
+    const registerWithController = () => {
+      try {
+        const id = webview.getWebContentsId?.();
+        if (typeof id === "number" && window.electron?.browser) {
+          window.electron.browser.registerTab(tab.id, id).catch(() => {});
+        }
+      } catch {}
+    };
+
+    const handleDomReady = () => {
+      registerWithController();
+    };
+
+    const handleConsoleMessage = (e: any) => {
+      const msg: string = e.message || "";
+      const activeToken = pickerTokenRef.current;
+      if (!activeToken) return;
+      const pickedPrefix = `__CONST_PICKED_ELEMENT__:${activeToken}:`;
+      const cancelPrefix = `__CONST_PICKED_CANCEL__:${activeToken}`;
+      if (msg.startsWith(pickedPrefix)) {
+        setIsPickerActive(false);
+        pickerTokenRef.current = "";
+        try {
+          const json = JSON.parse(msg.slice(pickedPrefix.length));
+          onSelectElementForChat?.(json);
+        } catch {}
+      } else if (msg.startsWith(cancelPrefix)) {
+        setIsPickerActive(false);
+        pickerTokenRef.current = "";
+      }
+    };
 
     const handleDidStartLoading = () => {
       setIsLoading(true);
@@ -345,6 +550,7 @@ export function BrowserTab({
 
     const handleDidStopLoading = () => {
       setIsLoading(false);
+      registerWithController();
       try {
         setCanGoBack(webview.canGoBack());
         setCanGoForward(webview.canGoForward());
@@ -416,6 +622,8 @@ export function BrowserTab({
       onUpdateTab?.(tab.id, { isAudible });
     };
 
+    webview.addEventListener("dom-ready", handleDomReady);
+    webview.addEventListener("console-message", handleConsoleMessage);
     webview.addEventListener("did-start-loading", handleDidStartLoading);
     webview.addEventListener("did-stop-loading", handleDidStopLoading);
     webview.addEventListener("did-navigate", handleDidNavigate);
@@ -428,6 +636,9 @@ export function BrowserTab({
     webview.addEventListener("media-paused", handleMediaPaused);
 
     return () => {
+      window.electron?.browser?.unregisterTab(tab.id).catch(() => {});
+      webview.removeEventListener("dom-ready", handleDomReady);
+      webview.removeEventListener("console-message", handleConsoleMessage);
       webview.removeEventListener("did-start-loading", handleDidStartLoading);
       webview.removeEventListener("did-stop-loading", handleDidStopLoading);
       webview.removeEventListener("did-navigate", handleDidNavigate);
@@ -439,7 +650,7 @@ export function BrowserTab({
       webview.removeEventListener("media-started-playing", handleMediaStartedPlaying);
       webview.removeEventListener("media-paused", handleMediaPaused);
     };
-  }, [tab.id, onUpdateTab, currentUrl]);
+  }, [tab.id, onUpdateTab, currentUrl, onSelectElementForChat]);
 
   // Viewport preset style
   const activePresetConfig = RESPONSIVE_PRESETS.find((p) => p.id === selectedPreset);
@@ -521,6 +732,57 @@ export function BrowserTab({
             )}
           </div>
         </form>
+
+        {/* AI / Human Control Status Pill */}
+        <button
+          type="button"
+          onClick={handleToggleControl}
+          className={`h-7 px-2 rounded-md flex items-center gap-1.5 text-[11px] font-medium transition-colors cursor-pointer border shrink-0 ${
+            controlState.holder === "human"
+              ? "bg-amber-500/15 text-amber-500 border-amber-500/30 hover:bg-amber-500/25"
+              : "bg-emerald-500/10 text-emerald-500 border-emerald-500/25 hover:bg-emerald-500/20"
+          }`}
+          title={
+            controlState.holder === "human"
+              ? language === "id"
+                ? "Anda memegang kendali browser — klik untuk kembalikan ke AI"
+                : "You have browser control — click to hand back to AI"
+              : language === "id"
+              ? "AI dapat mengontrol tab ini — klik untuk ambil alih kendali"
+              : "AI can control this browser — click to take manual control"
+          }
+        >
+          {controlState.holder === "human" ? (
+            <>
+              <Hand className="w-3 h-3" />
+              <span className="hidden sm:inline">{language === "id" ? "Anda" : "You Drive"}</span>
+            </>
+          ) : (
+            <>
+              <Bot className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">AI Pilot</span>
+            </>
+          )}
+        </button>
+
+        {/* Element Picker ("Select Element for Chat") */}
+        <button
+          type="button"
+          onClick={handleToggleElementPicker}
+          className={`w-7 h-7 rounded-md flex items-center justify-center transition-colors cursor-pointer border shrink-0 ${
+            isPickerActive
+              ? "bg-emerald-500/20 text-emerald-500 border-emerald-500/40 animate-pulse"
+              : "bg-transparent text-muted-foreground hover:text-foreground hover:bg-muted border-transparent"
+          }`}
+          title={
+            language === "id"
+              ? "Pilih elemen halaman untuk ditanyakan di Chat"
+              : "Pick an element on the page to ask about in Chat"
+          }
+          aria-label="Pick element for Chat"
+        >
+          <Sparkles className="w-3.5 h-3.5" />
+        </button>
 
         {/* Viewport Preset Picker */}
         <div className="relative" ref={sizeMenuRef}>
@@ -718,72 +980,153 @@ export function BrowserTab({
         </div>
       </div>
 
+      {/* 1b. Control State Banners */}
+      {controlState.holder === "human" && !controlState.requested && (
+        <div className="w-full bg-amber-500/10 border-b border-amber-500/20 px-3 py-1.5 flex items-center justify-between gap-2 text-xs text-amber-500 shrink-0 z-10">
+          <div className="flex items-center gap-2 min-w-0">
+            <Hand className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate">
+              {language === "id"
+                ? "Anda memegang kendali — klik dan ketik langsung di halaman"
+                : "You have control — click and type directly in the page"}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={handleToggleControl}
+            className="px-2 py-0.5 rounded bg-amber-500 text-zinc-950 font-medium text-[11px] hover:bg-amber-400 transition-colors cursor-pointer shrink-0"
+          >
+            {language === "id" ? "Kembalikan ke AI" : "Hand back to AI"}
+          </button>
+        </div>
+      )}
+
+      {controlState.requested && !controlState.secretWanted && (
+        <div className="w-full bg-amber-500/15 border-b border-amber-500/30 px-3 py-2 flex items-center justify-between gap-2 text-xs text-amber-500 shrink-0 z-10">
+          <div className="flex items-center gap-2 min-w-0">
+            <Hand className="w-4 h-4 shrink-0 animate-bounce" />
+            <span className="truncate font-medium">
+              {controlState.reason ||
+                (language === "id"
+                  ? "AI membutuhkan bantuan Anda di halaman ini (CAPTCHA / 2FA)"
+                  : "AI needs your help on this page (e.g. CAPTCHA / 2FA)")}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={handleToggleControl}
+            className="px-2.5 py-1 rounded bg-emerald-500 text-zinc-950 font-semibold text-[11px] hover:bg-emerald-400 transition-colors cursor-pointer shrink-0"
+          >
+            {language === "id" ? "Selesai — Lanjutkan AI" : "Done — Resume AI"}
+          </button>
+        </div>
+      )}
+
+      {controlState.secretWanted && (
+        <form
+          onSubmit={handleSupplySecret}
+          className="w-full bg-amber-500/15 border-b border-amber-500/30 px-3 py-2 flex items-center gap-2 text-xs text-amber-500 shrink-0 z-10"
+        >
+          <KeyRound className="w-4 h-4 shrink-0" />
+          <span className="font-medium shrink-0">
+            {controlState.secretWanted}:
+          </span>
+          <input
+            type="password"
+            value={secretInput}
+            onChange={(e) => setSecretInput(e.target.value)}
+            placeholder={
+              language === "id"
+                ? "Ketik rahasia (tidak terlihat oleh AI)..."
+                : "Enter secret (never visible to AI)..."
+            }
+            className="flex-1 bg-background/80 border border-amber-500/30 rounded px-2 py-1 text-xs text-foreground outline-none focus:border-amber-400"
+            autoFocus
+          />
+          <button
+            type="submit"
+            disabled={!secretInput.trim() || isSubmittingSecret}
+            className="px-2.5 py-1 rounded bg-amber-500 text-zinc-950 font-semibold text-[11px] hover:bg-amber-400 transition-colors cursor-pointer disabled:opacity-50 shrink-0"
+          >
+            {isSubmittingSecret
+              ? language === "id"
+                ? "Mengirim..."
+                : "Sending..."
+              : language === "id"
+              ? "Kirim"
+              : "Supply"}
+          </button>
+        </form>
+      )}
+
       {/* 2. Main Body Viewport */}
       <div className="flex-1 w-full h-[calc(100%-40px)] min-h-0 relative overflow-hidden flex flex-col bg-background">
-        {loadError ? (
-          /* Error State */
-          <div className="flex-1 w-full h-full flex flex-col items-center justify-center p-6 text-center max-w-sm mx-auto">
-            <div className="w-12 h-12 rounded-2xl bg-destructive/10 border border-destructive/20 flex items-center justify-center text-destructive mb-3 shadow-2xs">
-              <AlertCircle className="w-6 h-6" />
-            </div>
-            <h3 className="text-sm font-semibold text-foreground mb-1">
-              {loadError.url.includes("localhost") || loadError.url.includes("127.0.0.1")
-                ? language === "id"
-                  ? "Server lokal belum berjalan"
-                  : "Local server not running"
-                : language === "id"
-                ? "Tidak dapat memuat halaman"
-                : "Unable to load page"}
-            </h3>
-            <p className="text-xs text-muted-foreground mb-4 leading-relaxed">
-              {loadError.desc}
-            </p>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={handleReloadOrStop}
-                className="px-3 py-1.5 rounded-lg bg-secondary hover:bg-secondary/80 text-foreground text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5"
-              >
-                <RotateCw className="w-3.5 h-3.5" />
-                <span>{language === "id" ? "Coba Lagi" : "Retry"}</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleNavigate("https://www.google.com")}
-                className="px-3 py-1.5 rounded-lg bg-secondary hover:bg-secondary/80 text-muted-foreground hover:text-foreground text-xs transition-colors cursor-pointer"
-              >
-                {language === "id" ? "Ke Google" : "Go to Google"}
-              </button>
-            </div>
-          </div>
-        ) : (
-          /* Actual Webview Container with optional responsive viewport framing */
-          <div
-            className={`w-full h-full flex-1 min-h-0 relative flex flex-col ${
-              isCustomWidth
-                ? "shadow-2xl border-x border-border bg-background mx-auto"
-                : ""
-            }`}
+        {/* Keep <webview> always mounted so AI BrowserController never loses its guestContentsId */}
+        <div
+          className={`w-full h-full flex-1 min-h-0 relative flex flex-col ${
+            isCustomWidth
+              ? "shadow-2xl border-x border-border bg-background mx-auto"
+              : ""
+          }`}
+          style={{
+            width: isCustomWidth ? `${activePresetConfig.width}px` : "100%",
+            maxWidth: "100%",
+            height: "100%",
+          }}
+        >
+          <webview
+            ref={webviewRef}
+            src={initialUrlRef.current || currentUrl || "https://www.google.com"}
+            partition="persist:const_browser"
+            allowpopups={true}
+            webpreferences="contextIsolation=yes, backgroundThrottling=no, autoplayPolicy=no-user-gesture-required"
+            className="w-full h-full border-none block flex-1"
             style={{
-              width: isCustomWidth ? `${activePresetConfig.width}px` : "100%",
-              maxWidth: "100%",
+              display: "inline-flex",
+              width: "100%",
               height: "100%",
+              flex: "1 1 100%",
             }}
-          >
-            <webview
-              ref={webviewRef}
-              src={initialUrlRef.current || currentUrl || "https://www.google.com"}
-              partition="persist:const_browser"
-              allowpopups={true}
-              webpreferences="contextIsolation=yes, backgroundThrottling=no, autoplayPolicy=no-user-gesture-required"
-              className="w-full h-full border-none block flex-1"
-              style={{
-                display: "inline-flex",
-                width: "100%",
-                height: "100%",
-                flex: "1 1 100%",
-              }}
-            />
+          />
+        </div>
+
+        {loadError && (
+          /* Error State Overlay */
+          <div className="absolute inset-0 z-20 bg-background flex flex-col items-center justify-center p-6 text-center">
+            <div className="max-w-sm mx-auto flex flex-col items-center">
+              <div className="w-12 h-12 rounded-2xl bg-destructive/10 border border-destructive/20 flex items-center justify-center text-destructive mb-3 shadow-2xs">
+                <AlertCircle className="w-6 h-6" />
+              </div>
+              <h3 className="text-sm font-semibold text-foreground mb-1">
+                {loadError.url.includes("localhost") || loadError.url.includes("127.0.0.1")
+                  ? language === "id"
+                    ? "Server lokal belum berjalan"
+                    : "Local server not running"
+                  : language === "id"
+                  ? "Tidak dapat memuat halaman"
+                  : "Unable to load page"}
+              </h3>
+              <p className="text-xs text-muted-foreground mb-4 leading-relaxed">
+                {loadError.desc}
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleReloadOrStop}
+                  className="px-3 py-1.5 rounded-lg bg-secondary hover:bg-secondary/80 text-foreground text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5"
+                >
+                  <RotateCw className="w-3.5 h-3.5" />
+                  <span>{language === "id" ? "Coba Lagi" : "Retry"}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleNavigate("https://www.google.com")}
+                  className="px-3 py-1.5 rounded-lg bg-secondary hover:bg-secondary/80 text-muted-foreground hover:text-foreground text-xs transition-colors cursor-pointer"
+                >
+                  {language === "id" ? "Ke Google" : "Go to Google"}
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>
