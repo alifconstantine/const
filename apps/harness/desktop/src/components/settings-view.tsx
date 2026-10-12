@@ -713,12 +713,12 @@ export function SettingsView({
                         title="Manage models in Model settings"
                       >
                         <Bot className="w-3.5 h-3.5 text-[#737373] dark:text-[#969696]" />
-                        <span className="font-mono">{activeModel}</span>
+                        <span>{activeModel}</span>
                       </button>
                     </div>
 
                     {/* Default Speech */}
-                    <div className="flex items-center justify-between gap-4 pt-2 border-t border-[#dedee2]/60 dark:border-[#383838]/60">
+                    <div className="flex items-center justify-between gap-4">
                       <div className="flex flex-col">
                         <span className="text-[13px] font-medium text-[#262626] dark:text-white">
                           Default Voice AI
@@ -735,14 +735,14 @@ export function SettingsView({
                         title="Manage speech in Model settings"
                       >
                         <Volume2 className="w-3.5 h-3.5 text-[#737373] dark:text-[#969696]" />
-                        <span className="font-mono text-[#737373] dark:text-[#969696]">
+                        <span className="text-[#737373] dark:text-[#969696]">
                           {multiModalConfig.speech.activeModelId || "Not configured"}
                         </span>
                       </button>
                     </div>
 
                     {/* Default Image */}
-                    <div className="flex items-center justify-between gap-4 pt-2 border-t border-[#dedee2]/60 dark:border-[#383838]/60">
+                    <div className="flex items-center justify-between gap-4">
                       <div className="flex flex-col">
                         <span className="text-[13px] font-medium text-[#262626] dark:text-white">
                           Default Image AI
@@ -759,14 +759,14 @@ export function SettingsView({
                         title="Manage images in Model settings"
                       >
                         <ImageIcon className="w-3.5 h-3.5 text-[#737373] dark:text-[#969696]" />
-                        <span className="font-mono text-[#737373] dark:text-[#969696]">
+                        <span className="text-[#737373] dark:text-[#969696]">
                           {multiModalConfig.image.activeModelId || "Not configured"}
                         </span>
                       </button>
                     </div>
 
                     {/* Default Video */}
-                    <div className="flex items-center justify-between gap-4 pt-2 border-t border-[#dedee2]/60 dark:border-[#383838]/60">
+                    <div className="flex items-center justify-between gap-4">
                       <div className="flex flex-col">
                         <span className="text-[13px] font-medium text-[#262626] dark:text-white">
                           Default Video AI
@@ -783,7 +783,7 @@ export function SettingsView({
                         title="Manage videos in Model settings"
                       >
                         <VideoIcon className="w-3.5 h-3.5 text-[#737373] dark:text-[#969696]" />
-                        <span className="font-mono text-[#737373] dark:text-[#969696]">
+                        <span className="text-[#737373] dark:text-[#969696]">
                           {multiModalConfig.video.activeModelId || "Not configured"}
                         </span>
                       </button>

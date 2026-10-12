@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import {
   toast,
   cn,
+  ScrollArea,
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
@@ -26,7 +27,6 @@ import {
   ChevronDown,
   Unplug,
   Play,
-  ArrowRight,
 } from "lucide-react";
 import {
   type ModelCategory,
@@ -724,102 +724,176 @@ export function ModelSettings({
       {/* ===================================================================== */}
       <div className="space-y-3">
         {currentProviders.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-[#dedee2] dark:border-[#383838] bg-card/40 p-6 sm:p-8 space-y-6">
-            {/* Header info banner */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-border/50">
-              <div className="flex items-start gap-3.5">
-                <div className="w-11 h-11 rounded-2xl bg-secondary/80 border border-border/80 flex items-center justify-center text-foreground shrink-0 mt-0.5">
-                  {activeCategory === "speech" ? (
-                    <Volume2 className="w-5 h-5 text-indigo-500" />
-                  ) : activeCategory === "image" ? (
-                    <ImageIcon className="w-5 h-5 text-emerald-500" />
-                  ) : activeCategory === "video" ? (
-                    <VideoIcon className="w-5 h-5 text-purple-500" />
-                  ) : (
-                    <Bot className="w-5 h-5 text-blue-500" />
-                  )}
-                </div>
-                <div className="flex flex-col">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-semibold text-foreground">
-                      {activeCategory === "speech"
-                        ? "Speech & Voice AI"
-                        : activeCategory === "image"
-                        ? "Image & Visual Synthesis"
-                        : activeCategory === "video"
-                        ? "Cinematic Video Synthesis"
-                        : "LLM Reasoning"}
-                    </span>
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-secondary font-mono text-muted-foreground border border-border/60">
-                      Not configured
+          <div className="rounded-2xl border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#222222] px-6 py-11 sm:px-10 sm:py-13 flex flex-col items-center text-center">
+            {/* Bespoke Studio Modality Schematic Stage */}
+            <div className="mb-6">
+              {activeCategory === "speech" ? (
+                <div className="w-68 rounded-2xl bg-[#ffffff] dark:bg-[#1a1a1a] border border-[#dedee2] dark:border-[#303030] p-3.5 shadow-2xs flex flex-col gap-3 select-none">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-[#262626]/60 dark:bg-white/60" />
+                      <span className="text-[11px] font-medium text-[#262626] dark:text-[#d4d4d4]">
+                        Neural Voice Engine
+                      </span>
+                    </div>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-[#f0f0f2] dark:bg-[#262626] text-[#737373] dark:text-[#969696]">
+                      24kHz • 1.0x
                     </span>
                   </div>
-                  <p className="text-xs text-muted-foreground mt-0.5 max-w-xl leading-relaxed">
-                    {activeCategory === "speech"
-                      ? "Synthesize voice dialogues, auditory agent responses, and text-to-speech audio streams directly in your workbench."
-                      : activeCategory === "image"
-                      ? "Generate UI mockups, visual assets, architectural diagrams, and creative imagery using state-of-the-art vision models."
-                      : activeCategory === "video"
-                      ? "Generate cinematic clips, animated UI walkthroughs, and camera-motion video clips using frontier video APIs."
-                      : "Configure frontier LLM reasoning endpoints for code generation, agent autonomy, and analysis."}
-                  </p>
+                  <div className="flex items-center gap-2.5 p-2 rounded-xl bg-[#f5f5f7] dark:bg-[#222222]">
+                    <div className="w-7 h-7 rounded-lg bg-[#262626] dark:bg-white text-white dark:text-[#161616] flex items-center justify-center shrink-0">
+                      <Play className="w-3 h-3 fill-current ml-0.5" />
+                    </div>
+                    <div className="flex items-center gap-[3px] h-5 flex-1 px-0.5">
+                      {[35, 65, 95, 50, 80, 100, 60, 40, 85, 70, 45, 90, 55, 30, 60, 40, 25, 45].map(
+                        (h, idx) => (
+                          <span
+                            key={idx}
+                            style={{ height: `${h}%` }}
+                            className={cn(
+                              "flex-1 rounded-full",
+                              idx < 11
+                                ? "bg-[#262626]/75 dark:bg-white/75"
+                                : "bg-[#262626]/20 dark:bg-white/20"
+                            )}
+                          />
+                        )
+                      )}
+                    </div>
+                    <span className="text-[10px] font-medium text-[#737373] dark:text-[#969696] shrink-0">
+                      0:14
+                    </span>
+                  </div>
                 </div>
-              </div>
+              ) : activeCategory === "image" ? (
+                <div className="w-68 rounded-2xl bg-[#ffffff] dark:bg-[#1a1a1a] border border-[#dedee2] dark:border-[#303030] p-3 shadow-2xs flex flex-col gap-2.5 select-none">
+                  <div className="h-24 rounded-xl bg-[#f3f3f6] dark:bg-[#222222] border border-[#dedee2]/70 dark:border-[#2e2e2e] relative overflow-hidden flex items-center justify-center">
+                    {/* Corner Framing Marks */}
+                    <span className="absolute top-2.5 left-2.5 w-2.5 h-2.5 border-t border-l border-[#262626]/30 dark:border-white/30" />
+                    <span className="absolute top-2.5 right-2.5 w-2.5 h-2.5 border-t border-r border-[#262626]/30 dark:border-white/30" />
+                    <span className="absolute bottom-2.5 left-2.5 w-2.5 h-2.5 border-b border-l border-[#262626]/30 dark:border-white/30" />
+                    <span className="absolute bottom-2.5 right-2.5 w-2.5 h-2.5 border-b border-r border-[#262626]/30 dark:border-white/30" />
 
+                    {/* Minimalist Geometric Horizon Composition */}
+                    <div className="w-4 h-4 rounded-full bg-[#262626]/20 dark:bg-white/20 absolute top-4 right-9" />
+                    <div className="w-28 h-28 rounded-full bg-[#262626]/[0.06] dark:bg-white/[0.06] absolute -bottom-16 -left-4" />
+                    <div className="w-32 h-32 rounded-full bg-[#262626]/[0.11] dark:bg-white/[0.11] absolute -bottom-20 right-2" />
+                    <div className="w-8 h-8 rounded-xl bg-[#ffffff]/90 dark:bg-[#2b2b2b]/90 border border-[#dedee2] dark:border-[#383838] flex items-center justify-center shadow-2xs z-10">
+                      <ImageIcon className="w-4 h-4 text-[#262626] dark:text-white" />
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between px-0.5">
+                    <span className="text-[11px] font-medium text-[#262626] dark:text-[#d4d4d4]">
+                      Canvas Synthesis
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-[#f0f0f2] dark:bg-[#262626] text-[#737373] dark:text-[#969696]">
+                        1024×1024
+                      </span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-[#f0f0f2] dark:bg-[#262626] text-[#737373] dark:text-[#969696]">
+                        HD
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ) : activeCategory === "video" ? (
+                <div className="w-68 rounded-2xl bg-[#ffffff] dark:bg-[#1a1a1a] border border-[#dedee2] dark:border-[#303030] p-3 shadow-2xs flex flex-col gap-2.5 select-none">
+                  <div className="h-20 rounded-xl bg-[#f3f3f6] dark:bg-[#222222] border border-[#dedee2]/70 dark:border-[#2e2e2e] relative flex items-center justify-center overflow-hidden">
+                    <span className="absolute top-2 left-2.5 text-[9.5px] font-medium px-1.5 py-0.5 rounded bg-[#ffffff]/80 dark:bg-[#161616]/80 text-[#555555] dark:text-[#969696]">
+                      1080p • 16:9
+                    </span>
+                    <span className="absolute top-2 right-2.5 text-[9.5px] font-medium text-[#737373] dark:text-[#969696]">
+                      24 FPS
+                    </span>
+                    <div className="w-8 h-8 rounded-xl bg-[#262626] dark:bg-white text-white dark:text-[#161616] flex items-center justify-center shadow-2xs">
+                      <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
+                    </div>
+                  </div>
+                  {/* Mini Timeline Scrubber */}
+                  <div className="h-6 rounded-lg bg-[#f3f3f6] dark:bg-[#222222] px-2 flex items-center gap-1.5 relative">
+                    <div className="h-2 rounded-xs bg-[#262626]/65 dark:bg-white/65 w-12" />
+                    <div className="h-2 rounded-xs bg-[#262626]/35 dark:bg-white/35 w-16" />
+                    <div className="h-2 rounded-xs bg-[#262626]/15 dark:bg-white/15 flex-1" />
+                    <div className="absolute left-15 top-1 bottom-1 w-[1.5px] bg-[#262626] dark:bg-white rounded-full" />
+                  </div>
+                </div>
+              ) : (
+                <div className="w-68 rounded-2xl bg-[#ffffff] dark:bg-[#1a1a1a] border border-[#dedee2] dark:border-[#303030] p-3.5 shadow-2xs flex flex-col gap-2.5 select-none">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5">
+                      <Bot className="w-3.5 h-3.5 text-[#262626] dark:text-white" />
+                      <span className="text-[11px] font-medium text-[#262626] dark:text-[#d4d4d4]">
+                        Reasoning Stream
+                      </span>
+                    </div>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-[#f0f0f2] dark:bg-[#262626] text-[#737373] dark:text-[#969696]">
+                      128K
+                    </span>
+                  </div>
+                  <div className="space-y-1.5 pt-0.5">
+                    <div className="h-2 w-5/6 rounded-full bg-[#262626]/20 dark:bg-white/20" />
+                    <div className="h-2 w-2/3 rounded-full bg-[#262626]/12 dark:bg-white/12" />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Title & Description */}
+            <h3 className="text-[15px] font-semibold text-[#262626] dark:text-white tracking-tight">
+              {activeCategory === "speech"
+                ? "No speech providers configured"
+                : activeCategory === "image"
+                ? "No image providers configured"
+                : activeCategory === "video"
+                ? "No video providers configured"
+                : "No language model providers configured"}
+            </h3>
+            <p className="text-xs text-[#737373] dark:text-[#969696] max-w-md mt-1.5 leading-relaxed">
+              {activeCategory === "speech"
+                ? "Connect a speech synthesis adapter or custom audio endpoint to enable voice responses, character selection, and live audio previews."
+                : activeCategory === "image"
+                ? "Connect an image generation adapter or custom endpoint to synthesize visual assets, diagrams, and high-resolution artwork."
+                : activeCategory === "video"
+                ? "Connect a video synthesis adapter or custom endpoint to generate widescreen clips, motion graphics, and visual sequences."
+                : "Connect an LLM adapter or custom completion endpoint to power coding tasks, reasoning, and agent workflows."}
+            </p>
+
+            {/* Subtle Capability Chips */}
+            <div className="flex flex-wrap items-center justify-center gap-1.5 mt-4">
+              {(activeCategory === "speech"
+                ? ["OpenAI Speech API", "Multi-Voice & Rate", "Live Voice Preview"]
+                : activeCategory === "image"
+                ? ["OpenRouter & OpenAI", "Multi-Aspect Ratio", "HD Synthesis"]
+                : activeCategory === "video"
+                ? ["1080p & 720p HD", "16:9 & 9:16", "Motion Generation"]
+                : ["Chat Completions", "Anthropic Messages", "Dynamic Model Sync"]
+              ).map((feature) => (
+                <span
+                  key={feature}
+                  className="text-[11px] text-[#737373] dark:text-[#969696] bg-[#ebebed]/80 dark:bg-[#1a1a1a] border border-[#dedee2] dark:border-[#2e2e2e] px-2.5 py-1 rounded-lg"
+                >
+                  {feature}
+                </span>
+              ))}
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-center justify-center gap-2.5 mt-6">
+              <button
+                type="button"
+                onClick={() => setIsPresetModalOpen(true)}
+                className="h-9 px-4 rounded-xl bg-[#262626] dark:bg-white text-white dark:text-[#161616] text-xs font-semibold hover:opacity-90 active:scale-[0.98] transition-all flex items-center gap-1.5 cursor-pointer"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>Choose Adapter</span>
+              </button>
               <button
                 type="button"
                 onClick={handleAddCustomProvider}
-                className="h-9 px-3.5 rounded-xl border border-border hover:bg-secondary/70 text-xs font-medium text-foreground transition-all flex items-center gap-1.5 cursor-pointer shrink-0 shadow-none"
+                className="h-9 px-4 rounded-xl bg-[#ffffff] dark:bg-[#2b2b2b] hover:bg-[#ebebed] dark:hover:bg-[#333333] text-[#262626] dark:text-[#d4d4d4] border border-[#dedee2] dark:border-[#383838] text-xs font-medium transition-all flex items-center gap-1.5 cursor-pointer"
               >
-                <Plus className="w-3.5 h-3.5" />
                 <span>Custom Endpoint</span>
               </button>
-            </div>
-
-            {/* Quick-start Templates Section */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-medium text-foreground">
-                  Quick-start Adapter Templates
-                </span>
-                <span className="text-[11px] text-muted-foreground">
-                  Click to connect and configure
-                </span>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {activePresets.map((preset: any) => (
-                  <div
-                    key={preset.id}
-                    onClick={() => handleAddPresetProvider(preset)}
-                    className="p-4 rounded-xl border border-border bg-card/60 hover:bg-secondary/40 hover:border-foreground/30 transition-all cursor-pointer flex flex-col justify-between gap-3 group"
-                  >
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-semibold text-foreground group-hover:text-foreground">
-                          {preset.name}
-                        </span>
-                        <span className="text-[10px] px-2 py-0.5 rounded-md bg-secondary text-muted-foreground font-mono border border-border/50">
-                          {preset.protocol}
-                        </span>
-                      </div>
-                      <p className="text-[11px] font-mono text-muted-foreground truncate">
-                        {preset.baseUrl}
-                      </p>
-                    </div>
-
-                    <div className="flex items-center justify-between pt-2 border-t border-border/40 text-xs">
-                      <span className="text-[11px] text-muted-foreground group-hover:text-foreground transition-colors">
-                        Ready to configure
-                      </span>
-                      <span className="text-xs font-medium text-foreground flex items-center gap-1 group-hover:translate-x-0.5 transition-transform">
-                        <span>Connect</span>
-                        <ArrowRight className="w-3.5 h-3.5 text-muted-foreground" />
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
             </div>
           </div>
         ) : (
@@ -1113,7 +1187,7 @@ export function ModelSettings({
                               }
                               className="w-full accent-foreground cursor-pointer"
                             />
-                            <span className="text-xs font-mono text-muted-foreground w-10 text-right">
+                            <span className="text-xs text-muted-foreground w-10 text-right">
                               {editingProvider.speed || 1.0}x
                             </span>
                           </div>
@@ -1337,7 +1411,7 @@ export function ModelSettings({
                                 value={newModelId}
                                 onChange={(e) => setNewModelId(e.target.value)}
                                 placeholder="e.g. gemini-2.5-flash or gpt-4o"
-                                className="w-full px-3 py-1.5 rounded-lg bg-background border border-border text-xs text-foreground outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/40 font-mono"
+                                className="w-full px-3 py-1.5 rounded-lg bg-background border border-border text-xs text-foreground outline-none focus:ring-1 focus:ring-foreground/20 focus:border-foreground/40"
                               />
                             </div>
                             <div>
@@ -1431,41 +1505,45 @@ export function ModelSettings({
       {/* 3. Preset Adapter Picker Modal */}
       {isPresetModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-card border border-border rounded-2xl w-full max-w-md p-5 space-y-4 shadow-xl">
+          <div className="bg-[#f9f9fb] dark:bg-[#222222] border border-[#dedee2] dark:border-[#383838] rounded-2xl w-full max-w-md p-5 space-y-4 shadow-xl">
             <div className="flex items-center justify-between">
-              <h3 className="text-sm font-semibold text-foreground">
+              <h3 className="text-sm font-semibold text-[#262626] dark:text-white">
                 Add {activeCategory.toUpperCase()} Provider Adapter
               </h3>
               <button
                 type="button"
                 onClick={() => setIsPresetModalOpen(false)}
-                className="text-xs text-muted-foreground hover:text-foreground cursor-pointer"
+                className="text-xs text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white cursor-pointer"
               >
                 Close
               </button>
             </div>
-            <p className="text-xs text-muted-foreground">
-              Select an adapter template. Models are dynamically fetched using your API key without hardcoded dummy entries:
+            <p className="text-xs text-[#737373] dark:text-[#969696]">
+              Select an adapter template to prefill endpoint defaults. You can fetch or add models once connected:
             </p>
 
-            <div className="space-y-2 max-h-72 overflow-y-auto">
-              {activePresets.map((preset: any) => (
-                <button
-                  key={preset.id}
-                  type="button"
-                  onClick={() => handleAddPresetProvider(preset)}
-                  className="w-full text-left p-3 rounded-xl border border-border hover:bg-secondary/60 transition-colors flex items-center justify-between cursor-pointer"
-                >
-                  <div>
-                    <div className="text-xs font-semibold text-foreground">{preset.name}</div>
-                    <div className="text-[11px] text-muted-foreground font-mono truncate max-w-xs">
-                      {preset.baseUrl}
+            <ScrollArea className="max-h-72 pr-1">
+              <div className="space-y-2">
+                {activePresets.map((preset: any) => (
+                  <button
+                    key={preset.id}
+                    type="button"
+                    onClick={() => handleAddPresetProvider(preset)}
+                    className="w-full text-left p-3 rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#2b2b2b] hover:bg-[#ebebed] dark:hover:bg-[#333333] transition-colors flex items-center justify-between cursor-pointer"
+                  >
+                    <div className="min-w-0 pr-3">
+                      <div className="text-xs font-semibold text-[#262626] dark:text-white">
+                        {preset.name}
+                      </div>
+                      <div className="text-[11px] text-[#737373] dark:text-[#969696] truncate max-w-xs">
+                        {preset.baseUrl}
+                      </div>
                     </div>
-                  </div>
-                  <Plus className="w-4 h-4 text-muted-foreground shrink-0" />
-                </button>
-              ))}
-            </div>
+                    <Plus className="w-4 h-4 text-[#737373] dark:text-[#969696] shrink-0" />
+                  </button>
+                ))}
+              </div>
+            </ScrollArea>
           </div>
         </div>
       )}
