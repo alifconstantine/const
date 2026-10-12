@@ -154,6 +154,20 @@ const VALID_FALLBACK_TOOLS = new Set([
   "apply_patch",
   "run_command",
   "manage_task",
+  "wait",
+  "task",
+  "spawn_agent",
+  "subagent",
+  "delegate_task",
+  "agent_status",
+  "kill_agent",
+  "lsp",
+  "ast_grep",
+  "web_search",
+  "web_fetch",
+  "git_status",
+  "git_diff",
+  "git_log",
   "run_python",
   "python",
   "canva_mcp_generate_design",
@@ -387,10 +401,10 @@ Available tools:
 - grep: Search file contents for regex or text patterns across files in the workspace.
 - mkdir: Explicitly create a new directory or folder structure recursively.
 - manage_task: Inspect status, view real-time logs, list, or terminate running background processes and services started by the agent.
-- wait: Wait for background tasks or services to produce output, become ready, or settle. NEVER execute terminal 'sleep' commands to wait for tasks.
-- task: Delegate work to an isolated subagent. Runs synchronously in foreground by default, returning complete findings inside a <task-result> envelope, and streams live progress to the UI. Specialist personas: 'scout' (strictly read-only codebase research/exploration and broad pattern search), 'reviewer' (code review for quality, logic, and security analysis), or 'task' (focused worker with full write/edit capabilities). (Alias: spawn_agent).
-- agent_status: Check status, activity logs, or findings of running or completed subagents (when spawned with run_in_background: true).
-- kill_agent: Terminate an active running subagent.
+- wait: Event-driven wait for background subagents or background shell tasks to complete, produce output, or become ready. NEVER execute terminal 'sleep' commands to wait for tasks.
+- task: Delegate work to one or more isolated subagents. Supports single-task mode ('{ agent, name, description, assignment }') or parallel batch mode ('{ agent, context, tasks: [{ id, description, assignment }, ...] }'). Specialist roles: 'scout' (strictly read-only codebase reconnaissance), 'reviewer' (read-only code quality & logic audit), 'security-reviewer' (read-only vulnerability audit), 'task' (focused implementation worker with full write/edit/terminal tools), or 'sonic' (ultra-fast worker for rapid mechanical changes). Also loads custom '.const/agents/*.md' and '.omp/agents/*.md' personas.
+- agent_status: Check status, live activity trace, or '<task-result>' findings of running or completed subagents (by ID or 'AdjectiveNoun' handle).
+- kill_agent: Terminate an active running subagent by ID or handle (or '"all"').
 - browser_navigate: Navigate the native desktop sidepanel browser to a URL (e.g. 'http://localhost:3000'), or 'back', 'forward', 'reload'. Automatically opens the Browser tab if not open yet, and targets the active/last browser tab (or opens a new tab with 'newTab: true').
 - browser_snapshot: Capture a hierarchical ARIA accessibility tree, interactive element refs ([e1], [e2], ...), readable page text, and recent console/network errors. Supports 'diff: true' for compact unified deltas.
 - browser_click: Click an interactive element by its ref (e.g. 'e1'), semantic selector ('text/...', 'role/button[name="..."]', 'label/...', 'placeholder/...', 'testid/...', '#id'), or (x, y) coordinates.
@@ -414,15 +428,15 @@ NATIVE BROWSER AUTOMATION PROTOCOL:
   5. If a human check (CAPTCHA, 2FA, OTP, or secret password) appears, call 'browser_request_help' (setting 'secretWanted' and 'ref' for passwords) so the user can complete it and hand control back.
 
 SUB-AGENT DELEGATION PROTOCOL:
-- You can spawn multiple subagents (maximum 5 subagents per multi-step workflow) to divide modular tasks cleanly.
-- When spawning multiple subagents, ALWAYS name them clearly with sequential numeric prefixes in the 'name' or 'description' argument:
-  e.g. 'Sub-agent 1: Implementasi Navbar dan Hero Section', 'Sub-agent 2: Implementasi About Us Section', ..., up to 'Sub-agent 5: <Task Title>'.
-- Assign distinct roles ('scout', 'reviewer', or 'task') and provide a comprehensive, self-contained prompt specifying exact files and acceptance criteria for each subagent.
-- STRICT FILE PARTITIONING: To avoid file write collisions, locks, or failures, each subagent MUST work on separate, dedicated files or component directories (e.g. Sub-agent 1 creates 'sections/1-hero.html', Sub-agent 2 creates 'sections/2-about.html'). NEVER assign two subagents to modify the same file concurrently!
+- You can spawn up to 5 concurrent subagents to divide modular tasks cleanly.
+- Subagents start with a fresh, empty context window — they have ZERO memory of this conversation. Put shared background, architecture decisions, and constraints in 'context' (applied once to every task in a batch) and keep each task's 'assignment' scoped to its specific files and acceptance criteria.
+- Assign the appropriate specialist role ('scout', 'reviewer', 'security-reviewer', 'task', or 'sonic') and set 'solutionSpace' ('narrow' | 'constrained' | 'open') and 'effort' ('trivial' | 'standard' | 'complex') when appropriate to calibrate subagent reasoning depth.
+- STRICT FILE PARTITIONING: Each concurrent 'task' subagent MUST work on disjoint files or directories (e.g. Sub-agent 1 creates 'sections/1-hero.html', Sub-agent 2 creates 'sections/2-about.html'). NEVER assign two concurrent subagents to modify the same file!
 - PARALLEL VS SEQUENTIAL DELEGATION:
-  * BATCH / PARALLEL (Recommended for independent tasks): When tasks are independent (e.g. creating distinct component sections, separate pages, or decoupled utilities), invoke all subagent 'task' calls TOGETHER in a single turn. The engine will execute them concurrently in parallel (up to 5 subagents at the exact same time).
-  * SEQUENTIAL (For dependent pipeline tasks): When a subsequent task strictly depends on the findings or output of a previous task (e.g., Sub-agent 1 scout investigates codebase -> reports back -> Sub-agent 2 implements -> Sub-agent 3 reviews), invoke them sequentially across turns.
-- Subagents report their completed deliverables directly in a <task-result> envelope back to you.
+  * BATCH / PARALLEL (Recommended for independent tasks): Pass a single 'task' call with 'context' + 'tasks: [...]' array (or invoke multiple 'task' calls in one turn) to execute up to 5 subagents concurrently in parallel.
+  * SEQUENTIAL (For dependent pipeline tasks): When a subsequent task depends on a previous subagent's findings (e.g. 'scout' investigates -> 'task' implements -> 'reviewer' audits), invoke them sequentially across turns.
+  * BACKGROUND + WAIT: When 'run_in_background: true' is set, 'task' returns immediately with a handle ('id' / 'name'). Call 'wait({ id })' to block until completion without polling.
+- Subagents report their completed deliverables inside a '<task-result>' envelope (with full transcript persisted to disk if truncated).
 
 
 CRITICAL CODE GENERATION & TOOL CALLING PROTOCOL:
@@ -680,9 +694,9 @@ export class ConstAgent {
         this.abortController.abort();
       } catch {}
     }
-    // Immediately terminate any running subagents
+    // Immediately terminate any running subagents scoped to this conversation (or all if un-scoped)
     try {
-      globalSubAgentManager.killAllRunningSubAgents();
+      globalSubAgentManager.killAllRunningSubAgents(undefined, this.config.conversationId);
     } catch {}
     for (const [id, resolver] of this.pendingApprovals.entries()) {
       try {
@@ -745,9 +759,15 @@ export class ConstAgent {
             : buildConstSystemPrompt(workspacePath, this.config.systemPrompt);
 
         let effectiveSystemPrompt = systemPrompt;
-        if (consecutivePlanningTurns >= 2) {
+        const hasWriteTools = activeTools.some(
+          (t) => t.function.name === "write" || t.function.name === "edit"
+        );
+        if (consecutivePlanningTurns >= 2 && hasWriteTools) {
           effectiveSystemPrompt +=
             "\n\n[CRITICAL DIRECTIVE: You have completed all initial planning and analysis. You are REQUIRED to invoke tools now ('write', 'edit', 'bash', etc.) to make concrete file modifications. Do not output conversational planning without tool calls.]";
+        }
+        if (this.config.softTurnBudget && currentTurn >= this.config.softTurnBudget) {
+          effectiveSystemPrompt += `\n\n[TURN BUDGET WARNING: You have reached turn ${currentTurn} (soft budget: ${this.config.softTurnBudget} turns, hard limit: ${maxTurns} turns). Stop starting new lines of inquiry immediately. Synthesize your findings from the work already completed and return your final structured report now.]`;
         }
 
         const historyForContext = compactHistoryForContext(conversationHistory);
@@ -1292,7 +1312,11 @@ export class ConstAgent {
           return norm === "task" || norm === "spawnagent" || norm === "subagent" || norm === "delegatetask";
         };
         const subagentCallsCount = toolCalls.filter((tc) => isSubAgentToolName(tc.function?.name)).length;
-        const spawnedParallelAgents: string[] = [];
+        const spawnedParallelAgents: Array<{
+          agentId: string;
+          toolCallId: string;
+          toolName: string;
+        }> = [];
 
         for (const tc of toolCalls) {
           if (signal.aborted || this._isCancelled) {
@@ -1586,7 +1610,16 @@ export class ConstAgent {
             approvedThisTurn;
 
           const isTaskTool = isSubAgentToolName(tc.function.name);
-          const shouldRunParallel = isTaskTool && subagentCallsCount > 1;
+          const isExplicitBackground = Boolean(
+            parsedArgs.run_in_background === true || parsedArgs.async === true
+          );
+          const isBatchTaskCall =
+            Array.isArray(parsedArgs.tasks) && parsedArgs.tasks.length > 0;
+          const shouldRunParallel =
+            isTaskTool &&
+            !isBatchTaskCall &&
+            !isExplicitBackground &&
+            subagentCallsCount > 1;
           const effectiveArgs = shouldRunParallel
             ? { ...parsedArgs, run_in_background: true }
             : parsedArgs;
@@ -1599,6 +1632,7 @@ export class ConstAgent {
               signal,
               stepIndex: currentTurn,
               allowOutsideWorkspace,
+              conversationId: this.config.conversationId,
               onFileMutation: (record) => {
                 onEvent({ type: "file_mutation", record });
               },
@@ -1624,11 +1658,11 @@ export class ConstAgent {
               onSubAgentUpdated: (agent) => {
                 onEvent({ type: "subagent_updated", agent });
               },
-              onSubAgentFinished: (agentId, result, error) => {
-                onEvent({ type: "subagent_finished", agentId, result, error });
+              onSubAgentFinished: (agentId, result, error, agent) => {
+                onEvent({ type: "subagent_finished", agentId, result, error, agent });
               },
-              onSubAgentKilled: (agentId) => {
-                onEvent({ type: "subagent_killed", agentId });
+              onSubAgentKilled: (agentId, agent) => {
+                onEvent({ type: "subagent_killed", agentId, agent });
               },
               parentConfig: this.config,
               learnId: this.config.learnId,
@@ -1669,10 +1703,14 @@ export class ConstAgent {
             isError: Boolean(isError),
           });
 
-          if (shouldRunParallel) {
+          if (shouldRunParallel && !isError) {
             const match = typeof result === "string" ? result.match(/id="([^"]+)"/) : null;
             if (match && match[1]) {
-              spawnedParallelAgents.push(match[1]);
+              spawnedParallelAgents.push({
+                agentId: match[1],
+                toolCallId: tc.id,
+                toolName: tc.function.name,
+              });
             }
           }
 
@@ -1690,37 +1728,57 @@ export class ConstAgent {
           });
 
           await Promise.all(
-            spawnedParallelAgents.map((id) => globalSubAgentManager.waitForSubAgent(id))
+            spawnedParallelAgents.map((item) =>
+              globalSubAgentManager.waitForSubAgent(item.agentId)
+            )
           );
 
           if (signal.aborted || this._isCancelled) {
             throw new Error("User cancelled agent execution.");
           }
 
-          // Finalize task result envelopes for each subagent in conversationHistory
-          for (const agentId of spawnedParallelAgents) {
-            const agent = globalSubAgentManager.getSubAgent(agentId);
+          // Finalize task result envelopes for each subagent in conversationHistory AND emit updated tool_result for UI
+          for (const item of spawnedParallelAgents) {
+            const agent = globalSubAgentManager.getSubAgent(item.agentId);
             if (agent) {
+              const durationSec = Math.round(
+                ((agent.endTime || Date.now()) - agent.startTime) / 1000
+              );
+              const finalStatus =
+                agent.status === "killed"
+                  ? "cancelled"
+                  : agent.status === "failed"
+                  ? "failed"
+                  : "completed";
+              const finalEnvelope = formatTaskResultEnvelope({
+                id: agent.id,
+                name: agent.name,
+                agent: agent.role || "task",
+                status: finalStatus,
+                durationSec,
+                output: agent.result || "Completed with no output.",
+                error: agent.error,
+                artifactPath: agent.artifactPath,
+                turnCount: agent.turnCount,
+              });
+              const finalIsError = finalStatus === "failed" || finalStatus === "cancelled";
+
+              // Emit updated tool_result so ExecutionTrace and saved transcripts reflect final completion
+              onEvent({
+                type: "tool_result",
+                toolCallId: item.toolCallId,
+                toolName: item.toolName,
+                result: finalEnvelope,
+                isError: finalIsError,
+              });
+
               const histIdx = conversationHistory.findIndex(
-                (m) => m.role === "tool" && typeof m.content === "string" && m.content.includes(agentId)
+                (m) =>
+                  m.role === "tool" &&
+                  (m.tool_call_id === item.toolCallId ||
+                    (typeof m.content === "string" && m.content.includes(item.agentId)))
               );
               if (histIdx !== -1) {
-                const durationSec = Math.round(
-                  ((agent.endTime || Date.now()) - agent.startTime) / 1000
-                );
-                const finalEnvelope = formatTaskResultEnvelope({
-                  id: agent.id,
-                  agent: agent.role || "task",
-                  status:
-                    agent.status === "killed"
-                      ? "cancelled"
-                      : agent.status === "failed"
-                      ? "failed"
-                      : "completed",
-                  durationSec,
-                  output: agent.result || "Completed with no output.",
-                  error: agent.error,
-                });
                 const targetMsg = conversationHistory[histIdx];
                 if (targetMsg) {
                   targetMsg.content = finalEnvelope;

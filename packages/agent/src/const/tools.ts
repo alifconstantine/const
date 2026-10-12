@@ -27,12 +27,14 @@ import {
   executeSpawnAgent,
   executeAgentStatus,
   executeKillAgent,
+  formatTaskResultEnvelope,
   globalSubAgentManager,
 } from "./subagent.js";
 
 export interface ExecuteToolOptions {
   signal?: AbortSignal;
   stepIndex?: number;
+  conversationId?: string;
   onFileMutation?: (record: FileMutationRecord) => void;
   onTodoUpdate?: (todos: TodoItem[]) => void;
   askUser?: (questions: QuestionItem[]) => Promise<any>;
@@ -41,8 +43,8 @@ export interface ExecuteToolOptions {
   allowOutsideWorkspace?: boolean;
   onSubAgentStarted?: (agent: SubAgentItem) => void;
   onSubAgentUpdated?: (agent: SubAgentItem) => void;
-  onSubAgentFinished?: (agentId: string, result?: string, error?: string) => void;
-  onSubAgentKilled?: (agentId: string) => void;
+  onSubAgentFinished?: (agentId: string, result?: string, error?: string, agent?: SubAgentItem) => void;
+  onSubAgentKilled?: (agentId: string, agent?: SubAgentItem) => void;
   parentConfig?: AgentConfig;
   learnId?: string;
   onSourceCreated?: (source: any) => void;
@@ -1136,17 +1138,21 @@ export const CONST_DEFAULT_TOOLS: NativeToolDefinition[] = [
     function: {
       name: "wait",
       description:
-        "Wait for background jobs or services to produce output, become ready, or complete. If task_id is omitted, blocks on any active background task started by the agent. NEVER run bash 'sleep' to wait for tasks.",
+        "Event-driven barrier: wait for running background subagents or background shell processes/services to settle or produce output. If task_id / agent_id is omitted, blocks until the next active background subagent or background task settles. NEVER run bash 'sleep' to wait.",
       parameters: {
         type: "object",
         properties: {
           task_id: {
             type: "string",
-            description: "Optional task ID or name to wait for.",
+            description: "Optional background task ID, subagent ID, or subagent handle name to wait for.",
+          },
+          agent_id: {
+            type: "string",
+            description: "Optional subagent ID or handle name to wait for.",
           },
           timeout: {
             type: "number",
-            description: "Maximum seconds to wait (defaults to 30).",
+            description: "Maximum seconds to wait (defaults to 60).",
           },
         },
       },
@@ -1411,59 +1417,107 @@ export const CONST_DEFAULT_TOOLS: NativeToolDefinition[] = [
     function: {
       name: "task",
       description:
-        "Delegate work to an isolated subagent. Execution runs synchronously in foreground and blocks until work finishes, returning a <task-result> envelope with complete output. Progress is streamed live to the UI. Choose an agent persona: 'scout' (fast read-only research/code exploration), 'reviewer' (code review and quality/security analysis), or 'task' (worker for editing and implementing changes).",
+        "Delegate work to one or more isolated subagents. Supports single-task mode ('task') or parallel batch mode ('context' + 'tasks[]'). Runs synchronously in the foreground by default and returns <task-result> envelopes with complete findings while streaming live progress to the UI.\nAvailable specialist personas:\n- 'scout': Fast READ-ONLY codebase researcher for pattern search and architectural tracing.\n- 'reviewer': READ-ONLY code review specialist for logic correctness, regressions, and cross-boundary verification.\n- 'security-reviewer': READ-ONLY security specialist for vulnerability & source-to-sink auditing.\n- 'task': General-purpose worker with full read/write/edit/terminal capabilities (default).\n- 'sonic': High-speed worker for quick mechanical edits or targeted updates.\n(Also supports custom agents defined in .const/agents/*.md or .omp/agents/*.md).",
       parameters: {
         type: "object",
         properties: {
+          context: {
+            type: "string",
+            description:
+              "Optional shared background context, architectural contracts, or interfaces prepended to all spawned subagents (recommended when spawning a batch via 'tasks').",
+          },
+          tasks: {
+            type: "array",
+            description:
+              "Optional array of subagent tasks to spawn concurrently in parallel batch mode (up to 5 concurrent).",
+            items: {
+              type: "object",
+              properties: {
+                task: {
+                  type: "string",
+                  description:
+                    "Self-contained task instructions (# Target files, # Change steps, # Acceptance criteria).",
+                },
+                assignment: {
+                  type: "string",
+                  description:
+                    "Alias for 'task': self-contained task assignment instructions.",
+                },
+                agent: {
+                  type: "string",
+                  description:
+                    "Specialist persona: 'scout', 'reviewer', 'security-reviewer', 'task', 'sonic', or custom agent name. Default: 'task'.",
+                },
+                name: {
+                  type: "string",
+                  description:
+                    "Short CamelCase or descriptive handle (e.g. 'AuthAudit', 'Sub-agent 1: Hero Section'). Auto-generated if omitted.",
+                },
+                id: {
+                  type: "string",
+                  description: "Alias for 'name' (short CamelCase task identifier).",
+                },
+                description: {
+                  type: "string",
+                  description: "Short human-readable summary of what this subagent does.",
+                },
+                solution_space: {
+                  type: "string",
+                  description:
+                    "Optional brief note on how open-ended the problem is (e.g. 'one fix: rename prop' vs 'race condition cause open').",
+                },
+                effort: {
+                  type: "string",
+                  enum: ["lo", "med", "hi"],
+                  description: "Optional reasoning effort override ('lo', 'med', 'hi').",
+                },
+                model: {
+                  type: "string",
+                  description: "Optional model ID override for this subagent.",
+                },
+                run_in_background: {
+                  type: "boolean",
+                  description:
+                    "If true, launches in background and returns immediately. Use 'wait' to collect results.",
+                },
+              },
+            },
+          },
           task: {
             type: "string",
-            description: "Complete, self-contained instructions and acceptance criteria for the subagent.",
+            description:
+              "Complete, self-contained instructions and acceptance criteria when spawning a single subagent.",
           },
           agent: {
             type: "string",
-            enum: ["scout", "reviewer", "task"],
-            description: "The specialist subagent persona to spawn: 'scout' (read-only research/code search), 'reviewer' (code review/bug detection), or 'task' (general worker with full edit/write tools). Default: 'task'.",
+            description:
+              "The specialist subagent persona to spawn: 'scout' (read-only research), 'reviewer' (code review), 'security-reviewer' (security audit), 'task' (general worker), or 'sonic' (fast worker). Default: 'task'.",
           },
           name: {
             type: "string",
-            description: "Optional short identifier or label for this task (e.g. 'AuthAudit', 'DbResearch').",
+            description:
+              "Optional short identifier or label for this task (e.g. 'AuthAudit', 'Sub-agent 1: Navbar'). Auto-generated if omitted.",
+          },
+          solution_space: {
+            type: "string",
+            description:
+              "Optional brief description of how open-ended the problem is (guides subagent thinking effort).",
+          },
+          effort: {
+            type: "string",
+            enum: ["lo", "med", "hi"],
+            description: "Optional reasoning effort override ('lo', 'med', 'hi').",
+          },
+          model: {
+            type: "string",
+            description: "Optional model ID override for this subagent.",
           },
           run_in_background: {
             type: "boolean",
-            description: "If true, runs the subagent in background without waiting. Default is false (blocks until finished).",
+            description:
+              "If true, runs the subagent in the background without blocking. Call 'wait' to await completion. Default is false.",
           },
         },
-        required: ["task"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "spawn_agent",
-      description:
-        "Delegate a task to an isolated subagent (alias for 'task'). Runs in the foreground by default, returning a <task-result> envelope with complete findings, and streams live progress to the UI. NEVER run bash 'sleep' to poll for subagents.",
-      parameters: {
-        type: "object",
-        properties: {
-          prompt: {
-            type: "string",
-            description: "The complete instruction and task description for the subagent (same as 'task').",
-          },
-          description: {
-            type: "string",
-            description: "Short human-readable summary or name of the subagent's objective.",
-          },
-          role: {
-            type: "string",
-            description: "Specialist persona: 'scout' (or 'research' for read-only exploration), 'reviewer' (code review), or 'task' (or 'coder' for worker). Default: 'task'.",
-          },
-          run_in_background: {
-            type: "boolean",
-            description: "If true, runs the subagent in the background without waiting and returns immediately. Default is false (foreground: waits for completion and returns findings directly).",
-          },
-        },
-        required: ["prompt"],
       },
     },
   },
@@ -1472,13 +1526,13 @@ export const CONST_DEFAULT_TOOLS: NativeToolDefinition[] = [
     function: {
       name: "agent_status",
       description:
-        "Check the status, latest activity, and final findings of running or completed subagents. If agent_id is omitted, lists all subagents.",
+        "Check the status, latest activity, and findings of running or completed subagents in the current session. If agent_id is omitted, lists all session subagents.",
       parameters: {
         type: "object",
         properties: {
           agent_id: {
             type: "string",
-            description: "Optional ID of a specific subagent to inspect.",
+            description: "Optional ID or handle name of a specific subagent to inspect.",
           },
         },
       },
@@ -1489,13 +1543,13 @@ export const CONST_DEFAULT_TOOLS: NativeToolDefinition[] = [
     function: {
       name: "kill_agent",
       description:
-        "Terminate an active subagent running in the background.",
+        "Terminate an active subagent running in the background by its ID or handle name.",
       parameters: {
         type: "object",
         properties: {
           agent_id: {
             type: "string",
-            description: "The ID of the subagent to terminate.",
+            description: "The ID or handle name of the subagent to terminate.",
           },
         },
         required: ["agent_id"],
@@ -3768,21 +3822,79 @@ export class BackgroundProcessManager {
 export const globalTaskManager = new BackgroundProcessManager();
 
 export async function executeWaitTool(
-  args: { task_id?: string; id?: string; name?: string; timeout?: number },
-  signal?: AbortSignal
+  args: {
+    task_id?: string;
+    agent_id?: string;
+    id?: string;
+    name?: string;
+    timeout?: number;
+    seconds?: number;
+    max_seconds?: number;
+  },
+  signal?: AbortSignal,
+  conversationId?: string
 ): Promise<{ result: string; isError: boolean }> {
-  const targetId = args.task_id || args.id || args.name;
-  const timeoutSec = typeof args.timeout === "number" ? Math.max(1, args.timeout) : 30;
+  const targetId = args.task_id || args.agent_id || args.id || args.name;
+  const rawTimeout = args.timeout ?? args.seconds ?? args.max_seconds ?? 60;
+  const timeoutSec = typeof rawTimeout === "number" ? Math.max(1, Math.min(300, rawTimeout)) : 60;
   const timeoutMs = timeoutSec * 1000;
 
-  const allTasks = globalTaskManager.listTasks();
-  const runningTasks = allTasks.filter((t) => t.status === "running");
-
+  // 1. If a specific targetId is provided, check whether it's a subagent first
   if (targetId) {
+    const subagent = globalSubAgentManager.getSubAgent(targetId, conversationId);
+    if (subagent) {
+      const settled =
+        subagent.status === "running"
+          ? (await globalSubAgentManager.waitForAnySubAgent({
+              conversationId,
+              targetId: subagent.id,
+              timeoutMs,
+              signal,
+            })) || subagent
+          : subagent;
+
+      const durationSec = Math.round(
+        ((settled.endTime || Date.now()) - settled.startTime) / 1000
+      );
+      const envelopeStatus: "running" | "completed" | "cancelled" | "failed" =
+        settled.status === "running"
+          ? "running"
+          : settled.status === "killed"
+          ? "cancelled"
+          : settled.status === "failed"
+          ? "failed"
+          : "completed";
+
+      const output =
+        settled.status === "running"
+          ? `Subagent '${settled.name || settled.id}' is still running after waiting ${timeoutSec}s.\nRecent activity:\n${
+              settled.logs
+                .slice(-8)
+                .map((l) => `- ${l}`)
+                .join("\n") || "- Working..."
+            }`
+          : settled.result || "Completed with no output.";
+
+      return {
+        result: formatTaskResultEnvelope({
+          id: settled.id,
+          name: settled.name,
+          agent: settled.role || "task",
+          status: envelopeStatus,
+          durationSec,
+          output,
+          error: settled.error,
+          artifactPath: settled.artifactPath,
+          turnCount: settled.turnCount,
+        }),
+        isError: settled.status === "failed",
+      };
+    }
+
     const task = globalTaskManager.getTask(targetId);
     if (!task) {
       return {
-        result: `<task-result id="${targetId}" status="not_found">\n<error>Background task '${targetId}' not found.</error>\n</task-result>`,
+        result: `<task-result id="${targetId}" status="not_found">\n<error>Background task or subagent '${targetId}' not found.</error>\n</task-result>`,
         isError: true,
       };
     }
@@ -3795,7 +3907,7 @@ export async function executeWaitTool(
       };
     }
 
-    // Wait until task settles or new log arrives or timeout
+    // Wait until background shell task settles or new log arrives or timeout
     const initialLogCount = task.logs.length;
     const startTime = Date.now();
     while (Date.now() - startTime < timeoutMs) {
@@ -3818,16 +3930,66 @@ export async function executeWaitTool(
     };
   }
 
-  // No specific task ID: wait on any running background task
+  // 2. No specific ID: wait on any running subagent in this session or any running background shell task
+  const runningSubagents = globalSubAgentManager
+    .listSubAgents(conversationId)
+    .filter((a) => a.status === "running");
+
+  if (runningSubagents.length > 0) {
+    const settled = await globalSubAgentManager.waitForAnySubAgent({
+      conversationId,
+      timeoutMs,
+      signal,
+    });
+    if (settled) {
+      const durationSec = Math.round(
+        ((settled.endTime || Date.now()) - settled.startTime) / 1000
+      );
+      const envelopeStatus: "running" | "completed" | "cancelled" | "failed" =
+        settled.status === "running"
+          ? "running"
+          : settled.status === "killed"
+          ? "cancelled"
+          : settled.status === "failed"
+          ? "failed"
+          : "completed";
+      const output =
+        settled.status === "running"
+          ? `Subagent '${settled.name || settled.id}' is still running (${durationSec}s elapsed).\nRecent activity:\n${
+              settled.logs
+                .slice(-8)
+                .map((l) => `- ${l}`)
+                .join("\n") || "- Working..."
+            }`
+          : settled.result || "Completed with no output.";
+
+      return {
+        result: formatTaskResultEnvelope({
+          id: settled.id,
+          name: settled.name,
+          agent: settled.role || "task",
+          status: envelopeStatus,
+          durationSec,
+          output,
+          error: settled.error,
+          artifactPath: settled.artifactPath,
+          turnCount: settled.turnCount,
+        }),
+        isError: settled.status === "failed",
+      };
+    }
+  }
+
+  const allTasks = globalTaskManager.listTasks();
+  const runningTasks = allTasks.filter((t) => t.status === "running");
   const firstRunning = runningTasks[0];
   if (!firstRunning) {
     return {
-      result: "Nothing to wait for: no background task or service is running.",
+      result: "Nothing to wait for: no background subagent or shell service is currently running.",
       isError: false,
     };
   }
 
-  // Wait for any running task to produce output or settle
   const startTime = Date.now();
   const initialCounts = new Map(runningTasks.map((t) => [t.id, t.output?.length || 0]));
   let activeTask: BackgroundTaskItem = firstRunning;
@@ -5284,7 +5446,11 @@ export async function executeNativeTool(
       normalizedTool === "awaittask"
     ) {
       try {
-        const res = await executeWaitTool(args, signal);
+        const res = await executeWaitTool(
+          args,
+          signal,
+          options.conversationId || options.parentConfig?.conversationId
+        );
         return res;
       } catch (err: any) {
         return {
@@ -5793,10 +5959,16 @@ export async function executeNativeTool(
             workspacePath,
             parentConfig: options.parentConfig,
             availableTools: CONST_DEFAULT_TOOLS,
+            signal,
+            conversationId: options.conversationId || options.parentConfig?.conversationId,
+            allowOutsideWorkspace: options.allowOutsideWorkspace,
             onStarted: options.onSubAgentStarted,
             onUpdated: options.onSubAgentUpdated,
             onFinished: options.onSubAgentFinished,
             onKilled: options.onSubAgentKilled,
+            onFileMutation: options.onFileMutation,
+            onSourceCreated: options.onSourceCreated,
+            onArtifactCreated: options.onArtifactCreated,
           }
         );
         return {
@@ -5820,7 +5992,10 @@ export async function executeNativeTool(
       normalizedTool === "listagents"
     ) {
       try {
-        const res = executeAgentStatus(args);
+        const res = executeAgentStatus(
+          args,
+          options.conversationId || options.parentConfig?.conversationId
+        );
         return res;
       } catch (err: any) {
         return {
@@ -5839,7 +6014,11 @@ export async function executeNativeTool(
       normalizedTool === "terminateagent"
     ) {
       try {
-        const res = executeKillAgent(args, options.onSubAgentKilled);
+        const res = executeKillAgent(
+          args,
+          options.onSubAgentKilled,
+          options.conversationId || options.parentConfig?.conversationId
+        );
         return res;
       } catch (err: any) {
         return {

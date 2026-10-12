@@ -742,7 +742,17 @@ app.whenReady().then(() => {
   });
 
   ipcMain.handle("subagents:kill", async (_event, agentId: string) => {
-    return globalSubAgentManager.killSubAgent(agentId);
+    const killed = globalSubAgentManager.killSubAgent(agentId);
+    if (killed && win && !win.isDestroyed()) {
+      const agent = globalSubAgentManager.getSubAgent(agentId);
+      win.webContents.send("agent:stream-event", {
+        type: "subagent_killed",
+        conversationId: agent?.conversationId,
+        agentId: agent?.id || agentId,
+        agent,
+      });
+    }
+    return killed;
   });
 
   ipcMain.handle(
@@ -805,6 +815,7 @@ app.whenReady().then(() => {
         apiKey,
         model,
         workspacePath: targetWorkspace,
+        conversationId: convoId,
         mode: payload.mode || "ask_before_changes",
         thinkingLevel: payload.thinkingLevel as any,
         maxOutputTokens: payload.maxOutputTokens ?? (modelDef as any)?.maxOutputTokens,
@@ -925,23 +936,26 @@ app.whenReady().then(() => {
       }
     } catch {}
 
-    // Terminate any active sub-agents
-    try {
-      globalSubAgentManager.killAllRunningSubAgents((id) => {
-        if (win && !win.isDestroyed()) {
-          win.webContents.send("agent:subagent-updated", {
-            id,
-            status: "killed",
-            endTime: Date.now(),
-          });
-        }
-      });
-    } catch {}
-
     const safeConvoId =
       typeof targetConvoId === "string" && targetConvoId.trim().length > 0
         ? targetConvoId.trim()
         : undefined;
+
+    // Terminate any active sub-agents scoped to this conversation (or all if un-scoped)
+    try {
+      globalSubAgentManager.killAllRunningSubAgents((id) => {
+        if (win && !win.isDestroyed()) {
+          const agent = globalSubAgentManager.getSubAgent(id);
+          win.webContents.send("agent:stream-event", {
+            type: "subagent_killed",
+            conversationId: agent?.conversationId || safeConvoId,
+            agentId: id,
+            agent,
+          });
+        }
+      }, safeConvoId);
+    } catch {}
+
     let targetSession = safeConvoId ? activeSessions.get(safeConvoId) : undefined;
     if (!targetSession && activeSessions.size === 1) {
       targetSession = activeSessions.values().next().value;

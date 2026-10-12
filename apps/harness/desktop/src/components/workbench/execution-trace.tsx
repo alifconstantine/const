@@ -938,26 +938,122 @@ function SubAgentTraceItem({
   onOpenSubAgent?: (step: TraceStep) => void;
 }) {
   const args = tool.args || {};
-  const rawRole = (args.agent || args.role || "task") as string;
-  const role = rawRole.toLowerCase().trim() === "task" ? "general-purpose" : rawRole;
+  const baseRole = (args.agent || args.role || "task") as string;
+  const resultStr = typeof tool.result === "string" ? tool.result : "";
+
+  // Batch Mode: args.tasks is a non-empty array
+  if (Array.isArray(args.tasks) && args.tasks.length > 0) {
+    return (
+      <div className="flex flex-col gap-0.5">
+        {args.tasks.map((tItem: any, idx: number) => {
+          const itemRoleRaw = (tItem?.agent || tItem?.role || baseRole) as string;
+          const itemRole =
+            itemRoleRaw.toLowerCase().trim() === "task"
+              ? "general-purpose"
+              : itemRoleRaw;
+          const itemHandle = (tItem?.id || tItem?.name) as string | undefined;
+          const itemPrompt = (tItem?.assignment || tItem?.task || tItem?.prompt || "") as string;
+          const itemTitle =
+            tItem?.description ||
+            itemHandle ||
+            (typeof itemPrompt === "string" && itemPrompt
+              ? itemPrompt.slice(0, 70).replace(/[\r\n]+/g, " ")
+              : `Batch Task #${idx + 1}`);
+
+          // Check individual task envelope inside batch result if available
+          const itemEnvelopeRegex = itemHandle
+            ? new RegExp(`<task-result[^>]*name="${itemHandle.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"[^>]*>`, "i")
+            : null;
+          const itemEnvelopeHeader = itemEnvelopeRegex
+            ? resultStr.match(itemEnvelopeRegex)?.[0] || ""
+            : "";
+
+          const isItemFailed = Boolean(
+            tool.isError ||
+              (itemEnvelopeHeader
+                ? itemEnvelopeHeader.includes('status="failed"') ||
+                  itemEnvelopeHeader.includes('status="cancelled"')
+                : resultStr.includes('status="failed"'))
+          );
+          const isItemRunning =
+            !isItemFailed &&
+            (!tool.result ||
+              (itemEnvelopeHeader
+                ? itemEnvelopeHeader.includes('status="running"')
+                : resultStr.includes('status="running"')));
+
+          const syntheticStep: any = {
+            ...tool,
+            targetAgentName: itemHandle,
+            args: {
+              ...args,
+              agent: itemRoleRaw,
+              name: itemHandle,
+              description: itemTitle,
+              assignment: itemPrompt,
+            },
+          };
+
+          return (
+            <div
+              key={`${tool.id || "batch"}_${idx}`}
+              onClick={() => onOpenSubAgent?.(syntheticStep)}
+              className="flex items-center gap-2 py-1 px-1.5 rounded-md hover:bg-white/5 text-[13px] text-[#888888] min-w-0 select-none cursor-pointer group transition-colors"
+              title="Click to view subagent execution in sidebar"
+            >
+              <Bot className="w-3.5 h-3.5 text-[#969696] shrink-0" />
+              <span className="text-[#ffffff] font-medium text-xs shrink-0">SubAgent</span>
+              <span className="text-[11px] font-sans px-1.5 py-0.2 rounded bg-[#1e1e20] border border-[#2e2e2e] text-[#a0a0a0] shrink-0">
+                {itemRole}
+              </span>
+              {itemHandle && (
+                <span className="text-[11px] font-mono text-[#888888] shrink-0">
+                  {itemHandle}
+                </span>
+              )}
+              <span className="text-[#5d5d5d] shrink-0">·</span>
+              <span className="text-[#d4d4d4] group-hover:text-white transition-colors truncate text-xs flex-1 min-w-0 font-normal">
+                {itemTitle}
+              </span>
+              {isItemFailed && (
+                <span className="text-[11px] font-sans text-red-400/90 shrink-0 ml-auto font-medium">
+                  Failed
+                </span>
+              )}
+              {isItemRunning && (
+                <span className="text-[11px] font-sans text-[#ff9900]/90 shrink-0 ml-auto flex items-center gap-1 font-medium">
+                  <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                  Running
+                </span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
+  // Single-Task Mode
+  const role = baseRole.toLowerCase().trim() === "task" ? "general-purpose" : baseRole;
+  const nameMatch = resultStr.match(/name="([^"]+)"/);
+  const handleName = (args.name || args.id || nameMatch?.[1]) as string | undefined;
+  const promptStr = (args.assignment || args.task || args.prompt || "") as string;
   const title =
-    args.name ||
     args.description ||
+    args.name ||
     args.label ||
-    (typeof args.task === "string"
-      ? args.task.slice(0, 70).replace(/[\r\n]+/g, " ")
-      : typeof args.prompt === "string"
-      ? args.prompt.slice(0, 70).replace(/[\r\n]+/g, " ")
+    (typeof promptStr === "string" && promptStr
+      ? promptStr.slice(0, 70).replace(/[\r\n]+/g, " ")
       : "Delegated subagent task");
 
-  const resultStr = typeof tool.result === "string" ? tool.result : "";
   const isFailed = Boolean(
     tool.isError ||
       resultStr.includes('status="failed"') ||
       resultStr.includes('status="cancelled"') ||
       resultStr.includes('<error>')
   );
-  const isRunning = !tool.result && !tool.isError;
+  const isRunning =
+    !isFailed && (!tool.result || resultStr.includes('status="running"'));
 
   return (
     <div
@@ -970,6 +1066,11 @@ function SubAgentTraceItem({
       <span className="text-[11px] font-sans px-1.5 py-0.2 rounded bg-[#1e1e20] border border-[#2e2e2e] text-[#a0a0a0] shrink-0">
         {role}
       </span>
+      {handleName && handleName !== title && (
+        <span className="text-[11px] font-mono text-[#888888] shrink-0">
+          {handleName}
+        </span>
+      )}
       <span className="text-[#5d5d5d] shrink-0">·</span>
       <span className="text-[#d4d4d4] group-hover:text-white transition-colors truncate text-xs flex-1 min-w-0 font-normal">
         {title}

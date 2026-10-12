@@ -778,25 +778,77 @@ function AuthenticatedContent({
     for (const msg of messages) {
       if (msg && msg.role === "assistant" && msg.traceSteps) {
         for (const st of msg.traceSteps) {
-          if (
-            st &&
-            (st.name === "task" || st.name === "spawn_agent" || st.name === "subagent") &&
-            (st.args?.agent || st.args?.role || st.args?.task || st.args?.prompt)
+          if (!st) continue;
+          const isSubTool =
+            st.name === "task" ||
+            st.name === "spawn_agent" ||
+            st.name === "subagent" ||
+            st.name === "delegate_task";
+          if (!isSubTool) continue;
+
+          const baseRole = (st.args?.agent || st.args?.role || "task") as string;
+          const resultStr = typeof st.result === "string" ? st.result : "";
+
+          if (Array.isArray(st.args?.tasks) && st.args.tasks.length > 0) {
+            st.args.tasks.forEach((tItem: any, idx: number) => {
+              const tRole = (tItem?.agent || tItem?.role || baseRole) as string;
+              const tName = (tItem?.id || tItem?.name || `Task${idx + 1}`) as string;
+              const tDesc = (tItem?.description || tName || tRole) as string;
+              const tPrompt = (tItem?.assignment || tItem?.task || tItem?.prompt || tDesc) as string;
+              const agentId = `${st.toolCallId || st.id}_batch_${idx}`;
+              const isFailed = st.isError || resultStr.includes(`status="failed"`);
+              const isRunning = !st.result || resultStr.includes(`status="running"`);
+              if (!foundAgents.some((a) => a.id === agentId)) {
+                foundAgents.push({
+                  id: agentId,
+                  name: tName,
+                  role: tRole,
+                  description: tDesc,
+                  prompt: tPrompt,
+                  status: isFailed ? "failed" : isRunning ? "running" : "completed",
+                  startTime: st.startTime || Date.now(),
+                  endTime: isRunning ? undefined : Date.now(),
+                  logs: [],
+                  result: resultStr || undefined,
+                });
+              }
+            });
+          } else if (
+            st.args?.agent ||
+            st.args?.role ||
+            st.args?.task ||
+            st.args?.prompt ||
+            st.args?.assignment ||
+            st.args?.description
           ) {
-            const role = (st.args.agent || st.args.role || "task") as string;
-            const description = (st.args.name || st.args.description || role) as string;
-            const prompt = (st.args.task || st.args.prompt || "") as string;
-            const agentId = (st.result as any)?.agentId || st.toolCallId || st.id;
+            const role = baseRole;
+            const nameMatch = resultStr.match(/name="([^"]+)"/);
+            const idMatch = resultStr.match(/id="([^"]+)"/);
+            const statusMatch = resultStr.match(/status="([^"]+)"/);
+            const parsedStatus = statusMatch?.[1];
+            const description = (st.args.description || st.args.name || nameMatch?.[1] || role) as string;
+            const prompt = (st.args.assignment || st.args.task || st.args.prompt || description) as string;
+            const agentId = idMatch?.[1] || (st.result as any)?.agentId || st.toolCallId || st.id;
+            const status: SubAgentItem["status"] =
+              parsedStatus === "failed" || st.isError
+                ? "failed"
+                : parsedStatus === "cancelled" || parsedStatus === "killed"
+                ? "killed"
+                : parsedStatus === "running" || !st.result
+                ? "running"
+                : "completed";
             if (!foundAgents.some((a) => a.id === agentId)) {
               foundAgents.push({
                 id: agentId,
+                name: (st.args.name || nameMatch?.[1]) as string | undefined,
                 role,
                 description,
                 prompt,
-                status: "completed",
-                startTime: Date.now(),
-                endTime: Date.now(),
+                status,
+                startTime: st.startTime || Date.now(),
+                endTime: status === "running" ? undefined : Date.now(),
                 logs: [],
+                result: resultStr || undefined,
               });
             }
           }
@@ -815,7 +867,11 @@ function AuthenticatedContent({
       const list = next.get(conversationId) || [];
       next.set(
         conversationId,
-        list.map((a) => (a.id === agentId ? { ...a, status: "killed", endTime: Date.now() } : a))
+        list.map((a) =>
+          a.id === agentId || a.name === agentId
+            ? { ...a, status: "killed", endTime: Date.now() }
+            : a
+        )
       );
       return next;
     });
@@ -831,10 +887,10 @@ function AuthenticatedContent({
     }
 
     const index = activeSubAgents?.findIndex((a) => a.id === subAgent.id) ?? -1;
-    const numPrefix = index >= 0 ? `Sub-agent ${index + 1}: ` : "Sub-agent: ";
+    const handlePrefix = subAgent.name ? `${subAgent.name}: ` : index >= 0 ? `Sub-agent ${index + 1}: ` : "Sub-agent: ";
     const displayTitle = subAgent.description.toLowerCase().startsWith("sub-agent")
       ? subAgent.description
-      : `${numPrefix}${subAgent.description.slice(0, 30)}`;
+      : `${handlePrefix}${subAgent.description.slice(0, 30)}`;
 
     const newTab: RightPaneTab = {
       id: tabId,
@@ -852,18 +908,26 @@ function AuthenticatedContent({
 
   const handleOpenSubAgentFromTrace = (step: any) => {
     const args = step.args || {};
+    const resultStr = typeof step.result === "string" ? step.result : "";
+    const idMatch = resultStr.match(/id="([^"]+)"/);
+    const nameMatch = resultStr.match(/name="([^"]+)"/);
+    const extractedId = step.targetAgentId || idMatch?.[1];
+    const extractedName = step.targetAgentName || args.name || nameMatch?.[1];
+    const promptText = args.assignment || args.task || args.prompt || "";
     const title =
-      args.name ||
       args.description ||
+      args.name ||
       args.label ||
-      (typeof args.task === "string" ? args.task.slice(0, 50) : "Subagent Task");
+      (typeof promptText === "string" && promptText ? promptText.slice(0, 50) : "Subagent Task");
 
     const matching = activeSubAgents?.find(
       (a) =>
+        (extractedId && a.id === extractedId) ||
+        (extractedName && a.name && a.name.toLowerCase() === String(extractedName).toLowerCase()) ||
         (step.id && a.id.includes(step.id)) ||
         (step.toolCallId && a.id.includes(step.toolCallId)) ||
         a.description === title ||
-        (a.prompt && typeof args.task === "string" && a.prompt.includes(args.task.slice(0, 30)))
+        (a.prompt && typeof promptText === "string" && promptText.length > 0 && a.prompt.includes(promptText.slice(0, 30)))
     );
 
     if (matching) {
@@ -871,18 +935,29 @@ function AuthenticatedContent({
       return;
     }
 
-    const tabId = `subagent_${step.id || Date.now()}`;
+    const statusMatch = resultStr.match(/status="([^"]+)"/);
+    const parsedStatus = statusMatch?.[1];
+    const fallbackStatus: SubAgentItem["status"] =
+      parsedStatus === "failed" || step.isError
+        ? "failed"
+        : parsedStatus === "cancelled" || parsedStatus === "killed"
+        ? "killed"
+        : parsedStatus === "running" || !step.result
+        ? "running"
+        : "completed";
+
     const fallbackAgent: SubAgentItem = {
-      id: step.id || `agent_${Date.now()}`,
+      id: extractedId || step.id || `agent_${Date.now()}`,
+      name: extractedName,
       description: title,
-      prompt: args.task || args.prompt || title,
+      prompt: promptText || title,
       role: args.agent || args.role || "task",
-      status: step.isError ? "failed" : step.result ? "completed" : "running",
-      startTime: Date.now() - 5000,
-      endTime: step.result || step.isError ? Date.now() : undefined,
+      status: fallbackStatus,
+      startTime: step.startTime || Date.now() - 5000,
+      endTime: fallbackStatus === "running" ? undefined : Date.now(),
       logs: [`Spawned with role '${args.agent || args.role || "task"}'`],
-      result: typeof step.result === "string" ? step.result : undefined,
-      error: step.isError ? (typeof step.result === "string" ? step.result : "Failed") : undefined,
+      result: resultStr || undefined,
+      error: fallbackStatus === "failed" ? (resultStr || "Failed") : undefined,
     };
 
     handleOpenSubAgent(fallbackAgent);
@@ -1724,15 +1799,21 @@ function AuthenticatedContent({
           setConversationSubAgents((prev) => {
             const next = new Map(prev);
             const list = next.get(targetConvoId) || [];
-            const status = event.type === "subagent_killed" ? "killed" : "completed";
+            const status =
+              event.type === "subagent_killed"
+                ? "killed"
+                : event.error || event.agent?.status === "failed"
+                ? "failed"
+                : event.agent?.status || "completed";
             const updatedList = list.map((a) =>
               a.id === agentId
                 ? {
                     ...a,
-                    status: (status as any),
-                    result: event.result ?? a.result,
-                    error: event.error ?? a.error,
-                    endTime: Date.now(),
+                    ...(event.agent || {}),
+                    status: status as any,
+                    result: event.result ?? event.agent?.result ?? a.result,
+                    error: event.error ?? event.agent?.error ?? a.error,
+                    endTime: event.agent?.endTime || Date.now(),
                   }
                 : a
             );
