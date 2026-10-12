@@ -59,6 +59,9 @@ import {
   DEFAULT_ZOOM,
   ZOOM_STEP,
 } from "../lib/theme";
+import { ModelSettings } from "./settings/model-settings";
+import { loadMultiModalConfig } from "../lib/models-config";
+import { Volume2, Image as ImageIcon, Video as VideoIcon } from "lucide-react";
 
 export interface SettingsViewProps {
   open?: boolean;
@@ -210,9 +213,6 @@ export function SettingsView({
   const [conversationWidth, setConversationWidth] = useConversationWidth();
   const [zoom, setZoom] = useInterfaceZoom();
 
-  // Model settings sub-selection: "const" or custom provider ID or "add-provider"
-  const [selectedProviderId, setSelectedProviderId] = useState<string>("const");
-
   // Local configuration
   const [config, setConfig] = useState<UserConfig | null>(null);
   const [activeModel, setActiveModel] = useState<string>(() => {
@@ -223,6 +223,8 @@ export function SettingsView({
     if (saved === "Gemini 3.6 Flash") return "gemini-3.6-flash";
     return saved;
   });
+
+  const multiModalConfig = useMemo(() => loadMultiModalConfig(), [activeTab]);
 
   const [defaultConfirmationMode, setDefaultConfirmationMode] = useState<
     "ask_before_changes" | "full_access"
@@ -259,44 +261,6 @@ export function SettingsView({
     );
   };
 
-  const [customProviders, setCustomProviders] = useState<
-    Array<{
-      id: string;
-      name: string;
-      baseUrl: string;
-      apiKey: string;
-      format: string;
-      models: Array<{
-        id: string;
-        name: string;
-        supportsThinking?: boolean;
-        thinkingLevels?: string[];
-      }>;
-    }>
-  >([]);
-
-  // Add Provider form state
-  const [newProviderName, setNewProviderName] = useState("");
-  const [newProviderBaseUrl, setNewProviderBaseUrl] = useState("");
-  const [newProviderApiKey, setNewProviderApiKey] = useState("");
-  const [showApiKey, setShowApiKey] = useState(false);
-  const [newProviderFormat, setNewProviderFormat] = useState<string>(
-    "Anthropic: messages (/v1/messages)"
-  );
-  const [newProviderModels, setNewProviderModels] = useState<
-    Array<{
-      id: string;
-      name: string;
-      supportsThinking?: boolean;
-      thinkingLevels?: string[];
-    }>
-  >([]);
-
-  // Add Model dialog state
-  const [isAddingModel, setIsAddingModel] = useState(false);
-  const [tempModelId, setTempModelId] = useState("");
-  const [tempModelName, setTempModelName] = useState("");
-
   const [refreshKey, setRefreshKey] = useState(0);
 
   // Real-time reactive query for 7M Token Quota from Convex
@@ -321,12 +285,6 @@ export function SettingsView({
         if (cfg?.activeModel) {
           setActiveModel(cfg.activeModel);
         }
-        try {
-          const stored = localStorage.getItem("const_harness_custom_providers");
-          if (stored) {
-            setCustomProviders(JSON.parse(stored));
-          }
-        } catch {}
       });
     }
   }, [refreshKey]);
@@ -345,128 +303,6 @@ export function SettingsView({
       window.electron.saveConfig({ activeModel: modelId }).catch(() => {});
     }
     toast.success(`Active model set to ${displayName}`);
-  };
-
-  const handleAddModelToNewProvider = () => {
-    if (!tempModelId.trim()) {
-      toast.error("Model ID cannot be empty");
-      return;
-    }
-    const nameToUse = tempModelName.trim() || tempModelId.trim();
-    setNewProviderModels((prev) => [
-      ...prev,
-      {
-        id: tempModelId.trim(),
-        name: nameToUse,
-        supportsThinking: true,
-        thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
-      },
-    ]);
-    setTempModelId("");
-    setTempModelName("");
-    setIsAddingModel(false);
-  };
-
-  const handleRemoveModelFromNewProvider = (index: number) => {
-    setNewProviderModels((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const handleSaveNewProvider = async () => {
-    if (!newProviderName.trim()) {
-      toast.error("Provider Name is required");
-      return;
-    }
-    if (!newProviderBaseUrl.trim()) {
-      toast.error("Base URL is required");
-      return;
-    }
-    if (newProviderModels.length === 0) {
-      toast.error("Add at least one model before adding the provider");
-      return;
-    }
-
-    const providerId = `custom_${Date.now()}`;
-    const newProvider = {
-      id: providerId,
-      name: newProviderName.trim(),
-      baseUrl: newProviderBaseUrl.trim(),
-      apiKey: newProviderApiKey.trim(),
-      format: newProviderFormat,
-      models: newProviderModels,
-    };
-
-    const updated = [...customProviders, newProvider];
-    setCustomProviders(updated);
-    localStorage.setItem(
-      "const_harness_custom_providers",
-      JSON.stringify(updated)
-    );
-
-    // Also persist to electron ~/.const/config.json
-    if (window.electron?.saveConfig && config) {
-      const mergedProviders = {
-        ...config.providers,
-        [providerId]: {
-          name: newProvider.name,
-          baseUrl: newProvider.baseUrl,
-          apiKey: newProvider.apiKey,
-        },
-      };
-      const mergedModels = [
-        ...(config.customModels || []),
-        ...newProvider.models.map((m) => ({
-          id: m.id,
-          displayName: m.name,
-          provider: providerId,
-          baseUrl: newProvider.baseUrl,
-          supportsThinking: true,
-          thinkingLevels: ["low", "medium", "high", "xhigh", "max"],
-          supportsTools: true,
-        })),
-      ];
-
-      try {
-        await window.electron.saveConfig({
-          providers: mergedProviders,
-          customModels: mergedModels,
-        });
-      } catch {}
-    }
-
-    toast.success(`Provider "${newProvider.name}" added successfully`);
-    setNewProviderName("");
-    setNewProviderBaseUrl("");
-    setNewProviderApiKey("");
-    setNewProviderModels([]);
-    setSelectedProviderId(providerId);
-  };
-
-  const handleDeleteCustomProvider = async (id: string) => {
-    const updated = customProviders.filter((p) => p.id !== id);
-    setCustomProviders(updated);
-    localStorage.setItem(
-      "const_harness_custom_providers",
-      JSON.stringify(updated)
-    );
-
-    if (window.electron?.saveConfig && config) {
-      const remainingProviders = { ...config.providers };
-      delete remainingProviders[id];
-      const remainingModels = (config.customModels || []).filter(
-        (m) => m.provider !== id
-      );
-      try {
-        await window.electron.saveConfig({
-          providers: remainingProviders,
-          customModels: remainingModels,
-        });
-      } catch {}
-    }
-
-    toast.success("Custom provider removed");
-    if (selectedProviderId === id) {
-      setSelectedProviderId("const");
-    }
   };
 
   // Original Const Harness Nav Categories
@@ -645,7 +481,7 @@ export function SettingsView({
                   : activeTab === "appearance"
                   ? "Configure theme mode and conversation workbench layout."
                   : activeTab === "model-settings"
-                  ? "Manage custom model providers. Once configured, they can be selected during chat."
+                  ? "Configure multi-modal AI models for LLM reasoning, speech synthesis, image generation, and cinematic video."
                   : activeTab === "usage-stats"
                   ? "Monitor your weekly token consumption and account usage limits."
                   : "This section is currently being configured and will be available in an upcoming update."}
@@ -858,25 +694,100 @@ export function SettingsView({
                   <span className="text-[11px] font-medium text-[#737373] dark:text-[#969696] uppercase tracking-wider">
                     Workbench Preferences
                   </span>
-                  <div className="rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#222222] p-4 flex items-center justify-between gap-4">
-                    <div className="flex flex-col">
-                      <span className="text-[13px] font-medium text-[#262626] dark:text-white">
-                        Default Model
-                      </span>
-                      <span className="text-[11px] text-[#737373] dark:text-[#969696] mt-0.5">
-                        Active model selected for new tasks and workbench chat.
-                      </span>
+                  <div className="rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#222222] p-4 flex flex-col gap-3.5">
+                    {/* Default LLM */}
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex flex-col">
+                        <span className="text-[13px] font-medium text-[#262626] dark:text-white">
+                          Default LLM Model
+                        </span>
+                        <span className="text-[11px] text-[#737373] dark:text-[#969696] mt-0.5">
+                          Active model selected for new tasks and workbench chat.
+                        </span>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab("model-settings")}
+                        className="px-2.5 py-1 text-[11px] rounded-lg border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#2b2b2b] hover:bg-[#f0f0f2] dark:hover:bg-[#383838] text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer outline-none focus:outline-none"
+                        title="Manage models in Model settings"
+                      >
+                        <Bot className="w-3.5 h-3.5 text-[#737373] dark:text-[#969696]" />
+                        <span className="font-mono">{activeModel}</span>
+                      </button>
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => setActiveTab("model-settings")}
-                      className="px-2.5 py-1 text-[11px] rounded-lg border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#2b2b2b] hover:bg-[#f0f0f2] dark:hover:bg-[#383838] text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer outline-none focus:outline-none"
-                      title="Manage models in Model settings"
-                    >
-                      <Cpu className="w-3.5 h-3.5 text-[#737373] dark:text-[#969696]" />
-                      <span className="font-mono">{activeModel}</span>
-                    </button>
+                    {/* Default Speech */}
+                    <div className="flex items-center justify-between gap-4 pt-2 border-t border-[#dedee2]/60 dark:border-[#383838]/60">
+                      <div className="flex flex-col">
+                        <span className="text-[13px] font-medium text-[#262626] dark:text-white">
+                          Default Voice AI
+                        </span>
+                        <span className="text-[11px] text-[#737373] dark:text-[#969696] mt-0.5">
+                          Synthesizes audio responses and voice dialogues.
+                        </span>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab("model-settings")}
+                        className="px-2.5 py-1 text-[11px] rounded-lg border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#2b2b2b] hover:bg-[#f0f0f2] dark:hover:bg-[#383838] text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer outline-none focus:outline-none"
+                        title="Manage speech in Model settings"
+                      >
+                        <Volume2 className="w-3.5 h-3.5 text-[#737373] dark:text-[#969696]" />
+                        <span className="font-mono text-[#737373] dark:text-[#969696]">
+                          {multiModalConfig.speech.activeModelId || "Not configured"}
+                        </span>
+                      </button>
+                    </div>
+
+                    {/* Default Image */}
+                    <div className="flex items-center justify-between gap-4 pt-2 border-t border-[#dedee2]/60 dark:border-[#383838]/60">
+                      <div className="flex flex-col">
+                        <span className="text-[13px] font-medium text-[#262626] dark:text-white">
+                          Default Image AI
+                        </span>
+                        <span className="text-[11px] text-[#737373] dark:text-[#969696] mt-0.5">
+                          Generates visual assets and UI mockups.
+                        </span>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab("model-settings")}
+                        className="px-2.5 py-1 text-[11px] rounded-lg border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#2b2b2b] hover:bg-[#f0f0f2] dark:hover:bg-[#383838] text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer outline-none focus:outline-none"
+                        title="Manage images in Model settings"
+                      >
+                        <ImageIcon className="w-3.5 h-3.5 text-[#737373] dark:text-[#969696]" />
+                        <span className="font-mono text-[#737373] dark:text-[#969696]">
+                          {multiModalConfig.image.activeModelId || "Not configured"}
+                        </span>
+                      </button>
+                    </div>
+
+                    {/* Default Video */}
+                    <div className="flex items-center justify-between gap-4 pt-2 border-t border-[#dedee2]/60 dark:border-[#383838]/60">
+                      <div className="flex flex-col">
+                        <span className="text-[13px] font-medium text-[#262626] dark:text-white">
+                          Default Video AI
+                        </span>
+                        <span className="text-[11px] text-[#737373] dark:text-[#969696] mt-0.5">
+                          Generates cinematic video clips and motion sequences.
+                        </span>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setActiveTab("model-settings")}
+                        className="px-2.5 py-1 text-[11px] rounded-lg border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#2b2b2b] hover:bg-[#f0f0f2] dark:hover:bg-[#383838] text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white flex items-center gap-1.5 transition-colors cursor-pointer outline-none focus:outline-none"
+                        title="Manage videos in Model settings"
+                      >
+                        <VideoIcon className="w-3.5 h-3.5 text-[#737373] dark:text-[#969696]" />
+                        <span className="font-mono text-[#737373] dark:text-[#969696]">
+                          {multiModalConfig.video.activeModelId || "Not configured"}
+                        </span>
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -1169,443 +1080,12 @@ export function SettingsView({
               </div>
             ) : activeTab === "model-settings" ? (
               /* --------------------------------------------------------- */
-              /* Model Settings View (Two-Column Provider Studio)          */
+              /* Model Settings View (LLM, Speech, Image, Video)          */
               /* --------------------------------------------------------- */
-              <div className="flex flex-col gap-4 pb-6">
-                {/* Header Action: Refresh */}
-                <div className="flex items-center justify-end">
-                  <button
-                    type="button"
-                    onClick={handleRefresh}
-                    className="p-1.5 rounded-lg hover:bg-[#f0f0f2] dark:hover:bg-[#2b2b2b] text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white transition-colors cursor-pointer outline-none focus:outline-none flex items-center gap-1.5 text-xs"
-                    title="Refresh settings and models"
-                  >
-                    <RotateCw className="w-3.5 h-3.5" />
-                    <span>Refresh</span>
-                  </button>
-                </div>
-
-                {/* Two-Column Card Container */}
-                <div className="border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#222222] rounded-2xl flex overflow-hidden min-h-[500px] h-[520px]">
-                  {/* Left Column: Providers & Custom Providers */}
-                  <div className="w-56 sm:w-60 border-r border-[#dedee2] dark:border-[#383838] p-3.5 shrink-0 flex flex-col justify-between bg-[#f4f4f6] dark:bg-[#1b1b1b]">
-                    <div className="flex flex-col gap-4">
-                      {/* Native Main Provider */}
-                      <div className="flex flex-col gap-1.5">
-                        <span className="text-[11px] font-medium text-[#737373] dark:text-[#969696] tracking-wide px-1">
-                          Providers
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => setSelectedProviderId("const")}
-                          className={cn(
-                            "w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all cursor-pointer outline-none focus:outline-none",
-                            selectedProviderId === "const"
-                              ? "bg-[#e2e2e5] dark:bg-[#383838] text-[#262626] dark:text-white"
-                              : "text-[#555555] dark:text-[#d4d4d4] hover:bg-[#e9e9ec] dark:hover:bg-[#2b2b2b] hover:text-[#111111] dark:hover:text-white"
-                          )}
-                        >
-                          <div className="flex items-center gap-2 min-w-0">
-                            <ConstLogoIcon size="xs" className="w-4 h-4 text-[#262626] dark:text-white shrink-0" />
-                            <span className="truncate">Const</span>
-                          </div>
-                          <div className="w-2 h-2 rounded-full bg-[#22c55e] shrink-0" />
-                        </button>
-                      </div>
-
-                      {/* Custom Providers */}
-                      <div className="flex flex-col gap-1.5">
-                        <span className="text-[11px] font-medium text-[#737373] dark:text-[#969696] tracking-wide px-1">
-                          Custom providers
-                        </span>
-
-                        <div className="flex flex-col gap-1">
-                          {customProviders.map((cp) => (
-                            <div
-                              key={cp.id}
-                              className={cn(
-                                "w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all cursor-pointer group outline-none focus:outline-none",
-                                selectedProviderId === cp.id
-                                  ? "bg-[#e2e2e5] dark:bg-[#383838] text-[#262626] dark:text-white"
-                                  : "text-[#555555] dark:text-[#d4d4d4] hover:bg-[#e9e9ec] dark:hover:bg-[#2b2b2b] hover:text-[#111111] dark:hover:text-white"
-                              )}
-                              onClick={() => setSelectedProviderId(cp.id)}
-                            >
-                              <div className="flex items-center gap-2 min-w-0">
-                                <BoxIcon className="w-3.5 h-3.5 text-[#737373] dark:text-[#969696] shrink-0" />
-                                <span className="truncate">{cp.name}</span>
-                              </div>
-                              <div className="flex items-center gap-1.5">
-                                <div className="w-2 h-2 rounded-full bg-[#22c55e] shrink-0" />
-                                <button
-                                  type="button"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleDeleteCustomProvider(cp.id);
-                                  }}
-                                  className="opacity-0 group-hover:opacity-100 p-0.5 hover:text-rose-500 transition-opacity outline-none focus:outline-none"
-                                  title="Delete provider"
-                                >
-                                  <Trash2 className="w-3 h-3" />
-                                </button>
-                              </div>
-                            </div>
-                          ))}
-
-                          {/* + Add provider button */}
-                          <button
-                            type="button"
-                            onClick={() => setSelectedProviderId("add-provider")}
-                            className={cn(
-                              "w-full flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium transition-all cursor-pointer text-left outline-none focus:outline-none",
-                              selectedProviderId === "add-provider"
-                                ? "bg-[#e2e2e5] dark:bg-[#383838] text-[#262626] dark:text-white"
-                                : "text-[#737373] dark:text-[#969696] hover:bg-[#e9e9ec] dark:hover:bg-[#2b2b2b] hover:text-[#262626] dark:hover:text-white"
-                            )}
-                          >
-                            <Plus className="w-3.5 h-3.5" />
-                            <span>Add provider</span>
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Right Column: Provider Configuration or Const Native Details */}
-                  <ScrollArea className="flex-1 min-h-0 h-full p-5 bg-[#ffffff] dark:bg-[#222222]">
-                    {selectedProviderId === "const" ? (
-                      /* Const Native Provider Details */
-                      <div className="flex flex-col gap-5">
-                        {/* Header */}
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <ConstLogoIcon size="sm" className="w-5 h-5 text-[#262626] dark:text-white" />
-                            <h2 className="text-base font-medium text-[#262626] dark:text-white">
-                              Const
-                            </h2>
-                            <span className="text-[10px] uppercase font-mono px-2 py-0.5 rounded-md bg-[#22c55e]/15 text-[#16a34a] dark:text-[#4ade80] border border-[#22c55e]/30">
-                              Native Provider
-                            </span>
-                          </div>
-                          <p className="mt-1 text-xs text-[#737373] dark:text-[#969696]">
-                            Connected directly to <code className="text-[#262626] dark:text-[#d4d4d4] font-mono">router.const.web.id</code> via your Const Account SSO. No manual API keys required.
-                          </p>
-                        </div>
-
-                        {/* Free Weekly Quota Card */}
-                        <div className="border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#161616] rounded-xl p-4 font-mono">
-                          <div className="flex items-center justify-between text-xs text-[#737373] dark:text-[#969696] mb-2">
-                            <span className="font-semibold tracking-wider text-[#262626] dark:text-[#d4d4d4]">
-                              FREE WEEKLY QUOTA
-                            </span>
-                            <span className="tabular-nums text-[11px]">
-                              Resets in {quota?.resetsInText || "7d 0h"}
-                            </span>
-                          </div>
-
-                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mt-3">
-                            <div className="flex items-center gap-2.5">
-                              <span
-                                className={cn(
-                                  "text-sm sm:text-base font-bold tracking-tighter select-all",
-                                  barColorClass
-                                )}
-                              >
-                                [{asciiBar}]
-                              </span>
-                              <span
-                                className={cn(
-                                  "text-xs sm:text-sm font-semibold tabular-nums",
-                                  barColorClass
-                                )}
-                              >
-                                {percentRemaining.toFixed(0)}%
-                              </span>
-                            </div>
-
-                            <div className="text-xs sm:text-sm text-[#262626] dark:text-[#ececec] font-medium tabular-nums">
-                              {formatTokenDisplay(quota?.remainingTokens ?? 7_000_000)}{" "}
-                              <span className="text-[#737373] dark:text-[#888888] font-normal">
-                                / {formatTokenDisplay(quota?.weeklyLimitTokens ?? 7_000_000)} tokens left
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Available Models List */}
-                        <div className="flex flex-col gap-3">
-                          <div className="flex items-center justify-between">
-                            <Label className="text-xs font-medium text-[#262626] dark:text-[#d4d4d4]">
-                              Available Models on Const Router
-                            </Label>
-                            <span className="text-[11px] text-[#737373] dark:text-[#969696]">
-                              Synchronized automatically with chat
-                            </span>
-                          </div>
-
-                          <div className="flex flex-col gap-2">
-                            {BUILTIN_CONST_MODELS.map((m) => {
-                              const isCurrent = activeModel === m.id || activeModel === m.name;
-                              return (
-                                <div
-                                  key={m.id}
-                                  className={cn(
-                                    "border rounded-xl p-3.5 flex flex-col gap-2 transition-all cursor-pointer outline-none focus:outline-none",
-                                    isCurrent
-                                      ? "border-[#ff7a00]/60 bg-[#fff8f2] dark:bg-[#2b2b2b]"
-                                      : "border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#1c1c1c] hover:border-[#b0b0b4] dark:hover:border-[#4a4a4a]"
-                                  )}
-                                  onClick={() => handleSelectActiveModel(m.id)}
-                                >
-                                  <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-xs font-semibold text-[#262626] dark:text-white">
-                                        {m.name}
-                                      </span>
-                                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-[#ebebed] dark:bg-[#2b2b2b] text-[#555555] dark:text-[#a0a0a0] font-mono">
-                                        {m.id}
-                                      </span>
-                                      {isCurrent && (
-                                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#ff7a00]/20 text-[#ea580c] dark:text-[#ff9838] border border-[#ff7a00]/30 font-medium flex items-center gap-1">
-                                          <Check className="w-3 h-3" />
-                                          Active in Chat
-                                        </span>
-                                      )}
-                                      {m.supportsThinking && (
-                                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-[#ff7a00]/10 text-[#ea580c] dark:text-[#ff9838] border border-[#ff7a00]/25 font-sans">
-                                          Thinking: {m.thinkingLevels?.join(", ") || "low, medium, high"}
-                                        </span>
-                                      )}
-                                    </div>
-                                    <div className="flex items-center gap-1.5 text-[11px] text-[#737373] dark:text-[#969696]">
-                                      <span>{m.contextWindow}</span>
-                                      <span>•</span>
-                                      <span>{m.maxOutput}</span>
-                                    </div>
-                                  </div>
-                                  <p className="text-[11px] text-[#666666] dark:text-[#999999] leading-relaxed">
-                                    {m.desc}
-                                  </p>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-
-                        {/* Gateway Connection Details */}
-                        <div className="border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#161616] rounded-xl p-3 text-xs flex flex-col gap-1.5">
-                          <div className="flex items-center justify-between text-[#737373] dark:text-[#969696]">
-                            <span>Gateway Endpoint:</span>
-                            <span className="font-mono text-[#262626] dark:text-[#d4d4d4]">
-                              {CONST_ROUTER_DEFAULT_URL}
-                            </span>
-                          </div>
-                          <div className="flex items-center justify-between text-[#737373] dark:text-[#969696]">
-                            <span>Authentication:</span>
-                            <span className="text-[#16a34a] dark:text-[#4ade80] flex items-center gap-1">
-                              <ShieldCheck className="w-3.5 h-3.5" />
-                              Account SSO Linked
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      /* Custom Provider Configuration Form */
-                      <div className="flex flex-col gap-5 pb-4">
-                        <div>
-                          <h2 className="text-base font-medium text-[#262626] dark:text-white">
-                            Add model provider
-                          </h2>
-                          <p className="text-xs text-[#737373] dark:text-[#969696] mt-0.5">
-                            Configure a custom API endpoint and initial model.
-                          </p>
-                        </div>
-
-                        <div className="space-y-4">
-                          {/* Name Field */}
-                          <div className="space-y-1.5">
-                            <Label className="text-xs text-[#555555] dark:text-[#a0a0a0]">Name</Label>
-                            <Input
-                              type="text"
-                              value={newProviderName}
-                              onChange={(e) => setNewProviderName(e.target.value)}
-                              placeholder="e.g. DeepSeek"
-                              className="bg-[#ffffff] dark:bg-[#2b2b2b] border-[#dedee2] dark:border-[#383838] text-xs text-[#262626] dark:text-white placeholder-[#8a8a8a] dark:placeholder-[#5d5d5d] rounded-xl h-9 font-sans outline-none focus:outline-none ring-0"
-                            />
-                          </div>
-
-                          {/* Base URL Field */}
-                          <div className="space-y-1.5">
-                            <Label className="text-xs text-[#555555] dark:text-[#a0a0a0]">Base URL</Label>
-                            <Input
-                              type="text"
-                              value={newProviderBaseUrl}
-                              onChange={(e) => setNewProviderBaseUrl(e.target.value)}
-                              placeholder="https://api.example.com/v1"
-                              className="bg-[#ffffff] dark:bg-[#2b2b2b] border-[#dedee2] dark:border-[#383838] text-xs text-[#262626] dark:text-white placeholder-[#8a8a8a] dark:placeholder-[#5d5d5d] rounded-xl h-9 font-mono outline-none focus:outline-none ring-0"
-                            />
-                          </div>
-
-                          {/* API Key Field */}
-                          <div className="space-y-1.5">
-                            <Label className="text-xs text-[#555555] dark:text-[#a0a0a0]">API key</Label>
-                            <div className="relative">
-                              <Input
-                                type={showApiKey ? "text" : "password"}
-                                value={newProviderApiKey}
-                                onChange={(e) => setNewProviderApiKey(e.target.value)}
-                                placeholder="Enter API key"
-                                className="bg-[#ffffff] dark:bg-[#2b2b2b] border-[#dedee2] dark:border-[#383838] text-xs text-[#262626] dark:text-white placeholder-[#8a8a8a] dark:placeholder-[#5d5d5d] rounded-xl h-9 pr-9 font-mono outline-none focus:outline-none ring-0"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => setShowApiKey(!showApiKey)}
-                                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#737373] hover:text-[#262626] dark:hover:text-white transition-colors outline-none focus:outline-none"
-                              >
-                                {showApiKey ? (
-                                  <EyeOff className="w-4 h-4" />
-                                ) : (
-                                  <Eye className="w-4 h-4" />
-                                )}
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* API Format Dropdown */}
-                          <div className="space-y-1.5">
-                            <Label className="text-xs text-[#555555] dark:text-[#a0a0a0]">API format</Label>
-                            <select
-                              value={newProviderFormat}
-                              onChange={(e) => setNewProviderFormat(e.target.value)}
-                              className="w-full bg-[#ffffff] dark:bg-[#2b2b2b] border border-[#dedee2] dark:border-[#383838] hover:border-[#b0b0b4] dark:hover:border-[#4a4a4a] text-xs text-[#262626] dark:text-white rounded-xl px-3 py-2 outline-none transition-colors"
-                            >
-                              <option value="Anthropic: messages (/v1/messages)">
-                                Anthropic: messages (/v1/messages)
-                              </option>
-                              <option value="OpenAI: chat/completions (/v1/chat/completions)">
-                                OpenAI: chat/completions (/v1/chat/completions)
-                              </option>
-                              <option value="Google: generateContent (/v1beta)">
-                                Google: generateContent (/v1beta)
-                              </option>
-                            </select>
-                          </div>
-
-                          {/* Model List */}
-                          <div className="space-y-2">
-                            <Label className="text-xs text-[#555555] dark:text-[#a0a0a0]">Model list</Label>
-
-                            {newProviderModels.length === 0 ? (
-                              <div className="border border-dashed border-[#dedee2] dark:border-[#383838] rounded-xl p-3.5 flex items-center gap-2 text-xs text-[#737373] dark:text-[#888888] bg-[#f9f9fb] dark:bg-[#1c1c1c]">
-                                <Info className="w-4 h-4 shrink-0 text-[#737373]" />
-                                <span>
-                                  No models are configured. Add a model to use it in chat.
-                                </span>
-                              </div>
-                            ) : (
-                              <div className="flex flex-col gap-1.5">
-                                {newProviderModels.map((m, idx) => (
-                                  <div
-                                    key={m.id}
-                                    className="border border-[#dedee2] dark:border-[#383838] bg-[#ffffff] dark:bg-[#2b2b2b] rounded-lg px-3 py-2 flex items-center justify-between text-xs"
-                                  >
-                                    <div className="flex items-center gap-2">
-                                      <span className="font-medium text-[#262626] dark:text-white">{m.name}</span>
-                                      <span className="font-mono text-[#737373] dark:text-[#888888] text-[11px]">
-                                        ({m.id})
-                                      </span>
-                                    </div>
-                                    <button
-                                      type="button"
-                                      onClick={() => handleRemoveModelFromNewProvider(idx)}
-                                      className="text-[#737373] hover:text-rose-500 p-1 outline-none focus:outline-none"
-                                      title="Remove model"
-                                    >
-                                      <Trash2 className="w-3 h-3" />
-                                    </button>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
-
-                            {/* Add Model Inline Form */}
-                            {isAddingModel ? (
-                              <div className="border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#1c1c1c] rounded-xl p-3 flex flex-col gap-2.5">
-                                <div className="grid grid-cols-2 gap-2">
-                                  <div>
-                                    <Label className="text-[11px] text-[#737373] dark:text-[#888888]">Model ID</Label>
-                                    <Input
-                                      value={tempModelId}
-                                      onChange={(e) => setTempModelId(e.target.value)}
-                                      placeholder="e.g. deepseek-chat"
-                                      className="bg-[#ffffff] dark:bg-[#2b2b2b] border-[#dedee2] dark:border-[#383838] text-xs text-[#262626] dark:text-white rounded-lg h-8 mt-1 font-mono outline-none focus:outline-none ring-0"
-                                    />
-                                  </div>
-                                  <div>
-                                    <Label className="text-[11px] text-[#737373] dark:text-[#888888]">Display Name</Label>
-                                    <Input
-                                      value={tempModelName}
-                                      onChange={(e) => setTempModelName(e.target.value)}
-                                      placeholder="e.g. DeepSeek V3"
-                                      className="bg-[#ffffff] dark:bg-[#2b2b2b] border-[#dedee2] dark:border-[#383838] text-xs text-[#262626] dark:text-white rounded-lg h-8 mt-1 outline-none focus:outline-none ring-0"
-                                    />
-                                  </div>
-                                </div>
-                                <div className="flex justify-end gap-2">
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => setIsAddingModel(false)}
-                                    className="h-7 text-xs rounded-lg border-[#dedee2] dark:border-[#383838] text-[#262626] dark:text-[#d4d4d4] hover:bg-[#f0f0f2] dark:hover:bg-[#2b2b2b]"
-                                  >
-                                    Cancel
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    onClick={handleAddModelToNewProvider}
-                                    className="h-7 text-xs rounded-lg bg-[#262626] text-white hover:bg-black dark:bg-white dark:text-black dark:hover:bg-[#e0e0e0]"
-                                  >
-                                    Add
-                                  </Button>
-                                </div>
-                              </div>
-                            ) : (
-                              <button
-                                type="button"
-                                onClick={() => setIsAddingModel(true)}
-                                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#dedee2] dark:border-[#383838] text-xs text-[#262626] dark:text-[#d4d4d4] hover:bg-[#f0f0f2] dark:hover:bg-[#2b2b2b] hover:text-black dark:hover:text-white transition-colors cursor-pointer outline-none focus:outline-none"
-                              >
-                                <Plus className="w-3.5 h-3.5" />
-                                <span>Add model</span>
-                              </button>
-                            )}
-                          </div>
-                        </div>
-
-                        {/* Footer Row */}
-                        <div className="pt-4 flex items-center justify-between mt-auto">
-                          <div className="flex items-center gap-1.5 text-xs text-[#737373] dark:text-[#888888]">
-                            {newProviderModels.length === 0 && (
-                              <>
-                                <Info className="w-3.5 h-3.5 text-[#737373]" />
-                                <span>Add at least one model before adding the provider.</span>
-                              </>
-                            )}
-                          </div>
-
-                          <Button
-                            disabled={newProviderModels.length === 0 || !newProviderName.trim()}
-                            onClick={handleSaveNewProvider}
-                            className="bg-[#262626] hover:bg-black text-white dark:bg-[#383838] dark:hover:bg-[#444444] rounded-xl text-xs h-9 px-5 transition-all disabled:opacity-40"
-                          >
-                            Add provider
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                  </ScrollArea>
-                </div>
-              </div>
+              <ModelSettings
+                quota={quota}
+                onActiveModelChanged={(modelId) => handleSelectActiveModel(modelId)}
+              />
             ) : (
               /* --------------------------------------------------------- */
               /* Generic Placeholder for other original tabs               */
@@ -1644,24 +1124,5 @@ export function SettingsView({
         </main>
       </div>
     </div>
-  );
-}
-
-function BoxIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-    >
-      <path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z" />
-      <path d="m3.3 7 8.7 5 8.7-5" />
-      <path d="M12 22V12" />
-    </svg>
   );
 }
