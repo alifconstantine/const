@@ -563,7 +563,7 @@ export function Sidebar({
           <button
             type="button"
             onClick={() => onNewChat?.()}
-            className="w-full flex items-center justify-between px-3 py-2 rounded-xl bg-secondary/80 hover:bg-secondary border border-border/60 hover:border-border text-foreground font-medium text-xs transition-all cursor-pointer shadow-2xs group active:scale-[0.99]"
+            className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-secondary/80 hover:bg-secondary border border-border/60 hover:border-border text-foreground font-medium text-xs transition-all cursor-pointer shadow-2xs group active:scale-[0.99]"
             title={`New chat (${isMac ? "⌘K" : "Ctrl+K"})`}
           >
             <div className="flex items-center gap-2">
@@ -585,7 +585,7 @@ export function Sidebar({
           <button
             type="button"
             onClick={onOpenSearch}
-            className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg text-[#666666] dark:text-[#999999] hover:bg-[#dedee2] dark:hover:bg-[#383838] hover:text-black dark:hover:text-white transition-colors cursor-pointer group"
+            className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-[#666666] dark:text-[#999999] hover:bg-[#dedee2] dark:hover:bg-[#383838] hover:text-black dark:hover:text-white transition-colors cursor-pointer group"
           >
             <Search className="w-4 h-4 text-[#777777] dark:text-[#888888] group-hover:text-black dark:group-hover:text-white transition-colors" />
             <span>Search</span>
@@ -595,7 +595,7 @@ export function Sidebar({
           <button
             type="button"
             onClick={onOpenScheduledTasks}
-            className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg hover:bg-[#dedee2] dark:hover:bg-[#383838] hover:text-black dark:hover:text-white transition-colors cursor-pointer group ${
+            className={`w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-md hover:bg-[#dedee2] dark:hover:bg-[#383838] hover:text-black dark:hover:text-white transition-colors cursor-pointer group ${
               isScheduledTasksActive
                 ? "bg-[#dedee2] dark:bg-[#383838] text-black dark:text-white font-medium"
                 : "text-[#666666] dark:text-[#999999]"
@@ -747,7 +747,7 @@ export function Sidebar({
                                 }}
                                 onMouseEnter={() => setHoveredConvoId(convo.id)}
                                 onMouseLeave={() => setHoveredConvoId(null)}
-                                className={`relative w-full max-w-full h-8 flex items-center justify-between rounded-xl px-2.5 text-[13px] transition-colors cursor-pointer group/chat text-left ${
+                                className={`relative w-full max-w-full h-8 flex items-center justify-between rounded-md px-2.5 text-[13px] transition-colors cursor-pointer group/chat text-left ${
                                   isActive
                                     ? "bg-[#dedee2] dark:bg-[#383838] text-[#262626] dark:text-white font-medium shadow-xs"
                                     : "text-[#666666] dark:text-[#999999] hover:text-black dark:hover:text-white hover:bg-[#dedee2]/60 dark:hover:bg-white/[0.08]"
@@ -954,7 +954,7 @@ export function Sidebar({
                             >
                               {/* Collapsible Project / Group Header */}
                               <div
-                                className="relative w-full max-w-full overflow-hidden flex items-center justify-between px-2 py-1 rounded-lg text-[13px] font-medium text-[#666666] dark:text-[#999999] hover:text-black dark:hover:text-white transition-colors group/folder select-none hover:bg-[#dedee2]/60 dark:hover:bg-white/5"
+                                className="relative w-full max-w-full overflow-hidden flex items-center justify-between px-2 py-1 rounded-md text-[13px] font-medium text-[#666666] dark:text-[#999999] hover:text-black dark:hover:text-white transition-colors group/folder select-none hover:bg-[#dedee2]/60 dark:hover:bg-white/5"
                                 title={`Drag to reorder • ${projectName}`}
                               >
                                 <button
@@ -975,8 +975,8 @@ export function Sidebar({
                                   <button
                                     type="button"
                                     onClick={(e) => {
-                                      e.stopPropagation();
-                                      togglePinProject(projectName);
+                                       e.stopPropagation();
+                                       togglePinProject(projectName);
                                     }}
                                     className={`p-1 rounded hover:bg-[#dedee2] dark:hover:bg-[#383838] transition-colors cursor-pointer ${
                                       pinnedProjects.includes(projectName)
@@ -1034,7 +1034,7 @@ export function Sidebar({
                                               }}
                                               onMouseEnter={() => setHoveredConvoId(convo.id)}
                                               onMouseLeave={() => setHoveredConvoId(null)}
-                                              className={`relative w-full max-w-full h-8 flex items-center justify-between rounded-lg px-2 text-[13px] transition-colors cursor-pointer group/chat text-left ${
+                                              className={`relative w-full max-w-full h-8 flex items-center justify-between rounded-md px-2 text-[13px] transition-colors cursor-pointer group/chat text-left ${
                                                 isActive
                                                   ? "bg-[#dedee2] dark:bg-[#383838] text-[#262626] dark:text-white font-medium shadow-xs"
                                                   : "text-[#666666] dark:text-[#999999] hover:text-black dark:hover:text-white hover:bg-[#dedee2]/60 dark:hover:bg-white/5"
@@ -1247,10 +1247,10 @@ export function Sidebar({
                                   }}
                                   onMouseEnter={() => setHoveredConvoId(convo.id)}
                                   onMouseLeave={() => setHoveredConvoId(null)}
-                                  className={`relative w-full max-w-full h-8 flex items-center justify-between rounded-lg px-2 text-[13px] transition-colors cursor-pointer group/chat text-left ${
+                                  className={`relative w-full max-w-full h-8 flex items-center justify-between rounded-md px-2 text-[13px] transition-colors cursor-pointer group/chat text-left ${
                                     isActive
                                       ? "bg-[#dedee2] dark:bg-[#383838] text-[#262626] dark:text-white font-medium shadow-xs"
-                                      : "text-[#666666] dark:text-[#999999] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5"
+                                      : "text-[#666666] dark:text-[#999999] hover:text-black dark:hover:text-white hover:bg-[#dedee2]/60 dark:hover:bg-white/5"
                                   }`}
                                 >
                                   <AutoScrollTitle
@@ -1403,7 +1403,7 @@ export function Sidebar({
           <DropdownMenuTrigger asChild>
             <button
               type="button"
-              className="w-full flex items-center justify-between gap-3 p-2 rounded-xl hover:bg-[#dedee2] dark:hover:bg-[#383838] transition-colors text-left outline-none cursor-pointer group"
+              className="w-full flex items-center justify-between gap-3 p-2 rounded-lg hover:bg-[#dedee2] dark:hover:bg-[#383838] transition-colors text-left outline-none cursor-pointer group"
               aria-label="Account menu"
             >
               <div className="flex items-center gap-3 min-w-0">
