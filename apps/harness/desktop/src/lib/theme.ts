@@ -128,19 +128,32 @@ export function useConversationWidth(): [ConversationWidth, (width: Conversation
   return [width, setWidth];
 }
 
+export const MIN_ZOOM = 75;
+export const MAX_ZOOM = 140;
+export const DEFAULT_ZOOM = 100;
+export const ZOOM_STEP = 5;
+
+export const ZOOM_OPTIONS = [
+  { label: "80%", value: 80 },
+  { label: "90%", value: 90 },
+  { label: "100% (Default)", value: 100 },
+  { label: "110%", value: 110 },
+  { label: "125%", value: 125 },
+];
+
 export function getSavedZoom(): number {
-  if (typeof window === "undefined") return 100;
+  if (typeof window === "undefined") return DEFAULT_ZOOM;
   const saved = localStorage.getItem("const_interface_zoom");
   if (saved) {
     const parsed = parseInt(saved, 10);
-    if (!isNaN(parsed) && parsed >= 50 && parsed <= 200) {
+    if (!isNaN(parsed) && parsed >= MIN_ZOOM && parsed <= MAX_ZOOM) {
       return parsed;
     }
   }
-  return 100;
+  return DEFAULT_ZOOM;
 }
 
-export function applyZoom(zoom: number = 100) {
+export function applyZoom(zoom: number = DEFAULT_ZOOM) {
   if (typeof window === "undefined" || typeof document === "undefined") return;
   const factor = zoom / 100;
 
@@ -163,9 +176,24 @@ export function applyZoom(zoom: number = 100) {
 
 export function setSavedZoom(zoom: number) {
   if (typeof window === "undefined") return;
-  localStorage.setItem("const_interface_zoom", String(zoom));
-  applyZoom(zoom);
-  window.dispatchEvent(new CustomEvent("const-zoom-change", { detail: zoom }));
+  const clamped = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, Math.round(zoom)));
+  localStorage.setItem("const_interface_zoom", String(clamped));
+  applyZoom(clamped);
+  window.dispatchEvent(new CustomEvent("const-zoom-change", { detail: clamped }));
+}
+
+export function zoomIn() {
+  const current = getSavedZoom();
+  setSavedZoom(Math.min(MAX_ZOOM, current + ZOOM_STEP));
+}
+
+export function zoomOut() {
+  const current = getSavedZoom();
+  setSavedZoom(Math.max(MIN_ZOOM, current - ZOOM_STEP));
+}
+
+export function resetZoom() {
+  setSavedZoom(DEFAULT_ZOOM);
 }
 
 export function useInterfaceZoom(): [number, (zoom: number) => void] {
@@ -236,6 +264,22 @@ export function initThemeListener() {
 
   mediaQuery.addEventListener("change", handleChange);
 
+  // Global keyboard shortcuts for zoom (Ctrl/Cmd + Plus, Minus, 0)
+  const handleKeyDown = (e: KeyboardEvent) => {
+    if ((e.ctrlKey || e.metaKey) && (e.key === "=" || e.key === "+")) {
+      e.preventDefault();
+      zoomIn();
+    } else if ((e.ctrlKey || e.metaKey) && (e.key === "-" || e.key === "_")) {
+      e.preventDefault();
+      zoomOut();
+    } else if ((e.ctrlKey || e.metaKey) && e.key === "0") {
+      e.preventDefault();
+      resetZoom();
+    }
+  };
+
+  window.addEventListener("keydown", handleKeyDown);
+
   // Also listen for Electron native-theme changes if bridged
   let cleanupElectron: (() => void) | undefined;
   if (electron?.onSystemThemeChange) {
@@ -249,6 +293,7 @@ export function initThemeListener() {
 
   return () => {
     mediaQuery.removeEventListener("change", handleChange);
+    window.removeEventListener("keydown", handleKeyDown);
     cleanupElectron?.();
   };
 }
