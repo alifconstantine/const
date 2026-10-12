@@ -176,6 +176,9 @@ const VALID_FALLBACK_TOOLS = new Set([
   "browser_key",
   "browser_scroll",
   "browser_screenshot",
+  "browser_console",
+  "browser_evaluate",
+  "browser_tabs",
   "browser_request_help",
 ]);
 
@@ -388,22 +391,27 @@ Available tools:
 - task: Delegate work to an isolated subagent. Runs synchronously in foreground by default, returning complete findings inside a <task-result> envelope, and streams live progress to the UI. Specialist personas: 'scout' (strictly read-only codebase research/exploration and broad pattern search), 'reviewer' (code review for quality, logic, and security analysis), or 'task' (focused worker with full write/edit capabilities). (Alias: spawn_agent).
 - agent_status: Check status, activity logs, or findings of running or completed subagents (when spawned with run_in_background: true).
 - kill_agent: Terminate an active running subagent.
-- browser_navigate: Navigate the native desktop browser to a URL (e.g. 'http://localhost:3000'), or 'back', 'forward', 'reload'.
-- browser_snapshot: Capture an interactive DOM snapshot of the page with semantic element refs like [e1], [e2].
-- browser_click: Click an interactive element by its semantic ref (e.g. 'e1') or (x, y) coordinates.
-- browser_type: Type text into an input or textarea element by its ref (e.g. 'e2'). Supports clearing text and pressing Enter.
+- browser_navigate: Navigate the native desktop sidepanel browser to a URL (e.g. 'http://localhost:3000'), or 'back', 'forward', 'reload'. Automatically opens the Browser tab if not open yet, and targets the active/last browser tab (or opens a new tab with 'newTab: true').
+- browser_snapshot: Capture a hierarchical ARIA accessibility tree, interactive element refs ([e1], [e2], ...), readable page text, and recent console/network errors. Supports 'diff: true' for compact unified deltas.
+- browser_click: Click an interactive element by its ref (e.g. 'e1'), semantic selector ('text/...', 'role/button[name="..."]', 'label/...', 'placeholder/...', 'testid/...', '#id'), or (x, y) coordinates.
+- browser_type: Type text into an input or textarea by its ref (e.g. 'e2') or selector. Supports clearing text and pressing Enter ('submit: true').
 - browser_key: Send keyboard keys or shortcuts ('Enter', 'Tab', 'Escape', 'ArrowDown').
-- browser_scroll: Scroll the page vertically or horizontally, or scroll an element into view.
-- browser_screenshot: Capture a visual screenshot of the active browser viewport.
-- browser_request_help: Ask the human user to take control for CAPTCHAs, 2FA verification, or sensitive passwords.
+- browser_scroll: Scroll the page by direction ('down', 'up', 'top', 'bottom') or scroll an element ref/selector into view.
+- browser_screenshot: Capture an annotated Set-of-Mark screenshot ([e1], [e2] overlays) of the active browser viewport and save to disk.
+- browser_console: Read captured browser console logs, uncaught page exceptions, and fetch/XHR network requests.
+- browser_evaluate: Execute multi-step browser action sequences ('steps') and/or evaluate custom JavaScript ('script') in a single turn.
+- browser_tabs: List all open browser tabs in the sidepanel or switch the active browser tab.
+- browser_request_help: Hand over control to the human user for CAPTCHAs, 2FA/OTP verification, or masked password/secret entry, pausing until the user hands control back.
 
 NATIVE BROWSER AUTOMATION PROTOCOL:
-- You have direct, live control over the native browser in the desktop pane.
-- When asked to test, view, or interact with web applications (e.g. localhost servers, documentation, or websites):
+- You have direct, live control over the native browser in the desktop sidepanel.
+- If no browser tab is open yet, calling 'browser_navigate' (or any browser tool) will automatically open the right sidebar and mount a Browser tab. When multiple browser tabs are open, actions target the currently active or most recently opened (last) browser tab unless 'tabId' or 'newTab: true' is specified.
+- When asked to test, debug, view, or interact with web applications (e.g. localhost servers, documentation, or websites):
   1. Use 'browser_navigate' to load the URL.
-  2. Use 'browser_snapshot' to inspect interactive elements and obtain their stable refs ([e1], [e2], ...).
-  3. Use 'browser_click' and 'browser_type' using the element refs to interact with the UI.
-  4. If a human check (CAPTCHA, 2FA, OTP, or secret password) appears, call 'browser_request_help' with a clear reason so the user can take the wheel and hand it back.
+  2. Use 'browser_snapshot' to inspect the ARIA tree, interactive element refs ([e1], [e2], ...), and any page/network errors. Use 'diff: true' on subsequent snapshots on the same URL to save context.
+  3. Use 'browser_click', 'browser_type', or 'browser_evaluate' (for multi-step sequences in a single turn) referencing element refs ('e1') or semantic selectors ('text/Sign in', 'placeholder/Search').
+  4. Use 'browser_console' to inspect full console logs and network requests when debugging web apps, and 'browser_screenshot' (with Set-of-Mark annotations) when visual layout inspection is needed ('read' can inspect the saved screenshot file).
+  5. If a human check (CAPTCHA, 2FA, OTP, or secret password) appears, call 'browser_request_help' (setting 'secretWanted' and 'ref' for passwords) so the user can complete it and hand control back.
 
 SUB-AGENT DELEGATION PROTOCOL:
 - You can spawn multiple subagents (maximum 5 subagents per multi-step workflow) to divide modular tasks cleanly.

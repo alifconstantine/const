@@ -100,18 +100,44 @@ export interface BackgroundTaskItem {
   port?: number;
 }
 
+export interface SubAgentTraceStep {
+  id: string;
+  type: "thought" | "tool";
+  content?: string;
+  startTime?: number;
+  durationMs?: number;
+  toolCallId?: string;
+  name?: string;
+  args?: any;
+  result?: any;
+  isError?: boolean;
+  mutation?: FileMutationRecord;
+}
+
 export interface SubAgentItem {
   id: string;
+  name?: string;
   parentId?: string;
+  conversationId?: string;
   description: string;
   prompt: string;
   role?: string;
+  model?: string;
+  thinkingLevel?: string;
   status: "running" | "completed" | "failed" | "killed";
   startTime: number;
   endTime?: number;
   logs: string[];
+  traceSteps?: SubAgentTraceStep[];
   result?: string;
   error?: string;
+  artifactPath?: string;
+  turnCount?: number;
+  tokenUsage?: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  };
 }
 
 export interface AgentEventMap {
@@ -133,8 +159,8 @@ export interface AgentEventMap {
   task_stopped: { taskId: string; code: number | null };
   subagent_started: { agent: SubAgentItem };
   subagent_updated: { agent: SubAgentItem };
-  subagent_finished: { agentId: string; result?: string; error?: string };
-  subagent_killed: { agentId: string };
+  subagent_finished: { agentId: string; result?: string; error?: string; agent?: SubAgentItem };
+  subagent_killed: { agentId: string; agent?: SubAgentItem };
   source_created: { source: any };
   artifact_created: { artifact: any };
 }
@@ -161,6 +187,11 @@ export interface AgentConfig {
   systemPrompt?: string;
   workspacePath?: string;
   learnId?: string;
+  conversationId?: string;
+  parentAgentId?: string;
+  taskDepth?: number;
+  maxRecursionDepth?: number;
+  softTurnBudget?: number;
   maxTurns?: number;
   mode?: "ask_before_changes" | "full_access";
   initialAllowedTools?: Set<string> | string[];
@@ -173,4 +204,3 @@ export interface AgentConfig {
 
 export type ConstAgentMessage = AgentMessage;
 export type ConstAgentConfig = AgentConfig;
-

@@ -402,40 +402,76 @@ function AuthenticatedContent({
     setIsOpeningNewTab(false);
   };
 
-  const handleOpenBrowser = (initialUrl?: any) => {
-    setIsRightSidebarOpen(true);
-    const resolvedUrl =
-      typeof initialUrl === "string" && initialUrl.trim() && initialUrl !== "[object Object]"
-        ? initialUrl.trim()
-        : "https://www.google.com";
+  const activeRightPaneTabIdRef = useRef<string | null>(activeRightPaneTabId);
+  activeRightPaneTabIdRef.current = activeRightPaneTabId;
 
-    const existingBrowser = rightPaneTabs.find((t) => t.type === "browser");
-    if (existingBrowser) {
-      if (
-        typeof initialUrl === "string" &&
-        initialUrl.trim() &&
-        initialUrl !== "[object Object]" &&
-        initialUrl !== existingBrowser.url
-      ) {
-        handleUpdateTab(existingBrowser.id, { url: resolvedUrl });
-      }
-      setActiveRightPaneTabId(existingBrowser.id);
+  const handleOpenBrowser = useCallback(
+    (initialUrl?: any, options?: { tabId?: string; newTab?: boolean }) => {
+      setIsRightSidebarOpen(true);
       setIsOpeningNewTab(false);
-      return;
-    }
+      const hasCustomUrl =
+        typeof initialUrl === "string" &&
+        initialUrl.trim().length > 0 &&
+        initialUrl !== "[object Object]";
+      const resolvedUrl = hasCustomUrl ? initialUrl.trim() : "https://www.google.com";
 
-    const newTab: RightPaneTab = {
-      id: `browser_${Date.now()}`,
-      type: "browser",
-      title: "Browser",
-      url: resolvedUrl,
-      project: currentProject,
-      conversationId,
+      setRightPaneTabs((prev) => {
+        const browserTabs = prev.filter((t) => t.type === "browser");
+
+        if (!options?.newTab && browserTabs.length > 0) {
+          // 1. Explicit tabId if requested
+          // 2. Currently active tab if it is a browser tab
+          // 3. Otherwise the LAST (most recently opened) browser tab
+          const targetTab =
+            (options?.tabId ? browserTabs.find((t) => t.id === options.tabId) : undefined) ||
+            browserTabs.find((t) => t.id === activeRightPaneTabIdRef.current) ||
+            browserTabs[browserTabs.length - 1]!;
+
+          setActiveRightPaneTabId(targetTab.id);
+          window.electron?.browser?.setActiveTab(targetTab.id);
+
+          if (hasCustomUrl && resolvedUrl !== targetTab.url) {
+            return prev.map((t) => (t.id === targetTab.id ? { ...t, url: resolvedUrl } : t));
+          }
+          return prev;
+        }
+
+        const count = browserTabs.length;
+        const newTab: RightPaneTab = {
+          id: options?.tabId || `browser_${Date.now()}`,
+          type: "browser",
+          title: count === 0 ? "Browser" : `Browser ${count + 1}`,
+          url: resolvedUrl,
+          project: currentProject,
+          conversationId,
+        };
+        setActiveRightPaneTabId(newTab.id);
+        window.electron?.browser?.setActiveTab(newTab.id);
+        return [...prev, newTab];
+      });
+    },
+    [currentProject, conversationId]
+  );
+
+  // Sync active browser tab with Electron BrowserController & listen for AI auto-open requests
+  useEffect(() => {
+    const activeTab = rightPaneTabs.find((t) => t.id === activeRightPaneTabId);
+    if (activeTab && activeTab.type === "browser") {
+      window.electron?.browser?.setActiveTab(activeTab.id);
+    }
+  }, [activeRightPaneTabId, rightPaneTabs]);
+
+  useEffect(() => {
+    const unsub = window.electron?.browser?.onOpenTabRequest?.((data) => {
+      handleOpenBrowser(data?.url, {
+        tabId: data?.tabId,
+        newTab: data?.newTab,
+      });
+    });
+    return () => {
+      unsub?.();
     };
-    setRightPaneTabs((prev) => [...prev, newTab]);
-    setActiveRightPaneTabId(newTab.id);
-    setIsOpeningNewTab(false);
-  };
+  }, [handleOpenBrowser]);
 
   const handleUpdateTab = (tabId: string, updates: Partial<RightPaneTab>) => {
     setRightPaneTabs((prev) =>

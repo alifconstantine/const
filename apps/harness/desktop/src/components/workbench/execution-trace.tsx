@@ -12,6 +12,7 @@ import {
   ShieldAlert,
   HelpCircle,
   Bot,
+  Globe,
 } from "lucide-react";
 import { ScrollArea, cn } from "@const/ui";
 import type { FileMutationRecord, TraceStep } from "../../vite-env";
@@ -989,23 +990,56 @@ function SubAgentTraceItem({
 }
 
 // ---------------------------------------------------------------------------
-// Generic Tool Item fallback
+// Generic Tool Item fallback (including browser_* native tools)
 // ---------------------------------------------------------------------------
 function GenericToolItem({ tool }: { tool: TraceToolCall | TraceStep }) {
+  const toolName = tool.name ?? "";
+  const isBrowserTool = toolName.startsWith("browser_");
   let targetArg = "";
   if (tool.args) {
     if (typeof tool.args === "string") {
       targetArg = tool.args;
+    } else if (isBrowserTool) {
+      const refOrSel = tool.args.ref || tool.args.selector || "";
+      if (tool.args.url) {
+        targetArg = tool.args.url;
+      } else if (tool.args.text && refOrSel) {
+        targetArg = `${refOrSel} → "${tool.args.text}"`;
+      } else if (refOrSel) {
+        targetArg = refOrSel;
+      } else if (tool.args.key) {
+        targetArg = `Key: ${tool.args.key}`;
+      } else if (tool.args.direction) {
+        targetArg = `${tool.args.direction} (${tool.args.amount ?? 350}px)`;
+      } else if (tool.args.reason) {
+        targetArg = tool.args.reason;
+      } else if (tool.args.secretWanted) {
+        targetArg = tool.args.secretWanted;
+      } else if (Array.isArray(tool.args.steps)) {
+        targetArg = `${tool.args.steps.length} step(s)`;
+      } else if (tool.args.script) {
+        targetArg = String(tool.args.script).slice(0, 60);
+      } else if (tool.args.compact) {
+        targetArg = "compact";
+      }
     } else {
       targetArg = tool.args.path || tool.args.command || "";
     }
   }
 
+  const displayName = isBrowserTool
+    ? toolName.replace(/^browser_/, "browser ").replace(/_/g, " ")
+    : toolName;
+
   return (
     <div className="flex items-center gap-2 py-1 px-1.5 rounded-md hover:bg-white/5 text-[13px] text-[#888888] min-w-0 select-none">
-      <Layers className="w-3.5 h-3.5 text-[#777777] shrink-0" />
-      <span className="capitalize shrink-0">{tool.name}</span>
-      {targetArg && <span className="text-[#d4d4d4] truncate">{targetArg}</span>}
+      {isBrowserTool ? (
+        <Globe className="w-3.5 h-3.5 text-blue-400/80 shrink-0" />
+      ) : (
+        <Layers className="w-3.5 h-3.5 text-[#777777] shrink-0" />
+      )}
+      <span className="capitalize shrink-0">{displayName}</span>
+      {targetArg && <span className="text-[#d4d4d4] truncate font-mono text-xs">{targetArg}</span>}
     </div>
   );
 }

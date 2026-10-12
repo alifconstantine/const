@@ -171,6 +171,8 @@ contextBridge.exposeInMainWorld("electron", {
       ipcRenderer.invoke("browser:unregister-tab", tabId),
     setActiveTab: (tabId: string) =>
       ipcRenderer.invoke("browser:set-active-tab", tabId),
+    listTabs: () =>
+      ipcRenderer.invoke("browser:list-tabs"),
     getControl: () =>
       ipcRenderer.invoke("browser:get-control"),
     takeControl: () =>
@@ -181,8 +183,8 @@ contextBridge.exposeInMainWorld("electron", {
       ipcRenderer.invoke("browser:supply-secret", text),
     navigate: (url: string) =>
       ipcRenderer.invoke("browser:navigate", url),
-    snapshot: () =>
-      ipcRenderer.invoke("browser:snapshot"),
+    snapshot: (args?: any) =>
+      ipcRenderer.invoke("browser:snapshot", args),
     click: (args: any) =>
       ipcRenderer.invoke("browser:click", args),
     type: (args: any) =>
@@ -193,6 +195,10 @@ contextBridge.exposeInMainWorld("electron", {
       ipcRenderer.invoke("browser:scroll", args),
     screenshot: (args?: any) =>
       ipcRenderer.invoke("browser:screenshot", args),
+    console: (args?: any) =>
+      ipcRenderer.invoke("browser:console", args),
+    evaluate: (args: any) =>
+      ipcRenderer.invoke("browser:evaluate", args),
     onControlChanged: (callback: (state: any) => void) => {
       const handler = (_event: any, state: any) => callback(state);
       ipcRenderer.on("browser:control-changed", handler);
@@ -203,7 +209,7 @@ contextBridge.exposeInMainWorld("electron", {
       ipcRenderer.on("browser:ai-action", handler);
       return () => ipcRenderer.removeListener("browser:ai-action", handler);
     },
-    onOpenTabRequest: (callback: (data: { url: string }) => void) => {
+    onOpenTabRequest: (callback: (data: { url: string; tabId?: string; newTab?: boolean }) => void) => {
       const handler = (_event: any, data: any) => callback(data);
       ipcRenderer.on("browser:open-tab-request", handler);
       return () => ipcRenderer.removeListener("browser:open-tab-request", handler);

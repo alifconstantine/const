@@ -211,13 +211,24 @@ export function RightPane({
 
         {tabs.map((tab) => {
           const isTabActive = !isOpeningNewTab && tab.id === activeTabId;
+          const isBrowser = tab.type === "browser";
           return (
             <div
               key={tab.id}
               className={`w-full h-full min-h-0 ${
-                isTabActive ? "flex flex-col flex-1" : "hidden"
+                isTabActive
+                  ? "flex flex-col flex-1 relative z-10"
+                  : isBrowser
+                  ? "flex flex-col absolute inset-0 opacity-0 pointer-events-none -z-10"
+                  : "hidden"
               }`}
-              style={{ display: isTabActive ? "flex" : "none" }}
+              style={
+                isTabActive
+                  ? { display: "flex" }
+                  : isBrowser
+                  ? { display: "flex", visibility: "hidden" }
+                  : { display: "none" }
+              }
             >
               {renderTabContent(tab)}
             </div>

@@ -175,11 +175,39 @@ export class SubAgentManager {
         if (baseTools.length > 0) {
           if (canonicalRole === "scout") {
             // Read-only tools only
-            const READ_ONLY_TOOLS = ["read", "grep", "find", "ls", "web_search", "web_fetch", "lsp", "ast_grep"];
+            const READ_ONLY_TOOLS = [
+              "read",
+              "grep",
+              "find",
+              "ls",
+              "web_search",
+              "web_fetch",
+              "lsp",
+              "ast_grep",
+              "browser_snapshot",
+              "browser_screenshot",
+              "browser_console",
+              "browser_tabs",
+            ];
             childTools = baseTools.filter((t) => READ_ONLY_TOOLS.includes(t.function.name));
           } else if (canonicalRole === "reviewer") {
-            // Read-only + non-destructive git inspection tools
-            const REVIEWER_TOOLS = ["read", "grep", "find", "ls", "bash", "powershell", "lsp", "ast_grep", "web_search", "web_fetch"];
+            // Read-only + non-destructive git & browser inspection tools
+            const REVIEWER_TOOLS = [
+              "read",
+              "grep",
+              "find",
+              "ls",
+              "bash",
+              "powershell",
+              "lsp",
+              "ast_grep",
+              "web_search",
+              "web_fetch",
+              "browser_snapshot",
+              "browser_screenshot",
+              "browser_console",
+              "browser_tabs",
+            ];
             childTools = baseTools.filter((t) => REVIEWER_TOOLS.includes(t.function.name));
           } else {
             // Worker agent: all tools except subagent spawning (prevents infinite recursive spawns)
@@ -197,6 +225,7 @@ export class SubAgentManager {
           tools: childTools,
           maxTurns: 25,
           mode: "full_access", // Delegated child runs without interactive confirmation prompts
+          browserHandler: context.parentConfig.browserHandler,
         };
 
         const childAgent = new ConstAgent(childConfig);

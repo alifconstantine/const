@@ -9,6 +9,7 @@ import {
   rollbackFileMutation,
   globalTaskManager,
   globalSubAgentManager,
+  registerGlobalBrowserToolHandler,
   type ConstAgentMessage as AgentMessage,
   type FileMutationRecord,
 } from "@const/agent";
@@ -25,6 +26,10 @@ import {
   type ScheduledTaskSchedule,
 } from "./scheduled-tasks";
 import { browserController, type ControlState } from "./browser-controller";
+
+registerGlobalBrowserToolHandler((toolName, args) =>
+  browserController.executeTool(toolName, args)
+);
 
 // Initialize ~/.const/harness directory hierarchy (.gemini/antigravity aligned)
 const constHomeDir = path.join(os.homedir(), ".const");
@@ -1412,6 +1417,9 @@ app.whenReady().then(() => {
         mode: "full_access",
         thinkingLevel: "medium",
         maxTurns: 200,
+        browserHandler: async (toolName, args) => {
+          return await browserController.executeTool(toolName, args);
+        },
       });
 
       const taskName = task.name || task.title || "Scheduled Task";
@@ -1672,10 +1680,10 @@ app.whenReady().then(() => {
         win.webContents.send("browser:ai-action", action);
       }
     },
-    onTabOpenRequest: async (url: string) => {
+    onTabOpenRequest: async (payload: { url: string; tabId?: string; newTab?: boolean }) => {
       if (win && !win.isDestroyed()) {
-        win.webContents.send("browser:open-tab-request", { url });
-        return "browser-tab-default";
+        win.webContents.send("browser:open-tab-request", payload);
+        return payload.tabId || "browser-tab-default";
       }
       return null;
     },
@@ -1699,6 +1707,10 @@ app.whenReady().then(() => {
     return true;
   });
 
+  ipcMain.handle("browser:list-tabs", async () => {
+    return browserController.listTabs();
+  });
+
   ipcMain.handle("browser:get-control", async () => {
     return browserController.getControl();
   });
@@ -1719,8 +1731,8 @@ app.whenReady().then(() => {
     return await browserController.navigate(url);
   });
 
-  ipcMain.handle("browser:snapshot", async () => {
-    return await browserController.snapshot();
+  ipcMain.handle("browser:snapshot", async (_event, args?: any) => {
+    return await browserController.snapshot(args);
   });
 
   ipcMain.handle("browser:click", async (_event, args: any) => {
@@ -1739,8 +1751,16 @@ app.whenReady().then(() => {
     return await browserController.scroll(args);
   });
 
-  ipcMain.handle("browser:screenshot", async (_event, args: any) => {
+  ipcMain.handle("browser:screenshot", async (_event, args?: any) => {
     return await browserController.screenshot(args);
+  });
+
+  ipcMain.handle("browser:console", async (_event, args?: any) => {
+    return await browserController.readConsoleAndNetwork(args);
+  });
+
+  ipcMain.handle("browser:evaluate", async (_event, args: any) => {
+    return await browserController.evaluate(args);
   });
 
   createWindow();

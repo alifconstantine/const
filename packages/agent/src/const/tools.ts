@@ -270,13 +270,23 @@ export const BROWSER_NAVIGATE_TOOL: NativeToolDefinition = {
   function: {
     name: "browser_navigate",
     description:
-      "Navigate the native desktop browser to a specified URL, or go back/forward/reload. Returns the new URL and page title.",
+      "Navigate the native desktop sidepanel browser to a specified URL, or go 'back', 'forward', or 'reload'. If no browser tab is open yet, automatically opens one in the right pane. When multiple browser tabs exist, targets the active or most recently opened (last) browser tab unless tabId or newTab is specified.",
     parameters: {
       type: "object",
       properties: {
         url: {
           type: "string",
-          description: "The full URL to navigate to (e.g. 'https://github.com' or 'http://localhost:3000'), or 'back', 'forward', 'reload'.",
+          description:
+            "The URL to navigate to (e.g. 'https://github.com' or 'http://localhost:3000'), or 'back', 'forward', 'reload'.",
+        },
+        newTab: {
+          type: "boolean",
+          description:
+            "Set to true to open this URL in a brand new browser tab in the sidepanel instead of reusing the current/last browser tab.",
+        },
+        tabId: {
+          type: "string",
+          description: "Optional specific browser tab ID to target.",
         },
       },
       required: ["url"],
@@ -289,10 +299,36 @@ export const BROWSER_SNAPSHOT_TOOL: NativeToolDefinition = {
   function: {
     name: "browser_snapshot",
     description:
-      "Extract a semantic accessibility & interactive DOM snapshot of the active browser page. Interactive elements (links, buttons, inputs) are tagged with short refs like [e1], [e2] which you can use directly with browser_click or browser_type.",
+      "Extract a hierarchical ARIA accessibility tree, interactive DOM element refs ([e1], [e2], ...), readable page text, and recent console/network errors from the active browser tab. Supports oh-my-pi delta diffing (diff: true) and Shadow DOM traversal.",
     parameters: {
       type: "object",
-      properties: {},
+      properties: {
+        selector: {
+          type: "string",
+          description: "Optional CSS selector to scope the snapshot to a specific subtree.",
+        },
+        interactive: {
+          type: "boolean",
+          description: "If true, keep only interactive controls and their structural path in the ARIA tree.",
+        },
+        compact: {
+          type: "boolean",
+          description: "Remove unnamed generic/group wrappers (default: true).",
+        },
+        urls: {
+          type: "boolean",
+          description: "Include resolved href URLs on links in the ARIA tree (default: true).",
+        },
+        diff: {
+          type: "boolean",
+          description:
+            "If true, compare against the previous snapshot on the same URL and return a compact unified delta diff when only part of the page changed.",
+        },
+        tabId: {
+          type: "string",
+          description: "Optional specific browser tab ID to inspect.",
+        },
+      },
     },
   },
 };
@@ -302,13 +338,18 @@ export const BROWSER_CLICK_TOOL: NativeToolDefinition = {
   function: {
     name: "browser_click",
     description:
-      "Click on an interactive element by its semantic ref (e.g. 'e1', 'e2' from browser_snapshot) or directly at (x, y) coordinates. Visual cursor ripples show the click action.",
+      "Click on an interactive element by its ref (e.g. 'e1' from browser_snapshot), by semantic/CSS selector (e.g. 'text/Sign in', 'role/button[name=\"Submit\"]', 'label/Email', 'placeholder/Search', 'testid/login-btn', '#submit'), or at (x, y) coordinates.",
     parameters: {
       type: "object",
       properties: {
         ref: {
           type: "string",
           description: "The element ref ID from browser_snapshot (e.g. 'e1', 'e2'). Recommended.",
+        },
+        selector: {
+          type: "string",
+          description:
+            "Alternative selector: CSS selector or oh-my-pi query prefix ('text/...', 'role/button[name=\"...\"]', 'label/...', 'placeholder/...', 'testid/...', 'xpath/...', 'pierce/...').",
         },
         x: {
           type: "number",
@@ -327,6 +368,10 @@ export const BROWSER_CLICK_TOOL: NativeToolDefinition = {
           type: "number",
           description: "Number of clicks: 1 for single click, 2 for double click (default: 1).",
         },
+        tabId: {
+          type: "string",
+          description: "Optional specific browser tab ID.",
+        },
       },
     },
   },
@@ -337,7 +382,7 @@ export const BROWSER_TYPE_TOOL: NativeToolDefinition = {
   function: {
     name: "browser_type",
     description:
-      "Type text into an input or textarea element by its semantic ref (e.g. 'e2') or the currently focused element. Can automatically clear existing text and press Enter.",
+      "Type text into an input, textarea, or contenteditable element by its ref (e.g. 'e2'), selector (e.g. 'placeholder/Search', 'label/Password'), or the currently focused element. Supports React controlled inputs, clearing existing text, and pressing Enter to submit.",
     parameters: {
       type: "object",
       properties: {
@@ -349,6 +394,11 @@ export const BROWSER_TYPE_TOOL: NativeToolDefinition = {
           type: "string",
           description: "The target element ref ID from browser_snapshot (e.g. 'e2').",
         },
+        selector: {
+          type: "string",
+          description:
+            "Optional CSS or semantic selector (e.g. 'placeholder/Email', 'label/Username', '#email').",
+        },
         clear: {
           type: "boolean",
           description: "Whether to clear existing text before typing (default: true).",
@@ -356,6 +406,10 @@ export const BROWSER_TYPE_TOOL: NativeToolDefinition = {
         submit: {
           type: "boolean",
           description: "Whether to press Enter after typing to submit the form (default: false).",
+        },
+        tabId: {
+          type: "string",
+          description: "Optional specific browser tab ID.",
         },
       },
       required: ["text"],
@@ -381,6 +435,10 @@ export const BROWSER_KEY_TOOL: NativeToolDefinition = {
           items: { type: "string" },
           description: "Optional keyboard modifiers (e.g. ['Control'], ['Shift'], ['Alt']).",
         },
+        tabId: {
+          type: "string",
+          description: "Optional specific browser tab ID.",
+        },
       },
       required: ["key"],
     },
@@ -392,13 +450,22 @@ export const BROWSER_SCROLL_TOOL: NativeToolDefinition = {
   function: {
     name: "browser_scroll",
     description:
-      "Scroll the active browser page or container vertically or horizontally by delta pixels, or scroll to bring a specific element ref into view.",
+      "Scroll the active browser page by direction ('down', 'up', 'top', 'bottom', 'left', 'right'), pixel delta, or scroll a specific element ref/selector into view.",
     parameters: {
       type: "object",
       properties: {
+        direction: {
+          type: "string",
+          enum: ["down", "up", "left", "right", "top", "bottom"],
+          description: "Scroll direction (default: 'down').",
+        },
+        amount: {
+          type: "number",
+          description: "Scroll distance in pixels when using direction (default: 500).",
+        },
         deltaY: {
           type: "number",
-          description: "Vertical scroll amount in pixels (positive scrolls down, negative scrolls up). Default: 500.",
+          description: "Vertical scroll amount in pixels (positive scrolls down, negative scrolls up).",
         },
         deltaX: {
           type: "number",
@@ -407,6 +474,14 @@ export const BROWSER_SCROLL_TOOL: NativeToolDefinition = {
         ref: {
           type: "string",
           description: "Optional element ref ID to scroll directly into view.",
+        },
+        selector: {
+          type: "string",
+          description: "Optional CSS or semantic selector to scroll directly into view.",
+        },
+        tabId: {
+          type: "string",
+          description: "Optional specific browser tab ID.",
         },
       },
     },
@@ -418,13 +493,143 @@ export const BROWSER_SCREENSHOT_TOOL: NativeToolDefinition = {
   function: {
     name: "browser_screenshot",
     description:
-      "Capture a screenshot of the visible browser viewport. Returns image metadata and preview.",
+      "Capture a screenshot of the visible browser viewport with optional Set-of-Mark ([e1], [e2]) interactive element annotations. Saves the image to disk and returns the file path and annotation legend.",
     parameters: {
       type: "object",
       properties: {
+        annotate: {
+          type: "boolean",
+          description:
+            "Overlay numbered [e1], [e2] boxes on interactive elements in the screenshot and return a legend (default: true).",
+        },
         quality: {
           type: "number",
-          description: "JPEG/PNG quality from 1 to 100 (default: 80).",
+          description: "JPEG quality from 10 to 100 (default: 80).",
+        },
+        format: {
+          type: "string",
+          enum: ["jpeg", "png"],
+          description: "Image encoding format (default: 'jpeg').",
+        },
+        ref: {
+          type: "string",
+          description: "Optional element ref to scroll into view before capturing.",
+        },
+        selector: {
+          type: "string",
+          description: "Optional selector to scroll into view before capturing.",
+        },
+        tabId: {
+          type: "string",
+          description: "Optional specific browser tab ID.",
+        },
+      },
+    },
+  },
+};
+
+export const BROWSER_CONSOLE_TOOL: NativeToolDefinition = {
+  type: "function",
+  function: {
+    name: "browser_console",
+    description:
+      "Read captured browser console logs (log, warn, error), uncaught page exceptions, and fetch/XHR network requests from the active browser tab. Ideal for debugging localhost web apps.",
+    parameters: {
+      type: "object",
+      properties: {
+        level: {
+          type: "string",
+          enum: ["all", "error", "warn", "info", "log", "debug"],
+          description: "Filter console messages by severity level (default: 'all').",
+        },
+        includeNetwork: {
+          type: "boolean",
+          description: "Include captured fetch/XHR network requests and status codes (default: true).",
+        },
+        onlyFailedNetwork: {
+          type: "boolean",
+          description: "If true, only return failed network requests with status >= 400 or status 0.",
+        },
+        clear: {
+          type: "boolean",
+          description: "Clear captured console and network buffers after reading (default: false).",
+        },
+        limit: {
+          type: "number",
+          description: "Maximum number of entries to return (default: 50).",
+        },
+        tabId: {
+          type: "string",
+          description: "Optional specific browser tab ID.",
+        },
+      },
+    },
+  },
+};
+
+export const BROWSER_EVALUATE_TOOL: NativeToolDefinition = {
+  type: "function",
+  function: {
+    name: "browser_evaluate",
+    description:
+      "Execute a multi-step sequence of browser actions (click, type, key, scroll, select, wait, navigate) and/or run custom JavaScript inside the browser page in a single turn (oh-my-pi tab.run / tab.evaluate pattern).",
+    parameters: {
+      type: "object",
+      properties: {
+        steps: {
+          type: "array",
+          description: "Optional sequence of browser steps to execute in order before evaluating script.",
+          items: {
+            type: "object",
+            properties: {
+              action: {
+                type: "string",
+                enum: ["navigate", "click", "type", "key", "scroll", "select", "wait"],
+              },
+              url: { type: "string" },
+              ref: { type: "string" },
+              selector: { type: "string" },
+              text: { type: "string" },
+              key: { type: "string" },
+              value: { type: "string" },
+              clear: { type: "boolean" },
+              submit: { type: "boolean" },
+              direction: {
+                type: "string",
+                enum: ["down", "up", "left", "right", "top", "bottom"],
+              },
+              amount: { type: "number" },
+              ms: { type: "number" },
+            },
+            required: ["action"],
+          },
+        },
+        script: {
+          type: "string",
+          description:
+            "Optional JavaScript expression or async function body to execute in the page context (e.g. 'return document.title;' or 'document.querySelectorAll(\"li\").length').",
+        },
+        tabId: {
+          type: "string",
+          description: "Optional specific browser tab ID.",
+        },
+      },
+    },
+  },
+};
+
+export const BROWSER_TABS_TOOL: NativeToolDefinition = {
+  type: "function",
+  function: {
+    name: "browser_tabs",
+    description:
+      "List all open browser tabs in the desktop sidepanel (showing their tabId, URL, title, active status, and which tab is last) or switch the active browser tab.",
+    parameters: {
+      type: "object",
+      properties: {
+        tabId: {
+          type: "string",
+          description: "Optional tabId to switch to and make active.",
         },
       },
     },
@@ -436,21 +641,23 @@ export const BROWSER_REQUEST_HELP_TOOL: NativeToolDefinition = {
   function: {
     name: "browser_request_help",
     description:
-      "Pause automated browser actions and ask the human user to take control (e.g. to solve CAPTCHA, complete 2FA / OTP verification, or enter sensitive credentials). The user will see a banner and take over until handing control back to you.",
+      "Hand over browser control to the human user and pause until they complete manual verification (CAPTCHA, 2FA/OTP, login) or securely enter a password/secret into the page.",
     parameters: {
       type: "object",
       properties: {
         reason: {
           type: "string",
-          description: "Detailed reason why human intervention is required (e.g. 'Please complete Cloudflare Turnstile CAPTCHA', 'Please sign in with your Google account').",
+          description:
+            "Detailed reason why human intervention is required (e.g. 'Please complete Cloudflare Turnstile CAPTCHA', 'Please enter your account password').",
         },
         secretWanted: {
           type: "string",
-          description: "If requesting a password or secret to be typed, the label of the credential (e.g. 'Master Password', 'API Secret').",
+          description:
+            "If requesting a password or secret to be typed without exposing it in chat, the label of the credential (e.g. 'Account Password', 'API Secret').",
         },
         ref: {
           type: "string",
-          description: "Optional target element ref where the secret should be entered.",
+          description: "Optional target element ref where the secret should be entered (e.g. 'e4').",
         },
       },
       required: ["reason"],
@@ -466,6 +673,9 @@ export const NATIVE_BROWSER_TOOLS: NativeToolDefinition[] = [
   BROWSER_KEY_TOOL,
   BROWSER_SCROLL_TOOL,
   BROWSER_SCREENSHOT_TOOL,
+  BROWSER_CONSOLE_TOOL,
+  BROWSER_EVALUATE_TOOL,
+  BROWSER_TABS_TOOL,
   BROWSER_REQUEST_HELP_TOOL,
 ];
 

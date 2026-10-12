@@ -94,16 +94,28 @@ export interface BackgroundTaskItem {
 
 export interface SubAgentItem {
   id: string;
+  name?: string;
   parentId?: string;
+  conversationId?: string;
   description: string;
   prompt: string;
   role?: string;
+  model?: string;
+  thinkingLevel?: string;
   status: "running" | "completed" | "failed" | "killed";
   startTime: number;
   endTime?: number;
   logs: string[];
+  traceSteps?: TraceStep[];
   result?: string;
   error?: string;
+  artifactPath?: string;
+  turnCount?: number;
+  tokenUsage?: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  };
 }
 
 export interface AgentStreamEvent {
@@ -353,6 +365,7 @@ declare global {
         registerTab: (tabId: string, guestContentsId: number) => Promise<boolean>;
         unregisterTab: (tabId: string) => Promise<boolean>;
         setActiveTab: (tabId: string) => Promise<boolean>;
+        listTabs?: () => Promise<any[]>;
         getControl: () => Promise<{
           holder: "bot" | "human";
           since: string;
@@ -367,15 +380,19 @@ declare global {
         releaseControl: () => Promise<any>;
         supplySecret: (text: string) => Promise<{ success: boolean; characters: number }>;
         navigate: (url: string) => Promise<{ url: string; title: string }>;
-        snapshot: () => Promise<any>;
+        snapshot: (args?: any) => Promise<any>;
         click: (args: any) => Promise<any>;
         type: (args: any) => Promise<any>;
         key: (args: any) => Promise<any>;
         scroll: (args: any) => Promise<any>;
         screenshot: (args?: any) => Promise<any>;
+        console?: (args?: any) => Promise<any>;
+        evaluate?: (args: any) => Promise<any>;
         onControlChanged: (callback: (state: any) => void) => () => void;
         onAiAction: (callback: (action: any) => void) => () => void;
-        onOpenTabRequest?: (callback: (data: { url: string }) => void) => () => void;
+        onOpenTabRequest?: (
+          callback: (data: { url: string; tabId?: string; newTab?: boolean }) => void
+        ) => () => void;
       };
     };
   }

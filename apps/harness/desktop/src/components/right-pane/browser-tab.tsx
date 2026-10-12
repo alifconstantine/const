@@ -105,6 +105,8 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
 
   // Element Picker Mode
   const [isElementPickerActive, setIsElementPickerActive] = useState<boolean>(false);
+  const isElementPickerActiveRef = useRef<boolean>(false);
+  const pickerTokenRef = useRef<string | null>(null);
 
   // AI Browser Control State (OpenBot / oh-my-pi architecture)
   const [controlState, setControlState] = useState<{
@@ -171,16 +173,9 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
       setLatestAiAction({ ...act, timestamp: Date.now() });
     });
 
-    const unsubTabReq = window.electron.browser.onOpenTabRequest?.((data) => {
-      if (data.url) {
-        handleNavigate(data.url);
-      }
-    });
-
     return () => {
       unsubControl();
       unsubAction();
-      unsubTabReq?.();
     };
   }, []);
 
@@ -222,7 +217,7 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
     }
   }, [tab.isMuted]);
 
-  // Keep address bar in sync if tab.url changes from outside
+  // Keep address bar and webview in sync if tab.url changes from outside
   useEffect(() => {
     if (
       tab.url &&
@@ -232,6 +227,18 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
     ) {
       setCurrentUrl(tab.url);
       setAddressBarInput(tab.url);
+      setLoadError(null);
+      if (webviewRef.current) {
+        try {
+          const currentWvUrl =
+            typeof webviewRef.current.getURL === "function"
+              ? webviewRef.current.getURL()
+              : "";
+          if (currentWvUrl !== tab.url) {
+            webviewRef.current.loadURL(tab.url);
+          }
+        } catch {}
+      }
     }
   }, [tab.url, currentUrl]);
 
@@ -351,6 +358,8 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
 
     if (isElementPickerActive) {
       // Deactivate
+      pickerTokenRef.current = null;
+      isElementPickerActiveRef.current = false;
       setIsElementPickerActive(false);
       webviewRef.current.executeJavaScript(`
         if (window.__harnessPickerCleanup) {
@@ -359,11 +368,15 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
       `);
     } else {
       // Activate
+      const token = Math.random().toString(36).slice(2) + Date.now().toString(36);
+      pickerTokenRef.current = token;
+      isElementPickerActiveRef.current = true;
       setIsElementPickerActive(true);
       const inspectorScript = `
         (function() {
           if (window.__harnessPickerActive) return;
           window.__harnessPickerActive = true;
+          const PICKER_TOKEN = ${JSON.stringify(token)};
 
           // Remove any existing overlay
           const oldOverlay = document.getElementById('__harness_inspector_overlay');
@@ -502,13 +515,13 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
             };
 
             cleanup();
-            console.log('__HARNESS_ELEMENT_PICK__:' + JSON.stringify(payload));
+            console.log('__HARNESS_ELEMENT_PICK__:' + PICKER_TOKEN + ':' + JSON.stringify(payload));
           }
 
           function onKeyDown(e) {
             if (e.key === 'Escape') {
               cleanup();
-              console.log('__HARNESS_ELEMENT_CANCEL__');
+              console.log('__HARNESS_ELEMENT_CANCEL__:' + PICKER_TOKEN);
             }
           }
 
@@ -600,16 +613,23 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
 
     const handleConsoleMessage = (e: any) => {
       const msg = e.message || "";
-      if (msg.startsWith("__HARNESS_ELEMENT_PICK__:")) {
+      if (!isElementPickerActiveRef.current || !pickerTokenRef.current) return;
+      const pickPrefix = `__HARNESS_ELEMENT_PICK__:${pickerTokenRef.current}:`;
+      const cancelPrefix = `__HARNESS_ELEMENT_CANCEL__:${pickerTokenRef.current}`;
+      if (msg.startsWith(pickPrefix)) {
         try {
-          const raw = msg.replace("__HARNESS_ELEMENT_PICK__:", "");
+          const raw = msg.slice(pickPrefix.length);
           const data: BrowserSelectedElement = JSON.parse(raw);
+          pickerTokenRef.current = null;
+          isElementPickerActiveRef.current = false;
           setIsElementPickerActive(false);
           onSelectElementForChat?.(data);
         } catch (err) {
           console.error("Failed to parse picked element:", err);
         }
-      } else if (msg.startsWith("__HARNESS_ELEMENT_CANCEL__")) {
+      } else if (msg.startsWith(cancelPrefix)) {
+        pickerTokenRef.current = null;
+        isElementPickerActiveRef.current = false;
         setIsElementPickerActive(false);
       }
     };
@@ -945,8 +965,8 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
       </div>
 
       {/* AI Browser Control Status Banners (OpenBot & oh-my-pi inspired) */}
-      {/* Case 1: You have control */}
-      {controlState.holder === "human" && (
+      {/* Case 1: You have control (manual takeover without active AI help prompt) */}
+      {controlState.holder === "human" && !controlState.requested && (
         <div className="bg-[#0b1f13] border-b border-emerald-500/30 px-3.5 py-2 flex items-center justify-between text-xs text-emerald-200 shrink-0 z-10 animate-in fade-in slide-in-from-top-1 duration-150">
           <div className="flex items-center gap-2 min-w-0">
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
@@ -975,21 +995,31 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
             </div>
             <div className="min-w-0">
               <div className="font-semibold text-amber-100 flex items-center gap-1.5">
-                <span>The assistant needs your help</span>
+                <span>The assistant is waiting for your help</span>
               </div>
               <p className="text-amber-200/80 text-[11px] truncate">
-                {controlState.reason || "Please complete manual verification on the page."}
+                {controlState.reason || "Please complete manual verification on the page, then click Done."}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0 ml-3">
+            {controlState.holder !== "human" && (
+              <button
+                type="button"
+                onClick={handleTakeControl}
+                className="px-2.5 py-1.5 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 border border-amber-500/40 text-amber-200 text-xs font-medium transition-colors flex items-center gap-1.5 cursor-pointer"
+              >
+                <User className="w-3.5 h-3.5" />
+                <span>Take control</span>
+              </button>
+            )}
             <button
               type="button"
-              onClick={handleTakeControl}
+              onClick={handleHandBack}
               className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-xs font-semibold transition-colors flex items-center gap-1.5 cursor-pointer shadow-xs"
             >
-              <User className="w-3.5 h-3.5" />
-              <span>Take control</span>
+              <Check className="w-3.5 h-3.5" />
+              <span>Done — Resume AI</span>
             </button>
           </div>
         </div>
@@ -1052,70 +1082,72 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
 
       {/* 2. Web Viewport Area */}
       <div className="flex-1 w-full h-full min-h-0 relative overflow-hidden bg-[#121212] flex flex-col">
-        {loadError ? (
-          /* Friendly Error / Offline Localhost State */
-          <div className="flex-1 w-full h-full flex flex-col items-center justify-center text-center p-6 max-w-sm mx-auto">
-            <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 mb-3.5">
-              <AlertCircle className="w-6 h-6" />
+        {/* Friendly Error / Offline Localhost Overlay (keeps <webview> mounted underneath) */}
+        {loadError && (
+          <div className="absolute inset-0 z-20 bg-[#121212] flex flex-col items-center justify-center text-center p-6">
+            <div className="max-w-sm mx-auto flex flex-col items-center">
+              <div className="w-12 h-12 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 mb-3.5">
+                <AlertCircle className="w-6 h-6" />
+              </div>
+              <h3 className="text-sm font-semibold text-white mb-1">
+                {loadError.url.includes("localhost") || loadError.url.includes("127.0.0.1")
+                  ? "Local server not running"
+                  : "Unable to load page"}
+              </h3>
+              <p className="text-xs text-[#8e8e8e] mb-4 leading-relaxed">
+                {loadError.url.includes("localhost") || loadError.url.includes("127.0.0.1")
+                  ? `Could not connect to ${loadError.url}. Make sure your local development server is running in the terminal.`
+                  : loadError.desc}
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleReloadOrStop}
+                  className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-white text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5"
+                >
+                  <RotateCw className="w-3.5 h-3.5" />
+                  <span>Retry</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleNavigate("https://www.google.com")}
+                  className="px-3 py-1.5 rounded-lg bg-[#242424] hover:bg-[#2e2e2e] text-[#a0a0a0] hover:text-white text-xs transition-colors cursor-pointer"
+                >
+                  Go to Google
+                </button>
+              </div>
             </div>
-            <h3 className="text-sm font-semibold text-white mb-1">
-              {loadError.url.includes("localhost") || loadError.url.includes("127.0.0.1")
-                ? "Local server not running"
-                : "Unable to load page"}
-            </h3>
-            <p className="text-xs text-[#8e8e8e] mb-4 leading-relaxed">
-              {loadError.url.includes("localhost") || loadError.url.includes("127.0.0.1")
-                ? `Could not connect to ${loadError.url}. Make sure your local development server is running in the terminal.`
-                : loadError.desc}
-            </p>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={handleReloadOrStop}
-                className="px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/15 text-white text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5"
-              >
-                <RotateCw className="w-3.5 h-3.5" />
-                <span>Retry</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => handleNavigate("https://www.google.com")}
-                className="px-3 py-1.5 rounded-lg bg-[#242424] hover:bg-[#2e2e2e] text-[#a0a0a0] hover:text-white text-xs transition-colors cursor-pointer"
-              >
-                Go to Google
-              </button>
-            </div>
-          </div>
-        ) : (
-          /* Actual Webview Container with optional responsive viewport framing */
-          <div
-            className={`w-full h-full flex-1 min-h-0 relative flex flex-col ${
-              isCustomWidth
-                ? "shadow-2xl border-x border-[#333333] bg-black mx-auto"
-                : ""
-            }`}
-            style={{
-              width: isCustomWidth ? `${activePresetConfig.width}px` : "100%",
-              maxWidth: "100%",
-              height: "100%",
-            }}
-          >
-            <webview
-              ref={webviewRef}
-              src={initialUrlRef.current || currentUrl}
-              partition="persist:const_browser"
-              allowpopups={true}
-              webpreferences="contextIsolation=yes, backgroundThrottling=no, autoplayPolicy=no-user-gesture-required"
-              className="w-full h-full border-none block flex-1"
-              style={{
-                display: "inline-flex",
-                width: "100%",
-                height: "100%",
-                flex: "1 1 100%",
-              }}
-            />
           </div>
         )}
+
+        {/* Actual Webview Container with optional responsive viewport framing */}
+        <div
+          className={`w-full h-full flex-1 min-h-0 relative flex flex-col ${
+            isCustomWidth
+              ? "shadow-2xl border-x border-[#333333] bg-black mx-auto"
+              : ""
+          }`}
+          style={{
+            width: isCustomWidth ? `${activePresetConfig.width}px` : "100%",
+            maxWidth: "100%",
+            height: "100%",
+          }}
+        >
+          <webview
+            ref={webviewRef}
+            src={initialUrlRef.current || currentUrl}
+            partition="persist:const_browser"
+            allowpopups={true}
+            webpreferences="contextIsolation=yes, backgroundThrottling=no, autoplayPolicy=no-user-gesture-required"
+            className="w-full h-full border-none block flex-1"
+            style={{
+              display: "inline-flex",
+              width: "100%",
+              height: "100%",
+              flex: "1 1 100%",
+            }}
+          />
+        </div>
       </div>
     </div>
   );
