@@ -18,6 +18,7 @@ import {
   Globe,
   Bookmark,
   Sparkles,
+  Brain,
 } from "lucide-react";
 import { ScrollArea, cn, BrandLogo, getConnectorForTool, type ConnectorMetadata } from "@const/ui";
 import { FileIcon } from "./file-icon";
@@ -392,6 +393,23 @@ export function ExecutionTrace({
                 return (
                   <BrowserToolCard
                     key={step.id || `browser_${idx}`}
+                    tool={step}
+                  />
+                );
+              }
+
+              // G3. Long-Term Memory (retain, recall, reflect)
+              if (
+                norm === "retain" ||
+                norm === "recall" ||
+                norm === "reflect" ||
+                norm === "remember" ||
+                norm === "searchmemory" ||
+                norm === "reflectmemory"
+              ) {
+                return (
+                  <MemoryToolCard
+                    key={step.id || `mem_${idx}`}
                     tool={step}
                   />
                 );
@@ -839,6 +857,78 @@ function BrowserToolCard({ tool }: { tool: TraceStep | DisplayToolCall }) {
         <span className="shrink-0">{actionLabel}</span>
         {detailLabel && (
           <span className="text-foreground font-medium truncate">
+            {detailLabel}
+          </span>
+        )}
+        <div className="ml-auto flex items-center gap-1.5 shrink-0">
+          {hasResult && (
+            <ChevronDown
+              className="w-3 h-3 text-muted-foreground transition-transform duration-200 ease-out"
+              style={{ transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)" }}
+            />
+          )}
+        </div>
+      </div>
+
+      {hasResult && (
+        <SmoothCollapse isOpen={isOpen}>
+          <div className="mt-1 p-2 rounded-xl bg-secondary/80 border border-border text-xs font-mono select-text">
+            <ScrollArea className="max-h-48 w-full text-[11px] text-muted-foreground">
+              <pre className="whitespace-pre-wrap">
+                {typeof tool.result === "string"
+                  ? tool.result.slice(0, 2000)
+                  : JSON.stringify(tool.result, null, 2)}
+              </pre>
+            </ScrollArea>
+          </div>
+        </SmoothCollapse>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// 3b. Long-Term Memory Card (retain, recall, reflect)
+// ---------------------------------------------------------------------------
+function MemoryToolCard({ tool }: { tool: TraceStep | DisplayToolCall }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const norm = (tool.name || "").toLowerCase().replace(/[-_]/g, "");
+  const args = tool.args || {};
+
+  let actionLabel = "Memory operation";
+  let detailLabel = "";
+
+  if (norm === "retain" || norm === "remember" || norm === "savememory") {
+    actionLabel = "Saved to long-term memory";
+    if (Array.isArray(args.items) && args.items.length > 0) {
+      detailLabel = args.items[0]?.content
+        ? String(args.items[0].content).slice(0, 48)
+        : `${args.items.length} items`;
+    } else if (args.content) {
+      detailLabel = String(args.content).slice(0, 48);
+    }
+  } else if (norm === "recall" || norm === "searchmemory") {
+    actionLabel = "Retrieved memory";
+    detailLabel = args.query || args.prompt || "";
+  } else if (norm === "reflect" || norm === "reflectmemory") {
+    actionLabel = "Synthesized memories";
+    detailLabel = args.query || "";
+  }
+
+  const hasResult = Boolean(tool.result);
+
+  return (
+    <div className="w-full min-w-0 flex flex-col my-0.5">
+      <div
+        onClick={() => hasResult && setIsOpen((prev) => !prev)}
+        className={`flex items-center gap-2 py-1 px-1.5 rounded-md hover:bg-muted text-[13px] text-muted-foreground min-w-0 select-none ${
+          hasResult ? "cursor-pointer" : ""
+        }`}
+      >
+        <Brain className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
+        <span className="shrink-0">{actionLabel}</span>
+        {detailLabel && (
+          <span className="text-foreground font-medium truncate max-w-[260px]">
             {detailLabel}
           </span>
         )}

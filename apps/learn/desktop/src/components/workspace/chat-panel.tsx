@@ -80,6 +80,14 @@ import { SourcePreviewDialog } from "./source-preview-dialog";
 import { ImageLightbox } from "./image-lightbox";
 import { ApprovalCard } from "./approval-card";
 import type { ApprovalRequestData, ApprovalDecision } from "../../vite-env";
+import { RichMentionEditor, type RichMentionEditorRef } from "./rich-mention-editor";
+import { MentionPopover } from "./mention-popover";
+import {
+  searchMentionCandidates,
+  type ActiveAtToken,
+  type MentionCandidate,
+  type WorkspaceFileEntry,
+} from "../../lib/mention-search";
 
 interface ChatPanelProps {
   learnId?: string;
@@ -389,15 +397,18 @@ export function ChatPanel({
     language: language || "id",
     onTranscript: (liveTranscript) => {
       setInputMessage(liveTranscript);
+      editorRef.current?.setText(liveTranscript);
       if (liveTranscript.length > 50 || liveTranscript.includes("\n")) {
         setIsMultiline(true);
       }
       setTimeout(() => {
+        editorRef.current?.focus();
         textareaRef.current?.focus();
       }, 50);
     },
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const editorRef = useRef<RichMentionEditorRef>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const modelDropdownRef = useRef<HTMLDivElement>(null);
   const [isContextOpen, setIsContextOpen] = useState(false);
@@ -692,6 +703,81 @@ export function ChatPanel({
 
   // Current Learn query to fetch notebook title
   const currentLearn = useLiveQuery(() => (learnId ? db.learns.get(learnId) : undefined), [learnId]);
+
+  // Studio Artifacts query for @mention & prompt augmentation
+  const studioArtifacts =
+    useLiveQuery(
+      () => {
+        if (!learnId) return [];
+        return db.artifacts.where("learnId").equals(learnId).reverse().sortBy("createdAt");
+      },
+      [learnId]
+    ) || [];
+
+  // All learns query for @mention
+  const allLearns = useLiveQuery(() => db.learns.toArray(), []) || [];
+
+  // Rich @mention state
+  const [mentionToken, setMentionToken] = useState<ActiveAtToken | null>(null);
+  const [mentionIndex, setMentionIndex] = useState(0);
+  const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceFileEntry[]>([]);
+
+  // Fetch workspace files for @mention candidates
+  useEffect(() => {
+    let isMounted = true;
+    const fetchFiles = async () => {
+      const electron = (window as any).electron;
+      if (!electron?.listFiles) return;
+
+      let targetPath = workspacePath;
+      if (!targetPath && electron.getDefaultWorkspacePath && learnId) {
+        try {
+          targetPath = await electron.getDefaultWorkspacePath(learnId);
+        } catch {}
+      }
+      if (!targetPath) return;
+
+      try {
+        const files = await electron.listFiles(targetPath);
+        if (isMounted && Array.isArray(files)) {
+          setWorkspaceFiles(files);
+        }
+      } catch {}
+    };
+
+    fetchFiles();
+    return () => {
+      isMounted = false;
+    };
+  }, [workspacePath, learnId]);
+
+  const mentionCandidates = useMemo(() => {
+    if (!mentionToken) return [];
+    return searchMentionCandidates({
+      query: mentionToken.query,
+      quoted: mentionToken.quoted,
+      sources,
+      artifacts: studioArtifacts,
+      files: workspaceFiles,
+      sessionMedia: attachments,
+      learns: allLearns,
+      currentLearnId: learnId,
+      maxResults: 25,
+    });
+  }, [mentionToken, sources, studioArtifacts, workspaceFiles, attachments, allLearns, learnId]);
+
+  const handleDrillDirectory = (candidate: MentionCandidate) => {
+    if (!candidate || !candidate.drillPath) return;
+    editorRef.current?.drillDirectory(candidate);
+    setMentionIndex(0);
+  };
+
+  const handleSelectMentionCandidate = (candidate: MentionCandidate) => {
+    if (!candidate) return;
+    editorRef.current?.insertMention(candidate);
+    setMentionToken(null);
+    setMentionIndex(0);
+  };
 
   const sourcesMap = useMemo(() => {
     const map = new Map<string, LocalSource>();
@@ -1403,6 +1489,21 @@ export function ChatPanel({
     }
   };
 
+  const handlePasteFiles = async (files: FileList) => {
+    const remaining = MAX_ATTACHMENTS - attachments.length;
+    if (remaining <= 0) {
+      toast.warning(
+        language === "id"
+          ? `Maksimal ${MAX_ATTACHMENTS} media telah tercapai`
+          : `Maximum ${MAX_ATTACHMENTS} attachments reached`
+      );
+      return;
+    }
+    const newAttached = await parseUploadedFiles(Array.from(files).slice(0, remaining));
+    setAttachments((prev) => [...prev, ...newAttached].slice(0, MAX_ATTACHMENTS));
+    setIsMultiline(true);
+  };
+
   const handleEditFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
@@ -1473,7 +1574,8 @@ export function ChatPanel({
       stopVoiceListening();
     }
 
-    let textToSend = (customPrompt !== undefined ? customPrompt : inputMessage).trim();
+    const textFromEditor = editorRef.current?.getText();
+    let textToSend = (customPrompt !== undefined ? customPrompt : (textFromEditor ?? inputMessage)).trim();
     const currentAttachmentsRaw = customAttachments ? [...customAttachments] : [...attachments];
 
     if ((!textToSend && currentAttachmentsRaw.length === 0) || isStreaming) return;
@@ -1586,6 +1688,38 @@ export function ChatPanel({
       promptWithAttachments = `${promptWithAttachments}\n\n[${attHeader}:\n${attLines.join("\n")}\n${attInstruction}]`;
     }
 
+    // 4b. Augment prompt with referenced Studio Artifacts if mentioned via @[Title]
+    if (studioArtifacts && studioArtifacts.length > 0) {
+      const mentionMatches = textToSend.match(/@\[([^\]]+)\]/g);
+      if (mentionMatches && mentionMatches.length > 0) {
+        const referencedArtifacts: string[] = [];
+        for (const match of mentionMatches) {
+          const rawName = match.slice(2, -1).trim().toLowerCase();
+          const art = studioArtifacts.find(
+            (a) =>
+              a.title.toLowerCase() === rawName ||
+              a.id.toLowerCase() === rawName ||
+              `artifact_${a.id}`.toLowerCase() === rawName
+          );
+          if (art) {
+            let artBody = `### Referenced Studio Artifact: "${art.title}" (${art.type})\n`;
+            if (art.content) {
+              artBody += art.content.slice(0, 3000);
+            } else if (art.data) {
+              try {
+                artBody += JSON.stringify(art.data, null, 2).slice(0, 3000);
+              } catch {}
+            }
+            referencedArtifacts.push(artBody);
+          }
+        }
+        if (referencedArtifacts.length > 0) {
+          const artHeader = language === "id" ? "Artefak Studio yang Dirujuk" : "Referenced Studio Artifacts";
+          promptWithAttachments = `${promptWithAttachments}\n\n[${artHeader}:\n${referencedArtifacts.join("\n\n")}]`;
+        }
+      }
+    }
+
     // Build NotebookLM-style Grounded Context and System Prompt
     const groundedResult = buildGroundedContext(carriedSources);
     const systemPrompt = buildGroundedSystemPrompt({
@@ -1638,6 +1772,7 @@ export function ChatPanel({
     setMessages([...nextMessages, newAssistantMsg]);
     if (overrideHistory === undefined) {
       setInputMessage("");
+      editorRef.current?.clear();
       setIsMultiline(false);
       if (textareaRef.current) {
         textareaRef.current.style.height = `${SINGLE_LINE_HEIGHT}px`;
@@ -3812,7 +3947,7 @@ export function ChatPanel({
       </ScrollArea>
 
       {/* Sticky Bottom Chat Input Container */}
-      <div className={cn("shrink-0 max-w-3xl mx-auto w-full font-sans", isCompact ? "p-2.5 sm:p-3" : "p-4 sm:p-5")}>
+      <div className={cn("shrink-0 max-w-3xl mx-auto w-full font-sans relative z-30", isCompact ? "p-2.5 sm:p-3" : "p-4 sm:p-5")}>
         {activeApproval ? (
           <ApprovalCard
             request={activeApproval}
@@ -3820,111 +3955,166 @@ export function ChatPanel({
             onDecide={handleRespondApproval}
           />
         ) : (
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (!isStreaming && (inputMessage.trim() || attachments.length > 0)) {
-                handleSend(inputMessage);
-              }
-            }}
-            className={cn(
-              "w-full bg-card border border-border transition-[border-color,padding,opacity] duration-150 shadow-md rounded-[24px]",
-              editingMessageId !== null && "opacity-50 pointer-events-none",
-              isMultiline || attachments.length > 0
-                ? "p-3 sm:p-3.5"
-                : isCompact
-                ? "px-3 py-2 sm:py-2.5"
-                : "px-3 py-1.5 sm:py-2"
-            )}
-            style={{
-              display: "grid",
-              gridTemplateAreas: attachments.length > 0
-                ? '"shelf shelf shelf" "input input input" "plus . actions"'
-                : isMultiline || isCompact
-                ? '"input input input" "plus . actions"'
-                : '"plus input actions"',
-              gridTemplateColumns: "auto 1fr auto",
-              alignItems: isMultiline || attachments.length > 0 || isCompact ? "stretch" : "center",
-              rowGap: isMultiline || attachments.length > 0 || isCompact ? "0.5rem" : "0",
-              columnGap: "0.5rem",
-            }}
-          >
-            {/* Attachments Shelf */}
-            {attachments.length > 0 && (
-              <div style={{ gridArea: "shelf" }} className="w-full overflow-hidden">
-                {renderAttachmentsShelf()}
-              </div>
+          <div className="relative w-full">
+            {/* Mention Autocomplete Popover */}
+            {mentionToken && (
+              <MentionPopover
+                candidates={mentionCandidates}
+                selectedIndex={mentionIndex}
+                onSelect={handleSelectMentionCandidate}
+                onDrill={handleDrillDirectory}
+                onHover={(idx) => setMentionIndex(idx)}
+                onAddSource={onAddSource}
+              />
             )}
 
-            {/* Textarea with ScrollArea - Persistent across single-line & multi-line modes (NEVER UNMOUNTED) */}
-            <div style={{ gridArea: "input" }} className="min-w-0 w-full flex items-center">
-              <ScrollArea
-                className={cn(
-                  "w-full",
-                  isMultiline || attachments.length > 0
-                    ? "max-h-48 sm:max-h-60 [&>div>div[style]]:!block pr-1.5"
-                    : isCompact
-                    ? "min-h-[28px] max-h-32 overflow-hidden pr-1"
-                    : "h-[28px] overflow-hidden"
-                )}
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const text = editorRef.current?.getText() ?? inputMessage;
+                if (!isStreaming && (text.trim() || attachments.length > 0)) {
+                  handleSend(text);
+                }
+              }}
+              className={cn(
+                "w-full bg-card border border-border transition-[border-color,padding,opacity] duration-150 shadow-md rounded-[24px]",
+                editingMessageId !== null && "opacity-50 pointer-events-none",
+                isMultiline || attachments.length > 0
+                  ? "p-3 sm:p-3.5"
+                  : isCompact
+                  ? "px-3 py-2 sm:py-2.5"
+                  : "px-3 py-1.5 sm:py-2"
+              )}
+              style={{
+                display: "grid",
+                gridTemplateAreas: attachments.length > 0
+                  ? '"shelf shelf shelf" "input input input" "plus . actions"'
+                  : isMultiline || isCompact
+                  ? '"input input input" "plus . actions"'
+                  : '"plus input actions"',
+                gridTemplateColumns: "auto 1fr auto",
+                alignItems: isMultiline || attachments.length > 0 || isCompact ? "stretch" : "center",
+                rowGap: isMultiline || attachments.length > 0 || isCompact ? "0.5rem" : "0",
+                columnGap: "0.5rem",
+              }}
+            >
+              {/* Attachments Shelf */}
+              {attachments.length > 0 && (
+                <div style={{ gridArea: "shelf" }} className="w-full overflow-hidden">
+                  {renderAttachmentsShelf()}
+                </div>
+              )}
+
+              {/* Rich Mention Editor with ScrollArea - Persistent across single-line & multi-line modes */}
+              <div
+                style={{ gridArea: "input" }}
+                className="min-w-0 w-full flex items-center cursor-text"
+                onClick={() => {
+                  editorRef.current?.focus();
+                }}
               >
-                <textarea
-                  ref={textareaRef}
-                  value={inputMessage}
-                  onChange={(e) => {
-                    handleInputChange(e.target.value);
-                  }}
-                  onPaste={(e) => {
-                    const text = e.clipboardData.getData("text");
-                    if (text.includes("\n") || text.length > 60) {
-                      setIsMultiline(true);
-                    }
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.shiftKey) {
-                      e.preventDefault();
-                      if (!isStreaming && (inputMessage.trim() || attachments.length > 0)) {
-                        handleSend(inputMessage);
-                      }
-                    } else if (e.key === "Enter" && e.shiftKey) {
-                      setIsMultiline(true);
-                    }
-                  }}
-                  rows={isMultiline || attachments.length > 0 ? 2 : 1}
-                  disabled={isStreaming || editingMessageId !== null}
-                  placeholder={
-                    isStreaming
-                      ? t("inputStreamingPlaceholder")
-                      : editingMessageId !== null
-                      ? (language === "id" ? "Sedang mengedit pesan di atas..." : "Editing message above...")
-                      : t("inputPlaceholder")
-                  }
+                <ScrollArea
                   className={cn(
-                    "w-full resize-none bg-transparent text-[14px] text-foreground placeholder:text-muted-foreground/60 outline-none focus:outline-none focus:ring-0 font-sans block disabled:opacity-50 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden overflow-hidden transition-[height] duration-200 ease-out",
+                    "w-full",
                     isMultiline || attachments.length > 0
-                      ? "leading-[1.65] py-0.5 min-h-[48px]"
+                      ? "max-h-48 sm:max-h-60 [&>div>div[style]]:!block pr-1.5"
                       : isCompact
-                      ? "leading-5 py-0.5 min-h-[26px] max-h-[80px]"
-                      : "leading-5 py-1 h-[28px] max-h-[28px] overflow-hidden"
+                      ? "min-h-[28px] max-h-32 overflow-hidden pr-1"
+                      : "h-[28px] overflow-hidden"
                   )}
-                  style={{
-                    height: isMultiline || attachments.length > 0 || isCompact ? undefined : `${SINGLE_LINE_HEIGHT}px`,
-                  }}
-                />
-              </ScrollArea>
-            </div>
+                >
+                  <RichMentionEditor
+                    ref={editorRef}
+                    initialValue=""
+                    placeholder={
+                      isStreaming
+                        ? t("inputStreamingPlaceholder")
+                        : editingMessageId !== null
+                        ? (language === "id" ? "Sedang mengedit pesan di atas..." : "Editing message above...")
+                        : t("inputPlaceholder")
+                    }
+                    disabled={isStreaming || editingMessageId !== null}
+                    onSerializedChange={handleInputChange}
+                    onMentionTokenChange={(tok) => {
+                      setMentionToken(tok);
+                      setMentionIndex(0);
+                    }}
+                    onOpenSourcePreview={handleCitationClick}
+                    onOpenArtifactPreview={onOpenStudioArtifact}
+                    onSend={() => {
+                      const text = editorRef.current?.getText() ?? inputMessage;
+                      if (!isStreaming && (text.trim() || attachments.length > 0)) {
+                        handleSend(text);
+                      }
+                    }}
+                    onPasteFiles={handlePasteFiles}
+                    onKeyDown={(e) => {
+                      if (mentionToken && mentionCandidates.length > 0) {
+                        if (e.key === "ArrowDown") {
+                          e.preventDefault();
+                          setMentionIndex((prev) => (prev + 1) % mentionCandidates.length);
+                          return;
+                        }
+                        if (e.key === "ArrowUp") {
+                          e.preventDefault();
+                          setMentionIndex((prev) => (prev - 1 + mentionCandidates.length) % mentionCandidates.length);
+                          return;
+                        }
+                        if (e.key === "Tab") {
+                          e.preventDefault();
+                          const candidate = mentionCandidates[mentionIndex];
+                          if (candidate) {
+                            if (candidate.kind === "directory" && candidate.drillPath) {
+                              handleDrillDirectory(candidate);
+                            } else {
+                              handleSelectMentionCandidate(candidate);
+                            }
+                          }
+                          return;
+                        }
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          const candidate = mentionCandidates[mentionIndex];
+                          if (candidate) {
+                            handleSelectMentionCandidate(candidate);
+                          }
+                          return;
+                        }
+                        if (e.key === "Escape") {
+                          e.preventDefault();
+                          setMentionToken(null);
+                          return;
+                        }
+                      }
 
-            {/* Plus Button */}
-            <div style={{ gridArea: "plus" }} className="shrink-0 self-center flex items-center">
-              {renderPlusButton()}
-            </div>
+                      if (e.key === "Enter" && e.shiftKey) {
+                        setIsMultiline(true);
+                      }
+                    }}
+                    className={cn(
+                      "w-full resize-none bg-transparent text-[14px] text-foreground placeholder:text-muted-foreground/60 outline-none focus:outline-none focus:ring-0 font-sans block disabled:opacity-50 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden overflow-hidden transition-[height] duration-200 ease-out",
+                      isMultiline || attachments.length > 0
+                        ? "leading-[1.65] py-0.5 min-h-[48px]"
+                        : isCompact
+                        ? "leading-5 py-0.5 min-h-[26px] max-h-[80px]"
+                        : "leading-5 py-1 h-[28px] max-h-[28px] overflow-hidden"
+                    )}
+                  />
+                </ScrollArea>
+              </div>
 
-            {/* Right Action Items: Model Dropdown + Send Button */}
-            <div style={{ gridArea: "actions" }} className="flex items-center gap-1.5 shrink-0 justify-self-end self-center">
-              {renderModelDropdown()}
-              {renderSendButton()}
-            </div>
-          </form>
+              {/* Plus Button */}
+              <div style={{ gridArea: "plus" }} className="shrink-0 self-center flex items-center">
+                {renderPlusButton()}
+              </div>
+
+              {/* Right Action Items: Model Dropdown + Send Button */}
+              <div style={{ gridArea: "actions" }} className="flex items-center gap-1.5 shrink-0 justify-self-end self-center">
+                {renderModelDropdown()}
+                {renderSendButton()}
+              </div>
+            </form>
+          </div>
         )}
 
         {/* Active Conversation Footer Telemetry Bar */}

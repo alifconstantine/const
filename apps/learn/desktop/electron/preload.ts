@@ -19,6 +19,8 @@ contextBridge.exposeInMainWorld("electron", {
     ipcRenderer.invoke("workspace:get-default-path", learnId),
   deleteWorkspacePath: (learnId: string) =>
     ipcRenderer.invoke("workspace:delete-dir", learnId),
+  listFiles: (folderPath?: string) =>
+    ipcRenderer.invoke("workspace:list-files", folderPath),
   startAuth: (options?: { accountsUrl?: string; action?: string }) =>
     ipcRenderer.invoke("auth:start-login", options),
   cancelAuth: () => ipcRenderer.invoke("auth:cancel-login"),

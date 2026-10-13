@@ -698,6 +698,99 @@ export const NATIVE_BROWSER_TOOLS: NativeToolDefinition[] = [
 ];
 
 // ---------------------------------------------------------------------------
+// Long-Term Memory Tool Definitions (retain, recall, reflect)
+// ---------------------------------------------------------------------------
+
+export const RETAIN_TOOL: NativeToolDefinition = {
+  type: "function",
+  function: {
+    name: "retain",
+    description:
+      "Store important facts, learner conventions, study preferences, milestones, or decisions into durable long-term memory across chat sessions.",
+    parameters: {
+      type: "object",
+      properties: {
+        items: {
+          type: "array",
+          description: "Array of memory items to retain.",
+          items: {
+            type: "object",
+            properties: {
+              content: {
+                type: "string",
+                description: "Information or fact to remember.",
+              },
+              context: {
+                type: "string",
+                description: "Optional background or source context.",
+              },
+              scope: {
+                type: "string",
+                enum: ["project", "global"],
+                description: "Memory scope: 'project' (current workspace) or 'global' (cross-project knowledge).",
+              },
+            },
+            required: ["content"],
+          },
+        },
+      },
+      required: ["items"],
+    },
+  },
+};
+
+export const RECALL_TOOL: NativeToolDefinition = {
+  type: "function",
+  function: {
+    name: "recall",
+    description:
+      "Search long-term memory for previously retained facts, study topics, misconceptions, or user preferences.",
+    parameters: {
+      type: "object",
+      properties: {
+        query: {
+          type: "string",
+          description: "Natural language search query to recall relevant memories.",
+        },
+        scope: {
+          type: "string",
+          enum: ["project", "global", "all"],
+          description: "Scope filter (default: 'all').",
+        },
+        limit: {
+          type: "number",
+          description: "Maximum memories to return (default: 10).",
+        },
+      },
+      required: ["query"],
+    },
+  },
+};
+
+export const REFLECT_TOOL: NativeToolDefinition = {
+  type: "function",
+  function: {
+    name: "reflect",
+    description:
+      "Synthesize an overview or answer a question using relevant entries stored in long-term memory.",
+    parameters: {
+      type: "object",
+      properties: {
+        query: {
+          type: "string",
+          description: "Question or topic to reflect upon based on retained memory.",
+        },
+        context: {
+          type: "string",
+          description: "Optional additional context to guide reflection.",
+        },
+      },
+      required: ["query"],
+    },
+  },
+};
+
+// ---------------------------------------------------------------------------
 // Native Tool Definitions (Pi Standard 4 Core Tools + Aliases)
 // ---------------------------------------------------------------------------
 
@@ -1621,92 +1714,9 @@ export const CONST_DEFAULT_TOOLS: NativeToolDefinition[] = [
       },
     },
   },
-  {
-    type: "function",
-    function: {
-      name: "retain",
-      description:
-        "Store important architectural facts, conventions, user preferences, or decisions into durable long-term memory across chat sessions.",
-      parameters: {
-        type: "object",
-        properties: {
-          items: {
-            type: "array",
-            description: "Array of memory items to retain.",
-            items: {
-              type: "object",
-              properties: {
-                content: {
-                  type: "string",
-                  description: "Information or fact to remember.",
-                },
-                context: {
-                  type: "string",
-                  description: "Optional background or source context.",
-                },
-                scope: {
-                  type: "string",
-                  enum: ["project", "global"],
-                  description: "Memory scope: 'project' (current workspace) or 'global' (cross-project knowledge).",
-                },
-              },
-              required: ["content"],
-            },
-          },
-        },
-        required: ["items"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "recall",
-      description:
-        "Search long-term memory for previously retained facts, architectural decisions, or user preferences.",
-      parameters: {
-        type: "object",
-        properties: {
-          query: {
-            type: "string",
-            description: "Natural language search query to recall relevant memories.",
-          },
-          scope: {
-            type: "string",
-            enum: ["project", "global", "all"],
-            description: "Scope filter (default: 'all').",
-          },
-          limit: {
-            type: "number",
-            description: "Maximum memories to return (default: 10).",
-          },
-        },
-        required: ["query"],
-      },
-    },
-  },
-  {
-    type: "function",
-    function: {
-      name: "reflect",
-      description:
-        "Synthesize an overview or answer a question using relevant entries stored in long-term memory.",
-      parameters: {
-        type: "object",
-        properties: {
-          query: {
-            type: "string",
-            description: "Question or topic to reflect upon based on retained memory.",
-          },
-          context: {
-            type: "string",
-            description: "Optional additional context to guide reflection.",
-          },
-        },
-        required: ["query"],
-      },
-    },
-  },
+  RETAIN_TOOL,
+  RECALL_TOOL,
+  REFLECT_TOOL,
   {
     type: "function",
     function: {
@@ -2237,6 +2247,9 @@ export const CONST_LEARN_TOOLS: NativeToolDefinition[] = [
       },
     },
   },
+  RETAIN_TOOL,
+  RECALL_TOOL,
+  REFLECT_TOOL,
   ...NATIVE_BROWSER_TOOLS,
 ];
 

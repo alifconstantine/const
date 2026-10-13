@@ -507,6 +507,9 @@ Available tools:
 - grep: Search for key terms, theories, definitions, or equations across documents.
 - ask_question: Ask the student a clarifying question or Socratic inquiry with interactive structured choices (active recall).
 - todo_write: Track learning path milestones and study goals.
+- retain: Store important facts, user preferences, target exam goals, key strengths, misconceptions, or learning milestones in durable long-term memory across sessions.
+- recall: Search durable long-term memory for previously retained concepts, past learning history, or user preferences.
+- reflect: Synthesize an overview or answer a question using relevant entries stored in long-term memory.
 - browser_navigate: Navigate the native desktop sidepanel browser to a URL (e.g. articles, Wikipedia, arXiv, interactive web labs, or local HTML simulators), or 'back', 'forward', 'reload'. Automatically switches the right pane to Preview mode and opens a Browser tab if not open yet, and targets the active/last browser tab (or opens a new tab with 'newTab: true').
 - browser_snapshot: Capture a hierarchical ARIA accessibility tree, interactive element refs ([e1], [e2], ...), readable page text, and recent console/network errors. Supports 'diff: true' for compact unified deltas.
 - browser_click: Click an interactive element by its ref (e.g. 'e1'), semantic selector ('text/...', 'role/button[name="..."]', 'label/...', 'placeholder/...', 'testid/...', '#id'), or (x, y) coordinates.

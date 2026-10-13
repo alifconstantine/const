@@ -1069,6 +1069,137 @@ app.on("second-instance", (_event, commandLine) => {
     }
   });
 
+  const workspaceFilesCache = new Map<string, { timestamp: number; data: any[] }>();
+
+  ipcMain.handle("workspace:list-files", async (_event, workspacePath?: string) => {
+    if (!workspacePath || !fs.existsSync(workspacePath)) return [];
+
+    const cached = workspaceFilesCache.get(workspacePath);
+    if (cached && Date.now() - cached.timestamp < 15000) {
+      return cached.data;
+    }
+
+    try {
+      const results: Array<{
+        id: string;
+        name: string;
+        path: string;
+        parentDir?: string;
+        fullPath: string;
+        type: "code" | "image" | "doc" | "generic";
+        kind: "file" | "directory";
+      }> = [];
+
+      const ignored = new Set([
+        "node_modules",
+        ".git",
+        "dist",
+        "build",
+        ".next",
+        ".turbo",
+        ".cache",
+        "out",
+        "coverage",
+        "target",
+        ".idea",
+        ".vscode",
+        ".venv",
+        "__pycache__",
+        ".pytest_cache",
+        ".mypy_cache",
+        ".gradle",
+        ".DS_Store",
+      ]);
+
+      const getFileType = (ext: string): "code" | "image" | "doc" | "generic" => {
+        const lower = ext.toLowerCase();
+        if (
+          [
+            ".ts",
+            ".tsx",
+            ".js",
+            ".jsx",
+            ".json",
+            ".html",
+            ".css",
+            ".scss",
+            ".py",
+            ".rs",
+            ".go",
+            ".c",
+            ".cpp",
+            ".h",
+            ".sh",
+            ".yaml",
+            ".yml",
+            ".toml",
+            ".sql",
+          ].includes(lower)
+        ) {
+          return "code";
+        }
+        if ([".png", ".jpg", ".jpeg", ".gif", ".svg", ".webp", ".ico"].includes(lower)) {
+          return "image";
+        }
+        if ([".md", ".txt", ".pdf", ".doc", ".docx", ".csv"].includes(lower)) {
+          return "doc";
+        }
+        return "generic";
+      };
+
+      const MAX_DEPTH = 10;
+      const MAX_ENTRIES = 5000;
+
+      const walk = (currentDir: string, depth: number) => {
+        if (depth > MAX_DEPTH || results.length >= MAX_ENTRIES) return;
+        try {
+          const entries = fs.readdirSync(currentDir, { withFileTypes: true });
+          for (const entry of entries) {
+            if (results.length >= MAX_ENTRIES) break;
+            if (entry.name.startsWith(".") && entry.name !== ".env") continue;
+            const fullPath = path.join(currentDir, entry.name);
+            const rawRel = path.relative(workspacePath, fullPath);
+            const relPath = rawRel.replace(/\\/g, "/");
+            const parentRaw = path.relative(workspacePath, currentDir);
+            const parentDir = parentRaw === "" || parentRaw === "." ? "" : parentRaw.replace(/\\/g, "/");
+
+            if (entry.isDirectory()) {
+              if (!ignored.has(entry.name)) {
+                results.push({
+                  id: fullPath,
+                  name: entry.name,
+                  path: relPath,
+                  parentDir,
+                  fullPath,
+                  type: "generic",
+                  kind: "directory",
+                });
+                walk(fullPath, depth + 1);
+              }
+            } else if (entry.isFile()) {
+              const ext = path.extname(entry.name);
+              results.push({
+                id: fullPath,
+                name: entry.name,
+                path: relPath,
+                parentDir,
+                fullPath,
+                type: getFileType(ext),
+                kind: "file",
+              });
+            }
+          }
+        } catch {}
+      };
+
+      walk(workspacePath, 1);
+      workspaceFilesCache.set(workspacePath, { timestamp: Date.now(), data: results });
+      return results;
+    } catch {
+      return [];
+    }
+  });
+
   // Dedicated Loopback Auth Login Handlers
   ipcMain.handle("auth:start-login", async (_event, options?: { accountsUrl?: string; action?: string }) => {
     try {
@@ -1438,7 +1569,8 @@ app.on("second-instance", (_event, commandLine) => {
         `\n1. 'add_source': Whenever the student asks to save research/notes, or when you synthesize comprehensive knowledge, formulas, or study notes, invoke 'add_source' with type='text' (for notes) or type='url' (for web links). This immediately saves the source to the Sources panel!` +
         `\n2. 'create_studio_artifact': When the student asks to create study materials (e.g. flashcards, quiz, mind map, cheatsheet, report, or slide deck), invoke 'create_studio_artifact' with the complete structured data! The workspace Studio tab will automatically populate with your generated artifact so the user can study it interactively.` +
         `\n3. 'web_search' & 'web_fetch': Search live web resources and fetch full article contents for deep grounding whenever current facts or references are needed.` +
-        `\n4. Native Sidepanel Browser ('browser_navigate', 'browser_snapshot', 'browser_click', 'browser_type', 'browser_key', 'browser_scroll', 'browser_screenshot', 'browser_console', 'browser_evaluate', 'browser_tabs', 'browser_request_help'): When the student asks to open a webpage in the browser, browse Wikipedia/arXiv/docs together, or interact with a live web app/simulation in the right sidepanel, invoke 'browser_navigate' (which automatically expands the right pane into Preview mode and opens/targets the active or last Browser tab) followed by 'browser_snapshot' to inspect the ARIA accessibility tree and interactive element refs ([e1], [e2], ...).`;
+        `\n4. Native Sidepanel Browser ('browser_navigate', 'browser_snapshot', 'browser_click', 'browser_type', 'browser_key', 'browser_scroll', 'browser_screenshot', 'browser_console', 'browser_evaluate', 'browser_tabs', 'browser_request_help'): When the student asks to open a webpage in the browser, browse Wikipedia/arXiv/docs together, or interact with a live web app/simulation in the right sidepanel, invoke 'browser_navigate' (which automatically expands the right pane into Preview mode and opens/targets the active or last Browser tab) followed by 'browser_snapshot' to inspect the ARIA accessibility tree and interactive element refs ([e1], [e2], ...).` +
+        `\n5. Long-Term Memory ('retain', 'recall', 'reflect'): You have persistent durable memory across chat sessions and learning workspaces. When the student shares learning preferences (e.g. language, depth), target exams, recurring mistakes, or key concepts mastered, call 'retain' with scope='global' or 'project' to store them. Call 'recall' or 'reflect' to retrieve prior knowledge, past context, or tailored study preferences.`;
 
       const agentTools = [...CONST_LEARN_TOOLS, ...activeComposioTools];
 
