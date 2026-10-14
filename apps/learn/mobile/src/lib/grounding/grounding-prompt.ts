@@ -34,6 +34,7 @@ Your purpose is to help the user understand concepts deeply, explore hypotheses,
 
 4. MATHEMATICAL & CODE RIGOR:
 - Format all mathematical equations properly: use display math $$...$$ on its own line and inline math $...$ within paragraphs.
+- CRITICAL: NEVER place citations [source:id] or \text{[source:id]} INSIDE math delimiters ($...$ or $$...$$). Always place citations OUTSIDE the equation delimiters (e.g. '$$ x = y $$ [source:id]' or '$x = y$ [source:id]'). Placing citations inside math breaks equation rendering.
 - Format code blocks with appropriate language tags (e.g. \`\`\`python, \`\`\`typescript).
 
 5. LANGUAGE CONSISTENCY:
