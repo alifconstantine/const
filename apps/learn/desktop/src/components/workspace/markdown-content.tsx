@@ -3,8 +3,96 @@ import { marked, type Token, type Tokens } from "marked";
 import { Check, Copy, Download, Maximize2, X } from "lucide-react";
 import { cn, ScrollArea } from "@const/ui";
 import { useI18n } from "../../lib/i18n";
-import { createMarkedLatexExtension, renderKatex, sanitizeCurrencyAndMath, type MathToken } from "../../lib/marked-latex";
+import {
+  createMarkedLatexExtension,
+  renderKatex,
+  sanitizeCurrencyAndMath,
+  extractCitationsFromMath,
+  type MathToken,
+} from "../../lib/marked-latex";
 import { convertReferencesToMarkdownLinks } from "../../lib/grounding/source-references";
+
+const mathCitationPattern =
+  /(?:\\text\{)?(?:<a\s+[^>]*href="#ref-(?:source-)?(?:[^"]+)"[^>]*>.*?<\/a>|\[\d+\]\(#ref-(?:source-)?(?:[^\s")]+)(?:\s*(?:"|&quot;)(?:.*?)(?:"|&quot;))?\)|\(?\[?(?:source|sumber):[a-zA-Z0-9_\-]+\]?\)?|\[source_[a-zA-Z0-9_\-]+\])(?:\})?/gi;
+
+function cleanMathContentCitations(mathContent: string): {
+  cleanMath: string;
+  citations: string[];
+} {
+  const citations: string[] = [];
+  let cleanMath = mathContent.replace(mathCitationPattern, (m: string) => {
+    citations.push(m.replace(/^\\text\{/, "").replace(/\}$/, "").trim());
+    return "";
+  });
+
+  cleanMath = cleanMath
+    .replace(/\\text\{\s*\}/g, "")
+    .replace(/(?:\\quad|\\qquad|\s)+\s*$/g, "")
+    .trim();
+
+  return { cleanMath, citations };
+}
+
+/**
+ * Pre-processes markdown text by extracting any citation markers or badges trapped inside
+ * LaTeX math blocks ($...$, $$...$$, \[...\], \(...\)) and placing them immediately outside
+ * the math delimiters so that KaTeX can render purely mathematical syntax without parse errors.
+ */
+export function extractCitationsFromMathText(content: string): string {
+  if (!content || typeof content !== "string") return content;
+
+  // 1. Block math: $$...$$ or \[...\] (allows trailing characters/citations on the closing line)
+  let result = content.replace(
+    /(?:\${2}([\s\S]+?)\${2}|\\\[([\s\S]+?)\\\])([^\n]*)/g,
+    (_fullMatch: string, math1: string, math2: string, trailing: string) => {
+      const mathContent = math1 ?? math2 ?? "";
+      const { cleanMath, citations } = cleanMathContentCitations(mathContent);
+
+      let cleanTrailing = trailing || "";
+      if (cleanTrailing) {
+        cleanTrailing = cleanTrailing
+          .replace(mathCitationPattern, (m: string) => {
+            citations.push(m.trim());
+            return "";
+          })
+          .trim();
+      }
+
+      const citationStr = citations.length > 0 ? " " + citations.join(" ") : "";
+      const trailingStr = cleanTrailing ? " " + cleanTrailing : "";
+
+      if (citationStr || trailingStr) {
+        return `$$\n${cleanMath}\n$$\n${citationStr}${trailingStr}\n`;
+      }
+      return `$$\n${cleanMath}\n$$`;
+    }
+  );
+
+  // 2. Inline math: \(...\)
+  result = result.replace(/\\\(([\s\S]+?)\\\)/g, (_fullMatch: string, mathContent: string) => {
+    const { cleanMath, citations } = cleanMathContentCitations(mathContent);
+    if (citations.length > 0) {
+      return `\\(${cleanMath}\\) ${citations.join(" ")}`;
+    }
+    return `\\(${cleanMath}\\)`;
+  });
+
+  // 3. Inline math: $...$
+  result = result.replace(/\$([^\$\n\r]+?)\$/g, (fullMatch: string, mathContent: string) => {
+    // Ignore currency numbers: e.g. "$100", "$50.00"
+    if (/^[\\\$]?\s*\d+(?:[.,]\d+)?\s*[\\\$]?$/.test(mathContent.trim())) {
+      return fullMatch;
+    }
+
+    const { cleanMath, citations } = cleanMathContentCitations(mathContent);
+    if (citations.length > 0) {
+      return `$${cleanMath}$ ${citations.join(" ")}`;
+    }
+    return `$${cleanMath}$`;
+  });
+
+  return result;
+}
 
 // Configure marked globally once with GitHub Flavored Markdown and LaTeX extensions
 marked.use(createMarkedLatexExtension());
@@ -52,6 +140,9 @@ export function MarkdownContent({
   normalizedContent = normalizedContent.replace(/\n( +)([*+-]) /g, (match, spaces, bullet) => {
     return spaces.length === 1 ? `\n  ${bullet} ` : match;
   });
+
+  // Extract any citations trapped inside math delimiters ($...$, $$...$$, \[...\], \(...\))
+  normalizedContent = extractCitationsFromMathText(normalizedContent);
 
   // Convert [source:id] citations into markdown anchor links
   normalizedContent = convertReferencesToMarkdownLinks(normalizedContent, sourcesMap);
@@ -624,22 +715,33 @@ function MathBlock({
   const [copied, setCopied] = useState(false);
   const [showSource, setShowSource] = useState(false);
 
+  // Defensively extract any citations or badges from math
+  const { cleaned, badges } = extractCitationsFromMath(math);
+
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(math);
+      await navigator.clipboard.writeText(cleaned);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch {}
   };
 
-  const html = renderKatex(math, displayMode);
+  const html = renderKatex(cleaned, displayMode);
 
   return (
     <div className="rounded-xl overflow-hidden bg-muted/25 border border-border/60 my-3 select-none">
       <div className="flex items-center justify-between px-3.5 py-1.5 bg-muted/50 border-b border-border/40 text-xs">
-        <span className="font-mono text-[11px] text-muted-foreground uppercase tracking-wider">
-          LaTeX
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="font-mono text-[11px] text-muted-foreground uppercase tracking-wider">
+            LaTeX
+          </span>
+          {badges.length > 0 && (
+            <div
+              className="inline-flex items-center gap-1"
+              dangerouslySetInnerHTML={{ __html: badges.join("") }}
+            />
+          )}
+        </div>
         <div className="flex items-center gap-1.5">
           <button
             type="button"
@@ -671,7 +773,7 @@ function MathBlock({
 
       {showSource ? (
         <pre className="p-3.5 overflow-x-auto text-[13px] leading-5 font-mono text-foreground/90 select-text bg-muted/10">
-          <code>{math}</code>
+          <code>{cleaned}</code>
         </pre>
       ) : (
         <div
@@ -693,7 +795,8 @@ function InlineRenderer({
   const safeText = typeof text === "string" ? text : (text ? String(text) : "");
   if (!safeText) return null;
   const sanitized = sanitizeCurrencyAndMath(safeText);
-  const normalized = convertReferencesToMarkdownLinks(sanitized, sourcesMap);
+  const extracted = extractCitationsFromMathText(sanitized);
+  const normalized = convertReferencesToMarkdownLinks(extracted, sourcesMap);
   const html = marked.parseInline(normalized);
   if (typeof html === "string") {
     return (

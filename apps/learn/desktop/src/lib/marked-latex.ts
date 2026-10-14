@@ -9,6 +9,52 @@ export interface MathToken extends Tokens.Generic {
 }
 
 /**
+ * Defensively extract citation tags and badges that may have been placed inside
+ * LaTeX math mode (e.g. \text{[source:1]}, [source:id], or pre-rendered HTML badges).
+ * KaTeX throws parse errors on raw HTML like `<a href...>` and brackets inside text mode.
+ */
+export function extractCitationsFromMath(rawMath: string): {
+  cleaned: string;
+  badges: string[];
+} {
+  if (!rawMath || typeof rawMath !== "string") {
+    return { cleaned: "", badges: [] };
+  }
+
+  let cleaned = rawMath;
+  const badges: string[] = [];
+
+  // Match HTML citation badges: <a href="#ref-..." class="source-ref-badge" ...>...</a>
+  const htmlBadgePattern = /(?:\\text\{)?(<a\s+[^>]*href="#ref-(?:source-)?(?:[^"]+)"[^>]*>.*?<\/a>)(?:\})?/gi;
+  // Match markdown links: [1](#ref-source-...) or [1](#ref-...)
+  const mdLinkPattern = /(?:\\text\{)?(\[(\d+)\]\(#ref-(?:source-)?(?:[^\s")]+)(?:\s*(?:"|&quot;)(?:.*?)(?:"|&quot;))?\))(?:\})?/gi;
+  // Match source reference tags: [source:id], (source:id), [source_id]
+  const sourcePattern = /(?:\\text\{)?(\[(?:source|sumber):([a-zA-Z0-9_\-]+)\]|\((?:source|sumber):([a-zA-Z0-9_\-]+)\)|\[(source_[a-zA-Z0-9_\-]+)\])(?:\})?/gi;
+
+  cleaned = cleaned.replace(htmlBadgePattern, (_m, badge) => {
+    badges.push(badge);
+    return "";
+  });
+
+  cleaned = cleaned.replace(mdLinkPattern, (_m, link) => {
+    badges.push(link);
+    return "";
+  });
+
+  cleaned = cleaned.replace(sourcePattern, (_m, tag) => {
+    badges.push(tag);
+    return "";
+  });
+
+  cleaned = cleaned
+    .replace(/\\text\{\s*\}/g, "")
+    .replace(/(?:\\quad|\\qquad|\s)+\s*$/g, "")
+    .trim();
+
+  return { cleaned, badges };
+}
+
+/**
  * Safely render a LaTeX string into HTML using KaTeX.
  */
 export function renderKatex(
@@ -16,26 +62,34 @@ export function renderKatex(
   displayMode: boolean = false,
   options?: KatexOptions
 ): string {
+  const { cleaned, badges } = extractCitationsFromMath(math);
   try {
-    return katex.renderToString(math, {
+    const rendered = katex.renderToString(cleaned, {
       displayMode,
       throwOnError: false,
       errorColor: "inherit",
       output: "htmlAndMathml",
       ...options,
     });
+    if (badges.length > 0 && !displayMode) {
+      return `${rendered} ${badges.join(" ")}`;
+    }
+    return rendered;
   } catch {
-    const escaped = math
+    const escaped = cleaned
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;");
-    return `<span class="katex-fallback font-mono text-xs">${escaped}</span>`;
+    const badgeStr = badges.length > 0 ? ` ${badges.join(" ")}` : "";
+    return `<span class="katex-fallback font-mono text-xs">${escaped}</span>${badgeStr}`;
   }
 }
 
 /**
  * Sanitize common LLM currency hallucination patterns and broken escapes:
  * e.g. "\1.60$", "$\1.60$", "\0.27$", "(\1.86$)" -> "$1.60", "$0.27", "($1.86)"
+ * Note: Never rewrite standard digits followed by "$" (e.g. "$2 \times 2$" or "= 0 $$")
+ * as that breaks valid math closing delimiters.
  */
 export function sanitizeCurrencyAndMath(text: string): string {
   if (!text || typeof text !== "string") return text;
@@ -45,9 +99,6 @@ export function sanitizeCurrencyAndMath(text: string): string {
 
   // 2. Convert raw backslash currency like "\$1.60" into "$1.60"
   sanitized = sanitized.replace(/\\\$(\d+(?:[.,]\d+)?)/g, "$$$1");
-
-  // 3. Convert reverse currency like "1.60$" preceded by space/bracket/colon into "$1.60"
-  sanitized = sanitized.replace(/(^|[\s\(\[\{:])(\d+(?:[.,]\d+)?)\$/g, "$1$$$2");
 
   return sanitized;
 }
@@ -73,8 +124,8 @@ export function createMarkedLatexExtension(
           return match ? match.index : undefined;
         },
         tokenizer(src: string) {
-          // Matches $$...$$ or \[...\] at block level
-          const rule = /^(?:\${2}([\s\S]+?)\${2}|\\\[([\s\S]+?)\\\])(?:\n|$)/;
+          // Matches $$...$$ or \[...\] at block level (allows trailing spaces and line breaks)
+          const rule = /^(?:\${2}([\s\S]+?)\${2}|\\\[([\s\S]+?)\\\])(?:\s*(?:\n|$)|$)/;
           const match = rule.exec(src);
           if (match) {
             const raw = match[0];
