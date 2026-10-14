@@ -100,6 +100,8 @@ export function BrowserTab({
       ? tab.url.trim()
       : "https://www.google.com";
   const initialUrlRef = useRef<string>(rawInitial);
+  const currentUrlRef = useRef<string>(rawInitial);
+  const lastHandledPropUrlRef = useRef<string>(rawInitial);
   const [currentUrl, setCurrentUrl] = useState<string>(rawInitial);
   const [addressBarInput, setAddressBarInput] = useState<string>(rawInitial);
   const [pageTitle, setPageTitle] = useState<string>(tab.title || "");
@@ -306,12 +308,12 @@ export function BrowserTab({
   useEffect(() => {
     if (tab.url !== undefined && typeof tab.url === "string" && tab.url !== "[object Object]") {
       const trimmed = tab.url.trim();
-      if (trimmed && trimmed !== currentUrl) {
+      if (trimmed && trimmed !== lastHandledPropUrlRef.current) {
+        lastHandledPropUrlRef.current = trimmed;
+        initialUrlRef.current = trimmed;
+        currentUrlRef.current = trimmed;
         setCurrentUrl(trimmed);
         setAddressBarInput(trimmed);
-        if (!initialUrlRef.current) {
-          initialUrlRef.current = trimmed;
-        }
         if (webviewRef.current) {
           try {
             webviewRef.current.loadURL(normalizeUrl(trimmed));
@@ -321,7 +323,7 @@ export function BrowserTab({
         }
       }
     }
-  }, [tab.url, currentUrl]);
+  }, [tab.url]);
 
   // Close menus on outside click
   useEffect(() => {
@@ -340,6 +342,9 @@ export function BrowserTab({
   // Webview navigation helpers
   const handleNavigate = (targetUrl: string) => {
     const resolved = normalizeUrl(targetUrl);
+    lastHandledPropUrlRef.current = resolved;
+    initialUrlRef.current = resolved;
+    currentUrlRef.current = resolved;
     setAddressBarInput(resolved);
     setCurrentUrl(resolved);
     setLoadError(null);
@@ -520,6 +525,10 @@ export function BrowserTab({
       } catch {}
     };
 
+    // Ensure registration immediately on mount and after short delay if webview is already ready
+    registerWithController();
+    const fallbackTimer = setTimeout(registerWithController, 150);
+
     const handleDomReady = () => {
       registerWithController();
     };
@@ -559,6 +568,9 @@ export function BrowserTab({
 
     const handleDidNavigate = (e: any) => {
       if (e.url) {
+        lastHandledPropUrlRef.current = e.url;
+        initialUrlRef.current = e.url;
+        currentUrlRef.current = e.url;
         setCurrentUrl(e.url);
         setAddressBarInput(e.url);
         onUpdateTab?.(tab.id, { url: e.url });
@@ -571,6 +583,9 @@ export function BrowserTab({
 
     const handleDidNavigateInPage = (e: any) => {
       if (e.url) {
+        lastHandledPropUrlRef.current = e.url;
+        initialUrlRef.current = e.url;
+        currentUrlRef.current = e.url;
         setCurrentUrl(e.url);
         setAddressBarInput(e.url);
         onUpdateTab?.(tab.id, { url: e.url });
@@ -601,7 +616,7 @@ export function BrowserTab({
         setLoadError({
           code: e.errorCode,
           desc: e.errorDescription || "Failed to load page",
-          url: e.validatedURL || currentUrl,
+          url: e.validatedURL || currentUrlRef.current,
         });
       }
     };
@@ -636,6 +651,7 @@ export function BrowserTab({
     webview.addEventListener("media-paused", handleMediaPaused);
 
     return () => {
+      clearTimeout(fallbackTimer);
       window.electron?.browser?.unregisterTab(tab.id).catch(() => {});
       webview.removeEventListener("dom-ready", handleDomReady);
       webview.removeEventListener("console-message", handleConsoleMessage);
@@ -650,7 +666,7 @@ export function BrowserTab({
       webview.removeEventListener("media-started-playing", handleMediaStartedPlaying);
       webview.removeEventListener("media-paused", handleMediaPaused);
     };
-  }, [tab.id, onUpdateTab, currentUrl, onSelectElementForChat]);
+  }, [tab.id, onUpdateTab, onSelectElementForChat]);
 
   // Viewport preset style
   const activePresetConfig = RESPONSIVE_PRESETS.find((p) => p.id === selectedPreset);

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db, localDb } from "../../lib/db";
 import {
@@ -482,10 +482,11 @@ export function LearnWorkspace({
     setIsOpeningNewTab(false);
 
     const defaultUrl = "https://www.google.com";
-    const resolvedUrl =
-      typeof initialUrl === "string" && initialUrl.trim() && initialUrl !== "[object Object]"
-        ? initialUrl.trim()
-        : defaultUrl;
+    const hasExplicitUrl =
+      typeof initialUrl === "string" &&
+      initialUrl.trim().length > 0 &&
+      initialUrl.trim() !== "[object Object]";
+    const resolvedUrl = hasExplicitUrl ? initialUrl.trim() : defaultUrl;
 
     setRightPaneTabs((prev) => {
       const browserTabs = prev.filter((t) => t.type === "browser");
@@ -508,7 +509,7 @@ export function LearnWorkspace({
         const nextId = targetTab.id;
         setActiveRightPaneTabId(nextId);
         window.electron?.browser?.setActiveTab(nextId).catch(() => {});
-        if (initialUrl && resolvedUrl !== targetTab.url) {
+        if (hasExplicitUrl && resolvedUrl !== targetTab.url) {
           return prev.map((t) =>
             t.id === nextId ? { ...t, url: resolvedUrl } : t
           );
@@ -549,6 +550,9 @@ export function LearnWorkspace({
     }
   };
 
+  const handleOpenBrowserRef = useRef(handleOpenBrowser);
+  handleOpenBrowserRef.current = handleOpenBrowser;
+
   // Sync active browser tab selection with main process BrowserController
   useEffect(() => {
     if (!activeRightPaneTabId) return;
@@ -564,20 +568,20 @@ export function LearnWorkspace({
     if (!browserApi?.onOpenTabRequest) return;
     const unsub = browserApi.onOpenTabRequest((payload) => {
       if (typeof payload === "string") {
-        handleOpenBrowser(payload);
+        handleOpenBrowserRef.current(payload);
       } else if (payload && typeof payload === "object") {
-        handleOpenBrowser(payload.url, {
+        handleOpenBrowserRef.current(payload.url, {
           tabId: payload.tabId,
           newTab: payload.newTab,
         });
       } else {
-        handleOpenBrowser();
+        handleOpenBrowserRef.current();
       }
     });
     return () => {
       unsub();
     };
-  }, [activeRightPaneTabId, studioWidth]);
+  }, []);
 
   const existingSourceUrls = useMemo(() => {
     const urls = new Set<string>();

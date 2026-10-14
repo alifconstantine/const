@@ -382,7 +382,7 @@ export class BrowserController {
     }
 
     if (this.onTabOpenRequestCallback) {
-      const targetUrl = this.normalizeUrl(options?.url || "https://www.google.com");
+      const targetUrl = options?.url ? this.normalizeUrl(options.url) : "";
       const waiter = this.waitForNextTabRegistration(6500);
       await this.onTabOpenRequestCallback({
         url: targetUrl,
