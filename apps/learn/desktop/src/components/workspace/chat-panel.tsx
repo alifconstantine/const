@@ -82,8 +82,8 @@ import { ApprovalCard } from "./approval-card";
 import { QuestionCard, type QuestionItem } from "./question-card";
 import type { ApprovalRequestData, ApprovalDecision } from "../../vite-env";
 import { RichMentionEditor, type RichMentionEditorRef } from "./rich-mention-editor";
-import { MentionPopover } from "./mention-popover";
-import { SkillSlashPopover } from "./skill-slash-popover";
+import { MentionPopover, orderMentionCandidatesBySections } from "./mention-popover";
+import { SkillSlashPopover, orderSkillsBySections } from "./skill-slash-popover";
 import {
   searchMentionCandidates,
   type ActiveAtToken,
@@ -688,14 +688,23 @@ export function ChatPanel({
     if (!slashToken) return [];
     const query = slashToken.query.toLowerCase().trim();
     const enabledSkills = allSkills.filter((s) => s.isEnabled);
-    if (!query) return enabledSkills;
-    return enabledSkills.filter(
-      (s) =>
-        s.slug.toLowerCase().includes(query) ||
-        s.name.toLowerCase().includes(query) ||
-        s.description.toLowerCase().includes(query)
-    );
+    const matched = !query
+      ? enabledSkills
+      : enabledSkills.filter(
+          (s) =>
+            s.slug.toLowerCase().includes(query) ||
+            s.name.toLowerCase().includes(query) ||
+            s.description.toLowerCase().includes(query)
+        );
+    return orderSkillsBySections(matched);
   }, [slashToken, allSkills]);
+
+  // Keep slashIndex safely within bounds
+  useEffect(() => {
+    if (slashIndex >= filteredSkills.length && filteredSkills.length > 0) {
+      setSlashIndex(0);
+    }
+  }, [filteredSkills.length, slashIndex]);
 
   // Rich @mention state
   const [mentionToken, setMentionToken] = useState<ActiveAtToken | null>(null);
@@ -733,7 +742,7 @@ export function ChatPanel({
 
   const mentionCandidates = useMemo(() => {
     if (!mentionToken) return [];
-    return searchMentionCandidates({
+    const raw = searchMentionCandidates({
       query: mentionToken.query,
       quoted: mentionToken.quoted,
       sources,
@@ -744,7 +753,15 @@ export function ChatPanel({
       currentLearnId: learnId,
       maxResults: 25,
     });
+    return orderMentionCandidatesBySections(raw);
   }, [mentionToken, sources, studioArtifacts, workspaceFiles, attachments, allLearns, learnId]);
+
+  // Keep mentionIndex safely within bounds
+  useEffect(() => {
+    if (mentionIndex >= mentionCandidates.length && mentionCandidates.length > 0) {
+      setMentionIndex(0);
+    }
+  }, [mentionCandidates.length, mentionIndex]);
 
   const handleDrillDirectory = (candidate: MentionCandidate) => {
     if (!candidate || !candidate.drillPath) return;

@@ -54,6 +54,72 @@ function SkillIcon({ skill }: { skill: LocalSkill }) {
   return <PencilSparkles className="w-4 h-4 text-primary shrink-0" />;
 }
 
+export interface SkillCategorySection {
+  id: string;
+  title: string;
+  match: (skill: LocalSkill) => boolean;
+}
+
+export const SKILL_SECTIONS: SkillCategorySection[] = [
+  {
+    id: "writing",
+    title: "Writing & Reasoning",
+    match: (s) => s.category === "writing",
+  },
+  {
+    id: "math_science",
+    title: "Math & Animation",
+    match: (s) => s.category === "math_science",
+  },
+  {
+    id: "design",
+    title: "Design & UI",
+    match: (s) => s.category === "design",
+  },
+  {
+    id: "docs",
+    title: "Documents & Slides",
+    match: (s) => s.category === "document" || s.category === "presentation",
+  },
+  {
+    id: "video",
+    title: "Video & Motion",
+    match: (s) => s.category === "video",
+  },
+  {
+    id: "education",
+    title: "Guides & Frameworks",
+    match: (s) => s.category === "education",
+  },
+  {
+    id: "other",
+    title: "Custom Skills",
+    match: (s) =>
+      !s.category ||
+      (s.category !== "writing" &&
+        s.category !== "math_science" &&
+        s.category !== "design" &&
+        s.category !== "document" &&
+        s.category !== "presentation" &&
+        s.category !== "video" &&
+        s.category !== "education"),
+  },
+];
+
+/**
+ * Orders skills strictly by visual category sections.
+ * Guarantees that skills[0] is the top-most visible item in the popover,
+ * and keyboard navigation (ArrowUp/ArrowDown) flows strictly in visual order.
+ */
+export function orderSkillsBySections(skills: LocalSkill[]): LocalSkill[] {
+  const result: LocalSkill[] = [];
+  for (const section of SKILL_SECTIONS) {
+    const items = skills.filter(section.match);
+    result.push(...items);
+  }
+  return result;
+}
+
 export function SkillSlashPopover({
   skills,
   selectedIndex,
@@ -69,34 +135,19 @@ export function SkillSlashPopover({
 
   // Auto scroll active item into view as user navigates
   useEffect(() => {
+    if (selectedIndex === 0 && listRef.current) {
+      const scrollViewport = listRef.current.querySelector("[data-radix-scroll-area-viewport]");
+      if (scrollViewport) {
+        scrollViewport.scrollTop = 0;
+      }
+    }
     if (activeItemRef.current) {
       activeItemRef.current.scrollIntoView({
         block: "nearest",
-        behavior: "smooth",
+        behavior: "auto",
       });
     }
   }, [selectedIndex]);
-
-  // Group skills into category sections (matching MentionPopover structure)
-  const writingSkills = skills.filter((s) => s.category === "writing");
-  const mathSkills = skills.filter((s) => s.category === "math_science");
-  const designSkills = skills.filter((s) => s.category === "design");
-  const docSkills = skills.filter(
-    (s) => s.category === "document" || s.category === "presentation"
-  );
-  const videoSkills = skills.filter((s) => s.category === "video");
-  const educationSkills = skills.filter((s) => s.category === "education");
-  const otherSkills = skills.filter(
-    (s) =>
-      !s.category ||
-      (s.category !== "writing" &&
-        s.category !== "math_science" &&
-        s.category !== "design" &&
-        s.category !== "document" &&
-        s.category !== "presentation" &&
-        s.category !== "video" &&
-        s.category !== "education")
-  );
 
   const renderSection = (title: string, items: LocalSkill[]) => {
     if (items.length === 0) return null;
@@ -195,13 +246,12 @@ export function SkillSlashPopover({
       ) : (
         <ScrollArea className="max-h-80 overflow-y-auto pr-1">
           <div className="flex flex-col gap-0.5">
-            {renderSection("Writing & Reasoning", writingSkills)}
-            {renderSection("Math & Animation", mathSkills)}
-            {renderSection("Design & UI", designSkills)}
-            {renderSection("Documents & Slides", docSkills)}
-            {renderSection("Video & Motion", videoSkills)}
-            {renderSection("Guides & Frameworks", educationSkills)}
-            {renderSection("Custom Skills", otherSkills)}
+            {SKILL_SECTIONS.map((section) =>
+              renderSection(
+                section.title,
+                skills.filter(section.match)
+              )
+            )}
           </div>
         </ScrollArea>
       )}

@@ -78,6 +78,16 @@ function CandidateIcon({ candidate }: { candidate: MentionCandidate }) {
   return <FileIcon filename={candidate.title} className="w-4 h-4 shrink-0" />;
 }
 
+export function orderMentionCandidatesBySections(candidates: MentionCandidate[]): MentionCandidate[] {
+  const sources = candidates.filter((c) => c.kind === "source");
+  const artifacts = candidates.filter((c) => c.kind === "artifact");
+  const filesAndFolders = candidates.filter(
+    (c) => c.kind === "directory" || c.kind === "file" || c.kind === "media"
+  );
+  const notebooks = candidates.filter((c) => c.kind === "session");
+  return [...sources, ...artifacts, ...filesAndFolders, ...notebooks];
+}
+
 export function MentionPopover({
   candidates,
   selectedIndex,
@@ -92,10 +102,16 @@ export function MentionPopover({
 
   // Auto scroll active item into view as user navigates
   useEffect(() => {
+    if (selectedIndex === 0 && listRef.current) {
+      const scrollViewport = listRef.current.querySelector("[data-radix-scroll-area-viewport]");
+      if (scrollViewport) {
+        scrollViewport.scrollTop = 0;
+      }
+    }
     if (activeItemRef.current) {
       activeItemRef.current.scrollIntoView({
         block: "nearest",
-        behavior: "smooth",
+        behavior: "auto",
       });
     }
   }, [selectedIndex]);
