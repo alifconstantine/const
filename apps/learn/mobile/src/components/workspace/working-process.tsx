@@ -17,6 +17,7 @@ import { ScrollArea, cn, BrandLogo, getConnectorForTool, type ConnectorMetadata 
 import { FileIcon } from "./file-icon";
 import { MarkdownContent } from "./markdown-content";
 import { useI18n } from "../../lib/i18n";
+import { Python } from "@thesvg/react";
 
 export interface TraceStep {
   id?: string;
@@ -1277,7 +1278,7 @@ function PythonRunnerTraceItem({ tool }: { tool: TraceStep }) {
         )}
       >
         <div className="flex items-center gap-2 min-w-0 pr-2">
-          <TerminalIcon className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+          <Python className="w-3.5 h-3.5 shrink-0" />
           <span className="font-sans text-foreground font-medium text-xs">
             Python Execution
           </span>

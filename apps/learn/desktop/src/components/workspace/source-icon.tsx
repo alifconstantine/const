@@ -9,6 +9,7 @@ import {
   ClipboardPaste,
 } from "lucide-react";
 import { cn } from "@const/ui";
+import { FileIcon } from "./file-icon";
 
 export interface SourceIconProps {
   source: {
@@ -285,12 +286,12 @@ export function SourceIcon({ source, size = "md", className }: SourceIconProps) 
         <div
           className={cn(
             cSize,
-            "bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 flex items-center justify-center shrink-0",
+            "bg-muted/40 border border-border/60 flex items-center justify-center shrink-0",
             className
           )}
-          title="Source Code File"
+          title={source.title || "Source Code File"}
         >
-          <FileCode className={cn(iSize, "text-indigo-400 shrink-0")} />
+          <FileIcon filename={source.path || source.title || "code.ts"} className={iSize} />
         </div>
       );
     case "markdown":
@@ -298,12 +299,12 @@ export function SourceIcon({ source, size = "md", className }: SourceIconProps) 
         <div
           className={cn(
             cSize,
-            "bg-sky-500/10 border border-sky-500/20 text-sky-400 flex items-center justify-center shrink-0",
+            "bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0",
             className
           )}
           title="Markdown Document"
         >
-          <FileText className={cn(iSize, "text-sky-400 shrink-0")} />
+          <FileIcon filename="doc.md" className={iSize} />
         </div>
       );
     default:

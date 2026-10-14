@@ -184,6 +184,9 @@ importers:
       '@const/ui':
         specifier: workspace:*
         version: link:../../../packages/ui
+      '@thesvg/react':
+        specifier: ^3.3.13
+        version: 3.3.13(react@19.2.8)
       convex:
         specifier: ^1.45.0
         version: 1.45.0(react@19.2.8)
@@ -296,6 +299,9 @@ importers:
       '@const/ui':
         specifier: workspace:*
         version: link:../../../packages/ui
+      '@thesvg/react':
+        specifier: ^3.3.13
+        version: 3.3.13(react@19.2.8)
       convex:
         specifier: ^1.45.0
         version: 1.45.0(react@19.2.8)
@@ -3945,6 +3951,12 @@ packages:
   '@szmarczak/http-timer@4.0.6':
     resolution: {integrity: sha512-4BAffykYOgO+5nzBWYwE3W90sBgLJoUPRWWcL8wlyiM8IB8ipJz3UMJ9KXQd1RKQXpKp8Tutn80HZtWsu2u76w==}
     engines: {node: '>=10'}
+
+  '@thesvg/react@3.3.13':
+    resolution: {integrity: sha512-KNo1WPqGggV1mSsh48hLVpI83M0HBWK/cWiew1GYjQEA+TPzzonfyssDpSWd4meHvOouEuv7NkzUx6ScdMLLaQ==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      react: '>=18'
 
   '@turbo/darwin-64@2.10.12':
     resolution: {integrity: sha512-9nKgKoF6ZOUsM+or0OtNf+TTJSfGvDNP7ZFv/ZGWVwOSCkumyctQiTeHwB4UNljHTnC41AqylgbunLDHoccNrA==}
@@ -10716,6 +10728,10 @@ snapshots:
   '@szmarczak/http-timer@4.0.6':
     dependencies:
       defer-to-connect: 2.0.1
+
+  '@thesvg/react@3.3.13(react@19.2.8)':
+    dependencies:
+      react: 19.2.8
 
   '@turbo/darwin-64@2.10.12':
     optional: true

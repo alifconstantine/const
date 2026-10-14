@@ -18,6 +18,7 @@
     "@capacitor/core": "^8.5.1",
     "@const/backend": "workspace:*",
     "@const/ui": "workspace:*",
+    "@thesvg/react": "^3.3.13",
     "convex": "^1.45.0",
     "dexie": "^4.4.5",
     "dexie-react-hooks": "^4.4.0",

@@ -10,6 +10,7 @@ import {
   type MathToken,
 } from "../../lib/marked-latex";
 import { convertReferencesToMarkdownLinks } from "../../lib/grounding/source-references";
+import { FileIcon } from "./file-icon";
 
 const mathCitationPattern =
   /(?:\\text\{)?(?:<a\s+[^>]*href="#ref-(?:source-)?(?:[^"]+)"[^>]*>.*?<\/a>|\[\d+\]\(#ref-(?:source-)?(?:[^\s")]+)(?:\s*(?:"|&quot;)(?:.*?)(?:"|&quot;))?\)|\(?\[?(?:source|sumber):[a-zA-Z0-9_\-]+\]?\)?|\[source_[a-zA-Z0-9_\-]+\])(?:\})?/gi;
@@ -676,9 +677,12 @@ function CodeBlock({ code, language }: { code: string; language: string }) {
   return (
     <div className="rounded-xl overflow-hidden bg-muted/30 border border-border/60 my-2.5 select-none">
       <div className="flex items-center justify-between px-3 py-1.5 bg-muted/60 border-b border-border/50 text-xs">
-        <span className="font-mono text-[10px] text-muted-foreground lowercase">
-          {language}
-        </span>
+        <div className="flex items-center gap-1.5">
+          <FileIcon filename={language} className="w-3.5 h-3.5" />
+          <span className="font-mono text-[10px] text-muted-foreground lowercase">
+            {language}
+          </span>
+        </div>
         <button
           type="button"
           onClick={handleCopy}

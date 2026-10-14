@@ -20,6 +20,7 @@ import {
   Layers,
 } from "lucide-react";
 import { useI18n } from "../../lib/i18n";
+import { Python } from "@thesvg/react";
 
 export interface DisplayToolCall {
   id: string;
@@ -303,8 +304,8 @@ export function PythonRunnerCard({ toolCall, isExpanded, onToggle }: PythonRunne
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="w-5 h-5 rounded-md bg-yellow-500/15 text-yellow-500 flex items-center justify-center font-sans text-[10px] font-bold">
-            Py
+          <div className="w-5 h-5 rounded-md bg-muted/60 border border-border/40 flex items-center justify-center shrink-0">
+            <Python className="w-3.5 h-3.5" />
           </div>
           <span className="font-sans font-semibold text-foreground">
             Python Engine
