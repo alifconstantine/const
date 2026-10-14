@@ -93,6 +93,37 @@ export function activeAtToken(text: string, cursorPosition: number): ActiveAtTok
   return null;
 }
 
+export interface ActiveSlashToken {
+  /** Complete token replaced when the user accepts a completion, e.g. "/no" */
+  prefix: string;
+  /** Slug/skill query after "/", e.g. "no" */
+  query: string;
+  /** Start index of the "/" token in the editor text */
+  startCol: number;
+  /** End index (cursor column) of the token */
+  endCol: number;
+}
+
+/**
+ * Extract a slash command `/query` token at the cursor.
+ * Triggered at the start of input or after whitespace.
+ */
+export function activeSlashToken(text: string, cursorPosition: number): ActiveSlashToken | null {
+  if (cursorPosition < 0 || cursorPosition > text.length) return null;
+  const beforeCursor = text.slice(0, cursorPosition);
+
+  // Match slash at beginning of text or after whitespace: /(?:^|\s)(\/([a-zA-Z0-9_-]*))$/u
+  const slashMatch = /(?:^|\s)(\/([a-zA-Z0-9_-]*))$/u.exec(beforeCursor);
+  if (slashMatch && slashMatch[1] !== undefined && slashMatch[2] !== undefined) {
+    const prefix = slashMatch[1];
+    const query = slashMatch[2];
+    const startCol = cursorPosition - prefix.length;
+    return { prefix, query, startCol, endCol: cursorPosition };
+  }
+
+  return null;
+}
+
 /**
  * Format a selected candidate as insertion text.
  */

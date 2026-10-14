@@ -6,11 +6,18 @@ import React, {
   useState,
 } from "react";
 import { cn } from "@const/ui";
-import { activeAtToken, type ActiveAtToken, type MentionCandidate } from "../../lib/mention-search";
+import {
+  activeAtToken,
+  activeSlashToken,
+  type ActiveAtToken,
+  type ActiveSlashToken,
+  type MentionCandidate,
+} from "../../lib/mention-search";
 
 export interface RichMentionEditorRef {
   focus: () => void;
   insertMention: (candidate: MentionCandidate) => void;
+  insertSlashCommand: (slug: string) => void;
   drillDirectory: (candidate: MentionCandidate) => void;
   insertText: (text: string) => void;
   insertAt: () => void;
@@ -29,6 +36,7 @@ export interface RichMentionEditorProps {
   className?: string;
   onSerializedChange?: (value: string) => void;
   onMentionTokenChange?: (token: ActiveAtToken | null) => void;
+  onSlashTokenChange?: (token: ActiveSlashToken | null) => void;
   onOpenSourcePreview?: (sourceId: string) => void;
   onOpenArtifactPreview?: (artifactId: string) => void;
   onSend?: () => void;
@@ -180,6 +188,7 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
       className,
       onSerializedChange,
       onMentionTokenChange,
+      onSlashTokenChange,
       onOpenSourcePreview,
       onOpenArtifactPreview,
       onSend,
@@ -219,13 +228,14 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
         onSerializedChange?.(serialized);
       }
 
-      // Fast-path: If text does not contain '@', skip expensive DOM selection cloning and tree traversal
-      if (!serialized.includes("@")) {
+      // Fast-path: If text does not contain '@' and does not contain '/', skip expensive DOM selection cloning
+      if (!serialized.includes("@") && !serialized.includes("/")) {
         onMentionTokenChange?.(null);
+        onSlashTokenChange?.(null);
         return;
       }
 
-      // Check for active @ token at cursor
+      // Check for active @ or / token at cursor
       try {
         const sel = window.getSelection();
         if (sel && sel.rangeCount > 0 && editor.contains(sel.anchorNode)) {
@@ -240,18 +250,27 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
             tempContainer.appendChild(fragment);
             const textBeforeCaret = serializeContainer(tempContainer, true);
 
-            const token = activeAtToken(textBeforeCaret, textBeforeCaret.length);
-            onMentionTokenChange?.(token);
+            const atToken = activeAtToken(textBeforeCaret, textBeforeCaret.length);
+            onMentionTokenChange?.(atToken);
+            if (!atToken) {
+              const slashTok = activeSlashToken(textBeforeCaret, textBeforeCaret.length);
+              onSlashTokenChange?.(slashTok);
+            } else {
+              onSlashTokenChange?.(null);
+            }
           } else {
             onMentionTokenChange?.(null);
+            onSlashTokenChange?.(null);
           }
         } else {
           onMentionTokenChange?.(null);
+          onSlashTokenChange?.(null);
         }
       } catch {
         onMentionTokenChange?.(null);
+        onSlashTokenChange?.(null);
       }
-    }, [onSerializedChange, onMentionTokenChange]);
+    }, [onSerializedChange, onMentionTokenChange, onSlashTokenChange]);
 
     useImperativeHandle(
       ref,
@@ -269,6 +288,7 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
             lastEmittedValueRef.current = "";
             onSerializedChange?.("");
             onMentionTokenChange?.(null);
+            onSlashTokenChange?.(null);
           }
         },
         setText: (text: string) => {
@@ -341,6 +361,51 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
           sel?.addRange(range);
           saveSelection();
           syncContent();
+        },
+        insertSlashCommand: (slug: string) => {
+          const editor = editorRef.current;
+          if (!editor) return;
+          editor.focus();
+
+          const sel = window.getSelection();
+          let range: Range;
+          if (savedRangeRef.current && editor.contains(savedRangeRef.current.startContainer)) {
+            range = savedRangeRef.current;
+          } else if (sel && sel.rangeCount > 0 && editor.contains(sel.getRangeAt(0).startContainer)) {
+            range = sel.getRangeAt(0);
+          } else {
+            range = document.createRange();
+            range.selectNodeContents(editor);
+            range.collapse(false);
+          }
+
+          if (range.startContainer.nodeType === Node.TEXT_NODE) {
+            const node = range.startContainer;
+            const fullText = node.nodeValue || "";
+            const offset = range.startOffset;
+
+            const beforeText = fullText.slice(0, offset);
+            const tokenMatch = /(?:^|\s)(\/[a-zA-Z0-9_-]*)$/.exec(beforeText);
+
+            if (tokenMatch && tokenMatch[1]) {
+              const matchedPrefix = tokenMatch[1];
+              const tokenStart = offset - matchedPrefix.length;
+              range.setStart(node, tokenStart);
+              range.setEnd(node, offset);
+              range.deleteContents();
+            }
+          }
+
+          const textNode = document.createTextNode(`/${slug} `);
+          range.insertNode(textNode);
+          range.setStartAfter(textNode);
+          range.setEndAfter(textNode);
+          sel?.removeAllRanges();
+          sel?.addRange(range);
+
+          saveSelection();
+          syncContent();
+          onSlashTokenChange?.(null);
         },
         insertText: (text: string) => {
           const editor = editorRef.current;

@@ -397,6 +397,9 @@ export interface LocalSource {
   updatedAt: number;
 }
 
+export type { LocalSkill, LocalSkillBundle, SkillCategory } from "./skills/types";
+import type { LocalSkill, LocalSkillBundle } from "./skills/types";
+
 export const db = new Dexie("ConstLearnDatabase") as Dexie & {
   learns: EntityTable<LocalLearn, "id">;
   collections: EntityTable<LocalCollection, "id">;
@@ -404,6 +407,8 @@ export const db = new Dexie("ConstLearnDatabase") as Dexie & {
   messages: EntityTable<LocalMessage, "id">;
   sessions: EntityTable<LocalChatSession, "id">;
   sources: EntityTable<LocalSource, "id">;
+  skills: EntityTable<LocalSkill, "id">;
+  skillBundles: EntityTable<LocalSkillBundle, "id">;
 };
 
 db.version(1).stores({
@@ -467,6 +472,27 @@ db.version(4).stores({
   messages: "id, learnId, sessionId, role, createdAt",
   sessions: "id, learnId, title, updatedAt, createdAt",
   sources: "id, learnId, type, includedInChat, createdAt",
+});
+
+db.version(5).stores({
+  learns: "id, title, updatedAt, createdAt, *collectionIds, projectPath",
+  collections: "id, name, updatedAt, createdAt",
+  artifacts: "id, learnId, title, type, updatedAt, createdAt",
+  messages: "id, learnId, sessionId, role, createdAt",
+  sessions: "id, learnId, title, updatedAt, createdAt",
+  sources: "id, learnId, type, includedInChat, createdAt",
+  skills: "id, slug, name, category, isBuiltIn, isEnabled, scope, createdAt",
+});
+
+db.version(6).stores({
+  learns: "id, title, updatedAt, createdAt, *collectionIds, projectPath",
+  collections: "id, name, updatedAt, createdAt",
+  artifacts: "id, learnId, title, type, updatedAt, createdAt",
+  messages: "id, learnId, sessionId, role, createdAt",
+  sessions: "id, learnId, title, updatedAt, createdAt",
+  sources: "id, learnId, type, includedInChat, createdAt",
+  skills: "id, slug, name, category, isBuiltIn, isEnabled, scope, bundleId, createdAt",
+  skillBundles: "id, slug, name, category, isBuiltIn, isEnabled, scope, createdAt",
 });
 
 // Hook on reading sources from DB to ensure content is always a clean string even for legacy/malformed records
@@ -1073,6 +1099,102 @@ export const localDb = {
         updatedAt: Date.now(),
       });
     }
+  },
+
+  // Skills
+  async getSkills(): Promise<LocalSkill[]> {
+    return await db.skills.toArray();
+  },
+
+  async getSkill(id: string): Promise<LocalSkill | undefined> {
+    return await db.skills.get(id);
+  },
+
+  async getSkillBySlug(slug: string): Promise<LocalSkill | undefined> {
+    return await db.skills.where("slug").equals(slug).first();
+  },
+
+  async toggleSkill(id: string, isEnabled: boolean): Promise<void> {
+    await db.skills.update(id, {
+      isEnabled,
+      updatedAt: Date.now(),
+    });
+  },
+
+  async createSkill(skill: Omit<LocalSkill, "id" | "createdAt" | "updatedAt"> & { id?: string }): Promise<string> {
+    const id = skill.id || "skill_" + Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
+    const now = Date.now();
+    await db.skills.put({
+      ...skill,
+      id,
+      createdAt: now,
+      updatedAt: now,
+    });
+    return id;
+  },
+
+  async updateSkill(id: string, updates: Partial<LocalSkill>): Promise<void> {
+    await db.skills.update(id, {
+      ...updates,
+      updatedAt: Date.now(),
+    });
+  },
+
+  async deleteSkill(id: string): Promise<void> {
+    await db.skills.delete(id);
+  },
+
+  // Skill Bundles
+  async getSkillBundles(): Promise<LocalSkillBundle[]> {
+    return await db.skillBundles.toArray();
+  },
+
+  async getSkillBundle(id: string): Promise<LocalSkillBundle | undefined> {
+    return await db.skillBundles.get(id);
+  },
+
+  async toggleSkillBundle(id: string, isEnabled: boolean): Promise<void> {
+    const bundle = await db.skillBundles.get(id);
+    if (!bundle) return;
+    await db.skillBundles.update(id, {
+      isEnabled,
+      updatedAt: Date.now(),
+    });
+    if (bundle.skillIds && bundle.skillIds.length > 0) {
+      await Promise.all(
+        bundle.skillIds.map((skillId) =>
+          db.skills.update(skillId, {
+            isEnabled,
+            updatedAt: Date.now(),
+          })
+        )
+      );
+    }
+  },
+
+  async createSkillBundle(
+    bundle: Omit<LocalSkillBundle, "id" | "createdAt" | "updatedAt"> & { id?: string }
+  ): Promise<string> {
+    const id = bundle.id || "bundle_" + Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
+    const now = Date.now();
+    await db.skillBundles.put({
+      ...bundle,
+      id,
+      createdAt: now,
+      updatedAt: now,
+    });
+    return id;
+  },
+
+  async updateSkillBundle(id: string, updates: Partial<LocalSkillBundle>): Promise<void> {
+    await db.skillBundles.update(id, {
+      ...updates,
+      updatedAt: Date.now(),
+    });
+  },
+
+  async deleteSkillBundle(id: string): Promise<void> {
+    await db.skillBundles.delete(id);
   },
 };
 

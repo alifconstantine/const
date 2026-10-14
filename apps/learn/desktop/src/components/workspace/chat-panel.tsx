@@ -83,12 +83,16 @@ import { QuestionCard, type QuestionItem } from "./question-card";
 import type { ApprovalRequestData, ApprovalDecision } from "../../vite-env";
 import { RichMentionEditor, type RichMentionEditorRef } from "./rich-mention-editor";
 import { MentionPopover } from "./mention-popover";
+import { SkillSlashPopover } from "./skill-slash-popover";
 import {
   searchMentionCandidates,
   type ActiveAtToken,
+  type ActiveSlashToken,
   type MentionCandidate,
   type WorkspaceFileEntry,
 } from "../../lib/mention-search";
+import type { LocalSkill } from "../../lib/db";
+import { formatSkillsSystemPrompt } from "../../lib/skills/skills-service";
 
 interface ChatPanelProps {
   learnId?: string;
@@ -674,6 +678,24 @@ export function ChatPanel({
 
   // All learns query for @mention
   const allLearns = useLiveQuery(() => db.learns.toArray(), []) || [];
+
+  // Skills query for slash command (/skill-name) auto-complete & system prompt
+  const allSkills = useLiveQuery(() => db.skills.toArray(), []) || [];
+  const [slashToken, setSlashToken] = useState<ActiveSlashToken | null>(null);
+  const [slashIndex, setSlashIndex] = useState(0);
+
+  const filteredSkills = useMemo(() => {
+    if (!slashToken) return [];
+    const query = slashToken.query.toLowerCase().trim();
+    const enabledSkills = allSkills.filter((s) => s.isEnabled);
+    if (!query) return enabledSkills;
+    return enabledSkills.filter(
+      (s) =>
+        s.slug.toLowerCase().includes(query) ||
+        s.name.toLowerCase().includes(query) ||
+        s.description.toLowerCase().includes(query)
+    );
+  }, [slashToken, allSkills]);
 
   // Rich @mention state
   const [mentionToken, setMentionToken] = useState<ActiveAtToken | null>(null);
@@ -1736,10 +1758,29 @@ export function ChatPanel({
 
     // Build NotebookLM-style Grounded Context and System Prompt
     const groundedResult = buildGroundedContext(carriedSources);
-    const systemPrompt = buildGroundedSystemPrompt({
+    let systemPrompt = buildGroundedSystemPrompt({
       availableSourceIds: groundedResult.sourceIds,
       hasSources: groundedResult.activeSources.length > 0,
     });
+
+    // Inject active skills and explicit slash command triggers
+    const activeSkills = allSkills.filter((s) => s.isEnabled);
+    const skillsCatalogPrompt = formatSkillsSystemPrompt(activeSkills);
+    if (skillsCatalogPrompt) {
+      systemPrompt += skillsCatalogPrompt;
+    }
+
+    // Check if the user message explicitly invokes a skill via /{slug}
+    const skillSlashMatch = textToSend.match(/(?:^|\s)\/([a-zA-Z0-9_-]+)(?:\s|$)/);
+    if (skillSlashMatch && skillSlashMatch[1]) {
+      const invokedSlug = skillSlashMatch[1].toLowerCase();
+      const triggeredSkill = allSkills.find(
+        (s) => s.slug.toLowerCase() === invokedSlug && s.isEnabled
+      );
+      if (triggeredSkill) {
+        systemPrompt += `\n\n[USER EXPLICITLY TRIGGERED SKILL: "${triggeredSkill.name}" (/${triggeredSkill.slug})]:\n${triggeredSkill.content}\n\nSTRICT INSTRUCTION: The user explicitly invoked /${triggeredSkill.slug}. Prioritize and strictly apply the full instructions, methodology, and formatting guidelines of this skill.`;
+      }
+    }
 
     if (groundedResult.formattedContext) {
       promptWithAttachments = `${groundedResult.formattedContext}\n\n---\n## USER QUERY\n${promptWithAttachments}`;
@@ -3999,6 +4040,22 @@ export function ChatPanel({
               />
             )}
 
+            {/* Slash Command Skills Popover */}
+            {slashToken && !mentionToken && (
+              <SkillSlashPopover
+                skills={filteredSkills}
+                selectedIndex={slashIndex}
+                query={slashToken.query}
+                onSelect={(skill) => {
+                  editorRef.current?.insertSlashCommand(skill.slug);
+                  setSlashToken(null);
+                  setSlashIndex(0);
+                }}
+                onHover={(idx) => setSlashIndex(idx)}
+                onOpenSettings={() => onOpenSettings?.("skills")}
+              />
+            )}
+
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -4064,6 +4121,10 @@ export function ChatPanel({
                     setMentionToken(tok);
                     setMentionIndex(0);
                   }}
+                  onSlashTokenChange={(tok) => {
+                    setSlashToken(tok);
+                    setSlashIndex(0);
+                  }}
                   onOpenSourcePreview={handleCitationClick}
                   onOpenArtifactPreview={onOpenStudioArtifact}
                   onSend={() => {
@@ -4074,6 +4135,7 @@ export function ChatPanel({
                   }}
                   onPasteFiles={handlePasteFiles}
                   onKeyDown={(e) => {
+                    // 1. Mention candidates navigation
                     if (mentionToken && mentionCandidates.length > 0) {
                       if (e.key === "ArrowDown") {
                         e.preventDefault();
@@ -4108,6 +4170,35 @@ export function ChatPanel({
                       if (e.key === "Escape") {
                         e.preventDefault();
                         setMentionToken(null);
+                        return;
+                      }
+                    }
+
+                    // 2. Slash command skills navigation
+                    if (slashToken && filteredSkills.length > 0) {
+                      if (e.key === "ArrowDown") {
+                        e.preventDefault();
+                        setSlashIndex((prev) => (prev + 1) % filteredSkills.length);
+                        return;
+                      }
+                      if (e.key === "ArrowUp") {
+                        e.preventDefault();
+                        setSlashIndex((prev) => (prev - 1 + filteredSkills.length) % filteredSkills.length);
+                        return;
+                      }
+                      if (e.key === "Tab" || e.key === "Enter") {
+                        e.preventDefault();
+                        const selected = filteredSkills[slashIndex];
+                        if (selected) {
+                          editorRef.current?.insertSlashCommand(selected.slug);
+                          setSlashToken(null);
+                          setSlashIndex(0);
+                        }
+                        return;
+                      }
+                      if (e.key === "Escape") {
+                        e.preventDefault();
+                        setSlashToken(null);
                         return;
                       }
                     }

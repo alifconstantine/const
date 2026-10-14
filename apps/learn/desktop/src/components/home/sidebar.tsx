@@ -33,12 +33,13 @@ import {
   Globe,
   Box,
   Cable,
+  PencilSparkles,
 } from "lucide-react";
 import { getUserInitials, type UserProfile } from "../navbar";
 import { useI18n, LANGUAGE_OPTIONS } from "../../lib/i18n";
 import { DesktopUpdateBadge } from "./desktop-update-badge";
 
-export type HomeNavTab = "learns" | "sources" | "collections" | "artifacts" | "models" | "mcp";
+export type HomeNavTab = "learns" | "sources" | "collections" | "artifacts" | "models" | "mcp" | "skills";
 
 interface SidebarProps {
   activeTab: HomeNavTab;
@@ -87,6 +88,7 @@ export function Sidebar({
     { id: "artifacts", label: t("artifacts"), icon: Layers, count: artifactsCount },
     { id: "models", label: t("models") || "Models", icon: Box },
     { id: "mcp", label: t("mcpTools") || "MCP Tools", icon: Cable },
+    { id: "skills", label: t("skills") || "Skills", icon: PencilSparkles },
   ];
 
   const isMac =

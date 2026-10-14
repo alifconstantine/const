@@ -34,6 +34,7 @@ import {
   Menu as MenuIcon,
   Box,
   Cable,
+  PencilSparkles,
   Settings,
   Rows3,
   ChevronDown,
@@ -65,6 +66,7 @@ import { BatchAddToModuleDialog } from "./dialogs/batch-add-to-module-dialog";
 import { MenuContainer, MenuItem } from "../ui/fluid-menu";
 import { ModelSelectionSheet } from "./sheets/model-selection-sheet";
 import { McpToolsSheet } from "./sheets/mcp-tools-sheet";
+import { SkillsSheet } from "./sheets/skills-sheet";
 import { MobileSettingsSheet } from "./sheets/mobile-settings-sheet";
 import { UpdateSheet } from "./sheets/update-sheet";
 import type { UserProfile } from "../navbar";
@@ -260,6 +262,7 @@ export function LearnHome({
   const [isFluidMenuExpanded, setIsFluidMenuExpanded] = useState(false);
   const [isModelSheetOpen, setIsModelSheetOpen] = useState(false);
   const [isMcpSheetOpen, setIsMcpSheetOpen] = useState(false);
+  const [isSkillsSheetOpen, setIsSkillsSheetOpen] = useState(false);
   const [isSettingsSheetOpen, setIsSettingsSheetOpen] = useState(false);
   const [isUpdateSheetOpen, setIsUpdateSheetOpen] = useState(false);
 
@@ -267,9 +270,14 @@ export function LearnHome({
     const handleOpenModelsSheet = () => {
       setIsModelSheetOpen(true);
     };
+    const handleOpenSkillsSheet = () => {
+      setIsSkillsSheetOpen(true);
+    };
     window.addEventListener("const:open-models-sheet", handleOpenModelsSheet);
+    window.addEventListener("const:open-skills-sheet", handleOpenSkillsSheet);
     return () => {
       window.removeEventListener("const:open-models-sheet", handleOpenModelsSheet);
+      window.removeEventListener("const:open-skills-sheet", handleOpenSkillsSheet);
     };
   }, []);
 
@@ -1762,7 +1770,17 @@ export function LearnHome({
               }}
             />
 
-            {/* Child 3: Pengaturan */}
+            {/* Child 3: Skills */}
+            <MenuItem
+              label={t("skills") || "Skills"}
+              icon={<PencilSparkles size={20} strokeWidth={1.8} className="text-white" />}
+              onClick={() => {
+                setIsFluidMenuExpanded(false);
+                setIsSkillsSheetOpen(true);
+              }}
+            />
+
+            {/* Child 4: Pengaturan */}
             <MenuItem
               label={t("settings")}
               icon={<Settings size={20} strokeWidth={1.8} className="text-white" />}
@@ -1897,6 +1915,11 @@ export function LearnHome({
       <McpToolsSheet
         open={isMcpSheetOpen}
         onClose={() => setIsMcpSheetOpen(false)}
+      />
+
+      <SkillsSheet
+        open={isSkillsSheetOpen}
+        onClose={() => setIsSkillsSheetOpen(false)}
       />
 
       <MobileSettingsSheet

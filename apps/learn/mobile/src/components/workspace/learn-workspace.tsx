@@ -3,6 +3,7 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { db, localDb, type LocalMessage, type LocalArtifact, type LocalChatSession, type LocalSource } from "../../lib/db";
 import { buildGroundedContext } from "../../lib/grounding/context-builder";
 import { buildGroundedSystemPrompt } from "../../lib/grounding/grounding-prompt";
+import { formatSkillsSystemPrompt } from "../../lib/skills/skills-service";
 import {
   DEFAULT_MOBILE_MODELS,
   streamChatCompletion,
@@ -349,6 +350,9 @@ export function MobileLearnWorkspace({
   const learn = useLiveQuery(async () => {
     return await db.learns.get(learnId);
   }, [learnId]);
+
+  // Live skills from local Dexie for slash command triggers & agent capability
+  const allSkills = useLiveQuery(() => db.skills.toArray(), []) || [];
 
   // Live artifacts from local Dexie
   const artifacts = useLiveQuery(async () => {
@@ -1064,10 +1068,29 @@ export function MobileLearnWorkspace({
 
     // Build NotebookLM-style Grounded Context and System Prompt
     const groundedResult = buildGroundedContext(carriedSources);
-    const systemPrompt = buildGroundedSystemPrompt({
+    let systemPrompt = buildGroundedSystemPrompt({
       availableSourceIds: groundedResult.sourceIds,
       hasSources: groundedResult.activeSources.length > 0,
     });
+
+    // Inject active skills and explicit slash command triggers
+    const activeSkills = allSkills.filter((s) => s.isEnabled);
+    const skillsCatalogPrompt = formatSkillsSystemPrompt(activeSkills);
+    if (skillsCatalogPrompt) {
+      systemPrompt += skillsCatalogPrompt;
+    }
+
+    // Check if the user message explicitly invokes a skill via /{slug}
+    const skillSlashMatch = textToSend.match(/(?:^|\s)\/([a-zA-Z0-9_-]+)(?:\s|$)/);
+    if (skillSlashMatch && skillSlashMatch[1]) {
+      const invokedSlug = skillSlashMatch[1].toLowerCase();
+      const triggeredSkill = allSkills.find(
+        (s) => s.slug.toLowerCase() === invokedSlug && s.isEnabled
+      );
+      if (triggeredSkill) {
+        systemPrompt += `\n\n[USER EXPLICITLY TRIGGERED SKILL: "${triggeredSkill.name}" (/${triggeredSkill.slug})]:\n${triggeredSkill.content}\n\nSTRICT INSTRUCTION: The user explicitly invoked /${triggeredSkill.slug}. Prioritize and strictly apply the full instructions, methodology, and formatting guidelines of this skill.`;
+      }
+    }
 
     if (groundedResult.formattedContext) {
       promptWithAttachments = `${groundedResult.formattedContext}\n\n---\n## USER QUERY\n${promptWithAttachments}`;

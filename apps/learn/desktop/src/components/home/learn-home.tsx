@@ -62,6 +62,7 @@ import { DesktopUpdateBadge } from "./desktop-update-badge";
 import { SourcesView } from "./sources-view";
 import { ModelsView } from "./views/models-view";
 import { McpToolsView } from "./views/mcp-tools-view";
+import { SkillsView } from "../settings/skills-settings";
 import { CreateLearnDialog } from "./dialogs/create-learn-dialog";
 import { CreateCollectionDialog } from "./dialogs/create-collection-dialog";
 import { ManageCollectionDialog } from "./dialogs/manage-collection-dialog";
@@ -832,9 +833,14 @@ export function LearnHome({
           </div>
         )}
 
-        {/* Scrollable Main Area */}
-        <ScrollArea className="flex-1 w-full h-full min-h-0">
-          <div className="max-w-7xl mx-auto px-6 sm:px-10 py-7 space-y-9">
+        {/* Main Content Area */}
+        {activeTab === "skills" ? (
+          <div className="flex-1 w-full h-full min-h-0 flex flex-col overflow-hidden">
+            <SkillsView />
+          </div>
+        ) : (
+          <ScrollArea className="flex-1 w-full h-full min-h-0">
+            <div className="max-w-7xl mx-auto px-6 sm:px-10 py-7 space-y-9">
             {/* ============================================================ */}
             {/* TAB: LEARNS (Default View)                                   */}
             {/* ============================================================ */}
@@ -1906,6 +1912,7 @@ export function LearnHome({
             {activeTab === "mcp" && <McpToolsView />}
           </div>
         </ScrollArea>
+        )}
       </main>
 
       {/* Dialogs */}

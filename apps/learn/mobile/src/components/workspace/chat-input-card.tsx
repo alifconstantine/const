@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from "react";
+import React, { useRef, useEffect, useState, useMemo } from "react";
 import {
   ArrowUp,
   Square,
@@ -8,8 +8,11 @@ import {
   FileText,
   Video,
   Mic,
+  PencilSparkles,
 } from "lucide-react";
 import { ScrollArea, cn, toast, VoiceInput } from "@const/ui";
+import { useLiveQuery } from "dexie-react-hooks";
+import { db } from "../../lib/db";
 import { useVoiceRecognition } from "../../lib/voice";
 import { useI18n } from "../../lib/i18n";
 
@@ -91,6 +94,42 @@ export function ChatInputCard({
       }, 50);
     },
   });
+
+  // Skills live query for mobile slash command suggestions
+  const allSkills = useLiveQuery(() => db.skills.toArray(), []) || [];
+
+  const activeSlashQuery = useMemo(() => {
+    const match = /(?:^|\s)\/([a-zA-Z0-9_-]*)$/.exec(inputMessage);
+    if (!match) return null;
+    return match[1] || "";
+  }, [inputMessage]);
+
+  const slashSkills = useMemo(() => {
+    if (activeSlashQuery === null) return [];
+    const query = activeSlashQuery.toLowerCase();
+    const enabled = allSkills.filter((s) => s.isEnabled);
+    if (!query) return enabled;
+    return enabled.filter(
+      (s) =>
+        s.slug.toLowerCase().includes(query) ||
+        s.name.toLowerCase().includes(query) ||
+        s.description.toLowerCase().includes(query)
+    );
+  }, [activeSlashQuery, allSkills]);
+
+  const handleSelectSlashSkill = (slug: string) => {
+    const current = inputMessage;
+    const match = /(?:^|\s)(\/[a-zA-Z0-9_-]*)$/.exec(current);
+    let nextText = `/${slug} `;
+    if (match && match[1]) {
+      const startIdx = current.length - match[1].length;
+      nextText = current.slice(0, startIdx) + `/${slug} `;
+    }
+    onChangeInput(nextText);
+    setTimeout(() => {
+      textareaRef.current?.focus();
+    }, 50);
+  };
 
   const SINGLE_LINE_HEIGHT = 28;
   const MIN_MULTILINE_HEIGHT = 44;
@@ -528,6 +567,30 @@ export function ChatInputCard({
   return (
     <div className="w-full select-none font-sans">
       {renderFileInput()}
+
+      {/* Active Slash Skills Suggestion Bar on Mobile */}
+      {slashSkills.length > 0 && (
+        <div className="mb-2 w-full overflow-hidden">
+          <ScrollArea orientation="horizontal" className="w-full">
+            <div className="flex items-center gap-1.5 px-0.5 py-1 w-max">
+              {slashSkills.map((s) => (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => handleSelectSlashSkill(s.slug)}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-secondary hover:bg-secondary/80 border border-border text-xs text-foreground cursor-pointer active:scale-95 transition-all shadow-2xs"
+                >
+                  <PencilSparkles className="w-3 h-3 text-primary shrink-0" />
+                  <span className="font-semibold font-mono text-[11px]">/{s.slug}</span>
+                  <span className="text-[10px] text-muted-foreground truncate max-w-[120px]">
+                    {s.name}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </ScrollArea>
+        </div>
+      )}
 
       <div
         className={cn(

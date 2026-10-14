@@ -140,6 +140,9 @@ export function SettingsView({
     if (initialTab === "usage" || initialTab === "usage-stats") {
       return "usage";
     }
+    if (initialTab === "skill" || initialTab === "skills") {
+      return "skills";
+    }
     return initialTab || "general";
   }, [initialTab]);
 
@@ -383,13 +386,13 @@ export function SettingsView({
         <main className="flex-1 h-full flex flex-col min-w-0 bg-[#ffffff] dark:bg-[#161616] overflow-hidden">
           {/* Header Row: Title, Subtitle, and Top-Right Close Button 'X' */}
           <div className="flex-none px-6 sm:px-8 pt-5 pb-3 flex items-start justify-between gap-4 select-none">
-            <div>
-              <h1 className="text-xl font-medium tracking-tight text-[#262626] dark:text-white capitalize">
-                {activeTab === "general" && t("generalSettings")}
-                {activeTab === "usage" && (t("usageSettings") || "Usage & Limits")}
-                {activeTab === "appearance" && (t("theme") || "Appearance")}
-                {activeTab === "models" && (t("models") || "Models")}
-              </h1>
+                <div>
+                  <h1 className="text-xl font-medium tracking-tight text-[#262626] dark:text-white capitalize">
+                    {activeTab === "general" && t("generalSettings")}
+                    {activeTab === "usage" && (t("usageSettings") || "Usage & Limits")}
+                    {activeTab === "appearance" && (t("theme") || "Appearance")}
+                    {activeTab === "models" && (t("models") || "Models")}
+                  </h1>
               <p className="mt-1 text-xs text-[#737373] dark:text-[#969696]">
                 {activeTab === "general" && t("generalSettingsSubtitle")}
                 {activeTab === "usage" && t("usageSubtitle")}
