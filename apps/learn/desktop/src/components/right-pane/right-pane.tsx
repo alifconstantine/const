@@ -159,23 +159,31 @@ export function RightPane({
 
   const getArtifactIcon = (type: string, isZip?: boolean) => {
     if (isZip) return Package;
-    switch (type) {
+    const t = (type || "").toLowerCase().trim();
+    switch (t) {
       case "note":
+      case "notes":
         return SquarePen;
       case "mind_map":
+      case "mindmap":
+      case "diagram":
         return GitFork;
       case "quiz":
         return HelpCircle;
+      case "slide":
       case "slides":
         return Presentation;
+      case "audio":
       case "audio_summary":
         return AudioLines;
+      case "video":
       case "video_summary":
         return Video;
       case "report":
         return FileText;
       case "infographic":
         return BarChart3;
+      case "flashcard":
       case "flashcards":
         return BookOpen;
       case "data_table":
@@ -190,6 +198,52 @@ export function RightPane({
   const studioBtnRef = useRef<HTMLButtonElement>(null);
   const reviewBtnRef = useRef<HTMLButtonElement>(null);
   const [indicatorStyle, setIndicatorStyle] = useState<{ left: number; width: number }>({ left: 2, width: 0 });
+  const [studioCategory, setStudioCategory] = useState<string>("all");
+
+  const studioCategories = useMemo(() => {
+    if (!artifacts || artifacts.length === 0) return [];
+
+    let audio = 0;
+    let quiz = 0;
+    let mindmap = 0;
+    let notes = 0;
+    let visuals = 0;
+
+    for (const art of artifacts) {
+      const type = (art.type || "").toLowerCase().trim();
+      if (type === "audio_summary" || type === "audio") audio++;
+      else if (type === "quiz" || type === "flashcard" || type === "flashcards") quiz++;
+      else if (type === "mind_map" || type === "mindmap" || type === "diagram") mindmap++;
+      else if (type === "note" || type === "notes" || type === "report" || type === "cheatsheet") notes++;
+      else if (type === "infographic" || type === "video" || type === "video_summary" || type === "slide" || type === "slides") visuals++;
+      else notes++;
+    }
+
+    const cats: Array<{ id: string; label: string; count: number }> = [
+      { id: "all", label: t("studioFilterAll"), count: artifacts.length },
+    ];
+    if (audio > 0) cats.push({ id: "audio", label: t("studioFilterAudio"), count: audio });
+    if (quiz > 0) cats.push({ id: "quiz", label: t("studioFilterQuizzes"), count: quiz });
+    if (mindmap > 0) cats.push({ id: "mindmap", label: t("studioFilterMindMaps"), count: mindmap });
+    if (notes > 0) cats.push({ id: "notes", label: t("studioFilterNotes"), count: notes });
+    if (visuals > 0) cats.push({ id: "visuals", label: t("studioFilterVisuals"), count: visuals });
+
+    return cats;
+  }, [artifacts, t]);
+
+  const filteredArtifacts = useMemo(() => {
+    if (!artifacts) return [];
+    if (studioCategory === "all") return artifacts;
+    return artifacts.filter((art) => {
+      const type = (art.type || "").toLowerCase().trim();
+      if (studioCategory === "audio") return type === "audio_summary" || type === "audio";
+      if (studioCategory === "quiz") return type === "quiz" || type === "flashcard" || type === "flashcards";
+      if (studioCategory === "mindmap") return type === "mind_map" || type === "mindmap" || type === "diagram";
+      if (studioCategory === "notes") return type === "note" || type === "notes" || type === "report" || type === "cheatsheet";
+      if (studioCategory === "visuals") return type === "infographic" || type === "video" || type === "video_summary" || type === "slide" || type === "slides";
+      return true;
+    });
+  }, [artifacts, studioCategory]);
 
   const generatingCount = useMemo(() => {
     return (artifacts || []).filter((a) => a.status === "generating").length;
@@ -698,23 +752,70 @@ export function RightPane({
                 })}
               </div>
 
-              {/* Studio Activities & Generated Outputs List (Image 1) */}
+              {/* Studio Activities & Generated Outputs List */}
               <div className={cn("flex-1 flex flex-col min-h-0", artifacts && artifacts.length > 0 ? "space-y-2 mb-4" : "justify-center")}>
                 {artifacts && artifacts.length > 0 ? (
                   <div className="space-y-2">
-                    {artifacts.map((art) => {
+                    {/* Category Filter Bar / Header */}
+                    <div className="flex items-center justify-between gap-2 px-0.5 pt-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                          {t("studioOutputs")}
+                        </span>
+                        <span className="text-[10px] bg-secondary text-secondary-foreground font-medium px-1.5 py-0.5 rounded-full">
+                          {artifacts.length}
+                        </span>
+                      </div>
+                    </div>
+
+                    {studioCategories.length > 2 && (
+                      <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5">
+                        {studioCategories.map((cat) => (
+                          <button
+                            key={cat.id}
+                            type="button"
+                            onClick={() => setStudioCategory(cat.id)}
+                            className={cn(
+                              "text-[10.5px] px-2 py-0.5 rounded-lg font-medium transition-all shrink-0 cursor-pointer flex items-center gap-1",
+                              studioCategory === cat.id
+                                ? "bg-primary text-primary-foreground shadow-2xs"
+                                : "bg-secondary/60 hover:bg-secondary text-muted-foreground hover:text-foreground border border-border/50"
+                            )}
+                          >
+                            <span>{cat.label}</span>
+                            <span
+                              className={cn(
+                                "text-[9px] px-1 rounded-full",
+                                studioCategory === cat.id
+                                  ? "bg-primary-foreground/20 text-primary-foreground"
+                                  : "text-muted-foreground"
+                              )}
+                            >
+                              {cat.count}
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+
+                    {filteredArtifacts.map((art) => {
                       const isGenerating = art.status === "generating";
                       const ItemIcon = getArtifactIcon(art.type, art.isZip);
 
+                      const isAudio = art.type === "audio_summary" || art.type === "audio";
+                      const isQuiz = art.type === "quiz";
+                      const isFlashcard = art.type === "flashcard" || art.type === "flashcards";
+                      const isMindMap = art.type === "mind_map" || art.type === "mindmap" || art.type === "diagram";
+                      const isSlides = art.type === "slides" || art.type === "slide";
+                      const isVideo = art.type === "video_summary" || art.type === "video";
+                      const isInfographic = art.type === "infographic";
+                      const isReport = art.type === "report";
+                      const isNote = art.type === "note" || art.type === "notes" || (!isAudio && !isQuiz && !isFlashcard && !isMindMap && !isSlides && !isVideo && !isInfographic && !isReport);
+
                       if (isGenerating) {
-                        const isMindMap = art.type === "mind_map";
-                        const isQuiz = art.type === "quiz";
-                        const isFlashcard = art.type === "flashcard" || art.type === "flashcards";
-                        const isVideo = art.type === "video_summary";
-                        const isSlides = art.type === "slides";
-                        const isInfographic = art.type === "infographic";
-                        const isReport = art.type === "report";
-                        const defaultGeneratingTitle = isInfographic
+                        const defaultGeneratingTitle = isAudio
+                          ? t("creatingAudioSummaryStatus")
+                          : isInfographic
                           ? t("creatingInfographicStatus")
                           : isVideo
                           ? t("creatingVideoSummaryStatus")
@@ -735,7 +836,9 @@ export function RightPane({
                             key={art.id}
                             className={cn(
                               "p-3 rounded-2xl bg-card flex items-center gap-3 select-none animate-pulse shadow-xs border",
-                              isInfographic
+                              isAudio
+                                ? "border-indigo-500/30"
+                                : isInfographic
                                 ? "border-purple-500/30"
                                 : isVideo
                                 ? "border-emerald-500/30"
@@ -755,7 +858,9 @@ export function RightPane({
                             <div
                               className={cn(
                                 "h-9 w-9 rounded-xl flex items-center justify-center shrink-0 border",
-                                isInfographic
+                                isAudio
+                                  ? "bg-indigo-500/10 border-indigo-500/20 text-indigo-400"
+                                  : isInfographic
                                   ? "bg-purple-500/10 border-purple-500/20 text-purple-400"
                                   : isVideo
                                   ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400"
@@ -775,7 +880,9 @@ export function RightPane({
                               <RotateCw
                                 className={cn(
                                   "h-4 w-4 animate-spin",
-                                  isInfographic
+                                  isAudio
+                                    ? "text-indigo-400"
+                                    : isInfographic
                                     ? "text-purple-400"
                                     : isVideo
                                     ? "text-emerald-400"
@@ -808,7 +915,7 @@ export function RightPane({
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  onDeleteArtifact(art.id);
+                                  if (art.id) onDeleteArtifact(art.id);
                                 }}
                                 className="h-7 w-7 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive flex items-center justify-center transition-colors cursor-pointer shrink-0"
                                 title={t("delete")}
@@ -820,13 +927,6 @@ export function RightPane({
                         );
                       }
 
-                      const isQuiz = art.type === "quiz";
-                      const isFlashcard = art.type === "flashcard" || art.type === "flashcards";
-                      const isMindMap = art.type === "mind_map";
-                      const isSlides = art.type === "slides";
-                      const isVideo = art.type === "video_summary";
-                      const isInfographic = art.type === "infographic";
-                      const isReport = art.type === "report";
                       const itemCount = isQuiz && art.data?.questions
                         ? art.data.questions.length
                         : isFlashcard && art.data?.cards
@@ -850,6 +950,8 @@ export function RightPane({
                           : isReport
                           ? itemCount === 1 ? t("sectionsCountSingle") : t("sectionsCount", { count: itemCount })
                           : null
+                        : isAudio
+                        ? t("audioSummaryTitle")
                         : isMindMap
                         ? t("conceptMap")
                         : isInfographic
@@ -884,7 +986,7 @@ export function RightPane({
                             </div>
                           </div>
 
-                          {/* Dropdown Menu */}
+                          {/* Dropdown Menu: Tailored per artifact category */}
                           <DropdownMenu>
                             <DropdownMenuTrigger
                               asChild
@@ -902,6 +1004,7 @@ export function RightPane({
                               align="end"
                               className="w-44 p-1 shadow-xl bg-popover border-border"
                             >
+                              {/* Open / Preview Action */}
                               <DropdownMenuItem
                                 className="cursor-pointer flex items-center gap-2 text-xs py-2 px-2.5 text-popover-foreground hover:text-popover-foreground"
                                 onClick={(e) => {
@@ -910,37 +1013,109 @@ export function RightPane({
                                 }}
                               >
                                 <Eye className="h-3.5 w-3.5" />
-                                <span>{t("openPreview")}</span>
+                                <span>
+                                  {isQuiz
+                                    ? t("openQuiz")
+                                    : isFlashcard
+                                    ? t("openFlashcards")
+                                    : isMindMap
+                                    ? t("openMindMap")
+                                    : isSlides
+                                    ? t("openSlides")
+                                    : isNote
+                                    ? t("openNote")
+                                    : t("openPreview")}
+                                </span>
                               </DropdownMenuItem>
-                              <DropdownMenuItem
-                                className="cursor-pointer flex items-center gap-2 text-xs py-2 px-2.5 text-popover-foreground hover:text-popover-foreground"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  if (art.content) {
-                                    navigator.clipboard.writeText(art.content);
+
+                              {/* Copy Note Action: ONLY for text notes/reports, never for audio/quiz/mindmap */}
+                              {(isNote || isReport) && art.content && (
+                                <DropdownMenuItem
+                                  className="cursor-pointer flex items-center gap-2 text-xs py-2 px-2.5 text-popover-foreground hover:text-popover-foreground"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    navigator.clipboard.writeText(art.content || "");
                                     toast.success(t("noteCopied"));
-                                  }
-                                }}
-                              >
-                                <Copy className="h-3.5 w-3.5" />
-                                <span>{t("copyNote")}</span>
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                className="cursor-pointer flex items-center gap-2 text-xs py-2 px-2.5 text-popover-foreground hover:text-popover-foreground"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onDownloadArtifact?.(art);
-                                }}
-                              >
-                                <Download className="h-3.5 w-3.5" />
-                                <span>{t("downloadMd")}</span>
-                              </DropdownMenuItem>
+                                  }}
+                                >
+                                  <Copy className="h-3.5 w-3.5" />
+                                  <span>{t("copyNote")}</span>
+                                </DropdownMenuItem>
+                              )}
+
+                              {/* Download Actions: tailored per type. Quiz, Mind Map, and Flashcards DO NOT have download */}
+                              {isAudio && (
+                                <DropdownMenuItem
+                                  className="cursor-pointer flex items-center gap-2 text-xs py-2 px-2.5 text-popover-foreground hover:text-popover-foreground"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onDownloadArtifact?.(art);
+                                  }}
+                                >
+                                  <Download className="h-3.5 w-3.5" />
+                                  <span>{t("downloadAudio")}</span>
+                                </DropdownMenuItem>
+                              )}
+
+                              {isInfographic && (
+                                <DropdownMenuItem
+                                  className="cursor-pointer flex items-center gap-2 text-xs py-2 px-2.5 text-popover-foreground hover:text-popover-foreground"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onDownloadArtifact?.(art);
+                                  }}
+                                >
+                                  <Download className="h-3.5 w-3.5" />
+                                  <span>{t("downloadImage")}</span>
+                                </DropdownMenuItem>
+                              )}
+
+                              {isVideo && (
+                                <DropdownMenuItem
+                                  className="cursor-pointer flex items-center gap-2 text-xs py-2 px-2.5 text-popover-foreground hover:text-popover-foreground"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onDownloadArtifact?.(art);
+                                  }}
+                                >
+                                  <Download className="h-3.5 w-3.5" />
+                                  <span>{t("downloadVideo")}</span>
+                                </DropdownMenuItem>
+                              )}
+
+                              {(isNote || isReport) && (
+                                <DropdownMenuItem
+                                  className="cursor-pointer flex items-center gap-2 text-xs py-2 px-2.5 text-popover-foreground hover:text-popover-foreground"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onDownloadArtifact?.(art);
+                                  }}
+                                >
+                                  <Download className="h-3.5 w-3.5" />
+                                  <span>{t("downloadMd")}</span>
+                                </DropdownMenuItem>
+                              )}
+
+                              {isSlides && art.fileUrl && (
+                                <DropdownMenuItem
+                                  className="cursor-pointer flex items-center gap-2 text-xs py-2 px-2.5 text-popover-foreground hover:text-popover-foreground"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onDownloadArtifact?.(art);
+                                  }}
+                                >
+                                  <Download className="h-3.5 w-3.5" />
+                                  <span>{t("downloadPresentation")}</span>
+                                </DropdownMenuItem>
+                              )}
+
+                              {/* Separator & Delete */}
                               <DropdownMenuSeparator className="bg-border" />
                               <DropdownMenuItem
                                 className="cursor-pointer flex items-center gap-2 text-xs py-2 px-2.5 text-destructive focus:text-destructive"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  onDeleteArtifact?.(art.id);
+                                  if (art.id) onDeleteArtifact?.(art.id);
                                 }}
                               >
                                 <Trash2 className="h-3.5 w-3.5" />

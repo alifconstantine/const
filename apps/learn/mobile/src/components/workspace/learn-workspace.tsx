@@ -1361,24 +1361,126 @@ export function MobileLearnWorkspace({
 
   const handleDownloadArtifact = (art: LocalArtifact | null) => {
     if (!art) return;
-    const content = art.content || "";
-    if (art.fileUrl) {
-      const a = document.createElement("a");
-      a.href = art.fileUrl;
-      a.download = art.title || "artifact.zip";
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-    } else if (content) {
-      const blob = new Blob([content], { type: "text/markdown;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
+
+    const isAudio = art.type === "audio_summary" || art.type === "audio";
+    const isInfographic = art.type === "infographic";
+    const isVideo = art.type === "video_summary" || art.type === "video";
+    const safeTitle = (art.title || "artifact").replace(/[\\/:*?"<>|]/g, "_").trim();
+
+    const triggerDownload = (url: string, filename: string) => {
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${art.title || "artifact"}.md`;
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+    };
+
+    if (isAudio) {
+      const audioData = art.data || {};
+      if (audioData.audioBase64) {
+        try {
+          const cleanBase64 = audioData.audioBase64.includes(",")
+            ? audioData.audioBase64.split(",")[1]
+            : audioData.audioBase64;
+          const byteCharacters = atob(cleanBase64);
+          const byteNumbers = new Array(byteCharacters.length);
+          for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+          }
+          const byteArray = new Uint8Array(byteNumbers);
+          const blob = new Blob([byteArray], { type: "audio/mpeg" });
+          const url = URL.createObjectURL(blob);
+          triggerDownload(url, `${safeTitle}.mp3`);
+          setTimeout(() => URL.revokeObjectURL(url), 1000);
+          toast.success(t("audioDownloaded"));
+          return;
+        } catch (e) {
+          console.error("Failed to decode base64 audio:", e);
+        }
+      }
+
+      const audioUrl = audioData.audioUrl || art.fileUrl;
+      if (audioUrl) {
+        if (audioUrl.startsWith("blob:") || audioUrl.startsWith("data:")) {
+          triggerDownload(audioUrl, `${safeTitle}.mp3`);
+          toast.success(t("audioDownloaded"));
+          return;
+        }
+
+        fetch(audioUrl)
+          .then((res) => res.blob())
+          .then((blob) => {
+            const url = URL.createObjectURL(blob);
+            triggerDownload(url, `${safeTitle}.mp3`);
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+            toast.success(t("audioDownloaded"));
+          })
+          .catch(() => {
+            triggerDownload(audioUrl, `${safeTitle}.mp3`);
+            toast.success(t("audioDownloaded"));
+          });
+        return;
+      }
+
+      if (audioData.script || art.content) {
+        const scriptText = audioData.script || art.content;
+        const blob = new Blob([scriptText], { type: "text/plain;charset=utf-8" });
+        const url = URL.createObjectURL(blob);
+        triggerDownload(url, `${safeTitle}-script.txt`);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+        toast.success(t("audioDownloaded"));
+        return;
+      }
+    }
+
+    if (isInfographic) {
+      const imgUrl = art.data?.imageUrl || art.fileUrl;
+      if (imgUrl) {
+        if (imgUrl.startsWith("blob:") || imgUrl.startsWith("data:")) {
+          triggerDownload(imgUrl, `${safeTitle}.png`);
+          toast.success(t("imageDownloaded"));
+          return;
+        }
+
+        fetch(imgUrl)
+          .then((res) => res.blob())
+          .then((blob) => {
+            const url = URL.createObjectURL(blob);
+            triggerDownload(url, `${safeTitle}.png`);
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+            toast.success(t("imageDownloaded"));
+          })
+          .catch(() => {
+            triggerDownload(imgUrl, `${safeTitle}.png`);
+            toast.success(t("imageDownloaded"));
+          });
+        return;
+      }
+    }
+
+    if (isVideo) {
+      const videoUrl = art.data?.videoUrl || art.fileUrl;
+      if (videoUrl) {
+        triggerDownload(videoUrl, `${safeTitle}.mp4`);
+        toast.success(t("videoDownloaded"));
+        return;
+      }
+    }
+
+    if (art.fileUrl) {
+      triggerDownload(art.fileUrl, `${safeTitle}.zip`);
+      toast.success(t("noteDownloaded"));
+      return;
+    }
+
+    const content = art.content || "";
+    if (content) {
+      const blob = new Blob([content], { type: "text/markdown;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      triggerDownload(url, `${safeTitle}.md`);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      toast.success(t("noteDownloaded"));
     }
   };
 
