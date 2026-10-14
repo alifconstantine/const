@@ -126,8 +126,10 @@ export function LearnWorkspace({
           console.log("[learn-workspace] Auto-cleaning stuck generating artifact:", item.id);
           await db.artifacts.delete(item.id);
         }
+        // Auto-clean any duplicate sources
+        await localDb.deduplicateSources(learnId);
       } catch (err) {
-        console.warn("[learn-workspace] Failed to clean up stuck artifacts:", err);
+        console.warn("[learn-workspace] Failed to clean up stuck artifacts or duplicates:", err);
       }
     };
     cleanupStale();

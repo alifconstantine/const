@@ -81,6 +81,13 @@ export function SourcesPanel({
     });
   };
 
+  // Auto-clean any duplicate sources for this notebook in the background
+  React.useEffect(() => {
+    if (learnId) {
+      localDb.deduplicateSources(learnId).catch(console.error);
+    }
+  }, [learnId]);
+
   // Query sources live from Dexie database
   const sources =
     useLiveQuery(
@@ -91,14 +98,35 @@ export function SourcesPanel({
       [learnId]
     ) || [];
 
-  const displayCount = sources.length > 0 ? sources.length : fallbackCount;
-  const carriedCount = sources.filter((s) => s.includedInChat !== false).length;
+  // Deduplicate sources in-memory for zero duplicate UI artifacts
+  const uniqueSources = React.useMemo(() => {
+    const seen = new Set<string>();
+    return sources.filter((s) => {
+      const cleanTitle = (s.title || "").trim().toLowerCase();
+      const cleanUrl = (s.url || "").trim().toLowerCase();
+      const cleanPath = (s.path || "").trim().toLowerCase();
+      const cleanContent = (typeof s.content === "string" ? s.content.trim() : "").slice(0, 200);
+
+      const key = cleanUrl
+        ? `url:${cleanUrl}`
+        : cleanPath
+        ? `path:${cleanPath}`
+        : `title:${cleanTitle}_content:${cleanContent}`;
+
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [sources]);
+
+  const displayCount = uniqueSources.length > 0 ? uniqueSources.length : fallbackCount;
+  const carriedCount = uniqueSources.filter((s) => s.includedInChat !== false).length;
 
   const filteredSources = searchQuery.trim()
-    ? sources.filter((s) =>
+    ? uniqueSources.filter((s) =>
         (s?.title || "").toLowerCase().includes(searchQuery.toLowerCase().trim())
       )
-    : sources;
+    : uniqueSources;
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -328,23 +356,23 @@ export function SourcesPanel({
       </div>
 
       {/* Sources List or Empty State */}
-      {sources.length > 0 ? (
+      {uniqueSources.length > 0 ? (
         <div className="flex-1 flex flex-col min-h-0">
           {/* Subheader: Selection info & Bulk toggle */}
           <div className="flex items-center justify-between px-1 pb-2 mb-1.5 border-b border-border/40 text-[11px] text-muted-foreground shrink-0">
             <span>
-              {t("carriedSourcesHeader", { carried: carriedCount, total: sources.length })}
+              {t("carriedSourcesHeader", { carried: carriedCount, total: uniqueSources.length })}
             </span>
             {learnId && (
               <button
                 type="button"
                 onClick={() => {
-                  const allSelected = carriedCount === sources.length;
+                  const allSelected = carriedCount === uniqueSources.length;
                   localDb.setAllSourcesInChat(learnId, !allSelected);
                 }}
                 className="text-[10px] text-primary hover:underline cursor-pointer font-medium"
               >
-                {carriedCount === sources.length ? t("deselectAll") : t("selectAll")}
+                {carriedCount === uniqueSources.length ? t("deselectAll") : t("selectAll")}
               </button>
             )}
           </div>

@@ -364,8 +364,15 @@ export function MobileLearnWorkspace({
     });
   }, [learnId]);
 
+  // Auto-clean any duplicate sources for this notebook in the background
+  useEffect(() => {
+    if (learnId) {
+      localDb.deduplicateSources(learnId).catch(console.error);
+    }
+  }, [learnId]);
+
   // Live sources from local Dexie
-  const sources =
+  const rawSources =
     useLiveQuery(async () => {
       return await db.sources
         .where("learnId")
@@ -373,6 +380,26 @@ export function MobileLearnWorkspace({
         .reverse()
         .sortBy("createdAt");
     }, [learnId]) || [];
+
+  const sources = useMemo(() => {
+    const seen = new Set<string>();
+    return rawSources.filter((s) => {
+      const cleanTitle = (s.title || "").trim().toLowerCase();
+      const cleanUrl = (s.url || "").trim().toLowerCase();
+      const cleanPath = (s.path || "").trim().toLowerCase();
+      const cleanContent = (typeof s.content === "string" ? s.content.trim() : "").slice(0, 200);
+
+      const key = cleanUrl
+        ? `url:${cleanUrl}`
+        : cleanPath
+        ? `path:${cleanPath}`
+        : `title:${cleanTitle}_content:${cleanContent}`;
+
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [rawSources]);
 
   const carriedSources = sources.filter((s) => s.includedInChat !== false);
 

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import {
   X,
   Plus,
@@ -62,9 +62,16 @@ export function SourcesSheet({
   const [selectedSourceForPreview, setSelectedSourceForPreview] =
     useState<LocalSource | null>(null);
 
+  // Auto-clean any duplicate sources for this notebook in the background
+  useEffect(() => {
+    if (learnId) {
+      localDb.deduplicateSources(learnId).catch(console.error);
+    }
+  }, [learnId]);
+
   // Live Dexie query for sources
-  const sources =
-    useLiveQuery(
+  const sources: LocalSource[] =
+    useLiveQuery<LocalSource[]>(
       () => {
         if (!learnId) return [];
         return db.sources
@@ -76,14 +83,35 @@ export function SourcesSheet({
       [learnId]
     ) || [];
 
-  const displayCount = sources.length > 0 ? sources.length : fallbackCount;
-  const carriedCount = sources.filter((s) => s.includedInChat !== false).length;
+  // Deduplicate sources in-memory for zero duplicate UI artifacts
+  const uniqueSources = useMemo<LocalSource[]>(() => {
+    const seen = new Set<string>();
+    return sources.filter((s: LocalSource) => {
+      const cleanTitle = (s.title || "").trim().toLowerCase();
+      const cleanUrl = (s.url || "").trim().toLowerCase();
+      const cleanPath = (s.path || "").trim().toLowerCase();
+      const cleanContent = (typeof s.content === "string" ? s.content.trim() : "").slice(0, 200);
+
+      const key = cleanUrl
+        ? `url:${cleanUrl}`
+        : cleanPath
+        ? `path:${cleanPath}`
+        : `title:${cleanTitle}_content:${cleanContent}`;
+
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [sources]);
+
+  const displayCount = uniqueSources.length > 0 ? uniqueSources.length : fallbackCount;
+  const carriedCount = uniqueSources.filter((s: LocalSource) => s.includedInChat !== false).length;
 
   const filteredSources = searchQuery.trim()
-    ? sources.filter((s) =>
+    ? uniqueSources.filter((s: LocalSource) =>
         s.title.toLowerCase().includes(searchQuery.toLowerCase().trim())
       )
-    : sources;
+    : uniqueSources;
 
   return (
     <>
@@ -229,26 +257,26 @@ export function SourcesSheet({
             </div>
 
             {/* Sources List or Empty State */}
-            {sources.length > 0 ? (
+            {uniqueSources.length > 0 ? (
               <div className="flex flex-col gap-2 pt-0.5">
                 {/* Header selection info & bulk toggle */}
                 <div className="flex items-center justify-between px-1 text-[11px] text-muted-foreground">
                   <span>
                     {t("carriedSourcesHeader", {
                       carried: carriedCount,
-                      total: sources.length,
-                    }) || `${carriedCount} of ${sources.length} sources active in chat`}
+                      total: uniqueSources.length,
+                    }) || `${carriedCount} of ${uniqueSources.length} sources active in chat`}
                   </span>
                   {learnId && (
                     <button
                       type="button"
                       onClick={() => {
-                        const allSelected = carriedCount === sources.length;
+                        const allSelected = carriedCount === uniqueSources.length;
                         localDb.setAllSourcesInChat(learnId, !allSelected);
                       }}
                       className="text-[10.5px] text-foreground hover:underline cursor-pointer font-medium"
                     >
-                      {carriedCount === sources.length
+                      {carriedCount === uniqueSources.length
                         ? t("deselectAll") || "Deselect all"
                         : t("selectAll") || "Select all"}
                     </button>
@@ -257,7 +285,7 @@ export function SourcesSheet({
 
                 {/* List of items */}
                 <div className="flex flex-col gap-2">
-                  {filteredSources.map((source) => {
+                  {filteredSources.map((source: LocalSource) => {
                     const isCarried = source.includedInChat !== false;
                     return (
                       <div

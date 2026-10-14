@@ -525,6 +525,8 @@ export function ChatPanel({
   const isUserSendingRef = useRef<boolean>(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
   const activeAssistantRef = useRef<DisplayMessage | null>(null);
+  const processedSourceIdsRef = useRef<Set<string>>(new Set());
+  const processedArtifactIdsRef = useRef<Set<string>>(new Set());
 
   // Timer for live duration while streaming
   useEffect(() => {
@@ -649,7 +651,7 @@ export function ChatPanel({
   };
 
   // Sources live query in this learn
-  const sources =
+  const rawSources =
     useLiveQuery(
       () => {
         if (!learnId) return [];
@@ -657,6 +659,26 @@ export function ChatPanel({
       },
       [learnId]
     ) || [];
+
+  const sources = useMemo(() => {
+    const seen = new Set<string>();
+    return rawSources.filter((s) => {
+      const cleanTitle = (s.title || "").trim().toLowerCase();
+      const cleanUrl = (s.url || "").trim().toLowerCase();
+      const cleanPath = (s.path || "").trim().toLowerCase();
+      const cleanContent = (typeof s.content === "string" ? s.content.trim() : "").slice(0, 200);
+
+      const key = cleanUrl
+        ? `url:${cleanUrl}`
+        : cleanPath
+        ? `path:${cleanPath}`
+        : `title:${cleanTitle}_content:${cleanContent}`;
+
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [rawSources]);
 
   const carriedSources = sources.filter((s) => s.includedInChat !== false);
   const carriedSourcesCount = sources.length > 0 ? carriedSources.length : sourcesCount;
@@ -1153,6 +1175,149 @@ export function ChatPanel({
     if (!electron?.agent?.onStreamEvent) return;
 
     const unsubscribe = electron.agent.onStreamEvent((event: any) => {
+      // 1. Intercept standalone side-effect events (outside setMessages to prevent StrictMode duplicates)
+      if (event.type === "source_created") {
+        const source = event.source;
+        if (source && learnId) {
+          const sourceKey = source.id || `${learnId}_${source.title}_${source.url || source.path || ""}`;
+          if (!processedSourceIdsRef.current.has(sourceKey)) {
+            processedSourceIdsRef.current.add(sourceKey);
+            localDb
+              .createSource({
+                id: source.id,
+                learnId,
+                title: source.title || "Untitled Source",
+                type: source.type || "text",
+                url: source.url,
+                path: source.path,
+                content: source.content,
+                includedInChat: true,
+              })
+              .then(() => {
+                toast.success(
+                  language === "id"
+                    ? `Sumber "${source.title}" berhasil disimpan ke Sources!`
+                    : `Source "${source.title}" saved to Sources!`
+                );
+              })
+              .catch(console.error);
+          }
+        }
+        return;
+      }
+
+      if (event.type === "artifact_created") {
+        const artifact = event.artifact;
+        if (artifact && learnId) {
+          const artifactKey = artifact.id || `${learnId}_${artifact.title}_${artifact.type}`;
+          if (!processedArtifactIdsRef.current.has(artifactKey)) {
+            processedArtifactIdsRef.current.add(artifactKey);
+            localDb
+              .createArtifact({
+                id: artifact.id,
+                learnId,
+                title: artifact.title || "Untitled Artifact",
+                type: artifact.type,
+                data: artifact.data,
+                status: "completed",
+                content:
+                  typeof artifact.data === "string"
+                    ? artifact.data
+                    : JSON.stringify(artifact.data),
+              })
+              .then(() => {
+                toast.success(
+                  language === "id"
+                    ? `Artifact Studio "${artifact.title}" berhasil dibuat!`
+                    : `Studio Artifact "${artifact.title}" created!`
+                );
+              })
+              .catch(console.error);
+          }
+        }
+        return;
+      }
+
+      if (event.type === "approval_request") {
+        const approvalId = event.id || event.approvalId || event.approval?.id || event.approval?.approvalId;
+        const currentMode = permissionModeRef.current || "ask_before_changes";
+        if (currentMode === "full_access") {
+          // Auto-approve in full_access mode so execution proceeds without interruption
+          if (approvalId && electron?.agent?.respondApproval) {
+            electron.agent.respondApproval({
+              approvalId,
+              approved: true,
+              decision: "allow_once",
+            }).catch(() => {});
+          }
+        } else {
+          // In ask_before_changes mode, display interactive ApprovalCard
+          const approvalData: ApprovalRequestData = event.approval || {
+            id: approvalId || `approval_${Date.now()}`,
+            approvalId: approvalId || `approval_${Date.now()}`,
+            toolCallId: event.toolCallId,
+            toolName: event.toolName,
+            command: event.command,
+            args: event.args,
+            cwd: event.cwd,
+            description: event.description,
+            reason: event.reason,
+          };
+          setActiveApproval(approvalData);
+          setTimeout(() => {
+            messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+          }, 60);
+        }
+        return;
+      }
+
+      if (event.type === "approval_resolved") {
+        setActiveApproval(null);
+        return;
+      }
+
+      if (event.type === "ask_question") {
+        const rawQuestionsList =
+          event.questions ||
+          (Array.isArray(event.questionData?.questions)
+            ? event.questionData.questions
+            : event.question || event.questionData?.question
+            ? [
+                {
+                  question: event.question || event.questionData?.question,
+                  options: event.options || event.questionData?.options || [],
+                  category: event.category || event.questionData?.category,
+                },
+              ]
+            : []);
+
+        const questionsList: QuestionItem[] = (rawQuestionsList as any[]).map((q: any, qIdx: number) => ({
+          id: String(q.id || `q_${qIdx}_${Date.now()}`),
+          question: String(q.question || q.prompt || "Bagaimana kita ingin melanjutkan?"),
+          category: q.category,
+          options: Array.isArray(q.options) ? q.options : [],
+          is_multi_select: Boolean(q.is_multi_select),
+        }));
+
+        const effectiveQuestions = questionsList.length > 0 ? questionsList : [
+          {
+            question: "Bagaimana kita ingin melanjutkan?",
+            options: [],
+          },
+        ];
+
+        setActiveQuestion({
+          toolCallId: event.toolCallId,
+          questions: effectiveQuestions,
+        });
+      }
+
+      if (event.type === "error" || event.type === "done") {
+        setActiveApproval(null);
+        setActiveQuestion(null);
+        setIsStreaming(false);
+      }
+
       setMessages((prev) => {
         let targetIndex = -1;
         if (activeAssistantIdRef.current) {
@@ -1286,11 +1451,6 @@ export function ChatPanel({
             },
           ];
 
-          setActiveQuestion({
-            toolCallId: event.toolCallId,
-            questions: effectiveQuestions,
-          });
-
           const toolCalls = [...(updated.toolCalls || [])];
           const existingIdx = toolCalls.findIndex((tc) => tc.id === event.toolCallId);
           const qArgs = {
@@ -1336,38 +1496,6 @@ export function ChatPanel({
             });
           }
           updated.traceSteps = steps;
-        } else if (event.type === "approval_request") {
-          const approvalId = event.id || event.approvalId || event.approval?.id || event.approval?.approvalId;
-          const currentMode = permissionModeRef.current || "ask_before_changes";
-          if (currentMode === "full_access") {
-            // Auto-approve in full_access mode so execution proceeds without interruption
-            if (approvalId && electron?.agent?.respondApproval) {
-              electron.agent.respondApproval({
-                approvalId,
-                approved: true,
-                decision: "allow_once",
-              }).catch(() => {});
-            }
-          } else {
-            // In ask_before_changes mode, display interactive ApprovalCard
-            const approvalData: ApprovalRequestData = event.approval || {
-              id: approvalId || `approval_${Date.now()}`,
-              approvalId: approvalId || `approval_${Date.now()}`,
-              toolCallId: event.toolCallId,
-              toolName: event.toolName,
-              command: event.command,
-              args: event.args,
-              cwd: event.cwd,
-              description: event.description,
-              reason: event.reason,
-            };
-            setActiveApproval(approvalData);
-            setTimeout(() => {
-              messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-            }, 60);
-          }
-        } else if (event.type === "approval_resolved") {
-          setActiveApproval(null);
         } else if (event.type === "tool_result") {
           const toolCalls = [...(updated.toolCalls || [])];
           const existingIdx = toolCalls.findIndex((tc) => tc.id === event.toolCallId);
@@ -1418,53 +1546,7 @@ export function ChatPanel({
               updated.traceSteps = steps;
             }
           }
-        } else if (event.type === "source_created") {
-          if (event.source && learnId) {
-            localDb
-              .createSource({
-                learnId,
-                title: event.source.title || "Untitled Source",
-                type: event.source.type || "text",
-                url: event.source.url,
-                path: event.source.path,
-                content: event.source.content,
-                includedInChat: true,
-              })
-              .then(() => {
-                toast.success(
-                  language === "id"
-                    ? `Sumber "${event.source.title}" berhasil disimpan ke Sources!`
-                    : `Source "${event.source.title}" saved to Sources!`
-                );
-              })
-              .catch(console.error);
-          }
-        } else if (event.type === "artifact_created") {
-          if (event.artifact && learnId) {
-            localDb
-              .createArtifact({
-                learnId,
-                title: event.artifact.title || "Untitled Artifact",
-                type: event.artifact.type,
-                data: event.artifact.data,
-                status: "completed",
-                content:
-                  typeof event.artifact.data === "string"
-                    ? event.artifact.data
-                    : JSON.stringify(event.artifact.data),
-              })
-              .then(() => {
-                toast.success(
-                  language === "id"
-                    ? `Artifact Studio "${event.artifact.title}" berhasil dibuat!`
-                    : `Studio Artifact "${event.artifact.title}" created!`
-                );
-              })
-              .catch(console.error);
-          }
         } else if (event.type === "error") {
-          setActiveApproval(null);
-          setActiveQuestion(null);
           const defaultError = language === "id"
             ? "Terjadi kesalahan saat memproses permintaan."
             : "An error occurred while processing the request.";
@@ -1474,7 +1556,6 @@ export function ChatPanel({
             ? `${updated.content}\n\n⚠️ **Error:** ${errorMsg}`
             : `⚠️ **${errorPrefix}:** ${errorMsg}`;
           updated.isStreaming = false;
-          setIsStreaming(false);
 
           if (streamStartTimeRef.current) {
             updated.durationMs = Date.now() - streamStartTimeRef.current;
@@ -1496,8 +1577,6 @@ export function ChatPanel({
             });
           }
         } else if (event.type === "done") {
-          setActiveApproval(null);
-          setActiveQuestion(null);
           if (event.fullContent && !updated.content) {
             updated.content = event.fullContent;
           } else if (!updated.content && updated.toolCalls && updated.toolCalls.length > 0) {
@@ -1516,7 +1595,6 @@ export function ChatPanel({
           }
 
           updated.isStreaming = false;
-          setIsStreaming(false);
 
           if (learnId) {
             localDb.saveMessage({

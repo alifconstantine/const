@@ -738,9 +738,27 @@ export const localDb = {
     sourcesCount?: number;
     error?: string;
   }): Promise<string> {
+    if (data.id) {
+      const existing = await db.artifacts.get(data.id);
+      if (existing) {
+        return existing.id;
+      }
+    }
+
+    if (data.learnId) {
+      const existingArtifacts = await db.artifacts.where("learnId").equals(data.learnId).toArray();
+      const cleanTitle = (data.title || "").trim().toLowerCase();
+      const duplicate = existingArtifacts.find(
+        (a) => (a.title || "").trim().toLowerCase() === cleanTitle && a.type === data.type
+      );
+      if (duplicate) {
+        return duplicate.id;
+      }
+    }
+
     const id = data.id || "art_" + Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
     const now = Date.now();
-    await db.artifacts.add({
+    await db.artifacts.put({
       id,
       learnId: data.learnId,
       title: data.title.trim() || "Untitled Artifact",
@@ -927,6 +945,7 @@ export const localDb = {
 
   // Sources
   async createSource(data: {
+    id?: string;
     learnId: string;
     title: string;
     type?: LocalSource["type"];
@@ -937,8 +956,13 @@ export const localDb = {
     subpagesCount?: number;
     includedInChat?: boolean;
   }): Promise<string> {
-    const id = "source_" + Math.random().toString(36).substring(2, 9) + Date.now().toString(36);
-    const now = Date.now();
+    // 1. If explicit ID provided, return existing if already present
+    if (data.id) {
+      const existing = await db.sources.get(data.id);
+      if (existing) {
+        return existing.id;
+      }
+    }
 
     let safeContent: string | undefined = undefined;
     if (typeof data.content === "string") {
@@ -957,9 +981,38 @@ export const localDb = {
       safeContent = String(data.content);
     }
 
+    // 2. Prevent duplicate sources for the same learnId:
+    // Check if an identical source already exists (same url, same path, or same title + content)
+    const existingSources = await db.sources.where("learnId").equals(data.learnId).toArray();
+    const cleanTitle = (data.title || "").trim().toLowerCase();
+    const cleanUrl = (data.url || "").trim().toLowerCase();
+    const cleanPath = (data.path || "").trim().toLowerCase();
+    const cleanContentSnippet = (safeContent || "").trim().slice(0, 300);
+
+    const duplicate = existingSources.find((s) => {
+      const sUrl = (s.url || "").trim().toLowerCase();
+      const sPath = (s.path || "").trim().toLowerCase();
+      const sTitle = (s.title || "").trim().toLowerCase();
+      const sContentSnippet = (typeof s.content === "string" ? s.content.trim() : "").slice(0, 300);
+
+      if (cleanUrl && sUrl && cleanUrl === sUrl) return true;
+      if (cleanPath && sPath && cleanPath === sPath) return true;
+      if (cleanTitle && sTitle && cleanTitle === sTitle) {
+        if (cleanContentSnippet && sContentSnippet && cleanContentSnippet === sContentSnippet) return true;
+        if (!cleanUrl && !sUrl && !cleanPath && !sPath && !cleanContentSnippet && !sContentSnippet) return true;
+      }
+      return false;
+    });
+
+    if (duplicate) {
+      return duplicate.id;
+    }
+
+    const id = data.id || ("source_" + Math.random().toString(36).substring(2, 9) + Date.now().toString(36));
+    const now = Date.now();
     const safeSize = data.size ?? (safeContent ? new Blob([safeContent]).size : undefined);
 
-    await db.sources.add({
+    await db.sources.put({
       id,
       learnId: data.learnId,
       title: data.title,
@@ -981,6 +1034,42 @@ export const localDb = {
     });
 
     return id;
+  },
+
+  async deduplicateSources(learnId: string): Promise<number> {
+    const sources = await db.sources.where("learnId").equals(learnId).sortBy("createdAt");
+    const seen = new Map<string, string>();
+    const toDeleteIds: string[] = [];
+
+    for (const s of sources) {
+      const cleanTitle = (s.title || "").trim().toLowerCase();
+      const cleanUrl = (s.url || "").trim().toLowerCase();
+      const cleanPath = (s.path || "").trim().toLowerCase();
+      const cleanContentSnippet = (typeof s.content === "string" ? s.content.trim() : "").slice(0, 200);
+
+      const key = cleanUrl
+        ? `url:${cleanUrl}`
+        : cleanPath
+        ? `path:${cleanPath}`
+        : `title:${cleanTitle}_content:${cleanContentSnippet}`;
+
+      if (seen.has(key)) {
+        toDeleteIds.push(s.id);
+      } else {
+        seen.set(key, s.id);
+      }
+    }
+
+    if (toDeleteIds.length > 0) {
+      await db.sources.bulkDelete(toDeleteIds);
+      const remainingCount = await db.sources.where("learnId").equals(learnId).count();
+      await db.learns.update(learnId, {
+        sourcesCount: remainingCount,
+        updatedAt: Date.now(),
+      });
+    }
+
+    return toDeleteIds.length;
   },
 
   async getSources(learnId: string): Promise<LocalSource[]> {
