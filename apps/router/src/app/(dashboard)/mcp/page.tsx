@@ -42,11 +42,18 @@ export default function McpDashboardPage() {
     api.auth.queries.currentUser,
     isAuthenticated ? {} : "skip"
   );
-  const userId = user?._id || "learn_default_user";
+  const userId = user?.email || user?._id || "learn_desktop_user";
 
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
   const [activeConnector, setActiveConnector] = useState<ConnectorMetadata | null>(null);
+
+  // Connected Accounts State (Synced across Const Learn & Const Router)
+  const [connectedAccounts, setConnectedAccounts] = useState<
+    Array<{ id: string; toolkit: string; status: string }>
+  >([]);
+  const [loadingAccounts, setLoadingAccounts] = useState(false);
+  const [connectingConnectorId, setConnectingConnectorId] = useState<string | null>(null);
 
   // Usage State
   const [usage, setUsage] = useState<{
@@ -64,6 +71,28 @@ export default function McpDashboardPage() {
   const [testStatus, setTestStatus] = useState<"idle" | "testing" | "success" | "error">("idle");
   const [testResult, setTestResult] = useState<any>(null);
   const [testLatency, setTestLatency] = useState<number | null>(null);
+
+  const fetchConnectedAccounts = async () => {
+    try {
+      setLoadingAccounts(true);
+      const res = await fetch(`/v1/mcp/connected-accounts?userId=${encodeURIComponent(userId)}`);
+      if (res.ok) {
+        const data = await res.json();
+        const items = data.accounts || data.items || [];
+        setConnectedAccounts(
+          items.map((i: any) => ({
+            id: i.id,
+            toolkit: (i.toolkit?.slug || i.toolkit || "").toLowerCase(),
+            status: i.status || "ACTIVE",
+          }))
+        );
+      }
+    } catch (err) {
+      console.warn("Failed to fetch connected accounts:", err);
+    } finally {
+      setLoadingAccounts(false);
+    }
+  };
 
   const fetchUsage = async () => {
     try {
@@ -84,7 +113,60 @@ export default function McpDashboardPage() {
 
   useEffect(() => {
     fetchUsage();
+    fetchConnectedAccounts();
+    const interval = setInterval(fetchConnectedAccounts, 10000);
+    const onFocus = () => fetchConnectedAccounts();
+    window.addEventListener("focus", onFocus);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", onFocus);
+    };
   }, [userId]);
+
+  const isConnected = (connector: ConnectorMetadata) => {
+    if (connector.id === "cloud-sandbox") return true;
+    const slug = connector.toolkitSlug.toLowerCase().replace(/[-_]/g, "");
+    return connectedAccounts.some(
+      (a) =>
+        a.status === "ACTIVE" &&
+        (a.toolkit.replace(/[-_]/g, "") === slug ||
+          a.toolkit.includes(slug) ||
+          slug.includes(a.toolkit))
+    );
+  };
+
+  const getConnectedAccountId = (connector: ConnectorMetadata) => {
+    const slug = connector.toolkitSlug.toLowerCase().replace(/[-_]/g, "");
+    const match = connectedAccounts.find(
+      (a) =>
+        a.status === "ACTIVE" &&
+        (a.toolkit.replace(/[-_]/g, "") === slug ||
+          a.toolkit.includes(slug) ||
+          slug.includes(a.toolkit))
+    );
+    return match?.id;
+  };
+
+  const handleDisconnect = async (connector: ConnectorMetadata) => {
+    const accId = getConnectedAccountId(connector);
+    if (!accId) return;
+    try {
+      toast.info(`Disconnecting ${connector.name}...`);
+      const res = await fetch("/v1/mcp/disconnect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accountId: accId, userId }),
+      });
+      if (res.ok) {
+        toast.success(`${connector.name} disconnected.`);
+        fetchConnectedAccounts();
+      } else {
+        toast.error(`Failed to disconnect ${connector.name}.`);
+      }
+    } catch {
+      toast.error(`Failed to disconnect ${connector.name}.`);
+    }
+  };
 
   const runTestExecution = async () => {
     setTestStatus("testing");
@@ -131,6 +213,7 @@ export default function McpDashboardPage() {
 
   const handleConnectOAuth = async (connector: ConnectorMetadata) => {
     try {
+      setConnectingConnectorId(connector.id);
       toast.info(`Generating OAuth connection for ${connector.name}...`);
       const res = await fetch("/v1/mcp/auth-link", {
         method: "POST",
@@ -145,11 +228,15 @@ export default function McpDashboardPage() {
       if (res.ok && data.redirectUrl) {
         window.open(data.redirectUrl, "_blank");
         toast.success(`Opened authorization window for ${connector.name}.`);
+        setTimeout(fetchConnectedAccounts, 3000);
+        setTimeout(fetchConnectedAccounts, 7000);
       } else {
         throw new Error(data.error || "No redirect URL returned.");
       }
     } catch (err: any) {
       toast.error(err.message || "Failed to initiate OAuth.");
+    } finally {
+      setConnectingConnectorId(null);
     }
   };
 
@@ -410,14 +497,41 @@ export default function McpDashboardPage() {
               </Button>
 
               {connector.authType !== "No Auth" ? (
-                <Button
-                  size="sm"
-                  onClick={() => handleConnectOAuth(connector)}
-                  className="h-8 px-3.5 rounded-full bg-secondary hover:bg-foreground hover:text-background text-foreground text-xs font-medium transition-all cursor-pointer gap-1"
-                >
-                  <span>Connect</span>
-                  <ExternalLink className="h-3 w-3" />
-                </Button>
+                isConnected(connector) ? (
+                  <div className="flex items-center gap-1.5">
+                    <Badge className="bg-emerald-500/10 text-emerald-400 border-none font-mono text-[11px] px-2.5 py-1 flex items-center gap-1.5 rounded-full">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                      <span>Connected</span>
+                    </Badge>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDisconnect(connector)}
+                      className="h-8 px-2.5 rounded-full text-xs font-mono text-muted-foreground hover:text-destructive hover:bg-destructive/10 cursor-pointer transition-colors"
+                    >
+                      <span>Disconnect</span>
+                    </Button>
+                  </div>
+                ) : (
+                  <Button
+                    size="sm"
+                    disabled={connectingConnectorId === connector.id}
+                    onClick={() => handleConnectOAuth(connector)}
+                    className="h-8 px-3.5 rounded-full bg-secondary hover:bg-foreground hover:text-background text-foreground text-xs font-medium transition-all cursor-pointer gap-1.5"
+                  >
+                    {connectingConnectorId === connector.id ? (
+                      <>
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                        <span>Connecting...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span>Connect</span>
+                        <ExternalLink className="h-3 w-3" />
+                      </>
+                    )}
+                  </Button>
+                )
               ) : (
                 <Button
                   size="sm"

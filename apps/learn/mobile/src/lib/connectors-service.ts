@@ -4,7 +4,7 @@
  * coordinates OAuth connection flows, and interfaces with Composio.
  */
 
-import type { ConnectorMetadata } from "@const/ui";
+import { type ConnectorMetadata, AVAILABLE_CONNECTORS } from "@const/ui";
 import { Browser } from "@capacitor/browser";
 import { Capacitor } from "@capacitor/core";
 import {
@@ -65,6 +65,54 @@ export function isConnectorActive(connectorId: string): boolean {
   if (connectorId === "cloud-sandbox") return true;
   const connected = getConnectedConnectorIds();
   return connected.includes(connectorId);
+}
+
+/**
+ * Fetches connected accounts from Const Router Gateway and synchronizes mobile local storage.
+ */
+export async function syncConnectedConnectors(userEmailOrId?: string): Promise<string[]> {
+  const userId = userEmailOrId || getLocalDeviceId();
+  const routerBases = getRouterBaseUrls();
+
+  for (const routerBase of routerBases) {
+    try {
+      const res = await fetch(
+        `${routerBase}/mcp/connected-accounts?userId=${encodeURIComponent(userId)}`,
+        {
+          headers: {
+            "X-Device-Id": userId,
+            "X-User-Id": userId,
+          },
+        }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        const accounts = data.accounts || data.items || [];
+        const activeIds: string[] = [];
+
+        for (const acc of accounts) {
+          if (acc.status !== "ACTIVE") continue;
+          const slug = (acc.toolkit?.slug || acc.toolkit || "").toLowerCase().replace(/[-_]/g, "");
+          const match = AVAILABLE_CONNECTORS.find((c) => {
+            const cSlug = c.toolkitSlug.toLowerCase().replace(/[-_]/g, "");
+            return cSlug === slug || cSlug.includes(slug) || slug.includes(cSlug);
+          });
+          if (match) {
+            activeIds.push(match.id);
+            if (acc.id) {
+              localStorage.setItem(`composio_ca_${match.id}`, acc.id);
+            }
+          }
+        }
+
+        const unique = Array.from(new Set(["cloud-sandbox", ...activeIds]));
+        saveConnectedConnectorIds(unique);
+        return unique;
+      }
+    } catch {}
+  }
+
+  return getConnectedConnectorIds();
 }
 
 /**

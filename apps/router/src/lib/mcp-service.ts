@@ -52,11 +52,11 @@ function saveUsageStore(store: McpUsageStore) {
  * Returns Composio API Key from environment.
  */
 export function getComposioApiKey(): string {
-  return (
-    process.env.COMPOSIO_API_KEY?.trim() ||
-    process.env.VITE_COMPOSIO_API_KEY?.trim() ||
-    ""
-  );
+  const raw =
+    process.env.COMPOSIO_API_KEY ||
+    process.env.VITE_COMPOSIO_API_KEY ||
+    "";
+  return raw.trim().replace(/^["']|["']$/g, "").trim();
 }
 
 /**
@@ -164,6 +164,7 @@ export async function getOrCreateAuthConfigId(
   toolkitSlug: string,
   apiKey: string
 ): Promise<string> {
+  const cleanKey = apiKey.trim().replace(/^["']|["']$/g, "").trim();
   const norm = normalizeToolkitSlug(toolkitSlug);
   if (authConfigCache.has(norm)) {
     return authConfigCache.get(norm)!;
@@ -172,18 +173,27 @@ export async function getOrCreateAuthConfigId(
   // 1. Check existing auth_configs
   try {
     const listRes = await fetch("https://backend.composio.dev/api/v3.1/auth_configs", {
-      headers: { "x-api-key": apiKey },
+      headers: { "x-api-key": cleanKey },
     });
     if (listRes.ok) {
       const listData = await listRes.json();
       const match = listData.items?.find((item: any) => {
         const itemSlug = (item.toolkit?.slug || item.toolkit || "").toLowerCase().replace(/[-_]/g, "");
-        return itemSlug === norm || itemSlug === norm.replace(/[-_]/g, "");
+        const cleanNorm = norm.replace(/[-_]/g, "");
+        return (
+          itemSlug === cleanNorm ||
+          cleanNorm.startsWith(itemSlug) ||
+          itemSlug.startsWith(cleanNorm) ||
+          item.name?.toLowerCase().includes(cleanNorm)
+        );
       });
       if (match?.id) {
         authConfigCache.set(norm, match.id);
         return match.id;
       }
+    } else {
+      const errTxt = await listRes.text().catch(() => "");
+      console.warn(`[getOrCreateAuthConfigId] list failed (${listRes.status}):`, errTxt);
     }
   } catch (err) {
     console.warn("[getOrCreateAuthConfigId] list failed:", err);
@@ -194,7 +204,7 @@ export async function getOrCreateAuthConfigId(
   const createRes = await fetch("https://backend.composio.dev/api/v3.1/auth_configs", {
     method: "POST",
     headers: {
-      "x-api-key": apiKey,
+      "x-api-key": cleanKey,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
@@ -212,24 +222,32 @@ export async function getOrCreateAuthConfigId(
     }
   }
 
-  throw new Error(`Failed to resolve auth_config for toolkit: ${toolkitSlug}`);
+  const errText = await createRes.text().catch(() => "");
+  throw new Error(
+    `Failed to resolve auth_config for toolkit: ${toolkitSlug} (${createRes.status}): ${errText || "Check Composio API permissions"}`
+  );
 }
 
 /**
- * Standardizes toolkit slugs for OAuth links (e.g. google-sheets -> googlesheets).
+ * Standardizes toolkit slugs for OAuth links (e.g. google-sheets -> googlesheets, canva -> canva_mcp).
  */
 export function normalizeToolkitSlug(rawToolkit: string): string {
-  const norm = (rawToolkit || "").toLowerCase().trim().replace(/[-_]/g, "");
-  if (norm.startsWith("google") && !norm.includes("workspace")) {
-    return norm;
+  const clean = (rawToolkit || "").toLowerCase().trim();
+  const noDashes = clean.replace(/[-_]/g, "");
+
+  if (noDashes.includes("canva")) {
+    return "canva_mcp";
   }
-  if (norm.includes("canva")) {
-    return "canva";
+  if (noDashes.startsWith("google") && !noDashes.includes("workspace")) {
+    return noDashes;
   }
-  if (norm.includes("youtube")) {
+  if (noDashes.includes("youtube")) {
     return "youtube";
   }
-  return rawToolkit.trim();
+  if (noDashes.includes("github")) {
+    return "github";
+  }
+  return clean;
 }
 
 /**
@@ -494,9 +512,17 @@ export async function getMcpConnectedAccounts(userId: string = "learn_default_us
   }
 
   try {
+    const userIds = Array.from(
+      new Set(
+        [userId, "learn_desktop_user", "learn_default_user"]
+          .filter(Boolean)
+          .map((id) => id.trim())
+      )
+    ).join(",");
+
     const res = await fetch(
       `https://backend.composio.dev/api/v3.1/connected_accounts?user_ids=${encodeURIComponent(
-        userId
+        userIds
       )}`,
       {
         headers: { "x-api-key": apiKey },

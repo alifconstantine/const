@@ -52,6 +52,7 @@ import {
   isConnectorActive,
   connectConnector,
   disconnectConnector,
+  syncConnectedConnectors,
 } from "../../../lib/connectors-service";
 
 type MainTab = "apps" | "custom_mcp";
@@ -181,10 +182,24 @@ export function McpToolsView() {
       setMcpConfig(getStoredMcpConfig());
       setConnectedIds(getConnectedConnectorIds());
     };
+
+    // Synchronize connected connectors with Composio through Const Router Gateway
+    syncConnectedConnectors().then((ids) => {
+      if (Array.isArray(ids)) setConnectedIds(ids);
+    });
+
+    const onFocus = () => {
+      syncConnectedConnectors().then((ids) => {
+        if (Array.isArray(ids)) setConnectedIds(ids);
+      });
+    };
+
+    window.addEventListener("focus", onFocus);
     window.addEventListener("mcp_servers_changed", handleUpdate);
     window.addEventListener("connectors_changed", handleUpdate);
     window.addEventListener("storage", handleUpdate);
     return () => {
+      window.removeEventListener("focus", onFocus);
       window.removeEventListener("mcp_servers_changed", handleUpdate);
       window.removeEventListener("connectors_changed", handleUpdate);
       window.removeEventListener("storage", handleUpdate);

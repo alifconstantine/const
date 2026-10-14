@@ -11,18 +11,19 @@ const SLUG_MAPPINGS: Record<string, string> = {
   googlebigquery: "google-bigquery",
   canva: "canva",
   canva_mcp: "canva",
-  "google-calendar": "google-calendar-2026",
-  "google-drive": "google-drive-2026",
-  googledrive: "google-drive-2026",
-  "google-sheets": "google-sheets-2026",
-  googlesheets: "google-sheets-2026",
-  "google-docs": "google-docs-2026",
-  googledocs: "google-docs-2026",
-  "google-tasks": "google-tasks-2026",
-  googletasks: "google-tasks-2026",
-  "google-meet": "google-meet-2026",
-  "google-slides": "google-slides-2026",
-  googleslides: "google-slides-2026",
+  "canva-mcp": "canva",
+  "google-calendar": "google-calendar",
+  "google-drive": "google-drive",
+  googledrive: "google-drive",
+  "google-sheets": "google-sheets",
+  googlesheets: "google-sheets",
+  "google-docs": "google-docs",
+  googledocs: "google-docs",
+  "google-tasks": "google-tasks",
+  googletasks: "google-tasks",
+  "google-meet": "google-meet",
+  "google-slides": "google-slides",
+  googleslides: "google-slides",
   "google-classroom": "google-classroom",
   googleclassroom: "google-classroom",
   "google-forms": "google-forms",
@@ -184,43 +185,18 @@ export function BrandLogo({ id, name = "", size = "md", className = "" }: BrandL
     );
   }
 
-
-  const ROUTER_HOSTED_LOGOS = [
-    "canva",
-    "canva_mcp",
-    "google-sheets",
-    "googlesheets",
-    "google-docs",
-    "googledocs",
-    "google-slides",
-    "googleslides",
-    "google-drive",
-    "googledrive",
-    "google-tasks",
-    "googletasks",
-    "google-classroom",
-    "googleclassroom",
-    "google-forms",
-    "googleforms",
-    "youtube",
-    "cloud-sandbox",
-    "codeinterpreter",
-    "composio",
-  ];
-
-  const isRouterHosted = ROUTER_HOSTED_LOGOS.includes(id.toLowerCase());
+  // Primary source is thesvg.org
+  const primaryLogoUrl = `https://thesvg.org/icons/${resolvedSlug}/${svgFile}`;
   const normalizedHostedSlug = id.toLowerCase().replace(/_/g, "-");
-  const primaryLogoUrl = isRouterHosted
-    ? `https://router.const.web.id/assets/logos/${
-        normalizedHostedSlug === "canva-mcp"
-          ? "canva"
-          : normalizedHostedSlug === "codeinterpreter"
-            ? "cloud-sandbox"
-            : normalizedHostedSlug.startsWith("google") && !normalizedHostedSlug.includes("-")
-              ? normalizedHostedSlug.replace("google", "google-")
-              : normalizedHostedSlug
-      }.svg`
-    : `https://thesvg.org/icons/${resolvedSlug}/${svgFile}`;
+  const fallbackRouterLogoUrl = `https://router.const.web.id/assets/logos/${
+    normalizedHostedSlug === "canva-mcp"
+      ? "canva"
+      : normalizedHostedSlug === "codeinterpreter"
+        ? "cloud-sandbox"
+        : normalizedHostedSlug.startsWith("google") && !normalizedHostedSlug.includes("-")
+          ? normalizedHostedSlug.replace("google", "google-")
+          : normalizedHostedSlug
+  }.svg`;
 
   return (
     <div
@@ -254,11 +230,10 @@ export function BrandLogo({ id, name = "", size = "md", className = "" }: BrandL
           )}
           loading="lazy"
           onError={(e) => {
-            // Fallback from router to thesvg or monogram
             const target = e.currentTarget;
-            if (isRouterHosted && !target.dataset.triedFallback) {
+            if (!target.dataset.triedFallback) {
               target.dataset.triedFallback = "true";
-              target.src = `https://thesvg.org/icons/${resolvedSlug}/${svgFile}`;
+              target.src = fallbackRouterLogoUrl;
             } else {
               setError(true);
             }
