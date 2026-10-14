@@ -325,17 +325,17 @@ export function CreatePresentationDialog({
                         <div className="flex items-center">
                           {p.id === "native" ? (
                             <span className="text-[10px] font-sans font-medium text-[#969696] bg-[#222222] border border-[#2e2e2e] px-1.5 py-0.5 rounded-md">
-                              Bawaan
+                              {t("connectorStatusBuiltin")}
                             </span>
                           ) : isConnected ? (
                             <span className="text-[10px] font-sans font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded-md flex items-center gap-1">
                               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                              Terhubung
+                              {t("connectorStatusConnected")}
                             </span>
                           ) : (
                             <span className="text-[10px] font-sans font-medium text-[#969696] bg-[#222222] border border-[#2e2e2e] px-1.5 py-0.5 rounded-md flex items-center gap-1">
                               <span className="w-1.5 h-1.5 rounded-full bg-[#5d5d5d]"></span>
-                              Belum Konek
+                              {t("connectorStatusNotConnected")}
                             </span>
                           )}
                         </div>
@@ -356,13 +356,13 @@ export function CreatePresentationDialog({
                         <div className="flex-1 min-w-0">
                           <div className="text-xs font-semibold text-white font-sans">
                             {provider === "canva"
-                              ? "Canva MCP Belum Terhubung"
-                              : "Google Slides Belum Terhubung"}
+                              ? t("canvaMcpNotConnected")
+                              : t("googleSlidesNotConnected")}
                           </div>
                           <p className="text-[11.5px] text-[#d4d4d4] mt-0.5 leading-relaxed font-sans">
                             {provider === "canva"
-                              ? "Hubungkan akun Canva Anda di Menu MCP agar AI dapat menghasilkan dan menyinkronkan deck presentasi langsung ke dashboard Canva Anda."
-                              : "Hubungkan akun Google Slides Anda di Menu MCP agar AI dapat mengekspor slide presentasi secara otomatis ke Google Drive Anda."}
+                              ? t("canvaMcpNotConnectedDesc")
+                              : t("googleSlidesNotConnectedDesc")}
                           </p>
                         </div>
                       </div>
@@ -373,7 +373,7 @@ export function CreatePresentationDialog({
                         className="w-full py-1.5 px-3 rounded-xl bg-[#252528] hover:bg-[#383838] border border-[#2e2e2e] hover:border-[#383838] text-xs font-medium text-white flex items-center justify-center gap-1.5 transition-colors cursor-pointer font-sans"
                       >
                         <Cable className="h-3.5 w-3.5 text-white" />
-                        <span>Buka Menu MCP di Home</span>
+                        <span>{t("openMcpMenuHome")}</span>
                         <ChevronRight className="h-3.5 w-3.5 text-[#969696]" />
                       </button>
                     </div>

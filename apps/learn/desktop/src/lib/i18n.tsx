@@ -1204,6 +1204,15 @@ export const translations = {
     designThemePalette: "Design Theme Palette",
     presentationGuidancePlaceholder: "E.g., Emphasize benchmarks and key findings, target technical leadership...",
     createSlides: "Create Slides",
+    connectorStatusBuiltin: "Built-in",
+    connectorStatusConnected: "Connected",
+    connectorStatusNotConnected: "Not Connected",
+    canvaMcpNotConnected: "Canva MCP Not Connected",
+    canvaMcpNotConnectedDesc: "Connect your Canva account in the MCP Menu to generate and sync presentation decks directly to your Canva dashboard.",
+    googleSlidesNotConnected: "Google Slides Not Connected",
+    googleSlidesNotConnectedDesc: "Connect your Google Slides account in the MCP Menu to automatically export presentation decks to your Google Drive.",
+    openMcpMenu: "Open MCP Menu",
+    openMcpMenuHome: "Open MCP Menu on Home",
 
     // Studio Artifact Dialog (Quiz & Flashcards)
     interactiveQuizTitle: "Interactive Quiz",
@@ -2702,6 +2711,15 @@ export const translations = {
     designThemePalette: "Palet Tema Desain (Open-Design)",
     presentationGuidancePlaceholder: "Contoh: Fokuskan pada perbandingan arsitektur, buat tone profesional untuk presentasi pimpinan...",
     createSlides: "Buat Slide Presentasi",
+    connectorStatusBuiltin: "Bawaan",
+    connectorStatusConnected: "Terhubung",
+    connectorStatusNotConnected: "Belum Konek",
+    canvaMcpNotConnected: "Canva MCP Belum Terhubung",
+    canvaMcpNotConnectedDesc: "Hubungkan akun Canva Anda di Menu MCP agar AI dapat menghasilkan dan menyinkronkan deck presentasi langsung ke dashboard Canva Anda.",
+    googleSlidesNotConnected: "Google Slides Belum Terhubung",
+    googleSlidesNotConnectedDesc: "Hubungkan akun Google Slides Anda di Menu MCP agar AI dapat mengekspor slide presentasi secara otomatis ke Google Drive Anda.",
+    openMcpMenu: "Buka Menu MCP",
+    openMcpMenuHome: "Buka Menu MCP di Home",
 
     // Studio Artifact Dialog (Quiz & Flashcards)
     interactiveQuizTitle: "Kuis Interaktif",
