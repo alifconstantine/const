@@ -16,6 +16,7 @@ import {
 import {
   Search,
   Plus,
+  PanelLeft,
   RotateCw,
   MoreHorizontal,
   Trash2,
@@ -133,9 +134,15 @@ function getSkillIcon(iconName?: string, category?: SkillCategory): React.Elemen
 
 export interface SkillsSettingsProps {
   onClose?: () => void;
+  isSidebarOpen?: boolean;
+  onToggleSidebar?: () => void;
 }
 
-export function SkillsSettings({ onClose }: SkillsSettingsProps = {}) {
+export function SkillsSettings({
+  onClose,
+  isSidebarOpen,
+  onToggleSidebar,
+}: SkillsSettingsProps = {}) {
   const { t } = useI18n();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const uploadDropzoneInputRef = useRef<HTMLInputElement | null>(null);
@@ -158,10 +165,43 @@ export function SkillsSettings({ onClose }: SkillsSettingsProps = {}) {
 
   // List filter state
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedScope, setSelectedScope] = useState<"all" | "user" | "workspace">("user");
+  const [selectedScope, setSelectedScope] = useState<"all" | "user" | "workspace">("all");
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [deleteConfirmSkill, setDeleteConfirmSkill] = useState<LocalSkill | null>(null);
   const [isManualCreateOpen, setIsManualCreateOpen] = useState(false);
+
+  // Scope sliding tab indicator
+  const allScopeRef = useRef<HTMLButtonElement>(null);
+  const userScopeRef = useRef<HTMLButtonElement>(null);
+  const workspaceScopeRef = useRef<HTMLButtonElement>(null);
+  const [scopeIndicatorStyle, setScopeIndicatorStyle] = useState<{ left: number; width: number }>({
+    left: 0,
+    width: 0,
+  });
+
+  useEffect(() => {
+    const updateIndicator = () => {
+      let activeEl: HTMLButtonElement | null = null;
+      if (selectedScope === "all") activeEl = allScopeRef.current;
+      else if (selectedScope === "user") activeEl = userScopeRef.current;
+      else if (selectedScope === "workspace") activeEl = workspaceScopeRef.current;
+
+      if (activeEl) {
+        setScopeIndicatorStyle({
+          left: activeEl.offsetLeft,
+          width: activeEl.offsetWidth,
+        });
+      }
+    };
+
+    updateIndicator();
+    const timer = setTimeout(updateIndicator, 50);
+    window.addEventListener("resize", updateIndicator);
+    return () => {
+      clearTimeout(timer);
+      window.removeEventListener("resize", updateIndicator);
+    };
+  }, [selectedScope, viewMode]);
 
   // Upload view state (Image 4)
   const [uploadFile, setUploadFile] = useState<File | null>(null);
@@ -543,116 +583,117 @@ export function SkillsSettings({ onClose }: SkillsSettingsProps = {}) {
   // ---------------------------------------------------------------------------
   if (viewMode === "upload") {
     return (
-      <div className="flex-1 h-full flex flex-col min-h-0 bg-[#ffffff] dark:bg-[#161616] text-[#262626] dark:text-[#d4d4d4] select-none">
+      <div className="w-full flex flex-col space-y-6 font-sans select-none">
         {/* Top Back Navigation Bar */}
-        <div className="px-6 pt-5 pb-3 shrink-0 flex items-center justify-between border-b border-[#dedee2] dark:border-[#2e2e2e]">
-          <button
-            type="button"
+        <div className="flex items-center justify-between">
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => setViewMode("list")}
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-[#737373] dark:text-[#969696] hover:text-[#161616] dark:hover:text-white transition-colors cursor-pointer group"
+            className="gap-1.5 text-xs text-muted-foreground hover:text-foreground cursor-pointer -ml-2 h-8"
           >
-            <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform" />
+            <ArrowLeft className="w-3.5 h-3.5" />
             <span>{t("backToSkills")}</span>
-          </button>
+          </Button>
 
           {onClose && (
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={onClose}
-              className="p-1 rounded-lg text-[#737373] hover:text-[#161616] dark:hover:text-white transition-colors cursor-pointer"
+              className="h-8 w-8 p-0 rounded-lg text-muted-foreground hover:text-foreground"
             >
               <X className="w-4 h-4" />
-            </button>
+            </Button>
           )}
         </div>
 
         {/* Upload Container Body */}
-        <ScrollArea className="flex-1 p-6">
-          <div className="max-w-2xl mx-auto flex flex-col gap-6">
-            {/* Header Titles */}
+        <div className="max-w-2xl mx-auto w-full flex flex-col gap-6">
+          {/* Header Titles */}
+          <div>
+            <h2 className="font-serif text-2xl sm:text-3xl font-normal tracking-tight text-foreground">
+              {t("uploadSkillTitle")}
+            </h2>
+            <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+              {t("uploadSkillSubtitle")}
+            </p>
+          </div>
+
+          {/* Hidden File Input */}
+          <input
+            type="file"
+            ref={uploadDropzoneInputRef}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) processUploadedFile(file);
+              e.target.value = "";
+            }}
+            accept=".md,.markdown,.zip,text/markdown"
+            className="hidden"
+          />
+
+          {/* Large Dashed Dropzone */}
+          <div
+            onDragOver={(e) => {
+              e.preventDefault();
+              setIsDragOver(true);
+            }}
+            onDragLeave={() => setIsDragOver(false)}
+            onDrop={handleDrop}
+            onClick={() => uploadDropzoneInputRef.current?.click()}
+            className={cn(
+              "border-2 border-dashed rounded-2xl p-8 sm:p-12 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-3",
+              isDragOver
+                ? "border-primary bg-primary/5"
+                : "border-border hover:border-primary/60 bg-card"
+            )}
+          >
+            <div className="w-12 h-12 rounded-full bg-secondary border border-border flex items-center justify-center text-muted-foreground mb-1">
+              <Upload className="w-6 h-6 stroke-[1.8]" />
+            </div>
+
             <div>
-              <h2 className="text-xl sm:text-2xl font-semibold tracking-tight text-[#161616] dark:text-white">
-                {t("uploadSkillTitle")}
-              </h2>
-              <p className="text-xs text-[#737373] dark:text-[#969696] mt-1 leading-relaxed">
-                {t("uploadSkillSubtitle")}
-              </p>
+              <span className="text-sm font-semibold text-foreground block">
+                {t("dragAndDropFiles")}
+              </span>
+              <span className="text-xs text-muted-foreground block mt-1">
+                {uploadFile ? (
+                  <span className="font-medium text-primary">
+                    Selected: {uploadFile.name} ({(uploadFile.size / 1024).toFixed(1)} KB)
+                  </span>
+                ) : (
+                  "Supports single markdown or bundled archive"
+                )}
+              </span>
             </div>
 
-            {/* Hidden File Input */}
-            <input
-              type="file"
-              ref={uploadDropzoneInputRef}
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) processUploadedFile(file);
-                e.target.value = "";
-              }}
-              accept=".md,.markdown,.zip,text/markdown"
-              className="hidden"
-            />
-
-            {/* Large Dashed Dropzone */}
-            <div
-              onDragOver={(e) => {
-                e.preventDefault();
-                setIsDragOver(true);
-              }}
-              onDragLeave={() => setIsDragOver(false)}
-              onDrop={handleDrop}
-              onClick={() => uploadDropzoneInputRef.current?.click()}
-              className={cn(
-                "border-2 border-dashed rounded-2xl p-8 sm:p-12 text-center cursor-pointer transition-all flex flex-col items-center justify-center gap-3",
-                isDragOver
-                  ? "border-[#0066ff] bg-[#0066ff]/5"
-                  : "border-[#dedee2] dark:border-[#383838] hover:border-[#0066ff] dark:hover:border-[#0066ff] bg-[#f8f8fa] dark:bg-[#1a1a1a]"
-              )}
-            >
-              <div className="w-12 h-12 rounded-full bg-[#ebebed] dark:bg-[#2b2b2b] border border-[#dedee2] dark:border-[#383838] flex items-center justify-center text-[#737373] dark:text-[#d4d4d4] mb-1">
-                <Upload className="w-6 h-6 stroke-[1.8]" />
+            {/* Supported formats bullet points */}
+            <div className="flex flex-col items-start text-left text-xs text-muted-foreground gap-1.5 mt-2 bg-secondary/50 p-3 rounded-xl border border-border w-full max-w-md">
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground" />
+                <span>{t("uploadMdSupport")}</span>
               </div>
-
-              <div>
-                <span className="text-sm font-semibold text-[#161616] dark:text-white block">
-                  {t("dragAndDropFiles")}
-                </span>
-                <span className="text-xs text-[#737373] dark:text-[#969696] block mt-1">
-                  {uploadFile ? (
-                    <span className="font-medium text-[#0066ff] dark:text-blue-400">
-                      Selected: {uploadFile.name} ({(uploadFile.size / 1024).toFixed(1)} KB)
-                    </span>
-                  ) : (
-                    "Supports single markdown or bundled archive"
-                  )}
-                </span>
-              </div>
-
-              {/* Supported formats bullet points */}
-              <div className="flex flex-col items-start text-left text-xs text-[#737373] dark:text-[#969696] gap-1.5 mt-2 bg-[#ffffff] dark:bg-[#222222] p-3 rounded-xl border border-[#dedee2] dark:border-[#2e2e2e] w-full max-w-md">
-                <div className="flex items-center gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-[#737373] dark:bg-[#969696]" />
-                  <span>{t("uploadMdSupport")}</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-1.5 h-1.5 rounded-full bg-[#737373] dark:bg-[#969696]" />
-                  <span>{t("uploadZipSupport")}</span>
-                </div>
+              <div className="flex items-center gap-2">
+                <div className="w-1.5 h-1.5 rounded-full bg-muted-foreground" />
+                <span>{t("uploadZipSupport")}</span>
               </div>
             </div>
+          </div>
 
             {/* Security Scan Card (Image 4) */}
-            <div className="p-4 rounded-2xl bg-[#f8f8fa] dark:bg-[#1a1a1a] border border-[#dedee2] dark:border-[#2e2e2e] flex items-start gap-3.5">
+            <div className="p-4 rounded-2xl bg-card border border-border flex items-start gap-3.5">
               <div className="mt-0.5 shrink-0">
                 {scanStatus === "passed" ? (
                   <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
                     <ShieldCheck className="w-4 h-4" />
                   </div>
                 ) : scanStatus === "failed" ? (
-                  <div className="w-8 h-8 rounded-xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-xl bg-destructive/10 border border-destructive/20 text-destructive flex items-center justify-center">
                     <ShieldAlert className="w-4 h-4" />
                   </div>
                 ) : (
-                  <div className="w-8 h-8 rounded-xl bg-[#ebebed] dark:bg-[#2b2b2b] border border-[#dedee2] dark:border-[#383838] text-[#737373] dark:text-[#969696] flex items-center justify-center">
+                  <div className="w-8 h-8 rounded-xl bg-secondary border border-border text-muted-foreground flex items-center justify-center">
                     <Shield className="w-4 h-4" />
                   </div>
                 )}
@@ -660,7 +701,7 @@ export function SkillsSettings({ onClose }: SkillsSettingsProps = {}) {
 
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-semibold text-[#161616] dark:text-white">
+                  <span className="text-xs font-semibold text-foreground">
                     {t("securityScanTitle")}
                   </span>
                   <span
@@ -669,10 +710,10 @@ export function SkillsSettings({ onClose }: SkillsSettingsProps = {}) {
                       scanStatus === "passed"
                         ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20"
                         : scanStatus === "failed"
-                        ? "bg-red-500/10 text-red-600 dark:text-red-400 border border-red-500/20"
+                        ? "bg-destructive/10 text-destructive border border-destructive/20"
                         : scanStatus === "scanning"
                         ? "bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 animate-pulse"
-                        : "bg-[#ebebed] dark:bg-[#2b2b2b] text-[#737373] dark:text-[#969696] border border-[#dedee2] dark:border-[#383838]"
+                        : "bg-secondary text-muted-foreground border border-border"
                     )}
                   >
                     {scanStatus === "passed"
@@ -685,7 +726,7 @@ export function SkillsSettings({ onClose }: SkillsSettingsProps = {}) {
                   </span>
                 </div>
 
-                <p className="text-xs text-[#737373] dark:text-[#969696] mt-1 leading-relaxed">
+                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
                   {scanStatus === "passed" ? scanMessage : t("securityScanDesc")}
                 </p>
               </div>
@@ -693,71 +734,71 @@ export function SkillsSettings({ onClose }: SkillsSettingsProps = {}) {
 
             {/* AI Generated Overview Box */}
             {uploadFile && scanStatus === "passed" && (
-              <div className="flex flex-col gap-3 p-4 rounded-2xl bg-[#f8f8fa] dark:bg-[#1a1a1a] border border-[#dedee2] dark:border-[#2e2e2e]">
+              <div className="flex flex-col gap-3 p-4 rounded-2xl bg-card border border-border">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <PencilSparkles className="w-3.5 h-3.5 text-[#0066ff]" />
-                    <span className="text-xs font-semibold text-[#161616] dark:text-white">
+                    <PencilSparkles className="w-3.5 h-3.5 text-primary" />
+                    <span className="text-xs font-semibold text-foreground">
                       AI Overview & Configuration
                     </span>
                   </div>
-                  <span className="text-[10px] text-[#737373] dark:text-[#5d5d5d]">
+                  <span className="text-[10px] text-muted-foreground">
                     Auto-generated from content
                   </span>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div className="flex flex-col gap-1">
-                    <label className="text-[11px] font-medium text-[#737373] dark:text-[#969696]">
+                    <label className="text-[11px] font-medium text-muted-foreground">
                       {t("skillName")}
                     </label>
-                    <input
+                    <Input
                       type="text"
                       value={uploadSkillName}
                       onChange={(e) => setUploadSkillName(e.target.value)}
-                      className="w-full h-8 px-2.5 text-xs bg-[#ffffff] dark:bg-[#222222] border border-[#dedee2] dark:border-[#383838] rounded-xl text-[#161616] dark:text-white focus:outline-none focus:border-[#0066ff]"
+                      className="h-8 px-2.5 text-xs bg-background border-border text-foreground rounded-xl"
                     />
                   </div>
 
                   <div className="flex flex-col gap-1">
-                    <label className="text-[11px] font-medium text-[#737373] dark:text-[#969696]">
+                    <label className="text-[11px] font-medium text-muted-foreground">
                       {t("skillSlug")}
                     </label>
                     <div className="relative flex items-center">
-                      <span className="absolute left-2.5 text-xs text-[#737373] dark:text-[#969696] font-mono">
+                      <span className="absolute left-2.5 text-xs text-muted-foreground font-mono">
                         /
                       </span>
-                      <input
+                      <Input
                         type="text"
                         value={uploadSkillSlug}
                         onChange={(e) => setUploadSkillSlug(e.target.value)}
-                        className="w-full h-8 pl-6 pr-2.5 text-xs font-mono bg-[#ffffff] dark:bg-[#222222] border border-[#dedee2] dark:border-[#383838] rounded-xl text-[#161616] dark:text-white focus:outline-none focus:border-[#0066ff]"
+                        className="h-8 pl-6 pr-2.5 text-xs font-mono bg-background border-border text-foreground rounded-xl"
                       />
                     </div>
                   </div>
                 </div>
 
                 <div className="flex flex-col gap-1">
-                  <label className="text-[11px] font-medium text-[#737373] dark:text-[#969696]">
+                  <label className="text-[11px] font-medium text-muted-foreground">
                     {t("skillDescription")}
                   </label>
-                  <input
+                  <Input
                     type="text"
                     value={uploadSkillDescription}
                     onChange={(e) => setUploadSkillDescription(e.target.value)}
-                    className="w-full h-8 px-2.5 text-xs bg-[#ffffff] dark:bg-[#222222] border border-[#dedee2] dark:border-[#383838] rounded-xl text-[#161616] dark:text-white focus:outline-none focus:border-[#0066ff]"
+                    className="h-8 px-2.5 text-xs bg-background border-border text-foreground rounded-xl"
                   />
                 </div>
 
                 <div className="flex flex-col gap-1">
-                  <label className="text-[11px] font-medium text-[#737373] dark:text-[#969696]">
+                  <label className="text-[11px] font-medium text-muted-foreground">
                     Overview (Written by AI)
                   </label>
                   <textarea
                     rows={4}
                     value={uploadSkillOverview}
                     onChange={(e) => setUploadSkillOverview(e.target.value)}
-                    className="w-full p-2.5 text-xs bg-[#ffffff] dark:bg-[#222222] border border-[#dedee2] dark:border-[#383838] rounded-xl text-[#161616] dark:text-white focus:outline-none focus:border-[#0066ff] resize-y leading-relaxed font-sans"
+                    className="w-full p-2.5 text-xs bg-background border border-border rounded-xl text-foreground focus:outline-none focus:ring-1 focus:ring-primary/40 resize-y leading-relaxed font-sans"
                   />
                 </div>
               </div>
@@ -765,25 +806,25 @@ export function SkillsSettings({ onClose }: SkillsSettingsProps = {}) {
 
             {/* Bottom Action Buttons */}
             <div className="pt-2 flex items-center justify-end gap-3">
-              <button
-                type="button"
+              <Button
+                variant="outline"
+                size="sm"
                 onClick={() => setViewMode("list")}
-                className="px-4 py-2 rounded-xl border border-[#dedee2] dark:border-[#383838] text-xs font-medium text-[#737373] dark:text-[#d4d4d4] hover:bg-[#f0f0f2] dark:hover:bg-[#2b2b2b] transition-colors cursor-pointer"
+                className="rounded-xl border-border text-muted-foreground hover:text-foreground"
               >
                 {t("cancel")}
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button
+                size="sm"
                 onClick={handleUploadSubmit}
                 disabled={!uploadFile || scanStatus !== "passed"}
-                className="px-5 py-2 rounded-xl bg-[#161616] dark:bg-white text-white dark:text-[#161616] hover:bg-[#2b2b2b] dark:hover:bg-[#e2e2e5] disabled:opacity-40 disabled:cursor-not-allowed text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+                className="px-5 rounded-xl text-xs font-semibold shadow-xs"
               >
                 {t("uploadBtn")}
-              </button>
+              </Button>
             </div>
           </div>
-        </ScrollArea>
-      </div>
+        </div>
     );
   }
 
@@ -795,43 +836,45 @@ export function SkillsSettings({ onClose }: SkillsSettingsProps = {}) {
     const activeFileContent = bundleFilesMap[selectedFileName] || "";
 
     return (
-      <div className="flex-1 h-full flex flex-col min-h-0 bg-[#ffffff] dark:bg-[#161616] text-[#262626] dark:text-[#d4d4d4] select-none">
+      <div className="w-full flex flex-col space-y-6 font-sans select-none">
         {/* Top Back Navigation Bar */}
-        <div className="px-6 pt-5 pb-3 shrink-0 flex items-center justify-between">
-          <button
-            type="button"
+        <div className="flex items-center justify-between">
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => setViewMode("list")}
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-[#737373] dark:text-[#969696] hover:text-[#161616] dark:hover:text-white transition-colors cursor-pointer group"
+            className="gap-1.5 text-xs text-muted-foreground hover:text-foreground cursor-pointer -ml-2 h-8"
           >
-            <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform" />
+            <ArrowLeft className="w-3.5 h-3.5" />
             <span>{t("backToSkills")}</span>
-          </button>
+          </Button>
 
           {onClose && (
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={onClose}
-              className="p-1 rounded-lg text-[#737373] hover:text-[#161616] dark:hover:text-white transition-colors cursor-pointer"
+              className="h-8 w-8 p-0 rounded-lg text-muted-foreground hover:text-foreground"
             >
               <X className="w-4 h-4" />
-            </button>
+            </Button>
           )}
         </div>
 
-        {/* Bundle Header Strip (Image 1) */}
-        <div className="px-6 pb-4 shrink-0 flex items-center justify-between gap-4">
+        {/* Bundle Header Strip */}
+        <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3.5 min-w-0">
             {/* Icon */}
-            <div className="w-12 h-12 rounded-2xl bg-[#f4f4f6] dark:bg-[#222222] border border-[#dedee2] dark:border-[#383838] flex items-center justify-center text-[#161616] dark:text-white shrink-0 shadow-xs">
+            <div className="w-12 h-12 rounded-2xl bg-secondary border border-border flex items-center justify-center text-foreground shrink-0 shadow-xs">
               <Icon className="w-6 h-6 stroke-[1.8]" />
             </div>
 
             <div className="flex flex-col min-w-0">
-              <h2 className="text-xl font-semibold tracking-tight text-[#161616] dark:text-white truncate">
+              <h2 className="font-serif text-2xl sm:text-3xl font-normal tracking-tight text-foreground truncate">
                 {selectedBundle.name}
               </h2>
               {/* Meta row: Author · Version · Skills Count · Updated */}
-              <div className="flex items-center gap-2 text-xs text-[#737373] dark:text-[#969696] mt-0.5 flex-wrap">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5 flex-wrap">
                 {selectedBundle.author && <span>{selectedBundle.author}</span>}
                 {selectedBundle.version && (
                   <>
@@ -853,15 +896,11 @@ export function SkillsSettings({ onClose }: SkillsSettingsProps = {}) {
 
           {/* Action button: Add / Enabled */}
           <div className="shrink-0 flex items-center gap-2">
-            <button
-              type="button"
+            <Button
+              size="sm"
+              variant={selectedBundle.isEnabled ? "secondary" : "default"}
               onClick={() => handleToggleBundle(selectedBundle.id, !selectedBundle.isEnabled)}
-              className={cn(
-                "inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-colors cursor-pointer shadow-xs",
-                selectedBundle.isEnabled
-                  ? "bg-[#ebebed] dark:bg-[#2b2b2b] text-[#161616] dark:text-white border border-[#dedee2] dark:border-[#383838]"
-                  : "bg-[#161616] dark:bg-white text-white dark:text-[#161616] hover:bg-[#2b2b2b] dark:hover:bg-[#e2e2e5]"
-              )}
+              className="rounded-xl text-xs font-semibold gap-1.5 shadow-none"
             >
               {selectedBundle.isEnabled ? (
                 <>
@@ -874,20 +913,20 @@ export function SkillsSettings({ onClose }: SkillsSettingsProps = {}) {
                   <span>Add</span>
                 </>
               )}
-            </button>
+            </Button>
           </div>
         </div>
 
-        {/* 3 Tabs Row (Overview, Content, Skills · N) — Explicitly NO connectors */}
-        <div className="px-6 shrink-0 border-b border-[#dedee2] dark:border-[#2e2e2e] flex items-center gap-6 text-xs font-medium">
+        {/* 3 Tabs Row (Overview, Content, Skills · N) */}
+        <div className="border-b border-border flex items-center gap-6 text-xs font-medium">
           <button
             type="button"
             onClick={() => setBundleActiveTab("overview")}
             className={cn(
               "pb-2.5 transition-colors cursor-pointer border-b-2 -mb-[1px]",
               bundleActiveTab === "overview"
-                ? "border-[#161616] dark:border-white text-[#161616] dark:text-white font-semibold"
-                : "border-transparent text-[#737373] dark:text-[#969696] hover:text-[#161616] dark:hover:text-white"
+                ? "border-primary text-foreground font-semibold"
+                : "border-transparent text-muted-foreground hover:text-foreground"
             )}
           >
             {t("tabOverview")}
@@ -898,8 +937,8 @@ export function SkillsSettings({ onClose }: SkillsSettingsProps = {}) {
             className={cn(
               "pb-2.5 transition-colors cursor-pointer border-b-2 -mb-[1px]",
               bundleActiveTab === "content"
-                ? "border-[#161616] dark:border-white text-[#161616] dark:text-white font-semibold"
-                : "border-transparent text-[#737373] dark:text-[#969696] hover:text-[#161616] dark:hover:text-white"
+                ? "border-primary text-foreground font-semibold"
+                : "border-transparent text-muted-foreground hover:text-foreground"
             )}
           >
             {t("tabContent")}
@@ -910,8 +949,8 @@ export function SkillsSettings({ onClose }: SkillsSettingsProps = {}) {
             className={cn(
               "pb-2.5 transition-colors cursor-pointer border-b-2 -mb-[1px]",
               bundleActiveTab === "skills"
-                ? "border-[#161616] dark:border-white text-[#161616] dark:text-white font-semibold"
-                : "border-transparent text-[#737373] dark:text-[#969696] hover:text-[#161616] dark:hover:text-white"
+                ? "border-primary text-foreground font-semibold"
+                : "border-transparent text-muted-foreground hover:text-foreground"
             )}
           >
             {t("tabSkills")} · {bundleSubSkills.length}
@@ -920,62 +959,60 @@ export function SkillsSettings({ onClose }: SkillsSettingsProps = {}) {
 
         {/* Tab 1: OVERVIEW */}
         {bundleActiveTab === "overview" && (
-          <ScrollArea className="flex-1 p-6">
-            <div className="max-w-3xl flex flex-col gap-6">
-              <div
-                className="prose dark:prose-invert max-w-none text-xs leading-relaxed select-text [&_h1]:text-sm [&_h1]:font-semibold [&_h1]:mt-3 [&_h1]:mb-1.5 [&_h2]:text-xs [&_h2]:font-semibold [&_h2]:mt-2.5 [&_h2]:mb-1 [&_h3]:text-xs [&_h3]:font-semibold [&_h3]:mt-2 [&_h3]:mb-1 [&_p]:my-1.5 [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4 [&_li]:my-0.5 [&_code]:font-mono [&_code]:text-[11px] [&_code]:bg-[#ebebed] dark:[&_code]:bg-[#2a2a2a] [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded-md [&_strong]:text-[#161616] dark:[&_strong]:text-white"
-                dangerouslySetInnerHTML={{
-                  __html: marked.parse(selectedBundle.overview || selectedBundle.description) as string,
-                }}
-              />
+          <div className="max-w-3xl flex flex-col gap-6 pt-2">
+            <div
+              className="prose dark:prose-invert max-w-none text-xs leading-relaxed select-text [&_h1]:text-sm [&_h1]:font-semibold [&_h1]:mt-3 [&_h1]:mb-1.5 [&_h2]:text-xs [&_h2]:font-semibold [&_h2]:mt-2.5 [&_h2]:mb-1 [&_h3]:text-xs [&_h3]:font-semibold [&_h3]:mt-2 [&_h3]:mb-1 [&_p]:my-1.5 [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4 [&_li]:my-0.5 [&_code]:font-mono [&_code]:text-[11px] [&_code]:bg-secondary [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded-md [&_strong]:text-foreground"
+              dangerouslySetInnerHTML={{
+                __html: marked.parse(selectedBundle.overview || selectedBundle.description) as string,
+              }}
+            />
 
-              {/* Skills included list (Image 1) */}
-              <div className="flex flex-col gap-2 pt-2">
-                <span className="text-xs font-semibold text-[#161616] dark:text-white uppercase tracking-wider">
-                  Included Skills ({bundleSubSkills.length})
-                </span>
-                <div className="flex flex-col divide-y divide-[#dedee2]/60 dark:divide-[#2e2e2e]/60 border border-[#dedee2] dark:border-[#2e2e2e] rounded-2xl bg-[#ffffff] dark:bg-[#1a1a1a] overflow-hidden">
-                  {bundleSubSkills.map((sub) => (
-                    <div
-                      key={sub.id}
-                      onClick={() => {
-                        setSelectedSkill(sub);
-                        setOriginBundle(selectedBundle);
-                        setViewMode("skill-detail");
-                      }}
-                      className="p-3.5 hover:bg-[#f8f8fa] dark:hover:bg-[#222222]/60 transition-colors cursor-pointer flex items-start gap-3 group"
-                    >
-                      <div className="w-8 h-8 rounded-xl bg-[#f4f4f6] dark:bg-[#222222] border border-[#dedee2] dark:border-[#383838] flex items-center justify-center text-[#737373] dark:text-[#d4d4d4] shrink-0 mt-0.5 group-hover:border-[#0066ff]/40 transition-colors">
-                        <FileCode className="w-4 h-4" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-semibold text-[#161616] dark:text-white">
-                            {sub.name}
-                          </span>
-                          <span className="text-[11px] font-mono px-1.5 py-0.2 rounded-md bg-[#ebebed] dark:bg-[#2b2b2b] border border-[#dedee2] dark:border-[#383838] text-[#555555] dark:text-[#a0a0a0]">
-                            /{sub.slug}
-                          </span>
-                        </div>
-                        <p className="text-xs text-[#737373] dark:text-[#969696] line-clamp-2 mt-0.5 leading-relaxed">
-                          {sub.description}
-                        </p>
-                      </div>
-                      <ChevronRight className="w-4 h-4 text-[#737373] dark:text-[#5d5d5d] shrink-0 mt-2 group-hover:translate-x-0.5 transition-transform" />
+            {/* Skills included list */}
+            <div className="flex flex-col gap-2 pt-2">
+              <span className="text-xs font-semibold text-foreground uppercase tracking-wider">
+                Included Skills ({bundleSubSkills.length})
+              </span>
+              <div className="flex flex-col divide-y divide-border/60 border border-border rounded-2xl bg-card overflow-hidden shadow-2xs">
+                {bundleSubSkills.map((sub) => (
+                  <div
+                    key={sub.id}
+                    onClick={() => {
+                      setSelectedSkill(sub);
+                      setOriginBundle(selectedBundle);
+                      setViewMode("skill-detail");
+                    }}
+                    className="p-3.5 hover:bg-secondary/60 transition-colors cursor-pointer flex items-start gap-3 group"
+                  >
+                    <div className="w-8 h-8 rounded-xl bg-secondary border border-border flex items-center justify-center text-muted-foreground shrink-0 mt-0.5 group-hover:border-primary/40 transition-colors">
+                      <FileCode className="w-4 h-4" />
                     </div>
-                  ))}
-                </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-semibold text-foreground">
+                          {sub.name}
+                        </span>
+                        <span className="text-[11px] font-mono px-1.5 py-0.2 rounded-md bg-secondary border border-border/60 text-muted-foreground">
+                          /{sub.slug}
+                        </span>
+                      </div>
+                      <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5 leading-relaxed">
+                        {sub.description}
+                      </p>
+                    </div>
+                    <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0 mt-2 group-hover:translate-x-0.5 transition-transform" />
+                  </div>
+                ))}
               </div>
             </div>
-          </ScrollArea>
+          </div>
         )}
 
-        {/* Tab 2: CONTENT (Split Pane - Image 3) */}
+        {/* Tab 2: CONTENT (Split Pane) */}
         {bundleActiveTab === "content" && (
-          <div className="flex-1 min-h-0 flex overflow-hidden">
+          <div className="w-full h-[520px] rounded-2xl border border-border overflow-hidden flex bg-card shadow-2xs">
             {/* Left File Tree Sidebar */}
-            <div className="w-56 shrink-0 border-r border-[#dedee2] dark:border-[#2e2e2e] bg-[#f8f8fa] dark:bg-[#1a1a1a] flex flex-col">
-              <div className="px-3.5 py-2.5 border-b border-[#dedee2] dark:border-[#2e2e2e] text-[11px] font-semibold text-[#737373] dark:text-[#969696] uppercase tracking-wider">
+            <div className="w-56 shrink-0 border-r border-border bg-secondary/30 flex flex-col">
+              <div className="px-3.5 py-2.5 border-b border-border text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
                 Files ({Object.keys(bundleFilesMap).length})
               </div>
               <ScrollArea className="flex-1 p-2">
@@ -990,8 +1027,8 @@ export function SkillsSettings({ onClose }: SkillsSettingsProps = {}) {
                         className={cn(
                           "w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-mono flex items-center gap-2 transition-colors cursor-pointer truncate",
                           isSelected
-                            ? "bg-[#161616] dark:bg-white text-white dark:text-[#161616] font-medium"
-                            : "text-[#737373] dark:text-[#d4d4d4] hover:bg-[#ebebed] dark:hover:bg-[#252525]"
+                            ? "bg-primary text-primary-foreground font-medium"
+                            : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
                         )}
                       >
                         <FileText className="w-3.5 h-3.5 shrink-0" />
@@ -1004,24 +1041,24 @@ export function SkillsSettings({ onClose }: SkillsSettingsProps = {}) {
             </div>
 
             {/* Right Content Viewer */}
-            <div className="flex-1 min-w-0 flex flex-col bg-[#ffffff] dark:bg-[#161616]">
+            <div className="flex-1 min-w-0 flex flex-col bg-card">
               {/* File header bar */}
-              <div className="px-4 py-2.5 border-b border-[#dedee2] dark:border-[#2e2e2e] flex items-center justify-between gap-3">
-                <span className="text-xs font-mono font-medium text-[#161616] dark:text-white truncate">
+              <div className="px-4 py-2.5 border-b border-border flex items-center justify-between gap-3">
+                <span className="text-xs font-mono font-medium text-foreground truncate">
                   /{selectedFileName}
                 </span>
 
-                <div className="flex items-center gap-1.5 shrink-0">
-                  {/* Preview / Code Toggle */}
-                  <div className="flex items-center rounded-lg bg-[#f4f4f6] dark:bg-[#222222] border border-[#dedee2] dark:border-[#383838] p-0.5">
+                <div className="flex items-center gap-2 shrink-0">
+                  {/* Mode switcher: Preview vs Raw */}
+                  <div className="flex items-center p-0.5 rounded-lg bg-muted/70 border border-border">
                     <button
                       type="button"
                       onClick={() => setContentViewMode("preview")}
                       className={cn(
                         "p-1 rounded-md text-xs transition-colors cursor-pointer flex items-center gap-1 px-2",
                         contentViewMode === "preview"
-                          ? "bg-[#ffffff] dark:bg-[#161616] text-[#161616] dark:text-white shadow-2xs font-medium"
-                          : "text-[#737373] hover:text-[#161616] dark:hover:text-white"
+                          ? "bg-background text-foreground shadow-2xs font-medium"
+                          : "text-muted-foreground hover:text-foreground"
                       )}
                       title="Preview"
                     >
@@ -1034,8 +1071,8 @@ export function SkillsSettings({ onClose }: SkillsSettingsProps = {}) {
                       className={cn(
                         "p-1 rounded-md text-xs transition-colors cursor-pointer flex items-center gap-1 px-2",
                         contentViewMode === "code"
-                          ? "bg-[#ffffff] dark:bg-[#161616] text-[#161616] dark:text-white shadow-2xs font-medium"
-                          : "text-[#737373] hover:text-[#161616] dark:hover:text-white"
+                          ? "bg-background text-foreground shadow-2xs font-medium"
+                          : "text-muted-foreground hover:text-foreground"
                       )}
                       title="Raw Code"
                     >
@@ -1045,14 +1082,15 @@ export function SkillsSettings({ onClose }: SkillsSettingsProps = {}) {
                   </div>
 
                   {/* Copy button */}
-                  <button
-                    type="button"
+                  <Button
+                    variant="outline"
+                    size="sm"
                     onClick={() => handleCopyContent(activeFileContent)}
-                    className="p-1.5 rounded-lg border border-[#dedee2] dark:border-[#383838] bg-[#f4f4f6] dark:bg-[#222222] hover:bg-[#e9e9ec] dark:hover:bg-[#2b2b2b] text-[#737373] dark:text-[#d4d4d4] hover:text-[#161616] dark:hover:text-white transition-colors cursor-pointer"
+                    className="h-7 w-7 p-0 rounded-lg border-border text-muted-foreground hover:text-foreground cursor-pointer shadow-none"
                     title={t("copyCode")}
                   >
                     <Copy className="w-3.5 h-3.5" />
-                  </button>
+                  </Button>
                 </div>
               </div>
 
@@ -1060,11 +1098,11 @@ export function SkillsSettings({ onClose }: SkillsSettingsProps = {}) {
               <ScrollArea className="flex-1 p-5">
                 {contentViewMode === "preview" ? (
                   <div
-                    className="prose dark:prose-invert max-w-none text-xs leading-relaxed select-text [&_h1]:text-base [&_h1]:font-semibold [&_h1]:mt-4 [&_h1]:mb-2 [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:mt-3 [&_h2]:mb-1.5 [&_h3]:text-xs [&_h3]:font-semibold [&_h3]:mt-2 [&_h3]:mb-1 [&_p]:my-1.5 [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4 [&_li]:my-0.5 [&_pre]:p-3 [&_pre]:bg-[#f4f4f6] dark:[&_pre]:bg-[#202020] [&_pre]:rounded-xl [&_pre]:border [&_pre]:border-[#dedee2] dark:[&_pre]:border-[#2e2e2e] [&_pre]:overflow-x-auto [&_code]:font-mono [&_code]:text-[11px] [&_table]:w-full [&_table]:border-collapse [&_th]:border [&_th]:border-[#dedee2] dark:[&_th]:border-[#383838] [&_th]:p-1.5 [&_th]:bg-[#f4f4f6] dark:[&_th]:bg-[#222222] [&_td]:border [&_td]:border-[#dedee2] dark:[&_td]:border-[#383838] [&_td]:p-1.5"
+                    className="prose dark:prose-invert max-w-none text-xs leading-relaxed select-text [&_h1]:text-base [&_h1]:font-semibold [&_h1]:mt-4 [&_h1]:mb-2 [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:mt-3 [&_h2]:mb-1.5 [&_h3]:text-xs [&_h3]:font-semibold [&_h3]:mt-2 [&_h3]:mb-1 [&_p]:my-1.5 [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4 [&_li]:my-0.5 [&_pre]:p-3 [&_pre]:bg-secondary/50 [&_pre]:rounded-xl [&_pre]:border [&_pre]:border-border [&_pre]:overflow-x-auto [&_code]:font-mono [&_code]:text-[11px] [&_table]:w-full [&_table]:border-collapse [&_th]:border [&_th]:border-border [&_th]:p-1.5 [&_th]:bg-secondary/40 [&_td]:border [&_td]:border-border [&_td]:p-1.5"
                     dangerouslySetInnerHTML={{ __html: marked.parse(activeFileContent) as string }}
                   />
                 ) : (
-                  <pre className="p-4 text-xs font-mono text-[#161616] dark:text-[#d4d4d4] bg-[#f8f8fa] dark:bg-[#1a1a1a] rounded-xl border border-[#dedee2] dark:border-[#2e2e2e] overflow-x-auto whitespace-pre-wrap leading-relaxed select-text">
+                  <pre className="p-4 text-xs font-mono text-foreground bg-secondary/30 rounded-xl border border-border overflow-x-auto whitespace-pre-wrap leading-relaxed select-text">
                     {activeFileContent}
                   </pre>
                 )}
@@ -1073,46 +1111,44 @@ export function SkillsSettings({ onClose }: SkillsSettingsProps = {}) {
           </div>
         )}
 
-        {/* Tab 3: SKILLS (Image 1) */}
+        {/* Tab 3: SKILLS */}
         {bundleActiveTab === "skills" && (
-          <ScrollArea className="flex-1 p-6">
-            <div className="max-w-3xl flex flex-col gap-3">
-              <span className="text-xs font-semibold text-[#161616] dark:text-white uppercase tracking-wider">
-                Skills in this bundle ({bundleSubSkills.length})
-              </span>
-              <div className="flex flex-col divide-y divide-[#dedee2]/60 dark:divide-[#2e2e2e]/60 border border-[#dedee2] dark:border-[#2e2e2e] rounded-2xl bg-[#ffffff] dark:bg-[#1a1a1a] overflow-hidden shadow-xs">
-                {bundleSubSkills.map((sub) => (
-                  <div
-                    key={sub.id}
-                    onClick={() => {
-                      setSelectedSkill(sub);
-                      setOriginBundle(selectedBundle);
-                      setViewMode("skill-detail");
-                    }}
-                    className="p-3.5 hover:bg-[#f8f8fa] dark:hover:bg-[#222222]/60 transition-colors cursor-pointer flex items-start gap-3.5 group"
-                  >
-                    <div className="w-8 h-8 rounded-xl bg-[#f4f4f6] dark:bg-[#222222] border border-[#dedee2] dark:border-[#383838] flex items-center justify-center text-[#737373] dark:text-[#d4d4d4] shrink-0 mt-0.5 group-hover:border-[#0066ff]/40 transition-colors">
-                      <FileCode className="w-4 h-4" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-xs font-semibold text-[#161616] dark:text-white">
-                          {sub.name}
-                        </span>
-                        <span className="text-[11px] font-mono px-1.5 py-0.2 rounded-md bg-[#ebebed] dark:bg-[#2b2b2b] border border-[#dedee2] dark:border-[#383838] text-[#555555] dark:text-[#a0a0a0]">
-                          /{sub.slug}
-                        </span>
-                      </div>
-                      <p className="text-xs text-[#737373] dark:text-[#969696] line-clamp-2 mt-0.5 leading-relaxed">
-                        {sub.description}
-                      </p>
-                    </div>
-                    <ChevronRight className="w-4 h-4 text-[#737373] dark:text-[#5d5d5d] shrink-0 mt-2 group-hover:translate-x-0.5 transition-transform" />
+          <div className="max-w-3xl flex flex-col gap-3 pt-2">
+            <span className="text-xs font-semibold text-foreground uppercase tracking-wider">
+              Skills in this bundle ({bundleSubSkills.length})
+            </span>
+            <div className="flex flex-col divide-y divide-border/60 border border-border rounded-2xl bg-card overflow-hidden shadow-2xs">
+              {bundleSubSkills.map((sub) => (
+                <div
+                  key={sub.id}
+                  onClick={() => {
+                    setSelectedSkill(sub);
+                    setOriginBundle(selectedBundle);
+                    setViewMode("skill-detail");
+                  }}
+                  className="p-3.5 hover:bg-secondary/60 transition-colors cursor-pointer flex items-start gap-3.5 group"
+                >
+                  <div className="w-8 h-8 rounded-xl bg-secondary border border-border flex items-center justify-center text-muted-foreground shrink-0 mt-0.5 group-hover:border-primary/40 transition-colors">
+                    <FileCode className="w-4 h-4" />
                   </div>
-                ))}
-              </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-xs font-semibold text-foreground">
+                        {sub.name}
+                      </span>
+                      <span className="text-[11px] font-mono px-1.5 py-0.2 rounded-md bg-secondary border border-border/60 text-muted-foreground">
+                        /{sub.slug}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground line-clamp-2 mt-0.5 leading-relaxed">
+                      {sub.description}
+                    </p>
+                  </div>
+                  <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0 mt-2 group-hover:translate-x-0.5 transition-transform" />
+                </div>
+              ))}
             </div>
-          </ScrollArea>
+          </div>
         )}
       </div>
     );
@@ -1127,11 +1163,12 @@ export function SkillsSettings({ onClose }: SkillsSettingsProps = {}) {
     const filesList = Object.keys(skillFilesMap);
 
     return (
-      <div className="flex-1 h-full flex flex-col min-h-0 bg-[#ffffff] dark:bg-[#161616] text-[#262626] dark:text-[#d4d4d4] select-none">
+      <div className="w-full flex flex-col space-y-6 font-sans select-none">
         {/* Top Back Navigation Bar */}
-        <div className="px-6 pt-5 pb-3 shrink-0 flex items-center justify-between">
-          <button
-            type="button"
+        <div className="flex items-center justify-between">
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={() => {
               if (originBundle) {
                 setSelectedBundle(originBundle);
@@ -1140,40 +1177,41 @@ export function SkillsSettings({ onClose }: SkillsSettingsProps = {}) {
                 setViewMode("list");
               }
             }}
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-[#737373] dark:text-[#969696] hover:text-[#161616] dark:hover:text-white transition-colors cursor-pointer group"
+            className="gap-1.5 text-xs text-muted-foreground hover:text-foreground cursor-pointer -ml-2 h-8"
           >
-            <ArrowLeft className="w-3.5 h-3.5 group-hover:-translate-x-0.5 transition-transform" />
+            <ArrowLeft className="w-3.5 h-3.5" />
             <span>{originBundle ? originBundle.name : t("backToSkills")}</span>
-          </button>
+          </Button>
 
           {onClose && (
-            <button
-              type="button"
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={onClose}
-              className="p-1 rounded-lg text-[#737373] hover:text-[#161616] dark:hover:text-white transition-colors cursor-pointer"
+              className="h-8 w-8 p-0 rounded-lg text-muted-foreground hover:text-foreground"
             >
               <X className="w-4 h-4" />
-            </button>
+            </Button>
           )}
         </div>
 
-        {/* Skill Header Strip (Image 2) */}
-        <div className="px-6 pb-4 shrink-0 flex items-center justify-between gap-4">
+        {/* Skill Header Strip */}
+        <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3.5 min-w-0">
-            <div className="w-12 h-12 rounded-2xl bg-[#f4f4f6] dark:bg-[#222222] border border-[#dedee2] dark:border-[#383838] flex items-center justify-center text-[#161616] dark:text-white shrink-0 shadow-xs">
+            <div className="w-12 h-12 rounded-2xl bg-secondary border border-border flex items-center justify-center text-foreground shrink-0 shadow-xs">
               <Icon className="w-6 h-6 stroke-[1.8]" />
             </div>
 
             <div className="flex flex-col min-w-0">
               <div className="flex items-center gap-2">
-                <h2 className="text-xl font-semibold tracking-tight text-[#161616] dark:text-white truncate">
+                <h2 className="font-serif text-2xl sm:text-3xl font-normal tracking-tight text-foreground truncate">
                   {selectedSkill.name}
                 </h2>
-                <span className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-[#ebebed] dark:bg-[#2b2b2b] border border-[#dedee2] dark:border-[#383838] text-[#555555] dark:text-[#a0a0a0]">
+                <span className="text-[11px] font-mono px-2 py-0.5 rounded-md bg-secondary border border-border/60 text-muted-foreground">
                   /{selectedSkill.slug}
                 </span>
               </div>
-              <div className="flex items-center gap-2 text-xs text-[#737373] dark:text-[#969696] mt-0.5 flex-wrap">
+              <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5 flex-wrap">
                 {selectedSkill.author && <span>{selectedSkill.author}</span>}
                 {selectedSkill.version && (
                   <>
@@ -1193,27 +1231,26 @@ export function SkillsSettings({ onClose }: SkillsSettingsProps = {}) {
 
           {/* Action button: Enabled Switch */}
           <div className="shrink-0 flex items-center gap-3">
-            <span className="text-xs text-[#737373] dark:text-[#969696]">
+            <span className="text-xs text-muted-foreground">
               {selectedSkill.isEnabled ? "Enabled" : "Disabled"}
             </span>
             <Switch
               checked={selectedSkill.isEnabled}
               onCheckedChange={(checked) => handleToggleSkill(selectedSkill.id, checked)}
-              className="data-[state=checked]:bg-[#161616] dark:data-[state=checked]:bg-white data-[state=unchecked]:bg-[#dedee2] dark:data-[state=unchecked]:bg-[#383838]"
             />
           </div>
         </div>
 
-        {/* 2 Tabs Row (Overview, Content · N) — exactly 2 tabs for single skill! */}
-        <div className="px-6 shrink-0 border-b border-[#dedee2] dark:border-[#2e2e2e] flex items-center gap-6 text-xs font-medium">
+        {/* 2 Tabs Row (Overview, Content · N) */}
+        <div className="border-b border-border flex items-center gap-6 text-xs font-medium">
           <button
             type="button"
             onClick={() => setSkillActiveTab("overview")}
             className={cn(
               "pb-2.5 transition-colors cursor-pointer border-b-2 -mb-[1px]",
               skillActiveTab === "overview"
-                ? "border-[#161616] dark:border-white text-[#161616] dark:text-white font-semibold"
-                : "border-transparent text-[#737373] dark:text-[#969696] hover:text-[#161616] dark:hover:text-white"
+                ? "border-primary text-foreground font-semibold"
+                : "border-transparent text-muted-foreground hover:text-foreground"
             )}
           >
             {t("tabOverview")}
@@ -1224,8 +1261,8 @@ export function SkillsSettings({ onClose }: SkillsSettingsProps = {}) {
             className={cn(
               "pb-2.5 transition-colors cursor-pointer border-b-2 -mb-[1px]",
               skillActiveTab === "content"
-                ? "border-[#161616] dark:border-white text-[#161616] dark:text-white font-semibold"
-                : "border-transparent text-[#737373] dark:text-[#969696] hover:text-[#161616] dark:hover:text-white"
+                ? "border-primary text-foreground font-semibold"
+                : "border-transparent text-muted-foreground hover:text-foreground"
             )}
           >
             {t("tabContent")} · {filesList.length}
@@ -1234,52 +1271,50 @@ export function SkillsSettings({ onClose }: SkillsSettingsProps = {}) {
 
         {/* Tab 1: OVERVIEW */}
         {skillActiveTab === "overview" && (
-          <ScrollArea className="flex-1 p-6">
-            <div className="max-w-3xl flex flex-col gap-6">
-              <div>
-                <span className="text-xs font-semibold text-[#161616] dark:text-white uppercase tracking-wider block mb-2">
-                  {t("skillDescription")}
-                </span>
-                <p className="text-xs text-[#555555] dark:text-[#b0b0b0] leading-relaxed">
-                  {selectedSkill.description}
-                </p>
-              </div>
-
-              {selectedSkill.overview && (
-                <div>
-                  <span className="text-xs font-semibold text-[#161616] dark:text-white uppercase tracking-wider block mb-2">
-                    {t("tabOverview")}
-                  </span>
-                  <div
-                    className="prose dark:prose-invert max-w-none text-xs leading-relaxed select-text [&_h3]:text-xs [&_h3]:font-semibold [&_h3]:mt-3 [&_h3]:mb-1 [&_p]:my-1.5 [&_ul]:list-disc [&_ul]:pl-4 [&_code]:font-mono [&_code]:text-[11px]"
-                    dangerouslySetInnerHTML={{ __html: marked.parse(selectedSkill.overview) as string }}
-                  />
-                </div>
-              )}
-
-              {/* Slash Command Usage card */}
-              <div className="p-4 rounded-2xl bg-[#f8f8fa] dark:bg-[#1a1a1a] border border-[#dedee2] dark:border-[#2e2e2e] flex flex-col gap-2">
-                <span className="text-xs font-semibold text-[#161616] dark:text-white">
-                  {t("slashCommandSkills")}
-                </span>
-                <p className="text-xs text-[#737373] dark:text-[#969696] leading-relaxed">
-                  Trigger this skill manually by starting your message with{" "}
-                  <code className="font-mono text-[#161616] dark:text-white px-1.5 py-0.5 rounded-md bg-[#ebebed] dark:bg-[#2b2b2b] border border-[#dedee2] dark:border-[#383838]">
-                    /{selectedSkill.slug}
-                  </code>
-                  , or let Const AI autonomously choose and apply it when relevant to your study request.
-                </p>
-              </div>
+          <div className="max-w-3xl flex flex-col gap-6 pt-2">
+            <div>
+              <span className="text-xs font-semibold text-foreground uppercase tracking-wider block mb-2">
+                {t("skillDescription")}
+              </span>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                {selectedSkill.description}
+              </p>
             </div>
-          </ScrollArea>
+
+            {selectedSkill.overview && (
+              <div>
+                <span className="text-xs font-semibold text-foreground uppercase tracking-wider block mb-2">
+                  {t("tabOverview")}
+                </span>
+                <div
+                  className="prose dark:prose-invert max-w-none text-xs leading-relaxed select-text [&_h3]:text-xs [&_h3]:font-semibold [&_h3]:mt-3 [&_h3]:mb-1 [&_p]:my-1.5 [&_ul]:list-disc [&_ul]:pl-4 [&_code]:font-mono [&_code]:text-[11px] [&_code]:bg-secondary [&_code]:px-1 [&_code]:py-0.5 [&_code]:rounded-md [&_strong]:text-foreground"
+                  dangerouslySetInnerHTML={{ __html: marked.parse(selectedSkill.overview) as string }}
+                />
+              </div>
+            )}
+
+            {/* Slash Command Usage card */}
+            <div className="p-4 rounded-2xl bg-card border border-border flex flex-col gap-2 shadow-2xs">
+              <span className="text-xs font-semibold text-foreground">
+                {t("slashCommandSkills")}
+              </span>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                Trigger this skill manually by starting your message with{" "}
+                <code className="font-mono text-foreground px-1.5 py-0.5 rounded-md bg-secondary border border-border/60">
+                  /{selectedSkill.slug}
+                </code>
+                , or let Const AI autonomously choose and apply it when relevant to your study request.
+              </p>
+            </div>
+          </div>
         )}
 
-        {/* Tab 2: CONTENT (Split Pane - Image 2) */}
+        {/* Tab 2: CONTENT (Split Pane) */}
         {skillActiveTab === "content" && (
-          <div className="flex-1 min-h-0 flex overflow-hidden">
+          <div className="w-full h-[520px] rounded-2xl border border-border overflow-hidden flex bg-card shadow-2xs">
             {/* Left File Tree Sidebar */}
-            <div className="w-52 shrink-0 border-r border-[#dedee2] dark:border-[#2e2e2e] bg-[#f8f8fa] dark:bg-[#1a1a1a] flex flex-col">
-              <div className="px-3.5 py-2.5 border-b border-[#dedee2] dark:border-[#2e2e2e] text-[11px] font-semibold text-[#737373] dark:text-[#969696] uppercase tracking-wider">
+            <div className="w-52 shrink-0 border-r border-border bg-secondary/30 flex flex-col">
+              <div className="px-3.5 py-2.5 border-b border-border text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
                 Files ({filesList.length})
               </div>
               <ScrollArea className="flex-1 p-2">
@@ -1294,8 +1329,8 @@ export function SkillsSettings({ onClose }: SkillsSettingsProps = {}) {
                         className={cn(
                           "w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-mono flex items-center gap-2 transition-colors cursor-pointer truncate",
                           isSelected
-                            ? "bg-[#161616] dark:bg-white text-white dark:text-[#161616] font-medium"
-                            : "text-[#737373] dark:text-[#d4d4d4] hover:bg-[#ebebed] dark:hover:bg-[#252525]"
+                            ? "bg-primary text-primary-foreground font-medium"
+                            : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
                         )}
                       >
                         <FileText className="w-3.5 h-3.5 shrink-0" />
@@ -1308,23 +1343,23 @@ export function SkillsSettings({ onClose }: SkillsSettingsProps = {}) {
             </div>
 
             {/* Right Content Viewer */}
-            <div className="flex-1 min-w-0 flex flex-col bg-[#ffffff] dark:bg-[#161616]">
+            <div className="flex-1 min-w-0 flex flex-col bg-card">
               {/* Header bar */}
-              <div className="px-4 py-2.5 border-b border-[#dedee2] dark:border-[#2e2e2e] flex items-center justify-between gap-3">
-                <span className="text-xs font-mono font-medium text-[#161616] dark:text-white truncate">
+              <div className="px-4 py-2.5 border-b border-border flex items-center justify-between gap-3">
+                <span className="text-xs font-mono font-medium text-foreground truncate">
                   /{selectedFileName || "SKILL.md"}
                 </span>
 
                 <div className="flex items-center gap-1.5 shrink-0">
-                  <div className="flex items-center rounded-lg bg-[#f4f4f6] dark:bg-[#222222] border border-[#dedee2] dark:border-[#383838] p-0.5">
+                  <div className="flex items-center rounded-lg bg-muted/70 border border-border p-0.5">
                     <button
                       type="button"
                       onClick={() => setContentViewMode("preview")}
                       className={cn(
                         "p-1 rounded-md text-xs transition-colors cursor-pointer flex items-center gap-1 px-2",
                         contentViewMode === "preview"
-                          ? "bg-[#ffffff] dark:bg-[#161616] text-[#161616] dark:text-white shadow-2xs font-medium"
-                          : "text-[#737373] hover:text-[#161616] dark:hover:text-white"
+                          ? "bg-background text-foreground shadow-2xs font-medium"
+                          : "text-muted-foreground hover:text-foreground"
                       )}
                       title="Preview"
                     >
@@ -1337,8 +1372,8 @@ export function SkillsSettings({ onClose }: SkillsSettingsProps = {}) {
                       className={cn(
                         "p-1 rounded-md text-xs transition-colors cursor-pointer flex items-center gap-1 px-2",
                         contentViewMode === "code"
-                          ? "bg-[#ffffff] dark:bg-[#161616] text-[#161616] dark:text-white shadow-2xs font-medium"
-                          : "text-[#737373] hover:text-[#161616] dark:hover:text-white"
+                          ? "bg-background text-foreground shadow-2xs font-medium"
+                          : "text-muted-foreground hover:text-foreground"
                       )}
                       title="Raw Code"
                     >
@@ -1347,14 +1382,15 @@ export function SkillsSettings({ onClose }: SkillsSettingsProps = {}) {
                     </button>
                   </div>
 
-                  <button
-                    type="button"
+                  <Button
+                    variant="outline"
+                    size="sm"
                     onClick={() => handleCopyContent(activeFileContent)}
-                    className="p-1.5 rounded-lg border border-[#dedee2] dark:border-[#383838] bg-[#f4f4f6] dark:bg-[#222222] hover:bg-[#e9e9ec] dark:hover:bg-[#2b2b2b] text-[#737373] dark:text-[#d4d4d4] hover:text-[#161616] dark:hover:text-white transition-colors cursor-pointer"
+                    className="h-7 w-7 p-0 rounded-lg border-border text-muted-foreground hover:text-foreground cursor-pointer shadow-none"
                     title={t("copyCode")}
                   >
                     <Copy className="w-3.5 h-3.5" />
-                  </button>
+                  </Button>
                 </div>
               </div>
 
@@ -1362,11 +1398,11 @@ export function SkillsSettings({ onClose }: SkillsSettingsProps = {}) {
               <ScrollArea className="flex-1 p-5">
                 {contentViewMode === "preview" ? (
                   <div
-                    className="prose dark:prose-invert max-w-none text-xs leading-relaxed select-text [&_h1]:text-base [&_h1]:font-semibold [&_h1]:mt-4 [&_h1]:mb-2 [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:mt-3 [&_h2]:mb-1.5 [&_h3]:text-xs [&_h3]:font-semibold [&_h3]:mt-2 [&_h3]:mb-1 [&_p]:my-1.5 [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4 [&_li]:my-0.5 [&_pre]:p-3 [&_pre]:bg-[#f4f4f6] dark:[&_pre]:bg-[#202020] [&_pre]:rounded-xl [&_pre]:border [&_pre]:border-[#dedee2] dark:[&_pre]:border-[#2e2e2e] [&_pre]:overflow-x-auto [&_code]:font-mono [&_code]:text-[11px] [&_table]:w-full [&_table]:border-collapse [&_th]:border [&_th]:border-[#dedee2] dark:[&_th]:border-[#383838] [&_th]:p-1.5 [&_th]:bg-[#f4f4f6] dark:[&_th]:bg-[#222222] [&_td]:border [&_td]:border-[#dedee2] dark:[&_td]:border-[#383838] [&_td]:p-1.5"
+                    className="prose dark:prose-invert max-w-none text-xs leading-relaxed select-text [&_h1]:text-base [&_h1]:font-semibold [&_h1]:mt-4 [&_h1]:mb-2 [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:mt-3 [&_h2]:mb-1.5 [&_h3]:text-xs [&_h3]:font-semibold [&_h3]:mt-2 [&_h3]:mb-1 [&_p]:my-1.5 [&_ul]:list-disc [&_ul]:pl-4 [&_ol]:list-decimal [&_ol]:pl-4 [&_li]:my-0.5 [&_pre]:p-3 [&_pre]:bg-secondary/50 [&_pre]:rounded-xl [&_pre]:border [&_pre]:border-border [&_pre]:overflow-x-auto [&_code]:font-mono [&_code]:text-[11px] [&_table]:w-full [&_table]:border-collapse [&_th]:border [&_th]:border-border [&_th]:p-1.5 [&_th]:bg-secondary/40 [&_td]:border [&_td]:border-border [&_td]:p-1.5"
                     dangerouslySetInnerHTML={{ __html: marked.parse(activeFileContent) as string }}
                   />
                 ) : (
-                  <pre className="p-4 text-xs font-mono text-[#161616] dark:text-[#d4d4d4] bg-[#f8f8fa] dark:bg-[#1a1a1a] rounded-xl border border-[#dedee2] dark:border-[#2e2e2e] overflow-x-auto whitespace-pre-wrap leading-relaxed select-text">
+                  <pre className="p-4 text-xs font-mono text-foreground bg-secondary/30 rounded-xl border border-border overflow-x-auto whitespace-pre-wrap leading-relaxed select-text">
                     {activeFileContent}
                   </pre>
                 )}
@@ -1382,378 +1418,376 @@ export function SkillsSettings({ onClose }: SkillsSettingsProps = {}) {
   // RENDER: VIEW 0 — MAIN SKILLS & BUNDLES LIST
   // ---------------------------------------------------------------------------
   return (
-    <div className="flex-1 h-full flex flex-col min-h-0 bg-[#ffffff] dark:bg-[#161616] text-[#262626] dark:text-[#d4d4d4] select-none">
-      {/* Top Header Bar */}
-      <div className="px-6 pt-5 pb-4 shrink-0 flex flex-col gap-3">
-        {/* Title & Search Row */}
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-[#161616] dark:text-white">
-              {t("skillsTitle")}
-            </h1>
-            <p className="text-xs text-[#737373] dark:text-[#969696] mt-0.5">
-              {t("skillsSubtitle")}
-            </p>
-          </div>
-
-          {/* Search Bar & Close Button */}
-          <div className="flex items-center gap-2 shrink-0">
-            <div className="relative w-56 sm:w-64">
-              <Search className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-[#737373] dark:text-[#969696]" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder={t("searchSkills")}
-                className="w-full h-8 pl-8 pr-3 text-xs bg-[#f4f4f6] dark:bg-[#222222] border border-[#dedee2] dark:border-[#383838] rounded-xl text-[#161616] dark:text-white placeholder-[#737373] dark:placeholder-[#5d5d5d] focus:outline-none focus:border-[#0066ff] dark:focus:border-[#0066ff] transition-colors"
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => setSearchQuery("")}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[#737373] hover:text-[#161616] dark:hover:text-white"
-                >
-                  <X className="w-3 h-3" />
-                </button>
-              )}
-            </div>
-
-            {onClose && (
+    <div className="w-full flex flex-col space-y-6 font-sans select-none">
+      {/* 1. Header Section - Strict match with sources-view, models-view & learn-home */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-2.5">
+            {!isSidebarOpen && onToggleSidebar && (
               <button
                 type="button"
-                onClick={onClose}
-                className="p-1.5 rounded-lg text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white hover:bg-[#f0f0f2] dark:hover:bg-[#2b2b2b] transition-colors cursor-pointer outline-none focus:outline-none"
-                title="Close"
+                onClick={onToggleSidebar}
+                className="p-1.5 -ml-1 rounded-xl bg-muted hover:bg-secondary text-muted-foreground hover:text-foreground transition-all cursor-pointer flex items-center justify-center shrink-0 shadow-none"
+                title="Open sidebar"
+                aria-label="Open sidebar"
               >
-                <X className="w-4 h-4" />
+                <PanelLeft className="w-4 h-4" />
+              </button>
+            )}
+            <h1 className="font-serif text-2xl sm:text-3xl font-normal tracking-tight text-foreground">
+              {t("skillsTitle")}
+            </h1>
+            <span className="text-xs px-2.5 py-0.5 rounded-full bg-secondary text-muted-foreground font-sans tabular-nums">
+              {skills.length}
+            </span>
+          </div>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {t("skillsSubtitle")}
+          </p>
+        </div>
+
+        {/* Search Bar & Primary Actions */}
+        <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
+          {/* Search Input */}
+          <div className="relative">
+            <Search className="w-3.5 h-3.5 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+            <Input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder={t("searchSkills")}
+              className="h-8 w-44 sm:w-56 pl-8 pr-7 text-xs rounded-xl bg-card border-border text-foreground placeholder-muted-foreground focus-visible:ring-1 focus-visible:ring-primary/40 shadow-none"
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
               </button>
             )}
           </div>
-        </div>
 
-        {/* Scope Selector, Total Count & Controls Row */}
-        <div className="flex items-center justify-between pt-1">
-          {/* Left: Scope Pill & Count Badge */}
-          <div className="flex items-center gap-3">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl bg-[#f4f4f6] dark:bg-[#222222] border border-[#dedee2] dark:border-[#383838] text-xs font-medium text-[#161616] dark:text-white hover:bg-[#e9e9ec] dark:hover:bg-[#2b2b2b] transition-colors cursor-pointer"
-                >
-                  <User className="w-3.5 h-3.5 text-[#737373] dark:text-[#969696]" />
-                  <span>
-                    {selectedScope === "user"
-                      ? t("userScope")
-                      : selectedScope === "workspace"
-                      ? t("workspaceScope")
-                      : t("allScope")}
-                  </span>
-                  <ChevronDown className="w-3 h-3 text-[#737373] dark:text-[#969696] ml-0.5" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                align="start"
-                className="w-36 bg-[#ffffff] dark:bg-[#222222] border-[#dedee2] dark:border-[#383838] text-[#161616] dark:text-white"
+          {/* Upload Skill Button (Primary) */}
+          <Button
+            size="sm"
+            onClick={() => setViewMode("upload")}
+            className="h-8 px-3.5 rounded-xl text-xs font-medium gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 transition-all cursor-pointer shadow-none"
+          >
+            <Upload className="w-3.5 h-3.5 stroke-[2.2]" />
+            <span>{t("uploadBtn")}</span>
+          </Button>
+
+          {/* More Options Dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="h-8 w-8 rounded-xl border border-border bg-card hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center cursor-pointer shadow-none"
+                title={t("moreOptions")}
               >
-                <DropdownMenuItem
-                  onClick={() => setSelectedScope("user")}
-                  className="text-xs cursor-pointer flex items-center justify-between"
-                >
-                  <span>{t("userScope")}</span>
-                  {selectedScope === "user" && <Check className="w-3 h-3 text-[#0066ff]" />}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => setSelectedScope("workspace")}
-                  className="text-xs cursor-pointer flex items-center justify-between"
-                >
-                  <span>{t("workspaceScope")}</span>
-                  {selectedScope === "workspace" && <Check className="w-3 h-3 text-[#0066ff]" />}
-                </DropdownMenuItem>
-                <DropdownMenuSeparator className="bg-[#dedee2] dark:bg-[#383838]" />
-                <DropdownMenuItem
-                  onClick={() => setSelectedScope("all")}
-                  className="text-xs cursor-pointer flex items-center justify-between"
-                >
-                  <span>{t("allScope")}</span>
-                  {selectedScope === "all" && <Check className="w-3 h-3 text-[#0066ff]" />}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            <span className="text-xs text-[#737373] dark:text-[#969696]">|</span>
-
-            <span className="text-xs font-medium text-[#737373] dark:text-[#969696]">
-              {t("skills")} <span className="text-[#161616] dark:text-white">{skills.length}</span>
-            </span>
-          </div>
-
-          {/* Right: Sub-actions, Reset & Upload/New */}
-          <div className="flex items-center gap-2">
-            {/* More Options Dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  className="p-1.5 rounded-lg border border-[#dedee2] dark:border-[#383838] bg-[#f4f4f6] dark:bg-[#222222] hover:bg-[#e9e9ec] dark:hover:bg-[#2b2b2b] text-[#737373] dark:text-[#d4d4d4] hover:text-[#161616] dark:hover:text-white transition-colors cursor-pointer"
-                  title={t("moreOptions")}
-                >
-                  <MoreHorizontal className="w-3.5 h-3.5" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                align="end"
-                className="w-48 bg-[#ffffff] dark:bg-[#222222] border-[#dedee2] dark:border-[#383838] text-[#161616] dark:text-white"
+                <MoreHorizontal className="w-4 h-4" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              align="end"
+              className="w-48 bg-card border-border text-foreground p-1 rounded-xl shadow-xl"
+            >
+              <DropdownMenuItem
+                onClick={() => setIsManualCreateOpen(true)}
+                className="text-xs px-3 py-2 rounded-lg cursor-pointer hover:bg-secondary/70 focus:bg-secondary/70 flex items-center gap-2"
               >
-                <DropdownMenuItem
-                  onClick={() => setViewMode("upload")}
-                  className="text-xs cursor-pointer flex items-center gap-2"
-                >
-                  <Upload className="w-3.5 h-3.5" />
-                  <span>{t("uploadSkillTitle")}</span>
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => setIsManualCreateOpen(true)}
-                  className="text-xs cursor-pointer flex items-center gap-2"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Create from Scratch</span>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator className="bg-[#dedee2] dark:bg-[#383838]" />
-                <DropdownMenuItem
-                  onClick={handleResetToDefault}
-                  className="text-xs cursor-pointer flex items-center gap-2 text-amber-500 hover:text-amber-400"
-                >
-                  <RotateCw className="w-3.5 h-3.5" />
-                  <span>{t("resetSkills")}</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                <Plus className="w-3.5 h-3.5 text-muted-foreground" />
+                <span>Create from Scratch</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={() => ensureDefaultSkillsSeeded()}
+                className="text-xs px-3 py-2 rounded-lg cursor-pointer hover:bg-secondary/70 focus:bg-secondary/70 flex items-center gap-2"
+              >
+                <RotateCw className="w-3.5 h-3.5 text-muted-foreground" />
+                <span>{t("update")}</span>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator className="bg-border" />
+              <DropdownMenuItem
+                onClick={handleResetToDefault}
+                className="text-xs px-3 py-2 rounded-lg cursor-pointer text-amber-500 hover:text-amber-400 hover:bg-secondary/70 focus:bg-secondary/70 flex items-center gap-2"
+              >
+                <RotateCw className="w-3.5 h-3.5" />
+                <span>{t("resetSkills")}</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
-            {/* Refresh Button */}
+          {onClose && (
             <button
               type="button"
-              onClick={() => ensureDefaultSkillsSeeded()}
-              className="p-1.5 rounded-lg border border-[#dedee2] dark:border-[#383838] bg-[#f4f4f6] dark:bg-[#222222] hover:bg-[#e9e9ec] dark:hover:bg-[#2b2b2b] text-[#737373] dark:text-[#d4d4d4] hover:text-[#161616] dark:hover:text-white transition-colors cursor-pointer"
-              title={t("update")}
+              onClick={onClose}
+              className="p-1.5 rounded-xl text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer"
+              title="Close"
             >
-              <RotateCw className="w-3.5 h-3.5" />
+              <X className="w-4 h-4" />
             </button>
-
-            {/* Upload Button (Primary shortcut to Image 4) */}
-            <button
-              type="button"
-              onClick={() => setViewMode("upload")}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#161616] dark:bg-white text-white dark:text-[#161616] hover:bg-[#2b2b2b] dark:hover:bg-[#e2e2e5] text-xs font-semibold shadow-xs transition-colors cursor-pointer"
-            >
-              <Upload className="w-3.5 h-3.5 stroke-[2.2]" />
-              <span>{t("uploadBtn")}</span>
-            </button>
-          </div>
+          )}
         </div>
       </div>
 
-      {/* Main List Scroll Area */}
-      <ScrollArea className="flex-1 min-h-0 w-full px-6 pb-6">
-        {filteredBundles.length === 0 && filteredStandaloneSkills.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 text-center text-[#737373] dark:text-[#969696]">
-            <PencilSparkles className="w-8 h-8 stroke-1 text-[#737373] dark:text-[#5d5d5d] mb-3" />
-            <p className="text-sm font-medium text-[#161616] dark:text-white">
+      {/* 2. Scope Switcher Sliding Pill */}
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <div className="relative flex items-center h-9 p-0.5 rounded-xl bg-muted/70 border border-border w-fit">
+          <div
+            className="absolute top-0.5 bottom-0.5 left-0 rounded-lg bg-background shadow-2xs pointer-events-none transition-all duration-300"
+            style={{
+              transform: `translateX(${scopeIndicatorStyle.left}px)`,
+              width: `${scopeIndicatorStyle.width}px`,
+              opacity: scopeIndicatorStyle.width > 0 ? 1 : 0,
+              transitionTimingFunction: "cubic-bezier(0.16, 1, 0.3, 1)",
+            }}
+          />
+
+          <button
+            ref={allScopeRef}
+            type="button"
+            onClick={() => setSelectedScope("all")}
+            className={cn(
+              "relative z-10 px-4 h-full rounded-lg text-xs font-medium transition-colors duration-200 cursor-pointer select-none flex items-center justify-center",
+              selectedScope === "all"
+                ? "text-foreground font-semibold"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            {t("allScope") || "All"}
+          </button>
+          <button
+            ref={userScopeRef}
+            type="button"
+            onClick={() => setSelectedScope("user")}
+            className={cn(
+              "relative z-10 px-4 h-full rounded-lg text-xs font-medium transition-colors duration-200 cursor-pointer select-none flex items-center justify-center",
+              selectedScope === "user"
+                ? "text-foreground font-semibold"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            {t("userScope") || "Personal"}
+          </button>
+          <button
+            ref={workspaceScopeRef}
+            type="button"
+            onClick={() => setSelectedScope("workspace")}
+            className={cn(
+              "relative z-10 px-4 h-full rounded-lg text-xs font-medium transition-colors duration-200 cursor-pointer select-none flex items-center justify-center",
+              selectedScope === "workspace"
+                ? "text-foreground font-semibold"
+                : "text-muted-foreground hover:text-foreground"
+            )}
+          >
+            {t("workspaceScope") || "Workspace"}
+          </button>
+        </div>
+      </div>
+
+      {/* 3. Main List Content (Natural scroll flowing with parent page) */}
+      {filteredBundles.length === 0 && filteredStandaloneSkills.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 px-4 rounded-2xl border border-dashed border-border bg-card/40 text-center space-y-4">
+          <div className="h-12 w-12 rounded-2xl bg-secondary border border-border flex items-center justify-center mx-auto text-muted-foreground">
+            <PencilSparkles className="w-5 h-5 stroke-[1.5]" />
+          </div>
+          <div className="space-y-1 max-w-sm mx-auto">
+            <h3 className="font-serif text-lg text-foreground font-medium">
               {t("noSkillsFound")}
-            </p>
-            <p className="text-xs text-[#737373] dark:text-[#969696] max-w-sm mt-1">
+            </h3>
+            <p className="text-xs text-muted-foreground leading-relaxed">
               {t("noSkillsFoundDesc")}
             </p>
-            <button
-              type="button"
-              onClick={() => setViewMode("upload")}
-              className="mt-4 inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-[#dedee2] dark:border-[#383838] bg-[#f4f4f6] dark:bg-[#222222] hover:bg-[#e9e9ec] dark:hover:bg-[#2b2b2b] text-xs font-medium text-[#161616] dark:text-white transition-colors cursor-pointer"
-            >
-              <Upload className="w-3.5 h-3.5" />
-              <span>{t("uploadSkillTitle")}</span>
-            </button>
           </div>
-        ) : (
-          <div className="flex flex-col gap-6">
-            {/* Bundles Section */}
-            {filteredBundles.length > 0 && (
-              <div className="flex flex-col gap-2">
-                <span className="text-[11px] font-semibold text-[#737373] dark:text-[#969696] uppercase tracking-wider">
-                  Bundles & Toolkits ({filteredBundles.length})
-                </span>
-                <div className="flex flex-col divide-y divide-[#dedee2]/60 dark:divide-[#2e2e2e]/60 border border-[#dedee2] dark:border-[#2e2e2e] rounded-2xl bg-[#ffffff] dark:bg-[#1a1a1a] overflow-hidden shadow-xs">
-                  {filteredBundles.map((bundle) => {
-                    const Icon = getSkillIcon(bundle.icon, bundle.category);
-                    const subCount = bundle.skillIds?.length || 0;
-                    return (
-                      <div
-                        key={bundle.id}
-                        className="flex items-center justify-between gap-4 p-3.5 hover:bg-[#f8f8fa] dark:hover:bg-[#222222]/60 transition-colors group cursor-pointer"
-                        onClick={() => {
-                          setSelectedBundle(bundle);
-                          setBundleActiveTab("overview");
-                          setViewMode("bundle-detail");
-                        }}
-                      >
-                        {/* Icon & Info */}
-                        <div className="flex items-center gap-3.5 min-w-0 flex-1">
-                          <div className="w-10 h-10 rounded-xl bg-[#f4f4f6] dark:bg-[#222222] border border-[#dedee2] dark:border-[#383838] flex items-center justify-center text-[#161616] dark:text-white shrink-0 group-hover:border-[#0066ff]/40 transition-colors">
-                            <Icon className="w-5 h-5 stroke-[1.8]" />
-                          </div>
-
-                          <div className="flex flex-col min-w-0 flex-1">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="text-xs font-semibold text-[#161616] dark:text-white tracking-tight">
-                                {bundle.name}
-                              </span>
-                              <span className="text-[10px] font-medium px-2 py-0.2 rounded-md bg-[#ebebed] dark:bg-[#2b2b2b] border border-[#dedee2] dark:border-[#383838] text-[#555555] dark:text-[#a0a0a0]">
-                                {subCount} skills
-                              </span>
-                              {bundle.author && (
-                                <span className="text-[10px] text-[#737373] dark:text-[#5d5d5d]">
-                                  by @{bundle.author}
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-xs text-[#737373] dark:text-[#969696] line-clamp-1 truncate mt-0.5">
-                              {bundle.description}
-                            </p>
-                          </div>
+          <Button
+            size="sm"
+            onClick={() => setViewMode("upload")}
+            className="h-8 px-3.5 rounded-xl text-xs font-medium gap-1.5 bg-primary text-primary-foreground hover:bg-primary/90 transition-all cursor-pointer shadow-none"
+          >
+            <Upload className="w-3.5 h-3.5" />
+            <span>{t("uploadSkillTitle")}</span>
+          </Button>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-6">
+          {/* Bundles Section */}
+          {filteredBundles.length > 0 && (
+            <div className="flex flex-col gap-2.5">
+              <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                Bundles & Toolkits ({filteredBundles.length})
+              </span>
+              <div className="flex flex-col divide-y divide-border border border-border rounded-2xl bg-card overflow-hidden shadow-none">
+                {filteredBundles.map((bundle) => {
+                  const Icon = getSkillIcon(bundle.icon, bundle.category);
+                  const subCount = bundle.skillIds?.length || 0;
+                  return (
+                    <div
+                      key={bundle.id}
+                      className="flex items-center justify-between gap-4 p-3.5 hover:bg-secondary/60 transition-colors group cursor-pointer"
+                      onClick={() => {
+                        setSelectedBundle(bundle);
+                        setBundleActiveTab("overview");
+                        setViewMode("bundle-detail");
+                      }}
+                    >
+                      {/* Icon & Info */}
+                      <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                        <div className="w-10 h-10 rounded-xl bg-secondary border border-border flex items-center justify-center text-foreground shrink-0 group-hover:border-foreground/30 transition-colors">
+                          <Icon className="w-5 h-5 stroke-[1.8]" />
                         </div>
 
-                        {/* Right: Switch & Chevron */}
-                        <div
-                          className="flex items-center gap-3 shrink-0"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <Switch
-                            checked={bundle.isEnabled}
-                            onCheckedChange={(checked) => handleToggleBundle(bundle.id, checked)}
-                            className="data-[state=checked]:bg-[#161616] dark:data-[state=checked]:bg-white data-[state=unchecked]:bg-[#dedee2] dark:data-[state=unchecked]:bg-[#383838]"
-                          />
-                          <ChevronRight
-                            onClick={() => {
-                              setSelectedBundle(bundle);
-                              setBundleActiveTab("overview");
-                              setViewMode("bundle-detail");
-                            }}
-                            className="w-4 h-4 text-[#737373] dark:text-[#5d5d5d] group-hover:translate-x-0.5 transition-transform cursor-pointer"
-                          />
+                        <div className="flex flex-col min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs font-semibold text-foreground tracking-tight">
+                              {bundle.name}
+                            </span>
+                            <span className="text-[10px] font-medium px-2 py-0.5 rounded-md bg-secondary border border-border text-muted-foreground">
+                              {subCount} skills
+                            </span>
+                            {bundle.author && (
+                              <span className="text-[10px] text-muted-foreground">
+                                by @{bundle.author}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground line-clamp-1 truncate mt-0.5">
+                            {bundle.description}
+                          </p>
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
 
-            {/* Standalone Skills Section */}
-            {filteredStandaloneSkills.length > 0 && (
-              <div className="flex flex-col gap-2">
-                <span className="text-[11px] font-semibold text-[#737373] dark:text-[#969696] uppercase tracking-wider">
-                  Standalone Skills ({filteredStandaloneSkills.length})
-                </span>
-                <div className="flex flex-col divide-y divide-[#dedee2]/60 dark:divide-[#2e2e2e]/60 border border-[#dedee2] dark:border-[#2e2e2e] rounded-2xl bg-[#ffffff] dark:bg-[#1a1a1a] overflow-hidden shadow-xs">
-                  {filteredStandaloneSkills.map((skill) => {
-                    const Icon = getSkillIcon(skill.icon, skill.category);
-                    return (
+                      {/* Right: Switch & Chevron */}
                       <div
-                        key={skill.id}
-                        className="flex items-center justify-between gap-4 p-3.5 hover:bg-[#f8f8fa] dark:hover:bg-[#222222]/60 transition-colors group cursor-pointer"
-                        onClick={() => {
-                          setSelectedSkill(skill);
-                          setOriginBundle(null);
-                          setSkillActiveTab("overview");
-                          setViewMode("skill-detail");
-                        }}
+                        className="flex items-center gap-3 shrink-0"
+                        onClick={(e) => e.stopPropagation()}
                       >
-                        {/* Icon & Info */}
-                        <div className="flex items-center gap-3.5 min-w-0 flex-1">
-                          <div className="w-9 h-9 rounded-xl bg-[#f4f4f6] dark:bg-[#222222] border border-[#dedee2] dark:border-[#383838] flex items-center justify-center text-[#161616] dark:text-white shrink-0 group-hover:border-[#0066ff]/40 transition-colors">
-                            <Icon className="w-4 h-4" />
-                          </div>
+                        <Switch
+                          checked={bundle.isEnabled}
+                          onCheckedChange={(checked) => handleToggleBundle(bundle.id, checked)}
+                        />
+                        <ChevronRight
+                          onClick={() => {
+                            setSelectedBundle(bundle);
+                            setBundleActiveTab("overview");
+                            setViewMode("bundle-detail");
+                          }}
+                          className="w-4 h-4 text-muted-foreground group-hover:text-foreground group-hover:translate-x-0.5 transition-all cursor-pointer"
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
-                          <div className="flex flex-col min-w-0 flex-1">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="text-xs font-semibold text-[#161616] dark:text-white tracking-tight">
-                                {skill.name}
-                              </span>
-                              <span className="text-[11px] font-mono px-1.5 py-0.2 rounded-md bg-[#ebebed] dark:bg-[#2b2b2b] border border-[#dedee2] dark:border-[#383838] text-[#555555] dark:text-[#a0a0a0]">
-                                /{skill.slug}
-                              </span>
-                              {skill.author && (
-                                <span className="text-[10px] text-[#737373] dark:text-[#5d5d5d]">
-                                  by @{skill.author}
-                                </span>
-                              )}
-                              {!skill.isBuiltIn && (
-                                <span className="text-[10px] font-medium px-1.5 py-0.2 rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
-                                  {t("customBadge")}
-                                </span>
-                              )}
-                            </div>
-                            <p className="text-xs text-[#737373] dark:text-[#969696] line-clamp-1 truncate mt-0.5">
-                              {skill.description}
-                            </p>
-                          </div>
+          {/* Standalone Skills Section */}
+          {filteredStandaloneSkills.length > 0 && (
+            <div className="flex flex-col gap-2.5">
+              <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                Standalone Skills ({filteredStandaloneSkills.length})
+              </span>
+              <div className="flex flex-col divide-y divide-border border border-border rounded-2xl bg-card overflow-hidden shadow-none">
+                {filteredStandaloneSkills.map((skill) => {
+                  const Icon = getSkillIcon(skill.icon, skill.category);
+                  return (
+                    <div
+                      key={skill.id}
+                      className="flex items-center justify-between gap-4 p-3.5 hover:bg-secondary/60 transition-colors group cursor-pointer"
+                      onClick={() => {
+                        setSelectedSkill(skill);
+                        setOriginBundle(null);
+                        setSkillActiveTab("overview");
+                        setViewMode("skill-detail");
+                      }}
+                    >
+                      {/* Icon & Info */}
+                      <div className="flex items-center gap-3.5 min-w-0 flex-1">
+                        <div className="w-9 h-9 rounded-xl bg-secondary border border-border flex items-center justify-center text-foreground shrink-0 group-hover:border-foreground/30 transition-colors">
+                          <Icon className="w-4 h-4" />
                         </div>
 
-                        {/* Right: Switch & Actions */}
-                        <div
-                          className="flex items-center gap-3 shrink-0"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <Switch
-                            checked={skill.isEnabled}
-                            onCheckedChange={(checked) => handleToggleSkill(skill.id, checked)}
-                            className="data-[state=checked]:bg-[#161616] dark:data-[state=checked]:bg-white data-[state=unchecked]:bg-[#dedee2] dark:data-[state=unchecked]:bg-[#383838]"
-                          />
-                          {!skill.isBuiltIn ? (
-                            <button
-                              type="button"
-                              onClick={() => setDeleteConfirmSkill(skill)}
-                              className="p-1 rounded-lg hover:bg-red-500/10 text-[#737373] dark:text-[#969696] hover:text-red-500 transition-colors cursor-pointer"
-                              title={t("delete")}
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          ) : (
-                            <div className="w-6" />
-                          )}
+                        <div className="flex flex-col min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="text-xs font-semibold text-foreground tracking-tight">
+                              {skill.name}
+                            </span>
+                            <span className="text-[11px] font-mono px-1.5 py-0.5 rounded-md bg-secondary border border-border text-muted-foreground">
+                              /{skill.slug}
+                            </span>
+                            {skill.author && (
+                              <span className="text-[10px] text-muted-foreground">
+                                by @{skill.author}
+                              </span>
+                            )}
+                            {!skill.isBuiltIn && (
+                              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-md bg-primary/10 text-primary border border-primary/20">
+                                {t("customBadge")}
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-muted-foreground line-clamp-1 truncate mt-0.5">
+                            {skill.description}
+                          </p>
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
+
+                      {/* Right: Switch & Actions */}
+                      <div
+                        className="flex items-center gap-3 shrink-0"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Switch
+                          checked={skill.isEnabled}
+                          onCheckedChange={(checked) => handleToggleSkill(skill.id, checked)}
+                        />
+                        {!skill.isBuiltIn ? (
+                          <button
+                            type="button"
+                            onClick={() => setDeleteConfirmSkill(skill)}
+                            className="p-1 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors cursor-pointer"
+                            title={t("delete")}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        ) : (
+                          <div className="w-6" />
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            )}
-          </div>
-        )}
-      </ScrollArea>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Manual Create Dialog (Scratch Fallback) */}
       {isManualCreateOpen && (
         <div
-          className="fixed inset-0 z-60 flex items-center justify-center bg-black/50 dark:bg-black/70 backdrop-blur-xs p-4 animate-in fade-in duration-150"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-xs p-4 animate-in fade-in duration-150"
           onClick={() => setIsManualCreateOpen(false)}
         >
           <div
-            className="w-[560px] max-w-[95vw] max-h-[85vh] bg-[#ffffff] dark:bg-[#1f1f1f] border border-[#dedee2] dark:border-[#383838] rounded-2xl flex flex-col overflow-hidden text-[#262626] dark:text-[#d4d4d4] shadow-2xl animate-in zoom-in-[0.985] duration-150"
+            className="w-[560px] max-w-[95vw] max-h-[85vh] bg-card border border-border rounded-2xl flex flex-col overflow-hidden text-foreground shadow-2xl animate-in zoom-in-[0.985] duration-150"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="px-5 py-4 border-b border-[#dedee2] dark:border-[#383838] flex items-center justify-between">
+            <div className="px-5 py-4 border-b border-border flex items-center justify-between">
               <div>
-                <h3 className="text-sm font-semibold text-[#161616] dark:text-white">
+                <h3 className="text-sm font-semibold text-foreground">
                   Create Skill from Scratch
                 </h3>
-                <p className="text-xs text-[#737373] dark:text-[#969696] mt-0.5">
+                <p className="text-xs text-muted-foreground mt-0.5">
                   Write customized instructions and prompt triggers for your agent.
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setIsManualCreateOpen(false)}
-                className="p-1 rounded-lg text-[#737373] hover:text-[#161616] dark:hover:text-white"
+                className="p-1 rounded-lg text-muted-foreground hover:text-foreground cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1763,11 +1797,11 @@ export function SkillsSettings({ onClose }: SkillsSettingsProps = {}) {
               <ScrollArea className="flex-1 p-5">
                 <div className="flex flex-col gap-4">
                   <div className="grid grid-cols-2 gap-3">
-                    <div className="flex flex-col gap-1">
-                      <label className="text-[11px] font-medium text-[#737373] dark:text-[#969696]">
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-medium text-foreground">
                         {t("skillName")} *
                       </label>
-                      <input
+                      <Input
                         type="text"
                         required
                         value={manualName}
@@ -1780,45 +1814,45 @@ export function SkillsSettings({ onClose }: SkillsSettingsProps = {}) {
                           }
                         }}
                         placeholder="e.g. Code Reviewer"
-                        className="w-full h-8 px-2.5 text-xs bg-[#f4f4f6] dark:bg-[#2b2b2b] border border-[#dedee2] dark:border-[#383838] rounded-lg text-[#161616] dark:text-white focus:outline-none focus:border-[#0066ff]"
+                        className="h-8 px-2.5 text-xs bg-secondary/30 border-border text-foreground rounded-xl"
                       />
                     </div>
 
-                    <div className="flex flex-col gap-1">
-                      <label className="text-[11px] font-medium text-[#737373] dark:text-[#969696]">
+                    <div className="flex flex-col gap-1.5">
+                      <label className="text-xs font-medium text-foreground">
                         {t("skillSlug")} *
                       </label>
                       <div className="relative flex items-center">
-                        <span className="absolute left-2.5 text-xs text-[#737373] dark:text-[#969696] font-mono">
+                        <span className="absolute left-2.5 text-xs text-muted-foreground font-mono">
                           /
                         </span>
-                        <input
+                        <Input
                           type="text"
                           required
                           value={manualSlug}
                           onChange={(e) => setManualSlug(e.target.value)}
                           placeholder="code-review"
-                          className="w-full h-8 pl-6 pr-2.5 text-xs font-mono bg-[#f4f4f6] dark:bg-[#2b2b2b] border border-[#dedee2] dark:border-[#383838] rounded-lg text-[#161616] dark:text-white focus:outline-none focus:border-[#0066ff]"
+                          className="h-8 pl-6 pr-2.5 text-xs font-mono bg-secondary/30 border-border text-foreground rounded-xl"
                         />
                       </div>
                     </div>
                   </div>
 
-                  <div className="flex flex-col gap-1">
-                    <label className="text-[11px] font-medium text-[#737373] dark:text-[#969696]">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-medium text-foreground">
                       {t("skillDescription")}
                     </label>
-                    <input
+                    <Input
                       type="text"
                       value={manualDescription}
                       onChange={(e) => setManualDescription(e.target.value)}
                       placeholder="Summary of when AI should trigger this skill..."
-                      className="w-full h-8 px-2.5 text-xs bg-[#f4f4f6] dark:bg-[#2b2b2b] border border-[#dedee2] dark:border-[#383838] rounded-lg text-[#161616] dark:text-white focus:outline-none focus:border-[#0066ff]"
+                      className="h-8 px-2.5 text-xs bg-secondary/30 border-border text-foreground rounded-xl"
                     />
                   </div>
 
-                  <div className="flex flex-col gap-1">
-                    <label className="text-[11px] font-medium text-[#737373] dark:text-[#969696]">
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-medium text-foreground">
                       {t("skillContent")}
                     </label>
                     <textarea
@@ -1826,26 +1860,29 @@ export function SkillsSettings({ onClose }: SkillsSettingsProps = {}) {
                       value={manualContent}
                       onChange={(e) => setManualContent(e.target.value)}
                       placeholder="# Skill Instructions&#10;&#10;Explain step-by-step rules and prompt instructions here..."
-                      className="w-full p-2.5 text-xs font-mono bg-[#f4f4f6] dark:bg-[#161616] border border-[#dedee2] dark:border-[#383838] rounded-lg text-[#161616] dark:text-white focus:outline-none focus:border-[#0066ff] resize-y"
+                      className="w-full p-3 text-xs font-mono bg-secondary/30 border border-border rounded-xl text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:border-foreground/30 resize-y"
                     />
                   </div>
                 </div>
               </ScrollArea>
 
-              <div className="p-4 border-t border-[#dedee2] dark:border-[#383838] flex items-center justify-end gap-2 bg-[#f4f4f6]/50 dark:bg-[#161616]/50">
-                <button
+              <div className="p-4 border-t border-border flex items-center justify-end gap-2 bg-secondary/20">
+                <Button
                   type="button"
+                  variant="outline"
+                  size="sm"
                   onClick={() => setIsManualCreateOpen(false)}
-                  className="px-3 py-1.5 rounded-xl border border-[#dedee2] dark:border-[#383838] text-xs font-medium text-[#737373] dark:text-[#d4d4d4] hover:bg-[#e9e9ec] dark:hover:bg-[#2b2b2b] transition-colors"
+                  className="rounded-xl border-border text-muted-foreground hover:text-foreground cursor-pointer"
                 >
                   {t("cancel")}
-                </button>
-                <button
+                </Button>
+                <Button
                   type="submit"
-                  className="px-3.5 py-1.5 rounded-xl bg-[#161616] dark:bg-white text-white dark:text-[#161616] hover:bg-[#2b2b2b] dark:hover:bg-[#e2e2e5] text-xs font-semibold shadow-xs transition-colors"
+                  size="sm"
+                  className="rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 cursor-pointer shadow-none"
                 >
                   {t("saveSkill")}
-                </button>
+                </Button>
               </div>
             </form>
           </div>
@@ -1855,37 +1892,41 @@ export function SkillsSettings({ onClose }: SkillsSettingsProps = {}) {
       {/* Delete Confirmation Dialog */}
       {deleteConfirmSkill && (
         <div
-          className="fixed inset-0 z-60 flex items-center justify-center bg-black/50 dark:bg-black/70 backdrop-blur-xs p-4 animate-in fade-in duration-150"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-xs p-4 animate-in fade-in duration-150"
           onClick={() => setDeleteConfirmSkill(null)}
         >
           <div
-            className="w-96 max-w-[90vw] bg-[#ffffff] dark:bg-[#1f1f1f] border border-[#dedee2] dark:border-[#383838] rounded-2xl p-5 flex flex-col gap-4 text-[#262626] dark:text-[#d4d4d4] shadow-2xl animate-in zoom-in-[0.985] duration-150"
+            className="w-96 max-w-[90vw] bg-card border border-border rounded-2xl p-5 flex flex-col gap-4 text-foreground shadow-2xl animate-in zoom-in-[0.985] duration-150"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-red-500/10 text-red-500 flex items-center justify-center shrink-0">
+              <div className="w-10 h-10 rounded-xl bg-destructive/10 text-destructive flex items-center justify-center shrink-0">
                 <Trash2 className="w-5 h-5" />
               </div>
               <div>
-                <h4 className="text-sm font-semibold text-[#161616] dark:text-white">
+                <h4 className="text-sm font-semibold text-foreground">
                   {t("deleteSkillConfirm")}
                 </h4>
-                <p className="text-xs text-[#737373] dark:text-[#969696] mt-0.5">
+                <p className="text-xs text-muted-foreground mt-0.5">
                   {t("deleteSkillConfirmDesc", { name: deleteConfirmSkill.name })}
                 </p>
               </div>
             </div>
 
             <div className="flex items-center justify-end gap-2 pt-2">
-              <button
+              <Button
                 type="button"
+                variant="outline"
+                size="sm"
                 onClick={() => setDeleteConfirmSkill(null)}
-                className="px-3 py-1.5 rounded-xl border border-[#dedee2] dark:border-[#383838] text-xs font-medium text-[#737373] dark:text-[#d4d4d4] hover:bg-[#e9e9ec] dark:hover:bg-[#2b2b2b] transition-colors"
+                className="rounded-xl border-border text-muted-foreground hover:text-foreground cursor-pointer"
               >
                 {t("cancel")}
-              </button>
-              <button
+              </Button>
+              <Button
                 type="button"
+                variant="destructive"
+                size="sm"
                 onClick={async () => {
                   try {
                     await localDb.deleteSkill(deleteConfirmSkill.id);
@@ -1895,10 +1936,10 @@ export function SkillsSettings({ onClose }: SkillsSettingsProps = {}) {
                     toast.error(err?.message || "Failed to delete skill");
                   }
                 }}
-                className="px-3.5 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-semibold shadow-xs transition-colors"
+                className="rounded-xl cursor-pointer"
               >
                 {t("delete")}
-              </button>
+              </Button>
             </div>
           </div>
         </div>

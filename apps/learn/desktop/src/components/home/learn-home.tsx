@@ -834,13 +834,8 @@ export function LearnHome({
         )}
 
         {/* Main Content Area */}
-        {activeTab === "skills" ? (
-          <div className="flex-1 w-full h-full min-h-0 flex flex-col overflow-hidden">
-            <SkillsView />
-          </div>
-        ) : (
-          <ScrollArea className="flex-1 w-full h-full min-h-0">
-            <div className="max-w-7xl mx-auto px-6 sm:px-10 py-7 space-y-9">
+        <ScrollArea className="flex-1 w-full h-full min-h-0">
+          <div className="max-w-7xl mx-auto px-6 sm:px-10 py-7 space-y-9">
             {/* ============================================================ */}
             {/* TAB: LEARNS (Default View)                                   */}
             {/* ============================================================ */}
@@ -1910,9 +1905,18 @@ export function LearnHome({
             {/* TAB: MCP TOOLS & CONNECTORS                                  */}
             {/* ============================================================ */}
             {activeTab === "mcp" && <McpToolsView />}
+
+            {/* ============================================================ */}
+            {/* TAB: SKILLS                                                  */}
+            {/* ============================================================ */}
+            {activeTab === "skills" && (
+              <SkillsView
+                isSidebarOpen={isSidebarOpen}
+                onToggleSidebar={() => setIsSidebarOpen(true)}
+              />
+            )}
           </div>
         </ScrollArea>
-        )}
       </main>
 
       {/* Dialogs */}
