@@ -114,7 +114,14 @@ export default function McpDashboardPage() {
   useEffect(() => {
     fetchUsage();
     fetchConnectedAccounts();
-    const interval = setInterval(fetchConnectedAccounts, 10000);
+
+    // Poll only when active tab is visible to avoid unnecessary background network traffic
+    const interval = setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        fetchConnectedAccounts();
+      }
+    }, 12000);
+
     const onFocus = () => fetchConnectedAccounts();
     window.addEventListener("focus", onFocus);
     return () => {

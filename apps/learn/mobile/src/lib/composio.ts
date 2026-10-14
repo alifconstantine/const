@@ -563,6 +563,45 @@ else:
   };
 }
 
+let cachedHealthyRouterBase: string | null = null;
+let cachedHealthyRouterExpiry = 0;
+
+export async function fetchRouterMobile(
+  endpointPath: string,
+  options: RequestInit = {}
+): Promise<Response> {
+  const routerBases = getRouterBaseUrls();
+  const orderedBases =
+    cachedHealthyRouterBase && cachedHealthyRouterExpiry > Date.now()
+      ? [cachedHealthyRouterBase, ...routerBases.filter((b) => b !== cachedHealthyRouterBase)]
+      : routerBases;
+
+  let lastError: any = null;
+
+  for (const base of orderedBases) {
+    const isLocal = base.includes("localhost") || base.includes("127.0.0.1");
+    const controller = new AbortController();
+    const timeout = isLocal ? 1000 : 12000;
+    const timer = setTimeout(() => controller.abort(), timeout);
+
+    try {
+      const res = await fetch(`${base}${endpointPath}`, {
+        ...options,
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+      cachedHealthyRouterBase = base;
+      cachedHealthyRouterExpiry = Date.now() + 30000;
+      return res;
+    } catch (err: any) {
+      clearTimeout(timer);
+      lastError = err;
+    }
+  }
+
+  throw lastError || new Error("Gagal terhubung ke Const Router Gateway.");
+}
+
 /**
  * Generic Composio Tool Execution helper for Mobile.
  */
@@ -570,43 +609,42 @@ export async function executeComposioTool(
   toolSlug: string,
   args: any
 ): Promise<{ success: boolean; data?: any; error?: string }> {
-  const routerBases = getRouterBaseUrls();
   const userId = getLocalDeviceId();
-  let lastError = "Gagal mengeksekusi tool via Const Router Gateway.";
 
-  for (const routerUrl of routerBases) {
-    try {
-      const res = await fetch(`${routerUrl}/mcp/execute`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Device-Id": userId,
-          "X-User-Id": userId,
-        },
-        body: JSON.stringify({
-          toolSlug,
-          arguments: args,
-          userId,
-        }),
-      });
+  try {
+    const res = await fetchRouterMobile("/mcp/execute", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Device-Id": userId,
+        "X-User-Id": userId,
+      },
+      body: JSON.stringify({
+        toolSlug,
+        arguments: args,
+        userId,
+      }),
+    });
 
-      const json = await res.json().catch(() => ({}));
-      if (res.ok && json.success) {
-        recordComposioToolCall(toolSlug, true);
-        return { success: true, data: json.data || json.result };
-      } else if (res.status === 429 || json.error) {
-        recordComposioToolCall(toolSlug, false, undefined, json.error);
-        return { success: false, error: json.error };
-      }
-    } catch (routerErr: any) {
-      lastError = routerErr?.message || lastError;
+    const json = await res.json().catch(() => ({}));
+    if (res.ok && json.success) {
+      recordComposioToolCall(toolSlug, true);
+      return { success: true, data: json.data || json.result };
+    } else if (res.status === 429 || json.error) {
+      recordComposioToolCall(toolSlug, false, undefined, json.error);
+      return { success: false, error: json.error };
     }
-  }
 
-  return {
-    success: false,
-    error: lastError,
-  };
+    return {
+      success: false,
+      error: json.error || "Gagal mengeksekusi tool via Const Router Gateway.",
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err?.message || "Gagal mengeksekusi tool via Const Router Gateway.",
+    };
+  }
 }
 
 /**

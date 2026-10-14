@@ -67,50 +67,90 @@ export function isConnectorActive(connectorId: string): boolean {
   return connected.includes(connectorId);
 }
 
+let cachedHealthyRouterBase: string | null = null;
+let cachedHealthyRouterExpiry = 0;
+
+/**
+ * Intelligent Router Gateway client for mobile with fast probe timeout and 30s healthy host caching.
+ */
+export async function fetchRouterGateway(
+  endpointPath: string,
+  options: RequestInit = {}
+): Promise<Response> {
+  const routerBases = getRouterBaseUrls();
+  const orderedBases =
+    cachedHealthyRouterBase && cachedHealthyRouterExpiry > Date.now()
+      ? [cachedHealthyRouterBase, ...routerBases.filter((b) => b !== cachedHealthyRouterBase)]
+      : routerBases;
+
+  let lastError: any = null;
+
+  for (const base of orderedBases) {
+    const isLocal = base.includes("localhost") || base.includes("127.0.0.1");
+    const controller = new AbortController();
+    const timeout = isLocal ? 1000 : 12000;
+    const timer = setTimeout(() => controller.abort(), timeout);
+
+    try {
+      const res = await fetch(`${base}${endpointPath}`, {
+        ...options,
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+      cachedHealthyRouterBase = base;
+      cachedHealthyRouterExpiry = Date.now() + 30000;
+      return res;
+    } catch (err: any) {
+      clearTimeout(timer);
+      lastError = err;
+    }
+  }
+
+  throw lastError || new Error("Gagal terhubung ke Const Router Gateway.");
+}
+
 /**
  * Fetches connected accounts from Const Router Gateway and synchronizes mobile local storage.
  */
 export async function syncConnectedConnectors(userEmailOrId?: string): Promise<string[]> {
   const userId = userEmailOrId || getLocalDeviceId();
-  const routerBases = getRouterBaseUrls();
 
-  for (const routerBase of routerBases) {
-    try {
-      const res = await fetch(
-        `${routerBase}/mcp/connected-accounts?userId=${encodeURIComponent(userId)}`,
-        {
-          headers: {
-            "X-Device-Id": userId,
-            "X-User-Id": userId,
-          },
-        }
-      );
-      if (res.ok) {
-        const data = await res.json();
-        const accounts = data.accounts || data.items || [];
-        const activeIds: string[] = [];
+  try {
+    const res = await fetchRouterGateway(
+      `/mcp/connected-accounts?userId=${encodeURIComponent(userId)}`,
+      {
+        headers: {
+          "X-Device-Id": userId,
+          "X-User-Id": userId,
+        },
+      }
+    );
 
-        for (const acc of accounts) {
-          if (acc.status !== "ACTIVE") continue;
-          const slug = (acc.toolkit?.slug || acc.toolkit || "").toLowerCase().replace(/[-_]/g, "");
-          const match = AVAILABLE_CONNECTORS.find((c) => {
-            const cSlug = c.toolkitSlug.toLowerCase().replace(/[-_]/g, "");
-            return cSlug === slug || cSlug.includes(slug) || slug.includes(cSlug);
-          });
-          if (match) {
-            activeIds.push(match.id);
-            if (acc.id) {
-              localStorage.setItem(`composio_ca_${match.id}`, acc.id);
-            }
+    if (res.ok) {
+      const data = await res.json();
+      const accounts = data.accounts || data.items || [];
+      const activeIds: string[] = [];
+
+      for (const acc of accounts) {
+        if (acc.status !== "ACTIVE") continue;
+        const slug = (acc.toolkit?.slug || acc.toolkit || "").toLowerCase().replace(/[-_]/g, "");
+        const match = AVAILABLE_CONNECTORS.find((c) => {
+          const cSlug = c.toolkitSlug.toLowerCase().replace(/[-_]/g, "");
+          return cSlug === slug || cSlug.includes(slug) || slug.includes(cSlug);
+        });
+        if (match) {
+          activeIds.push(match.id);
+          if (acc.id) {
+            localStorage.setItem(`composio_ca_${match.id}`, acc.id);
           }
         }
-
-        const unique = Array.from(new Set(["cloud-sandbox", ...activeIds]));
-        saveConnectedConnectorIds(unique);
-        return unique;
       }
-    } catch {}
-  }
+
+      const unique = Array.from(new Set(["cloud-sandbox", ...activeIds]));
+      saveConnectedConnectorIds(unique);
+      return unique;
+    }
+  } catch {}
 
   return getConnectedConnectorIds();
 }
@@ -128,50 +168,40 @@ export async function connectConnector(
   const targetSlug = connector.toolkitSlug;
 
   if (connector.authType !== "No Auth") {
-    const routerBases = getRouterBaseUrls();
-    let lastError: string | null = null;
+    try {
+      const res = await fetchRouterGateway("/mcp/auth-link", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Device-Id": userId,
+          "X-User-Id": userId,
+        },
+        body: JSON.stringify({
+          toolkit: targetSlug,
+          userId,
+          callbackUrl: "https://accounts.const.web.id/auth-success?connector=" + connector.id,
+        }),
+      });
 
-    // Iterate through available router gateway URLs (local dev server then production)
-    for (const routerBase of routerBases) {
-      try {
-        const res = await fetch(`${routerBase}/mcp/auth-link`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Device-Id": userId,
-            "X-User-Id": userId,
-          },
-          body: JSON.stringify({
-            toolkit: targetSlug,
-            userId,
-            callbackUrl: "https://accounts.const.web.id/auth-success?connector=" + connector.id,
-          }),
-        });
+      const data = await res.json().catch(() => ({}));
 
-        const data = await res.json().catch(() => ({}));
-
-        if (res.ok && data.success && data.redirectUrl) {
-          await openExternalUrl(data.redirectUrl);
-          saveConnectedConnectorIds([...current, connector.id]);
-          if (data.connectedAccountId) {
-            localStorage.setItem(`composio_ca_${connector.id}`, data.connectedAccountId);
-          }
-          return {
-            success: true,
-            redirectUrl: data.redirectUrl,
-            message: `Membuka otorisasi ${connector.name}... Silakan selesaikan login di browser.`,
-          };
-        } else if (data.error) {
-          lastError = data.error;
+      if (res.ok && data.success && data.redirectUrl) {
+        await openExternalUrl(data.redirectUrl);
+        saveConnectedConnectorIds([...current, connector.id]);
+        if (data.connectedAccountId) {
+          localStorage.setItem(`composio_ca_${connector.id}`, data.connectedAccountId);
         }
-      } catch (routerErr: any) {
-        lastError = routerErr?.message || "Koneksi gateway gagal";
+        return {
+          success: true,
+          redirectUrl: data.redirectUrl,
+          message: `Membuka otorisasi ${connector.name}... Silakan selesaikan login di browser.`,
+        };
       }
-    }
 
-    throw new Error(
-      lastError || `Gagal menghubungkan ${connector.name} via Const Router Gateway.`
-    );
+      throw new Error(data.error || `Gagal menghubungkan ${connector.name} via Const Router Gateway.`);
+    } catch (err: any) {
+      throw new Error(err?.message || `Gagal menghubungkan ${connector.name} via Const Router Gateway.`);
+    }
   }
 
   // Fallback ONLY for No-Auth tools
@@ -195,24 +225,18 @@ export async function disconnectConnector(connectorId: string): Promise<boolean>
     if (storedCa) {
       localStorage.removeItem(`composio_ca_${connectorId}`);
 
-      const routerBases = getRouterBaseUrls();
       const userId = getLocalDeviceId();
-      for (const base of routerBases) {
-        try {
-          await fetch(`${base}/mcp/disconnect`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "X-Device-Id": userId,
-            },
-            body: JSON.stringify({
-              accountId: storedCa,
-              userId,
-            }),
-          });
-          break;
-        } catch {}
-      }
+      await fetchRouterGateway("/mcp/disconnect", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Device-Id": userId,
+        },
+        body: JSON.stringify({
+          accountId: storedCa,
+          userId,
+        }),
+      }).catch(() => {});
     }
     return true;
   } catch (err) {

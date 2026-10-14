@@ -67,6 +67,48 @@ export function getRouterBaseUrls(): string[] {
   return Array.from(new Set(urls));
 }
 
+let cachedHealthyRouterBase: string | null = null;
+let cachedHealthyRouterExpiry = 0;
+
+/**
+ * Intelligent Router Gateway client with fast probe timeout and 30s healthy host caching.
+ */
+export async function fetchRouterGateway(
+  endpointPath: string,
+  options: RequestInit = {}
+): Promise<Response> {
+  const routerBases = getRouterBaseUrls();
+  const orderedBases =
+    cachedHealthyRouterBase && cachedHealthyRouterExpiry > Date.now()
+      ? [cachedHealthyRouterBase, ...routerBases.filter((b) => b !== cachedHealthyRouterBase)]
+      : routerBases;
+
+  let lastError: any = null;
+
+  for (const base of orderedBases) {
+    const isLocal = base.includes("localhost") || base.includes("127.0.0.1");
+    const controller = new AbortController();
+    const timeout = isLocal ? 1000 : 12000;
+    const timer = setTimeout(() => controller.abort(), timeout);
+
+    try {
+      const res = await fetch(`${base}${endpointPath}`, {
+        ...options,
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+      cachedHealthyRouterBase = base;
+      cachedHealthyRouterExpiry = Date.now() + 30000;
+      return res;
+    } catch (err: any) {
+      clearTimeout(timer);
+      lastError = err;
+    }
+  }
+
+  throw lastError || new Error("Gagal terhubung ke Const Router Gateway.");
+}
+
 /**
  * Fetches connected accounts from Const Router Gateway and synchronizes local storage.
  */
@@ -77,45 +119,42 @@ export async function syncConnectedConnectors(userEmailOrId?: string): Promise<s
     localStorage.getItem("const_device_id") ||
     "learn_desktop_user";
 
-  const routerBases = getRouterBaseUrls();
+  try {
+    const res = await fetchRouterGateway(
+      `/mcp/connected-accounts?userId=${encodeURIComponent(userId)}`,
+      {
+        headers: {
+          "X-Device-Id": userId,
+          "X-User-Id": userId,
+        },
+      }
+    );
 
-  for (const routerBase of routerBases) {
-    try {
-      const res = await fetch(
-        `${routerBase}/mcp/connected-accounts?userId=${encodeURIComponent(userId)}`,
-        {
-          headers: {
-            "X-Device-Id": userId,
-            "X-User-Id": userId,
-          },
-        }
-      );
-      if (res.ok) {
-        const data = await res.json();
-        const accounts = data.accounts || data.items || [];
-        const activeIds: string[] = [];
+    if (res.ok) {
+      const data = await res.json();
+      const accounts = data.accounts || data.items || [];
+      const activeIds: string[] = [];
 
-        for (const acc of accounts) {
-          if (acc.status !== "ACTIVE") continue;
-          const slug = (acc.toolkit?.slug || acc.toolkit || "").toLowerCase().replace(/[-_]/g, "");
-          const match = AVAILABLE_CONNECTORS.find((c) => {
-            const cSlug = c.toolkitSlug.toLowerCase().replace(/[-_]/g, "");
-            return cSlug === slug || cSlug.includes(slug) || slug.includes(cSlug);
-          });
-          if (match && match.id !== "cloud-sandbox") {
-            activeIds.push(match.id);
-            if (acc.id) {
-              localStorage.setItem(`composio_ca_${match.id}`, acc.id);
-            }
+      for (const acc of accounts) {
+        if (acc.status !== "ACTIVE") continue;
+        const slug = (acc.toolkit?.slug || acc.toolkit || "").toLowerCase().replace(/[-_]/g, "");
+        const match = AVAILABLE_CONNECTORS.find((c) => {
+          const cSlug = c.toolkitSlug.toLowerCase().replace(/[-_]/g, "");
+          return cSlug === slug || cSlug.includes(slug) || slug.includes(cSlug);
+        });
+        if (match && match.id !== "cloud-sandbox") {
+          activeIds.push(match.id);
+          if (acc.id) {
+            localStorage.setItem(`composio_ca_${match.id}`, acc.id);
           }
         }
-
-        const unique = Array.from(new Set(activeIds));
-        saveConnectedConnectorIds(unique);
-        return unique;
       }
-    } catch {}
-  }
+
+      const unique = Array.from(new Set(activeIds));
+      saveConnectedConnectorIds(unique);
+      return unique;
+    }
+  } catch {}
 
   return getConnectedConnectorIds();
 }
@@ -170,54 +209,45 @@ export async function connectConnector(
 
   // 2. Direct Const Router MCP Gateway fallback (for web preview / non-IPC fallback)
   if (connector.authType !== "No Auth") {
-    const routerBases = getRouterBaseUrls();
-    let lastError: string | null = null;
+    try {
+      const res = await fetchRouterGateway("/mcp/auth-link", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Device-Id": userId,
+          "X-User-Id": userId,
+        },
+        body: JSON.stringify({
+          toolkit: targetSlug,
+          userId,
+          callbackUrl: "https://accounts.const.web.id/auth-success?connector=" + connector.id,
+        }),
+      });
 
-    for (const routerBase of routerBases) {
-      try {
-        const res = await fetch(`${routerBase}/mcp/auth-link`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Device-Id": userId,
-            "X-User-Id": userId,
-          },
-          body: JSON.stringify({
-            toolkit: targetSlug,
-            userId,
-            callbackUrl: "https://accounts.const.web.id/auth-success?connector=" + connector.id,
-          }),
-        });
-
-        const data = await res.json().catch(() => ({}));
-        if (res.ok && data.success && data.redirectUrl) {
-          if ((window as any).electron?.openExternal) {
-            await (window as any).electron.openExternal(data.redirectUrl);
-          } else {
-            window.open(data.redirectUrl, "_blank");
-          }
-
-          saveConnectedConnectorIds([...current, connector.id]);
-          if (data.connectedAccountId) {
-            localStorage.setItem(`composio_ca_${connector.id}`, data.connectedAccountId);
-          }
-
-          return {
-            success: true,
-            redirectUrl: data.redirectUrl,
-            message: `Membuka browser untuk otorisasi ${connector.name}... Silakan selesaikan login.`,
-          };
-        } else if (data.error) {
-          lastError = data.error;
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success && data.redirectUrl) {
+        if ((window as any).electron?.openExternal) {
+          await (window as any).electron.openExternal(data.redirectUrl);
+        } else {
+          window.open(data.redirectUrl, "_blank");
         }
-      } catch (routerErr: any) {
-        lastError = routerErr?.message || "Koneksi gateway gagal";
-      }
-    }
 
-    throw new Error(
-      lastError || `Gagal menghubungkan ${connector.name} via Const Router Gateway.`
-    );
+        saveConnectedConnectorIds([...current, connector.id]);
+        if (data.connectedAccountId) {
+          localStorage.setItem(`composio_ca_${connector.id}`, data.connectedAccountId);
+        }
+
+        return {
+          success: true,
+          redirectUrl: data.redirectUrl,
+          message: `Membuka browser untuk otorisasi ${connector.name}... Silakan selesaikan login.`,
+        };
+      }
+
+      throw new Error(data.error || `Gagal menghubungkan ${connector.name} via Const Router Gateway.`);
+    } catch (err: any) {
+      throw new Error(err?.message || `Gagal menghubungkan ${connector.name} via Const Router Gateway.`);
+    }
   }
 
   // Fallback ONLY for No-Auth tools
@@ -244,17 +274,11 @@ export async function disconnectConnector(connectorId: string): Promise<boolean>
           .disconnectAccount({ accountId: storedCa })
           .catch(() => {});
       } else {
-        const routerBases = getRouterBaseUrls();
-        for (const base of routerBases) {
-          try {
-            await fetch(`${base}/mcp/disconnect`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ accountId: storedCa }),
-            });
-            break;
-          } catch {}
-        }
+        await fetchRouterGateway("/mcp/disconnect", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ accountId: storedCa }),
+        }).catch(() => {});
       }
     }
     return true;

@@ -177,6 +177,12 @@ export async function getOrCreateAuthConfigId(
     });
     if (listRes.ok) {
       const listData = await listRes.json();
+      for (const item of listData.items || []) {
+        const itemSlug = (item.toolkit?.slug || item.toolkit || "").toLowerCase().replace(/[-_]/g, "");
+        if (itemSlug && item.id) {
+          authConfigCache.set(itemSlug, item.id);
+        }
+      }
       const match = listData.items?.find((item: any) => {
         const itemSlug = (item.toolkit?.slug || item.toolkit || "").toLowerCase().replace(/[-_]/g, "");
         const cleanNorm = norm.replace(/[-_]/g, "");
@@ -502,8 +508,10 @@ export async function getMcpAuthLink(
   }
 }
 
+const connectedAccountsCache = new Map<string, { data: any; expiresAt: number }>();
+
 /**
- * Lists connected OAuth accounts for a user.
+ * Lists connected OAuth accounts for a user with 15-second in-memory caching.
  */
 export async function getMcpConnectedAccounts(userId: string = "learn_default_user") {
   const apiKey = getComposioApiKey();
@@ -511,15 +519,20 @@ export async function getMcpConnectedAccounts(userId: string = "learn_default_us
     return { success: false, error: "COMPOSIO_API_KEY is not configured.", accounts: [] };
   }
 
-  try {
-    const userIds = Array.from(
-      new Set(
-        [userId, "learn_desktop_user", "learn_default_user"]
-          .filter(Boolean)
-          .map((id) => id.trim())
-      )
-    ).join(",");
+  const userIds = Array.from(
+    new Set(
+      [userId, "learn_desktop_user", "learn_default_user"]
+        .filter(Boolean)
+        .map((id) => id.trim())
+    )
+  ).join(",");
 
+  const cached = connectedAccountsCache.get(userIds);
+  if (cached && cached.expiresAt > Date.now()) {
+    return { success: true, accounts: cached.data };
+  }
+
+  try {
     const res = await fetch(
       `https://backend.composio.dev/api/v3.1/connected_accounts?user_ids=${encodeURIComponent(
         userIds
@@ -535,9 +548,15 @@ export async function getMcpConnectedAccounts(userId: string = "learn_default_us
     }
 
     const data = await res.json();
+    const accounts = data.items || data.data || data || [];
+    connectedAccountsCache.set(userIds, {
+      data: accounts,
+      expiresAt: Date.now() + 15000,
+    });
+
     return {
       success: true,
-      accounts: data.items || data.data || data || [],
+      accounts,
     };
   } catch (err: any) {
     return { success: false, error: err.message || "Network error", accounts: [] };
@@ -548,6 +567,7 @@ export async function getMcpConnectedAccounts(userId: string = "learn_default_us
  * Disconnects an active OAuth account in Composio.
  */
 export async function disconnectMcpAccount(accountId: string) {
+  connectedAccountsCache.clear();
   const apiKey = getComposioApiKey();
   if (!apiKey) {
     return { success: false, error: "COMPOSIO_API_KEY is not configured." };

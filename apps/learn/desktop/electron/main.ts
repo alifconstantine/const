@@ -800,6 +800,42 @@ app.on("second-instance", (_event, commandLine) => {
     return Array.from(new Set(urls));
   };
 
+  let cachedHealthyRouterBase: string | null = null;
+  let cachedHealthyRouterExpiry = 0;
+
+  const fetchRouterMain = async (path: string, options: RequestInit = {}): Promise<Response> => {
+    const routerBases = getRouterBaseUrls();
+    const orderedBases =
+      cachedHealthyRouterBase && cachedHealthyRouterExpiry > Date.now()
+        ? [cachedHealthyRouterBase, ...routerBases.filter((b) => b !== cachedHealthyRouterBase)]
+        : routerBases;
+
+    let lastError: any = null;
+
+    for (const base of orderedBases) {
+      const isLocal = base.includes("localhost") || base.includes("127.0.0.1");
+      const controller = new AbortController();
+      const timeout = isLocal ? 1000 : 12000;
+      const timer = setTimeout(() => controller.abort(), timeout);
+
+      try {
+        const res = await fetch(`${base}${path}`, {
+          ...options,
+          signal: controller.signal,
+        });
+        clearTimeout(timer);
+        cachedHealthyRouterBase = base;
+        cachedHealthyRouterExpiry = Date.now() + 30000;
+        return res;
+      } catch (err: any) {
+        clearTimeout(timer);
+        lastError = err;
+      }
+    }
+
+    throw lastError || new Error("Gagal terhubung ke Const Router Gateway.");
+  };
+
   ipcMain.handle(
     "composio:get-auth-link",
     async (
@@ -808,43 +844,35 @@ app.on("second-instance", (_event, commandLine) => {
     ) => {
       try {
         const userId = payload.userId || "learn_desktop_user";
-        const routerBases = getRouterBaseUrls();
-        let lastError: any = null;
+        const res = await fetchRouterMain("/mcp/auth-link", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Device-Id": userId,
+            "X-User-Id": userId,
+          },
+          body: JSON.stringify({
+            toolkit: payload.toolkit,
+            userId,
+            callbackUrl:
+              payload.callbackUrl || "https://accounts.const.web.id/auth-success",
+          }),
+        });
 
-        for (const routerBase of routerBases) {
-          try {
-            const res = await fetch(`${routerBase}/mcp/auth-link`, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "X-Device-Id": userId,
-                "X-User-Id": userId,
-              },
-              body: JSON.stringify({
-                toolkit: payload.toolkit,
-                userId,
-                callbackUrl:
-                  payload.callbackUrl || "https://accounts.const.web.id/auth-success",
-              }),
-            });
-
-            const data = await res.json().catch(() => ({}));
-            if (res.ok && data.success && data.redirectUrl) {
-              await shell.openExternal(data.redirectUrl);
-              return {
-                success: true,
-                redirectUrl: data.redirectUrl,
-                connectedAccountId: data.connectedAccountId,
-              };
-            } else if (data.error) {
-              lastError = new Error(data.error);
-            }
-          } catch (routerErr: any) {
-            lastError = routerErr;
-          }
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.success && data.redirectUrl) {
+          await shell.openExternal(data.redirectUrl);
+          return {
+            success: true,
+            redirectUrl: data.redirectUrl,
+            connectedAccountId: data.connectedAccountId,
+          };
         }
 
-        throw lastError || new Error("Gagal menginisialisasi otorisasi via Const Router Gateway.");
+        return {
+          success: false,
+          error: data.error || "Gagal menginisialisasi otorisasi via Const Router Gateway.",
+        };
       } catch (err: any) {
         console.error("[Composio IPC get-auth-link Error]", err);
         return { success: false, error: err?.message || String(err) };
@@ -857,28 +885,19 @@ app.on("second-instance", (_event, commandLine) => {
     async (_event, payload: { accountId: string; userId?: string }) => {
       try {
         const userId = payload.userId || "learn_desktop_user";
-        const routerBases = getRouterBaseUrls();
-
-        for (const routerBase of routerBases) {
-          try {
-            const res = await fetch(`${routerBase}/mcp/disconnect`, {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                "X-Device-Id": userId,
-                "X-User-Id": userId,
-              },
-              body: JSON.stringify({
-                accountId: payload.accountId,
-                userId,
-              }),
-            });
-            if (res.ok) {
-              return { success: true };
-            }
-          } catch {}
-        }
-        return { success: true };
+        const res = await fetchRouterMain("/mcp/disconnect", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Device-Id": userId,
+            "X-User-Id": userId,
+          },
+          body: JSON.stringify({
+            accountId: payload.accountId,
+            userId,
+          }),
+        });
+        return { success: res.ok };
       } catch (err: any) {
         return { success: false, error: err?.message || String(err) };
       }
@@ -890,24 +909,18 @@ app.on("second-instance", (_event, commandLine) => {
     async (_event, payload?: { userId?: string }) => {
       try {
         const userId = payload?.userId || "learn_desktop_user";
-        const routerBases = getRouterBaseUrls();
-
-        for (const routerBase of routerBases) {
-          try {
-            const res = await fetch(
-              `${routerBase}/mcp/connected-accounts?userId=${encodeURIComponent(userId)}`,
-              {
-                headers: {
-                  "X-Device-Id": userId,
-                  "X-User-Id": userId,
-                },
-              }
-            );
-            if (res.ok) {
-              const data = await res.json();
-              return { success: true, items: data.accounts || data.items || [] };
-            }
-          } catch {}
+        const res = await fetchRouterMain(
+          `/mcp/connected-accounts?userId=${encodeURIComponent(userId)}`,
+          {
+            headers: {
+              "X-Device-Id": userId,
+              "X-User-Id": userId,
+            },
+          }
+        );
+        if (res.ok) {
+          const data = await res.json();
+          return { success: true, items: data.accounts || data.items || [] };
         }
         return { success: true, items: [] };
       } catch {
@@ -923,72 +936,68 @@ app.on("second-instance", (_event, commandLine) => {
       payload: { toolSlug: string; arguments: any; userId?: string }
     ) => {
       const userId = payload.userId || "learn_desktop_user";
-      const routerBases = getRouterBaseUrls();
-      let lastError = "Gagal mengeksekusi tool via Const Router Gateway.";
 
-      for (const routerBase of routerBases) {
-        try {
-          const res = await fetch(`${routerBase}/mcp/execute`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "X-Device-Id": userId,
-              "X-User-Id": userId,
-            },
-            body: JSON.stringify({
-              toolSlug: payload.toolSlug,
-              arguments: payload.arguments,
-              userId,
-            }),
-          });
+      try {
+        const res = await fetchRouterMain("/mcp/execute", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Device-Id": userId,
+            "X-User-Id": userId,
+          },
+          body: JSON.stringify({
+            toolSlug: payload.toolSlug,
+            arguments: payload.arguments,
+            userId,
+          }),
+        });
 
-          const json = await res.json().catch(() => ({}));
+        const json = await res.json().catch(() => ({}));
 
-          if (res.ok && json.success) {
-            recordComposioToolCall(payload.toolSlug, true, userId);
-            return { success: true, data: json.data || json.result };
-          } else if (res.status === 429 || json.error) {
-            recordComposioToolCall(payload.toolSlug, false, userId, json.error);
-            return { success: false, error: json.error };
-          }
-        } catch (routerErr: any) {
-          lastError = routerErr?.message || lastError;
+        if (res.ok && json.success) {
+          recordComposioToolCall(payload.toolSlug, true, userId);
+          return { success: true, data: json.data || json.result };
+        } else if (res.status === 429 || json.error) {
+          recordComposioToolCall(payload.toolSlug, false, userId, json.error);
+          return { success: false, error: json.error };
         }
-      }
 
-      return {
-        success: false,
-        error: lastError,
-      };
+        return {
+          success: false,
+          error: json.error || "Gagal mengeksekusi tool via Const Router Gateway.",
+        };
+      } catch (err: any) {
+        return {
+          success: false,
+          error: err?.message || "Gagal mengeksekusi tool via Const Router Gateway.",
+        };
+      }
     }
   );
 
   ipcMain.handle("composio:get-usage", async (_event, userId?: string) => {
     const uid = userId || "learn_desktop_user";
-    const routerBases = getRouterBaseUrls();
 
-    for (const routerBase of routerBases) {
-      try {
-        const res = await fetch(`${routerBase}/mcp/usage?userId=${encodeURIComponent(uid)}`, {
-          headers: {
-            "X-Device-Id": uid,
-            "X-User-Id": uid,
-          },
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.success && data.usage) {
-            return {
-              used: data.usage.count || 0,
-              limit: data.usage.limit || 300,
-              remaining: data.usage.remaining ?? Math.max(0, (data.usage.limit || 300) - (data.usage.count || 0)),
-              resetAt: new Date(data.usage.resetDate).getTime(),
-              byTool: {},
-            };
-          }
+    try {
+      const res = await fetchRouterMain(`/mcp/usage?userId=${encodeURIComponent(uid)}`, {
+        headers: {
+          "X-Device-Id": uid,
+          "X-User-Id": uid,
+        },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.usage) {
+          return {
+            used: data.usage.count || 0,
+            limit: data.usage.limit || 300,
+            remaining: data.usage.remaining ?? Math.max(0, (data.usage.limit || 300) - (data.usage.count || 0)),
+            resetAt: new Date(data.usage.resetDate).getTime(),
+            byTool: {},
+          };
         }
-      } catch {}
-    }
+      }
+    } catch {}
 
     return loadComposioUsage(uid);
   });
