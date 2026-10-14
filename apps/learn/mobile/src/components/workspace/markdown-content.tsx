@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { marked, type Token, type Tokens } from "marked";
 import { Check, Copy, Download, Maximize2, X } from "lucide-react";
-import { cn } from "@const/ui";
+import { cn, Checkbox } from "@const/ui";
 import {
   createMarkedLatexExtension,
   renderKatex,
@@ -287,9 +287,17 @@ function TokenRenderer({
         <ul className={cn("space-y-1.5 my-2 pl-0.5 text-foreground dark:text-white", isNested && "my-1 pl-2.5 space-y-1")}>
           {list.items.map((item: Tokens.ListItem, idx: number) => (
             <li key={idx} className="flex items-start gap-2.5 leading-[1.6]">
-              <span className="select-none text-muted-foreground text-[13px] leading-none pt-1 shrink-0">
-                •
-              </span>
+              {item.task ? (
+                <Checkbox
+                  checked={item.checked}
+                  disabled
+                  className="mt-1 mr-0.5 h-3.5 w-3.5 rounded-[3px] border-border/80 data-[state=checked]:bg-primary data-[state=checked]:border-primary data-[state=checked]:text-primary-foreground shrink-0 pointer-events-none"
+                />
+              ) : (
+                <span className="select-none text-muted-foreground text-[13px] leading-none pt-1 shrink-0">
+                  •
+                </span>
+              )}
               <div className="flex-1 min-w-0">
                 <ListItemContent
                   item={item}
