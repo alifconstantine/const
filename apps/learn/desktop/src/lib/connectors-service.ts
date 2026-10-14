@@ -51,62 +51,42 @@ export function isConnectorActive(connectorId: string): boolean {
   return connected.includes(connectorId);
 }
 
-export function getRouterBaseUrls(): string[] {
-  const urls: string[] = [];
+export function getRouterBaseUrl(): string {
   const explicit =
     (import.meta as any).env?.VITE_CONST_ROUTER_BASE_URL ||
     (import.meta as any).env?.CONST_ROUTER_BASE_URL;
   if (explicit) {
-    urls.push(explicit.replace(/\/+$/, ""));
+    return explicit.replace(/\/+$/, "");
   }
-  if ((import.meta as any).env?.DEV) {
-    urls.push("http://localhost:3002/v1");
-    urls.push("http://127.0.0.1:3002/v1");
-  }
-  urls.push("https://router.const.web.id/v1");
-  return Array.from(new Set(urls));
+  return "https://router.const.web.id/v1";
 }
 
-let cachedHealthyRouterBase: string | null = null;
-let cachedHealthyRouterExpiry = 0;
+export function getRouterBaseUrls(): string[] {
+  return [getRouterBaseUrl()];
+}
 
 /**
- * Intelligent Router Gateway client with fast probe timeout and 30s healthy host caching.
+ * Directly communicates with Const Router Gateway in production.
  */
 export async function fetchRouterGateway(
   endpointPath: string,
   options: RequestInit = {}
 ): Promise<Response> {
-  const routerBases = getRouterBaseUrls();
-  const orderedBases =
-    cachedHealthyRouterBase && cachedHealthyRouterExpiry > Date.now()
-      ? [cachedHealthyRouterBase, ...routerBases.filter((b) => b !== cachedHealthyRouterBase)]
-      : routerBases;
+  const base = getRouterBaseUrl();
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 15000);
 
-  let lastError: any = null;
-
-  for (const base of orderedBases) {
-    const isLocal = base.includes("localhost") || base.includes("127.0.0.1");
-    const controller = new AbortController();
-    const timeout = isLocal ? 1000 : 12000;
-    const timer = setTimeout(() => controller.abort(), timeout);
-
-    try {
-      const res = await fetch(`${base}${endpointPath}`, {
-        ...options,
-        signal: controller.signal,
-      });
-      clearTimeout(timer);
-      cachedHealthyRouterBase = base;
-      cachedHealthyRouterExpiry = Date.now() + 30000;
-      return res;
-    } catch (err: any) {
-      clearTimeout(timer);
-      lastError = err;
-    }
+  try {
+    const res = await fetch(`${base}${endpointPath}`, {
+      ...options,
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+    return res;
+  } catch (err: any) {
+    clearTimeout(timeoutId);
+    throw err || new Error("Gagal terhubung ke Const Router Gateway.");
   }
-
-  throw lastError || new Error("Gagal terhubung ke Const Router Gateway.");
 }
 
 /**

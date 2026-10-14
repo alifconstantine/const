@@ -784,56 +784,29 @@ app.on("second-instance", (_event, commandLine) => {
     return false;
   });
 
-  const getRouterBaseUrls = () => {
-    const urls: string[] = [];
+  const getRouterBaseUrl = (): string => {
     const explicit =
       process.env.CONST_ROUTER_BASE_URL ||
       process.env.VITE_CONST_ROUTER_BASE_URL;
-    if (explicit) {
-      urls.push(explicit.replace(/\/+$/, ""));
-    }
-    if (!app.isPackaged || process.env.NODE_ENV === "development") {
-      urls.push("http://localhost:3002/v1");
-      urls.push("http://127.0.0.1:3002/v1");
-    }
-    urls.push("https://router.const.web.id/v1");
-    return Array.from(new Set(urls));
+    return (explicit || "https://router.const.web.id/v1").replace(/\/+$/, "");
   };
 
-  let cachedHealthyRouterBase: string | null = null;
-  let cachedHealthyRouterExpiry = 0;
-
   const fetchRouterMain = async (path: string, options: RequestInit = {}): Promise<Response> => {
-    const routerBases = getRouterBaseUrls();
-    const orderedBases =
-      cachedHealthyRouterBase && cachedHealthyRouterExpiry > Date.now()
-        ? [cachedHealthyRouterBase, ...routerBases.filter((b) => b !== cachedHealthyRouterBase)]
-        : routerBases;
+    const base = getRouterBaseUrl();
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 15000);
 
-    let lastError: any = null;
-
-    for (const base of orderedBases) {
-      const isLocal = base.includes("localhost") || base.includes("127.0.0.1");
-      const controller = new AbortController();
-      const timeout = isLocal ? 1000 : 12000;
-      const timer = setTimeout(() => controller.abort(), timeout);
-
-      try {
-        const res = await fetch(`${base}${path}`, {
-          ...options,
-          signal: controller.signal,
-        });
-        clearTimeout(timer);
-        cachedHealthyRouterBase = base;
-        cachedHealthyRouterExpiry = Date.now() + 30000;
-        return res;
-      } catch (err: any) {
-        clearTimeout(timer);
-        lastError = err;
-      }
+    try {
+      const res = await fetch(`${base}${path}`, {
+        ...options,
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+      return res;
+    } catch (err: any) {
+      clearTimeout(timer);
+      throw err || new Error("Gagal terhubung ke Const Router Gateway.");
     }
-
-    throw lastError || new Error("Gagal terhubung ke Const Router Gateway.");
   };
 
   ipcMain.handle(
