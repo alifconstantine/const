@@ -50,6 +50,7 @@ import {
   toast,
   AVAILABLE_CONNECTORS,
   VoiceInput,
+  Checkbox,
 } from "@const/ui";
 import { useVoiceRecognition } from "../../lib/voice";
 import { getConnectedConnectorIds } from "../../lib/connectors-service";
@@ -2587,11 +2588,14 @@ export function ChatPanel({
                           : "hover:bg-muted/50 text-muted-foreground opacity-60 hover:opacity-100"
                       )}
                     >
-                      <input
-                        type="checkbox"
+                      <Checkbox
                         checked={isCarried}
-                        onChange={() => {}}
-                        className="rounded border-border h-3.5 w-3.5 text-primary focus:ring-0 cursor-pointer pointer-events-none"
+                        onCheckedChange={() => {
+                          localDb.toggleSourceInChat(source.id, !isCarried);
+                        }}
+                        onClick={(e) => e.stopPropagation()}
+                        className="h-3.5 w-3.5 rounded-[4px] border-border/80 data-[state=checked]:bg-primary data-[state=checked]:border-primary data-[state=checked]:text-primary-foreground shrink-0 cursor-pointer transition-all"
+                        aria-label={`Toggle ${source.title}`}
                       />
                       <div className="flex-1 min-w-0">
                         <div className="truncate text-[11.5px] font-medium text-foreground">

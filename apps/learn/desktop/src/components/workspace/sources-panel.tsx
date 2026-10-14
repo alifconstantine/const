@@ -18,6 +18,7 @@ import {
   DropdownMenuItem,
   cn,
   ScrollArea,
+  Checkbox,
 } from "@const/ui";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db, localDb, type LocalSource } from "@/lib/db";
@@ -386,11 +387,14 @@ export function SourcesPanel({
                       localDb.toggleSourceInChat(source.id, !isCarried);
                     }}
                   >
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={isCarried}
-                      onChange={() => {}}
-                      className="rounded border-border h-3.5 w-3.5 text-primary focus:ring-0 cursor-pointer pointer-events-none shrink-0"
+                      onCheckedChange={() => {
+                        localDb.toggleSourceInChat(source.id, !isCarried);
+                      }}
+                      onClick={(e) => e.stopPropagation()}
+                      className="h-4 w-4 rounded-[4px] border-border/80 data-[state=checked]:bg-primary data-[state=checked]:border-primary data-[state=checked]:text-primary-foreground shrink-0 cursor-pointer transition-all"
+                      aria-label={`Toggle ${source.title}`}
                     />
 
                     <SourceIcon source={source} size="md" />

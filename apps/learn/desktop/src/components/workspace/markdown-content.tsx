@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from "react";
 import { marked, type Token, type Tokens } from "marked";
 import { Check, Copy, Download, Maximize2, X } from "lucide-react";
-import { cn, ScrollArea } from "@const/ui";
+import { cn, ScrollArea, Checkbox } from "@const/ui";
 import { useI18n } from "../../lib/i18n";
 import {
   createMarkedLatexExtension,
@@ -288,11 +288,10 @@ function TokenRenderer({
           {list.items.map((item: Tokens.ListItem, idx: number) => (
             <li key={idx} className="flex items-start gap-2.5 leading-[1.65]">
               {item.task ? (
-                <input
-                  type="checkbox"
+                <Checkbox
                   checked={item.checked}
-                  readOnly
-                  className="mt-1 mr-0.5 rounded accent-primary shrink-0 pointer-events-none"
+                  disabled
+                  className="mt-1 mr-0.5 h-3.5 w-3.5 rounded-[3px] border-border/80 data-[state=checked]:bg-primary data-[state=checked]:border-primary data-[state=checked]:text-primary-foreground shrink-0 pointer-events-none"
                 />
               ) : (
                 <span className={cn(

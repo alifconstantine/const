@@ -9,6 +9,7 @@ import {
   DropdownMenuItem,
   cn,
   toast,
+  Checkbox,
 } from "@const/ui";
 import {
   X,
@@ -695,11 +696,10 @@ export function AddSourceDialog({
               {/* Recursive Docs Crawling Toggle */}
               <div className="p-3 rounded-2xl bg-secondary/40 border border-border/50 flex flex-col gap-2">
                 <label className="flex items-start gap-2.5 cursor-pointer">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     checked={crawlDocs}
-                    onChange={(e) => setCrawlDocs(e.target.checked)}
-                    className="mt-0.5 rounded border-border text-primary focus:ring-0"
+                    onCheckedChange={(checked) => setCrawlDocs(!!checked)}
+                    className="mt-0.5 rounded-[4px] border-border/80 data-[state=checked]:bg-primary data-[state=checked]:border-primary data-[state=checked]:text-primary-foreground"
                   />
                   <div>
                     <span className="text-xs font-semibold text-foreground block">
