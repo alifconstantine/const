@@ -8,10 +8,8 @@ import type { ConnectorMetadata } from "@const/ui";
 import { Browser } from "@capacitor/browser";
 import { Capacitor } from "@capacitor/core";
 import {
-  getComposioApiKey,
-  getComposioBaseUrl,
   getLocalDeviceId,
-  getRouterBaseUrl,
+  getRouterBaseUrls,
 } from "./composio";
 
 export async function openExternalUrl(url: string): Promise<void> {
@@ -82,116 +80,50 @@ export async function connectConnector(
   const targetSlug = connector.toolkitSlug;
 
   if (connector.authType !== "No Auth") {
-    const routerBaseUrl = getRouterBaseUrl();
+    const routerBases = getRouterBaseUrls();
+    let lastError: string | null = null;
 
-    // 1. Primary path: Request OAuth authorization link from Const Router MCP Gateway
-    try {
-      const res = await fetch(`${routerBaseUrl}/mcp/auth-link`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Device-Id": userId,
-          "X-User-Id": userId,
-        },
-        body: JSON.stringify({
-          toolkit: targetSlug,
-          userId,
-          callbackUrl: "https://accounts.const.web.id/auth-success?connector=" + connector.id,
-        }),
-      });
+    // Iterate through available router gateway URLs (local dev server then production)
+    for (const routerBase of routerBases) {
+      try {
+        const res = await fetch(`${routerBase}/mcp/auth-link`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Device-Id": userId,
+            "X-User-Id": userId,
+          },
+          body: JSON.stringify({
+            toolkit: targetSlug,
+            userId,
+            callbackUrl: "https://accounts.const.web.id/auth-success?connector=" + connector.id,
+          }),
+        });
 
-      const data = await res.json().catch(() => ({}));
+        const data = await res.json().catch(() => ({}));
 
-      if (res.ok && data.success && data.redirectUrl) {
-        await openExternalUrl(data.redirectUrl);
-        saveConnectedConnectorIds([...current, connector.id]);
-        if (data.connectedAccountId) {
-          localStorage.setItem(`composio_ca_${connector.id}`, data.connectedAccountId);
+        if (res.ok && data.success && data.redirectUrl) {
+          await openExternalUrl(data.redirectUrl);
+          saveConnectedConnectorIds([...current, connector.id]);
+          if (data.connectedAccountId) {
+            localStorage.setItem(`composio_ca_${connector.id}`, data.connectedAccountId);
+          }
+          return {
+            success: true,
+            redirectUrl: data.redirectUrl,
+            message: `Membuka otorisasi ${connector.name}... Silakan selesaikan login di browser.`,
+          };
+        } else if (data.error) {
+          lastError = data.error;
         }
-        return {
-          success: true,
-          redirectUrl: data.redirectUrl,
-          message: `Membuka otorisasi ${connector.name}... Silakan selesaikan login di browser.`,
-        };
-      } else if (data.error) {
-        throw new Error(data.error);
-      }
-    } catch (routerErr: any) {
-      console.warn("[Mobile Connect] Router gateway auth-link warning, checking fallback:", routerErr);
-      if (routerErr?.message && !routerErr.message.includes("fetch")) {
-        throw routerErr;
+      } catch (routerErr: any) {
+        lastError = routerErr?.message || "Koneksi gateway gagal";
       }
     }
 
-    // 2. Direct Composio fallback if local API key is configured
-    const apiKey = getComposioApiKey();
-    if (!apiKey) {
-      throw new Error(
-        `Gagal menghubungkan ${connector.name} via Const Router Gateway.`
-      );
-    }
-
-    const baseUrl = getComposioBaseUrl();
-
-    // 2a. Session creation
-    const sessRes = await fetch(`${baseUrl.replace(/\/+$/, "")}/tool_router/session`, {
-      method: "POST",
-      headers: {
-        "x-api-key": apiKey,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        user_id: userId,
-        manage_connections: { enable: true },
-      }),
-    });
-
-    if (!sessRes.ok) {
-      const errTxt = await sessRes.text().catch(() => "");
-      throw new Error(`Gagal membuat sesi Composio (${sessRes.status}): ${errTxt || "Periksa API key Anda"}`);
-    }
-
-    const sessData = await sessRes.json();
-    const sessionId = sessData.session_id;
-
-    // 2b. Request link session
-    const linkRes = await fetch(
-      `${baseUrl.replace(/\/+$/, "")}/tool_router/session/${sessionId}/link`,
-      {
-        method: "POST",
-        headers: {
-          "x-api-key": apiKey,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          toolkit: targetSlug,
-          callback_url: "https://accounts.const.web.id/auth-success?connector=" + connector.id,
-        }),
-      }
+    throw new Error(
+      lastError || `Gagal menghubungkan ${connector.name} via Const Router Gateway.`
     );
-
-    if (!linkRes.ok) {
-      const errTxt = await linkRes.text().catch(() => "");
-      throw new Error(`Gagal mendapatkan link otorisasi (${linkRes.status}): ${errTxt}`);
-    }
-
-    const linkData = await linkRes.json();
-    const redirectUrl = linkData.redirect_url || linkData.redirectUrl;
-
-    if (redirectUrl) {
-      await openExternalUrl(redirectUrl);
-      saveConnectedConnectorIds([...current, connector.id]);
-      if (linkData.connected_account_id) {
-        localStorage.setItem(`composio_ca_${connector.id}`, linkData.connected_account_id);
-      }
-      return {
-        success: true,
-        redirectUrl,
-        message: `Membuka otorisasi ${connector.name}... Silakan selesaikan login di browser.`,
-      };
-    }
-
-    throw new Error("Composio tidak mengembalikan URL redirect otorisasi.");
   }
 
   // Fallback ONLY for No-Auth tools
@@ -215,31 +147,23 @@ export async function disconnectConnector(connectorId: string): Promise<boolean>
     if (storedCa) {
       localStorage.removeItem(`composio_ca_${connectorId}`);
 
-      // Try router gateway disconnect
-      const routerBaseUrl = getRouterBaseUrl();
+      const routerBases = getRouterBaseUrls();
       const userId = getLocalDeviceId();
-      try {
-        await fetch(`${routerBaseUrl}/mcp/disconnect`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Device-Id": userId,
-          },
-          body: JSON.stringify({
-            accountId: storedCa,
-            userId,
-          }),
-        });
-      } catch {
-        // Fallback to direct DELETE if local API key exists
-        const apiKey = getComposioApiKey();
-        const baseUrl = getComposioBaseUrl();
-        if (apiKey) {
-          await fetch(`${baseUrl.replace(/\/+$/, "")}/connected_accounts/${storedCa}`, {
-            method: "DELETE",
-            headers: { "x-api-key": apiKey },
-          }).catch(() => {});
-        }
+      for (const base of routerBases) {
+        try {
+          await fetch(`${base}/mcp/disconnect`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Device-Id": userId,
+            },
+            body: JSON.stringify({
+              accountId: storedCa,
+              userId,
+            }),
+          });
+          break;
+        } catch {}
       }
     }
     return true;

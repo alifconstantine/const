@@ -155,53 +155,64 @@ export function recordMcpToolCall(
   saveUsageStore(store);
 }
 
+const authConfigCache = new Map<string, string>();
+
 /**
- * Gets or creates a persistent Composio session for the user.
+ * Gets or creates the Composio Auth Config ID for a given toolkit without requiring session permissions.
  */
-export async function getOrCreateComposioSession(
-  userId: string = "learn_default_user",
-  forceNew = false
+export async function getOrCreateAuthConfigId(
+  toolkitSlug: string,
+  apiKey: string
 ): Promise<string> {
-  const apiKey = getComposioApiKey();
-  if (!apiKey) {
-    throw new Error(
-      "COMPOSIO_API_KEY belum dikonfigurasi di server Const Router. Silakan tambahkan COMPOSIO_API_KEY di dashboard Vercel."
-    );
+  const norm = normalizeToolkitSlug(toolkitSlug);
+  if (authConfigCache.has(norm)) {
+    return authConfigCache.get(norm)!;
   }
 
-  const cached = sessionCache.get(userId);
-  if (!forceNew && cached && cached.expiresAt > Date.now()) {
-    return cached.sessionId;
+  // 1. Check existing auth_configs
+  try {
+    const listRes = await fetch("https://backend.composio.dev/api/v3.1/auth_configs", {
+      headers: { "x-api-key": apiKey },
+    });
+    if (listRes.ok) {
+      const listData = await listRes.json();
+      const match = listData.items?.find((item: any) => {
+        const itemSlug = (item.toolkit?.slug || item.toolkit || "").toLowerCase().replace(/[-_]/g, "");
+        return itemSlug === norm || itemSlug === norm.replace(/[-_]/g, "");
+      });
+      if (match?.id) {
+        authConfigCache.set(norm, match.id);
+        return match.id;
+      }
+    }
+  } catch (err) {
+    console.warn("[getOrCreateAuthConfigId] list failed:", err);
   }
 
-  const sessRes = await fetch("https://backend.composio.dev/api/v3.1/tool_router/session", {
+  // 2. Create / retrieve managed auth_config for this toolkit
+  const authScheme = norm.includes("canva") ? "DCR_OAUTH" : "OAUTH2";
+  const createRes = await fetch("https://backend.composio.dev/api/v3.1/auth_configs", {
     method: "POST",
     headers: {
       "x-api-key": apiKey,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      user_id: userId,
-      manage_connections: { enable: true },
-      workbench: { enable: true },
+      toolkit: { slug: norm },
+      auth_scheme: authScheme,
     }),
   });
 
-  if (!sessRes.ok) {
-    const errText = await sessRes.text().catch(() => "");
-    throw new Error(`Composio session creation failed (${sessRes.status}): ${errText}`);
+  if (createRes.ok) {
+    const createData = await createRes.json();
+    const acId = createData.auth_config?.id || createData.id;
+    if (acId) {
+      authConfigCache.set(norm, acId);
+      return acId;
+    }
   }
 
-  const sessData = await sessRes.json();
-  const sessionId = sessData.session_id;
-
-  // Cache for 6 hours
-  sessionCache.set(userId, {
-    sessionId,
-    expiresAt: Date.now() + 6 * 60 * 60 * 1000,
-  });
-
-  return sessionId;
+  throw new Error(`Failed to resolve auth_config for toolkit: ${toolkitSlug}`);
 }
 
 /**
@@ -355,29 +366,17 @@ export async function executeMcpTool(
   }
 
   try {
-    let sessionId = await getOrCreateComposioSession(userId);
-
-    const runCall = async (sess: string) => {
-      return await fetch(`https://backend.composio.dev/api/v3.1/tool_router/session/${sess}/execute`, {
-        method: "POST",
-        headers: {
-          "x-api-key": apiKey,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          tool_slug: targetSlug,
-          arguments: normalizedArgs,
-        }),
-      });
-    };
-
-    let execRes = await runCall(sessionId);
-
-    // If session expired or not found, recreate session and retry once
-    if (execRes.status === 404 || execRes.status === 401) {
-      sessionId = await getOrCreateComposioSession(userId, true);
-      execRes = await runCall(sessionId);
-    }
+    const execRes = await fetch(`https://backend.composio.dev/api/v3/tools/execute/${targetSlug}`, {
+      method: "POST",
+      headers: {
+        "x-api-key": apiKey,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        user_id: userId,
+        arguments: normalizedArgs,
+      }),
+    });
 
     if (!execRes.ok) {
       const errText = await execRes.text().catch(() => "");
@@ -390,6 +389,19 @@ export async function executeMcpTool(
     }
 
     const data = await execRes.json();
+    if (data.successful === false || (data.error && !data.data)) {
+      const errMsg =
+        typeof data.error === "object"
+          ? data.error.message || JSON.stringify(data.error)
+          : data.error;
+      recordMcpToolCall(targetSlug, false, userId, errMsg);
+      return {
+        success: false,
+        error: errMsg || "Tool execution failed on Composio.",
+        status: "execution_error",
+      };
+    }
+
     recordMcpToolCall(targetSlug, true, userId);
 
     return {
@@ -425,33 +437,21 @@ export async function getMcpAuthLink(
   const normalizedToolkit = normalizeToolkitSlug(toolkit);
 
   try {
-    let sessionId = await getOrCreateComposioSession(userId);
+    const authConfigId = await getOrCreateAuthConfigId(normalizedToolkit, apiKey);
 
-    const runLink = async (sess: string) => {
-      return await fetch(
-        `https://backend.composio.dev/api/v3.1/tool_router/session/${sess}/link`,
-        {
-          method: "POST",
-          headers: {
-            "x-api-key": apiKey,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            toolkit: normalizedToolkit,
-            callback_url:
-              callbackUrl || "https://accounts.const.web.id/auth-success?connector=" + normalizedToolkit,
-          }),
-        }
-      );
-    };
-
-    let linkRes = await runLink(sessionId);
-
-    // If session expired or unauthorized, recreate session and retry once
-    if (linkRes.status === 404 || linkRes.status === 401) {
-      sessionId = await getOrCreateComposioSession(userId, true);
-      linkRes = await runLink(sessionId);
-    }
+    const linkRes = await fetch("https://backend.composio.dev/api/v3.1/connected_accounts/link", {
+      method: "POST",
+      headers: {
+        "x-api-key": apiKey,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        user_id: userId,
+        auth_config_id: authConfigId,
+        callback_url:
+          callbackUrl || "https://accounts.const.web.id/auth-success?connector=" + normalizedToolkit,
+      }),
+    });
 
     if (!linkRes.ok) {
       const errText = await linkRes.text().catch(() => "");

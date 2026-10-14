@@ -32,6 +32,22 @@ export function getRouterBaseUrl(): string {
   return envUrl.replace(/\/+$/, "");
 }
 
+export function getRouterBaseUrls(): string[] {
+  const urls: string[] = [];
+  const envUrl =
+    (import.meta as any).env?.VITE_CONST_ROUTER_BASE_URL ||
+    (import.meta as any).env?.CONST_ROUTER_BASE_URL;
+  if (envUrl) {
+    urls.push(envUrl.replace(/\/+$/, ""));
+  }
+  if ((import.meta as any).env?.DEV) {
+    urls.push("http://localhost:3002/v1");
+    urls.push("http://127.0.0.1:3002/v1");
+  }
+  urls.push("https://router.const.web.id/v1");
+  return Array.from(new Set(urls));
+}
+
 /**
  * Resolves the base URL for Composio API.
  * When running in development (localhost or LAN IP like 10.188.x.x),
@@ -554,88 +570,43 @@ export async function executeComposioTool(
   toolSlug: string,
   args: any
 ): Promise<{ success: boolean; data?: any; error?: string }> {
-  const routerUrl = getRouterBaseUrl();
+  const routerBases = getRouterBaseUrls();
   const userId = getLocalDeviceId();
+  let lastError = "Gagal mengeksekusi tool via Const Router Gateway.";
 
-  // 1. Primary path: Delegate execution to Const Router MCP Gateway
-  try {
-    const res = await fetch(`${routerUrl}/mcp/execute`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Device-Id": userId,
-        "X-User-Id": userId,
-      },
-      body: JSON.stringify({
-        toolSlug,
-        arguments: args,
-        userId,
-      }),
-    });
-
-    const json = await res.json();
-    if (res.ok && json.success) {
-      recordComposioToolCall(toolSlug, true);
-      return { success: true, data: json.data || json.result };
-    } else if (json.error) {
-      recordComposioToolCall(toolSlug, false, undefined, json.error);
-      return { success: false, error: json.error };
-    }
-  } catch (routerErr) {
-    console.warn("[Mobile Composio] Router MCP gateway unavailable, checking direct fallback:", routerErr);
-  }
-
-  // 2. Direct Composio fallback if local API key is configured
-  const apiKey = getComposioApiKey();
-  if (!apiKey) {
-    return {
-      success: false,
-      error: "Gagal mengeksekusi tool via Const Router Gateway.",
-    };
-  }
-
-  const limitCheck = checkComposioLimit();
-  if (!limitCheck.allowed) {
-    return {
-      success: false,
-      error: limitCheck.message || "Batas mingguan 300 tool call Composio telah tercapai.",
-    };
-  }
-
-  const baseUrl = getComposioBaseUrl();
-  try {
-    let sessionId = await getOrCreateSessionId();
-    const runExec = async (sId: string, targetBase = baseUrl) => {
-      return await fetch(`${targetBase.replace(/\/+$/, "")}/tool_router/session/${sId}/execute`, {
+  for (const routerUrl of routerBases) {
+    try {
+      const res = await fetch(`${routerUrl}/mcp/execute`, {
         method: "POST",
         headers: {
-          "x-api-key": apiKey,
           "Content-Type": "application/json",
+          "X-Device-Id": userId,
+          "X-User-Id": userId,
         },
         body: JSON.stringify({
-          tool_slug: toolSlug,
+          toolSlug,
           arguments: args,
+          userId,
         }),
       });
-    };
 
-    let res = await runExec(sessionId);
-    if (res.status === 404 || res.status === 401) {
-      sessionId = await getOrCreateSessionId(true);
-      res = await runExec(sessionId);
+      const json = await res.json().catch(() => ({}));
+      if (res.ok && json.success) {
+        recordComposioToolCall(toolSlug, true);
+        return { success: true, data: json.data || json.result };
+      } else if (res.status === 429 || json.error) {
+        recordComposioToolCall(toolSlug, false, undefined, json.error);
+        return { success: false, error: json.error };
+      }
+    } catch (routerErr: any) {
+      lastError = routerErr?.message || lastError;
     }
-    if (!res.ok) {
-      const errText = await res.text().catch(() => "");
-      recordComposioToolCall(toolSlug, false, undefined, `HTTP ${res.status}: ${errText}`);
-      return { success: false, error: `Tool ${toolSlug} failed (HTTP ${res.status}): ${errText}` };
-    }
-    const json = await res.json();
-    recordComposioToolCall(toolSlug, true);
-    return { success: true, data: json.data || json };
-  } catch (err: any) {
-    recordComposioToolCall(toolSlug, false, undefined, err?.message);
-    return { success: false, error: err?.message || String(err) };
   }
+
+  return {
+    success: false,
+    error: lastError,
+  };
 }
 
 /**

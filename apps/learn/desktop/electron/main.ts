@@ -784,126 +784,67 @@ app.on("second-instance", (_event, commandLine) => {
     return false;
   });
 
-  const getRouterBaseUrl = () => {
-    const raw =
+  const getRouterBaseUrls = () => {
+    const urls: string[] = [];
+    const explicit =
       process.env.CONST_ROUTER_BASE_URL ||
-      process.env.VITE_CONST_ROUTER_BASE_URL ||
-      "https://router.const.web.id/v1";
-    return raw.replace(/\/+$/, "");
+      process.env.VITE_CONST_ROUTER_BASE_URL;
+    if (explicit) {
+      urls.push(explicit.replace(/\/+$/, ""));
+    }
+    if (!app.isPackaged || process.env.NODE_ENV === "development") {
+      urls.push("http://localhost:3002/v1");
+      urls.push("http://127.0.0.1:3002/v1");
+    }
+    urls.push("https://router.const.web.id/v1");
+    return Array.from(new Set(urls));
   };
 
   ipcMain.handle(
     "composio:get-auth-link",
     async (
       _event,
-      payload: { toolkit: string; userId?: string; callbackUrl?: string; apiKey?: string }
+      payload: { toolkit: string; userId?: string; callbackUrl?: string }
     ) => {
       try {
         const userId = payload.userId || "learn_desktop_user";
-        const routerBase = getRouterBaseUrl();
+        const routerBases = getRouterBaseUrls();
+        let lastError: any = null;
 
-        // 1. Primary path: Const Router MCP Gateway
-        try {
-          const res = await fetch(`${routerBase}/mcp/auth-link`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "X-Device-Id": userId,
-              "X-User-Id": userId,
-            },
-            body: JSON.stringify({
-              toolkit: payload.toolkit,
-              userId,
-              callbackUrl:
-                payload.callbackUrl || "https://accounts.const.web.id/auth-success",
-            }),
-          });
+        for (const routerBase of routerBases) {
+          try {
+            const res = await fetch(`${routerBase}/mcp/auth-link`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "X-Device-Id": userId,
+                "X-User-Id": userId,
+              },
+              body: JSON.stringify({
+                toolkit: payload.toolkit,
+                userId,
+                callbackUrl:
+                  payload.callbackUrl || "https://accounts.const.web.id/auth-success",
+              }),
+            });
 
-          const data = await res.json().catch(() => ({}));
-          if (res.ok && data.success && data.redirectUrl) {
-            await shell.openExternal(data.redirectUrl);
-            return {
-              success: true,
-              redirectUrl: data.redirectUrl,
-              connectedAccountId: data.connectedAccountId,
-            };
-          } else if (data.error) {
-            throw new Error(data.error);
+            const data = await res.json().catch(() => ({}));
+            if (res.ok && data.success && data.redirectUrl) {
+              await shell.openExternal(data.redirectUrl);
+              return {
+                success: true,
+                redirectUrl: data.redirectUrl,
+                connectedAccountId: data.connectedAccountId,
+              };
+            } else if (data.error) {
+              lastError = new Error(data.error);
+            }
+          } catch (routerErr: any) {
+            lastError = routerErr;
           }
-        } catch (routerErr: any) {
-          console.warn("[Composio IPC get-auth-link] Gateway warning, checking fallback:", routerErr);
-          if (routerErr?.message && !routerErr.message.includes("fetch")) {
-            throw routerErr;
-          }
         }
 
-        // 2. Direct Composio fallback if local API key is configured
-        const apiKey =
-          payload.apiKey ||
-          process.env.COMPOSIO_API_KEY ||
-          process.env.VITE_COMPOSIO_API_KEY ||
-          "";
-
-        if (!apiKey) {
-          throw new Error("Gagal menginisialisasi otorisasi via Const Router Gateway.");
-        }
-
-        const sessRes = await fetch("https://backend.composio.dev/api/v3.1/tool_router/session", {
-          method: "POST",
-          headers: {
-            "x-api-key": apiKey,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            user_id: userId,
-            manage_connections: { enable: true },
-          }),
-        });
-
-        if (!sessRes.ok) {
-          const errText = await sessRes.text();
-          throw new Error(`Composio session creation failed (${sessRes.status}): ${errText}`);
-        }
-
-        const sessData = await sessRes.json();
-        const sessionId = sessData.session_id;
-
-        const linkRes = await fetch(
-          `https://backend.composio.dev/api/v3.1/tool_router/session/${sessionId}/link`,
-          {
-            method: "POST",
-            headers: {
-              "x-api-key": apiKey,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              toolkit: payload.toolkit,
-              callback_url:
-                payload.callbackUrl || "https://accounts.const.web.id/auth-success",
-            }),
-          }
-        );
-
-        if (!linkRes.ok) {
-          const errText = await linkRes.text();
-          throw new Error(`Composio link failed (${linkRes.status}): ${errText}`);
-        }
-
-        const linkData = await linkRes.json();
-        const redirectUrl = linkData.redirect_url || linkData.redirectUrl;
-
-        if (redirectUrl) {
-          await shell.openExternal(redirectUrl);
-          return {
-            success: true,
-            redirectUrl,
-            sessionId,
-            connectedAccountId: linkData.connected_account_id,
-            linkToken: linkData.link_token,
-          };
-        }
-
-        throw new Error("No redirect_url returned by Composio");
+        throw lastError || new Error("Gagal menginisialisasi otorisasi via Const Router Gateway.");
       } catch (err: any) {
         console.error("[Composio IPC get-auth-link Error]", err);
         return { success: false, error: err?.message || String(err) };
@@ -913,46 +854,29 @@ app.on("second-instance", (_event, commandLine) => {
 
   ipcMain.handle(
     "composio:disconnect-account",
-    async (_event, payload: { accountId: string; apiKey?: string; userId?: string }) => {
+    async (_event, payload: { accountId: string; userId?: string }) => {
       try {
         const userId = payload.userId || "learn_desktop_user";
-        const routerBase = getRouterBaseUrl();
+        const routerBases = getRouterBaseUrls();
 
-        // 1. Primary path: Router gateway disconnect
-        try {
-          const res = await fetch(`${routerBase}/mcp/disconnect`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "X-Device-Id": userId,
-              "X-User-Id": userId,
-            },
-            body: JSON.stringify({
-              accountId: payload.accountId,
-              userId,
-            }),
-          });
-          if (res.ok) {
-            return { success: true };
-          }
-        } catch {}
-
-        // 2. Direct fallback
-        const apiKey =
-          payload.apiKey ||
-          process.env.COMPOSIO_API_KEY ||
-          process.env.VITE_COMPOSIO_API_KEY ||
-          "";
-
-        if (apiKey) {
-          const delRes = await fetch(
-            `https://backend.composio.dev/api/v3.1/connected_accounts/${payload.accountId}`,
-            {
-              method: "DELETE",
-              headers: { "x-api-key": apiKey },
+        for (const routerBase of routerBases) {
+          try {
+            const res = await fetch(`${routerBase}/mcp/disconnect`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                "X-Device-Id": userId,
+                "X-User-Id": userId,
+              },
+              body: JSON.stringify({
+                accountId: payload.accountId,
+                userId,
+              }),
+            });
+            if (res.ok) {
+              return { success: true };
             }
-          );
-          return { success: delRes.ok };
+          } catch {}
         }
         return { success: true };
       } catch (err: any) {
@@ -963,43 +887,29 @@ app.on("second-instance", (_event, commandLine) => {
 
   ipcMain.handle(
     "composio:get-connected-accounts",
-    async (_event, payload?: { userId?: string; apiKey?: string }) => {
+    async (_event, payload?: { userId?: string }) => {
       try {
         const userId = payload?.userId || "learn_desktop_user";
-        const routerBase = getRouterBaseUrl();
+        const routerBases = getRouterBaseUrls();
 
-        // 1. Primary path: Router gateway
-        try {
-          const res = await fetch(`${routerBase}/mcp/connected-accounts?userId=${encodeURIComponent(userId)}`);
-          if (res.ok) {
-            const data = await res.json();
-            return { success: true, items: data.items || [] };
-          }
-        } catch {}
-
-        // 2. Fallback
-        const apiKey =
-          payload?.apiKey ||
-          process.env.COMPOSIO_API_KEY ||
-          process.env.VITE_COMPOSIO_API_KEY ||
-          "";
-
-        if (!apiKey) return { success: false, items: [] };
-
-        const res = await fetch(
-          `https://backend.composio.dev/api/v3.1/connected_accounts?user_ids=${encodeURIComponent(
-            userId
-          )}`,
-          {
-            headers: { "x-api-key": apiKey },
-          }
-        );
-
-        if (res.ok) {
-          const data = await res.json();
-          return { success: true, items: data.items || [] };
+        for (const routerBase of routerBases) {
+          try {
+            const res = await fetch(
+              `${routerBase}/mcp/connected-accounts?userId=${encodeURIComponent(userId)}`,
+              {
+                headers: {
+                  "X-Device-Id": userId,
+                  "X-User-Id": userId,
+                },
+              }
+            );
+            if (res.ok) {
+              const data = await res.json();
+              return { success: true, items: data.accounts || data.items || [] };
+            }
+          } catch {}
         }
-        return { success: false, items: [] };
+        return { success: true, items: [] };
       } catch {
         return { success: false, items: [] };
       }
@@ -1010,131 +920,75 @@ app.on("second-instance", (_event, commandLine) => {
     "composio:execute-tool",
     async (
       _event,
-      payload: { toolSlug: string; arguments: any; userId?: string; apiKey?: string }
+      payload: { toolSlug: string; arguments: any; userId?: string }
     ) => {
       const userId = payload.userId || "learn_desktop_user";
-      const routerBase = getRouterBaseUrl();
+      const routerBases = getRouterBaseUrls();
+      let lastError = "Gagal mengeksekusi tool via Const Router Gateway.";
 
-      // 1. Primary path: Router gateway (enforces 300/week quota and manages server credentials)
-      try {
-        const res = await fetch(`${routerBase}/mcp/execute`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "X-Device-Id": userId,
-            "X-User-Id": userId,
-          },
-          body: JSON.stringify({
-            toolSlug: payload.toolSlug,
-            arguments: payload.arguments,
-            userId,
-          }),
-        });
-
-        const json = await res.json().catch(() => ({}));
-
-        if (res.ok && json.success) {
-          recordComposioToolCall(payload.toolSlug, true, userId);
-          return { success: true, data: json.data || json.result };
-        } else if (res.status === 429 || json.error) {
-          recordComposioToolCall(payload.toolSlug, false, userId, json.error);
-          return { success: false, error: json.error };
-        }
-      } catch (routerErr) {
-        console.warn("[Composio execute-tool] Gateway warning, checking direct fallback:", routerErr);
-      }
-
-      // 2. Direct Composio fallback if local API key is configured
-      const apiKey =
-        payload.apiKey ||
-        process.env.COMPOSIO_API_KEY ||
-        process.env.VITE_COMPOSIO_API_KEY ||
-        "";
-
-      if (!apiKey) {
-        return {
-          success: false,
-          error: "Gagal mengeksekusi tool via Const Router Gateway.",
-        };
-      }
-
-      const limitCheck = checkComposioLimit(userId);
-      if (!limitCheck.allowed) {
-        return { success: false, error: limitCheck.message };
-      }
-
-      try {
-        const sessRes = await fetch("https://backend.composio.dev/api/v3.1/tool_router/session", {
-          method: "POST",
-          headers: {
-            "x-api-key": apiKey,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            user_id: userId,
-            manage_connections: { enable: true },
-          }),
-        });
-
-        if (!sessRes.ok) {
-          const errText = await sessRes.text();
-          throw new Error(`Composio session creation failed (${sessRes.status}): ${errText}`);
-        }
-
-        const sessData = await sessRes.json();
-        const sessionId = sessData.session_id;
-
-        const execRes = await fetch(
-          `https://backend.composio.dev/api/v3.1/tool_router/session/${sessionId}/execute`,
-          {
+      for (const routerBase of routerBases) {
+        try {
+          const res = await fetch(`${routerBase}/mcp/execute`, {
             method: "POST",
             headers: {
-              "x-api-key": apiKey,
               "Content-Type": "application/json",
+              "X-Device-Id": userId,
+              "X-User-Id": userId,
             },
             body: JSON.stringify({
-              tool_slug: payload.toolSlug,
+              toolSlug: payload.toolSlug,
               arguments: payload.arguments,
+              userId,
             }),
+          });
+
+          const json = await res.json().catch(() => ({}));
+
+          if (res.ok && json.success) {
+            recordComposioToolCall(payload.toolSlug, true, userId);
+            return { success: true, data: json.data || json.result };
+          } else if (res.status === 429 || json.error) {
+            recordComposioToolCall(payload.toolSlug, false, userId, json.error);
+            return { success: false, error: json.error };
           }
-        );
-
-        if (!execRes.ok) {
-          const errText = await execRes.text();
-          recordComposioToolCall(payload.toolSlug, false, userId, `HTTP ${execRes.status}: ${errText}`);
-          throw new Error(`Composio execute failed for ${payload.toolSlug} (${execRes.status}): ${errText}`);
+        } catch (routerErr: any) {
+          lastError = routerErr?.message || lastError;
         }
-
-        const data = await execRes.json();
-        recordComposioToolCall(payload.toolSlug, true, userId);
-        return { success: true, data: data.data || data };
-      } catch (err: any) {
-        console.error("[Composio execute-tool Error]", err);
-        recordComposioToolCall(payload.toolSlug, false, userId, err?.message);
-        return { success: false, error: err?.message || String(err) };
       }
+
+      return {
+        success: false,
+        error: lastError,
+      };
     }
   );
 
   ipcMain.handle("composio:get-usage", async (_event, userId?: string) => {
     const uid = userId || "learn_desktop_user";
-    const routerBase = getRouterBaseUrl();
+    const routerBases = getRouterBaseUrls();
 
-    try {
-      const res = await fetch(`${routerBase}/mcp/usage?userId=${encodeURIComponent(uid)}`);
-      if (res.ok) {
-        const data = await res.json();
-        if (data.success && data.user) {
-          return {
-            used: data.user.used,
-            limit: data.user.limit,
-            remaining: data.user.remaining,
-            resetAt: data.user.resetAt,
-            byTool: data.user.byTool || {},
-          };
+    for (const routerBase of routerBases) {
+      try {
+        const res = await fetch(`${routerBase}/mcp/usage?userId=${encodeURIComponent(uid)}`, {
+          headers: {
+            "X-Device-Id": uid,
+            "X-User-Id": uid,
+          },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && data.usage) {
+            return {
+              used: data.usage.count || 0,
+              limit: data.usage.limit || 300,
+              remaining: data.usage.remaining ?? Math.max(0, (data.usage.limit || 300) - (data.usage.count || 0)),
+              resetAt: new Date(data.usage.resetDate).getTime(),
+              byTool: {},
+            };
+          }
         }
-      }
-    } catch {}
+      } catch {}
+    }
 
     return loadComposioUsage(uid);
   });
