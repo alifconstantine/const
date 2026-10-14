@@ -51,10 +51,10 @@ export default function FeatureExplorerSection() {
                   </div>
                 </div>
                 <div className="grid-col col-xs-4 col-md-offset-2 col-md-6 astro-hkzvdn3m">
-                  <div className="feature-media astro-hkzvdn3m border border-border/80 dark:border-[#262626] bg-card dark:bg-[#141414] shadow-sm rounded-2xl overflow-hidden">
+                  <div className="feature-media astro-hkzvdn3m border border-border/80 dark:border-[#262626] bg-card dark:bg-[#141414] shadow-sm rounded-2xl overflow-hidden aspect-[16/10]">
                     {item.mediaType === 'video' ? (
                       <video
-                        className="feature-media-item astro-hkzvdn3m"
+                        className="feature-media-item astro-hkzvdn3m w-full h-full object-cover"
                         autoPlay
                         muted
                         loop
@@ -65,11 +65,12 @@ export default function FeatureExplorerSection() {
                       </video>
                     ) : (
                       <img
-                        className="feature-image astro-hkzvdn3m"
+                        className="feature-image astro-hkzvdn3m w-full h-full object-cover"
                         src={item.mediaSrc}
                         alt={item.title}
-                        width="736"
-                        height="750"
+                        width="1282"
+                        height="801"
+                        loading="lazy"
                       />
                     )}
                   </div>

@@ -1,6 +1,32 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 @import "@const/ui/globals.css";
 
+/* Google Symbols & Ligature Fallback */
+@font-face {
+  font-family: 'Google Symbols';
+  font-style: normal;
+  font-weight: 100 700;
+  font-display: block;
+  src: url(/fonts/HhyNU5Ak9u-oMExPeInvcuEmPpEJ.ttf) format('truetype');
+}
+
+.symbol {
+  font-family: 'Google Symbols', sans-serif !important;
+  font-weight: normal;
+  font-style: normal;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  text-transform: none;
+  letter-spacing: normal;
+  word-wrap: normal;
+  white-space: nowrap;
+  direction: ltr;
+  -webkit-font-feature-settings: 'liga';
+  -webkit-font-smoothing: antialiased;
+}
+
 /* Const Design System — Studio Monochrome Theme Calibration (DESIGN.md) */
 :root {
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;

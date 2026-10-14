@@ -42,10 +42,10 @@ export default function Footer() {
             <h5>{t.footer.colPlatform}</h5>
             <ul>
               <li>
-                <Link href="#features">Desktop Powerhouse</Link>
+                <Link href="#features">Desktop</Link>
               </li>
               <li>
-                <Link href="#features">Mobile Companion</Link>
+                <Link href="#features">Mobile</Link>
               </li>
               <li>
                 <Link href="#features">Hyperframe Studio</Link>
