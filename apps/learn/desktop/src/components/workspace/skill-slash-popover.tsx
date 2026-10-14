@@ -131,23 +131,35 @@ export function SkillSlashPopover({
 }: SkillSlashPopoverProps) {
   const { t, language } = useI18n();
   const listRef = useRef<HTMLDivElement>(null);
-  const activeItemRef = useRef<HTMLButtonElement>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
 
-  // Auto scroll active item into view as user navigates
+  // Directly adjust viewport scroll position so the active item and its section header are always in view
   useEffect(() => {
-    if (selectedIndex === 0 && listRef.current) {
-      const scrollViewport = listRef.current.querySelector("[data-radix-scroll-area-viewport]");
-      if (scrollViewport) {
-        scrollViewport.scrollTop = 0;
-      }
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+
+    if (selectedIndex === 0) {
+      viewport.scrollTop = 0;
+      return;
     }
-    if (activeItemRef.current) {
-      activeItemRef.current.scrollIntoView({
-        block: "nearest",
-        behavior: "auto",
-      });
+
+    if (selectedIndex === skills.length - 1) {
+      viewport.scrollTop = viewport.scrollHeight;
+      return;
     }
-  }, [selectedIndex]);
+
+    const selectedEl = viewport.querySelector<HTMLElement>('[data-selected="true"]');
+    if (!selectedEl) return;
+
+    const vRect = viewport.getBoundingClientRect();
+    const elRect = selectedEl.getBoundingClientRect();
+
+    if (elRect.bottom > vRect.bottom) {
+      viewport.scrollTop += (elRect.bottom - vRect.bottom) + 28;
+    } else if (elRect.top < vRect.top) {
+      viewport.scrollTop -= (vRect.top - elRect.top) + 28;
+    }
+  }, [selectedIndex, skills.length]);
 
   const renderSection = (title: string, items: LocalSkill[]) => {
     if (items.length === 0) return null;
@@ -165,7 +177,7 @@ export function SkillSlashPopover({
             return (
               <button
                 key={skill.id}
-                ref={isSelected ? activeItemRef : undefined}
+                data-selected={isSelected ? "true" : "false"}
                 type="button"
                 onMouseDown={(e) => {
                   e.preventDefault();
@@ -244,7 +256,7 @@ export function SkillSlashPopover({
           )}
         </div>
       ) : (
-        <ScrollArea className="max-h-80 overflow-y-auto pr-1">
+        <ScrollArea viewportRef={viewportRef} className="max-h-80 pr-1">
           <div className="flex flex-col gap-0.5">
             {SKILL_SECTIONS.map((section) =>
               renderSection(

@@ -98,23 +98,35 @@ export function MentionPopover({
   className,
 }: MentionPopoverProps) {
   const listRef = useRef<HTMLDivElement>(null);
-  const activeItemRef = useRef<HTMLButtonElement>(null);
+  const viewportRef = useRef<HTMLDivElement>(null);
 
-  // Auto scroll active item into view as user navigates
+  // Directly adjust viewport scroll position so the active item is always in view
   useEffect(() => {
-    if (selectedIndex === 0 && listRef.current) {
-      const scrollViewport = listRef.current.querySelector("[data-radix-scroll-area-viewport]");
-      if (scrollViewport) {
-        scrollViewport.scrollTop = 0;
-      }
+    const viewport = viewportRef.current;
+    if (!viewport) return;
+
+    if (selectedIndex === 0) {
+      viewport.scrollTop = 0;
+      return;
     }
-    if (activeItemRef.current) {
-      activeItemRef.current.scrollIntoView({
-        block: "nearest",
-        behavior: "auto",
-      });
+
+    if (selectedIndex === candidates.length - 1) {
+      viewport.scrollTop = viewport.scrollHeight;
+      return;
     }
-  }, [selectedIndex]);
+
+    const selectedEl = viewport.querySelector<HTMLElement>('[data-selected="true"]');
+    if (!selectedEl) return;
+
+    const vRect = viewport.getBoundingClientRect();
+    const elRect = selectedEl.getBoundingClientRect();
+
+    if (elRect.bottom > vRect.bottom) {
+      viewport.scrollTop += (elRect.bottom - vRect.bottom) + 28;
+    } else if (elRect.top < vRect.top) {
+      viewport.scrollTop -= (vRect.top - elRect.top) + 28;
+    }
+  }, [selectedIndex, candidates.length]);
 
   // Group candidates into sections
   const sources = candidates.filter((c) => c.kind === "source");
@@ -141,7 +153,7 @@ export function MentionPopover({
             return (
               <button
                 key={candidate.id}
-                ref={isSelected ? activeItemRef : undefined}
+                data-selected={isSelected ? "true" : "false"}
                 type="button"
                 onMouseDown={(e) => {
                   e.preventDefault();
@@ -224,7 +236,7 @@ export function MentionPopover({
           )}
         </div>
       ) : (
-        <ScrollArea className="max-h-80 overflow-y-auto pr-1">
+        <ScrollArea viewportRef={viewportRef} className="max-h-80 pr-1">
           <div className="flex flex-col gap-0.5">
             {renderSection("Sources & Study Materials", sources)}
             {renderSection("Studio Artifacts", artifacts)}
