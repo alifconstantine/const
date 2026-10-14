@@ -203,6 +203,8 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
     const isComposingRef = useRef(false);
     const lastEmittedValueRef = useRef<string>(initialValue || "");
     const lastPropValueRef = useRef<string>(initialValue || "");
+    const lastMentionTokenRef = useRef<ActiveAtToken | null>(null);
+    const lastSlashTokenRef = useRef<ActiveSlashToken | null>(null);
 
     const saveSelection = useCallback(() => {
       const sel = window.getSelection();
@@ -213,6 +215,36 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
         }
       }
     }, []);
+
+    const emitMentionToken = useCallback(
+      (tok: ActiveAtToken | null) => {
+        const prev = lastMentionTokenRef.current;
+        const changed =
+          (!prev && !!tok) ||
+          (!!prev && !tok) ||
+          (!!prev && !!tok && (prev.query !== tok.query || prev.prefix !== tok.prefix || prev.quoted !== tok.quoted));
+        if (changed) {
+          lastMentionTokenRef.current = tok;
+          onMentionTokenChange?.(tok);
+        }
+      },
+      [onMentionTokenChange]
+    );
+
+    const emitSlashToken = useCallback(
+      (tok: ActiveSlashToken | null) => {
+        const prev = lastSlashTokenRef.current;
+        const changed =
+          (!prev && !!tok) ||
+          (!!prev && !tok) ||
+          (!!prev && !!tok && (prev.query !== tok.query || prev.prefix !== tok.prefix));
+        if (changed) {
+          lastSlashTokenRef.current = tok;
+          onSlashTokenChange?.(tok);
+        }
+      },
+      [onSlashTokenChange]
+    );
 
     const syncContent = useCallback(() => {
       if (!editorRef.current) return;
@@ -230,8 +262,8 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
 
       // Fast-path: If text does not contain '@' and does not contain '/', skip expensive DOM selection cloning
       if (!serialized.includes("@") && !serialized.includes("/")) {
-        onMentionTokenChange?.(null);
-        onSlashTokenChange?.(null);
+        emitMentionToken(null);
+        emitSlashToken(null);
         return;
       }
 
@@ -251,26 +283,26 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
             const textBeforeCaret = serializeContainer(tempContainer, true);
 
             const atToken = activeAtToken(textBeforeCaret, textBeforeCaret.length);
-            onMentionTokenChange?.(atToken);
+            emitMentionToken(atToken);
             if (!atToken) {
               const slashTok = activeSlashToken(textBeforeCaret, textBeforeCaret.length);
-              onSlashTokenChange?.(slashTok);
+              emitSlashToken(slashTok);
             } else {
-              onSlashTokenChange?.(null);
+              emitSlashToken(null);
             }
           } else {
-            onMentionTokenChange?.(null);
-            onSlashTokenChange?.(null);
+            emitMentionToken(null);
+            emitSlashToken(null);
           }
         } else {
-          onMentionTokenChange?.(null);
-          onSlashTokenChange?.(null);
+          emitMentionToken(null);
+          emitSlashToken(null);
         }
       } catch {
-        onMentionTokenChange?.(null);
-        onSlashTokenChange?.(null);
+        emitMentionToken(null);
+        emitSlashToken(null);
       }
-    }, [onSerializedChange, onMentionTokenChange, onSlashTokenChange]);
+    }, [onSerializedChange, emitMentionToken, emitSlashToken]);
 
     useImperativeHandle(
       ref,
@@ -286,6 +318,8 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
             editorRef.current.innerHTML = "";
             setIsEmpty(true);
             lastEmittedValueRef.current = "";
+            lastMentionTokenRef.current = null;
+            lastSlashTokenRef.current = null;
             onSerializedChange?.("");
             onMentionTokenChange?.(null);
             onSlashTokenChange?.(null);
@@ -405,6 +439,7 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
 
           saveSelection();
           syncContent();
+          lastSlashTokenRef.current = null;
           onSlashTokenChange?.(null);
         },
         insertText: (text: string) => {
@@ -487,6 +522,7 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
 
           saveSelection();
           syncContent();
+          lastMentionTokenRef.current = null;
           onMentionTokenChange?.(null);
         },
         drillDirectory: (candidate: MentionCandidate) => {
@@ -605,7 +641,22 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
             saveSelection();
             syncContent();
           }}
-          onKeyUp={() => {
+          onKeyUp={(e) => {
+            if (
+              e.key === "ArrowUp" ||
+              e.key === "ArrowDown" ||
+              e.key === "ArrowLeft" ||
+              e.key === "ArrowRight" ||
+              e.key === "Escape" ||
+              e.key === "Enter" ||
+              e.key === "Tab" ||
+              e.key === "Shift" ||
+              e.key === "Control" ||
+              e.key === "Alt" ||
+              e.key === "Meta"
+            ) {
+              return;
+            }
             saveSelection();
             syncContent();
           }}

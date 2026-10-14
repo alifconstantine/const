@@ -99,6 +99,17 @@ export function MentionPopover({
 }: MentionPopoverProps) {
   const listRef = useRef<HTMLDivElement>(null);
   const viewportRef = useRef<HTMLDivElement>(null);
+  const lastMousePosRef = useRef({ x: 0, y: 0 });
+
+  const handleMouseMove = (e: React.MouseEvent, index: number) => {
+    if (
+      Math.abs(e.clientX - lastMousePosRef.current.x) > 2 ||
+      Math.abs(e.clientY - lastMousePosRef.current.y) > 2
+    ) {
+      lastMousePosRef.current = { x: e.clientX, y: e.clientY };
+      onHover(index);
+    }
+  };
 
   // Directly adjust viewport scroll position so the active item is always in view
   useEffect(() => {
@@ -159,7 +170,7 @@ export function MentionPopover({
                   e.preventDefault();
                   onSelect(candidate);
                 }}
-                onMouseEnter={() => onHover(globalIndex)}
+                onMouseMove={(e) => handleMouseMove(e, globalIndex)}
                 className={cn(
                   "flex items-center gap-2.5 px-3 py-1.5 rounded-xl text-left transition-colors duration-100 font-sans group select-none w-full",
                   isSelected

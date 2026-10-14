@@ -711,6 +711,37 @@ export function ChatPanel({
   const [mentionIndex, setMentionIndex] = useState(0);
   const [workspaceFiles, setWorkspaceFiles] = useState<WorkspaceFileEntry[]>([]);
 
+  const prevMentionQueryRef = useRef<string | null>(null);
+  const prevSlashQueryRef = useRef<string | null>(null);
+
+  const handleMentionTokenChange = useCallback((tok: ActiveAtToken | null) => {
+    setMentionToken(tok);
+    if (!tok) {
+      prevMentionQueryRef.current = null;
+      setMentionIndex(0);
+    } else {
+      const q = `${tok.prefix}:${tok.query}:${tok.quoted ? "1" : "0"}`;
+      if (prevMentionQueryRef.current !== q) {
+        prevMentionQueryRef.current = q;
+        setMentionIndex(0);
+      }
+    }
+  }, []);
+
+  const handleSlashTokenChange = useCallback((tok: ActiveSlashToken | null) => {
+    setSlashToken(tok);
+    if (!tok) {
+      prevSlashQueryRef.current = null;
+      setSlashIndex(0);
+    } else {
+      const q = `${tok.prefix}:${tok.query}`;
+      if (prevSlashQueryRef.current !== q) {
+        prevSlashQueryRef.current = q;
+        setSlashIndex(0);
+      }
+    }
+  }, []);
+
   // Fetch workspace files for @mention candidates
   useEffect(() => {
     let isMounted = true;
@@ -4134,14 +4165,8 @@ export function ChatPanel({
                   }
                   disabled={isStreaming || editingMessageId !== null}
                   onSerializedChange={handleInputChange}
-                  onMentionTokenChange={(tok) => {
-                    setMentionToken(tok);
-                    setMentionIndex(0);
-                  }}
-                  onSlashTokenChange={(tok) => {
-                    setSlashToken(tok);
-                    setSlashIndex(0);
-                  }}
+                  onMentionTokenChange={handleMentionTokenChange}
+                  onSlashTokenChange={handleSlashTokenChange}
                   onOpenSourcePreview={handleCitationClick}
                   onOpenArtifactPreview={onOpenStudioArtifact}
                   onSend={() => {
