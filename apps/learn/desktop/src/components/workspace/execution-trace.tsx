@@ -248,11 +248,21 @@ export function ExecutionTrace({
 
               // A. Socratic Question (ask_question)
               if (norm === "askquestion" || norm === "question") {
+                if (!step.result && (step as any).status !== "completed") {
+                  return (
+                    <div
+                      key={step.id || `q_${idx}`}
+                      className="flex items-center gap-2 py-0.5 text-[13px] text-muted-foreground font-sans select-none"
+                    >
+                      <HelpCircle className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                      <span>Asking questions</span>
+                    </div>
+                  );
+                }
                 return (
                   <AskedQuestionsTraceItem
                     key={step.id || `q_${idx}`}
                     step={step}
-                    onAnswer={onAnswerQuestion}
                   />
                 );
               }
@@ -1160,16 +1170,10 @@ function FileMutationCard({
 // ---------------------------------------------------------------------------
 function AskedQuestionsTraceItem({
   step,
-  onAnswer,
 }: {
   step: TraceStep | DisplayToolCall;
-  onAnswer?: (toolCallId: string, answer: any) => void;
 }) {
-  const { t } = useI18n();
   const [isOpen, setIsOpen] = useState(true);
-  const [customInput, setCustomInput] = useState("");
-  const [selectedOption, setSelectedOption] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
   let rawQuestions: any[] = [];
   if (step.args) {
@@ -1184,10 +1188,9 @@ function AskedQuestionsTraceItem({
       (Array.isArray(parsedArgs) ? parsedArgs : [parsedArgs]);
   }
 
-  const isCompleted = Boolean(step.result || (step as any).status === "completed");
-
-  // Parse Q&A pairs for completed questions
+  // Parse Q&A pairs
   const qaPairs: Array<{ question: string; answer: string }> = [];
+
   let result = step.result;
   if (typeof result === "string") {
     try {
@@ -1198,15 +1201,27 @@ function AskedQuestionsTraceItem({
   if (Array.isArray(result)) {
     result.forEach((item, idx) => {
       if (item && typeof item === "object" && item.question && item.answer) {
-        qaPairs.push({ question: String(item.question), answer: String(item.answer) });
+        const ans =
+          typeof item.answer === "object" && item.answer !== null
+            ? String(item.answer.label || item.answer.value || JSON.stringify(item.answer))
+            : String(item.answer);
+        qaPairs.push({ question: String(item.question), answer: ans });
       } else {
         const qText = rawQuestions[idx]?.question || `Question ${idx + 1}`;
-        qaPairs.push({ question: qText, answer: String(item) });
+        const ans =
+          typeof item === "object" && item !== null
+            ? String(item.label || item.value || JSON.stringify(item))
+            : String(item);
+        qaPairs.push({ question: qText, answer: ans });
       }
     });
   } else if (result && typeof result === "object") {
     Object.entries(result).forEach(([k, v]) => {
-      qaPairs.push({ question: k, answer: String(v) });
+      const vText =
+        typeof v === "object" && v !== null
+          ? String((v as any).label || (v as any).value || JSON.stringify(v))
+          : String(v);
+      qaPairs.push({ question: k, answer: vText });
     });
   } else if (result) {
     const qText = rawQuestions[0]?.question || "Question";
@@ -1214,30 +1229,6 @@ function AskedQuestionsTraceItem({
   }
 
   const questionCount = qaPairs.length || rawQuestions.length || 1;
-
-  const handleSelect = async (opt: string) => {
-    if (isCompleted || isSubmitting || !onAnswer) return;
-    setSelectedOption(opt);
-    setIsSubmitting(true);
-    try {
-      await onAnswer(step.id, opt);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handleCustomSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const trimmed = customInput.trim();
-    if (!trimmed || isCompleted || isSubmitting || !onAnswer) return;
-    setSelectedOption(trimmed);
-    setIsSubmitting(true);
-    try {
-      await onAnswer(step.id, trimmed);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
 
   return (
     <div className="flex flex-col w-full min-w-0 my-0.5 font-sans select-none">
@@ -1248,9 +1239,7 @@ function AskedQuestionsTraceItem({
       >
         <HelpCircle className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
         <span>
-          {isCompleted
-            ? `Asked ${questionCount} question${questionCount > 1 ? "s" : ""}`
-            : "Asking questions"}
+          Asked {questionCount} question{questionCount > 1 ? "s" : ""}
         </span>
         <ChevronDown
           className="w-3.5 h-3.5 text-muted-foreground transition-transform duration-200 ease-out"
@@ -1260,76 +1249,16 @@ function AskedQuestionsTraceItem({
 
       <SmoothCollapse isOpen={isOpen}>
         <div className="pt-1.5 pb-2 pl-5 space-y-2 select-text font-sans">
-          {isCompleted ? (
-            qaPairs.map((pair, idx) => (
-              <div key={idx} className="space-y-0.5 text-left">
-                <div className="font-semibold text-[12.5px] text-foreground leading-snug">
-                  {pair.question}
-                </div>
-                <div className="text-[12px] text-muted-foreground leading-snug">
-                  {pair.answer}
-                </div>
+          {qaPairs.map((pair, idx) => (
+            <div key={idx} className="space-y-0.5 text-left">
+              <div className="font-semibold text-[12.5px] text-foreground leading-snug">
+                {pair.question}
               </div>
-            ))
-          ) : (
-            <div className="space-y-2 text-left">
-              {rawQuestions.map((qObj, qIdx) => {
-                const questionText = qObj?.question || "Bagaimana kita ingin melanjutkan?";
-                const options: string[] = Array.isArray(qObj?.options) ? qObj.options : [];
-                return (
-                  <div key={qIdx} className="space-y-2">
-                    <div className="font-semibold text-[12.5px] text-foreground leading-snug">
-                      {questionText}
-                    </div>
-                    {options.length > 0 && (
-                      <div className="space-y-1.5">
-                        {options.map((opt, oIdx) => (
-                          <button
-                            key={oIdx}
-                            type="button"
-                            disabled={isSubmitting}
-                            onClick={() => handleSelect(opt)}
-                            className={cn(
-                              "w-full text-left p-2 rounded-lg border transition-all text-xs font-medium flex items-center justify-between cursor-pointer",
-                              selectedOption === opt
-                                ? "bg-primary/20 border-primary text-primary"
-                                : "bg-card hover:bg-muted border-border text-foreground"
-                            )}
-                          >
-                            <div className="flex items-center gap-2">
-                              <span className="w-4 h-4 rounded-full bg-muted text-muted-foreground flex items-center justify-center text-[9px] font-sans tabular-nums">
-                                {oIdx + 1}
-                              </span>
-                              <span>{opt}</span>
-                            </div>
-                            <ArrowRight className="h-3 w-3 text-muted-foreground opacity-70" />
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-
-              <form onSubmit={handleCustomSubmit} className="pt-1 flex gap-2">
-                <input
-                  type="text"
-                  value={customInput}
-                  onChange={(e) => setCustomInput(e.target.value)}
-                  disabled={isSubmitting}
-                  placeholder={t("customAnswerPlaceholder")}
-                  className="flex-1 bg-card border border-border rounded-lg px-3 py-1.5 text-xs text-foreground placeholder:text-muted-foreground/60 outline-none focus:border-primary transition-all"
-                />
-                <button
-                  type="submit"
-                  disabled={!customInput.trim() || isSubmitting}
-                  className="px-3 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-primary-foreground disabled:opacity-40 transition-all flex items-center justify-center cursor-pointer shadow-xs"
-                >
-                  <Send className="h-3 w-3" />
-                </button>
-              </form>
+              <div className="text-[12px] text-muted-foreground leading-snug">
+                {pair.answer}
+              </div>
             </div>
-          )}
+          ))}
         </div>
       </SmoothCollapse>
     </div>

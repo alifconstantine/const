@@ -33,6 +33,42 @@ export interface DisplayToolCall {
 // ---------------------------------------------------------------------------
 // 1. Socratic Question Card (ask_question)
 // ---------------------------------------------------------------------------
+export interface SocraticOptionItem {
+  label: string;
+  description?: string;
+  isRecommended?: boolean;
+  value: string;
+}
+
+export function parseSocraticOption(opt: any, index: number): SocraticOptionItem {
+  if (typeof opt === "string") {
+    const isRec = opt.toLowerCase().includes("recommended");
+    const cleanLabel = opt.replace(/\(Recommended\)/i, "").trim();
+    return {
+      label: cleanLabel || opt,
+      value: opt,
+      isRecommended: isRec,
+    };
+  }
+  if (opt && typeof opt === "object") {
+    const label = String(opt.label || opt.value || opt.title || opt.text || "");
+    const cleanLabel = label.replace(/\(Recommended\)/i, "").trim();
+    const isRec = Boolean(opt.recommended || opt.isRecommended) || label.toLowerCase().includes("recommended");
+    const description = typeof opt.description === "string" ? opt.description : undefined;
+    return {
+      label: cleanLabel || label || `Option ${index + 1}`,
+      description,
+      isRecommended: isRec,
+      value: label || cleanLabel || `Option ${index + 1}`,
+    };
+  }
+  return {
+    label: String(opt ?? `Option ${index + 1}`),
+    value: String(opt ?? `Option ${index + 1}`),
+    isRecommended: false,
+  };
+}
+
 interface SocraticQuestionCardProps {
   toolCall: DisplayToolCall;
   onAnswer: (toolCallId: string, answer: string) => void;
@@ -49,11 +85,15 @@ export function SocraticQuestionCard({ toolCall, onAnswer }: SocraticQuestionCar
     toolCall.args?.questions?.[0]?.question ||
     t("howToProceedFallback");
 
-  const rawOptions: string[] = Array.isArray(toolCall.args?.options)
+  const rawOptionsList = Array.isArray(toolCall.args?.options)
     ? toolCall.args.options
     : Array.isArray(toolCall.args?.questions?.[0]?.options)
     ? toolCall.args.questions[0].options
     : [];
+
+  const normalizedOptions: SocraticOptionItem[] = rawOptionsList.map(
+    (opt: any, idx: number) => parseSocraticOption(opt, idx)
+  );
 
   const allowCustom = toolCall.args?.allow_custom !== false;
   const isCompleted = toolCall.status === "completed" || Boolean(toolCall.result);
@@ -126,7 +166,11 @@ export function SocraticQuestionCard({ toolCall, onAnswer }: SocraticQuestionCar
               <strong className="text-emerald-400">
                 {typeof toolCall.result === "string"
                   ? toolCall.result
-                  : selectedOption || JSON.stringify(toolCall.result)}
+                  : selectedOption
+                  ? String(selectedOption)
+                  : typeof toolCall.result === "object" && toolCall.result !== null
+                  ? String(toolCall.result.label || toolCall.result.value || JSON.stringify(toolCall.result))
+                  : String(toolCall.result ?? "")}
               </strong>
             </span>
           </div>
@@ -134,25 +178,41 @@ export function SocraticQuestionCard({ toolCall, onAnswer }: SocraticQuestionCar
       ) : (
         /* Active Options Selection */
         <div className="space-y-2 pt-1">
-          {rawOptions.map((opt, idx) => (
+          {normalizedOptions.map((optItem, idx) => (
             <button
               key={idx}
               type="button"
               disabled={isSubmitting}
-              onClick={() => handleSelectOption(opt)}
+              onClick={() => handleSelectOption(optItem.value)}
               className={`w-full text-left p-3 rounded-xl border transition-all text-xs font-medium flex items-center justify-between group cursor-pointer ${
-                selectedOption === opt
+                selectedOption === optItem.value
                   ? "bg-sky-500/20 border-sky-400 text-sky-200"
                   : "bg-background/60 hover:bg-sky-500/10 border-border/60 hover:border-sky-500/40 text-foreground active:scale-99"
               }`}
             >
-              <div className="flex items-center gap-2.5">
-                <span className="w-5 h-5 rounded-full bg-muted/80 text-muted-foreground group-hover:bg-sky-500 group-hover:text-white flex items-center justify-center text-[10px] font-sans tabular-nums font-medium transition-colors">
+              <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                <span className="w-5 h-5 rounded-full bg-muted/80 text-muted-foreground group-hover:bg-sky-500 group-hover:text-white flex items-center justify-center text-[10px] font-sans tabular-nums font-medium transition-colors shrink-0 mt-0.5">
                   {idx + 1}
                 </span>
-                <span>{opt}</span>
+                <div className="flex flex-col min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-foreground group-hover:text-sky-300 transition-colors font-medium">
+                      {optItem.label}
+                    </span>
+                    {optItem.isRecommended && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-400 font-sans font-medium">
+                        {t("recommended") || "Recommended"}
+                      </span>
+                    )}
+                  </div>
+                  {optItem.description && (
+                    <span className="text-[11px] text-muted-foreground leading-relaxed mt-0.5">
+                      {optItem.description}
+                    </span>
+                  )}
+                </div>
               </div>
-              <ArrowRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+              <ArrowRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0 ml-2" />
             </button>
           ))}
 

@@ -79,6 +79,7 @@ import { MarkdownContent } from "./markdown-content";
 import { SourcePreviewDialog } from "./source-preview-dialog";
 import { ImageLightbox } from "./image-lightbox";
 import { ApprovalCard } from "./approval-card";
+import { QuestionCard, type QuestionItem } from "./question-card";
 import type { ApprovalRequestData, ApprovalDecision } from "../../vite-env";
 import { RichMentionEditor, type RichMentionEditorRef } from "./rich-mention-editor";
 import { MentionPopover } from "./mention-popover";
@@ -312,6 +313,7 @@ export function ChatPanel({
 
   // Observe container width for adaptive responsive UI (heading & chat input)
   const panelRef = useRef<HTMLElement>(null);
+  const [panelWidth, setPanelWidth] = useState<number>(0);
   const [isCompact, setIsCompact] = useState<boolean>(false);
 
   useEffect(() => {
@@ -320,6 +322,7 @@ export function ChatPanel({
       for (const entry of entries) {
         const width = entry.contentRect.width;
         if (width > 0) {
+          setPanelWidth(width);
           const compact = width < 480;
           setIsCompact((prev) => (prev !== compact ? compact : prev));
         }
@@ -374,6 +377,10 @@ export function ChatPanel({
   permissionModeRef.current = permissionMode;
   const [activeApproval, setActiveApproval] = useState<ApprovalRequestData | null>(null);
   const [isRespondingApproval, setIsRespondingApproval] = useState(false);
+  const [activeQuestion, setActiveQuestion] = useState<{
+    toolCallId: string;
+    questions: QuestionItem[];
+  } | null>(null);
 
   // Attachments state (max 5 media/files)
   const MAX_ATTACHMENTS = 5;
@@ -858,6 +865,8 @@ export function ChatPanel({
   const activeSessionIdRef = useRef<string | null>(activeSessionId);
   useEffect(() => {
     activeSessionIdRef.current = activeSessionId;
+    setActiveApproval(null);
+    setActiveQuestion(null);
     if (learnId && activeSessionId) {
       try {
         localStorage.setItem(`const_learn_active_session_${learnId}`, activeSessionId);
@@ -1200,21 +1209,46 @@ export function ChatPanel({
           }
           updated.traceSteps = steps;
         } else if (event.type === "ask_question") {
+          const rawQuestionsList =
+            event.questions ||
+            (Array.isArray(event.questionData?.questions)
+              ? event.questionData.questions
+              : event.question || event.questionData?.question
+              ? [
+                  {
+                    question: event.question || event.questionData?.question,
+                    options: event.options || event.questionData?.options || [],
+                    category: event.category || event.questionData?.category,
+                  },
+                ]
+              : []);
+
+          const questionsList: QuestionItem[] = (rawQuestionsList as any[]).map((q: any, qIdx: number) => ({
+            id: String(q.id || `q_${qIdx}_${Date.now()}`),
+            question: String(q.question || q.prompt || "Bagaimana kita ingin melanjutkan?"),
+            category: q.category,
+            options: Array.isArray(q.options) ? q.options : [],
+            is_multi_select: Boolean(q.is_multi_select),
+          }));
+
+          const effectiveQuestions = questionsList.length > 0 ? questionsList : [
+            {
+              question: "Bagaimana kita ingin melanjutkan?",
+              options: [],
+            },
+          ];
+
+          setActiveQuestion({
+            toolCallId: event.toolCallId,
+            questions: effectiveQuestions,
+          });
+
           const toolCalls = [...(updated.toolCalls || [])];
           const existingIdx = toolCalls.findIndex((tc) => tc.id === event.toolCallId);
           const qArgs = {
-            question:
-              event.question ||
-              event.questionData?.question ||
-              event.questions?.[0]?.question ||
-              "Bagaimana kita ingin melanjutkan?",
-            options:
-              event.options ||
-              event.questionData?.options ||
-              event.questions?.[0]?.options ||
-              [],
-            allow_custom:
-              event.allow_custom ?? event.questionData?.allow_custom ?? true,
+            questions: effectiveQuestions,
+            question: effectiveQuestions[0]?.question,
+            options: effectiveQuestions[0]?.options || [],
           };
           if (existingIdx >= 0) {
             toolCalls[existingIdx] = {
@@ -1382,6 +1416,7 @@ export function ChatPanel({
           }
         } else if (event.type === "error") {
           setActiveApproval(null);
+          setActiveQuestion(null);
           const defaultError = language === "id"
             ? "Terjadi kesalahan saat memproses permintaan."
             : "An error occurred while processing the request.";
@@ -1414,6 +1449,7 @@ export function ChatPanel({
           }
         } else if (event.type === "done") {
           setActiveApproval(null);
+          setActiveQuestion(null);
           if (event.fullContent && !updated.content) {
             updated.content = event.fullContent;
           } else if (!updated.content && updated.toolCalls && updated.toolCalls.length > 0) {
@@ -1581,6 +1617,7 @@ export function ChatPanel({
     if ((!textToSend && currentAttachmentsRaw.length === 0) || isStreaming) return;
 
     setActiveApproval(null);
+    setActiveQuestion(null);
 
     if (!textToSend && currentAttachmentsRaw.length > 0) {
       textToSend = t("analyzeAttachedMediaPrompt");
@@ -2168,6 +2205,8 @@ export function ChatPanel({
     if (electron?.agent?.abort) {
       await electron.agent.abort();
     }
+    setActiveApproval(null);
+    setActiveQuestion(null);
     setIsStreaming(false);
     setMessages((prev) =>
       prev.map((msg) => (msg.isStreaming ? { ...msg, isStreaming: false } : msg))
@@ -2360,11 +2399,12 @@ export function ChatPanel({
   };
 
   const handleAnswerQuestion = async (toolCallId: string, answer: any) => {
+    setActiveQuestion(null);
     const stringified = typeof answer === "string" ? answer : JSON.stringify(answer);
     setMessages((prev) => {
       return prev.map((msg) => {
-        if (!msg.toolCalls || msg.toolCalls.length === 0) return msg;
-        const updatedTc = msg.toolCalls.map((tc) => {
+        if (!msg.toolCalls && !msg.traceSteps) return msg;
+        const updatedTc = (msg.toolCalls || []).map((tc) => {
           if (tc.id === toolCallId) {
             return {
               ...tc,
@@ -2374,7 +2414,17 @@ export function ChatPanel({
           }
           return tc;
         });
-        return { ...msg, toolCalls: updatedTc };
+        const updatedSteps = (msg.traceSteps || []).map((step) => {
+          if (step.id === toolCallId || step.toolCallId === toolCallId) {
+            return {
+              ...step,
+              status: "completed" as const,
+              result: answer,
+            };
+          }
+          return step;
+        });
+        return { ...msg, toolCalls: updatedTc, traceSteps: updatedSteps };
       });
     });
 
@@ -3948,7 +3998,14 @@ export function ChatPanel({
 
       {/* Sticky Bottom Chat Input Container */}
       <div className={cn("shrink-0 max-w-3xl mx-auto w-full font-sans relative z-30", isCompact ? "p-2.5 sm:p-3" : "p-4 sm:p-5")}>
-        {activeApproval ? (
+        {activeQuestion ? (
+          <QuestionCard
+            toolCallId={activeQuestion.toolCallId}
+            questions={activeQuestion.questions}
+            onAnswer={handleAnswerQuestion}
+            onDismiss={() => handleAnswerQuestion(activeQuestion.toolCallId, "Dismissed")}
+          />
+        ) : activeApproval ? (
           <ApprovalCard
             request={activeApproval}
             isResponding={isRespondingApproval}
@@ -4118,104 +4175,117 @@ export function ChatPanel({
         )}
 
         {/* Active Conversation Footer Telemetry Bar */}
-        {conversationMetrics && (
-          <div className="w-full flex items-center justify-center gap-2 pt-2 pb-0.5 select-none flex-wrap">
-            {/* Pill 1: Session statistics (Gauge) */}
-            <Popover>
-              <PopoverTrigger asChild>
-                <button
-                  type="button"
-                  className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-sans text-muted-foreground hover:text-foreground hover:bg-muted/50 data-[state=open]:bg-muted/50 data-[state=open]:text-foreground transition-colors select-none cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/40"
-                  title="Session statistics"
+        {conversationMetrics && (() => {
+          const isTelemetryCompact = isCompact || (panelWidth > 0 && panelWidth < 520);
+          return (
+            <div className="w-full flex items-center justify-center gap-1.5 pt-2 pb-0.5 select-none flex-nowrap">
+              {/* Pill 1: Session statistics (Gauge) */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    className={cn(
+                      "inline-flex items-center rounded-full text-[11px] font-sans text-muted-foreground hover:text-foreground hover:bg-muted/50 data-[state=open]:bg-muted/50 data-[state=open]:text-foreground transition-colors select-none cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/40 shrink-0",
+                      isTelemetryCompact ? "h-6 w-6 justify-center p-0" : "gap-1.5 px-2 py-0.5"
+                    )}
+                    title={`Session statistics: ${conversationMetrics.turns} turns ${conversationMetrics.steps} steps · ${conversationMetrics.tokPerSec} tok/s`}
+                  >
+                    <Gauge className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+                    {!isTelemetryCompact && (
+                      <span>
+                        {conversationMetrics.turns} turns {conversationMetrics.steps} steps · {conversationMetrics.tokPerSec} tok/s
+                      </span>
+                    )}
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent
+                  side="top"
+                  align="center"
+                  sideOffset={8}
+                  className="w-72 sm:w-80 p-3.5 rounded-xl bg-popover/95 backdrop-blur-md border border-border/80 shadow-2xl z-50 font-sans"
                 >
-                  <Gauge className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
-                  <span>
-                    {conversationMetrics.turns} turns {conversationMetrics.steps} steps · {conversationMetrics.tokPerSec} tok/s
-                  </span>
-                </button>
-              </PopoverTrigger>
-              <PopoverContent
-                side="top"
-                align="center"
-                sideOffset={8}
-                className="w-72 sm:w-80 p-3.5 rounded-xl bg-popover/95 backdrop-blur-md border border-border/80 shadow-2xl z-50 font-sans"
-              >
-                <div className="flex items-center gap-2 mb-3">
-                  <Gauge className="w-4 h-4 text-muted-foreground shrink-0" />
-                  <span className="font-medium text-[13px] text-foreground">Session statistics</span>
-                </div>
-                <div className="space-y-2 text-[12.5px] font-sans">
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">LLM time</span>
-                    <span className="tabular-nums text-foreground">{formatDurationDisplay(conversationMetrics.llmDurationMs)}</span>
+                  <div className="flex items-center gap-2 mb-3">
+                    <Gauge className="w-4 h-4 text-muted-foreground shrink-0" />
+                    <span className="font-medium text-[13px] text-foreground">Session statistics</span>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Tool time</span>
-                    <span className="tabular-nums text-foreground">{formatDurationDisplay(conversationMetrics.toolDurationMs)}</span>
+                  <div className="space-y-2 text-[12.5px] font-sans">
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">LLM time</span>
+                      <span className="tabular-nums text-foreground">{formatDurationDisplay(conversationMetrics.llmDurationMs)}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Tool time</span>
+                      <span className="tabular-nums text-foreground">{formatDurationDisplay(conversationMetrics.toolDurationMs)}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Avg time to first token (TTFT)</span>
+                      <span className="tabular-nums text-foreground">{conversationMetrics.ttftSeconds.toFixed(1)}s</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Tokens per second (TPS)</span>
+                      <span className="tabular-nums text-foreground">{conversationMetrics.tokPerSec} tok/s</span>
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Avg time to first token (TTFT)</span>
-                    <span className="tabular-nums text-foreground">{conversationMetrics.ttftSeconds.toFixed(1)}s</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Tokens per second (TPS)</span>
-                    <span className="tabular-nums text-foreground">{conversationMetrics.tokPerSec} tok/s</span>
-                  </div>
-                </div>
-              </PopoverContent>
-            </Popover>
+                </PopoverContent>
+              </Popover>
 
-            {/* Pill 2: Token usage (Database) */}
-            <Popover>
-              <PopoverTrigger asChild>
-                <button
-                  type="button"
-                  className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-sans text-muted-foreground hover:text-foreground hover:bg-muted/50 data-[state=open]:bg-muted/50 data-[state=open]:text-foreground transition-colors select-none cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/40"
-                  title="Token usage"
+              {/* Pill 2: Token usage (Database) */}
+              <Popover>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    className={cn(
+                      "inline-flex items-center rounded-full text-[11px] font-sans text-muted-foreground hover:text-foreground hover:bg-muted/50 data-[state=open]:bg-muted/50 data-[state=open]:text-foreground transition-colors select-none cursor-pointer focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/40 shrink-0",
+                      isTelemetryCompact ? "h-6 w-6 justify-center p-0" : "gap-1.5 px-2 py-0.5"
+                    )}
+                    title={`Token usage: ${formatTokenDisplay(conversationMetrics.totalTokens)} tok · Cache hit ${conversationMetrics.cacheHitRate}%`}
+                  >
+                    <Database className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
+                    {!isTelemetryCompact && (
+                      <span>
+                        {formatTokenDisplay(conversationMetrics.totalTokens)} tok · Cache hit {conversationMetrics.cacheHitRate}%
+                      </span>
+                    )}
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent
+                  side="top"
+                  align="center"
+                  sideOffset={8}
+                  className="w-72 sm:w-80 p-3.5 rounded-xl bg-popover/95 backdrop-blur-md border border-border/80 shadow-2xl z-50 font-sans"
                 >
-                  <Database className="w-3.5 h-3.5 shrink-0 text-muted-foreground" />
-                  <span>
-                    {formatTokenDisplay(conversationMetrics.totalTokens)} tok · Cache hit {conversationMetrics.cacheHitRate}%
-                  </span>
-                </button>
-              </PopoverTrigger>
-              <PopoverContent
-                side="top"
-                align="center"
-                sideOffset={8}
-                className="w-72 sm:w-80 p-3.5 rounded-xl bg-popover/95 backdrop-blur-md border border-border/80 shadow-2xl z-50 font-sans"
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <Database className="w-4 h-4 text-muted-foreground shrink-0" />
-                    <span className="font-medium text-[13px] text-foreground">Token usage</span>
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <Database className="w-4 h-4 text-muted-foreground shrink-0" />
+                      <span className="font-medium text-[13px] text-foreground">Token usage</span>
+                    </div>
+                    <span className="tabular-nums font-medium text-foreground text-[13px]">
+                      {conversationMetrics.totalTokens.toLocaleString()} tok
+                    </span>
                   </div>
-                  <span className="tabular-nums font-medium text-foreground text-[13px]">
-                    {conversationMetrics.totalTokens.toLocaleString()} tok
-                  </span>
-                </div>
-                <div className="space-y-2 text-[12.5px] font-sans">
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Cache hit</span>
-                    <span className="tabular-nums text-foreground">{conversationMetrics.cacheHitRate}%</span>
+                  <div className="space-y-2 text-[12.5px] font-sans">
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Cache hit</span>
+                      <span className="tabular-nums text-foreground">{conversationMetrics.cacheHitRate}%</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Uncached input</span>
+                      <span className="tabular-nums text-foreground">{conversationMetrics.uncachedInputTokens.toLocaleString()} tok</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Cached input</span>
+                      <span className="tabular-nums text-foreground">{conversationMetrics.cachedInputTokens.toLocaleString()} tok</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">Output</span>
+                      <span className="tabular-nums text-foreground">{conversationMetrics.outputTokens.toLocaleString()} tok</span>
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Uncached input</span>
-                    <span className="tabular-nums text-foreground">{conversationMetrics.uncachedInputTokens.toLocaleString()} tok</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Cached input</span>
-                    <span className="tabular-nums text-foreground">{conversationMetrics.cachedInputTokens.toLocaleString()} tok</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">Output</span>
-                    <span className="tabular-nums text-foreground">{conversationMetrics.outputTokens.toLocaleString()} tok</span>
-                  </div>
-                </div>
-              </PopoverContent>
-            </Popover>
-          </div>
-        )}
+                </PopoverContent>
+              </Popover>
+            </div>
+          );
+        })()}
       </div>
 
       {/* Slide-over Chat History Panel */}

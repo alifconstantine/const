@@ -638,12 +638,12 @@ export function RightPane({
               </div>
             </div>
 
-        {/* Main Body based on Active Menu with smooth fade */}
-        <div className="flex-1 flex flex-col min-h-0 relative overflow-hidden">
+        {/* Main Body based on Active Menu */}
+        <div className="flex-1 flex flex-col min-h-0 relative overflow-hidden bg-card">
           {/* Studio Content */}
           <div
             className={cn(
-              "flex-1 flex flex-col min-h-0 select-none",
+              "flex-1 flex flex-col min-h-0 select-none bg-card relative z-10",
               mode === "studio" ? "flex" : "hidden"
             )}
             style={{ display: mode === "studio" ? "flex" : "none" }}
@@ -971,11 +971,10 @@ export function RightPane({
           {/* Review Sidepanel (Persistent Stack keeping tabs mounted) */}
           <div
             className={cn(
-              "flex-1 w-full h-full min-h-0 flex flex-col overflow-hidden bg-background animate-in fade-in duration-200",
-              mode === "preview"
-                ? "flex"
-                : "invisible pointer-events-none absolute inset-0 -z-10"
+              "flex-1 w-full h-full min-h-0 flex flex-col overflow-hidden bg-background",
+              mode === "preview" ? "flex" : "hidden"
             )}
+            style={{ display: mode === "preview" ? "flex" : "none" }}
           >
             {/* Harness Tab Header with +, Search Dropdown, Drag & Drop */}
             <TabHeader
