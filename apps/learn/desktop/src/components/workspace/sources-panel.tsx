@@ -95,7 +95,7 @@ export function SourcesPanel({
 
   const filteredSources = searchQuery.trim()
     ? sources.filter((s) =>
-        s.title.toLowerCase().includes(searchQuery.toLowerCase().trim())
+        (s?.title || "").toLowerCase().includes(searchQuery.toLowerCase().trim())
       )
     : sources;
 

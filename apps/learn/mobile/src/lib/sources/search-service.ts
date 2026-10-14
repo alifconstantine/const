@@ -1,6 +1,6 @@
 /**
  * Web Search Service for Const Learn Mobile.
- * Powered by Const Router AI Gateway (router.const.web.id) backed by Exa AI.
+ * Powered by Const Search with native DuckDuckGo public fallback.
  * Supports both standard Fast Search and Deep Research mode,
  * as well as Web vs Academic Journal category filtering.
  */

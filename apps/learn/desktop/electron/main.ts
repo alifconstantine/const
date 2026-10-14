@@ -11,6 +11,7 @@ import {
   COMPOSIO_TOOL_MAP,
   getComposioToolBySlugOrId,
   registerGlobalBrowserToolHandler,
+  executeWebSearch,
   type AgentMessage,
   type FileMutationRecord,
   type NativeToolDefinition,
@@ -1299,6 +1300,14 @@ app.on("second-instance", (_event, commandLine) => {
         return { success: true, resolved };
       }
       return { success: false, error: "Active agent not found or resolveApproval not supported" };
+    }
+  );
+
+  ipcMain.handle(
+    "agent:web-search",
+    async (_event, { query, numResults }: { query: string; numResults?: number }) => {
+      const res = await executeWebSearch(query, numResults || 5);
+      return res;
     }
   );
 

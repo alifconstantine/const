@@ -397,10 +397,10 @@ export function AddSourceDialog({
             </div>
           )}
 
-          {/* VIEW: MAIN (Exa Search + Options) */}
+          {/* VIEW: MAIN (Const Search + Options) */}
           {mode === "main" && (
             <>
-              {/* Search Box with Exa AI backend */}
+              {/* Search Box with Const Search backend */}
               <div className="w-full bg-secondary/50 rounded-2xl p-3 sm:p-3.5 border border-border/60 focus-within:border-foreground/30 transition-all text-left mb-3.5 shadow-2xs">
                 <input
                   type="text"
@@ -409,7 +409,7 @@ export function AddSourceDialog({
                   onKeyDown={(e) => {
                     if (e.key === "Enter") handleSearch();
                   }}
-                  placeholder={t("searchWebSources") || "Search web, papers, or documentation via Exa AI..."}
+                  placeholder={t("searchWebSources") || "Search web, papers, or documentation via Const Search..."}
                   className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground/60 outline-none px-1.5 py-1"
                 />
                 <div className="flex items-center justify-between mt-3 px-0.5">
@@ -456,7 +456,7 @@ export function AddSourceDialog({
                             <BookOpen className="h-3.5 w-3.5 text-amber-400 mt-0.5 shrink-0" />
                             <div>
                               <p className="font-medium text-foreground">{t("webScopeJournal") || "Jurnal Akademik"}</p>
-                              <p className="text-[10.5px] text-muted-foreground">Paper riset & jurnal ilmiah (Exa AI)</p>
+                              <p className="text-[10.5px] text-muted-foreground">Paper riset & jurnal ilmiah (Const Search)</p>
                             </div>
                           </div>
                           {webScope === "journal" && <Check className="h-3.5 w-3.5 text-primary shrink-0" />}

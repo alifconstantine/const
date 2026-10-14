@@ -79,58 +79,10 @@ export async function executeWebSearch(
       }
     }
   } catch {
-    // Fall through to Exa AI or DuckDuckGo fallback
+    // Fall through to public search fallback (DuckDuckGo)
   }
 
-  const exaKey = process.env.EXA_API_KEY || process.env.VITE_EXA_API_KEY || "";
-
-  // 2. Try Exa Search if key is present
-  if (exaKey) {
-    try {
-      const resp = await fetch("https://api.exa.ai/search", {
-        method: "POST",
-        headers: {
-          "x-api-key": exaKey,
-          "Content-Type": "application/json",
-          "User-Agent": "const-harness/0.1.0",
-        },
-        body: JSON.stringify({
-          query: cleanQuery,
-          type: "auto",
-          numResults: Math.min(Math.max(numResults, 1), 20),
-          contents: {
-            highlights: {
-              numSentences: 2,
-              highlightsPerUrl: 1,
-            },
-          },
-        }),
-        signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(15000)]) : AbortSignal.timeout(15000),
-      });
-
-      if (resp.ok) {
-        const data = (await resp.json()) as any;
-        const sources: WebSearchSource[] = (data.results || []).map((r: any) => ({
-          title: r.title || r.url,
-          url: r.url,
-          snippet: (r.highlights && r.highlights[0]) || r.text || "",
-          publishedAt: r.publishedDate,
-        }));
-
-        const formatted = formatSearchResults(cleanQuery, "exa", sources);
-        return {
-          query: cleanQuery,
-          provider: "exa",
-          sources,
-          formatted,
-        };
-      }
-    } catch {
-      // Fall through to public search fallback
-    }
-  }
-
-  // 2. DuckDuckGo public HTML search fallback
+  // 2. DuckDuckGo public HTML search fallback (NO Exa fallback)
   try {
     const searchUrl = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(cleanQuery)}`;
     const resp = await fetch(searchUrl, {

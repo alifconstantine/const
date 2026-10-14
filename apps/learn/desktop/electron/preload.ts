@@ -89,6 +89,8 @@ contextBridge.exposeInMainWorld("electron", {
     },
     rollbackFile: (record: any) =>
       ipcRenderer.invoke("agent:rollback-file", { record }),
+    webSearch: (query: string, numResults?: number) =>
+      ipcRenderer.invoke("agent:web-search", { query, numResults }),
     onStreamEvent: (callback: (event: any) => void) => {
       const handler = (_event: any, data: any) => callback(data);
       ipcRenderer.on("agent:stream-event", handler);
