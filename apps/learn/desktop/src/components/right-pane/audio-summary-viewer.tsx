@@ -78,7 +78,6 @@ export function AudioSummaryViewer({
   const [volume, setVolume] = useState(1);
   const [copied, setCopied] = useState(false);
   const [isSynthesizing, setIsSynthesizing] = useState(false);
-  const [transcriptViewMode, setTranscriptViewMode] = useState<"formatted" | "raw">("formatted");
   const [liveAudioSrc, setLiveAudioSrc] = useState<string>(
     data.audioUrl || data.audioBase64 || ""
   );
@@ -569,87 +568,53 @@ export function AudioSummaryViewer({
 
           {/* Script & Transcript Card */}
           <div className="p-5 sm:p-6 rounded-2xl bg-card border border-border shadow-xs space-y-4">
-            {/* Header with Title and Mode Switcher */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-              <div className="flex items-center gap-2.5">
-                <div className="h-7 w-7 rounded-lg bg-secondary border border-border flex items-center justify-center text-muted-foreground">
+            {/* Header: Title on Left, Copy & Ask in Chat on Right (Single row, never wraps awkwardly) */}
+            <div className="flex items-center justify-between gap-2.5">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="h-7 w-7 rounded-lg bg-secondary border border-border flex items-center justify-center text-muted-foreground shrink-0">
                   <FileText className="h-3.5 w-3.5" />
                 </div>
-                <h3 className="text-sm font-semibold text-foreground tracking-tight">
+                <h3 className="text-sm font-semibold text-foreground tracking-tight truncate">
                   {t("audioTranscript")}
                 </h3>
               </div>
 
-              {/* View Switcher, Copy, and Ask In Chat Actions */}
-              <div className="flex items-center gap-2 flex-wrap">
-                {/* Formatted vs Raw Segmented Switcher */}
-                <div className="flex items-center p-0.5 rounded-xl bg-secondary/70 border border-border/60">
-                  <button
-                    type="button"
-                    onClick={() => setTranscriptViewMode("formatted")}
-                    className={cn(
-                      "px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors cursor-pointer",
-                      transcriptViewMode === "formatted"
-                        ? "bg-background text-foreground shadow-2xs"
-                        : "text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    Formatted
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setTranscriptViewMode("raw")}
-                    className={cn(
-                      "px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors cursor-pointer",
-                      transcriptViewMode === "raw"
-                        ? "bg-background text-foreground shadow-2xs"
-                        : "text-muted-foreground hover:text-foreground"
-                    )}
-                  >
-                    Raw Script
-                  </button>
-                </div>
-
-                {/* Copy Script Button */}
+              {/* Actions: Copy & Ask in Chat */}
+              <div className="flex items-center gap-1.5 shrink-0">
                 <Button
-                  variant="outline"
+                  variant="ghost"
                   size="sm"
                   onClick={handleCopyScript}
-                  className="h-8 px-2.5 rounded-xl border-border bg-secondary/40 hover:bg-secondary text-xs text-muted-foreground hover:text-foreground gap-1.5 cursor-pointer shadow-none"
+                  className="h-8 px-2 sm:px-2.5 rounded-xl hover:bg-secondary text-xs text-muted-foreground hover:text-foreground gap-1.5 cursor-pointer shadow-none"
+                  title={t("copyScript")}
                 >
                   {copied ? (
                     <Check className="h-3.5 w-3.5 text-emerald-500" />
                   ) : (
                     <Copy className="h-3.5 w-3.5" />
                   )}
-                  <span>{copied ? t("copied") : t("copyScript")}</span>
+                  <span className="hidden sm:inline">{copied ? t("copied") : t("copyScript")}</span>
                 </Button>
 
-                {/* Ask in Chat Button */}
                 {onExplainInChat && (
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={handleExplain}
                     className="h-8 px-2.5 rounded-xl border-border bg-secondary/40 hover:bg-secondary text-xs text-foreground gap-1.5 cursor-pointer shadow-none"
+                    title={t("askInChat")}
                   >
                     <Bot className="h-3.5 w-3.5 text-primary" />
-                    <span>{t("askInChat")}</span>
+                    <span className="hidden sm:inline">{t("askInChat")}</span>
                   </Button>
                 )}
               </div>
             </div>
 
-            {/* Transcript Content Box */}
-            {transcriptViewMode === "formatted" ? (
-              <div className="p-4 sm:p-5 rounded-xl bg-secondary/20 border border-border/40 select-text">
-                {renderFormattedScript(data.script)}
-              </div>
-            ) : (
-              <pre className="p-4 sm:p-5 rounded-xl bg-secondary/20 border border-border/40 text-xs text-foreground font-mono leading-relaxed whitespace-pre-wrap select-text overflow-x-auto">
-                {data.script || t("noTranscriptAvailable")}
-              </pre>
-            )}
+            {/* Direct Transcript Text Content (No nested box/border) */}
+            <div className="pt-1 select-text">
+              {renderFormattedScript(data.script)}
+            </div>
           </div>
         </div>
       </ScrollArea>
