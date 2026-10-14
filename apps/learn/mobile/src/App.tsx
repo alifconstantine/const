@@ -39,6 +39,23 @@ function AuthenticatedContent({
     setOpenAddSourceOnLoad(false);
   };
 
+  useEffect(() => {
+    const onOpenMcpSheet = () => {
+      if (activeLearnId) {
+        setActiveLearnId(null);
+        setOpenAddSourceOnLoad(false);
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent("const:open-mcp-sheet"));
+        }, 50);
+      }
+    };
+
+    window.addEventListener("const:open-mcp-sheet", onOpenMcpSheet);
+    return () => {
+      window.removeEventListener("const:open-mcp-sheet", onOpenMcpSheet);
+    };
+  }, [activeLearnId]);
+
   if (isSettingsOpen) {
     return (
       <MobileSettingsView

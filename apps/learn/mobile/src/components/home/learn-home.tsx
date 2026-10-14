@@ -273,11 +273,16 @@ export function LearnHome({
     const handleOpenSkillsSheet = () => {
       setIsSkillsSheetOpen(true);
     };
+    const handleOpenMcpSheet = () => {
+      setIsMcpSheetOpen(true);
+    };
     window.addEventListener("const:open-models-sheet", handleOpenModelsSheet);
     window.addEventListener("const:open-skills-sheet", handleOpenSkillsSheet);
+    window.addEventListener("const:open-mcp-sheet", handleOpenMcpSheet);
     return () => {
       window.removeEventListener("const:open-models-sheet", handleOpenModelsSheet);
       window.removeEventListener("const:open-skills-sheet", handleOpenSkillsSheet);
+      window.removeEventListener("const:open-mcp-sheet", handleOpenMcpSheet);
     };
   }, []);
 

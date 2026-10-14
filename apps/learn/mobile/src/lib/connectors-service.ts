@@ -64,7 +64,12 @@ export function saveConnectedConnectorIds(ids: string[]): void {
 export function isConnectorActive(connectorId: string): boolean {
   if (connectorId === "cloud-sandbox") return true;
   const connected = getConnectedConnectorIds();
-  return connected.includes(connectorId);
+  if (connected.includes(connectorId)) return true;
+  const norm = connectorId.toLowerCase().replace(/[-_]/g, "");
+  return connected.some((c) => {
+    const cNorm = c.toLowerCase().replace(/[-_]/g, "");
+    return cNorm === norm || cNorm.includes(norm) || norm.includes(cNorm);
+  });
 }
 
 /**

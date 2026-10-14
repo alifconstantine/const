@@ -11,6 +11,7 @@ import { useI18n } from "./lib/i18n";
 import { TitleBar } from "./components/title-bar";
 import { SettingsView } from "./components/settings/settings-view";
 import { openExternalUrl } from "./lib/open-external";
+import type { HomeNavTab } from "./components/home/sidebar";
 import authArt from "./assets/auth-art.jpg";
 
 function AuthenticatedContent({
@@ -26,6 +27,7 @@ function AuthenticatedContent({
   const [openAddSourceOnLoad, setOpenAddSourceOnLoad] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState<string>("general");
+  const [homeNavTab, setHomeNavTab] = useState<HomeNavTab>("learns");
 
   const handleOpenSettings = (tab: string = "general") => {
     setSettingsTab(tab);
@@ -43,6 +45,25 @@ function AuthenticatedContent({
     window.addEventListener("const:open-settings", onOpenSettings);
     return () => {
       window.removeEventListener("const:open-settings", onOpenSettings);
+    };
+  }, []);
+
+  // Listen for const:navigate-home-tab event dispatched from workspace/studio dialogs to return home to a specific tab (e.g. MCP)
+  useEffect(() => {
+    const onNavigateHomeTab = (e?: Event) => {
+      const customEvent = e as CustomEvent<{ tab?: HomeNavTab }>;
+      const tab = customEvent?.detail?.tab || "learns";
+      setHomeNavTab(tab);
+      setActiveLearnId(null);
+      setOpenAddSourceOnLoad(false);
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent("const:navigate-tab", { detail: { tab } }));
+      }, 50);
+    };
+
+    window.addEventListener("const:navigate-home-tab", onNavigateHomeTab as EventListener);
+    return () => {
+      window.removeEventListener("const:navigate-home-tab", onNavigateHomeTab as EventListener);
     };
   }, []);
 
@@ -112,6 +133,7 @@ function AuthenticatedContent({
         />
       ) : (
         <LearnHome
+          initialTab={homeNavTab}
           onOpenLearn={handleOpenLearn}
           onOpenSettings={handleOpenSettings}
           user={user}

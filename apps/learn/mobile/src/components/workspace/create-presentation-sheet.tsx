@@ -5,10 +5,13 @@ import {
   Check,
   FileText,
   Sliders,
+  Cable,
+  ChevronRight,
 } from "lucide-react";
 import { BrandLogo, cn } from "@const/ui";
 import { useI18n } from "../../lib/i18n";
 import type { LocalSource } from "../../lib/db";
+import { isConnectorActive, syncConnectedConnectors } from "../../lib/connectors-service";
 
 export interface CreatePresentationSheetProps {
   open: boolean;
@@ -50,6 +53,41 @@ export function CreatePresentationSheet({
   const { t } = useI18n();
 
   const [provider, setProvider] = useState<"native" | "canva" | "slides">("native");
+
+  // Active MCP connector states (Canva MCP & Google Slides)
+  const [activeConnections, setActiveConnections] = useState<{
+    canva: boolean;
+    slides: boolean;
+  }>(() => ({
+    canva: isConnectorActive("canva_mcp") || isConnectorActive("canva"),
+    slides: isConnectorActive("google-slides") || isConnectorActive("googleslides"),
+  }));
+
+  React.useEffect(() => {
+    if (!open) return;
+    const updateActiveConnections = () => {
+      setActiveConnections({
+        canva: isConnectorActive("canva_mcp") || isConnectorActive("canva"),
+        slides: isConnectorActive("google-slides") || isConnectorActive("googleslides"),
+      });
+    };
+
+    updateActiveConnections();
+    syncConnectedConnectors()
+      .then(() => updateActiveConnections())
+      .catch(() => {});
+
+    window.addEventListener("connectors_changed", updateActiveConnections);
+    return () => {
+      window.removeEventListener("connectors_changed", updateActiveConnections);
+    };
+  }, [open]);
+
+  const handleOpenMcpSheet = () => {
+    onClose();
+    window.dispatchEvent(new CustomEvent("const:open-mcp-sheet"));
+  };
+
   const [lengthMode, setLengthMode] = useState<"short" | "medium" | "long" | "auto">("auto");
   const [customCount, setCustomCount] = useState<number>(10);
   const [isCustomCount, setIsCustomCount] = useState(false);
@@ -199,37 +237,104 @@ export function CreatePresentationSheet({
           </div>
 
           {/* Section 2: Presentation Engine (Native, Canva, Slides) */}
-          <div className="space-y-1.5">
-            <label className="text-[11.5px] font-medium text-[#999999]">
+          <div className="space-y-2">
+            <label className="text-[11.5px] font-medium text-[#999999] font-sans">
               {t("presentationEngine")}
             </label>
             <div className="grid grid-cols-3 gap-2">
               {PROVIDERS.map((p) => {
                 const isSelected = provider === p.id;
+                const isConnected =
+                  p.id === "native"
+                    ? true
+                    : p.id === "canva"
+                    ? activeConnections.canva
+                    : activeConnections.slides;
+
                 return (
                   <button
                     key={p.id}
                     type="button"
                     onClick={() => setProvider(p.id)}
                     className={cn(
-                      "px-2.5 py-2.5 rounded-xl border text-left flex items-center justify-center gap-2 cursor-pointer transition-all",
+                      "p-2.5 rounded-xl border text-left flex flex-col justify-between gap-2 cursor-pointer transition-all min-h-[70px] font-sans",
                       isSelected
                         ? "bg-[#252525] border-white/40 shadow-sm text-white"
                         : "bg-[#1f1f1f] border-[#2c2c2c] hover:border-[#383838] opacity-80 hover:opacity-100 text-[#888888]"
                     )}
                   >
-                    {p.logoId ? (
-                      <BrandLogo id={p.logoId} size="xs" className="w-5 h-5 rounded-md p-0.5 border-0 shadow-none bg-transparent shrink-0" />
-                    ) : (
-                      <Presentation className="h-4 w-4 text-white shrink-0" />
-                    )}
-                    <span className="text-xs font-semibold text-white truncate">
-                      {p.name}
-                    </span>
+                    <div className="flex items-center gap-1.5 truncate w-full">
+                      {p.logoId ? (
+                        <BrandLogo
+                          id={p.logoId}
+                          size="xs"
+                          className="w-4 h-4 rounded-md p-0.5 border-0 shadow-none bg-transparent shrink-0"
+                        />
+                      ) : (
+                        <Presentation className="h-3.5 w-3.5 text-white shrink-0" />
+                      )}
+                      <span className="text-[11.5px] font-semibold text-white truncate">
+                        {p.id === "slides" ? "Google Slides" : p.name}
+                      </span>
+                    </div>
+
+                    {/* Connection status badge */}
+                    <div className="flex items-center">
+                      {p.id === "native" ? (
+                        <span className="text-[9.5px] font-sans font-medium text-[#969696] bg-[#222222] border border-[#2e2e2e] px-1.5 py-0.5 rounded-md">
+                          Bawaan
+                        </span>
+                      ) : isConnected ? (
+                        <span className="text-[9.5px] font-sans font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded-md flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                          Terhubung
+                        </span>
+                      ) : (
+                        <span className="text-[9.5px] font-sans font-medium text-[#969696] bg-[#222222] border border-[#2e2e2e] px-1.5 py-0.5 rounded-md flex items-center gap-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#5d5d5d]"></span>
+                          Belum Konek
+                        </span>
+                      )}
+                    </div>
                   </button>
                 );
               })}
             </div>
+
+            {/* Notice banner when selected provider is not connected */}
+            {provider !== "native" &&
+              ((provider === "canva" && !activeConnections.canva) ||
+                (provider === "slides" && !activeConnections.slides)) && (
+                <div className="p-2.5 rounded-xl bg-[#1c1c1c] border border-[#2e2e2e] space-y-2 animate-in fade-in-0 duration-150">
+                  <div className="flex items-start gap-2">
+                    <div className="p-1 rounded-lg bg-[#252528] border border-[#2e2e2e] text-amber-400 shrink-0">
+                      <Cable className="h-3.5 w-3.5" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[11.5px] font-semibold text-white font-sans">
+                        {provider === "canva"
+                          ? "Canva MCP Belum Terhubung"
+                          : "Google Slides Belum Terhubung"}
+                      </div>
+                      <p className="text-[10.5px] text-[#d4d4d4] mt-0.5 leading-relaxed font-sans">
+                        {provider === "canva"
+                          ? "Hubungkan akun Canva Anda di Menu MCP agar slide otomatis tersimpan ke dashboard Canva Anda."
+                          : "Hubungkan akun Google Slides Anda di Menu MCP agar slide otomatis tersimpan ke Google Drive Anda."}
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleOpenMcpSheet}
+                    className="w-full py-1.5 px-2.5 rounded-xl bg-[#252528] hover:bg-[#383838] border border-[#2e2e2e] hover:border-[#383838] text-[11px] font-medium text-white flex items-center justify-center gap-1.5 transition-colors cursor-pointer font-sans"
+                  >
+                    <Cable className="h-3 w-3 text-white" />
+                    <span>Buka Menu MCP</span>
+                    <ChevronRight className="h-3 w-3 text-[#969696]" />
+                  </button>
+                </div>
+              )}
           </div>
 
           {/* Section 3: Slide Count / Length Mode */}

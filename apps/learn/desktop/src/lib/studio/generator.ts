@@ -2588,12 +2588,13 @@ ${groundedContext.formattedContext.slice(0, 3000)}`;
           const candidates = job?.result?.generated_designs || job?.design_candidates || [];
           const firstCand = candidates[0];
 
-          if (job?.id && firstCand?.candidate_id) {
+          const candId = firstCand?.candidate_id || firstCand?.id;
+          if (job?.id && candId) {
             const createRes = await electron.composio.executeTool({
               toolSlug: "CANVA_MCP_CREATE_DESIGN_FROM_CANDIDATE",
               arguments: {
                 job_id: job.id,
-                candidate_id: firstCand.candidate_id,
+                candidate_id: candId,
               },
             });
 

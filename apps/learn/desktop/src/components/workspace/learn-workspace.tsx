@@ -2230,6 +2230,11 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
         open={isCreatePresentationOpen}
         onOpenChange={setIsCreatePresentationOpen}
         sources={sources || []}
+        onNavigateToMcp={() => {
+          window.dispatchEvent(
+            new CustomEvent("const:navigate-home-tab", { detail: { tab: "mcp" } })
+          );
+        }}
         onGenerate={handleGeneratePresentation}
       />
 

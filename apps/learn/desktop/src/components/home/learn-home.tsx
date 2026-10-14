@@ -73,6 +73,7 @@ import { useI18n } from "../../lib/i18n";
 import type { UserProfile } from "../navbar";
 
 interface LearnHomeProps {
+  initialTab?: HomeNavTab;
   onOpenLearn?: (learnId: string, openAddSource?: boolean) => void;
   onOpenSettings?: (tab?: string) => void;
   user?: UserProfile | null;
@@ -176,6 +177,7 @@ function getArtifactConfig(type: string, isZip?: boolean): ArtifactConfig {
 }
 
 export function LearnHome({
+  initialTab,
   onOpenLearn,
   onOpenSettings,
   user,
@@ -186,7 +188,14 @@ export function LearnHome({
 
   // Navigation & Shell State
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [activeTab, setActiveTab] = useState<HomeNavTab>("learns");
+  const [activeTab, setActiveTab] = useState<HomeNavTab>(initialTab || "learns");
+
+  useEffect(() => {
+    if (initialTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
+
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [searchQuery, setSearchQuery] = useState("");
   const [activeCollectionId, setActiveCollectionId] = useState<string | null>(null);

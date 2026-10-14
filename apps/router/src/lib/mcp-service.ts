@@ -359,9 +359,9 @@ export async function executeMcpTool(
 
   // Canva MCP length parameter
   if (targetSlug === "CANVA_MCP_GENERATE_DESIGN" && normalizedArgs.length) {
-    const validLengths = ["short", "medium", "long"];
+    const validLengths = ["short", "balanced", "comprehensive", "medium", "long"];
     if (!validLengths.includes(normalizedArgs.length)) {
-      normalizedArgs.length = "medium";
+      normalizedArgs.length = "balanced";
     }
   }
 
