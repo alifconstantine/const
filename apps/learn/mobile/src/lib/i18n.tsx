@@ -575,7 +575,7 @@ export const translations = {
     // Settings
     backToLearns: "Back to Learns",
     preferences: "Preferences",
-    generalSettings: "General Settings",
+    generalSettings: "General",
     generalSettingsSubtitle: "Manage user profile, study session status, and system runtime environment.",
     appearanceSubtitle: "Customize user interface theme for visual comfort.",
     connectedAccount: "Connected Account",
@@ -1980,7 +1980,7 @@ export const translations = {
     // Settings
     backToLearns: "Kembali ke Learns",
     preferences: "Preferensi",
-    generalSettings: "Pengaturan Umum",
+    generalSettings: "Umum",
     generalSettingsSubtitle: "Kelola profil pengguna, status sesi belajar, dan konfigurasi lingkungan sistem.",
     appearanceSubtitle: "Sesuaikan tema tampilan antarmuka sesuai dengan kenyamanan visual Anda.",
     connectedAccount: "Akun Terhubung",
