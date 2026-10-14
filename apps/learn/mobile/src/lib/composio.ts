@@ -22,6 +22,17 @@ export interface CodeInterpreterResult {
 }
 
 /**
+ * Resolves the base URL for Const Router AI & Tool Gateway.
+ */
+export function getRouterBaseUrl(): string {
+  const envUrl =
+    (import.meta as any).env?.VITE_CONST_ROUTER_BASE_URL ||
+    (import.meta as any).env?.CONST_ROUTER_BASE_URL ||
+    "https://router.const.web.id/v1";
+  return envUrl.replace(/\/+$/, "");
+}
+
+/**
  * Resolves the base URL for Composio API.
  * When running in development (localhost or LAN IP like 10.188.x.x),
  * uses the relative proxy "/composio-api" configured in Vite to bypass
@@ -160,6 +171,54 @@ export async function executeCodeInterpreter(
     timeout?: number;
   }
 ): Promise<CodeInterpreterResult> {
+  const startTime = Date.now();
+
+  // 1. Primary path: Delegate to Const Router MCP Gateway
+  try {
+    const res = await executeComposioTool("CODEINTERPRETER_EXECUTE_CODE", {
+      code_to_execute: code,
+      ...(options?.sandboxId ? { sandbox_id: options.sandboxId } : {}),
+      ...(options?.timeout ? { timeout: options.timeout } : {}),
+    });
+
+    if (res.success && res.data) {
+      const data = res.data;
+      const hasError = Boolean(data.error);
+      return {
+        success: !hasError,
+        stdout: data.stdout || "",
+        stderr: data.stderr || "",
+        results: data.results || undefined,
+        error: data.error || null,
+        sandboxId: data.sandbox_id,
+        logId: data.log_id,
+        durationMs: Date.now() - startTime,
+      };
+    } else if (res.error) {
+      return {
+        success: false,
+        stdout: "",
+        stderr: res.error,
+        error: res.error,
+        durationMs: Date.now() - startTime,
+      };
+    }
+  } catch (gatewayErr) {
+    console.warn("[executeCodeInterpreter Gateway Warning]", gatewayErr);
+  }
+
+  // 2. Direct Composio fallback if local API key is configured
+  const apiKey = getComposioApiKey();
+  if (!apiKey) {
+    return {
+      success: false,
+      stdout: "",
+      stderr: "Gagal mengeksekusi tool Cloud Sandbox melalui Const Router Gateway.",
+      error: "Gateway unavailable",
+      durationMs: Date.now() - startTime,
+    };
+  }
+
   const limit = checkComposioLimit();
   if (!limit.allowed) {
     return {
@@ -167,22 +226,10 @@ export async function executeCodeInterpreter(
       stdout: "",
       stderr: limit.message || "Batas mingguan 300 tool call Composio telah tercapai.",
       error: "Weekly limit exceeded",
-      durationMs: 0,
+      durationMs: Date.now() - startTime,
     };
   }
 
-  const apiKey = getComposioApiKey();
-  if (!apiKey) {
-    return {
-      success: false,
-      stdout: "",
-      stderr: "COMPOSIO_API_KEY is not configured in environment.",
-      error: "Missing API Key",
-      durationMs: 0,
-    };
-  }
-
-  const startTime = Date.now();
   const baseUrl = getComposioBaseUrl();
 
   const runRequest = async (sessionId: string, targetBase = baseUrl) => {
@@ -322,59 +369,31 @@ export async function executeCanvaMcp(payload: {
   error?: string | null;
   durationMs: number;
 }> {
-  const limitCheck = checkComposioLimit();
-  if (!limitCheck.allowed) {
-    const fallbackUrl = `https://www.canva.com/search?q=${encodeURIComponent(payload.prompt)}`;
-    return {
-      success: false,
-      editUrl: fallbackUrl,
-      message: limitCheck.message || "Batas mingguan 300 tool call Composio telah tercapai.",
-      error: "Weekly limit exceeded",
-      durationMs: 0,
-    };
-  }
-
-  const apiKey = getComposioApiKey();
   const startTime = Date.now();
-  const baseUrl = getComposioBaseUrl();
-
-  const runExec = async (sessionId: string, toolSlug: string, args: any, targetBase = baseUrl) => {
-    return await fetch(`${targetBase.replace(/\/+$/, "")}/tool_router/session/${sessionId}/execute`, {
-      method: "POST",
-      headers: {
-        "x-api-key": apiKey,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        tool_slug: toolSlug,
-        arguments: args,
-      }),
-    });
-  };
 
   try {
-    let sessionId = await getOrCreateSessionId();
-
     // 1. If direct materialization was requested
     if (payload.jobId && payload.candidateId) {
-      const res = await runExec(sessionId, "CANVA_MCP_CREATE_DESIGN_FROM_CANDIDATE", {
+      const res = await executeComposioTool("CANVA_MCP_CREATE_DESIGN_FROM_CANDIDATE", {
         job_id: payload.jobId,
         candidate_id: payload.candidateId,
       });
-      const json = await res.json();
-      const summary = json.data?.design_summary || json.data;
-      const editUrl = summary?.urls?.edit_url || summary?.edit_url;
-      const viewUrl = summary?.urls?.view_url || summary?.view_url;
-      return {
-        success: Boolean(editUrl),
-        designId: summary?.id,
-        title: summary?.title || payload.prompt,
-        pageCount: summary?.page_count || 1,
-        editUrl,
-        viewUrl,
-        message: `Presentasi Canva "${summary?.title || payload.prompt}" berhasil dibuat di akun Canva Anda!`,
-        durationMs: Date.now() - startTime,
-      };
+
+      if (res.success && res.data) {
+        const summary = res.data?.design_summary || res.data;
+        const editUrl = summary?.urls?.edit_url || summary?.edit_url;
+        const viewUrl = summary?.urls?.view_url || summary?.view_url;
+        return {
+          success: Boolean(editUrl),
+          designId: summary?.id,
+          title: summary?.title || payload.prompt,
+          pageCount: summary?.page_count || 1,
+          editUrl,
+          viewUrl,
+          message: `Presentasi Canva "${summary?.title || payload.prompt}" berhasil dibuat di akun Canva Anda!`,
+          durationMs: Date.now() - startTime,
+        };
+      }
     }
 
     // Dynamic Canva length determination
@@ -386,102 +405,73 @@ export async function executeCanvaMcp(payload: {
         ? "balanced"
         : "short");
 
-    // 2. Generate designs
-    let genRes: Response;
-    try {
-      genRes = await runExec(sessionId, "CANVA_MCP_GENERATE_DESIGN", {
-        query: payload.prompt,
-        design_type: payload.designType || "presentation",
-        length: canvaLength,
-      });
-    } catch {
-      genRes = await runExec(
-        sessionId,
-        "CANVA_MCP_GENERATE_DESIGN",
-        {
-          query: payload.prompt,
-          design_type: payload.designType || "presentation",
-          length: canvaLength,
-        },
-        baseUrl === "/composio-api" ? "https://backend.composio.dev/api/v3.1" : "/composio-api"
-      );
-    }
+    // 2. Generate designs via Router Gateway
+    const genRes = await executeComposioTool("CANVA_MCP_GENERATE_DESIGN", {
+      query: payload.prompt,
+      design_type: payload.designType || "presentation",
+      length: canvaLength,
+    });
 
-    if (genRes.status === 404 || genRes.status === 401) {
-      sessionId = await getOrCreateSessionId(true);
-      genRes = await runExec(sessionId, "CANVA_MCP_GENERATE_DESIGN", {
-        query: payload.prompt,
-        design_type: payload.designType || "presentation",
-        length: canvaLength,
-      });
-    }
+    if (genRes.success && genRes.data) {
+      const job = genRes.data?.job || genRes.data;
+      const designs = job?.result?.generated_designs || [];
+      const firstCand = designs[0];
 
-    if (!genRes.ok) {
-      throw new Error(`Canva MCP Generate failed with HTTP ${genRes.status}`);
-    }
+      if (job?.id && firstCand?.candidate_id) {
+        // 3. Materialize first candidate into real presentation
+        const createRes = await executeComposioTool("CANVA_MCP_CREATE_DESIGN_FROM_CANDIDATE", {
+          job_id: job.id,
+          candidate_id: firstCand.candidate_id,
+        });
 
-    const genJson = await genRes.json();
-    const job = genJson.data?.job || genJson.data;
-    const designs = job?.result?.generated_designs || [];
-    const firstCand = designs[0];
+        if (createRes.success && createRes.data) {
+          const summary = createRes.data?.design_summary || createRes.data;
+          const editUrl = summary?.urls?.edit_url || firstCand.url;
+          const viewUrl = summary?.urls?.view_url || firstCand.url;
+          const pageCount = summary?.page_count || 4;
+          const title = summary?.title || payload.prompt;
 
-    if (job?.id && firstCand?.candidate_id) {
-      // 3. Materialize first candidate into real presentation
-      const createRes = await runExec(sessionId, "CANVA_MCP_CREATE_DESIGN_FROM_CANDIDATE", {
-        job_id: job.id,
-        candidate_id: firstCand.candidate_id,
-      });
+          return {
+            success: true,
+            designId: summary?.id || firstCand.candidate_id,
+            title,
+            pageCount,
+            editUrl,
+            viewUrl,
+            thumbnails: firstCand.thumbnails || [],
+            message: `Presentasi Canva "${title}" berhasil dibuat dengan ${pageCount} slide di akun Canva Anda!`,
+            durationMs: Date.now() - startTime,
+          };
+        }
+      }
 
-      if (createRes.ok) {
-        const createJson = await createRes.json();
-        const summary = createJson.data?.design_summary || createJson.data;
-        const editUrl = summary?.urls?.edit_url || firstCand.url;
-        const viewUrl = summary?.urls?.view_url || firstCand.url;
-        const pageCount = summary?.page_count || 4;
-        const title = summary?.title || payload.prompt;
-
-        recordComposioToolCall(
-          payload.jobId && payload.candidateId
-            ? "CANVA_MCP_CREATE_DESIGN_FROM_CANDIDATE"
-            : "CANVA_MCP_GENERATE_DESIGN",
-          true
-        );
-
+      if (firstCand?.url) {
         return {
           success: true,
-          designId: summary?.id,
-          title,
-          pageCount,
-          editUrl,
-          viewUrl,
+          title: payload.prompt,
+          editUrl: firstCand.url,
+          viewUrl: firstCand.url,
           thumbnails: firstCand.thumbnails || [],
-          message: `Presentasi Canva "${title}" berhasil dibuat dengan ${pageCount} slide di akun Canva Anda!`,
+          message: `Draft presentasi Canva "${payload.prompt}" berhasil dibuat!`,
           durationMs: Date.now() - startTime,
         };
       }
     }
 
-    if (firstCand?.url) {
-      recordComposioToolCall("CANVA_MCP_GENERATE_DESIGN", true);
-      return {
-        success: true,
-        title: payload.prompt,
-        editUrl: firstCand.url,
-        viewUrl: firstCand.url,
-        thumbnails: firstCand.thumbnails || [],
-        message: `Draft presentasi Canva "${payload.prompt}" berhasil dibuat!`,
-        durationMs: Date.now() - startTime,
-      };
-    }
-
-    throw new Error("No design candidates returned by Canva MCP");
-  } catch (err: any) {
-    recordComposioToolCall("CANVA_MCP_GENERATE_DESIGN", false, undefined, err?.message);
     const fallbackUrl = `https://www.canva.com/search?q=${encodeURIComponent(payload.prompt)}`;
     return {
       success: false,
       editUrl: fallbackUrl,
-      message: `Desain Canva disiapkan untuk: "${payload.prompt}". Silakan hubungkan akun Canva di menu MCP.`,
+      message: `Desain Canva disiapkan untuk: "${payload.prompt}". Silakan hubungkan akun Canva di menu Connectors.`,
+      error: genRes.error || null,
+      durationMs: Date.now() - startTime,
+    };
+  } catch (err: any) {
+    const fallbackUrl = `https://www.canva.com/search?q=${encodeURIComponent(payload.prompt)}`;
+    return {
+      success: false,
+      editUrl: fallbackUrl,
+      message: `Desain Canva disiapkan untuk: "${payload.prompt}". Silakan hubungkan akun Canva di menu Connectors.`,
       error: err?.message || String(err),
       durationMs: Date.now() - startTime,
     };
@@ -564,6 +554,46 @@ export async function executeComposioTool(
   toolSlug: string,
   args: any
 ): Promise<{ success: boolean; data?: any; error?: string }> {
+  const routerUrl = getRouterBaseUrl();
+  const userId = getLocalDeviceId();
+
+  // 1. Primary path: Delegate execution to Const Router MCP Gateway
+  try {
+    const res = await fetch(`${routerUrl}/mcp/execute`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Device-Id": userId,
+        "X-User-Id": userId,
+      },
+      body: JSON.stringify({
+        toolSlug,
+        arguments: args,
+        userId,
+      }),
+    });
+
+    const json = await res.json();
+    if (res.ok && json.success) {
+      recordComposioToolCall(toolSlug, true);
+      return { success: true, data: json.data || json.result };
+    } else if (json.error) {
+      recordComposioToolCall(toolSlug, false, undefined, json.error);
+      return { success: false, error: json.error };
+    }
+  } catch (routerErr) {
+    console.warn("[Mobile Composio] Router MCP gateway unavailable, checking direct fallback:", routerErr);
+  }
+
+  // 2. Direct Composio fallback if local API key is configured
+  const apiKey = getComposioApiKey();
+  if (!apiKey) {
+    return {
+      success: false,
+      error: "Gagal mengeksekusi tool via Const Router Gateway.",
+    };
+  }
+
   const limitCheck = checkComposioLimit();
   if (!limitCheck.allowed) {
     return {
@@ -572,7 +602,6 @@ export async function executeComposioTool(
     };
   }
 
-  const apiKey = getComposioApiKey();
   const baseUrl = getComposioBaseUrl();
   try {
     let sessionId = await getOrCreateSessionId();

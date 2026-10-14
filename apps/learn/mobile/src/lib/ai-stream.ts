@@ -487,29 +487,26 @@ export async function streamChatCompletion({
 
   const composioKey = getComposioApiKey();
   const mcpConfig = getStoredMcpConfig();
-  const hasComposio = Boolean(composioKey);
 
   // A tool is ONLY exposed to the AI if the user has actively connected it.
-  // If not connected, the AI has no knowledge of the tool and simply responds naturally in text/markdown.
+  // Execution is handled seamlessly via Const Router MCP Gateway.
   const hasSandbox =
-    hasComposio &&
-    (isConnectorActive("cloud-sandbox") ||
-      mcpConfig.servers.some(
-        (s) => s.id === "composio" && s.enabled !== false && s.status !== "disabled"
-      ));
+    isConnectorActive("cloud-sandbox") ||
+    mcpConfig.servers.some(
+      (s) => s.id === "composio" && s.enabled !== false && s.status !== "disabled"
+    );
   const hasCanva =
-    hasComposio &&
-    (isConnectorActive("canva_mcp") ||
-      mcpConfig.servers.some(
-        (s) => s.id === "canva" && s.enabled !== false && s.status !== "disabled"
-      ));
-  const hasSheets = hasComposio && isConnectorActive("google-sheets");
-  const hasDocs = hasComposio && isConnectorActive("google-docs");
-  const hasSlides = hasComposio && isConnectorActive("google-slides");
-  const hasDrive = hasComposio && isConnectorActive("google-drive");
-  const hasTasks = hasComposio && isConnectorActive("google-tasks");
-  const hasClassroom = hasComposio && isConnectorActive("google-classroom");
-  const hasForms = hasComposio && isConnectorActive("google-forms");
+    isConnectorActive("canva_mcp") ||
+    mcpConfig.servers.some(
+      (s) => s.id === "canva" && s.enabled !== false && s.status !== "disabled"
+    );
+  const hasSheets = isConnectorActive("google-sheets");
+  const hasDocs = isConnectorActive("google-docs");
+  const hasSlides = isConnectorActive("google-slides");
+  const hasDrive = isConnectorActive("google-drive");
+  const hasTasks = isConnectorActive("google-tasks");
+  const hasClassroom = isConnectorActive("google-classroom");
+  const hasForms = isConnectorActive("google-forms");
   const hasYoutube = isConnectorActive("youtube");
 
   const activeTools: any[] = [];
@@ -828,20 +825,14 @@ export async function streamChatCompletion({
         onToolCallStart?.(toolItem);
 
         if (toolItem.name === "code_interpreter" && parsedArgs.code) {
-          if (!composioKey) {
-            toolItem.result = "Composio API Key belum dikonfigurasi. Silakan tambahkan API Key Anda di menu MCP Servers (Cloud Sandbox).";
-            toolItem.isError = true;
-            toolItem.durationMs = 100;
-          } else {
-            const execRes = await executeCodeInterpreter(parsedArgs.code);
-            const rawOutput =
-              execRes.stdout ||
-              execRes.stderr ||
-              (execRes.success ? "Execution completed successfully." : execRes.error || "Execution failed.");
-            toolItem.result = rawOutput;
-            toolItem.isError = !execRes.success;
-            toolItem.durationMs = execRes.durationMs;
-          }
+          const execRes = await executeCodeInterpreter(parsedArgs.code);
+          const rawOutput =
+            execRes.stdout ||
+            execRes.stderr ||
+            (execRes.success ? "Execution completed successfully." : execRes.error || "Execution failed.");
+          toolItem.result = rawOutput;
+          toolItem.isError = !execRes.success;
+          toolItem.durationMs = execRes.durationMs;
         } else if (toolItem.name === "canva_mcp_generate_design" || toolItem.name === "canva_generate_design") {
           const prompt = parsedArgs.prompt || parsedArgs.query || parsedArgs.topic || "Educational visual presentation";
           const type = parsedArgs.designType || parsedArgs.type || "presentation";
@@ -878,24 +869,22 @@ export async function streamChatCompletion({
           let liveSuccess = false;
           let errorNotice = "";
 
-          if (composioKey) {
-            try {
-              const res = await executeComposioTool("GOOGLESHEETS_CREATE_SPREADSHEET", {
-                title,
-              });
-              if (res?.success && res.data) {
-                const sheetId = res.data.spreadsheet_id || res.data.spreadsheetId || res.data.id;
-                if (sheetId) {
-                  realSheetId = sheetId;
-                  realSheetUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/edit`;
-                  liveSuccess = true;
-                }
-              } else if (res?.error) {
-                errorNotice = res.error;
+          try {
+            const res = await executeComposioTool("GOOGLESHEETS_CREATE_SPREADSHEET", {
+              title,
+            });
+            if (res?.success && res.data) {
+              const sheetId = res.data.spreadsheet_id || res.data.spreadsheetId || res.data.id;
+              if (sheetId) {
+                realSheetId = sheetId;
+                realSheetUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/edit`;
+                liveSuccess = true;
               }
-            } catch (err: any) {
-              errorNotice = err?.message || String(err);
+            } else if (res?.error) {
+              errorNotice = res.error;
             }
+          } catch (err: any) {
+            errorNotice = err?.message || String(err);
           }
 
           if (liveSuccess && realSheetUrl) {
@@ -911,7 +900,7 @@ export async function streamChatCompletion({
               _instruction: `IMPORTANT: In your conversational response, you MUST provide a clickable link: [Buka di Google Sheets](${realSheetUrl}).`,
             });
           } else {
-            const notConnected = !composioKey || errorNotice.includes("No active connection") || errorNotice.includes("4302");
+            const notConnected = errorNotice.includes("No active connection") || errorNotice.includes("4302") || errorNotice.includes("not connected");
             toolItem.result = JSON.stringify({
               status: "partial_success",
               provider: "Google Sheets",
@@ -919,7 +908,7 @@ export async function streamChatCompletion({
               title,
               rowsProcessed: rows.length,
               message: notConnected
-                ? `Struktur tabel "${title}" (${rows.length} baris) telah dirancang di chat. Akun Google Sheets belum terhubung di menu Connectors (Composio) untuk sinkronisasi cloud.`
+                ? `Struktur tabel "${title}" (${rows.length} baris) telah dirancang di chat. Akun Google Sheets belum terhubung di menu Connectors untuk sinkronisasi cloud.`
                 : `Struktur tabel "${title}" telah disiapkan. ${errorNotice}`,
             });
           }
@@ -935,24 +924,22 @@ export async function streamChatCompletion({
           let liveSuccess = false;
           let errorNotice = "";
 
-          if (composioKey) {
-            try {
-              const res = await executeComposioTool("GOOGLEDOCS_CREATE_DOCUMENT", {
-                title,
-              });
-              if (res?.success && res.data) {
-                const docId = res.data.document_id || res.data.documentId || res.data.id;
-                if (docId) {
-                  realDocId = docId;
-                  realDocUrl = `https://docs.google.com/document/d/${docId}/edit`;
-                  liveSuccess = true;
-                }
-              } else if (res?.error) {
-                errorNotice = res.error;
+          try {
+            const res = await executeComposioTool("GOOGLEDOCS_CREATE_DOCUMENT", {
+              title,
+            });
+            if (res?.success && res.data) {
+              const docId = res.data.document_id || res.data.documentId || res.data.id;
+              if (docId) {
+                realDocId = docId;
+                realDocUrl = `https://docs.google.com/document/d/${docId}/edit`;
+                liveSuccess = true;
               }
-            } catch (err: any) {
-              errorNotice = err?.message || String(err);
+            } else if (res?.error) {
+              errorNotice = res.error;
             }
+          } catch (err: any) {
+            errorNotice = err?.message || String(err);
           }
 
           if (liveSuccess && realDocUrl) {
@@ -967,14 +954,14 @@ export async function streamChatCompletion({
               _instruction: `IMPORTANT: In your conversational response, you MUST provide a clickable link: [Buka di Google Docs](${realDocUrl}).`,
             });
           } else {
-            const notConnected = !composioKey || errorNotice.includes("No active connection") || errorNotice.includes("4302");
+            const notConnected = errorNotice.includes("No active connection") || errorNotice.includes("4302") || errorNotice.includes("not connected");
             toolItem.result = JSON.stringify({
               status: "partial_success",
               provider: "Google Docs",
               action,
               title,
               message: notConnected
-                ? `Dokumen catatan "${title}" telah dirancang di chat. Akun Google Docs belum terhubung di menu Connectors (Composio) untuk sinkronisasi cloud.`
+                ? `Dokumen catatan "${title}" telah dirancang di chat. Akun Google Docs belum terhubung di menu Connectors untuk sinkronisasi cloud.`
                 : `Dokumen "${title}" telah disiapkan. ${errorNotice}`,
             });
           }
@@ -991,43 +978,41 @@ export async function streamChatCompletion({
           let liveSuccess = false;
           let errorNotice = "";
 
-          if (composioKey) {
-            try {
-              let markdownText = parsedArgs.markdown_text || parsedArgs.markdown;
-              if (!markdownText) {
-                if (slides.length > 0) {
-                  markdownText = `Theme: corporate_blue\n\n# ${title}\n\n`;
-                  markdownText += slides
-                    .map((s: any) => {
-                      const bullets = Array.isArray(s.bullets)
-                        ? s.bullets.map((b: string) => `• ${b}`).join("\n")
-                        : s.content || "";
-                      return `## ${s.title || "Slide"}\n\n${bullets}`;
-                    })
-                    .join("\n\n---\n\n");
-                } else {
-                  markdownText = `Theme: corporate_blue\n\n# ${title}\n\n---\n\n## Pendahuluan\n• Gambaran materi pokok\n\n---\n\n## Kesimpulan\n• Rangkuman materi`;
-                }
+          try {
+            let markdownText = parsedArgs.markdown_text || parsedArgs.markdown;
+            if (!markdownText) {
+              if (slides.length > 0) {
+                markdownText = `Theme: corporate_blue\n\n# ${title}\n\n`;
+                markdownText += slides
+                  .map((s: any) => {
+                    const bullets = Array.isArray(s.bullets)
+                      ? s.bullets.map((b: string) => `• ${b}`).join("\n")
+                      : s.content || "";
+                    return `## ${s.title || "Slide"}\n\n${bullets}`;
+                  })
+                  .join("\n\n---\n\n");
+              } else {
+                markdownText = `Theme: corporate_blue\n\n# ${title}\n\n---\n\n## Pendahuluan\n• Gambaran materi pokok\n\n---\n\n## Kesimpulan\n• Rangkuman materi`;
               }
-
-              const res = await executeComposioTool("GOOGLESLIDES_CREATE_SLIDES_MARKDOWN", {
-                title,
-                markdown_text: markdownText,
-              });
-
-              if (res?.success && res.data) {
-                const presId = res.data.presentation_id || res.data.presentationId || res.data.id;
-                if (presId) {
-                  realPresId = presId;
-                  realPresUrl = `https://docs.google.com/presentation/d/${presId}/edit`;
-                  liveSuccess = true;
-                }
-              } else if (res?.error) {
-                errorNotice = res.error;
-              }
-            } catch (err: any) {
-              errorNotice = err?.message || String(err);
             }
+
+            const res = await executeComposioTool("GOOGLESLIDES_CREATE_SLIDES_MARKDOWN", {
+              title,
+              markdown_text: markdownText,
+            });
+
+            if (res?.success && res.data) {
+              const presId = res.data.presentation_id || res.data.presentationId || res.data.id;
+              if (presId) {
+                realPresId = presId;
+                realPresUrl = `https://docs.google.com/presentation/d/${presId}/edit`;
+                liveSuccess = true;
+              }
+            } else if (res?.error) {
+              errorNotice = res.error;
+            }
+          } catch (err: any) {
+            errorNotice = err?.message || String(err);
           }
 
           if (liveSuccess && realPresUrl) {
@@ -1042,7 +1027,7 @@ export async function streamChatCompletion({
               _instruction: `IMPORTANT: In your conversational response, you MUST prominently provide the clickable link: [Buka Presentasi di Google Slides](${realPresUrl}).`,
             });
           } else {
-            const notConnected = !composioKey || errorNotice.includes("No active connection") || errorNotice.includes("4302");
+            const notConnected = errorNotice.includes("No active connection") || errorNotice.includes("4302") || errorNotice.includes("not connected");
             toolItem.result = JSON.stringify({
               status: "partial_success",
               provider: "Google Slides",
@@ -1050,7 +1035,7 @@ export async function streamChatCompletion({
               slideCount: count,
               slides,
               message: notConnected
-                ? `Struktur slide presentasi "${title}" (${count} slide) telah dirancang di chat. Akun Google Anda belum terhubung di menu Connectors (Composio), sehingga slide belum dapat disimpan otomatis ke Google Drive.`
+                ? `Struktur slide presentasi "${title}" (${count} slide) telah dirancang di chat. Akun Google Anda belum terhubung di menu Connectors, sehingga slide belum dapat disimpan otomatis ke Google Drive.`
                 : `Struktur slide presentasi "${title}" (${count} slide) telah disiapkan. ${errorNotice || "Layanan Google Slides belum terhubung."}`,
             });
           }
@@ -1062,24 +1047,22 @@ export async function streamChatCompletion({
           let files: any[] = [];
           const driveUrl = `https://drive.google.com/drive/search?q=${encodeURIComponent(query)}`;
 
-          if (composioKey) {
-            try {
-              const res = await executeComposioTool("GOOGLEDRIVE_SEARCH_FILES_OR_FOLDERS", {
-                query,
-              });
-              if (res?.success && res.data) {
-                const found = res.data.files || res.data.items || [];
-                if (Array.isArray(found) && found.length > 0) {
-                  files = found.map((f: any) => ({
-                    name: f.name || f.title || "File Drive",
-                    type: f.mimeType || "document",
-                    size: f.size || "Unknown",
-                    webViewLink: f.webViewLink || f.url,
-                  }));
-                }
+          try {
+            const res = await executeComposioTool("GOOGLEDRIVE_SEARCH_FILES_OR_FOLDERS", {
+              query,
+            });
+            if (res?.success && res.data) {
+              const found = res.data.files || res.data.items || [];
+              if (Array.isArray(found) && found.length > 0) {
+                files = found.map((f: any) => ({
+                  name: f.name || f.title || "File Drive",
+                  type: f.mimeType || "document",
+                  size: f.size || "Unknown",
+                  webViewLink: f.webViewLink || f.url,
+                }));
               }
-            } catch {}
-          }
+            }
+          } catch {}
 
           if (files.length === 0) {
             files = [
@@ -1104,15 +1087,13 @@ export async function streamChatCompletion({
           const action = parsedArgs.action || "create_task";
           const startTime = Date.now();
 
-          if (composioKey) {
-            try {
-              await executeComposioTool("GOOGLETASKS_INSERT_TASK", {
-                title,
-                notes: parsedArgs.notes || "Catatan belajar Const Learn",
-                due: parsedArgs.dueDate,
-              });
-            } catch {}
-          }
+          try {
+            await executeComposioTool("GOOGLETASKS_INSERT_TASK", {
+              title,
+              notes: parsedArgs.notes || "Catatan belajar Const Learn",
+              due: parsedArgs.dueDate,
+            });
+          } catch {}
 
           toolItem.result = JSON.stringify({
             status: "success",
@@ -1149,24 +1130,22 @@ export async function streamChatCompletion({
           let liveSuccess = false;
           let errorNotice = "";
 
-          if (composioKey) {
-            try {
-              const res = await executeComposioTool("GOOGLEFORMS_CREATE_FORM", {
-                title,
-              });
-              if (res?.success && res.data) {
-                const formId = res.data.form_id || res.data.formId || res.data.id;
-                if (formId) {
-                  realFormId = formId;
-                  realFormUrl = `https://docs.google.com/forms/d/${formId}/edit`;
-                  liveSuccess = true;
-                }
-              } else if (res?.error) {
-                errorNotice = res.error;
+          try {
+            const res = await executeComposioTool("GOOGLEFORMS_CREATE_FORM", {
+              title,
+            });
+            if (res?.success && res.data) {
+              const formId = res.data.form_id || res.data.formId || res.data.id;
+              if (formId) {
+                realFormId = formId;
+                realFormUrl = `https://docs.google.com/forms/d/${formId}/edit`;
+                liveSuccess = true;
               }
-            } catch (err: any) {
-              errorNotice = err?.message || String(err);
+            } else if (res?.error) {
+              errorNotice = res.error;
             }
+          } catch (err: any) {
+            errorNotice = err?.message || String(err);
           }
 
           if (liveSuccess && realFormUrl) {
@@ -1181,31 +1160,71 @@ export async function streamChatCompletion({
               _instruction: `IMPORTANT: In your conversational response, you MUST provide a clickable link: [Buka Kuis di Google Forms](${realFormUrl}).`,
             });
           } else {
-            const notConnected = !composioKey || errorNotice.includes("No active connection") || errorNotice.includes("4302");
+            const notConnected = errorNotice.includes("No active connection") || errorNotice.includes("4302") || errorNotice.includes("not connected");
             toolItem.result = JSON.stringify({
               status: "partial_success",
               provider: "Google Forms",
               title,
               questionsCount: qCount,
               message: notConnected
-                ? `Formulir kuis "${title}" (${qCount} pertanyaan) telah dirancang di chat. Akun Google Forms belum terhubung di menu Connectors (Composio).`
+                ? `Formulir kuis "${title}" (${qCount} pertanyaan) telah dirancang di chat. Akun Google Forms belum terhubung di menu Connectors.`
                 : `Formulir "${title}" telah disiapkan. ${errorNotice}`,
             });
           }
           toolItem.isError = false;
           toolItem.durationMs = Math.max(Date.now() - startTime, 200);
         } else if (toolItem.name === "youtube_search_and_transcribe") {
-          const topic = parsedArgs.topic || "Materi Pelajaran";
+          const topic = parsedArgs.topic || parsedArgs.query || "Materi Pelajaran";
+          const startTime = Date.now();
+          let videoTitle = `Kuliah & Visualisasi: ${topic}`;
+          let highlights = `Konsep inti, formula, dan penjelasan visual tentang ${topic}.`;
+          let videoUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(topic + " penjelasan")}`;
+          let liveSuccess = false;
+          let errorNotice = "";
+
+          try {
+            const res = await executeComposioTool("YOUTUBE_SEARCH_YOU_TUBE", {
+              q: topic,
+            });
+            if (res?.success && res.data) {
+              const items = res.data.items || res.data.videos || [];
+              if (Array.isArray(items) && items.length > 0) {
+                const first = items[0];
+                const snippet = first.snippet || first;
+                const vId = first.id?.videoId || first.id || first.videoId;
+                if (snippet.title) videoTitle = snippet.title;
+                if (snippet.description) highlights = snippet.description.slice(0, 200) + "...";
+                if (vId) videoUrl = `https://www.youtube.com/watch?v=${vId}`;
+                liveSuccess = true;
+              }
+            } else if (res?.error) {
+              errorNotice = res.error;
+            }
+          } catch (err: any) {
+            errorNotice = err?.message || String(err);
+          }
+
+          const notConnected =
+            errorNotice.includes("No active connection") ||
+            errorNotice.includes("4302") ||
+            errorNotice.includes("not connected");
+
           toolItem.result = JSON.stringify({
-            status: "success",
+            status: liveSuccess ? "success" : "partial_success",
             provider: "YouTube",
             topic,
-            videoTitle: `Kuliah Lengkap & Visualisasi: ${topic}`,
-            highlights: `Konsep inti, pembuktian formula, dan rangkuman penjelasan visual tentang ${topic}.`,
-            videoUrl: `https://www.youtube.com/results?search_query=${encodeURIComponent(topic + " penjelasan")}`,
+            videoTitle,
+            highlights,
+            videoUrl,
+            message: liveSuccess
+              ? `Video referensi "${videoTitle}" berhasil ditemukan dari YouTube.`
+              : notConnected
+              ? `Pencarian referensi "${topic}" disiapkan. Akun YouTube belum terhubung di menu Connectors.`
+              : `Pencarian referensi "${topic}" disiapkan. ${errorNotice || ""}`,
+            _instruction: `In your response, provide the link: [Tonton Video di YouTube](${videoUrl}).`,
           });
           toolItem.isError = false;
-          toolItem.durationMs = 230;
+          toolItem.durationMs = Math.max(Date.now() - startTime, 200);
         } else {
           toolItem.result = "Tool execution unsupported.";
           toolItem.isError = true;

@@ -784,6 +784,14 @@ app.on("second-instance", (_event, commandLine) => {
     return false;
   });
 
+  const getRouterBaseUrl = () => {
+    const raw =
+      process.env.CONST_ROUTER_BASE_URL ||
+      process.env.VITE_CONST_ROUTER_BASE_URL ||
+      "https://router.const.web.id/v1";
+    return raw.replace(/\/+$/, "");
+  };
+
   ipcMain.handle(
     "composio:get-auth-link",
     async (
@@ -791,6 +799,45 @@ app.on("second-instance", (_event, commandLine) => {
       payload: { toolkit: string; userId?: string; callbackUrl?: string; apiKey?: string }
     ) => {
       try {
+        const userId = payload.userId || "learn_desktop_user";
+        const routerBase = getRouterBaseUrl();
+
+        // 1. Primary path: Const Router MCP Gateway
+        try {
+          const res = await fetch(`${routerBase}/mcp/auth-link`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Device-Id": userId,
+              "X-User-Id": userId,
+            },
+            body: JSON.stringify({
+              toolkit: payload.toolkit,
+              userId,
+              callbackUrl:
+                payload.callbackUrl || "https://accounts.const.web.id/auth-success",
+            }),
+          });
+
+          const data = await res.json().catch(() => ({}));
+          if (res.ok && data.success && data.redirectUrl) {
+            await shell.openExternal(data.redirectUrl);
+            return {
+              success: true,
+              redirectUrl: data.redirectUrl,
+              connectedAccountId: data.connectedAccountId,
+            };
+          } else if (data.error) {
+            throw new Error(data.error);
+          }
+        } catch (routerErr: any) {
+          console.warn("[Composio IPC get-auth-link] Gateway warning, checking fallback:", routerErr);
+          if (routerErr?.message && !routerErr.message.includes("fetch")) {
+            throw routerErr;
+          }
+        }
+
+        // 2. Direct Composio fallback if local API key is configured
         const apiKey =
           payload.apiKey ||
           process.env.COMPOSIO_API_KEY ||
@@ -798,12 +845,9 @@ app.on("second-instance", (_event, commandLine) => {
           "";
 
         if (!apiKey) {
-          throw new Error("Composio API Key belum dikonfigurasi. Silakan periksa COMPOSIO_API_KEY di file .env.");
+          throw new Error("Gagal menginisialisasi otorisasi via Const Router Gateway.");
         }
 
-        const userId = payload.userId || "learn_desktop_user";
-
-        // 1. Create or resume session in Composio REST API v3.1
         const sessRes = await fetch("https://backend.composio.dev/api/v3.1/tool_router/session", {
           method: "POST",
           headers: {
@@ -824,7 +868,6 @@ app.on("second-instance", (_event, commandLine) => {
         const sessData = await sessRes.json();
         const sessionId = sessData.session_id;
 
-        // 2. Request connect link for the specified toolkit
         const linkRes = await fetch(
           `https://backend.composio.dev/api/v3.1/tool_router/session/${sessionId}/link`,
           {
@@ -850,7 +893,6 @@ app.on("second-instance", (_event, commandLine) => {
         const redirectUrl = linkData.redirect_url || linkData.redirectUrl;
 
         if (redirectUrl) {
-          // Open the authorization link directly in the default system browser
           await shell.openExternal(redirectUrl);
           return {
             success: true,
@@ -871,24 +913,48 @@ app.on("second-instance", (_event, commandLine) => {
 
   ipcMain.handle(
     "composio:disconnect-account",
-    async (_event, payload: { accountId: string; apiKey?: string }) => {
+    async (_event, payload: { accountId: string; apiKey?: string; userId?: string }) => {
       try {
+        const userId = payload.userId || "learn_desktop_user";
+        const routerBase = getRouterBaseUrl();
+
+        // 1. Primary path: Router gateway disconnect
+        try {
+          const res = await fetch(`${routerBase}/mcp/disconnect`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-Device-Id": userId,
+              "X-User-Id": userId,
+            },
+            body: JSON.stringify({
+              accountId: payload.accountId,
+              userId,
+            }),
+          });
+          if (res.ok) {
+            return { success: true };
+          }
+        } catch {}
+
+        // 2. Direct fallback
         const apiKey =
           payload.apiKey ||
           process.env.COMPOSIO_API_KEY ||
           process.env.VITE_COMPOSIO_API_KEY ||
           "";
 
-        if (!apiKey) return { success: false, error: "Missing API Key" };
-
-        const delRes = await fetch(
-          `https://backend.composio.dev/api/v3.1/connected_accounts/${payload.accountId}`,
-          {
-            method: "DELETE",
-            headers: { "x-api-key": apiKey },
-          }
-        );
-        return { success: delRes.ok };
+        if (apiKey) {
+          const delRes = await fetch(
+            `https://backend.composio.dev/api/v3.1/connected_accounts/${payload.accountId}`,
+            {
+              method: "DELETE",
+              headers: { "x-api-key": apiKey },
+            }
+          );
+          return { success: delRes.ok };
+        }
+        return { success: true };
       } catch (err: any) {
         return { success: false, error: err?.message || String(err) };
       }
@@ -899,6 +965,19 @@ app.on("second-instance", (_event, commandLine) => {
     "composio:get-connected-accounts",
     async (_event, payload?: { userId?: string; apiKey?: string }) => {
       try {
+        const userId = payload?.userId || "learn_desktop_user";
+        const routerBase = getRouterBaseUrl();
+
+        // 1. Primary path: Router gateway
+        try {
+          const res = await fetch(`${routerBase}/mcp/connected-accounts?userId=${encodeURIComponent(userId)}`);
+          if (res.ok) {
+            const data = await res.json();
+            return { success: true, items: data.items || [] };
+          }
+        } catch {}
+
+        // 2. Fallback
         const apiKey =
           payload?.apiKey ||
           process.env.COMPOSIO_API_KEY ||
@@ -907,7 +986,6 @@ app.on("second-instance", (_event, commandLine) => {
 
         if (!apiKey) return { success: false, items: [] };
 
-        const userId = payload?.userId || "learn_desktop_user";
         const res = await fetch(
           `https://backend.composio.dev/api/v3.1/connected_accounts?user_ids=${encodeURIComponent(
             userId
@@ -935,24 +1013,57 @@ app.on("second-instance", (_event, commandLine) => {
       payload: { toolSlug: string; arguments: any; userId?: string; apiKey?: string }
     ) => {
       const userId = payload.userId || "learn_desktop_user";
+      const routerBase = getRouterBaseUrl();
 
-      // Enforce weekly 300 tool call limit
+      // 1. Primary path: Router gateway (enforces 300/week quota and manages server credentials)
+      try {
+        const res = await fetch(`${routerBase}/mcp/execute`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-Device-Id": userId,
+            "X-User-Id": userId,
+          },
+          body: JSON.stringify({
+            toolSlug: payload.toolSlug,
+            arguments: payload.arguments,
+            userId,
+          }),
+        });
+
+        const json = await res.json().catch(() => ({}));
+
+        if (res.ok && json.success) {
+          recordComposioToolCall(payload.toolSlug, true, userId);
+          return { success: true, data: json.data || json.result };
+        } else if (res.status === 429 || json.error) {
+          recordComposioToolCall(payload.toolSlug, false, userId, json.error);
+          return { success: false, error: json.error };
+        }
+      } catch (routerErr) {
+        console.warn("[Composio execute-tool] Gateway warning, checking direct fallback:", routerErr);
+      }
+
+      // 2. Direct Composio fallback if local API key is configured
+      const apiKey =
+        payload.apiKey ||
+        process.env.COMPOSIO_API_KEY ||
+        process.env.VITE_COMPOSIO_API_KEY ||
+        "";
+
+      if (!apiKey) {
+        return {
+          success: false,
+          error: "Gagal mengeksekusi tool via Const Router Gateway.",
+        };
+      }
+
       const limitCheck = checkComposioLimit(userId);
       if (!limitCheck.allowed) {
         return { success: false, error: limitCheck.message };
       }
 
       try {
-        const apiKey =
-          payload.apiKey ||
-          process.env.COMPOSIO_API_KEY ||
-          process.env.VITE_COMPOSIO_API_KEY ||
-          "";
-        if (!apiKey) {
-          throw new Error("COMPOSIO_API_KEY is not configured. Please set COMPOSIO_API_KEY in .env.");
-        }
-
-        // 1. Create or resume session
         const sessRes = await fetch("https://backend.composio.dev/api/v3.1/tool_router/session", {
           method: "POST",
           headers: {
@@ -973,7 +1084,6 @@ app.on("second-instance", (_event, commandLine) => {
         const sessData = await sessRes.json();
         const sessionId = sessData.session_id;
 
-        // 2. Execute tool
         const execRes = await fetch(
           `https://backend.composio.dev/api/v3.1/tool_router/session/${sessionId}/execute`,
           {
@@ -1007,7 +1117,26 @@ app.on("second-instance", (_event, commandLine) => {
   );
 
   ipcMain.handle("composio:get-usage", async (_event, userId?: string) => {
-    return loadComposioUsage(userId || "learn_desktop_user");
+    const uid = userId || "learn_desktop_user";
+    const routerBase = getRouterBaseUrl();
+
+    try {
+      const res = await fetch(`${routerBase}/mcp/usage?userId=${encodeURIComponent(uid)}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.user) {
+          return {
+            used: data.user.used,
+            limit: data.user.limit,
+            remaining: data.user.remaining,
+            resetAt: data.user.resetAt,
+            byTool: data.user.byTool || {},
+          };
+        }
+      }
+    } catch {}
+
+    return loadComposioUsage(uid);
   });
 
   ipcMain.handle("shell:open-path", async (_event, targetPath: string) => {

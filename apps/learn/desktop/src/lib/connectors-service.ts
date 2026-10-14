@@ -103,15 +103,64 @@ export async function connectConnector(
     }
   }
 
-  // 2. Direct HTTP REST fallback (for web preview / fallback)
+  // 2. Direct Const Router MCP Gateway fallback (for web preview / non-IPC fallback)
   if (connector.authType !== "No Auth") {
+    const routerBase =
+      (import.meta as any).env?.VITE_CONST_ROUTER_BASE_URL ||
+      (import.meta as any).env?.CONST_ROUTER_BASE_URL ||
+      "https://router.const.web.id/v1";
+
+    try {
+      const res = await fetch(`${routerBase.replace(/\/+$/, "")}/mcp/auth-link`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Device-Id": userId,
+          "X-User-Id": userId,
+        },
+        body: JSON.stringify({
+          toolkit: targetSlug,
+          userId,
+          callbackUrl: "https://accounts.const.web.id/auth-success?connector=" + connector.id,
+        }),
+      });
+
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data.success && data.redirectUrl) {
+        if ((window as any).electron?.openExternal) {
+          await (window as any).electron.openExternal(data.redirectUrl);
+        } else {
+          window.open(data.redirectUrl, "_blank");
+        }
+
+        saveConnectedConnectorIds([...current, connector.id]);
+        if (data.connectedAccountId) {
+          localStorage.setItem(`composio_ca_${connector.id}`, data.connectedAccountId);
+        }
+
+        return {
+          success: true,
+          redirectUrl: data.redirectUrl,
+          message: `Membuka browser untuk otorisasi ${connector.name}... Silakan selesaikan login.`,
+        };
+      } else if (data.error) {
+        throw new Error(data.error);
+      }
+    } catch (routerErr: any) {
+      console.warn("[Router Gateway auth-link warning]", routerErr);
+      if (routerErr?.message && !routerErr.message.includes("fetch")) {
+        throw routerErr;
+      }
+    }
+
+    // 2b. Direct Composio fallback if local API key is configured
     if (!apiKey) {
       throw new Error(
-        `Composio API Key belum dikonfigurasi untuk menghubungkan ${connector.name}. Silakan tambahkan COMPOSIO_API_KEY di file .env atau Pengaturan.`
+        `Gagal menghubungkan ${connector.name} via Const Router Gateway.`
       );
     }
 
-    // 2a. Create or resume session
+    // 2c. Create or resume session
     const sessRes = await fetch("https://backend.composio.dev/api/v3.1/tool_router/session", {
       method: "POST",
       headers: {
@@ -132,7 +181,7 @@ export async function connectConnector(
     const sessData = await sessRes.json();
     const sessionId = sessData.session_id;
 
-    // 2b. Request link session with toolkit
+    // 2d. Request link session with toolkit
     const linkRes = await fetch(
       `https://backend.composio.dev/api/v3.1/tool_router/session/${sessionId}/link`,
       {
@@ -202,12 +251,24 @@ export async function disconnectConnector(connectorId: string): Promise<boolean>
           .disconnectAccount({ accountId: storedCa })
           .catch(() => {});
       } else {
-        const apiKey = getComposioApiKey();
-        if (apiKey) {
-          await fetch(`https://backend.composio.dev/api/v3.1/connected_accounts/${storedCa}`, {
-            method: "DELETE",
-            headers: { "x-api-key": apiKey },
-          }).catch(() => {});
+        const routerBase =
+          (import.meta as any).env?.VITE_CONST_ROUTER_BASE_URL ||
+          (import.meta as any).env?.CONST_ROUTER_BASE_URL ||
+          "https://router.const.web.id/v1";
+        try {
+          await fetch(`${routerBase.replace(/\/+$/, "")}/mcp/disconnect`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ accountId: storedCa }),
+          });
+        } catch {
+          const apiKey = getComposioApiKey();
+          if (apiKey) {
+            await fetch(`https://backend.composio.dev/api/v3.1/connected_accounts/${storedCa}`, {
+              method: "DELETE",
+              headers: { "x-api-key": apiKey },
+            }).catch(() => {});
+          }
         }
       }
     }

@@ -2771,11 +2771,59 @@ export async function executeComposioTool(
   signal?: AbortSignal
 ): Promise<{ result: any; isError: boolean }> {
   const norm = toolName.toLowerCase().replace(/[-_]/g, "");
+  const userId = process.env.COMPOSIO_USER_ID || "learn_desktop_user";
+
+  // 1. Primary path: Delegate execution to Const Router MCP Gateway
+  const routerBaseUrl = (
+    process.env.CONST_ROUTER_BASE_URL ||
+    process.env.VITE_CONST_ROUTER_BASE_URL ||
+    "https://router.const.web.id/v1"
+  ).replace(/\/+$/, "");
+
+  try {
+    const routerRes = await fetch(`${routerBaseUrl}/mcp/execute`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-User-Id": userId,
+      },
+      body: JSON.stringify({
+        toolSlug: toolName,
+        arguments: args,
+        userId,
+      }),
+      signal,
+    });
+
+    if (routerRes.ok) {
+      const routerData = await routerRes.json();
+      if (routerData.success && routerData.data) {
+        const d = routerData.data;
+        return {
+          result: typeof d === "string" ? d : JSON.stringify(d, null, 2),
+          isError: false,
+        };
+      }
+    } else if (routerRes.status === 429) {
+      const errData = await routerRes.json().catch(() => ({}));
+      return {
+        result: JSON.stringify({
+          error: errData.error || "Batas mingguan 300 tool call MCP telah tercapai.",
+          status: "limit_exceeded",
+          tool: toolName,
+        }),
+        isError: true,
+      };
+    }
+  } catch (routerErr) {
+    console.warn("[Agent Tool] Router MCP gateway unavailable, checking local fallback:", routerErr);
+  }
+
+  // 2. Secondary fallback: Local Composio execution if COMPOSIO_API_KEY is present
   const apiKey =
     process.env.COMPOSIO_API_KEY ||
     process.env.VITE_COMPOSIO_API_KEY ||
     "";
-  const userId = process.env.COMPOSIO_USER_ID || "learn_desktop_user";
 
   if (apiKey) {
     const limitCheck = checkAgentComposioLimit(userId);

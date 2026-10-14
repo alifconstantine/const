@@ -23,6 +23,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   X,
+  Boxes,
 } from "lucide-react";
 
 interface NavItem {
@@ -65,6 +66,11 @@ const navSections: NavSection[] = [
         title: "Endpoints",
         href: "/endpoints",
         icon: Terminal,
+      },
+      {
+        title: "MCP Tools",
+        href: "/mcp",
+        icon: Boxes,
       },
       {
         title: "Combos",

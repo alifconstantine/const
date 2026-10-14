@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { useRouterAuth } from "@/components/providers/convex-client-provider";
 import { useQuery } from "convex/react";
@@ -41,6 +41,7 @@ import {
   CalendarDays,
   Activity,
   Cpu,
+  Boxes,
 } from "lucide-react";
 
 function formatTokens(tokens?: number): string {
@@ -113,6 +114,20 @@ export default function DashboardOverviewPage() {
   const [copiedEndpoint, setCopiedEndpoint] = useState(false);
   const [copiedModel, setCopiedModel] = useState(false);
   const [copiedCurl, setCopiedCurl] = useState(false);
+
+  // MCP Weekly Tool Calls Usage
+  const [mcpUsage, setMcpUsage] = useState<{ count: number; limit: number; remaining: number } | null>(null);
+
+  useEffect(() => {
+    fetch("/v1/mcp/usage")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.usage) {
+          setMcpUsage(data.usage);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   // 52-Week aggregated data for the wave chart
   const { weeklyWaveData, maxWeeklyTokens, peakWeek } = useMemo<{
@@ -446,7 +461,7 @@ export default function DashboardOverviewPage() {
 
       {/* 3. Infrastructure & Performance Snapshot Strip */}
       <Card className="rounded-2xl border-border/70 bg-secondary/30 p-3.5 sm:p-4">
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 divide-y sm:divide-y-0 sm:divide-x divide-border/60">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 divide-y sm:divide-y-0 sm:divide-x divide-border/60">
           <div className="flex items-center gap-3 pt-2 sm:pt-0 sm:px-3 first:pl-1">
             <Server className="h-4 w-4 text-muted-foreground shrink-0" />
             <div>
@@ -494,6 +509,21 @@ export default function DashboardOverviewPage() {
               </div>
             </div>
           </div>
+
+          <Link
+            href="/mcp"
+            className="flex items-center gap-3 pt-2 sm:pt-0 sm:px-3 hover:opacity-80 transition-opacity"
+          >
+            <Boxes className="h-4 w-4 text-emerald-400 shrink-0" />
+            <div>
+              <div className="text-[11px] font-sans text-muted-foreground uppercase tracking-wider font-semibold">
+                MCP Tool Calls
+              </div>
+              <div className="text-base font-semibold font-sans text-foreground tabular-nums">
+                {mcpUsage ? `${mcpUsage.count} / ${mcpUsage.limit}` : "0 / 300"}
+              </div>
+            </div>
+          </Link>
 
           <div className="flex items-center gap-3 pt-2 sm:pt-0 sm:px-3">
             <Scale className="h-4 w-4 text-muted-foreground shrink-0" />

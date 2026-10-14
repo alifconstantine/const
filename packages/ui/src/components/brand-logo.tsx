@@ -185,6 +185,43 @@ export function BrandLogo({ id, name = "", size = "md", className = "" }: BrandL
   }
 
 
+  const ROUTER_HOSTED_LOGOS = [
+    "canva",
+    "canva_mcp",
+    "google-sheets",
+    "googlesheets",
+    "google-docs",
+    "googledocs",
+    "google-slides",
+    "googleslides",
+    "google-drive",
+    "googledrive",
+    "google-tasks",
+    "googletasks",
+    "google-classroom",
+    "googleclassroom",
+    "google-forms",
+    "googleforms",
+    "youtube",
+    "cloud-sandbox",
+    "codeinterpreter",
+    "composio",
+  ];
+
+  const isRouterHosted = ROUTER_HOSTED_LOGOS.includes(id.toLowerCase());
+  const normalizedHostedSlug = id.toLowerCase().replace(/_/g, "-");
+  const primaryLogoUrl = isRouterHosted
+    ? `https://router.const.web.id/assets/logos/${
+        normalizedHostedSlug === "canva-mcp"
+          ? "canva"
+          : normalizedHostedSlug === "codeinterpreter"
+            ? "cloud-sandbox"
+            : normalizedHostedSlug.startsWith("google") && !normalizedHostedSlug.includes("-")
+              ? normalizedHostedSlug.replace("google", "google-")
+              : normalizedHostedSlug
+      }.svg`
+    : `https://thesvg.org/icons/${resolvedSlug}/${svgFile}`;
+
   return (
     <div
       className={cn(
@@ -209,14 +246,23 @@ export function BrandLogo({ id, name = "", size = "md", className = "" }: BrandL
     >
       {!error ? (
         <img
-          src={`https://thesvg.org/icons/${resolvedSlug}/${svgFile}`}
+          src={primaryLogoUrl}
           alt={`${name || id} logo`}
           className={cn(
             "w-full h-full object-contain",
             shouldInvertInDarkMode ? "dark:invert" : ""
           )}
           loading="lazy"
-          onError={() => setError(true)}
+          onError={(e) => {
+            // Fallback from router to thesvg or monogram
+            const target = e.currentTarget;
+            if (isRouterHosted && !target.dataset.triedFallback) {
+              target.dataset.triedFallback = "true";
+              target.src = `https://thesvg.org/icons/${resolvedSlug}/${svgFile}`;
+            } else {
+              setError(true);
+            }
+          }}
         />
       ) : (
         <span>{monogram}</span>
