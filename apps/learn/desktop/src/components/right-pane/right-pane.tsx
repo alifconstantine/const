@@ -191,6 +191,11 @@ export function RightPane({
   const reviewBtnRef = useRef<HTMLButtonElement>(null);
   const [indicatorStyle, setIndicatorStyle] = useState<{ left: number; width: number }>({ left: 2, width: 0 });
 
+  const generatingCount = useMemo(() => {
+    return (artifacts || []).filter((a) => a.status === "generating").length;
+  }, [artifacts]);
+  const isAnyGenerating = generatingCount > 0;
+
   useEffect(() => {
     const activeRef = mode === "studio" ? studioBtnRef.current : reviewBtnRef.current;
     if (activeRef) {
@@ -199,7 +204,7 @@ export function RightPane({
         width: activeRef.offsetWidth,
       });
     }
-  }, [mode, mutations.length]);
+  }, [mode, mutations.length, isAnyGenerating, generatingCount]);
 
   const activeTab = tabs.find((t) => t.id === activeTabId) || tabs[0];
 
@@ -612,8 +617,17 @@ export function RightPane({
                       : "text-muted-foreground hover:text-foreground"
                   )}
                 >
-                  <PenTool className="w-3.5 h-3.5" />
+                  {isAnyGenerating ? (
+                    <RotateCw className="w-3.5 h-3.5 animate-spin text-purple-500 shrink-0" />
+                  ) : (
+                    <PenTool className="w-3.5 h-3.5 shrink-0" />
+                  )}
                   <span>{t("studio") || "Studio"}</span>
+                  {isAnyGenerating && (
+                    <span className="px-1.5 py-0.5 rounded-full bg-purple-500/15 text-purple-600 dark:text-purple-400 font-sans tabular-nums text-[10px] font-semibold ml-0.5 animate-pulse">
+                      {generatingCount}
+                    </span>
+                  )}
                 </button>
 
                 <button

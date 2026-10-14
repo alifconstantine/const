@@ -46,6 +46,7 @@ export interface GenerateStudioArtifactOptions {
   voiceModel?: string;
   voiceId?: string;
   audioLanguage?: string;
+  signal?: AbortSignal;
 }
 
 export interface GenerateVideoSummaryOptions {
@@ -62,6 +63,7 @@ export interface GenerateVideoSummaryOptions {
   deliveryMode?: string;
   speed?: number;
   customInstructions?: string;
+  signal?: AbortSignal;
 }
 
 export interface GenerateCheatSheetOptions {
@@ -71,6 +73,7 @@ export interface GenerateCheatSheetOptions {
   coverageMode: "short" | "auto" | "long";
   topicFocus?: string;
   language?: "id" | "en";
+  signal?: AbortSignal;
 }
 
 function getRouterBaseUrl(): string {
@@ -375,10 +378,15 @@ export async function generateStudioArtifact({
   voiceModel = "inworld-tts-2",
   voiceId = "Ashley",
   audioLanguage,
+  signal,
 }: GenerateStudioArtifactOptions): Promise<{
   title: string;
   data: QuizData | FlashcardData | MindMapData | AudioSummaryData;
 }> {
+  if (signal?.aborted) {
+    throw new Error("Generation aborted: workspace closed");
+  }
+
   // Aggregate source texts for grounding context
   const sourceSnippets = sources
     .slice(0, 5)
@@ -680,6 +688,10 @@ Rules:
         authToken: authToken || undefined,
         temperature: 0.3,
       });
+
+      if (signal?.aborted) {
+        throw new Error("Generation aborted: workspace closed");
+      }
 
       if (res?.success && res.content) {
         const parsed = extractJson(res.content);
@@ -2104,6 +2116,7 @@ export interface GeneratePresentationOptions {
   language?: "id" | "en";
   themeId?: "bold_dark" | "swiss_blue" | "sea_indigo" | "ash_lime" | string;
   customInstructions?: string;
+  signal?: AbortSignal;
 }
 
 /**
@@ -2816,6 +2829,7 @@ export interface GenerateInfographicOptions {
   customDescription?: string;
   providerId?: string;
   modelId?: string;
+  signal?: AbortSignal;
 }
 
 const INFOGRAPHIC_STYLE_DESCRIPTORS: Record<string, { labelId: string; labelEn: string; promptDesc: string }> = {
@@ -3161,6 +3175,7 @@ export interface GenerateReportArtifactOptions {
   depth?: "short" | "medium" | "long" | "auto";
   language?: "id" | "en";
   customInstructions?: string;
+  signal?: AbortSignal;
 }
 
 export async function generateReportArtifact({

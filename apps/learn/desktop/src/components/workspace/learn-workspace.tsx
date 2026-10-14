@@ -112,7 +112,29 @@ export function LearnWorkspace({
     });
   }, [learnId]);
 
-  // Auto-clean any stale stuck "generating" artifacts (e.g. from previous app crashes or interrupted renders)
+  const isMountedRef = useRef(true);
+  const activeGenerationsRef = useRef<Map<string, { abortController: AbortController; type: string }>>(new Map());
+
+  // Workspace unmount lifecycle: only abort active generations when completely exiting the workspace
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      for (const [artId, gen] of activeGenerationsRef.current.entries()) {
+        try {
+          gen.abortController.abort();
+        } catch {}
+        void localDb.updateArtifact(artId, {
+          status: "error",
+          error: "Cancelled: workspace closed",
+        }).catch(() => {});
+      }
+      activeGenerationsRef.current.clear();
+    };
+  }, []);
+
+  // Auto-clean any truly abandoned "generating" artifacts from previous crashed sessions (older than 15 minutes)
+  // ONLY run on initial workspace mount, NEVER delete active generations running in this session!
   useEffect(() => {
     if (!learnId) return;
     const cleanupStale = async () => {
@@ -120,11 +142,18 @@ export function LearnWorkspace({
         const stuck = await db.artifacts
           .where("learnId")
           .equals(learnId)
-          .filter((a) => a.status === "generating" && (!a.createdAt || Date.now() - a.createdAt > 15 * 1000))
+          .filter((a) => {
+            if (a.status !== "generating") return false;
+            if (activeGenerationsRef.current.has(a.id)) return false;
+            return !a.createdAt || Date.now() - a.createdAt > 15 * 60 * 1000;
+          })
           .toArray();
         for (const item of stuck) {
-          console.log("[learn-workspace] Auto-cleaning stuck generating artifact:", item.id);
-          await db.artifacts.delete(item.id);
+          console.log("[learn-workspace] Marking abandoned generating artifact as error:", item.id);
+          await localDb.updateArtifact(item.id, {
+            status: "error",
+            error: "Generation interrupted",
+          });
         }
         // Auto-clean any duplicate sources
         await localDb.deduplicateSources(learnId);
@@ -133,7 +162,7 @@ export function LearnWorkspace({
       }
     };
     cleanupStale();
-  }, [learnId, artifacts]);
+  }, [learnId]);
 
   // Dialog & Panel states
   const [isAddSourceOpen, setIsAddSourceOpen] = useState(initialSourceModalOpen);
@@ -752,6 +781,9 @@ export function LearnWorkspace({
       content: "",
     });
 
+    const abortController = new AbortController();
+    activeGenerationsRef.current.set(artId, { abortController, type: params.type });
+
     try {
       // Call background AI generator
       const result = await generateStudioArtifact({
@@ -768,7 +800,12 @@ export function LearnWorkspace({
         voiceModel: params.voiceModel,
         voiceId: params.voiceId,
         audioLanguage: params.language,
+        signal: abortController.signal,
       });
+
+      if (!isMountedRef.current || abortController.signal.aborted) {
+        return;
+      }
 
       // Update Dexie artifact to completed
       await localDb.updateArtifact(artId, {
@@ -778,33 +815,42 @@ export function LearnWorkspace({
         status: "completed",
       });
 
-      toast.success(
-        params.type === "quiz"
-          ? t("quizCreatedSuccess")
-          : params.type === "flashcard"
-          ? t("flashcardsCreatedSuccess")
-          : params.type === "mind_map"
-          ? t("mindMapCreatedSuccess")
-          : params.type === "audio_summary"
-          ? t("audioSummaryCreatedSuccess")
-          : t("presentationCreatedSuccess")
-      );
+      if (isMountedRef.current) {
+        toast.success(
+          params.type === "quiz"
+            ? t("quizCreatedSuccess")
+            : params.type === "flashcard"
+            ? t("flashcardsCreatedSuccess")
+            : params.type === "mind_map"
+            ? t("mindMapCreatedSuccess")
+            : params.type === "audio_summary"
+            ? t("audioSummaryCreatedSuccess")
+            : t("presentationCreatedSuccess")
+        );
 
-      // Auto-open in preview & auto-widen
-      const fullArt = await localDb.getArtifact(artId);
-      if (fullArt) {
-        handleOpenStudioArtifact(fullArt);
+        // Auto-open in preview & auto-widen
+        const fullArt = await localDb.getArtifact(artId);
+        if (fullArt) {
+          handleOpenStudioArtifact(fullArt);
+        }
       }
     } catch (err: any) {
+      if (abortController.signal.aborted) {
+        return;
+      }
       console.error("Failed to generate studio artifact:", err);
       await localDb.updateArtifact(artId, {
         title,
         status: "error",
         error: err?.message || "Generation failed",
       });
-      toast.error(
-        t("failedCreateMaterial", { error: err?.message || t("errorOccurred") })
-      );
+      if (isMountedRef.current) {
+        toast.error(
+          t("failedCreateMaterial", { error: err?.message || t("errorOccurred") })
+        );
+      }
+    } finally {
+      activeGenerationsRef.current.delete(artId);
     }
   };
 
@@ -840,6 +886,9 @@ export function LearnWorkspace({
       content: "",
     });
 
+    const abortController = new AbortController();
+    activeGenerationsRef.current.set(artId, { abortController, type: "video_summary" });
+
     try {
       // 2. Call generator in background
       const result = await generateVideoSummaryArtifact({
@@ -856,7 +905,12 @@ export function LearnWorkspace({
         deliveryMode: params.deliveryMode,
         speed: params.speed,
         customInstructions: params.customInstructions,
+        signal: abortController.signal,
       });
+
+      if (!isMountedRef.current || abortController.signal.aborted) {
+        return;
+      }
 
       // 3. Update artifact in Dexie
       await localDb.updateArtifact(artId, {
@@ -866,23 +920,32 @@ export function LearnWorkspace({
         status: "completed",
       });
 
-      toast.success(t("videoSummaryCreatedSuccess"));
+      if (isMountedRef.current) {
+        toast.success(t("videoSummaryCreatedSuccess"));
 
-      // 4. Auto-open in preview & auto-widen
-      const fullArt = await localDb.getArtifact(artId);
-      if (fullArt) {
-        handleOpenStudioArtifact(fullArt);
+        // 4. Auto-open in preview & auto-widen
+        const fullArt = await localDb.getArtifact(artId);
+        if (fullArt) {
+          handleOpenStudioArtifact(fullArt);
+        }
       }
     } catch (err: any) {
+      if (abortController.signal.aborted) {
+        return;
+      }
       console.error("Failed to generate video summary:", err);
       await localDb.updateArtifact(artId, {
         title,
         status: "error",
         error: err?.message || "Generation failed",
       });
-      toast.error(
-        t("failedCreateVideoSummary", { error: err?.message || t("errorOccurred") })
-      );
+      if (isMountedRef.current) {
+        toast.error(
+          t("failedCreateVideoSummary", { error: err?.message || t("errorOccurred") })
+        );
+      }
+    } finally {
+      activeGenerationsRef.current.delete(artId);
     }
   };
 
@@ -914,6 +977,9 @@ export function LearnWorkspace({
       content: "",
     });
 
+    const abortController = new AbortController();
+    activeGenerationsRef.current.set(artId, { abortController, type: "slides" });
+
     try {
       // 2. Call generator in background
       const result = await generatePresentationArtifact({
@@ -926,7 +992,12 @@ export function LearnWorkspace({
         themeId: params.themeId || "bold_dark",
         language: targetLang,
         customInstructions: params.customInstructions,
+        signal: abortController.signal,
       });
+
+      if (!isMountedRef.current || abortController.signal.aborted) {
+        return;
+      }
 
       // 3. Update artifact in Dexie
       await localDb.updateArtifact(artId, {
@@ -936,23 +1007,32 @@ export function LearnWorkspace({
         status: "completed",
       });
 
-      toast.success(t("presentationCreatedSuccess"));
+      if (isMountedRef.current) {
+        toast.success(t("presentationCreatedSuccess"));
 
-      // 4. Auto-open in preview & auto-widen
-      const fullArt = await localDb.getArtifact(artId);
-      if (fullArt) {
-        handleOpenStudioArtifact(fullArt);
+        // 4. Auto-open in preview & auto-widen
+        const fullArt = await localDb.getArtifact(artId);
+        if (fullArt) {
+          handleOpenStudioArtifact(fullArt);
+        }
       }
     } catch (err: any) {
+      if (abortController.signal.aborted) {
+        return;
+      }
       console.error("Failed to generate presentation:", err);
       await localDb.updateArtifact(artId, {
         title,
         status: "error",
         error: err?.message || "Generation failed",
       });
-      toast.error(
-        t("failedCreatePresentation", { error: err?.message || t("errorOccurred") })
-      );
+      if (isMountedRef.current) {
+        toast.error(
+          t("failedCreatePresentation", { error: err?.message || t("errorOccurred") })
+        );
+      }
+    } finally {
+      activeGenerationsRef.current.delete(artId);
     }
   };
 
@@ -988,6 +1068,9 @@ export function LearnWorkspace({
     setIsStudioCollapsed(false);
     setRightPaneMode("studio");
 
+    const abortController = new AbortController();
+    activeGenerationsRef.current.set(artId, { abortController, type: "infographic" });
+
     try {
       const result = await generateInfographicArtifact({
         artifactId: artId,
@@ -1000,7 +1083,12 @@ export function LearnWorkspace({
         customDescription: params.customDescription,
         providerId: params.providerId,
         modelId: params.modelId,
+        signal: abortController.signal,
       });
+
+      if (!isMountedRef.current || abortController.signal.aborted) {
+        return;
+      }
 
       await localDb.updateArtifact(artId, {
         title: result.title || title,
@@ -1009,22 +1097,31 @@ export function LearnWorkspace({
         status: "completed",
       });
 
-      toast.success(t("infographicCreatedSuccess"));
+      if (isMountedRef.current) {
+        toast.success(t("infographicCreatedSuccess"));
 
-      const fullArt = await localDb.getArtifact(artId);
-      if (fullArt) {
-        handleOpenStudioArtifact(fullArt);
+        const fullArt = await localDb.getArtifact(artId);
+        if (fullArt) {
+          handleOpenStudioArtifact(fullArt);
+        }
       }
     } catch (err: any) {
+      if (abortController.signal.aborted) {
+        return;
+      }
       console.error("Failed to generate infographic:", err);
       await localDb.updateArtifact(artId, {
         title,
         status: "error",
         error: err?.message || "Generation failed",
       });
-      toast.error(
-        t("failedCreateInfographic", { error: err?.message || t("errorOccurred") })
-      );
+      if (isMountedRef.current) {
+        toast.error(
+          t("failedCreateInfographic", { error: err?.message || t("errorOccurred") })
+        );
+      }
+    } finally {
+      activeGenerationsRef.current.delete(artId);
     }
   };
 
@@ -1057,6 +1154,9 @@ export function LearnWorkspace({
       content: "",
     });
 
+    const abortController = new AbortController();
+    activeGenerationsRef.current.set(artId, { abortController, type: "report" });
+
     try {
       // 2. Call generator in background
       const result = await generateReportArtifact({
@@ -1070,7 +1170,12 @@ export function LearnWorkspace({
         depth: params.depth,
         language: params.language,
         customInstructions: params.customInstructions,
+        signal: abortController.signal,
       });
+
+      if (!isMountedRef.current || abortController.signal.aborted) {
+        return;
+      }
 
       // 3. Update artifact in Dexie
       await localDb.updateArtifact(artId, {
@@ -1080,23 +1185,32 @@ export function LearnWorkspace({
         status: "completed",
       });
 
-      toast.success(t("reportCreatedSuccess"));
+      if (isMountedRef.current) {
+        toast.success(t("reportCreatedSuccess"));
 
-      // 4. Auto-open in preview & auto-widen
-      const fullArt = await localDb.getArtifact(artId);
-      if (fullArt) {
-        handleOpenStudioArtifact(fullArt);
+        // 4. Auto-open in preview & auto-widen
+        const fullArt = await localDb.getArtifact(artId);
+        if (fullArt) {
+          handleOpenStudioArtifact(fullArt);
+        }
       }
     } catch (err: any) {
+      if (abortController.signal.aborted) {
+        return;
+      }
       console.error("Failed to generate report:", err);
       await localDb.updateArtifact(artId, {
         title,
         status: "error",
         error: err?.message || "Generation failed",
       });
-      toast.error(
-        t("failedCreateReport", { error: err?.message || t("errorOccurred") })
-      );
+      if (isMountedRef.current) {
+        toast.error(
+          t("failedCreateReport", { error: err?.message || t("errorOccurred") })
+        );
+      }
+    } finally {
+      activeGenerationsRef.current.delete(artId);
     }
   };
 
@@ -1126,6 +1240,9 @@ export function LearnWorkspace({
       content: "",
     });
 
+    const abortController = new AbortController();
+    activeGenerationsRef.current.set(artId, { abortController, type: "cheatsheet" });
+
     try {
       const result = await generateCheatSheetArtifact({
         artifactId: artId,
@@ -1134,7 +1251,12 @@ export function LearnWorkspace({
         coverageMode: params.coverageMode,
         topicFocus: params.topicFocus,
         language: targetLang,
+        signal: abortController.signal,
       });
+
+      if (!isMountedRef.current || abortController.signal.aborted) {
+        return;
+      }
 
       await localDb.updateArtifact(artId, {
         title: result.title || title,
@@ -1143,26 +1265,31 @@ export function LearnWorkspace({
         status: "completed",
       });
 
-      toast.success(t("cheatSheetCreatedSuccess"));
+      if (isMountedRef.current) {
+        toast.success(t("cheatSheetCreatedSuccess"));
 
-      const fullArt = await localDb.getArtifact(artId);
-      if (fullArt) {
-        handleOpenStudioArtifact(fullArt);
+        const fullArt = await localDb.getArtifact(artId);
+        if (fullArt) {
+          handleOpenStudioArtifact(fullArt);
+        }
       }
     } catch (err: any) {
+      if (abortController.signal.aborted) {
+        return;
+      }
       console.error("Failed to generate cheatsheet:", err);
       await localDb.updateArtifact(artId, {
         title,
         status: "error",
         error: err?.message || "Generation failed",
       });
-      toast.error(
-        t("failedCreateCheatSheet", { error: err?.message || t("errorOccurred") })
-      );
-      const fullArt = await localDb.getArtifact(artId);
-      if (fullArt) {
-        handleOpenStudioArtifact(fullArt);
+      if (isMountedRef.current) {
+        toast.error(
+          t("failedCreateCheatSheet", { error: err?.message || t("errorOccurred") })
+        );
       }
+    } finally {
+      activeGenerationsRef.current.delete(artId);
     }
   };
 
