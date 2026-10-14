@@ -100,8 +100,6 @@ export function StudioSheet({
     return t("relativeDaysAgo", { days: diffDay });
   };
 
-  const [studioCategory, setStudioCategory] = useState<string>("all");
-
   const getArtifactIcon = (type: string, isZip?: boolean) => {
     if (isZip) return Package;
     const t = (type || "").toLowerCase().trim();
@@ -138,51 +136,6 @@ export function StudioSheet({
         return SquarePen;
     }
   };
-
-  const studioCategories = useMemo(() => {
-    if (!artifacts || artifacts.length === 0) return [];
-
-    let audio = 0;
-    let quiz = 0;
-    let mindmap = 0;
-    let notes = 0;
-    let visuals = 0;
-
-    for (const art of artifacts) {
-      const type = (art.type || "").toLowerCase().trim();
-      if (type === "audio_summary" || type === "audio") audio++;
-      else if (type === "quiz" || type === "flashcard" || type === "flashcards") quiz++;
-      else if (type === "mind_map" || type === "mindmap" || type === "diagram") mindmap++;
-      else if (type === "note" || type === "notes" || type === "report" || type === "cheatsheet") notes++;
-      else if (type === "infographic" || type === "video" || type === "video_summary" || type === "slide" || type === "slides") visuals++;
-      else notes++;
-    }
-
-    const cats: Array<{ id: string; label: string; count: number }> = [
-      { id: "all", label: t("studioFilterAll"), count: artifacts.length },
-    ];
-    if (audio > 0) cats.push({ id: "audio", label: t("studioFilterAudio"), count: audio });
-    if (quiz > 0) cats.push({ id: "quiz", label: t("studioFilterQuizzes"), count: quiz });
-    if (mindmap > 0) cats.push({ id: "mindmap", label: t("studioFilterMindMaps"), count: mindmap });
-    if (notes > 0) cats.push({ id: "notes", label: t("studioFilterNotes"), count: notes });
-    if (visuals > 0) cats.push({ id: "visuals", label: t("studioFilterVisuals"), count: visuals });
-
-    return cats;
-  }, [artifacts, t]);
-
-  const filteredArtifacts = useMemo(() => {
-    if (!artifacts) return [];
-    if (studioCategory === "all") return artifacts;
-    return artifacts.filter((art) => {
-      const type = (art.type || "").toLowerCase().trim();
-      if (studioCategory === "audio") return type === "audio_summary" || type === "audio";
-      if (studioCategory === "quiz") return type === "quiz" || type === "flashcard" || type === "flashcards";
-      if (studioCategory === "mindmap") return type === "mind_map" || type === "mindmap" || type === "diagram";
-      if (studioCategory === "notes") return type === "note" || type === "notes" || type === "report" || type === "cheatsheet";
-      if (studioCategory === "visuals") return type === "infographic" || type === "video" || type === "video_summary" || type === "slide" || type === "slides";
-      return true;
-    });
-  }, [artifacts, studioCategory]);
 
   return (
     <>
@@ -296,7 +249,7 @@ export function StudioSheet({
           <div className="space-y-2 pt-1 flex-1">
             <div className="flex items-center justify-between px-0.5">
               <span className="text-xs font-semibold text-foreground">
-                {t("studioOutputs")}
+                {t("artifacts")}
               </span>
               {artifacts && artifacts.length > 0 && (
                 <span className="text-[10.5px] font-sans px-2 py-0.5 rounded-full bg-secondary border border-border/70 text-muted-foreground">
@@ -305,38 +258,8 @@ export function StudioSheet({
               )}
             </div>
 
-            {studioCategories.length > 2 && (
-              <div className="flex items-center gap-1 overflow-x-auto no-scrollbar py-0.5">
-                {studioCategories.map((cat) => (
-                  <button
-                    key={cat.id}
-                    type="button"
-                    onClick={() => setStudioCategory(cat.id)}
-                    className={cn(
-                      "text-[10px] px-2 py-0.5 rounded-lg font-medium transition-all shrink-0 cursor-pointer flex items-center gap-1",
-                      studioCategory === cat.id
-                        ? "bg-primary text-primary-foreground shadow-2xs"
-                        : "bg-secondary/60 hover:bg-secondary text-muted-foreground hover:text-foreground border border-border/50"
-                    )}
-                  >
-                    <span>{cat.label}</span>
-                    <span
-                      className={cn(
-                        "text-[9px] px-1 rounded-full",
-                        studioCategory === cat.id
-                          ? "bg-primary-foreground/20 text-primary-foreground"
-                          : "text-muted-foreground"
-                      )}
-                    >
-                      {cat.count}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            )}
-
             <div className="space-y-2">
-              {filteredArtifacts.map((art) => {
+              {(artifacts || []).map((art) => {
                 const isGenerating = art.status === "generating";
                 const ItemIcon = getArtifactIcon(art.type, art.isZip);
 
