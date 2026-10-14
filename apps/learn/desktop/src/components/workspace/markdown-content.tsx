@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { marked, type Token, type Tokens } from "marked";
 import { Check, Copy, Download, Maximize2, X } from "lucide-react";
 import { cn, ScrollArea } from "@const/ui";
@@ -124,31 +124,34 @@ interface MarkdownContentProps {
   onOpenBrowser?: (url: string) => void;
 }
 
-export function MarkdownContent({
+export const MarkdownContent = React.memo(function MarkdownContent({
   content,
   className = "",
   sourcesMap,
   onSourceClick,
   onOpenBrowser,
 }: MarkdownContentProps) {
+  const tokens = useMemo(() => {
+    if (!content || typeof content !== "string") return [];
+
+    // Sanitize currency and escaped math hallucinations (e.g. \1.60$ -> $1.60)
+    let normalizedContent = sanitizeCurrencyAndMath(content);
+
+    // Normalize single-space indented list items so they parse cleanly into nested lists
+    normalizedContent = normalizedContent.replace(/\n( +)([*+-]) /g, (match, spaces, bullet) => {
+      return spaces.length === 1 ? `\n  ${bullet} ` : match;
+    });
+
+    // Extract any citations trapped inside math delimiters ($...$, $$...$$, \[...\], \(...\))
+    normalizedContent = extractCitationsFromMathText(normalizedContent);
+
+    // Convert [source:id] citations into markdown anchor links
+    normalizedContent = convertReferencesToMarkdownLinks(normalizedContent, sourcesMap);
+
+    return marked.lexer(normalizedContent);
+  }, [content, sourcesMap]);
+
   if (!content || typeof content !== "string") return null;
-
-  // Sanitize currency and escaped math hallucinations (e.g. \1.60$ -> $1.60)
-  let normalizedContent = sanitizeCurrencyAndMath(content);
-
-  // Normalize single-space indented list items so they parse cleanly into nested lists
-  normalizedContent = normalizedContent.replace(/\n( +)([*+-]) /g, (match, spaces, bullet) => {
-    return spaces.length === 1 ? `\n  ${bullet} ` : match;
-  });
-
-  // Extract any citations trapped inside math delimiters ($...$, $$...$$, \[...\], \(...\))
-  normalizedContent = extractCitationsFromMathText(normalizedContent);
-
-  // Convert [source:id] citations into markdown anchor links
-  normalizedContent = convertReferencesToMarkdownLinks(normalizedContent, sourcesMap);
-
-  const tokens = marked.lexer(normalizedContent);
-
   const handleClick = (e: React.MouseEvent) => {
     const target = (e.target as HTMLElement).closest("a");
     if (target) {
@@ -188,7 +191,7 @@ export function MarkdownContent({
       ))}
     </div>
   );
-}
+});
 
 function TokenRenderer({
   token,

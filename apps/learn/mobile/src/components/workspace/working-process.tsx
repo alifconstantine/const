@@ -93,7 +93,7 @@ export function SmoothCollapse({
  * - Sub-collapsible reasoning: "Thought for a few seconds ⌄"
  * - Unified chronological tool rows (Google Slides, Canva, Roadmap, Terminal, Files, etc.)
  */
-export function WorkingProcess({
+export const WorkingProcess = React.memo(function WorkingProcess({
   thinking = "",
   isExecuting = false,
   durationMs,
@@ -370,7 +370,7 @@ export function WorkingProcess({
       </SmoothCollapse>
     </div>
   );
-}
+});
 
 // ---------------------------------------------------------------------------
 // 1. Thought Item: Minimalist thinking accordion matching Image 2

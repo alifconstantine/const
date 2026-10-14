@@ -98,7 +98,7 @@ export function SmoothCollapse({
   );
 }
 
-export function ExecutionTrace({
+export const ExecutionTrace = React.memo(function ExecutionTrace({
   thinking,
   toolCalls = [],
   traceSteps = [],
@@ -455,7 +455,7 @@ export function ExecutionTrace({
       )}
     </div>
   );
-}
+});
 
 // ---------------------------------------------------------------------------
 // 1. Thought Item: Minimalist thinking accordion matching apps/harness/desktop

@@ -25,6 +25,7 @@ export interface RichMentionEditorProps {
   initialValue?: string;
   placeholder?: string;
   disabled?: boolean;
+  isMultiline?: boolean;
   className?: string;
   onSerializedChange?: (value: string) => void;
   onMentionTokenChange?: (token: ActiveAtToken | null) => void;
@@ -175,6 +176,7 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
       initialValue = "",
       placeholder = "Tanya apapun, gunakan @ untuk referensi materi belajar...",
       disabled = false,
+      isMultiline = false,
       className,
       onSerializedChange,
       onMentionTokenChange,
@@ -207,7 +209,7 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
       if (!editorRef.current) return;
       const editor = editorRef.current;
       const serialized = serializeContainer(editor);
-      const textForCheck = editor.innerText.replace(/\r?\n/g, "").trim();
+      const textForCheck = (editor.textContent || "").replace(/\r?\n/g, "").trim();
       const hasBadges = Boolean(editor.querySelector('[data-mention-token="true"]'));
       const empty = textForCheck.length === 0 && !hasBadges;
       setIsEmpty(empty);
@@ -215,6 +217,12 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
       if (lastEmittedValueRef.current !== serialized) {
         lastEmittedValueRef.current = serialized;
         onSerializedChange?.(serialized);
+      }
+
+      // Fast-path: If text does not contain '@', skip expensive DOM selection cloning and tree traversal
+      if (!serialized.includes("@")) {
+        onMentionTokenChange?.(null);
+        return;
       }
 
       // Check for active @ token at cursor
@@ -498,10 +506,15 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
     }, [initialValue]);
 
     return (
-      <div className="relative w-full flex items-center min-h-[28px]">
+      <div className={cn("relative w-full", isMultiline ? "min-h-[44px]" : "min-h-[28px] flex items-center")}>
         {/* Placeholder label */}
         {isEmpty && (
-          <span className="absolute left-0 top-0 py-1 text-[14px] text-muted-foreground/60 pointer-events-none select-none font-sans truncate pr-2">
+          <span
+            className={cn(
+              "absolute left-0 text-[14px] text-muted-foreground/60 pointer-events-none select-none font-sans truncate pr-2",
+              isMultiline ? "top-1.5 py-0 px-1" : "top-0 py-1 px-1.5"
+            )}
+          >
             {placeholder}
           </span>
         )}
@@ -562,7 +575,10 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
             }
           }}
           className={cn(
-            "w-full min-h-[28px] max-h-48 overflow-y-auto outline-none focus:outline-none text-[14px] leading-5 text-foreground font-sans break-words whitespace-pre-wrap select-text py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+            "w-full outline-none focus:outline-none text-[14px] font-sans break-words whitespace-pre-wrap select-text [scrollbar-width:none] [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none]",
+            isMultiline
+              ? "leading-relaxed py-1 min-h-[44px] sm:min-h-[48px] max-h-48 sm:max-h-56 overflow-y-auto px-1"
+              : "leading-5 py-0.5 h-[28px] max-h-[28px] overflow-hidden px-1.5",
             disabled ? "opacity-50 cursor-not-allowed" : "cursor-text",
             className
           )}

@@ -109,7 +109,10 @@ export function ChatInputCard({
     if (!textarea) return;
 
     if (!isMultiline && attachments.length === 0) {
-      textarea.style.height = `${SINGLE_LINE_HEIGHT}px`;
+      const singlePx = `${SINGLE_LINE_HEIGHT}px`;
+      if (textarea.style.height !== singlePx) {
+        textarea.style.height = singlePx;
+      }
       return;
     }
 
@@ -118,7 +121,10 @@ export function ChatInputCard({
       Math.max(MIN_MULTILINE_HEIGHT, textarea.scrollHeight),
       MAX_MULTILINE_HEIGHT
     );
-    textarea.style.height = `${nextHeight}px`;
+    const nextPx = `${nextHeight}px`;
+    if (textarea.style.height !== nextPx) {
+      textarea.style.height = nextPx;
+    }
   };
 
   const handleInputChange = (val: string) => {
@@ -131,7 +137,7 @@ export function ChatInputCard({
 
     if (!val.trim()) {
       if (isMultiline) setIsMultiline(false);
-      if (textareaRef.current) {
+      if (textareaRef.current && textareaRef.current.style.height !== `${SINGLE_LINE_HEIGHT}px`) {
         textareaRef.current.style.height = `${SINGLE_LINE_HEIGHT}px`;
       }
       return;
@@ -142,10 +148,10 @@ export function ChatInputCard({
       return;
     }
 
-    // In single-line mode, detect if text has wrapped beyond single-line width
+    // In single-line mode, only check scrollHeight if text is long enough to potentially wrap (> 35 chars)
     const textarea = textareaRef.current;
     if (textarea && !isMultiline) {
-      if (textarea.scrollHeight > SINGLE_LINE_HEIGHT + 4) {
+      if (val.length > 35 && textarea.scrollHeight > SINGLE_LINE_HEIGHT + 4) {
         setIsMultiline(true);
         return;
       }
@@ -154,7 +160,7 @@ export function ChatInputCard({
     // Collapse back if user deletes back to a short string (<= 30 chars) without newlines
     if (isMultiline && val.length <= 30 && !val.includes("\n") && attachments.length === 0) {
       setIsMultiline(false);
-      if (textarea) {
+      if (textarea && textarea.style.height !== `${SINGLE_LINE_HEIGHT}px`) {
         textarea.style.height = `${SINGLE_LINE_HEIGHT}px`;
       }
       return;
@@ -169,11 +175,13 @@ export function ChatInputCard({
       if (!isMultiline) setIsMultiline(true);
     } else if (!inputMessage.trim()) {
       if (isMultiline) setIsMultiline(false);
-      textarea.style.height = `${SINGLE_LINE_HEIGHT}px`;
+      if (textarea.style.height !== `${SINGLE_LINE_HEIGHT}px`) {
+        textarea.style.height = `${SINGLE_LINE_HEIGHT}px`;
+      }
       return;
     } else if (inputMessage.includes("\n")) {
       if (!isMultiline) setIsMultiline(true);
-    } else if (!isMultiline && textarea.scrollHeight > SINGLE_LINE_HEIGHT + 4) {
+    } else if (!isMultiline && inputMessage.length > 35 && textarea.scrollHeight > SINGLE_LINE_HEIGHT + 4) {
       setIsMultiline(true);
     }
 

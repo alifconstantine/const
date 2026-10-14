@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from "react";
 import {
   ArrowRight,
   ArrowUp,
@@ -410,13 +410,11 @@ export function ChatPanel({
       }
       setTimeout(() => {
         editorRef.current?.focus();
-        textareaRef.current?.focus();
       }, 50);
     },
   });
   const fileInputRef = useRef<HTMLInputElement>(null);
   const editorRef = useRef<RichMentionEditorRef>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const modelDropdownRef = useRef<HTMLDivElement>(null);
   const [isContextOpen, setIsContextOpen] = useState(false);
   const contextMenuRef = useRef<HTMLDivElement>(null);
@@ -462,42 +460,6 @@ export function ChatPanel({
     }
   }, [permissionMode, activeApproval, isRespondingApproval]);
 
-  const SINGLE_LINE_HEIGHT = 28;
-  const MIN_MULTILINE_HEIGHT = 48;
-  const MAX_MULTILINE_HEIGHT = 220;
-
-  // Auto-grow textarea height calculation (only applies to multi-line mode)
-  const adjustHeight = () => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
-
-    // Viewport element from Radix ScrollArea
-    const viewport = textarea.closest(
-      "[data-radix-scroll-area-viewport]"
-    ) as HTMLElement | null;
-    const prevScrollTop = viewport ? viewport.scrollTop : 0;
-
-    if (!isMultiline && attachments.length === 0) {
-      textarea.style.height = `${SINGLE_LINE_HEIGHT}px`;
-      return;
-    }
-
-    textarea.style.height = "auto";
-    const nextHeight = Math.max(MIN_MULTILINE_HEIGHT, textarea.scrollHeight);
-    textarea.style.height = `${nextHeight}px`;
-
-    // Handle scroll position in viewport
-    if (viewport) {
-      const isNearBottom =
-        viewport.scrollHeight - viewport.clientHeight - prevScrollTop < 40;
-      if (isNearBottom) {
-        viewport.scrollTop = viewport.scrollHeight;
-      } else if (prevScrollTop > 0) {
-        viewport.scrollTop = prevScrollTop;
-      }
-    }
-  };
-
   // Input change handler ensuring reliable return to single-line pill when empty
   const handleInputChange = (val: string) => {
     setInputMessage(val);
@@ -506,9 +468,6 @@ export function ChatPanel({
     if (!val.trim() && attachments.length === 0) {
       if (isMultiline) {
         setIsMultiline(false);
-      }
-      if (textareaRef.current) {
-        textareaRef.current.style.height = `${SINGLE_LINE_HEIGHT}px`;
       }
       return;
     }
@@ -522,9 +481,9 @@ export function ChatPanel({
     }
 
     // 3. In single-line mode, detect if text has wrapped beyond single-line width
-    const textarea = textareaRef.current;
-    if (textarea && !isMultiline) {
-      if (textarea.scrollHeight > SINGLE_LINE_HEIGHT + 4) {
+    const el = editorRef.current?.getElement();
+    if (!isMultiline) {
+      if ((el && el.scrollHeight > 34) || val.length > 60) {
         setIsMultiline(true);
         return;
       }
@@ -533,30 +492,22 @@ export function ChatPanel({
     // 4. When in multi-line mode but text is single line and short (<= 30 chars) without attachments, collapse back
     if (isMultiline && val.length <= 30 && !val.includes("\n") && attachments.length === 0) {
       setIsMultiline(false);
-      if (textarea) {
-        textarea.style.height = `${SINGLE_LINE_HEIGHT}px`;
-      }
       return;
     }
   };
 
   useEffect(() => {
-    const textarea = textareaRef.current;
-    if (!textarea) return;
+    const el = editorRef.current?.getElement();
 
     if (attachments.length > 0) {
       if (!isMultiline) setIsMultiline(true);
     } else if (!inputMessage.trim()) {
       if (isMultiline) setIsMultiline(false);
-      textarea.style.height = `${SINGLE_LINE_HEIGHT}px`;
-      return;
     } else if (inputMessage.includes("\n")) {
       if (!isMultiline) setIsMultiline(true);
-    } else if (!isMultiline && textarea.scrollHeight > SINGLE_LINE_HEIGHT + 4) {
+    } else if (!isMultiline && ((el && el.scrollHeight > 34) || inputMessage.length > 60)) {
       setIsMultiline(true);
     }
-
-    adjustHeight();
   }, [inputMessage, attachments.length, isMultiline]);
 
   // Execution timing state
@@ -799,7 +750,7 @@ export function ChatPanel({
     return map;
   }, [sources]);
 
-  const handleCitationClick = (sourceId: string) => {
+  const handleCitationClick = useCallback((sourceId: string) => {
     const cleanId = sourceId.replace(/^\[?source:/i, "").replace(/^source_/, "").replace(/\]$/, "");
     const src =
       sourcesMap.get(cleanId) ||
@@ -811,23 +762,49 @@ export function ChatPanel({
     } else {
       toast.info(`Sumber ID: ${sourceId}`);
     }
-  };
+  }, [sourcesMap]);
 
   // Dynamic telemetry metrics for active conversation (matching apps/harness/desktop)
   const conversationMetrics = useMemo(() => {
     return calculateConversationMetrics(messages);
   }, [messages]);
 
-  // Context window usage estimation for learning sources and discussion history
-  const contextUsage = useMemo(() => {
+  // Base context window usage estimation (memoized across sources and messages - does not recalculate on keystroke)
+  const baseContextUsage = useMemo(() => {
     const totalTokens = parseContextWindowTokens((currentModel as any)?.contextWindow);
     return calculateContextUsage({
       sources,
       messages,
-      draftInput: inputMessage,
       totalTokens,
     });
-  }, [sources, messages, inputMessage, currentModel]);
+  }, [sources, messages, currentModel]);
+
+  // Fast O(1) context usage derivation that adds draft input tokens without looping over all sources/messages
+  const contextUsage = useMemo(() => {
+    if (!inputMessage) return baseContextUsage;
+    const draftInputTokens = Math.round(inputMessage.length / 3.8);
+    const usedTokens = baseContextUsage.usedTokens + draftInputTokens;
+    const totalTokens = baseContextUsage.totalTokens;
+    const rawPercentUsed = totalTokens > 0 ? (usedTokens / totalTokens) * 100 : 0;
+    const percentUsed =
+      rawPercentUsed <= 0
+        ? "0%"
+        : rawPercentUsed < 1
+        ? `${rawPercentUsed.toFixed(1)}%`
+        : `${Math.round(rawPercentUsed)}%`;
+    const safePercent = Math.min(100, Math.max(0.5, rawPercentUsed));
+    const availableTokens = Math.max(0, totalTokens - usedTokens);
+
+    return {
+      ...baseContextUsage,
+      usedTokens,
+      rawPercentUsed,
+      percentUsed,
+      safePercent,
+      draftInputTokens,
+      availableTokens,
+    };
+  }, [baseContextUsage, inputMessage]);
 
   // Context window indicator visibility: only show once user has sent their first message
   const hasStartedChat = useMemo(() => {
@@ -1811,9 +1788,6 @@ export function ChatPanel({
       setInputMessage("");
       editorRef.current?.clear();
       setIsMultiline(false);
-      if (textareaRef.current) {
-        textareaRef.current.style.height = `${SINGLE_LINE_HEIGHT}px`;
-      }
       setAttachments([]);
     }
     setIsStreaming(true);
@@ -4062,102 +4036,88 @@ export function ChatPanel({
                 </div>
               )}
 
-              {/* Rich Mention Editor with ScrollArea - Persistent across single-line & multi-line modes */}
+              {/* Rich Mention Editor - Persistent across single-line & multi-line modes (No ScrollArea wrapper to prevent scrollbar) */}
               <div
                 style={{ gridArea: "input" }}
-                className="min-w-0 w-full flex items-center cursor-text"
+                className={cn(
+                  "min-w-0 w-full cursor-text",
+                  isMultiline || attachments.length > 0 || isCompact ? "flex items-start" : "flex items-center"
+                )}
                 onClick={() => {
                   editorRef.current?.focus();
                 }}
               >
-                <ScrollArea
-                  className={cn(
-                    "w-full",
-                    isMultiline || attachments.length > 0
-                      ? "max-h-48 sm:max-h-60 [&>div>div[style]]:!block pr-1.5"
-                      : isCompact
-                      ? "min-h-[28px] max-h-32 overflow-hidden pr-1"
-                      : "h-[28px] overflow-hidden"
-                  )}
-                >
-                  <RichMentionEditor
-                    ref={editorRef}
-                    initialValue=""
-                    placeholder={
-                      isStreaming
-                        ? t("inputStreamingPlaceholder")
-                        : editingMessageId !== null
-                        ? (language === "id" ? "Sedang mengedit pesan di atas..." : "Editing message above...")
-                        : t("inputPlaceholder")
+                <RichMentionEditor
+                  ref={editorRef}
+                  isMultiline={isMultiline || attachments.length > 0 || isCompact}
+                  initialValue=""
+                  placeholder={
+                    isStreaming
+                      ? t("inputStreamingPlaceholder")
+                      : editingMessageId !== null
+                      ? (language === "id" ? "Sedang mengedit pesan di atas..." : "Editing message above...")
+                      : t("inputPlaceholder")
+                  }
+                  disabled={isStreaming || editingMessageId !== null}
+                  onSerializedChange={handleInputChange}
+                  onMentionTokenChange={(tok) => {
+                    setMentionToken(tok);
+                    setMentionIndex(0);
+                  }}
+                  onOpenSourcePreview={handleCitationClick}
+                  onOpenArtifactPreview={onOpenStudioArtifact}
+                  onSend={() => {
+                    const text = editorRef.current?.getText() ?? inputMessage;
+                    if (!isStreaming && (text.trim() || attachments.length > 0)) {
+                      handleSend(text);
                     }
-                    disabled={isStreaming || editingMessageId !== null}
-                    onSerializedChange={handleInputChange}
-                    onMentionTokenChange={(tok) => {
-                      setMentionToken(tok);
-                      setMentionIndex(0);
-                    }}
-                    onOpenSourcePreview={handleCitationClick}
-                    onOpenArtifactPreview={onOpenStudioArtifact}
-                    onSend={() => {
-                      const text = editorRef.current?.getText() ?? inputMessage;
-                      if (!isStreaming && (text.trim() || attachments.length > 0)) {
-                        handleSend(text);
+                  }}
+                  onPasteFiles={handlePasteFiles}
+                  onKeyDown={(e) => {
+                    if (mentionToken && mentionCandidates.length > 0) {
+                      if (e.key === "ArrowDown") {
+                        e.preventDefault();
+                        setMentionIndex((prev) => (prev + 1) % mentionCandidates.length);
+                        return;
                       }
-                    }}
-                    onPasteFiles={handlePasteFiles}
-                    onKeyDown={(e) => {
-                      if (mentionToken && mentionCandidates.length > 0) {
-                        if (e.key === "ArrowDown") {
-                          e.preventDefault();
-                          setMentionIndex((prev) => (prev + 1) % mentionCandidates.length);
-                          return;
-                        }
-                        if (e.key === "ArrowUp") {
-                          e.preventDefault();
-                          setMentionIndex((prev) => (prev - 1 + mentionCandidates.length) % mentionCandidates.length);
-                          return;
-                        }
-                        if (e.key === "Tab") {
-                          e.preventDefault();
-                          const candidate = mentionCandidates[mentionIndex];
-                          if (candidate) {
-                            if (candidate.kind === "directory" && candidate.drillPath) {
-                              handleDrillDirectory(candidate);
-                            } else {
-                              handleSelectMentionCandidate(candidate);
-                            }
-                          }
-                          return;
-                        }
-                        if (e.key === "Enter") {
-                          e.preventDefault();
-                          const candidate = mentionCandidates[mentionIndex];
-                          if (candidate) {
+                      if (e.key === "ArrowUp") {
+                        e.preventDefault();
+                        setMentionIndex((prev) => (prev - 1 + mentionCandidates.length) % mentionCandidates.length);
+                        return;
+                      }
+                      if (e.key === "Tab") {
+                        e.preventDefault();
+                        const candidate = mentionCandidates[mentionIndex];
+                        if (candidate) {
+                          if (candidate.kind === "directory" && candidate.drillPath) {
+                            handleDrillDirectory(candidate);
+                          } else {
                             handleSelectMentionCandidate(candidate);
                           }
-                          return;
                         }
-                        if (e.key === "Escape") {
-                          e.preventDefault();
-                          setMentionToken(null);
-                          return;
-                        }
+                        return;
                       }
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        const candidate = mentionCandidates[mentionIndex];
+                        if (candidate) {
+                          handleSelectMentionCandidate(candidate);
+                        }
+                        return;
+                      }
+                      if (e.key === "Escape") {
+                        e.preventDefault();
+                        setMentionToken(null);
+                        return;
+                      }
+                    }
 
-                      if (e.key === "Enter" && e.shiftKey) {
-                        setIsMultiline(true);
-                      }
-                    }}
-                    className={cn(
-                      "w-full resize-none bg-transparent text-[14px] text-foreground placeholder:text-muted-foreground/60 outline-none focus:outline-none focus:ring-0 font-sans block disabled:opacity-50 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden overflow-hidden transition-[height] duration-200 ease-out",
-                      isMultiline || attachments.length > 0
-                        ? "leading-[1.65] py-0.5 min-h-[48px]"
-                        : isCompact
-                        ? "leading-5 py-0.5 min-h-[26px] max-h-[80px]"
-                        : "leading-5 py-1 h-[28px] max-h-[28px] overflow-hidden"
-                    )}
-                  />
-                </ScrollArea>
+                    if (e.key === "Enter" && e.shiftKey) {
+                      setIsMultiline(true);
+                    }
+                  }}
+                  className="w-full resize-none bg-transparent transition-[height] duration-150 ease-out"
+                />
               </div>
 
               {/* Plus Button */}

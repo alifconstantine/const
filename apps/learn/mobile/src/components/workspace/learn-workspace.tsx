@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useLayoutEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useLayoutEffect, useRef, useMemo, useCallback } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db, localDb, type LocalMessage, type LocalArtifact, type LocalChatSession, type LocalSource } from "../../lib/db";
 import { buildGroundedContext } from "../../lib/grounding/context-builder";
@@ -388,7 +388,7 @@ export function MobileLearnWorkspace({
   const [selectedSourceForPreview, setSelectedSourceForPreview] =
     useState<LocalSource | null>(null);
 
-  const handleCitationClick = (sourceId: string) => {
+  const handleCitationClick = useCallback((sourceId: string) => {
     const cleanId = sourceId.replace(/^\[?source:/i, "").replace(/^source_/, "").replace(/\]$/, "");
     const src =
       sourcesMap.get(cleanId) ||
@@ -400,7 +400,7 @@ export function MobileLearnWorkspace({
     } else {
       toast.info(`Sumber ID: ${sourceId}`);
     }
-  };
+  }, [sourcesMap]);
 
   // Navigation drawers & sheets
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -424,10 +424,10 @@ export function MobileLearnWorkspace({
   const [isReaderOpen, setIsReaderOpen] = useState(false);
 
   // Open link directly in user's default browser on mobile
-  const handleOpenBrowser = (url: string) => {
+  const handleOpenBrowser = useCallback((url: string) => {
     if (!url) return;
     window.open(url, "_blank", "noopener,noreferrer");
-  };
+  }, []);
 
   // Local state
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
@@ -514,17 +514,43 @@ export function MobileLearnWorkspace({
     return calculateConversationMetrics(messages);
   }, [messages]);
 
-  // Context window usage estimation for learning sources and discussion history
-  const contextUsage = useMemo(() => {
+  // Base context window usage estimation (memoized across sources and messages - does not recalculate on keystroke)
+  const baseContextUsage = useMemo(() => {
     const totalTokens = parseContextWindowTokens((currentModel as any)?.contextWindow);
     return calculateContextUsage({
       sources,
       sourcesCount: learn?.sourcesCount || 0,
       messages,
-      draftInput: inputMessage,
       totalTokens,
     });
-  }, [sources, learn?.sourcesCount, messages, inputMessage, currentModel]);
+  }, [sources, learn?.sourcesCount, messages, currentModel]);
+
+  // Fast O(1) context usage derivation that adds draft input tokens without looping over all sources/messages
+  const contextUsage = useMemo(() => {
+    if (!inputMessage) return baseContextUsage;
+    const draftInputTokens = Math.round(inputMessage.length / 3.8);
+    const usedTokens = baseContextUsage.usedTokens + draftInputTokens;
+    const totalTokens = baseContextUsage.totalTokens;
+    const rawPercentUsed = totalTokens > 0 ? (usedTokens / totalTokens) * 100 : 0;
+    const percentUsed =
+      rawPercentUsed <= 0
+        ? "0%"
+        : rawPercentUsed < 1
+        ? `${rawPercentUsed.toFixed(1)}%`
+        : `${Math.round(rawPercentUsed)}%`;
+    const safePercent = Math.min(100, Math.max(0.5, rawPercentUsed));
+    const availableTokens = Math.max(0, totalTokens - usedTokens);
+
+    return {
+      ...baseContextUsage,
+      usedTokens,
+      rawPercentUsed,
+      percentUsed,
+      safePercent,
+      draftInputTokens,
+      availableTokens,
+    };
+  }, [baseContextUsage, inputMessage]);
 
   // Context window indicator visibility: only show once user has sent their first message
   const hasStartedChat = useMemo(() => {
