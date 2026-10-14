@@ -30,6 +30,7 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuLabel,
+  ScrollArea,
 } from "@const/ui";
 import { db, localDb, type LocalSource, type LocalLearn } from "../../lib/db";
 import { useI18n } from "../../lib/i18n";
@@ -433,47 +434,49 @@ export function SourcesView({
               <ChevronDown className="w-3 h-3 ml-0.5 opacity-70" />
             </button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-56 p-1.5 shadow-md max-h-72 overflow-y-auto">
-            <DropdownMenuItem
-              className="cursor-pointer text-xs py-2 px-2 flex items-center gap-2"
-              onClick={() => {
-                setActiveCategory("all");
-                setSelectedWorkspaceId("all");
-              }}
-            >
-              <FileText className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="flex-1">{t("allSources")}</span>
-              <span className="text-[10px] text-muted-foreground font-sans">({sources.length})</span>
-              {activeCategory === "all" && <Check className="h-3.5 w-3.5 ml-1 text-primary" />}
-            </DropdownMenuItem>
+          <DropdownMenuContent align="end" className="w-56 p-1 shadow-md">
+            <ScrollArea className="max-h-72 w-full" viewportClassName="p-0.5 space-y-0.5">
+              <DropdownMenuItem
+                className="cursor-pointer text-xs py-2 px-2 flex items-center gap-2"
+                onClick={() => {
+                  setActiveCategory("all");
+                  setSelectedWorkspaceId("all");
+                }}
+              >
+                <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+                <span className="flex-1">{t("allSources")}</span>
+                <span className="text-[10px] text-muted-foreground font-sans">({sources.length})</span>
+                {activeCategory === "all" && <Check className="h-3.5 w-3.5 ml-1 text-primary" />}
+              </DropdownMenuItem>
 
-            {workspacesWithSources.length > 0 && (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground/70 px-2 py-1 font-medium">
-                  {t("byWorkspace")}
-                </DropdownMenuLabel>
+              {workspacesWithSources.length > 0 && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-muted-foreground/70 px-2 py-1 font-medium">
+                    {t("byWorkspace")}
+                  </DropdownMenuLabel>
 
-                {workspacesWithSources.map((ws) => {
-                  const isSelected = activeCategory === "workspace" && selectedWorkspaceId === ws.id;
-                  return (
-                    <DropdownMenuItem
-                      key={ws.id}
-                      className="cursor-pointer text-xs py-2 px-2 flex items-center gap-2"
-                      onClick={() => {
-                        setActiveCategory("workspace");
-                        setSelectedWorkspaceId(ws.id);
-                      }}
-                    >
-                      <LearnIcon icon={ws.emoji} className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
-                      <span className="flex-1 truncate">{ws.title}</span>
-                      <span className="text-[10px] text-muted-foreground font-sans">({ws.sourcesInDb})</span>
-                      {isSelected && <Check className="h-3.5 w-3.5 ml-1 text-primary shrink-0" />}
-                    </DropdownMenuItem>
-                  );
-                })}
-              </>
-            )}
+                  {workspacesWithSources.map((ws) => {
+                    const isSelected = activeCategory === "workspace" && selectedWorkspaceId === ws.id;
+                    return (
+                      <DropdownMenuItem
+                        key={ws.id}
+                        className="cursor-pointer text-xs py-2 px-2 flex items-center gap-2"
+                        onClick={() => {
+                          setActiveCategory("workspace");
+                          setSelectedWorkspaceId(ws.id);
+                        }}
+                      >
+                        <LearnIcon icon={ws.emoji} className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+                        <span className="flex-1 truncate">{ws.title}</span>
+                        <span className="text-[10px] text-muted-foreground font-sans">({ws.sourcesInDb})</span>
+                        {isSelected && <Check className="h-3.5 w-3.5 ml-1 text-primary shrink-0" />}
+                      </DropdownMenuItem>
+                    );
+                  })}
+                </>
+              )}
+            </ScrollArea>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
