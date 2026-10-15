@@ -40,12 +40,15 @@ export interface CanvaExportJob {
 
 const STORAGE_KEY_TOKENS = "const_canva_tokens_v2";
 const STORAGE_KEY_CLIENT_ID = "const_canva_client_id";
+const STORAGE_KEY_DYNAMIC_CLIENT_ID = "const_canva_dcr_client_id";
+const STORAGE_KEY_ACTIVE_CLIENT_ID = "const_canva_active_client_id";
+const STORAGE_KEY_IS_DCR = "const_canva_is_dcr";
 const STORAGE_KEY_REDIRECT_URI = "const_canva_redirect_uri";
 const STORAGE_KEY_PKCE_VERIFIER = "const_canva_pkce_verifier";
 const STORAGE_KEY_OAUTH_STATE = "const_canva_oauth_state";
 
-// Default public Client ID for Const Learn
-export const DEFAULT_CANVA_CLIENT_ID = "OC-AZX17ConstLearn";
+// Default verified DCR fallback Client ID for Const Learn
+export const DEFAULT_CANVA_CLIENT_ID = "KRCrBcbuZbMbr4fw";
 export const CANVA_LOOPBACK_REDIRECT_URI = "http://127.0.0.1:24135/canva/callback";
 export const CANVA_WEB_REDIRECT_URI = "https://accounts.const.web.id/oauth/canva/callback";
 export const DEFAULT_CANVA_REDIRECT_URI = CANVA_LOOPBACK_REDIRECT_URI;
@@ -53,7 +56,12 @@ export const DEFAULT_CANVA_REDIRECT_URI = CANVA_LOOPBACK_REDIRECT_URI;
 export const CANVA_AUTH_ENDPOINT = "https://www.canva.com/api/oauth/authorize";
 export const CANVA_TOKEN_ENDPOINT = "https://api.canva.com/rest/v1/oauth/token";
 export const CANVA_API_BASE = "https://api.canva.com/rest/v1";
+
+// Canva MCP Remote Endpoints (supports DCR & Remote MCP OAuth)
 export const CANVA_MCP_ENDPOINT = "https://mcp.canva.com/mcp";
+export const CANVA_MCP_DCR_ENDPOINT = "https://mcp.canva.com/register";
+export const CANVA_MCP_AUTH_ENDPOINT = "https://mcp.canva.com/authorize";
+export const CANVA_MCP_TOKEN_ENDPOINT = "https://mcp.canva.com/token";
 
 export const CANVA_REQUIRED_SCOPES = [
   "design:content:read",
@@ -149,14 +157,69 @@ export function getCanvaClientId(): string {
   return (envVal && envVal.trim()) || "";
 }
 
-export function isConfiguredCanvaClientId(id?: string): boolean {
-  const current = id !== undefined ? id : getCanvaClientId();
-  return Boolean(
-    current &&
-      current.trim() &&
-      current.trim() !== "OC-AZX17ConstLearn" &&
-      current.trim().length > 3
-  );
+export function isConfiguredCanvaClientId(_id?: string): boolean {
+  // Always true because Canva MCP supports Dynamic Client Registration (DCR) and public defaults
+  return true;
+}
+
+/**
+ * Resolves or dynamically registers a Canva Client ID via Canva MCP DCR (RFC 7591).
+ * If a custom Client ID was explicitly provided in env/localStorage, it uses that.
+ * Otherwise, it dynamically registers/fetches an OAuth client from https://mcp.canva.com/register
+ * so users just click Connect and log in without creating an app in the Canva Developer Portal.
+ */
+export async function getOrRegisterCanvaClientId(): Promise<{ clientId: string; isDcr: boolean }> {
+  // 1. Check explicit developer/custom client ID from env or settings
+  const explicit = getCanvaClientId();
+  if (explicit && explicit.trim() && explicit.trim() !== "OC-AZX17ConstLearn" && explicit.trim().length > 3) {
+    return { clientId: explicit.trim(), isDcr: !explicit.trim().startsWith("OC-") };
+  }
+
+  // 2. Check cached dynamic client ID in localStorage
+  if (typeof window !== "undefined") {
+    const cachedDcr = localStorage.getItem(STORAGE_KEY_DYNAMIC_CLIENT_ID);
+    if (cachedDcr && cachedDcr.trim()) {
+      return { clientId: cachedDcr.trim(), isDcr: true };
+    }
+  }
+
+  // 3. Register dynamically via Canva Remote MCP DCR
+  try {
+    const redirectUris = [
+      CANVA_LOOPBACK_REDIRECT_URI,
+      CANVA_WEB_REDIRECT_URI,
+      getCanvaRedirectUri(),
+    ].filter((v, i, a) => a.indexOf(v) === i);
+
+    const res = await doFetch(CANVA_MCP_DCR_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        client_name: "Const Learn",
+        redirect_uris: redirectUris,
+        grant_types: ["authorization_code", "refresh_token"],
+        response_types: ["code"],
+        token_endpoint_auth_method: "none",
+      }),
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      if (data.client_id) {
+        if (typeof window !== "undefined") {
+          localStorage.setItem(STORAGE_KEY_DYNAMIC_CLIENT_ID, data.client_id);
+        }
+        return { clientId: data.client_id, isDcr: true };
+      }
+    }
+  } catch (err) {
+    console.warn("[Canva Client] Dynamic Client Registration error, using verified fallback client:", err);
+  }
+
+  // 4. Fallback to verified Canva DCR client
+  return { clientId: "KRCrBcbuZbMbr4fw", isDcr: true };
 }
 
 export function setCanvaClientId(clientId: string): void {
@@ -253,13 +316,18 @@ export async function createCanvaAuthUrl(options?: {
   redirectUri?: string;
   clientId?: string;
 }): Promise<CanvaAuthUrlResult> {
-  const clientId = options?.clientId || getCanvaClientId();
-  if (!isConfiguredCanvaClientId(clientId)) {
-    throw new Error(
-      "Canva Client ID belum dikonfigurasi. Silakan masukkan Client ID integrasi Anda dari Canva Developer Portal (canva.dev/apps)."
-    );
-  }
   const redirectUri = options?.redirectUri || getCanvaRedirectUri();
+
+  let targetClientId = options?.clientId;
+  let isDcr = false;
+  if (!targetClientId) {
+    const resolved = await getOrRegisterCanvaClientId();
+    targetClientId = resolved.clientId;
+    isDcr = resolved.isDcr;
+  } else {
+    isDcr = !targetClientId.startsWith("OC-");
+  }
+
   const verifier = generateCodeVerifier(64);
   const challenge = await generateCodeChallenge(verifier);
   const state = "st_" + generateCodeVerifier(24);
@@ -267,19 +335,25 @@ export async function createCanvaAuthUrl(options?: {
   if (typeof window !== "undefined") {
     localStorage.setItem(STORAGE_KEY_PKCE_VERIFIER, verifier);
     localStorage.setItem(STORAGE_KEY_OAUTH_STATE, state);
+    localStorage.setItem(STORAGE_KEY_ACTIVE_CLIENT_ID, targetClientId);
+    localStorage.setItem(STORAGE_KEY_IS_DCR, isDcr ? "true" : "false");
   }
 
+  const authEndpoint = isDcr ? CANVA_MCP_AUTH_ENDPOINT : CANVA_AUTH_ENDPOINT;
   const params = new URLSearchParams({
     response_type: "code",
-    client_id: clientId,
+    client_id: targetClientId,
     redirect_uri: redirectUri,
-    scope: CANVA_REQUIRED_SCOPES,
     code_challenge: challenge,
-    code_challenge_method: "s256",
+    code_challenge_method: "S256",
     state: state,
   });
 
-  const url = `${CANVA_AUTH_ENDPOINT}?${params.toString()}`;
+  if (!isDcr) {
+    params.set("scope", CANVA_REQUIRED_SCOPES);
+  }
+
+  const url = `${authEndpoint}?${params.toString()}`;
 
   return {
     url,
@@ -314,8 +388,19 @@ export async function exchangeCanvaAuthCode(options: {
   redirectUri?: string;
   clientId?: string;
 }): Promise<CanvaTokenData> {
-  const clientId = options.clientId || getCanvaClientId();
   const redirectUri = options.redirectUri || getCanvaRedirectUri();
+
+  let clientId = options.clientId;
+  let isDcr = false;
+  if (!clientId && typeof window !== "undefined") {
+    clientId = localStorage.getItem(STORAGE_KEY_ACTIVE_CLIENT_ID) || undefined;
+    isDcr = localStorage.getItem(STORAGE_KEY_IS_DCR) === "true";
+  }
+  if (!clientId) {
+    const resolved = await getOrRegisterCanvaClientId();
+    clientId = resolved.clientId;
+    isDcr = resolved.isDcr;
+  }
 
   let verifier = options.verifier;
   if (!verifier && typeof window !== "undefined") {
@@ -334,6 +419,7 @@ export async function exchangeCanvaAuthCode(options: {
     }
   }
 
+  const tokenEndpoint = isDcr ? CANVA_MCP_TOKEN_ENDPOINT : CANVA_TOKEN_ENDPOINT;
   const bodyParams = new URLSearchParams({
     grant_type: "authorization_code",
     client_id: clientId,
@@ -342,7 +428,7 @@ export async function exchangeCanvaAuthCode(options: {
     redirect_uri: redirectUri,
   });
 
-  const response = await doFetch(CANVA_TOKEN_ENDPOINT, {
+  const response = await doFetch(tokenEndpoint, {
     method: "POST",
     headers: {
       "Content-Type": "application/x-www-form-urlencoded",
@@ -396,7 +482,13 @@ export async function refreshCanvaAccessToken(existingTokens?: CanvaTokenData): 
     return null;
   }
 
-  const clientId = getCanvaClientId();
+  const isDcr = typeof window !== "undefined" && localStorage.getItem(STORAGE_KEY_IS_DCR) === "true";
+  let clientId = typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEY_ACTIVE_CLIENT_ID) : null;
+  if (!clientId) {
+    clientId = (await getOrRegisterCanvaClientId()).clientId;
+  }
+
+  const tokenEndpoint = isDcr ? CANVA_MCP_TOKEN_ENDPOINT : CANVA_TOKEN_ENDPOINT;
   const bodyParams = new URLSearchParams({
     grant_type: "refresh_token",
     client_id: clientId,
@@ -404,7 +496,7 @@ export async function refreshCanvaAccessToken(existingTokens?: CanvaTokenData): 
   });
 
   try {
-    const response = await doFetch(CANVA_TOKEN_ENDPOINT, {
+    const response = await doFetch(tokenEndpoint, {
       method: "POST",
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",

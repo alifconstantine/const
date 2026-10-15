@@ -385,7 +385,7 @@ export function CreatePresentationSheet({
                         </div>
 
                         <p className="text-[10px] text-[#cccccc] leading-relaxed font-sans">
-                          Canva memerlukan Client ID resmi dari portal developer. Buat di{" "}
+                          Secara default Canva terhubung otomatis via Remote MCP. Jika Anda ingin menggunakan Client ID kustom dari{" "}
                           <a
                             href="https://www.canva.dev/apps"
                             target="_blank"
@@ -394,7 +394,7 @@ export function CreatePresentationSheet({
                           >
                             canva.dev/apps <ExternalLink className="w-2.5 h-2.5" />
                           </a>
-                          , lalu tempel di bawah ini:
+                          , tempel di bawah ini:
                         </p>
 
                         <div className="flex items-center gap-1.5">

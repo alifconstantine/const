@@ -953,92 +953,67 @@ export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
                 <div className="p-4 rounded-2xl border border-border bg-card/50 space-y-3">
                   <div className="flex items-center justify-between">
                     <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                      <span>Konfigurasi Canva App</span>
+                      <span>Koneksi Native Canva</span>
                     </h4>
                     <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-medium border border-emerald-500/20">
-                      PKCE S256
+                      Auto DCR & PKCE S256
                     </span>
                   </div>
 
                   <p className="text-[11px] text-muted-foreground leading-relaxed">
-                    Koneksi native membuka browser perangkat tempat Anda sudah login akun Google/Canva, lalu mengarahkan kembali via OAuth 2.0 PKCE.
+                    Koneksi native membuka browser perangkat tempat Anda sudah login akun Canva. Cukup tekan tombol <strong className="text-foreground font-medium">Connect</strong> di atas—token dan izin akan ditangani otomatis via Canva Remote MCP.
                   </p>
 
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-medium text-muted-foreground">
-                      Canva Client ID
-                    </label>
-                    <div className="flex items-center gap-1.5">
-                      <input
-                        type="text"
-                        value={canvaClientIdInput}
-                        onChange={(e) => setCanvaClientIdInput(e.target.value)}
-                        placeholder="OC-AZX..."
-                        className="flex-1 px-2.5 py-1.5 text-xs rounded-xl bg-secondary/40 border border-border text-foreground font-mono placeholder:text-muted-foreground focus:outline-none focus:border-primary/50"
-                      />
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        size="sm"
-                        onClick={handleSaveCanvaClientId}
-                        className="rounded-xl px-3 h-8 text-xs cursor-pointer shrink-0"
-                      >
-                        Simpan
-                      </Button>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <span className="text-[11px] font-medium text-muted-foreground block">
-                      Authorized Redirect URIs (Daftarkan di Canva Portal)
-                    </span>
-                    <div className="space-y-1.5">
-                      <div className="flex items-center justify-between p-2 rounded-xl bg-secondary/50 border border-border/70 text-[10px] font-mono text-muted-foreground">
-                        <div className="truncate flex items-center gap-1.5">
-                          <span className="text-[9px] uppercase font-sans font-semibold text-cyan-400 px-1 py-0.5 rounded bg-cyan-500/10 shrink-0">Web/Mobile</span>
-                          <span className="truncate">https://accounts.const.web.id/oauth/canva/callback</span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            navigator.clipboard.writeText("https://accounts.const.web.id/oauth/canva/callback");
-                            toast.success("Redirect URI Web/Mobile disalin!");
-                          }}
-                          className="p-1 hover:text-foreground text-muted-foreground cursor-pointer shrink-0 ml-1.5"
-                          title="Salin URI Web/Mobile"
-                        >
-                          <Copy className="w-3 h-3" />
-                        </button>
-                      </div>
-
-                      <div className="flex items-center justify-between p-2 rounded-xl bg-secondary/50 border border-border/70 text-[10px] font-mono text-muted-foreground">
-                        <div className="truncate flex items-center gap-1.5">
-                          <span className="text-[9px] uppercase font-sans font-semibold text-primary px-1 py-0.5 rounded bg-primary/10 shrink-0">Desktop</span>
-                          <span className="truncate">http://127.0.0.1:24135/canva/callback</span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            navigator.clipboard.writeText("http://127.0.0.1:24135/canva/callback");
-                            toast.success("Redirect URI Desktop disalin!");
-                          }}
-                          className="p-1 hover:text-foreground text-muted-foreground cursor-pointer shrink-0 ml-1.5"
-                          title="Salin URI Desktop"
-                        >
-                          <Copy className="w-3 h-3" />
-                        </button>
+                  {getStoredCanvaTokens()?.displayName ? (
+                    <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-400 flex items-center gap-2">
+                      <Check className="w-4 h-4 shrink-0 text-emerald-400" />
+                      <div className="min-w-0">
+                        <span className="font-semibold block truncate">
+                          Akun Terhubung: {getStoredCanvaTokens()?.displayName}
+                        </span>
+                        <span className="text-[10px] text-emerald-400/80 block">
+                          Siap membuat presentasi dan desain langsung ke Canva.
+                        </span>
                       </div>
                     </div>
-                  </div>
-
-                  {getStoredCanvaTokens()?.displayName && (
-                    <div className="pt-2 border-t border-border/50 text-[11px] text-emerald-400 flex items-center gap-1.5">
-                      <Check className="w-3.5 h-3.5 shrink-0" />
-                      <span className="truncate font-medium">
-                        Akun aktif: {getStoredCanvaTokens()?.displayName}
+                  ) : (
+                    <div className="p-2.5 rounded-xl bg-secondary/50 border border-border/70 text-xs text-muted-foreground flex items-center gap-2">
+                      <ShieldCheck className="w-4 h-4 shrink-0 text-primary" />
+                      <span className="text-[10.5px] leading-relaxed">
+                        Login aman via browser dengan OAuth 2.0 PKCE tanpa perantara pihak ketiga.
                       </span>
                     </div>
                   )}
+
+                  {/* Optional Developer Override */}
+                  <details className="pt-2 border-t border-border/50 text-[11px] group">
+                    <summary className="cursor-pointer font-medium text-muted-foreground hover:text-foreground transition-colors select-none">
+                      Pengaturan Pengembang Kustom (Opsional)
+                    </summary>
+                    <div className="pt-2.5 space-y-2.5">
+                      <p className="text-[10.5px] text-muted-foreground leading-relaxed">
+                        Jika menggunakan integrasi kustom dari Canva Developer Portal, masukkan Client ID di bawah:
+                      </p>
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="text"
+                          value={canvaClientIdInput}
+                          onChange={(e) => setCanvaClientIdInput(e.target.value)}
+                          placeholder="OC-AZX... (kosongkan untuk auto)"
+                          className="flex-1 px-2.5 py-1.5 text-xs rounded-xl bg-secondary/40 border border-border text-foreground font-mono placeholder:text-muted-foreground focus:outline-none focus:border-primary/50"
+                        />
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          size="sm"
+                          onClick={handleSaveCanvaClientId}
+                          className="rounded-xl px-3 h-8 text-xs cursor-pointer shrink-0"
+                        >
+                          Simpan
+                        </Button>
+                      </div>
+                    </div>
+                  </details>
                 </div>
               )}
 
