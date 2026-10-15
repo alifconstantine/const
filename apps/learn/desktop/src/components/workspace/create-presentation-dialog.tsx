@@ -9,8 +9,21 @@ import {
   FileText,
   Cable,
   Link2,
+  Copy,
+  ExternalLink,
+  Settings,
 } from "lucide-react";
-import { Dialog, DialogContent, ScrollArea, BrandLogo, toast, cn } from "@const/ui";
+import {
+  Dialog,
+  DialogContent,
+  ScrollArea,
+  BrandLogo,
+  toast,
+  cn,
+  isConfiguredCanvaClientId,
+  setCanvaClientId,
+  getCanvaClientId,
+} from "@const/ui";
 import { useI18n } from "../../lib/i18n";
 import type { LocalSource } from "../../lib/db";
 import { isConnectorActive, syncConnectedConnectors } from "../../lib/connectors-service";
@@ -105,8 +118,14 @@ export function CreatePresentationDialog({
   };
 
   const [isConnectingCanvaDirect, setIsConnectingCanvaDirect] = useState(false);
+  const [showCanvaConfigInput, setShowCanvaConfigInput] = useState(false);
+  const [canvaClientIdInputValue, setCanvaClientIdInputValue] = useState(() => getCanvaClientId());
 
   const handleQuickConnectCanva = async () => {
+    if (!isConfiguredCanvaClientId()) {
+      setShowCanvaConfigInput(true);
+      return;
+    }
     setIsConnectingCanvaDirect(true);
     try {
       const res = await connectCanvaDesktop();
@@ -389,28 +408,128 @@ export function CreatePresentationDialog({
                       </div>
 
                       {provider === "canva" ? (
-                        <div className="flex items-center gap-2 pt-0.5">
-                          <button
-                            type="button"
-                            disabled={isConnectingCanvaDirect}
-                            onClick={handleQuickConnectCanva}
-                            className="flex-1 py-1.5 px-3 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-xs font-medium text-white flex items-center justify-center gap-1.5 transition-colors cursor-pointer font-sans disabled:opacity-50"
-                          >
-                            <Link2 className="h-3.5 w-3.5" />
-                            <span>
-                              {isConnectingCanvaDirect
-                                ? "Menghubungkan..."
-                                : "Hubungkan Canva (OAuth Direct)"}
-                            </span>
-                          </button>
-                          <button
-                            type="button"
-                            onClick={handleOpenMcpMenu}
-                            className="py-1.5 px-3 rounded-xl bg-[#252528] hover:bg-[#383838] border border-[#2e2e2e] text-xs font-medium text-white flex items-center gap-1 transition-colors cursor-pointer font-sans"
-                          >
-                            <span>Menu MCP</span>
-                          </button>
-                        </div>
+                        !isConfiguredCanvaClientId() || showCanvaConfigInput ? (
+                          <div className="p-3 rounded-xl bg-[#232328] border border-[#383842] space-y-2.5">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs font-semibold text-white font-sans">
+                                  Konfigurasi Canva Client ID
+                                </span>
+                                <span className="text-[9.5px] font-sans font-medium uppercase tracking-wider px-1.5 py-0.2 rounded-full bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
+                                  canva.dev
+                                </span>
+                              </div>
+                              {isConfiguredCanvaClientId() && (
+                                <button
+                                  type="button"
+                                  onClick={() => setShowCanvaConfigInput(false)}
+                                  className="text-[11px] text-[#969696] hover:text-white cursor-pointer font-sans"
+                                >
+                                  Tutup
+                                </button>
+                              )}
+                            </div>
+
+                            <p className="text-[11px] text-[#cccccc] leading-relaxed font-sans">
+                              Canva memerlukan Client ID integrasi resmi Anda. Buat integrasi di{" "}
+                              <a
+                                href="https://www.canva.dev/apps"
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-cyan-400 hover:underline inline-flex items-center gap-0.5 font-medium"
+                              >
+                                canva.dev/apps <ExternalLink className="w-2.5 h-2.5" />
+                              </a>
+                              , lalu tempel Client ID Anda di bawah ini:
+                            </p>
+
+                            <div className="flex items-center gap-1.5">
+                              <input
+                                type="text"
+                                value={canvaClientIdInputValue}
+                                onChange={(e) => setCanvaClientIdInputValue(e.target.value)}
+                                placeholder="Tempel Client ID dari Canva Portal (contoh: OC-A...)"
+                                className="flex-1 px-2.5 py-1.5 text-xs rounded-xl bg-[#18181b] border border-[#3f3f46] text-white font-mono placeholder:text-[#71717a] focus:outline-none focus:border-cyan-500"
+                              />
+                              <button
+                                type="button"
+                                disabled={isConnectingCanvaDirect}
+                                onClick={async () => {
+                                  if (!canvaClientIdInputValue.trim()) {
+                                    toast.error("Masukkan Client ID yang valid dari canva.dev.");
+                                    return;
+                                  }
+                                  setCanvaClientId(canvaClientIdInputValue.trim());
+                                  setShowCanvaConfigInput(false);
+                                  setIsConnectingCanvaDirect(true);
+                                  try {
+                                    const res = await connectCanvaDesktop();
+                                    if (res.success) {
+                                      setActiveConnections((prev) => ({ ...prev, canva: true }));
+                                      toast.success(res.message || "Canva berhasil terhubung!");
+                                    } else {
+                                      toast.error(res.message || "Gagal menghubungkan Canva.");
+                                    }
+                                  } catch (err: any) {
+                                    toast.error(err?.message || "Gagal menghubungkan Canva.");
+                                  } finally {
+                                    setIsConnectingCanvaDirect(false);
+                                  }
+                                }}
+                                className="px-3 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-xs font-medium text-white transition-colors cursor-pointer shrink-0 font-sans disabled:opacity-50"
+                              >
+                                {isConnectingCanvaDirect ? "Menghubungkan..." : "Simpan & Hubungkan"}
+                              </button>
+                            </div>
+
+                            <div className="flex items-center justify-between p-2 rounded-xl bg-[#18181b] border border-[#2e2e2e] text-[10.5px] font-mono text-[#a1a1aa]">
+                              <span className="truncate">Redirect URI: http://127.0.0.1:24135/canva/callback</span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  navigator.clipboard.writeText("http://127.0.0.1:24135/canva/callback");
+                                  toast.success("Redirect URI Desktop disalin!");
+                                }}
+                                className="p-1 hover:text-white text-[#a1a1aa] shrink-0 ml-1 cursor-pointer"
+                                title="Salin URI"
+                              >
+                                <Copy className="w-3 h-3" />
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2 pt-0.5">
+                            <button
+                              type="button"
+                              disabled={isConnectingCanvaDirect}
+                              onClick={handleQuickConnectCanva}
+                              className="flex-1 py-1.5 px-3 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-xs font-medium text-white flex items-center justify-center gap-1.5 transition-colors cursor-pointer font-sans disabled:opacity-50"
+                            >
+                              <Link2 className="h-3.5 w-3.5" />
+                              <span>
+                                {isConnectingCanvaDirect
+                                  ? "Menghubungkan di Browser..."
+                                  : "Hubungkan Canva (OAuth Direct)"}
+                              </span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setShowCanvaConfigInput(true)}
+                              className="py-1.5 px-2.5 rounded-xl bg-[#252528] hover:bg-[#383838] border border-[#2e2e2e] text-xs font-medium text-[#c4c4c4] hover:text-white flex items-center gap-1 transition-colors cursor-pointer font-sans"
+                              title="Ubah Client ID"
+                            >
+                              <Settings className="h-3.5 w-3.5" />
+                              <span>Ubah ID</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleOpenMcpMenu}
+                              className="py-1.5 px-3 rounded-xl bg-[#252528] hover:bg-[#383838] border border-[#2e2e2e] text-xs font-medium text-white flex items-center gap-1 transition-colors cursor-pointer font-sans"
+                            >
+                              <span>Menu MCP</span>
+                            </button>
+                          </div>
+                        )
                       ) : (
                         <button
                           type="button"

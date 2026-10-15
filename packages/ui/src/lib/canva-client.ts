@@ -146,7 +146,17 @@ export function getCanvaClientId(): string {
     (typeof import.meta !== "undefined" && (import.meta as any).env?.VITE_CANVA_CLIENT_ID) ||
     (typeof process !== "undefined" && process.env?.VITE_CANVA_CLIENT_ID) ||
     (typeof process !== "undefined" && process.env?.CANVA_CLIENT_ID);
-  return (envVal && envVal.trim()) || DEFAULT_CANVA_CLIENT_ID;
+  return (envVal && envVal.trim()) || "";
+}
+
+export function isConfiguredCanvaClientId(id?: string): boolean {
+  const current = id !== undefined ? id : getCanvaClientId();
+  return Boolean(
+    current &&
+      current.trim() &&
+      current.trim() !== "OC-AZX17ConstLearn" &&
+      current.trim().length > 3
+  );
 }
 
 export function setCanvaClientId(clientId: string): void {
@@ -244,6 +254,11 @@ export async function createCanvaAuthUrl(options?: {
   clientId?: string;
 }): Promise<CanvaAuthUrlResult> {
   const clientId = options?.clientId || getCanvaClientId();
+  if (!isConfiguredCanvaClientId(clientId)) {
+    throw new Error(
+      "Canva Client ID belum dikonfigurasi. Silakan masukkan Client ID integrasi Anda dari Canva Developer Portal (canva.dev/apps)."
+    );
+  }
   const redirectUri = options?.redirectUri || getCanvaRedirectUri();
   const verifier = generateCodeVerifier(64);
   const challenge = await generateCodeChallenge(verifier);
