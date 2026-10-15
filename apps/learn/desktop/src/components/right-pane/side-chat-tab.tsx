@@ -12,8 +12,6 @@ import {
   Copy,
   Check,
   ExternalLink,
-  Plus,
-  ArrowUp,
 } from "lucide-react";
 import { ScrollArea, cn, toast } from "@const/ui";
 import { ExecutionTrace, type DisplayToolCall, type TraceStep } from "../workspace/execution-trace";
@@ -49,6 +47,20 @@ export interface SideChatTabProps {
   onStopAgent?: (conversationId: string) => void;
   onOpenFileDiff?: (record: FileMutationRecord) => void;
   onOpenBrowser?: (url: string) => void;
+}
+
+function formatMessageTimestamp(ts?: number): string {
+  if (!ts) return "";
+  const d = new Date(ts);
+  const month = d.getMonth() + 1;
+  const day = d.getDate();
+  let hours = d.getHours();
+  const minutes = d.getMinutes().toString().padStart(2, "0");
+  const ampm = hours >= 12 ? "PM" : "AM";
+  hours = hours % 12;
+  if (hours === 0) hours = 12;
+  const hoursStr = hours.toString().padStart(2, "0");
+  return `${month}/${day} ${hoursStr}.${minutes} ${ampm}`;
 }
 
 export function SideChatTab({
@@ -263,32 +275,33 @@ export function SideChatTab({
       {/* 2. Chat Area: Read-Only Message Flow */}
       <ScrollArea ref={scrollRef} className="flex-1 w-full h-full min-h-0">
         <div className="w-full max-w-4xl mx-auto px-4 sm:px-6 py-6 flex flex-col gap-6">
-          {/* User Message: The Synthesized Prompt (Styled matching Main Chat's right-aligned bubble) */}
+          {/* User Message: The Synthesized Prompt (Styled exactly matching Main Chat's right-aligned bubble, without edit icon) */}
           <div className="w-full flex flex-col items-end group">
-            <div className="max-w-[85%] rounded-3xl rounded-tr-md bg-muted/80 text-foreground px-4 py-2.5 text-[13.5px] border border-border/60 shadow-xs leading-relaxed font-sans">
-              <div className="flex items-center justify-between pb-1.5 mb-1.5 border-b border-border/40 text-[11px] text-muted-foreground font-medium select-none gap-4">
-                <span>{isIndo ? "Prompt Pengarah" : "Directive Prompt"}</span>
-                <button
-                  type="button"
-                  onClick={handleCopyPrompt}
-                  className="flex items-center gap-1 text-[11px] hover:text-foreground transition-colors cursor-pointer"
-                >
-                  {copiedPrompt ? (
-                    <>
-                      <Check className="w-3 h-3 text-emerald-500" />
-                      <span>{isIndo ? "Disalin" : "Copied"}</span>
-                    </>
-                  ) : (
-                    <>
-                      <Copy className="w-3 h-3" />
-                      <span>{isIndo ? "Salin" : "Copy"}</span>
-                    </>
-                  )}
-                </button>
+            {session.prompt ? (
+              <div className="max-w-[85%] rounded-3xl rounded-tr-md bg-muted/80 text-foreground px-4 py-2.5 text-[13.5px] border border-border/60 shadow-xs leading-relaxed whitespace-pre-wrap font-sans select-text">
+                {session.prompt}
               </div>
-              <div className="whitespace-pre-wrap select-text text-[13px] leading-relaxed">
-                {session.prompt || (isIndo ? "Menyiapkan instruksi..." : "Preparing instructions...")}
-              </div>
+            ) : null}
+
+            {/* User hover action bar: Timestamp, Copy (no Edit icon) */}
+            <div className="flex items-center gap-2 pt-1.5 pr-1 opacity-0 group-hover:opacity-100 transition-opacity text-xs text-muted-foreground select-none font-sans">
+              {session.startTime && (
+                <span className="text-[11px] font-sans tabular-nums text-muted-foreground/70">
+                  {formatMessageTimestamp(session.startTime)}
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={handleCopyPrompt}
+                className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                title={isIndo ? "Salin pesan" : "Copy message"}
+              >
+                {copiedPrompt ? (
+                  <Check className="w-3.5 h-3.5 text-emerald-500" />
+                ) : (
+                  <Copy className="w-3.5 h-3.5" />
+                )}
+              </button>
             </div>
           </div>
 
@@ -341,44 +354,6 @@ export function SideChatTab({
           </div>
         </div>
       </ScrollArea>
-
-      {/* 3. Bottom Bar: Read-Only Input Container (Matching Main Chat UI) */}
-      <div className="shrink-0 p-3 sm:p-4 bg-background border-t border-border/40 select-none">
-        <div className="w-full max-w-4xl mx-auto">
-          <div className="w-full bg-card border border-border transition-[border-color,padding,opacity] duration-150 shadow-md rounded-[24px] px-3 py-2 flex items-center justify-between gap-2">
-            {/* Plus / Action Icon Placeholder */}
-            <div className="h-8 w-8 rounded-full flex items-center justify-center text-muted-foreground/40 bg-muted/40 shrink-0">
-              <Plus className="h-4 w-4" />
-            </div>
-
-            {/* Read-Only State Display */}
-            <div className="flex-1 min-w-0 text-[13px] text-muted-foreground/60 italic truncate select-none px-1">
-              {isRunning
-                ? isIndo
-                  ? "SideChat read-only — AI sedang mengeksekusi instruksi..."
-                  : "SideChat read-only — AI is executing instructions..."
-                : isIndo
-                ? "SideChat read-only — eksekusi tugas telah selesai"
-                : "SideChat read-only — task execution finished"}
-            </div>
-
-            {/* Read-Only Pill & Disabled Send Icon */}
-            <div className="flex items-center gap-1.5 shrink-0">
-              <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-full bg-muted/60 text-muted-foreground border border-border/50">
-                Read Only
-              </span>
-              <button
-                type="button"
-                disabled
-                className="h-8 w-8 rounded-full flex items-center justify-center bg-muted/60 text-muted-foreground/40 cursor-not-allowed shrink-0"
-                aria-label="Send (disabled)"
-              >
-                <ArrowUp className="h-4 w-4 stroke-[2.5]" />
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
   );
 }
