@@ -62,6 +62,7 @@ import { DesktopUpdateBadge } from "./desktop-update-badge";
 import { SourcesView } from "./sources-view";
 import { ModelsView } from "./views/models-view";
 import { SkillsView } from "../settings/skills-settings";
+import { McpView } from "./views/mcp-view";
 import { CreateLearnDialog } from "./dialogs/create-learn-dialog";
 import { CreateCollectionDialog } from "./dialogs/create-collection-dialog";
 import { ManageCollectionDialog } from "./dialogs/manage-collection-dialog";
@@ -1914,6 +1915,16 @@ export function LearnHome({
             {/* ============================================================ */}
             {activeTab === "skills" && (
               <SkillsView
+                isSidebarOpen={isSidebarOpen}
+                onToggleSidebar={() => setIsSidebarOpen(true)}
+              />
+            )}
+
+            {/* ============================================================ */}
+            {/* TAB: MCP SERVERS                                             */}
+            {/* ============================================================ */}
+            {activeTab === "mcp" && (
+              <McpView
                 isSidebarOpen={isSidebarOpen}
                 onToggleSidebar={() => setIsSidebarOpen(true)}
               />

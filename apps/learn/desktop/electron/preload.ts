@@ -259,5 +259,14 @@ contextBridge.exposeInMainWorld("electron", {
       return () => ipcRenderer.removeListener("browser:open-tab-request", handler);
     },
   },
+  mcp: {
+    testConnection: (serverConfig: any) =>
+      ipcRenderer.invoke("mcp:test-connection", serverConfig),
+    disconnect: (serverConfig: any) =>
+      ipcRenderer.invoke("mcp:disconnect", serverConfig),
+    startOAuth: (payload: { provider: string; authUrl?: string }) =>
+      ipcRenderer.invoke("mcp:start-oauth", payload),
+    abortOAuth: () => ipcRenderer.invoke("mcp:abort-oauth"),
+  },
 });
 

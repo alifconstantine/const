@@ -137,6 +137,25 @@ declare global {
           error?: string;
         }>;
       };
+      mcp?: {
+        testConnection: (serverConfig: any) => Promise<{
+          success: boolean;
+          tools?: Array<{ name: string; description?: string; inputSchema?: any }>;
+          count?: number;
+          sessionId?: string;
+          error?: string;
+        }>;
+        disconnect: (serverConfig: any) => Promise<{
+          success: boolean;
+          error?: string;
+        }>;
+        startOAuth: (payload: { provider: string; authUrl?: string }) => Promise<{
+          success: boolean;
+          token?: string;
+          error?: string;
+        }>;
+        abortOAuth: () => Promise<boolean>;
+      };
       video?: {
         getProjectPath: (payload: { learnId: string; artifactId: string }) => Promise<{ success: boolean; projectPath?: string; error?: string }>;
         synthesizeScenes: (payload: {

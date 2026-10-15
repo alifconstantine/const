@@ -26,6 +26,12 @@ import {
   stopCanvaLoopbackServer,
   CANVA_LOOPBACK_PORT,
 } from "./canva-auth-server.js";
+import {
+  testMcpServerConnection,
+  startMcpOAuthFlow,
+  stopMcpOAuthServer,
+  disconnectMcpServer,
+} from "./mcp-runner.js";
 import { browserController, type ControlState } from "./browser-controller.js";
 
 let pendingCanvaResolver: ((result: { success: boolean; code?: string; state?: string; error?: string }) => void) | null = null;
@@ -1733,6 +1739,23 @@ app.on("second-instance", (_event, commandLine) => {
       return true;
     }
     return false;
+  });
+
+  ipcMain.handle("mcp:test-connection", async (_event, config) => {
+    return await testMcpServerConnection(config);
+  });
+
+  ipcMain.handle("mcp:start-oauth", async (_event, payload: { provider: string; authUrl?: string }) => {
+    return await startMcpOAuthFlow(payload.provider, payload.authUrl);
+  });
+
+  ipcMain.handle("mcp:abort-oauth", async () => {
+    stopMcpOAuthServer();
+    return true;
+  });
+
+  ipcMain.handle("mcp:disconnect", async (_event, config) => {
+    return await disconnectMcpServer(config);
   });
 
   ipcMain.handle(

@@ -22,8 +22,15 @@ export interface McpServerConfig {
   enabled?: boolean;
   isDefault?: boolean;
   isCustom?: boolean;
-  status?: "ready" | "needs_auth" | "disabled" | "error";
+  status?: "ready" | "connected" | "disconnected" | "needs_auth" | "disabled" | "error";
   errorMessage?: string;
+  description?: string;
+  tools?: Array<{ name: string; description?: string; inputSchema?: any }>;
+  skills?: string[];
+  authUrl?: string;
+  oauthConnected?: boolean;
+  sessionId?: string;
+  lastConnectedAt?: number;
 }
 
 export interface McpConfigurationState {
@@ -50,6 +57,7 @@ export const AVAILABLE_PRESET_MCP_SERVERS: McpServerConfig[] = [
     enabled: true,
     status: "ready",
     isCustom: false,
+    description: "Akses 500+ aplikasi (Google Workspace, Slack, Linear, Notion, GitHub) via Composio Platform.",
   },
   {
     id: "canva",
@@ -64,45 +72,23 @@ export const AVAILABLE_PRESET_MCP_SERVERS: McpServerConfig[] = [
     enabled: true,
     status: "ready",
     isCustom: false,
+    authUrl: "https://mcp.canva.com/authorize",
+    description: "Integrasi desain Canva: generate presentasi, dokumen, grafis, dan kelola aset desain.",
   },
   {
-    id: "parallel-search",
-    name: "parallel-search",
+    id: "canva_remote",
+    name: "Canva (Remote HTTP)",
     transport: "http",
     scope: "user",
     timeoutMs: 30000,
     protocolVersion: "auto",
-    url: "https://search.parallel.ai/mcp",
+    url: "https://mcp.canva.com/mcp",
     headers: {},
     enabled: false,
     status: "ready",
     isCustom: false,
-  },
-  {
-    id: "tinyfish",
-    name: "tinyfish",
-    transport: "http",
-    scope: "user",
-    timeoutMs: 30000,
-    protocolVersion: "auto",
-    url: "https://agent.tinyfish.ai/mcp?source=tinyfish_cli&client=zcode",
-    headers: {},
-    enabled: false,
-    status: "ready",
-    isCustom: false,
-  },
-  {
-    id: "context7",
-    name: "Context7",
-    transport: "http",
-    scope: "user",
-    timeoutMs: 30000,
-    protocolVersion: "auto",
-    url: "https://mcp.context7.com/mcp",
-    headers: {},
-    enabled: false,
-    status: "ready",
-    isCustom: false,
+    authUrl: "https://mcp.canva.com/authorize",
+    description: "Koneksi remote HTTP langsung ke endpoint Canva MCP tanpa proses lokal.",
   },
   {
     id: "github",
@@ -119,6 +105,8 @@ export const AVAILABLE_PRESET_MCP_SERVERS: McpServerConfig[] = [
     enabled: false,
     status: "ready",
     isCustom: false,
+    authUrl: "https://github.com/settings/tokens/new?scopes=repo,read:org,user&description=Const%20Learn%20MCP",
+    description: "Akses repositori, issues, pull requests, file, dan commit di GitHub.",
   },
   {
     id: "filesystem",
@@ -133,6 +121,7 @@ export const AVAILABLE_PRESET_MCP_SERVERS: McpServerConfig[] = [
     enabled: false,
     status: "ready",
     isCustom: false,
+    description: "Akses sistem berkas lokal yang aman untuk membaca dan menulis file direktori.",
   },
   {
     id: "puppeteer",
@@ -147,6 +136,49 @@ export const AVAILABLE_PRESET_MCP_SERVERS: McpServerConfig[] = [
     enabled: false,
     status: "ready",
     isCustom: false,
+    description: "Otomasi browser Chromium, penjelajahan web, screenshot, dan ekstraksi konten.",
+  },
+  {
+    id: "parallel-search",
+    name: "parallel-search",
+    transport: "http",
+    scope: "user",
+    timeoutMs: 30000,
+    protocolVersion: "auto",
+    url: "https://search.parallel.ai/mcp",
+    headers: {},
+    enabled: false,
+    status: "ready",
+    isCustom: false,
+    description: "Pencarian riset web multi-sumber secara simultan untuk pembelajaran.",
+  },
+  {
+    id: "tinyfish",
+    name: "tinyfish",
+    transport: "http",
+    scope: "user",
+    timeoutMs: 30000,
+    protocolVersion: "auto",
+    url: "https://agent.tinyfish.ai/mcp?source=tinyfish_cli&client=zcode",
+    headers: {},
+    enabled: false,
+    status: "ready",
+    isCustom: false,
+    description: "Asisten pencarian dan browsing web terkurasi dari TinyFish.",
+  },
+  {
+    id: "context7",
+    name: "Context7",
+    transport: "http",
+    scope: "user",
+    timeoutMs: 30000,
+    protocolVersion: "auto",
+    url: "https://mcp.context7.com/mcp",
+    headers: {},
+    enabled: false,
+    status: "ready",
+    isCustom: false,
+    description: "Pencarian konteks dokumentasi dan referensi kode library global.",
   },
 ];
 
@@ -231,6 +263,14 @@ export function importMcpJson(jsonString: string): McpConfigurationState {
   } catch (err: any) {
     throw new Error(`Format JSON MCP tidak valid: ${err?.message || String(err)}`);
   }
+}
+
+export function exportMcpServersToJson(servers: McpServerConfig[]): string {
+  return exportMcpJson({ servers });
+}
+
+export function importMcpServersFromJson(jsonString: string): McpServerConfig[] {
+  return importMcpJson(jsonString).servers;
 }
 
 /**

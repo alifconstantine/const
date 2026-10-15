@@ -21,8 +21,15 @@ export interface McpServerConfig {
   enabled?: boolean;
   isDefault?: boolean;
   isCustom?: boolean;
-  status?: "ready" | "needs_auth" | "disabled" | "error";
+  status?: "ready" | "connected" | "disconnected" | "needs_auth" | "disabled" | "error";
   errorMessage?: string;
+  description?: string;
+  tools?: Array<{ name: string; description?: string; inputSchema?: any }>;
+  skills?: string[];
+  authUrl?: string;
+  oauthConnected?: boolean;
+  sessionId?: string;
+  lastConnectedAt?: number;
 }
 
 export interface McpConfigurationState {
@@ -31,34 +38,19 @@ export interface McpConfigurationState {
 
 export const AVAILABLE_PRESET_MCP_SERVERS: McpServerConfig[] = [
   {
-    id: "composio",
-    name: "Composio",
-    transport: "stdio",
-    scope: "user",
-    timeoutMs: 30000,
-    protocolVersion: "auto",
-    command: "npx",
-    args: ["-y", "composio-mcp"],
-    env: {
-      COMPOSIO_API_KEY: "",
-    },
-    enabled: true,
-    status: "ready",
-    isCustom: false,
-  },
-  {
     id: "canva",
     name: "Canva",
-    transport: "stdio",
+    transport: "http",
     scope: "user",
     timeoutMs: 30000,
     protocolVersion: "auto",
-    command: "npx",
-    args: ["-y", "mcp-remote@latest", "https://mcp.canva.com/mcp"],
-    env: {},
+    url: "https://mcp.canva.com/mcp",
+    headers: {},
     enabled: true,
     status: "ready",
     isCustom: false,
+    authUrl: "https://mcp.canva.com/authorize",
+    description: "Integrasi desain Canva: generate presentasi, gambar, dokumen, dan kelola aset desain via HTTP.",
   },
   {
     id: "parallel-search",
@@ -72,6 +64,7 @@ export const AVAILABLE_PRESET_MCP_SERVERS: McpServerConfig[] = [
     enabled: false,
     status: "ready",
     isCustom: false,
+    description: "Pencarian riset web multi-sumber secara simultan untuk pembelajaran.",
   },
   {
     id: "tinyfish",
@@ -85,6 +78,7 @@ export const AVAILABLE_PRESET_MCP_SERVERS: McpServerConfig[] = [
     enabled: false,
     status: "ready",
     isCustom: false,
+    description: "Asisten pencarian dan browsing web terkurasi dari TinyFish.",
   },
   {
     id: "context7",
@@ -98,6 +92,24 @@ export const AVAILABLE_PRESET_MCP_SERVERS: McpServerConfig[] = [
     enabled: false,
     status: "ready",
     isCustom: false,
+    description: "Pencarian konteks dokumentasi dan referensi kode library global.",
+  },
+  {
+    id: "composio",
+    name: "Composio",
+    transport: "stdio",
+    scope: "user",
+    timeoutMs: 30000,
+    protocolVersion: "auto",
+    command: "npx",
+    args: ["-y", "composio-mcp"],
+    env: {
+      COMPOSIO_API_KEY: "",
+    },
+    enabled: false,
+    status: "ready",
+    isCustom: false,
+    description: "Akses 500+ integrasi via Composio Platform.",
   },
   {
     id: "github",
@@ -114,6 +126,7 @@ export const AVAILABLE_PRESET_MCP_SERVERS: McpServerConfig[] = [
     enabled: false,
     status: "ready",
     isCustom: false,
+    description: "Akses repositori, issues, pull requests, file, dan commit di GitHub.",
   },
 ];
 
