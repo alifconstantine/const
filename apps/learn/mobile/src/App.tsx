@@ -178,9 +178,40 @@ export default function App() {
     // 3. Native Deep Link Listener for Capacitor Android
     let cleanupListener: (() => void) | undefined;
     if (Capacitor.isNativePlatform()) {
+      const handleCanvaDeepLink = async (url: string) => {
+        if (url.includes("oauth/canva") || url.includes("connector=canva")) {
+          try {
+            const parsed = new URL(url.replace("const-learn://", "https://learn.const.web.id/"));
+            const code = parsed.searchParams.get("code");
+            const state = parsed.searchParams.get("state");
+            if (code) {
+              const { exchangeCanvaAuthCode, getCanvaRedirectUri } = await import("@const/ui");
+              const verifier = localStorage.getItem("const_canva_pkce_verifier");
+              if (verifier) {
+                await exchangeCanvaAuthCode({
+                  code,
+                  state: state || undefined,
+                  verifier,
+                  redirectUri: getCanvaRedirectUri(),
+                });
+                window.dispatchEvent(new CustomEvent("connectors_changed"));
+              }
+            }
+            try {
+              await Browser.close();
+            } catch {}
+            return true;
+          } catch (err) {
+            console.error("[Mobile Canva Auth Callback error]", err);
+          }
+        }
+        return false;
+      };
+
       // Check if cold-started directly from deep link
-      CapApp.getLaunchUrl().then((launch) => {
+      CapApp.getLaunchUrl().then(async (launch) => {
         if (launch?.url) {
+          if (await handleCanvaDeepLink(launch.url)) return;
           const { token: deepToken, refreshToken: deepRefresh } = extractToken(launch.url);
           if (deepToken) {
             handleTokenReceived(deepToken, deepRefresh);
@@ -191,6 +222,7 @@ export default function App() {
       // Listen for runtime appUrlOpen (returning from external or in-app browser)
       CapApp.addListener("appUrlOpen", async (data) => {
         if (data?.url) {
+          if (await handleCanvaDeepLink(data.url)) return;
           const { token: deepToken, refreshToken: deepRefresh } = extractToken(data.url);
           if (deepToken) {
             handleTokenReceived(deepToken, deepRefresh);

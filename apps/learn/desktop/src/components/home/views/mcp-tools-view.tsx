@@ -1011,7 +1011,7 @@ export function McpToolsView() {
                   </div>
 
                   <p className="text-[11.5px] text-muted-foreground leading-relaxed">
-                    Integrasi native menggunakan alur OAuth 2.0 PKCE resmi langsung ke Canva Connect REST API & MCP tanpa perantara proxy.
+                    Integrasi native membuka peramban default Anda (Chrome/Firefox/Edge) tempat Anda sudah login dengan akun Google/Canva, lalu menangkap otorisasi via OAuth 2.0 PKCE.
                   </p>
 
                   <div className="space-y-1.5">
@@ -1038,23 +1038,46 @@ export function McpToolsView() {
                     </div>
                   </div>
 
-                  <div className="space-y-1">
+                  <div className="space-y-2">
                     <span className="text-[11px] font-medium text-muted-foreground block">
-                      Authorized Redirect URI
+                      Authorized Redirect URIs (Daftarkan di Canva Portal)
                     </span>
-                    <div className="flex items-center justify-between p-2 rounded-xl bg-secondary/50 border border-border/70 text-[11px] font-mono text-muted-foreground">
-                      <span className="truncate">{getCanvaRedirectUri()}</span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          navigator.clipboard.writeText(getCanvaRedirectUri());
-                          toast.success("Redirect URI disalin!");
-                        }}
-                        className="p-1 hover:text-foreground text-muted-foreground cursor-pointer"
-                        title="Salin URI"
-                      >
-                        <Copy className="w-3 h-3" />
-                      </button>
+                    <div className="space-y-1.5">
+                      <div className="flex items-center justify-between p-2 rounded-xl bg-secondary/50 border border-border/70 text-[11px] font-mono text-muted-foreground">
+                        <div className="truncate flex items-center gap-1.5">
+                          <span className="text-[9.5px] uppercase font-sans font-semibold text-primary px-1 py-0.5 rounded bg-primary/10 shrink-0">Desktop</span>
+                          <span className="truncate">http://127.0.0.1:24135/canva/callback</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText("http://127.0.0.1:24135/canva/callback");
+                            toast.success("Redirect URI Desktop disalin!");
+                          }}
+                          className="p-1 hover:text-foreground text-muted-foreground cursor-pointer shrink-0 ml-1.5"
+                          title="Salin URI Desktop"
+                        >
+                          <Copy className="w-3 h-3" />
+                        </button>
+                      </div>
+
+                      <div className="flex items-center justify-between p-2 rounded-xl bg-secondary/50 border border-border/70 text-[11px] font-mono text-muted-foreground">
+                        <div className="truncate flex items-center gap-1.5">
+                          <span className="text-[9.5px] uppercase font-sans font-semibold text-cyan-400 px-1 py-0.5 rounded bg-cyan-500/10 shrink-0">Web/Mobile</span>
+                          <span className="truncate">https://accounts.const.web.id/oauth/canva/callback</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText("https://accounts.const.web.id/oauth/canva/callback");
+                            toast.success("Redirect URI Web/Mobile disalin!");
+                          }}
+                          className="p-1 hover:text-foreground text-muted-foreground cursor-pointer shrink-0 ml-1.5"
+                          title="Salin URI Web/Mobile"
+                        >
+                          <Copy className="w-3 h-3" />
+                        </button>
+                      </div>
                     </div>
                   </div>
 

@@ -46,7 +46,9 @@ const STORAGE_KEY_OAUTH_STATE = "const_canva_oauth_state";
 
 // Default public Client ID for Const Learn
 export const DEFAULT_CANVA_CLIENT_ID = "OC-AZX17ConstLearn";
-export const DEFAULT_CANVA_REDIRECT_URI = "https://learn.const.web.id/oauth/canva/callback";
+export const CANVA_LOOPBACK_REDIRECT_URI = "http://127.0.0.1:24135/canva/callback";
+export const CANVA_WEB_REDIRECT_URI = "https://accounts.const.web.id/oauth/canva/callback";
+export const DEFAULT_CANVA_REDIRECT_URI = CANVA_LOOPBACK_REDIRECT_URI;
 
 export const CANVA_AUTH_ENDPOINT = "https://www.canva.com/api/oauth/authorize";
 export const CANVA_TOKEN_ENDPOINT = "https://api.canva.com/rest/v1/oauth/token";
@@ -164,7 +166,15 @@ export function getCanvaRedirectUri(): string {
   const envVal =
     (typeof import.meta !== "undefined" && (import.meta as any).env?.VITE_CANVA_REDIRECT_URI) ||
     (typeof process !== "undefined" && process.env?.VITE_CANVA_REDIRECT_URI);
-  return (envVal && envVal.trim()) || DEFAULT_CANVA_REDIRECT_URI;
+  if (envVal && envVal.trim()) return envVal.trim();
+
+  // Desktop electron uses local loopback server for system default browser callback
+  if (typeof window !== "undefined" && (window as any).electron) {
+    return CANVA_LOOPBACK_REDIRECT_URI;
+  }
+
+  // Mobile / Web uses central web callback that deep-links into the mobile app
+  return CANVA_WEB_REDIRECT_URI;
 }
 
 export function setCanvaRedirectUri(uri: string): void {

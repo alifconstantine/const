@@ -49,7 +49,8 @@ if (typeof window !== "undefined" && (window as any).electron?.canva?.request) {
 
 /**
  * Initiates Canva OAuth connection for Desktop.
- * Prefers the native modal BrowserWindow popup to eliminate external browser tabs.
+ * Opens the user's default system browser (Chrome/Edge/Firefox) where their Google and Canva accounts
+ * are already logged in, and captures the callback via a local loopback HTTP server or deep link.
  */
 export async function connectCanvaDesktop(): Promise<{
   success: boolean;
@@ -60,7 +61,7 @@ export async function connectCanvaDesktop(): Promise<{
   try {
     const authSetup = await createCanvaAuthUrl();
 
-    // 1. Electron In-App Auth Window (Fastest, zero tabs, instant callback interception)
+    // 1. Electron Default Browser + Loopback Server (Instant, uses existing Google/Canva session)
     if ((window as any).electron?.canva?.openAuthWindow) {
       const authResult = await (window as any).electron.canva.openAuthWindow({
         authUrl: authSetup.url,

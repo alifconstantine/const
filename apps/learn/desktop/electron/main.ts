@@ -21,7 +21,14 @@ import {
   stopLoopbackAuthServer,
   registerLinuxProtocolHandler,
 } from "./auth-server.js";
+import {
+  startCanvaLoopbackServer,
+  stopCanvaLoopbackServer,
+  CANVA_LOOPBACK_PORT,
+} from "./canva-auth-server.js";
 import { browserController, type ControlState } from "./browser-controller.js";
+
+let pendingCanvaResolver: ((result: { success: boolean; code?: string; state?: string; error?: string }) => void) | null = null;
 
 registerGlobalBrowserToolHandler((toolName, args) =>
   browserController.executeTool(toolName, args)
@@ -467,7 +474,30 @@ function extractTokenFromUrl(rawUrl: string): string | undefined {
   return matchedToken ? decodeURIComponent(matchedToken) : undefined;
 }
 
+function checkAndHandleCanvaDeepLink(url: string): boolean {
+  if (url.includes("oauth/canva") || url.includes("connector=canva")) {
+    try {
+      const parsed = new URL(url.replace("const-learn://", "https://learn.const.web.id/"));
+      const code = parsed.searchParams.get("code");
+      const state = parsed.searchParams.get("state");
+      const error = parsed.searchParams.get("error") || parsed.searchParams.get("error_description");
+      if (pendingCanvaResolver) {
+        if (error) {
+          pendingCanvaResolver({ success: false, error });
+        } else if (code) {
+          pendingCanvaResolver({ success: true, code, state: state || undefined });
+        }
+        return true;
+      }
+    } catch {}
+  }
+  return false;
+}
+
 function sendDeepLinkToRenderer(url: string) {
+  if (checkAndHandleCanvaDeepLink(url)) {
+    return;
+  }
   if (!win || !win.webContents) {
     pendingDeepLink = url;
     return;
@@ -982,86 +1012,43 @@ app.on("second-instance", (_event, commandLine) => {
     "canva:open-auth-window",
     async (_event, payload: { authUrl: string; redirectUri?: string }) => {
       const authUrl = payload.authUrl;
-      const redirectUri = (
-        payload.redirectUri || "https://learn.const.web.id/oauth/canva/callback"
-      ).toLowerCase();
 
-      return new Promise((resolve) => {
+      return new Promise(async (resolve) => {
         let isResolved = false;
 
-        const authWindow = new BrowserWindow({
-          width: 620,
-          height: 750,
-          parent: win || undefined,
-          modal: true,
-          show: true,
-          title: "Otorisasi Canva - Const Learn",
-          autoHideMenuBar: true,
-          webPreferences: {
-            nodeIntegration: false,
-            contextIsolation: true,
-          },
-        });
-
-        const checkUrl = (url: string) => {
+        const handleResult = (result: {
+          success: boolean;
+          code?: string;
+          state?: string;
+          error?: string;
+        }) => {
           if (isResolved) return;
-          try {
-            const parsed = new URL(url);
-            const lowerUrl = url.toLowerCase();
-            const isMatch =
-              lowerUrl.startsWith(redirectUri) ||
-              lowerUrl.includes("oauth/canva/callback") ||
-              lowerUrl.startsWith("const-learn://oauth/canva") ||
-              lowerUrl.includes("auth-success?connector=canva");
+          isResolved = true;
+          pendingCanvaResolver = null;
+          stopCanvaLoopbackServer();
 
-            if (isMatch) {
-              const code = parsed.searchParams.get("code");
-              const state = parsed.searchParams.get("state");
-              const error =
-                parsed.searchParams.get("error") ||
-                parsed.searchParams.get("error_description");
+          // Bring main window back to focus
+          if (win) {
+            if (win.isMinimized()) win.restore();
+            win.show();
+            win.focus();
+          }
 
-              isResolved = true;
-              setTimeout(() => {
-                if (!authWindow.isDestroyed()) authWindow.close();
-              }, 100);
-
-              if (error) {
-                resolve({ success: false, error });
-              } else if (code) {
-                resolve({ success: true, code, state });
-              } else {
-                resolve({
-                  success: false,
-                  error: "Tidak ada kode otorisasi pada URL kembalian.",
-                });
-              }
-            }
-          } catch {}
+          resolve(result);
         };
 
-        authWindow.webContents.on("will-navigate", (_e, url) => checkUrl(url));
-        authWindow.webContents.on("will-redirect", (_e, url) => checkUrl(url));
+        pendingCanvaResolver = handleResult;
 
-        authWindow.on("closed", () => {
-          if (!isResolved) {
-            isResolved = true;
-            resolve({
-              success: false,
-              error: "Jendela login Canva ditutup oleh pengguna.",
-            });
-          }
-        });
+        try {
+          // 1. Start local loopback HTTP server to catch redirect from user's default browser
+          await startCanvaLoopbackServer(handleResult);
+        } catch (err) {
+          console.warn("[Electron Main] Could not start Canva loopback server:", err);
+        }
 
-        authWindow.loadURL(authUrl).catch((err) => {
-          if (!isResolved) {
-            isResolved = true;
-            resolve({
-              success: false,
-              error: err?.message || "Gagal memuat halaman login Canva.",
-            });
-          }
-        });
+        // 2. Open the user's DEFAULT BROWSER where they are already logged in to Google & Canva
+        console.log("[Electron Main] Opening Canva OAuth in default system browser:", authUrl);
+        await shell.openExternal(authUrl);
       });
     }
   );
