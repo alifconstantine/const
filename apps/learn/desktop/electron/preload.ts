@@ -46,6 +46,16 @@ contextBridge.exposeInMainWorld("electron", {
     getUsage: (userId?: string) =>
       ipcRenderer.invoke("composio:get-usage", userId),
   },
+  canva: {
+    openAuthWindow: (payload: { authUrl: string; redirectUri?: string }) =>
+      ipcRenderer.invoke("canva:open-auth-window", payload),
+    request: (payload: {
+      url: string;
+      method?: string;
+      headers?: Record<string, string>;
+      body?: string;
+    }) => ipcRenderer.invoke("canva:request", payload),
+  },
   agent: {
     getModels: () => ipcRenderer.invoke("agent:get-models"),
     sendMessage: (payload: {

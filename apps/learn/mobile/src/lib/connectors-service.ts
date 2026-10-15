@@ -11,6 +11,11 @@ import {
   getLocalDeviceId,
   getRouterBaseUrl,
 } from "./composio";
+import {
+  connectCanvaMobile,
+  disconnectCanvaMobile,
+  isCanvaMobileConnected,
+} from "./canva-auth";
 
 export async function openExternalUrl(url: string): Promise<void> {
   if (Capacitor.isNativePlatform()) {
@@ -35,17 +40,26 @@ export function getConnectedConnectorIds(): string[] {
     return ["cloud-sandbox"];
   }
 
+  const result: string[] = ["cloud-sandbox"];
+  if (isCanvaMobileConnected()) {
+    result.push("canva_mcp");
+  }
+
   try {
     const raw = localStorage.getItem(CONNECTED_CONNECTORS_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {
-        return Array.from(new Set(["cloud-sandbox", ...parsed]));
+        for (const id of parsed) {
+          if (!result.includes(id)) {
+            result.push(id);
+          }
+        }
       }
     }
   } catch {}
 
-  return ["cloud-sandbox"];
+  return result;
 }
 
 /**
@@ -63,6 +77,9 @@ export function saveConnectedConnectorIds(ids: string[]): void {
  */
 export function isConnectorActive(connectorId: string): boolean {
   if (connectorId === "cloud-sandbox") return true;
+  if (connectorId === "canva_mcp" || connectorId.toLowerCase().includes("canva")) {
+    return isCanvaMobileConnected();
+  }
   const connected = getConnectedConnectorIds();
   if (connected.includes(connectorId)) return true;
   const norm = connectorId.toLowerCase().replace(/[-_]/g, "");
@@ -150,6 +167,16 @@ export async function connectConnector(
   connector: ConnectorMetadata,
   userEmailOrId?: string
 ): Promise<{ success: boolean; redirectUrl?: string; message?: string }> {
+  // Native Canva branch
+  if (connector.id === "canva_mcp" || connector.id.toLowerCase().includes("canva")) {
+    const canvaRes = await connectCanvaMobile();
+    return {
+      success: canvaRes.success,
+      redirectUrl: canvaRes.redirectUrl,
+      message: canvaRes.message,
+    };
+  }
+
   const current = getConnectedConnectorIds();
   const userId = userEmailOrId || getLocalDeviceId();
   const targetSlug = connector.toolkitSlug;
@@ -204,6 +231,10 @@ export async function connectConnector(
  */
 export async function disconnectConnector(connectorId: string): Promise<boolean> {
   if (connectorId === "cloud-sandbox") return false;
+  // Native Canva disconnect branch
+  if (connectorId === "canva_mcp" || connectorId.toLowerCase().includes("canva")) {
+    return disconnectCanvaMobile();
+  }
   try {
     const current = getConnectedConnectorIds();
     saveConnectedConnectorIds(current.filter((id) => id !== connectorId));

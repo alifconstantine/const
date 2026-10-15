@@ -238,6 +238,26 @@ declare global {
           callback: (payload: { url: string; tabId?: string; newTab?: boolean } | string) => void
         ) => () => void;
       };
+      canva?: {
+        openAuthWindow: (payload: { authUrl: string; redirectUri?: string }) => Promise<{
+          success: boolean;
+          code?: string;
+          state?: string;
+          error?: string;
+        }>;
+        request: (payload: {
+          url: string;
+          method?: string;
+          headers?: Record<string, string>;
+          body?: string;
+        }) => Promise<{
+          ok: boolean;
+          status: number;
+          text: string;
+          json?: any;
+          error?: string;
+        }>;
+      };
     };
   }
 }

@@ -5,6 +5,11 @@
  */
 
 import { type ConnectorMetadata, AVAILABLE_CONNECTORS } from "@const/ui";
+import {
+  connectCanvaDesktop,
+  disconnectCanvaDesktop,
+  isCanvaDesktopConnected,
+} from "./canva-auth";
 
 const CONNECTED_CONNECTORS_KEY = "const_learn_connected_connectors_v1";
 
@@ -17,18 +22,27 @@ export function getConnectedConnectorIds(): string[] {
     return [];
   }
 
+  const result: string[] = [];
+  if (isCanvaDesktopConnected()) {
+    result.push("canva_mcp");
+  }
+
   try {
     const raw = localStorage.getItem(CONNECTED_CONNECTORS_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed)) {
         // Exclude cloud-sandbox / codeinterpreter on desktop
-        return parsed.filter((id) => id !== "cloud-sandbox");
+        for (const id of parsed) {
+          if (id !== "cloud-sandbox" && !result.includes(id)) {
+            result.push(id);
+          }
+        }
       }
     }
   } catch {}
 
-  return [];
+  return result;
 }
 
 /**
@@ -47,6 +61,9 @@ export function saveConnectedConnectorIds(ids: string[]): void {
  */
 export function isConnectorActive(connectorId: string): boolean {
   if (connectorId === "cloud-sandbox") return false;
+  if (connectorId === "canva_mcp" || connectorId.toLowerCase().includes("canva")) {
+    return isCanvaDesktopConnected();
+  }
   const connected = getConnectedConnectorIds();
   if (connected.includes(connectorId)) return true;
   const norm = connectorId.toLowerCase().replace(/[-_]/g, "");
@@ -152,6 +169,16 @@ export async function connectConnector(
   connector: ConnectorMetadata,
   userEmailOrId?: string
 ): Promise<{ success: boolean; redirectUrl?: string; message?: string }> {
+  // Native Canva branch
+  if (connector.id === "canva_mcp" || connector.id.toLowerCase().includes("canva")) {
+    const canvaRes = await connectCanvaDesktop();
+    return {
+      success: canvaRes.success,
+      redirectUrl: canvaRes.redirectUrl,
+      message: canvaRes.message,
+    };
+  }
+
   const current = getConnectedConnectorIds();
   const userId = userEmailOrId || localStorage.getItem("const_device_id") || "learn_desktop_user";
   const targetSlug = connector.toolkitSlug;
@@ -247,6 +274,11 @@ export async function connectConnector(
  * Disconnects an app and deletes the remote connected account if present.
  */
 export async function disconnectConnector(connectorId: string): Promise<boolean> {
+  // Native Canva disconnect branch
+  if (connectorId === "canva_mcp" || connectorId.toLowerCase().includes("canva")) {
+    return disconnectCanvaDesktop();
+  }
+
   try {
     const current = getConnectedConnectorIds();
     saveConnectedConnectorIds(current.filter((id) => id !== connectorId));

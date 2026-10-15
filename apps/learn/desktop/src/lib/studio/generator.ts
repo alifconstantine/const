@@ -31,6 +31,12 @@ import {
   blobToBase64,
 } from "./hyperframes-builder";
 import { buildPresentationHtml } from "./presentation-builder";
+import {
+  createCanvaDesignNative,
+  exportCanvaDesignNative,
+  pollCanvaExportJob,
+  isCanvaAuthenticated,
+} from "@const/ui";
 
 export interface GenerateStudioArtifactOptions {
   type: "quiz" | "flashcard" | "mind_map" | "audio_summary";
@@ -2126,13 +2132,36 @@ export async function exportCanvaPresentation(options: {
   designId?: string;
   format?: "pdf" | "pptx" | "png";
 }): Promise<{ success: boolean; downloadUrl?: string; error?: string }> {
-  const electron = typeof window !== "undefined" ? (window as any).electron : null;
   if (!options.designId) {
     return { success: false, error: "Canva design ID is missing" };
   }
 
   const formatType = options.format || "pdf";
 
+  // 1. Native Canva Connect Direct Export (Preferred, 100% Native, no Composio proxy)
+  if (isCanvaAuthenticated()) {
+    try {
+      const expRes = await exportCanvaDesignNative({
+        designId: options.designId,
+        format: formatType,
+      });
+
+      if (expRes.success && expRes.jobId) {
+        const pollRes = await pollCanvaExportJob({ jobId: expRes.jobId });
+        if (pollRes.success && pollRes.downloadUrls?.[0]) {
+          return { success: true, downloadUrl: pollRes.downloadUrls[0] };
+        }
+        if (pollRes.error) {
+          return { success: false, error: pollRes.error };
+        }
+      }
+    } catch (nativeErr: any) {
+      console.warn("[Presentation] Native Canva export error, falling back to MCP:", nativeErr);
+    }
+  }
+
+  // 2. Legacy fallback via Electron Composio
+  const electron = typeof window !== "undefined" ? (window as any).electron : null;
   if (electron?.composio?.executeTool) {
     try {
       const res = await electron.composio.executeTool({
@@ -2162,7 +2191,7 @@ export async function exportCanvaPresentation(options: {
     }
   }
 
-  return { success: false, error: "Electron Composio is not available" };
+  return { success: false, error: "Koneksi Canva tidak tersedia untuk export." };
 }
 
 /**
@@ -2557,22 +2586,48 @@ export async function generatePresentationArtifact(
   const electron = typeof window !== "undefined" ? (window as any).electron : null;
 
   // -------------------------------------------------------------------------
-  // PROVIDER 1: CANVA (Canva MCP via Composio / MCP Tools)
+  // PROVIDER 1: CANVA (Native Canva Connect REST API & Canva MCP)
   // -------------------------------------------------------------------------
   if (provider === "canva") {
-    // Crucial Canva MCP fix: length enum must match slide count!
-    // "short" = 1-5 slides, "balanced" = 5-15 slides, "comprehensive" = 15+ slides
-    const canvaLength: "short" | "balanced" | "comprehensive" =
-      targetCount <= 5 ? "short" : targetCount <= 15 ? "balanced" : "comprehensive";
+    let canvaResult: any = null;
 
-    const promptText = `Tolong buatkan slide presentasi komprehensif tentang: "${primaryTitle}".
+    // 1. Direct Native Canva Connect API (High Performance, No Proxy, 300 req/min)
+    if (isCanvaAuthenticated()) {
+      try {
+        const nativeRes = await createCanvaDesignNative({
+          title: primaryTitle,
+          preset: "presentation",
+        });
+
+        if (nativeRes.success && nativeRes.design) {
+          const d = nativeRes.design;
+          canvaResult = {
+            designId: d.id,
+            title: d.title || primaryTitle,
+            pageCount: targetCount,
+            editUrl: d.urls.edit_url,
+            viewUrl: d.urls.view_url,
+            thumbnails: d.thumbnail?.url ? [{ url: d.thumbnail.url }] : [],
+          };
+        }
+      } catch (nativeErr) {
+        console.warn("[Presentation] Native Canva design creation error, trying MCP fallback:", nativeErr);
+      }
+    }
+
+    // 2. Fallback: Composio Canva MCP if native token was not present or failed
+    if (!canvaResult && electron?.composio?.executeTool) {
+      // Crucial Canva MCP fix: length enum must match slide count!
+      // "short" = 1-5 slides, "balanced" = 5-15 slides, "comprehensive" = 15+ slides
+      const canvaLength: "short" | "balanced" | "comprehensive" =
+        targetCount <= 5 ? "short" : targetCount <= 15 ? "balanced" : "comprehensive";
+
+      const promptText = `Tolong buatkan slide presentasi komprehensif tentang: "${primaryTitle}".
 Jumlah slide target: ${targetCount} slide.
 ${customInstructions ? `Instruksi khusus: "${customInstructions}"\n` : ""}
 Konteks materi:
 ${groundedContext.formattedContext.slice(0, 3000)}`;
 
-    let canvaResult: any = null;
-    if (electron?.composio?.executeTool) {
       try {
         const genRes = await electron.composio.executeTool({
           toolSlug: "CANVA_MCP_GENERATE_DESIGN",

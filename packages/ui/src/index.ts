@@ -6,6 +6,7 @@ export * from "./components/theme-provider";
 export * from "./components/const-logo";
 export * from "./components/brand-logo";
 export * from "./lib/connectors-data";
+export * from "./lib/canva-client";
 
 // Hooks
 export * from "./hooks/use-toast";

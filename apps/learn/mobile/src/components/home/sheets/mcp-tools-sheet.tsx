@@ -32,6 +32,10 @@ import {
   ScrollArea,
   toast,
   cn,
+  getCanvaClientId,
+  setCanvaClientId,
+  getCanvaRedirectUri,
+  getStoredCanvaTokens,
 } from "@const/ui";
 import { useI18n } from "../../../lib/i18n";
 import { InteractiveBottomSheet } from "./interactive-bottom-sheet";
@@ -127,6 +131,12 @@ export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
   const [connectedIds, setConnectedIds] = useState<string[]>(() => getConnectedConnectorIds());
   const [isConnectingId, setIsConnectingId] = useState<string | null>(null);
   const [copiedPromptIndex, setCopiedPromptIndex] = useState<number | null>(null);
+  const [canvaClientIdInput, setCanvaClientIdInput] = useState(() => getCanvaClientId());
+
+  const handleSaveCanvaClientId = () => {
+    setCanvaClientId(canvaClientIdInput);
+    toast.success("Canva Client ID berhasil disimpan!");
+  };
 
   // Custom MCP State
   const [customMcpSubTab, setCustomMcpSubTab] = useState<CustomMcpSubTab>("servers");
@@ -793,12 +803,25 @@ export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
                             <h4 className="text-xs font-semibold text-foreground group-hover:text-primary transition-colors truncate">
                               {connector.name}
                             </h4>
-                            <span className="text-[10px] px-1.5 py-0.2 rounded bg-secondary text-muted-foreground font-sans shrink-0">
-                              {connector.authType}
+                            <span
+                              className={cn(
+                                "text-[9.5px] px-1.5 py-0.5 rounded font-sans font-medium shrink-0",
+                                connector.id.includes("canva")
+                                  ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20"
+                                  : "bg-secondary text-muted-foreground"
+                              )}
+                            >
+                              {connector.id.includes("canva") ? "Native OAuth" : connector.authType}
                             </span>
                           </div>
                           <p className="text-[11px] text-muted-foreground leading-relaxed line-clamp-1">
-                            {isConnected
+                            {connector.id.includes("canva")
+                              ? isConnected
+                                ? getStoredCanvaTokens()?.displayName
+                                  ? `Terhubung: ${getStoredCanvaTokens()?.displayName} (Connect REST API)`
+                                  : "Terhubung secara native via Canva OAuth 2.0 PKCE"
+                                : "Koneksi resmi langsung ke Canva Connect API tanpa proxy."
+                              : isConnected
                               ? t("connectorConnectedTooltip")
                               : t("connectorDisconnectedTooltip")}
                           </p>
@@ -924,6 +947,77 @@ export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
                   {selectedConnector.description}
                 </p>
               </div>
+
+              {/* Canva Native App Developer Configuration Widget */}
+              {selectedConnector.id.includes("canva") && (
+                <div className="p-4 rounded-2xl border border-border bg-card/50 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-semibold text-foreground uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                      <span>Konfigurasi Canva App</span>
+                    </h4>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-400 font-medium border border-emerald-500/20">
+                      PKCE S256
+                    </span>
+                  </div>
+
+                  <p className="text-[11px] text-muted-foreground leading-relaxed">
+                    Koneksi native menggunakan OAuth 2.0 PKCE resmi langsung ke Canva Connect REST API & MCP tanpa perantara proxy.
+                  </p>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-medium text-muted-foreground">
+                      Canva Client ID
+                    </label>
+                    <div className="flex items-center gap-1.5">
+                      <input
+                        type="text"
+                        value={canvaClientIdInput}
+                        onChange={(e) => setCanvaClientIdInput(e.target.value)}
+                        placeholder="OC-AZX..."
+                        className="flex-1 px-2.5 py-1.5 text-xs rounded-xl bg-secondary/40 border border-border text-foreground font-mono placeholder:text-muted-foreground focus:outline-none focus:border-primary/50"
+                      />
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        onClick={handleSaveCanvaClientId}
+                        className="rounded-xl px-3 h-8 text-xs cursor-pointer shrink-0"
+                      >
+                        Simpan
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1">
+                    <span className="text-[11px] font-medium text-muted-foreground block">
+                      Authorized Redirect URI
+                    </span>
+                    <div className="flex items-center justify-between p-2 rounded-xl bg-secondary/50 border border-border/70 text-[10.5px] font-mono text-muted-foreground">
+                      <span className="truncate">{getCanvaRedirectUri()}</span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(getCanvaRedirectUri());
+                          toast.success("Redirect URI disalin!");
+                        }}
+                        className="p-1 hover:text-foreground text-muted-foreground cursor-pointer shrink-0"
+                        title="Salin URI"
+                      >
+                        <Copy className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {getStoredCanvaTokens()?.displayName && (
+                    <div className="pt-2 border-t border-border/50 text-[11px] text-emerald-400 flex items-center gap-1.5">
+                      <Check className="w-3.5 h-3.5 shrink-0" />
+                      <span className="truncate font-medium">
+                        Akun aktif: {getStoredCanvaTokens()?.displayName}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="p-4 rounded-2xl border border-border bg-card/50 space-y-2.5">
                 <h4 className="text-xs font-semibold text-foreground flex items-center gap-2">

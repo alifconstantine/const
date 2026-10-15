@@ -9,6 +9,12 @@ import {
   recordComposioToolCall,
   getStoredComposioUsage,
 } from "./composio-usage";
+import {
+  isCanvaAuthenticated,
+  createCanvaDesignNative,
+  exportCanvaDesignNative,
+  pollCanvaExportJob,
+} from "@const/ui";
 
 export interface CodeInterpreterResult {
   success: boolean;
@@ -376,6 +382,33 @@ export async function executeCanvaMcp(payload: {
   const startTime = Date.now();
 
   try {
+    // 0. Direct Native Canva Connect API (if authenticated via PKCE)
+    if (isCanvaAuthenticated()) {
+      try {
+        const nativeRes = await createCanvaDesignNative({
+          title: payload.prompt.slice(0, 100),
+          preset: "presentation",
+        });
+
+        if (nativeRes.success && nativeRes.design) {
+          const d = nativeRes.design;
+          return {
+            success: true,
+            designId: d.id,
+            title: d.title || payload.prompt,
+            pageCount: payload.slideCount || 6,
+            editUrl: d.urls.edit_url,
+            viewUrl: d.urls.view_url,
+            thumbnails: d.thumbnail?.url ? [{ url: d.thumbnail.url }] : [],
+            message: `Presentasi Canva "${d.title || payload.prompt}" berhasil dibuat secara native di akun Canva Anda!`,
+            durationMs: Date.now() - startTime,
+          };
+        }
+      } catch (nativeErr) {
+        console.warn("[executeCanvaMcp] Native Canva Connect error, trying Composio fallback:", nativeErr);
+      }
+    }
+
     // 1. If direct materialization was requested
     if (payload.jobId && payload.candidateId) {
       const res = await executeComposioTool("CANVA_MCP_CREATE_DESIGN_FROM_CANDIDATE", {
@@ -706,6 +739,29 @@ export async function exportCanvaPresentation(options: {
 
   const formatType = options.format || "pdf";
 
+  // 1. Native Canva Connect Direct Export
+  if (isCanvaAuthenticated()) {
+    try {
+      const expRes = await exportCanvaDesignNative({
+        designId: options.designId,
+        format: formatType,
+      });
+
+      if (expRes.success && expRes.jobId) {
+        const pollRes = await pollCanvaExportJob({ jobId: expRes.jobId });
+        if (pollRes.success && pollRes.downloadUrls?.[0]) {
+          return { success: true, downloadUrl: pollRes.downloadUrls[0] };
+        }
+        if (pollRes.error) {
+          return { success: false, error: pollRes.error };
+        }
+      }
+    } catch (nativeErr: any) {
+      console.warn("[exportCanvaPresentation] Native export failed, trying Composio:", nativeErr);
+    }
+  }
+
+  // 2. Legacy fallback to Composio
   try {
     const res = await executeComposioTool("CANVA_MCP_EXPORT_DESIGN", {
       design_id: options.designId,

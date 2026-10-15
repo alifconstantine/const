@@ -7,11 +7,13 @@ import {
   Sliders,
   Cable,
   ChevronRight,
+  Link2,
 } from "lucide-react";
-import { BrandLogo, cn } from "@const/ui";
+import { BrandLogo, toast, cn } from "@const/ui";
 import { useI18n } from "../../lib/i18n";
 import type { LocalSource } from "../../lib/db";
 import { isConnectorActive, syncConnectedConnectors } from "../../lib/connectors-service";
+import { connectCanvaMobile } from "../../lib/canva-auth";
 
 export interface CreatePresentationSheetProps {
   open: boolean;
@@ -86,6 +88,25 @@ export function CreatePresentationSheet({
   const handleOpenMcpSheet = () => {
     onClose();
     window.dispatchEvent(new CustomEvent("const:open-mcp-sheet"));
+  };
+
+  const [isConnectingCanvaDirect, setIsConnectingCanvaDirect] = useState(false);
+
+  const handleQuickConnectCanva = async () => {
+    setIsConnectingCanvaDirect(true);
+    try {
+      const res = await connectCanvaMobile();
+      if (res.success) {
+        setActiveConnections((prev) => ({ ...prev, canva: true }));
+        toast.success(res.message || "Canva berhasil terhubung!");
+      } else {
+        toast.error(res.message || "Gagal menghubungkan Canva.");
+      }
+    } catch (err: any) {
+      toast.error(err?.message || "Gagal menghubungkan Canva.");
+    } finally {
+      setIsConnectingCanvaDirect(false);
+    }
   };
 
   const [lengthMode, setLengthMode] = useState<"short" | "medium" | "long" | "auto">("auto");
@@ -324,20 +345,45 @@ export function CreatePresentationSheet({
                     </div>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={handleOpenMcpSheet}
-                    className="w-full py-1.5 px-2.5 rounded-xl bg-[#252528] hover:bg-[#383838] border border-[#2e2e2e] hover:border-[#383838] text-[11px] font-medium text-white flex items-center justify-between gap-1.5 transition-colors cursor-pointer font-sans"
-                  >
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <Cable className="h-3 w-3 text-white shrink-0" />
-                      <span>{t("openMcpMenu")}</span>
-                      <span className="text-[8.5px] font-sans font-semibold uppercase tracking-wider px-1.5 py-0.2 rounded-full bg-primary/20 text-primary border border-primary/30 leading-none">
-                        Beta
-                      </span>
+                  {provider === "canva" ? (
+                    <div className="flex items-center gap-2 pt-0.5">
+                      <button
+                        type="button"
+                        disabled={isConnectingCanvaDirect}
+                        onClick={handleQuickConnectCanva}
+                        className="flex-1 py-1.5 px-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-[11px] font-medium text-white flex items-center justify-center gap-1.5 transition-colors cursor-pointer font-sans disabled:opacity-50"
+                      >
+                        <Link2 className="h-3 w-3" />
+                        <span>
+                          {isConnectingCanvaDirect
+                            ? "Menghubungkan..."
+                            : "Hubungkan Canva (OAuth Direct)"}
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleOpenMcpSheet}
+                        className="py-1.5 px-2 rounded-xl bg-[#252528] hover:bg-[#383838] border border-[#2e2e2e] text-[11px] font-medium text-white flex items-center gap-1 transition-colors cursor-pointer font-sans"
+                      >
+                        <span>Menu MCP</span>
+                      </button>
                     </div>
-                    <ChevronRight className="h-3 w-3 text-[#969696] shrink-0" />
-                  </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleOpenMcpSheet}
+                      className="w-full py-1.5 px-2.5 rounded-xl bg-[#252528] hover:bg-[#383838] border border-[#2e2e2e] hover:border-[#383838] text-[11px] font-medium text-white flex items-center justify-between gap-1.5 transition-colors cursor-pointer font-sans"
+                    >
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <Cable className="h-3 w-3 text-white shrink-0" />
+                        <span>{t("openMcpMenu")}</span>
+                        <span className="text-[8.5px] font-sans font-semibold uppercase tracking-wider px-1.5 py-0.2 rounded-full bg-primary/20 text-primary border border-primary/30 leading-none">
+                          Beta
+                        </span>
+                      </div>
+                      <ChevronRight className="h-3 w-3 text-[#969696] shrink-0" />
+                    </button>
+                  )}
                 </div>
               )}
           </div>

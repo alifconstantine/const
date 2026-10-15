@@ -975,6 +975,139 @@ app.on("second-instance", (_event, commandLine) => {
     return loadComposioUsage(uid);
   });
 
+  // ---------------------------------------------------------------------------
+  // Native Canva OAuth Window & Direct Request Handlers
+  // ---------------------------------------------------------------------------
+  ipcMain.handle(
+    "canva:open-auth-window",
+    async (_event, payload: { authUrl: string; redirectUri?: string }) => {
+      const authUrl = payload.authUrl;
+      const redirectUri = (
+        payload.redirectUri || "https://learn.const.web.id/oauth/canva/callback"
+      ).toLowerCase();
+
+      return new Promise((resolve) => {
+        let isResolved = false;
+
+        const authWindow = new BrowserWindow({
+          width: 620,
+          height: 750,
+          parent: win || undefined,
+          modal: true,
+          show: true,
+          title: "Otorisasi Canva - Const Learn",
+          autoHideMenuBar: true,
+          webPreferences: {
+            nodeIntegration: false,
+            contextIsolation: true,
+          },
+        });
+
+        const checkUrl = (url: string) => {
+          if (isResolved) return;
+          try {
+            const parsed = new URL(url);
+            const lowerUrl = url.toLowerCase();
+            const isMatch =
+              lowerUrl.startsWith(redirectUri) ||
+              lowerUrl.includes("oauth/canva/callback") ||
+              lowerUrl.startsWith("const-learn://oauth/canva") ||
+              lowerUrl.includes("auth-success?connector=canva");
+
+            if (isMatch) {
+              const code = parsed.searchParams.get("code");
+              const state = parsed.searchParams.get("state");
+              const error =
+                parsed.searchParams.get("error") ||
+                parsed.searchParams.get("error_description");
+
+              isResolved = true;
+              setTimeout(() => {
+                if (!authWindow.isDestroyed()) authWindow.close();
+              }, 100);
+
+              if (error) {
+                resolve({ success: false, error });
+              } else if (code) {
+                resolve({ success: true, code, state });
+              } else {
+                resolve({
+                  success: false,
+                  error: "Tidak ada kode otorisasi pada URL kembalian.",
+                });
+              }
+            }
+          } catch {}
+        };
+
+        authWindow.webContents.on("will-navigate", (_e, url) => checkUrl(url));
+        authWindow.webContents.on("will-redirect", (_e, url) => checkUrl(url));
+
+        authWindow.on("closed", () => {
+          if (!isResolved) {
+            isResolved = true;
+            resolve({
+              success: false,
+              error: "Jendela login Canva ditutup oleh pengguna.",
+            });
+          }
+        });
+
+        authWindow.loadURL(authUrl).catch((err) => {
+          if (!isResolved) {
+            isResolved = true;
+            resolve({
+              success: false,
+              error: err?.message || "Gagal memuat halaman login Canva.",
+            });
+          }
+        });
+      });
+    }
+  );
+
+  ipcMain.handle(
+    "canva:request",
+    async (
+      _event,
+      payload: {
+        url: string;
+        method?: string;
+        headers?: Record<string, string>;
+        body?: string;
+      }
+    ) => {
+      try {
+        const res = await fetch(payload.url, {
+          method: payload.method || "GET",
+          headers: payload.headers,
+          body: payload.body,
+        });
+
+        const status = res.status;
+        const ok = res.ok;
+        const text = await res.text().catch(() => "");
+        let json: any = null;
+        try {
+          json = JSON.parse(text);
+        } catch {}
+
+        return {
+          ok,
+          status,
+          text,
+          json,
+        };
+      } catch (err: any) {
+        return {
+          ok: false,
+          status: 500,
+          error: err?.message || "Canva network error",
+        };
+      }
+    }
+  );
+
   ipcMain.handle("shell:open-path", async (_event, targetPath: string) => {
     if (!targetPath || !fs.existsSync(targetPath)) return false;
     const res = await shell.openPath(targetPath);
