@@ -68,6 +68,7 @@ export interface MenuItemProps {
   icon?: React.ReactNode;
   isActive?: boolean;
   label?: string;
+  badge?: React.ReactNode;
   className?: string;
 }
 
@@ -78,6 +79,7 @@ export function MenuItem({
   icon,
   isActive = false,
   label,
+  badge,
   className = "",
 }: MenuItemProps) {
   return (
@@ -94,10 +96,15 @@ export function MenuItem({
       title={label}
       aria-label={label}
     >
-      <span className="flex items-center justify-center h-full">
+      <span className="relative flex items-center justify-center h-full w-full">
         {icon && (
           <span className="h-5 w-5 flex items-center justify-center transition-all duration-200 group-hover:[&_svg]:stroke-[2.2]">
             {icon}
+          </span>
+        )}
+        {badge && (
+          <span className="absolute -top-1.5 -right-1.5 text-[8px] font-sans font-bold uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-primary text-primary-foreground leading-none border border-neutral-900 shadow-md pointer-events-none">
+            {badge}
           </span>
         )}
         {children}
@@ -201,7 +208,7 @@ export function MenuContainer({
           return (
             <div
               key={index}
-              className="absolute top-0 left-0 bg-neutral-900 dark:bg-neutral-900 text-white border border-neutral-800/80 rounded-full will-change-transform shadow-xl overflow-hidden flex items-center justify-center"
+              className="absolute top-0 left-0 bg-neutral-900 dark:bg-neutral-900 text-white border border-neutral-800/80 rounded-full will-change-transform shadow-xl overflow-visible flex items-center justify-center"
               style={{
                 ...sizeStyle,
                 transform: `translateY(${isExpanded ? translateY : 0}px) scale(${isExpanded ? 1 : 0.7})`,

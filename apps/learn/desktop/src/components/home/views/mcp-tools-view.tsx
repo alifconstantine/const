@@ -668,6 +668,9 @@ export function McpToolsView() {
           <h1 className="font-serif text-2xl sm:text-3xl font-normal tracking-tight text-foreground">
             {t("mcpConnectorsTitle")}
           </h1>
+          <span className="text-[10px] font-sans font-medium uppercase tracking-wider px-2 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
+            Beta
+          </span>
           <span className="text-xs px-2.5 py-0.5 rounded-full bg-secondary text-muted-foreground font-sans tabular-nums">
             {mainTab === "apps" ? t("activeCountBadge", { count: connectedIds.length }) : t("installedCountBadge", { count: mcpConfig.servers.length })}
           </span>

@@ -666,7 +666,10 @@ export function McpToolsSheet({ open, onClose }: McpToolsSheetProps) {
             <h2 className="text-base font-semibold text-foreground tracking-tight">
               {t("mcpConnectorsTitle")}
             </h2>
-            <span className="px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10.5px] font-medium border border-primary/20">
+            <span className="px-1.5 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-semibold border border-primary/20 uppercase tracking-wider">
+              Beta
+            </span>
+            <span className="px-2 py-0.5 rounded-full bg-secondary text-muted-foreground text-[10.5px] font-medium border border-border/40">
               {mainTab === "apps" ? t("activeCountBadge", { count: filteredConnectors.length }) : t("installedCountBadge", { count: mcpConfig.servers.length })}
             </span>
           </div>

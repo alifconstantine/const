@@ -1767,7 +1767,8 @@ export function LearnHome({
 
             {/* Child 2: MCP Tools */}
             <MenuItem
-              label="MCP Tools"
+              label={t("mcpTools") || "MCP Tools"}
+              badge="Beta"
               icon={<Cable size={20} strokeWidth={1.8} className="text-white" />}
               onClick={() => {
                 setIsFluidMenuExpanded(false);

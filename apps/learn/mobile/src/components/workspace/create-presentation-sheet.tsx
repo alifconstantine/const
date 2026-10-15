@@ -327,11 +327,16 @@ export function CreatePresentationSheet({
                   <button
                     type="button"
                     onClick={handleOpenMcpSheet}
-                    className="w-full py-1.5 px-2.5 rounded-xl bg-[#252528] hover:bg-[#383838] border border-[#2e2e2e] hover:border-[#383838] text-[11px] font-medium text-white flex items-center justify-center gap-1.5 transition-colors cursor-pointer font-sans"
+                    className="w-full py-1.5 px-2.5 rounded-xl bg-[#252528] hover:bg-[#383838] border border-[#2e2e2e] hover:border-[#383838] text-[11px] font-medium text-white flex items-center justify-between gap-1.5 transition-colors cursor-pointer font-sans"
                   >
-                    <Cable className="h-3 w-3 text-white" />
-                    <span>{t("openMcpMenu")}</span>
-                    <ChevronRight className="h-3 w-3 text-[#969696]" />
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <Cable className="h-3 w-3 text-white shrink-0" />
+                      <span>{t("openMcpMenu")}</span>
+                      <span className="text-[8.5px] font-sans font-semibold uppercase tracking-wider px-1.5 py-0.2 rounded-full bg-primary/20 text-primary border border-primary/30 leading-none">
+                        Beta
+                      </span>
+                    </div>
+                    <ChevronRight className="h-3 w-3 text-[#969696] shrink-0" />
                   </button>
                 </div>
               )}

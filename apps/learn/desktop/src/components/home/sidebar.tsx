@@ -81,13 +81,14 @@ export function Sidebar({
     label: string;
     icon: React.ComponentType<{ className?: string }>;
     count?: number;
+    badge?: string;
   }> = [
     { id: "learns", label: t("learns"), icon: BookOpen, count: learnsCount },
     { id: "sources", label: t("sources"), icon: FileText, count: sourcesCount },
     { id: "collections", label: t("collections"), icon: Folder, count: collectionsCount },
     { id: "artifacts", label: t("artifacts"), icon: Layers, count: artifactsCount },
     { id: "models", label: t("models") || "Models", icon: Box },
-    { id: "mcp", label: t("mcpTools") || "MCP Tools", icon: Cable },
+    { id: "mcp", label: t("mcpTools") || "MCP Tools", icon: Cable, badge: "Beta" },
     { id: "skills", label: t("skills") || "Skills", icon: PencilSparkles },
   ];
 
@@ -187,6 +188,18 @@ export function Sidebar({
                     )}
                   >
                     {item.count}
+                  </span>
+                )}
+                {item.badge && (
+                  <span
+                    className={cn(
+                      "text-[9px] font-sans font-medium uppercase tracking-wider px-1.5 py-0.5 rounded-full border leading-none shrink-0",
+                      isActive
+                        ? "bg-primary/10 text-primary border-primary/20"
+                        : "bg-muted/70 text-muted-foreground border-border/40"
+                    )}
+                  >
+                    {item.badge}
                   </span>
                 )}
               </button>
