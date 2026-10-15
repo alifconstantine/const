@@ -20,13 +20,21 @@ export function FilePreviewTab({ tab }: FilePreviewTabProps) {
   const hasLeadingEllipsis = allParts.length > 2;
   const pathParts = hasLeadingEllipsis ? allParts.slice(-2) : allParts;
   const isMarkdown = fileName.toLowerCase().endsWith(".md") || fileName.toLowerCase().endsWith(".markdown");
+  const isPdf = fileName.toLowerCase().endsWith(".pdf");
 
   const [mode, setMode] = useState<"formatted" | "raw">(
     tab.previewMode || (isMarkdown ? "formatted" : "raw")
   );
 
+  const pdfUrl = isPdf && tab.filePath
+    ? tab.filePath.startsWith("const-media:") || tab.filePath.startsWith("http")
+      ? tab.filePath
+      : `const-media://file/${tab.filePath.replace(/\\/g, "/")}`
+    : "";
+
   useEffect(() => {
     const electron = (window as any).electron;
+    if (isPdf) return;
     if (!content && tab.filePath && electron?.readFile) {
       electron.readFile(tab.filePath).then((res: any) => {
         if (res && res.content !== undefined) {
@@ -36,7 +44,7 @@ export function FilePreviewTab({ tab }: FilePreviewTabProps) {
         }
       });
     }
-  }, [tab.filePath, content]);
+  }, [tab.filePath, content, isPdf]);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(content);
@@ -161,7 +169,21 @@ export function FilePreviewTab({ tab }: FilePreviewTabProps) {
 
       {/* Main Content Area */}
       <div className="flex-1 w-full h-full min-h-0 overflow-hidden relative">
-        {mode === "formatted" && isMarkdown ? (
+        {isPdf ? (
+          <div className="w-full h-full min-h-0 bg-[#141414] overflow-hidden relative">
+            {pdfUrl ? (
+              <iframe
+                src={pdfUrl}
+                title={fileName}
+                className="w-full h-full border-0 bg-[#141414]"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground">
+                No PDF preview available
+              </div>
+            )}
+          </div>
+        ) : mode === "formatted" && isMarkdown ? (
           <ScrollArea className="w-full h-full p-4 select-text">
             <div className="max-w-3xl mx-auto prose dark:prose-invert text-xs leading-relaxed">
               <MarkdownContent content={content} />

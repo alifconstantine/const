@@ -44,8 +44,7 @@ import { QuizViewer } from "./quiz-viewer";
 import { FlashcardViewer } from "./flashcard-viewer";
 import { MindMapTab } from "./mind-map-tab";
 import { AudioSummaryViewer } from "./audio-summary-viewer";
-import { VideoSummaryViewer } from "./video-summary-viewer";
-import { PresentationViewer } from "./presentation-viewer";
+import { SideChatTab, type SideChatSession } from "./side-chat-tab";
 import { InfographicViewer } from "./infographic-viewer";
 import { ReportViewer } from "./report-viewer";
 import { CheatSheetViewer } from "./cheatsheet-viewer";
@@ -53,7 +52,7 @@ import { STUDIO_TOOLS } from "../workspace/studio-panel";
 import { useI18n } from "../../lib/i18n";
 import type { RightPaneTab, RightPaneTabType, AddSourceFromBrowserParams } from "./types";
 import type { FileMutationRecord } from "@const/agent";
-import { type LocalArtifact, type AudioSummaryData, type VideoSummaryData, type SlideDeckData, type InfographicData, type ReportData, type CheatSheetData } from "../../lib/db";
+import { type LocalArtifact, type AudioSummaryData, type InfographicData, type ReportData, type CheatSheetData } from "../../lib/db";
 
 export interface GeneratingArtifactStatus {
   id: string;
@@ -98,6 +97,8 @@ export interface RightPaneProps {
   onExplainInChat?: (prompt: string) => void;
   onAddSourceFromBrowser?: (params: AddSourceFromBrowserParams) => Promise<any> | void;
   existingSourceUrls?: Set<string>;
+  activeSideChatSessions?: Map<string, SideChatSession>;
+  onStopSideAgent?: (conversationId: string) => void;
   onSelectElementForChat?: (info: {
     tag: string;
     id?: string;
@@ -142,6 +143,8 @@ export function RightPane({
   onExplainInChat,
   onAddSourceFromBrowser,
   existingSourceUrls,
+  activeSideChatSessions,
+  onStopSideAgent,
   onSelectElementForChat,
 }: RightPaneProps) {
   const { t } = useI18n();
@@ -217,6 +220,25 @@ export function RightPane({
   const activeTab = tabs.find((t) => t.id === activeTabId) || tabs[0];
 
   const renderTabContent = (tab: RightPaneTab) => {
+    if (tab.type === "side_chat") {
+      const artId = tab.artifact?.id || tab.artifactId || tab.id;
+      const matchedSession =
+        tab.sideChatSession ||
+        (activeSideChatSessions ? activeSideChatSessions.get(artId) || activeSideChatSessions.get(tab.id) : undefined);
+
+      return (
+        <SideChatTab
+          tab={tab}
+          artifact={tab.artifact}
+          activeSession={matchedSession}
+          onStopAgent={onStopSideAgent}
+          onOpenFileDiff={onOpenFileDiff}
+          onOpenBrowser={(url) => {
+            window.electron?.openExternal?.(url) || window.open(url, "_blank");
+          }}
+        />
+      );
+    }
     if (tab.type === "file_diff") {
       return (
         <FileDiffTab
@@ -305,60 +327,24 @@ export function RightPane({
           );
         }
       }
-      if (tab.artifact?.type === "video_summary") {
-        const videoData =
-          (tab.artifact.data as VideoSummaryData) ||
-          (() => {
-            try {
-              return typeof tab.artifact.content === "string"
-                ? JSON.parse(tab.artifact.content)
-                : null;
-            } catch {
-              return null;
-            }
-          })();
-        if (videoData) {
-          return (
-            <VideoSummaryViewer
-              data={{
-                ...videoData,
-                id: tab.artifact.id || videoData.id,
-                learnId: tab.artifact.learnId || videoData.learnId,
-              }}
-              onExplainInChat={onExplainInChat}
-              onToggleExpand={onToggleCollapse}
-              isExpanded={!isCollapsed}
-            />
-          );
-        }
-      }
-      if (tab.artifact?.type === "slides") {
-        const slideData =
-          (tab.artifact.data as SlideDeckData) ||
-          (() => {
-            try {
-              return typeof tab.artifact.content === "string"
-                ? JSON.parse(tab.artifact.content)
-                : null;
-            } catch {
-              return null;
-            }
-          })();
-        if (slideData) {
-          return (
-            <PresentationViewer
-              artifact={tab.artifact}
-              data={{
-                ...slideData,
-                id: tab.artifact.id || slideData.id,
-                learnId: tab.artifact.learnId || slideData.learnId,
-              }}
-              onExplainInChat={onExplainInChat}
-              onToggleExpand={onToggleCollapse}
-              isExpanded={!isCollapsed}
-            />
-          );
-        }
+      if (tab.artifact?.type === "video_summary" || tab.artifact?.type === "slides") {
+        const artId = tab.artifact.id || tab.id;
+        const matchedSession =
+          tab.sideChatSession ||
+          (activeSideChatSessions ? activeSideChatSessions.get(artId) || activeSideChatSessions.get(tab.id) : undefined);
+
+        return (
+          <SideChatTab
+            tab={tab}
+            artifact={tab.artifact}
+            activeSession={matchedSession}
+            onStopAgent={onStopSideAgent}
+            onOpenFileDiff={onOpenFileDiff}
+            onOpenBrowser={(url) => {
+              window.electron?.openExternal?.(url) || window.open(url, "_blank");
+            }}
+          />
+        );
       }
       if (tab.artifact?.type === "infographic") {
         const infoData =
@@ -746,8 +732,14 @@ export function RightPane({
                         return (
                           <div
                             key={art.id}
+                            onClick={() => {
+                              if ((isSlides || isVideo) && onSelectArtifact) {
+                                onSelectArtifact(art);
+                              }
+                            }}
                             className={cn(
                               "p-3 rounded-2xl bg-card flex items-center gap-3 select-none animate-pulse shadow-xs border",
+                              (isSlides || isVideo) && "cursor-pointer hover:border-border/80 transition-all",
                               isAudio
                                 ? "border-indigo-500/30"
                                 : isInfographic

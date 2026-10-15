@@ -8,7 +8,8 @@ export type RightPaneTabType =
   | "browser"
   | "note_preview"
   | "studio_preview"
-  | "mind_map";
+  | "mind_map"
+  | "side_chat";
 
 export interface RightPaneTab {
   id: string;
@@ -25,6 +26,8 @@ export interface RightPaneTab {
   favicon?: string;
   artifactId?: string;
   artifact?: LocalArtifact;
+  sideChatRole?: "presentation" | "video_summary" | string;
+  sideChatSession?: any;
   mindMapData?: any;
   isAudible?: boolean;
   isMuted?: boolean;

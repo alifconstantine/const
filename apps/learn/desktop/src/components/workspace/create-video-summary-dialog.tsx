@@ -10,6 +10,7 @@ import {
   ArrowRight,
   Settings,
   Search,
+  Loader2,
 } from "lucide-react";
 import { Dialog, DialogContent, ScrollArea, cn } from "@const/ui";
 import { useI18n } from "../../lib/i18n";
@@ -27,7 +28,7 @@ export interface CreateVideoSummaryDialogProps {
   sources: LocalSource[];
   onGenerate: (options: {
     selectedSourceIds: string[];
-    coverageMode: "short" | "long" | "auto";
+    coverageMode: "auto" | "long";
     language: "id" | "en";
     audioLanguage: string;
     voiceProviderId: string;
@@ -37,7 +38,7 @@ export interface CreateVideoSummaryDialogProps {
     deliveryMode?: string;
     speed?: number;
     customInstructions?: string;
-  }) => void;
+  }) => Promise<void> | void;
   onOpenSettings?: () => void;
   onOpenModelsSettings?: () => void;
 }
@@ -87,8 +88,8 @@ export function CreateVideoSummaryDialog({
   // Sources selection
   const [selectedSourceIds, setSelectedSourceIds] = useState<string[]>([]);
 
-  // Coverage depth: "auto" | "short" | "long"
-  const [coverageMode, setCoverageMode] = useState<"short" | "long" | "auto">("auto");
+  // Coverage depth: "auto" | "long"
+  const [coverageMode, setCoverageMode] = useState<"auto" | "long">("auto");
 
   // Voice state
   const [voiceModel, setVoiceModel] = useState<string>("inworld-tts-2");
@@ -96,6 +97,7 @@ export function CreateVideoSummaryDialog({
   const [audioLanguage, setAudioLanguage] = useState<string>(language === "id" ? "id-ID" : "en-US");
   const [deliveryMode, setDeliveryMode] = useState<string>("BALANCED");
   const [speed, setSpeed] = useState<number>(1.0);
+  const [isSynthesizing, setIsSynthesizing] = useState(false);
 
   // Search queries for dropdowns
   const [voiceSearch, setVoiceSearch] = useState<string>("");
@@ -233,9 +235,9 @@ export function CreateVideoSummaryDialog({
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (selectedSourceIds.length === 0) return;
+    if (selectedSourceIds.length === 0 || isSynthesizing) return;
 
     if (!hasInworldKey) {
       handleOpenSettingsAction();
@@ -245,22 +247,29 @@ export function CreateVideoSummaryDialog({
     const chosenVoice = availableVoices.find((v) => v.id === voiceId);
     const chosenVoiceName = chosenVoice?.name || voiceId || "Ashley";
 
-    onGenerate({
-      selectedSourceIds:
-        selectedSourceIds.length > 0 ? selectedSourceIds : sources.map((s) => s.id),
-      coverageMode,
-      language: audioLanguage.startsWith("id") ? "id" : "en",
-      audioLanguage,
-      voiceProviderId: inworldProvider?.id || "inworld",
-      voiceModel: voiceModel || "inworld-tts-2",
-      voiceId: voiceId || "Ashley",
-      voiceName: chosenVoiceName,
-      deliveryMode: isTts2Model ? deliveryMode : undefined,
-      speed,
-      customInstructions: customInstructions.trim() || undefined,
-    });
+    try {
+      setIsSynthesizing(true);
+      await onGenerate({
+        selectedSourceIds:
+          selectedSourceIds.length > 0 ? selectedSourceIds : sources.map((s) => s.id),
+        coverageMode,
+        language: audioLanguage.startsWith("id") ? "id" : "en",
+        audioLanguage,
+        voiceProviderId: inworldProvider?.id || "inworld",
+        voiceModel: voiceModel || "inworld-tts-2",
+        voiceId: voiceId || "Ashley",
+        voiceName: chosenVoiceName,
+        deliveryMode: isTts2Model ? deliveryMode : undefined,
+        speed,
+        customInstructions: customInstructions.trim() || undefined,
+      });
 
-    onOpenChange(false);
+      onOpenChange(false);
+    } catch (err) {
+      console.error("Video summary prompt synthesis error:", err);
+    } finally {
+      setIsSynthesizing(false);
+    }
   };
 
   // Helper labels
@@ -276,9 +285,7 @@ export function CreateVideoSummaryDialog({
   const selectedLangDisplay = selectedLangObj?.label || audioLanguage || t("videoSelectLanguagePrompt");
 
   const coverageDisplay =
-    coverageMode === "short"
-      ? t("videoCoverageShortShort")
-      : coverageMode === "long"
+    coverageMode === "long"
       ? t("videoCoverageLongShort")
       : t("videoCoverageAutoShort");
 
@@ -439,7 +446,6 @@ export function CreateVideoSummaryDialog({
                         {(
                           [
                             { id: "auto", label: t("videoCoverageAutoShort") },
-                            { id: "short", label: t("videoCoverageShortShort") },
                             { id: "long", label: t("videoCoverageLongShort") },
                           ] as const
                         ).map((opt) => {
@@ -924,10 +930,20 @@ export function CreateVideoSummaryDialog({
             </button>
             <button
               type="submit"
-              disabled={!hasInworldKey || sources.length === 0}
+              disabled={!hasInworldKey || sources.length === 0 || isSynthesizing}
               className="px-4 py-2 rounded-xl bg-white hover:bg-neutral-200 disabled:opacity-40 disabled:hover:bg-white disabled:cursor-not-allowed text-xs font-semibold text-black flex items-center gap-1.5 transition-all cursor-pointer shadow-sm active:scale-98"
             >
-              <span>{t("videoGenerateBtn")}</span>
+              {isSynthesizing ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin text-black" />
+                  <span>{t("synthesizingPrompt") || "Meracik Prompt Video & Skills..."}</span>
+                </>
+              ) : (
+                <>
+                  <Video className="h-3.5 w-3.5" />
+                  <span>{t("videoGenerateBtn")}</span>
+                </>
+              )}
             </button>
           </div>
         </form>

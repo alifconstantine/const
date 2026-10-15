@@ -34,8 +34,18 @@ export async function ensureDefaultSkillsSeeded(): Promise<void> {
         await db.skills.put(skill);
       } else {
         const ex = existingSkills.find((s) => s.id === skill.id);
-        if (ex && ex.isBuiltIn && (!ex.files || !ex.bundleId || ex.content.length < 300)) {
+        if (
+          ex &&
+          ex.isBuiltIn &&
+          (ex.content !== skill.content ||
+            ex.description !== skill.description ||
+            !ex.files ||
+            !ex.bundleId ||
+            ex.content.length < 300)
+        ) {
           await db.skills.update(skill.id, {
+            name: skill.name,
+            description: skill.description,
             bundleId: skill.bundleId,
             bundleName: skill.bundleName,
             files: skill.files,

@@ -41,6 +41,8 @@ import { useI18n, LANGUAGE_OPTIONS } from "../../lib/i18n";
 import { SourcesPanel } from "./sources-panel";
 import { ChatPanel } from "./chat-panel";
 import { RightPane, type RightPaneTab, type RightPaneTabType, type GeneratingArtifactStatus } from "../right-pane";
+import { type SideChatSession } from "../right-pane/side-chat-tab";
+import { type TraceStep } from "./execution-trace";
 import { AddSourceDialog } from "./add-source-dialog";
 import { CreateStudioArtifactDialog } from "./create-studio-artifact-dialog";
 import { CreateMindMapDialog } from "./create-mind-map-dialog";
@@ -57,12 +59,15 @@ import { buildGroundedContext } from "../../lib/grounding/context-builder";
 import { streamChatCompletion } from "../../lib/ai-stream";
 import {
   generateStudioArtifact,
-  generateVideoSummaryArtifact,
-  generatePresentationArtifact,
   generateInfographicArtifact,
   generateReportArtifact,
   generateCheatSheetArtifact,
 } from "../../lib/studio/generator";
+import {
+  synthesizePresentationPrompt,
+  synthesizeVideoSummaryPrompt,
+} from "../../lib/studio/prompt-synthesizer";
+import { DEFAULT_BUILTIN_SKILLS } from "../../lib/skills/default-skills";
 import { fetchWebContent } from "../../lib/sources/web-fetcher";
 import type { AddSourceFromBrowserParams } from "../right-pane";
 import type { FileMutationRecord } from "@const/agent";
@@ -196,6 +201,236 @@ export function LearnWorkspace({
   const [activeRightPaneTabId, setActiveRightPaneTabId] = useState<string>("review");
   const [isOpeningNewTab, setIsOpeningNewTab] = useState(false);
   const [sessionMutations, setSessionMutations] = useState<FileMutationRecord[]>([]);
+
+  // Active in-memory SideChat sessions for Presentation Slides & Video Summary
+  const [activeSideChatSessions, setActiveSideChatSessions] = useState<Map<string, SideChatSession>>(new Map());
+
+  // Listen for stream events from isolated side-chat agents (Presentation Slides & Video Summary)
+  useEffect(() => {
+    const electron = (window as any).electron;
+    if (!electron?.agent?.onStreamEvent) return;
+
+    const unsubscribe = electron.agent.onStreamEvent((event: any) => {
+      const convoId = event?.conversationId;
+      if (!convoId || convoId === "main") return;
+
+      setActiveSideChatSessions((prev) => {
+        const next = new Map(prev);
+        const existing = next.get(convoId);
+        if (!existing) return prev;
+
+        const updated = { ...existing };
+
+        if (event.type === "token") {
+          updated.content = (updated.content || "") + (event.token || "");
+          if (updated.traceSteps && updated.traceSteps.length > 0) {
+            const steps = [...updated.traceSteps];
+            const lastStep = steps[steps.length - 1];
+            if (lastStep && lastStep.type === "thought" && lastStep.startTime && !lastStep.durationMs) {
+              steps[steps.length - 1] = {
+                ...lastStep,
+                durationMs: Math.max(1000, Date.now() - lastStep.startTime),
+              };
+              updated.traceSteps = steps;
+            }
+          }
+        } else if (event.type === "thinking") {
+          updated.thinking = (updated.thinking || "") + (event.thinking || "");
+          const steps: TraceStep[] = updated.traceSteps ? [...updated.traceSteps] : [];
+          const lastStep = steps[steps.length - 1];
+          if (lastStep && lastStep.type === "thought") {
+            steps[steps.length - 1] = {
+              ...lastStep,
+              content: (lastStep.content || "") + (event.thinking || ""),
+            };
+          } else {
+            steps.push({
+              id: `thought_${Date.now()}_${steps.length}`,
+              type: "thought",
+              content: event.thinking || "",
+              startTime: Date.now(),
+            });
+          }
+          updated.traceSteps = steps;
+        } else if (event.type === "tool_call") {
+          const toolCalls = [...(updated.toolCalls || [])];
+          const existingIdx = toolCalls.findIndex((tc) => tc.id === event.toolCallId);
+          if (existingIdx >= 0) {
+            toolCalls[existingIdx] = {
+              ...toolCalls[existingIdx]!,
+              name: event.toolName,
+              args: event.args,
+              status: "running",
+            };
+          } else {
+            toolCalls.push({
+              id: event.toolCallId,
+              name: event.toolName,
+              args: event.args,
+              status: "running",
+            });
+          }
+          updated.toolCalls = toolCalls;
+
+          const steps: TraceStep[] = updated.traceSteps ? [...updated.traceSteps] : [];
+          const sIdx = steps.findIndex((s) => s.id === event.toolCallId || s.toolCallId === event.toolCallId);
+          if (sIdx >= 0) {
+            steps[sIdx] = {
+              ...steps[sIdx]!,
+              name: event.toolName,
+              args: event.args,
+              status: "running",
+            };
+          } else {
+            steps.push({
+              id: event.toolCallId,
+              type: "tool",
+              toolCallId: event.toolCallId,
+              name: event.toolName,
+              args: event.args,
+              status: "running",
+              startTime: Date.now(),
+            });
+          }
+          updated.traceSteps = steps;
+        } else if (event.type === "tool_result") {
+          const toolCalls = [...(updated.toolCalls || [])];
+          const existingIdx = toolCalls.findIndex((tc) => tc.id === event.toolCallId);
+          if (existingIdx >= 0) {
+            toolCalls[existingIdx] = {
+              ...toolCalls[existingIdx]!,
+              result: event.result,
+              isError: event.isError,
+              status: event.isError ? "error" : "completed",
+            };
+          }
+          updated.toolCalls = toolCalls;
+
+          const steps: TraceStep[] = updated.traceSteps ? [...updated.traceSteps] : [];
+          const sIdx = steps.findIndex((s) => s.id === event.toolCallId || s.toolCallId === event.toolCallId);
+          if (sIdx >= 0) {
+            steps[sIdx] = {
+              ...steps[sIdx]!,
+              result: event.result,
+              isError: event.isError,
+              status: event.isError ? "error" : "completed",
+              durationMs: steps[sIdx]?.startTime ? Date.now() - steps[sIdx]!.startTime! : undefined,
+            };
+          }
+          updated.traceSteps = steps;
+
+          if (!updated.outputFilePath && typeof event.result === "string") {
+            const match = event.result.match(/([^\s"']+\.(?:pdf|mp4))/i);
+            if (match && match[1]) {
+              updated.outputFilePath = match[1].trim();
+            }
+          }
+        } else if (event.type === "file_mutation") {
+          if (event.record) {
+            const mutations = updated.mutations ? [...updated.mutations] : [];
+            mutations.push(event.record);
+            updated.mutations = mutations;
+
+            const filePath = event.record.path || event.record.targetFile || "";
+            const lower = filePath.toLowerCase();
+            if (lower.endsWith(".pdf") || lower.endsWith(".mp4")) {
+              updated.outputFilePath = filePath;
+            }
+          }
+        } else if (event.type === "done") {
+          updated.status = "completed";
+          updated.endTime = Date.now();
+          updated.durationMs = Date.now() - updated.startTime;
+
+          if (!updated.outputFilePath && updated.content) {
+            const match = updated.content.match(/([^\s"']+\.(?:pdf|mp4))/i);
+            if (match && match[1]) {
+              updated.outputFilePath = match[1].trim();
+            }
+          }
+
+          localDb.updateArtifact(convoId, {
+            status: "completed",
+            content: updated.content,
+            data: {
+              sideChat: updated,
+              pdfPath: updated.outputFilePath?.endsWith(".pdf") ? updated.outputFilePath : undefined,
+              mp4Path: updated.outputFilePath?.endsWith(".mp4") ? updated.outputFilePath : undefined,
+            },
+          }).catch(console.error);
+
+          toast.success(
+            updated.role === "presentation"
+              ? (language === "id" ? "Presentasi selesai dibuat!" : "Presentation slides created!")
+              : (language === "id" ? "Video summary selesai dibuat!" : "Video summary created!")
+          );
+        } else if (event.type === "error") {
+          updated.status = "failed";
+          updated.error = event.error || "Generation error";
+          updated.endTime = Date.now();
+          updated.durationMs = Date.now() - updated.startTime;
+
+          localDb.updateArtifact(convoId, {
+            status: "error",
+            error: event.error || "Generation failed",
+            data: {
+              sideChat: updated,
+            },
+          }).catch(console.error);
+
+          toast.error(
+            language === "id"
+              ? `Gagal memproses: ${event.error}`
+              : `Generation error: ${event.error}`
+          );
+        }
+
+        if (event.type !== "done" && event.type !== "error") {
+          localDb.updateArtifact(convoId, {
+            data: {
+              sideChat: updated,
+              outputFilePath: updated.outputFilePath,
+            },
+          }).catch(() => {});
+        }
+
+        next.set(convoId, updated);
+        return next;
+      });
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, [language]);
+
+  const handleStopSideAgent = async (conversationId: string) => {
+    try {
+      await window.electron?.agent?.abort?.(conversationId);
+      setActiveSideChatSessions((prev) => {
+        const next = new Map(prev);
+        const existing = next.get(conversationId);
+        if (existing) {
+          const updated: SideChatSession = {
+            ...existing,
+            status: "cancelled",
+            endTime: Date.now(),
+            durationMs: Date.now() - existing.startTime,
+          };
+          next.set(conversationId, updated);
+          localDb.updateArtifact(conversationId, {
+            status: "error",
+            error: "Dibatalkan oleh pengguna / Cancelled by user",
+            data: { sideChat: updated },
+          }).catch(() => {});
+        }
+        return next;
+      });
+      toast.info(language === "id" ? "Proses pembuatan dihentikan" : "Generation stopped");
+    } catch (err) {
+      console.error("Failed to abort side agent:", err);
+    }
+  };
 
   const handleOpenFileDiff = (mutation: FileMutationRecord) => {
     setIsStudioCollapsed(false);
@@ -800,23 +1035,54 @@ export function LearnWorkspace({
     setRightPaneMode("preview");
     setIsOpeningNewTab(false);
 
+    const isSlidesOrVideo = art.type === "slides" || art.type === "video_summary";
+
     const existingTab = rightPaneTabs.find(
-      (t) => t.type === "studio_preview" && t.artifact?.id === art.id
+      (t) =>
+        (t.type === "studio_preview" || t.type === "side_chat") &&
+        (t.artifact?.id === art.id || (art.id && t.id.includes(art.id)))
     );
 
+    let targetTabId = "";
     if (existingTab) {
-      setActiveRightPaneTabId(existingTab.id);
+      targetTabId = existingTab.id;
+      setRightPaneTabs((prev) =>
+        prev.map((t) =>
+          t.id === existingTab.id
+            ? {
+                ...t,
+                type: isSlidesOrVideo ? "side_chat" : t.type,
+                title: art.title || t.title,
+                artifact: art,
+                sideChatRole: isSlidesOrVideo
+                  ? art.type === "slides"
+                    ? "presentation"
+                    : "video_summary"
+                  : undefined,
+              }
+            : t
+        )
+      );
     } else {
-      const tabId = `studio_${art.id}_${Date.now()}`;
+      targetTabId = isSlidesOrVideo
+        ? `sidechat_${art.id || Date.now()}`
+        : `studio_${art.id || Date.now()}_${Date.now()}`;
       const newTab: RightPaneTab = {
-        id: tabId,
-        type: "studio_preview",
-        title: art.title,
+        id: targetTabId,
+        type: isSlidesOrVideo ? "side_chat" : "studio_preview",
+        title: art.title || (art.type === "slides" ? "Presentation Slides" : art.type === "video_summary" ? "Video Summary" : "Studio Artifact"),
         artifact: art,
+        artifactId: art.id,
+        sideChatRole: isSlidesOrVideo
+          ? art.type === "slides"
+            ? "presentation"
+            : "video_summary"
+          : undefined,
       };
       setRightPaneTabs((prev) => [...prev, newTab]);
-      setActiveRightPaneTabId(tabId);
     }
+
+    setActiveRightPaneTabId(targetTabId);
 
     // Auto-widen studio/preview pane width like handleOpenBrowser
     const responsiveDefaults = getResponsiveWidths();
@@ -965,9 +1231,45 @@ export function LearnWorkspace({
     }
   };
 
+  const buildSkillsSystemPromptForText = async (text: string): Promise<string> => {
+    let systemPrompt = "";
+    try {
+      const customSkills = await localDb.getSkills().catch(() => []);
+      const allSkills = [...customSkills, ...DEFAULT_BUILTIN_SKILLS];
+
+      const skillSlashMatches = Array.from(text.matchAll(/(?:^|\s)\/([a-zA-Z0-9_-]+)(?:\s|$)/g));
+      const triggeredSlugs = new Set<string>(
+        skillSlashMatches.map((m) => m[1]?.toLowerCase()).filter(Boolean) as string[]
+      );
+
+      const skillsTagMatch = text.match(/\[SKILLS_TO_ACTIVATE:\s*([^\]]+)\]/i);
+      if (skillsTagMatch && skillsTagMatch[1]) {
+        skillsTagMatch[1].split(/[\s,]+/).forEach((s) => {
+          const cleaned = s.replace(/^\//, "").trim().toLowerCase();
+          if (cleaned) triggeredSlugs.add(cleaned);
+        });
+      }
+
+      if (triggeredSlugs.size > 0) {
+        for (const invokedSlug of triggeredSlugs) {
+          const triggeredSkill = allSkills.find(
+            (s) => s.slug.toLowerCase() === invokedSlug || s.id.toLowerCase() === invokedSlug
+          );
+
+          if (triggeredSkill) {
+            systemPrompt += `\n\n[USER EXPLICITLY TRIGGERED SKILL: "${triggeredSkill.name}" (/${triggeredSkill.slug})]:\n${triggeredSkill.content}\n\nSTRICT INSTRUCTION: The user explicitly invoked /${triggeredSkill.slug}. Prioritize and strictly apply the full instructions, methodology, and formatting guidelines of this skill.`;
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("Failed to expand skills for prompt:", err);
+    }
+    return systemPrompt;
+  };
+
   const handleGenerateVideoSummary = async (params: {
     selectedSourceIds: string[];
-    coverageMode: "short" | "long" | "auto";
+    coverageMode: "auto" | "long";
     language: "id" | "en";
     audioLanguage?: string;
     voiceProviderId: string;
@@ -985,29 +1287,24 @@ export function LearnWorkspace({
     );
     if (selectedSources.length === 0) return;
 
-    const title = t("videoSummaryTitle");
+    const targetLang: "id" | "en" = params.language === "id" ? "id" : "en";
 
-    // 1. Create generating artifact in Dexie
-    const artId = await localDb.createArtifact({
-      learnId,
-      title: t("creatingVideoSummaryStatus"),
-      type: "video_summary",
-      status: "generating",
-      sourcesCount: selectedSources.length,
-      content: "",
-    });
-
-    const abortController = new AbortController();
-    activeGenerationsRef.current.set(artId, { abortController, type: "video_summary" });
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      toast.error(
+        targetLang === "id"
+          ? "Tidak ada koneksi internet. Pastikan perangkat Anda terhubung ke jaringan."
+          : "No internet connection. Please check your network connection."
+      );
+      return;
+    }
 
     try {
-      // 2. Call generator in background
-      const result = await generateVideoSummaryArtifact({
-        artifactId: artId,
-        learnId,
+      const downloadsPath = await window.electron?.getDownloadsPath?.();
+
+      const promptToRun = await synthesizeVideoSummaryPrompt({
         sources: selectedSources,
         coverageMode: params.coverageMode,
-        language: params.language,
+        language: targetLang,
         audioLanguage: params.audioLanguage,
         voiceProviderId: params.voiceProviderId,
         voiceModel: params.voiceModel,
@@ -1016,56 +1313,97 @@ export function LearnWorkspace({
         deliveryMode: params.deliveryMode,
         speed: params.speed,
         customInstructions: params.customInstructions,
-        signal: abortController.signal,
+        downloadsPath,
       });
 
-      if (!isMountedRef.current || abortController.signal.aborted) {
-        return;
-      }
+      const title = params.customInstructions?.trim()
+        ? `Video: ${params.customInstructions.trim().slice(0, 30)}`
+        : (t("videoSummary") || "Video Summary");
 
-      // 3. Update artifact in Dexie
-      await localDb.updateArtifact(artId, {
-        title: result.title || title,
-        data: result.data,
-        content: JSON.stringify(result.data),
-        status: "completed",
-      });
-
-      if (isMountedRef.current) {
-        toast.success(t("videoSummaryCreatedSuccess"));
-
-        // 4. Auto-open in preview & auto-widen
-        const fullArt = await localDb.getArtifact(artId);
-        if (fullArt) {
-          handleOpenStudioArtifact(fullArt);
-        }
-      }
-    } catch (err: any) {
-      if (abortController.signal.aborted) {
-        return;
-      }
-      console.error("Failed to generate video summary:", err);
-      await localDb.updateArtifact(artId, {
+      // 1. Create generating artifact in Dexie
+      const artId = await localDb.createArtifact({
+        learnId,
         title,
-        status: "error",
-        error: err?.message || "Generation failed",
+        type: "video_summary",
+        status: "generating",
+        sourcesCount: selectedSources.length,
+        content: "",
       });
+
+      // 2. Initialize in-memory SideChat session
+      const initialSession: SideChatSession = {
+        id: artId,
+        role: "video_summary",
+        title,
+        prompt: promptToRun,
+        status: "running",
+        startTime: Date.now(),
+        traceSteps: [],
+        toolCalls: [],
+        mutations: [],
+        content: "",
+      };
+
+      setActiveSideChatSessions((prev) => new Map(prev).set(artId, initialSession));
+      await localDb.updateArtifact(artId, {
+        data: { sideChat: initialSession },
+      });
+
+      // 3. Immediately open SideChat tab in right pane
+      handleOpenStudioArtifact({
+        id: artId,
+        learnId,
+        title,
+        type: "video_summary",
+        status: "generating",
+        sourcesCount: selectedSources.length,
+        content: "",
+        data: { sideChat: initialSession },
+      } as any);
+
+      // 4. Expand skills into effective system prompt
+      const effectiveSystemPrompt = await buildSkillsSystemPromptForText(promptToRun);
+
+      // 5. Launch isolated side agent via Electron
+      const activeModelId = localStorage.getItem("const_learn_active_model") || "gemini-3.8-flash";
+      const defaultWorkspacePath = await window.electron?.getDefaultWorkspacePath?.(learnId);
+
+      window.electron?.agent?.sendMessage({
+        messages: [{ role: "user", content: promptToRun }],
+        systemPrompt: effectiveSystemPrompt || undefined,
+        model: activeModelId,
+        workspacePath: defaultWorkspacePath,
+        learnId,
+        conversationId: artId,
+        mode: "full_access",
+      }).catch((err: any) => {
+        console.error("Side agent video summary failed:", err);
+        localDb.updateArtifact(artId, {
+          status: "error",
+          error: err?.message || "Execution error",
+        });
+      });
+
       if (isMountedRef.current) {
-        toast.error(
-          t("failedCreateVideoSummary", { error: err?.message || t("errorOccurred") })
+        toast.success(
+          targetLang === "id"
+            ? "SideChat dibuka & AI sedang memproses video summary..."
+            : "SideChat opened & AI is generating video summary..."
         );
       }
-    } finally {
-      activeGenerationsRef.current.delete(artId);
+    } catch (err: any) {
+      console.error("Failed to synthesize video summary prompt:", err);
+      if (isMountedRef.current) {
+        toast.error(err?.message || t("errorOccurred"));
+      }
     }
   };
 
   const handleGeneratePresentation = async (params: {
     selectedSourceIds: string[];
     provider: "native";
-    lengthMode: "short" | "medium" | "long" | "auto";
+    lengthMode: "medium" | "long" | "auto";
     slideCount?: number;
-    themeId?: "bold_dark" | "swiss_blue" | "sea_indigo" | "ash_lime";
     customInstructions?: string;
   }) => {
     if (!learnId) return;
@@ -1076,69 +1414,109 @@ export function LearnWorkspace({
     if (selectedSources.length === 0) return;
 
     const targetLang: "id" | "en" = language === "id" ? "id" : "en";
-    const title = t("presentationTitle");
 
-    const artId = await localDb.createArtifact({
-      learnId,
-      title: t("creatingPresentationStatus"),
-      type: "slides",
-      status: "generating",
-      sourcesCount: selectedSources.length,
-      content: "",
-    });
-
-    const abortController = new AbortController();
-    activeGenerationsRef.current.set(artId, { abortController, type: "slides" });
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      toast.error(
+        targetLang === "id"
+          ? "Tidak ada koneksi internet. Pastikan perangkat Anda terhubung ke jaringan."
+          : "No internet connection. Please check your network connection."
+      );
+      return;
+    }
 
     try {
-      const result = await generatePresentationArtifact({
-        artifactId: artId,
-        learnId,
+      const downloadsPath = await window.electron?.getDownloadsPath?.();
+
+      const promptToRun = await synthesizePresentationPrompt({
         sources: selectedSources,
         provider: "native",
         lengthMode: params.lengthMode,
         slideCount: params.slideCount,
-        themeId: params.themeId || "bold_dark",
-        language: targetLang,
         customInstructions: params.customInstructions,
-        signal: abortController.signal,
+        language: targetLang,
+        downloadsPath,
       });
 
-      if (!isMountedRef.current || abortController.signal.aborted) {
-        return;
-      }
+      const title = params.customInstructions?.trim()
+        ? `Presentation: ${params.customInstructions.trim().slice(0, 30)}`
+        : (t("presentation") || "Presentation Slides");
 
-      await localDb.updateArtifact(artId, {
-        title: result.title || title,
-        data: result.data,
-        content: JSON.stringify(result.data),
-        status: "completed",
-      });
-
-      if (isMountedRef.current) {
-        toast.success(t("presentationCreatedSuccess"));
-        const fullArt = await localDb.getArtifact(artId);
-        if (fullArt) {
-          handleOpenStudioArtifact(fullArt);
-        }
-      }
-    } catch (err: any) {
-      if (abortController.signal.aborted) {
-        return;
-      }
-      console.error("Failed to generate presentation:", err);
-      await localDb.updateArtifact(artId, {
+      // 1. Create generating artifact in Dexie
+      const artId = await localDb.createArtifact({
+        learnId,
         title,
-        status: "error",
-        error: err?.message || "Generation failed",
+        type: "slides",
+        status: "generating",
+        sourcesCount: selectedSources.length,
+        content: "",
       });
+
+      // 2. Initialize in-memory SideChat session
+      const initialSession: SideChatSession = {
+        id: artId,
+        role: "presentation",
+        title,
+        prompt: promptToRun,
+        status: "running",
+        startTime: Date.now(),
+        traceSteps: [],
+        toolCalls: [],
+        mutations: [],
+        content: "",
+      };
+
+      setActiveSideChatSessions((prev) => new Map(prev).set(artId, initialSession));
+      await localDb.updateArtifact(artId, {
+        data: { sideChat: initialSession },
+      });
+
+      // 3. Immediately open SideChat tab in right pane
+      handleOpenStudioArtifact({
+        id: artId,
+        learnId,
+        title,
+        type: "slides",
+        status: "generating",
+        sourcesCount: selectedSources.length,
+        content: "",
+        data: { sideChat: initialSession },
+      } as any);
+
+      // 4. Expand skills into effective system prompt
+      const effectiveSystemPrompt = await buildSkillsSystemPromptForText(promptToRun);
+
+      // 5. Launch isolated side agent via Electron
+      const activeModelId = localStorage.getItem("const_learn_active_model") || "gemini-3.8-flash";
+      const defaultWorkspacePath = await window.electron?.getDefaultWorkspacePath?.(learnId);
+
+      window.electron?.agent?.sendMessage({
+        messages: [{ role: "user", content: promptToRun }],
+        systemPrompt: effectiveSystemPrompt || undefined,
+        model: activeModelId,
+        workspacePath: defaultWorkspacePath,
+        learnId,
+        conversationId: artId,
+        mode: "full_access",
+      }).catch((err: any) => {
+        console.error("Side agent presentation failed:", err);
+        localDb.updateArtifact(artId, {
+          status: "error",
+          error: err?.message || "Execution error",
+        });
+      });
+
       if (isMountedRef.current) {
-        toast.error(
-          t("failedCreatePresentation", { error: err?.message || t("errorOccurred") })
+        toast.success(
+          targetLang === "id"
+            ? "SideChat dibuka & AI sedang memproses presentasi..."
+            : "SideChat opened & AI is generating presentation slides..."
         );
       }
-    } finally {
-      activeGenerationsRef.current.delete(artId);
+    } catch (err: any) {
+      console.error("Failed to synthesize presentation prompt:", err);
+      if (isMountedRef.current) {
+        toast.error(err?.message || t("errorOccurred"));
+      }
     }
   };
 
@@ -1524,11 +1902,19 @@ export function LearnWorkspace({
       prev.filter(
         (t) =>
           !(t.type === "studio_preview" && t.artifact?.id === artId) &&
+          !(t.type === "side_chat" && (t.artifact?.id === artId || t.artifactId === artId)) &&
           t.artifactId !== artId &&
           t.id !== `note_${artId}` &&
-          t.id !== `studio_${artId}`
+          t.id !== `studio_${artId}` &&
+          t.id !== `sidechat_${artId}`
       )
     );
+    setActiveSideChatSessions((prev) => {
+      const next = new Map(prev);
+      next.delete(artId);
+      return next;
+    });
+    window.electron?.agent?.abort?.(artId).catch(() => {});
   };
 
   const handleAddNote = async () => {
@@ -2276,6 +2662,8 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
             onExplainInChat={(prompt) => setPendingStudioPrompt(prompt)}
             onAddSourceFromBrowser={handleAddSourceFromBrowser}
             existingSourceUrls={existingSourceUrls}
+            activeSideChatSessions={activeSideChatSessions}
+            onStopSideAgent={handleStopSideAgent}
           />
         </ErrorBoundary>
       </div>

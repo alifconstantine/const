@@ -2220,13 +2220,13 @@ export const CONST_LEARN_TOOLS: NativeToolDefinition[] = [
     function: {
       name: "create_studio_artifact",
       description:
-        "Generate and add an educational study artifact directly into the workspace Studio. Supports interactive flashcards, quizzes, mind maps, cheat sheets, reports, and slide decks. Automatically populates the Studio tab so the user can study or review it.",
+        "Generate and add an educational study artifact directly into the workspace Studio. Supports interactive flashcards, quizzes, mind maps, cheat sheets, and reports. Automatically populates the Studio tab so the user can study or review it.",
       parameters: {
         type: "object",
         properties: {
           artifact_type: {
             type: "string",
-            enum: ["flashcard", "quiz", "mind_map", "cheatsheet", "report", "slides"],
+            enum: ["flashcard", "quiz", "mind_map", "cheatsheet", "report"],
             description: "The type of studio learning artifact to create.",
           },
           title: {
@@ -2240,10 +2240,10 @@ export const CONST_LEARN_TOOLS: NativeToolDefinition[] = [
           data: {
             type: "object",
             description:
-              "The structured artifact data according to its type (e.g. for flashcard: { cards: [{ front, back, hint }] }; for quiz: { questions: [{ question, options, correctIndex, explanation }] }; for mind_map: { root: { label, children: [...] } }; for cheatsheet: { cards: [{ title, badge, content }] }).",
+              "The structured artifact data according to its type (e.g. for flashcard: { cards: [{ front, back, hint }] }; for quiz: { questions: [...] }; for mind_map: { root: {...} }; for cheatsheet: { cards: [...] }).",
           },
         },
-        required: ["artifact_type", "title", "data"],
+        required: ["artifact_type", "title"],
       },
     },
   },

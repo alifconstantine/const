@@ -11,6 +11,8 @@ import {
   SquarePen,
   Volume2,
   VolumeX,
+  Presentation,
+  Video,
 } from "lucide-react";
 import { FileIcon } from "../workspace/file-icon";
 import type { RightPaneTab, RightPaneTabType } from "./types";
@@ -26,7 +28,7 @@ interface TabHeaderProps {
   onToggleMuteTab?: (tabId: string) => void;
 }
 
-function getTabIcon(type: RightPaneTabType) {
+function getTabIcon(type: RightPaneTabType, role?: string) {
   switch (type) {
     case "review":
       return Layers;
@@ -41,6 +43,8 @@ function getTabIcon(type: RightPaneTabType) {
       return GitFork;
     case "note_preview":
       return SquarePen;
+    case "side_chat":
+      return role === "video_summary" ? Video : Presentation;
     default:
       return Layers;
   }
@@ -231,7 +235,7 @@ export function TabHeader({
                 </div>
               ) : (
                 filteredTabs.map((t) => {
-                  const Icon = getTabIcon(t.type);
+                  const Icon = getTabIcon(t.type, t.sideChatRole || t.artifact?.type);
                   const isActive = !isOpeningNewTab && t.id === activeTabId;
                   return (
                     <div
@@ -314,7 +318,7 @@ export function TabHeader({
         className="flex-1 flex items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden min-w-0 px-1.5"
       >
         {tabs.map((tab, index) => {
-          const Icon = getTabIcon(tab.type);
+          const Icon = getTabIcon(tab.type, tab.sideChatRole || tab.artifact?.type);
           const isActive = !isOpeningNewTab && tab.id === activeTabId;
           const isBeingDragged = draggedIndex === index;
           const isDropTarget = dragOverIndex === index && draggedIndex !== index;

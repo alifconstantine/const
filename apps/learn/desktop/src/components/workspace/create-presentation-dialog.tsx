@@ -6,8 +6,10 @@ import {
   ChevronDown,
   Sliders,
   FileText,
+  Loader2,
+  Sparkles,
 } from "lucide-react";
-import { Dialog, DialogContent, ScrollArea, cn } from "@const/ui";
+import { Dialog, DialogContent, ScrollArea, cn, toast } from "@const/ui";
 import { useI18n } from "../../lib/i18n";
 import type { LocalSource } from "../../lib/db";
 
@@ -18,10 +20,10 @@ export interface CreatePresentationDialogProps {
   onGenerate: (options: {
     selectedSourceIds: string[];
     provider: "native";
-    lengthMode: "short" | "medium" | "long" | "auto";
+    lengthMode: "medium" | "long" | "auto";
     slideCount?: number;
     customInstructions?: string;
-  }) => void;
+  }) => Promise<void> | void;
 }
 
 export function CreatePresentationDialog({
@@ -30,14 +32,16 @@ export function CreatePresentationDialog({
   sources,
   onGenerate,
 }: CreatePresentationDialogProps) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
+  const isIndo = language === "id";
 
   // Sources selection
   const [selectedSourceIds, setSelectedSourceIds] = useState<string[]>([]);
   const [isSourceDropdownOpen, setIsSourceDropdownOpen] = useState(false);
+  const [isSynthesizing, setIsSynthesizing] = useState(false);
 
   // Length mode & slide count
-  const [lengthMode, setLengthMode] = useState<"short" | "medium" | "long" | "auto">("auto");
+  const [lengthMode, setLengthMode] = useState<"medium" | "long" | "auto">("auto");
   const [customSlideCount, setCustomSlideCount] = useState<number>(10);
   const [isCustomCount, setIsCustomCount] = useState(false);
 
@@ -79,36 +83,50 @@ export function CreatePresentationDialog({
     }
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (selectedSourceIds.length === 0) return;
+    if (selectedSourceIds.length === 0 || isSynthesizing) return;
+
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      toast.error(
+        isIndo
+          ? "Tidak ada koneksi internet. Pastikan perangkat Anda terhubung ke jaringan."
+          : "No internet connection. Please check your network connection."
+      );
+      return;
+    }
 
     let targetCount: number | undefined = undefined;
     if (isCustomCount && customSlideCount > 0) {
       targetCount = customSlideCount;
-    } else if (lengthMode === "short") {
-      targetCount = 4;
     } else if (lengthMode === "long") {
       targetCount = 10;
     } else if (lengthMode === "medium") {
       targetCount = 7;
     }
 
-    onGenerate({
-      selectedSourceIds:
-        selectedSourceIds.length > 0 ? selectedSourceIds : sources.map((s) => s.id),
-      provider: "native",
-      lengthMode,
-      slideCount: targetCount,
-      customInstructions: customInstructions.trim() || undefined,
-    });
-
-    onOpenChange(false);
+    try {
+      setIsSynthesizing(true);
+      await onGenerate({
+        selectedSourceIds:
+          selectedSourceIds.length > 0 ? selectedSourceIds : sources.map((s) => s.id),
+        provider: "native",
+        lengthMode,
+        slideCount: targetCount,
+        customInstructions: customInstructions.trim() || undefined,
+      });
+      onOpenChange(false);
+    } catch (err: any) {
+      console.error("Presentation prompt synthesis error:", err);
+      toast.error(err?.message || t("errorOccurred"));
+    } finally {
+      setIsSynthesizing(false);
+    }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[620px] w-full max-h-[88vh] flex flex-col gap-0 p-0 bg-[#161616] border border-[#2b2b2b] text-[#e0e0e0] rounded-2xl shadow-2xl overflow-hidden font-sans [&>button]:hidden outline-none focus:outline-none focus-visible:outline-none ring-0 focus-visible:ring-0">
+      <DialogContent className="max-w-[560px] w-full max-h-[88vh] flex flex-col gap-0 p-0 bg-[#161616] border border-[#2b2b2b] text-[#e0e0e0] rounded-2xl shadow-2xl overflow-hidden font-sans [&>button]:hidden outline-none focus:outline-none focus-visible:outline-none ring-0 focus-visible:ring-0">
         {/* Header */}
         <div className="shrink-0 flex items-center justify-between px-5 pt-5 pb-2 bg-[#161616]">
           <div className="flex items-center gap-2.5">
@@ -121,28 +139,33 @@ export function CreatePresentationDialog({
           <button
             type="button"
             onClick={() => onOpenChange(false)}
-            className="h-7 w-7 rounded-lg hover:bg-[#222222] text-[#888888] hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+            className="p-1 rounded-lg text-[#777777] hover:text-white hover:bg-[#222222] transition-colors cursor-pointer"
           >
             <X className="h-4 w-4" />
           </button>
         </div>
 
+        {/* Content Form */}
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
-          <ScrollArea className="flex-1 min-h-0 w-full px-5 py-2">
-            <div className="space-y-4 pb-2">
-              {/* Source Scope Dropdown */}
-              <div className="space-y-1.5 relative" data-studio-dropdown>
+          <ScrollArea className="flex-1 p-5 min-h-0">
+            <div className="space-y-4">
+              {/* Sources Dropdown */}
+              <div className="space-y-1.5" data-studio-dropdown>
                 <label className="text-[11.5px] font-medium text-[#999999]">
-                  {t("sourceScope")}
+                  {t("videoSourceScopeLabel")}
                 </label>
                 <div className="relative">
                   <button
                     type="button"
                     onClick={() => setIsSourceDropdownOpen(!isSourceDropdownOpen)}
-                    className="w-full h-9 px-3 rounded-xl bg-[#222222] border border-[#2b2b2b] hover:border-[#383838] flex items-center justify-between text-xs text-left cursor-pointer transition-colors"
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#202020] border border-[#2c2c2c] hover:border-[#383838] flex items-center justify-between text-xs text-white transition-colors cursor-pointer"
                   >
-                    <span className="text-white font-medium truncate">
-                      {selectedSourceIds.length === sources.length
+                    <span className="truncate">
+                      {selectedSourceIds.length === 0
+                        ? isIndo
+                          ? "Pilih sumber rujukan..."
+                          : "Select sources..."
+                        : selectedSourceIds.length === sources.length
                         ? t("videoAllSourcesSelected", { count: sources.length })
                         : t("videoSourcesSelectedCount", {
                             selected: selectedSourceIds.length,
@@ -151,17 +174,17 @@ export function CreatePresentationDialog({
                     </span>
                     <ChevronDown
                       className={cn(
-                        "h-3.5 w-3.5 text-[#888888] transition-transform",
+                        "h-4 w-4 text-[#777] transition-transform",
                         isSourceDropdownOpen && "rotate-180"
                       )}
                     />
                   </button>
 
                   {isSourceDropdownOpen && (
-                    <div className="absolute top-full left-0 right-0 mt-1 z-50 p-1.5 rounded-xl bg-[#1e1e1e] border border-[#2c2c2c] shadow-xl max-h-48 overflow-y-auto space-y-0.5">
+                    <div className="absolute top-full left-0 right-0 mt-1 z-50 p-2 rounded-xl bg-[#1e1e1e] border border-[#2e2e2e] shadow-2xl max-h-56 flex flex-col">
                       <div
                         onClick={handleSelectAllSources}
-                        className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-white hover:bg-[#272727] cursor-pointer flex items-center justify-between border-b border-[#282828] mb-1 pb-2"
+                        className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-white hover:bg-[#272727] cursor-pointer flex items-center justify-between border-b border-[#282828] mb-1 pb-2 shrink-0"
                       >
                         <span>
                           {selectedSourceIds.length === sources.length
@@ -173,37 +196,58 @@ export function CreatePresentationDialog({
                         </span>
                       </div>
 
-                      {sources.map((s) => {
-                        const isChecked = selectedSourceIds.includes(s.id);
-                        return (
-                          <div
-                            key={s.id}
-                            onClick={() => handleToggleSource(s.id)}
-                            className="px-2.5 py-1.5 rounded-lg text-xs hover:bg-[#272727] cursor-pointer flex items-center justify-between transition-colors"
-                          >
-                            <span
-                              className={cn(
-                                "truncate pr-2",
-                                isChecked ? "text-white font-medium" : "text-[#888]"
-                              )}
+                      <ScrollArea className="flex-1 max-h-40 overflow-y-auto pr-1">
+                        {sources.map((src) => {
+                          const isSelected = selectedSourceIds.includes(src.id);
+                          return (
+                            <button
+                              key={src.id}
+                              type="button"
+                              onClick={() => handleToggleSource(src.id)}
+                              className="w-full px-2.5 py-2 rounded-lg text-xs hover:bg-[#282828] cursor-pointer flex items-center justify-between transition-colors text-left font-sans"
                             >
-                              {s.title}
-                            </span>
-                            <div
-                              className={cn(
-                                "h-3.5 w-3.5 rounded flex items-center justify-center shrink-0 border transition-colors",
-                                isChecked
-                                  ? "bg-white border-white text-black"
-                                  : "border-[#444] bg-transparent"
-                              )}
-                            >
-                              {isChecked && <Check className="h-2.5 w-2.5 stroke-[3]" />}
-                            </div>
-                          </div>
-                        );
-                      })}
+                              <div className="flex items-center gap-2 truncate pr-2">
+                                <FileText className="h-3.5 w-3.5 text-[#777777] shrink-0" />
+                                <span className="truncate text-[#e0e0e0]">{src.title}</span>
+                              </div>
+                              <div
+                                className={cn(
+                                  "h-4 w-4 rounded border flex items-center justify-center shrink-0 transition-colors",
+                                  isSelected
+                                    ? "bg-white border-white text-black"
+                                    : "border-[#444449] bg-transparent"
+                                )}
+                              >
+                                {isSelected && <Check className="h-3 w-3 stroke-[3]" />}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </ScrollArea>
                     </div>
                   )}
+                </div>
+              </div>
+
+              {/* Engine Spec Banner: Const Native 16:9 PDF */}
+              <div className="p-3 rounded-xl bg-[#1d1d1d] border border-[#2d2d2d] flex items-center justify-between">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="h-8 w-8 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 shrink-0">
+                    <Presentation className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-xs font-semibold text-white truncate flex items-center gap-1.5">
+                      <span>Const Native (16:9 PDF Deck)</span>
+                      <span className="text-[10px] font-medium px-1.5 py-0.2 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                        Autonomous
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-[#888888] truncate mt-0.5">
+                      {isIndo
+                        ? "AI menentukan tata letak, palet warna, tipografi, dan mengekspor ke format PDF"
+                        : "AI determines layout, color palette, typography, and exports directly to PDF"}
+                    </p>
+                  </div>
                 </div>
               </div>
 
@@ -224,22 +268,21 @@ export function CreatePresentationDialog({
                 </div>
 
                 {!isCustomCount ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 gap-2">
                     {[
                       {
                         id: "auto" as const,
                         label: t("modeAdaptiveLabel"),
-                        desc: t("modeAdaptiveDesc"),
-                      },
-                      {
-                        id: "short" as const,
-                        label: t("modeConciseLabel"),
-                        desc: t("modeConciseDesc"),
+                        desc: isIndo
+                          ? "AI menentukan jumlah slide ideal secara proporsional"
+                          : "AI dynamically determines the optimal slide count",
                       },
                       {
                         id: "long" as const,
                         label: t("modeInDepthLabel"),
-                        desc: t("modeInDepthDesc"),
+                        desc: isIndo
+                          ? "Kajian mendalam dan komprehensif (~10-12 slide)"
+                          : "In-depth comprehensive analysis (~10-12 slides)",
                       },
                     ].map((mode) => {
                       const isSelected = lengthMode === mode.id;
@@ -263,7 +306,7 @@ export function CreatePresentationDialog({
                   </div>
                 ) : (
                   <div className="flex items-center gap-2">
-                    {[5, 8, 10, 12, 15].map((count) => {
+                    {[5, 8, 10, 12, 15, 20].map((count) => {
                       const isSelected = customSlideCount === count;
                       return (
                         <button
@@ -301,8 +344,8 @@ export function CreatePresentationDialog({
             </div>
           </ScrollArea>
 
-          {/* Footer Actions - Borderless */}
-          <div className="shrink-0 px-5 py-3.5 bg-[#161616] flex items-center justify-end gap-2">
+          {/* Footer Actions */}
+          <div className="shrink-0 px-5 py-3.5 bg-[#161616] flex items-center justify-end gap-2 border-t border-[#242424]">
             <button
               type="button"
               onClick={() => onOpenChange(false)}
@@ -312,11 +355,20 @@ export function CreatePresentationDialog({
             </button>
             <button
               type="submit"
-              disabled={selectedSourceIds.length === 0}
+              disabled={selectedSourceIds.length === 0 || isSynthesizing}
               className="px-4 py-2 rounded-xl bg-white hover:bg-neutral-200 disabled:opacity-40 disabled:hover:bg-white disabled:cursor-not-allowed text-xs font-semibold text-black flex items-center gap-1.5 transition-all cursor-pointer shadow-sm active:scale-98"
             >
-              <Presentation className="h-3.5 w-3.5" />
-              <span>{t("createSlides")}</span>
+              {isSynthesizing ? (
+                <>
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  <span>{t("synthesizingPrompt") || "Meracik Prompt..."}</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-3.5 w-3.5" />
+                  <span>{t("createSlides")}</span>
+                </>
+              )}
             </button>
           </div>
         </form>

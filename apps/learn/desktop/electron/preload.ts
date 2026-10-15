@@ -10,6 +10,8 @@ contextBridge.exposeInMainWorld("electron", {
   },
   openExternal: (url: string) => ipcRenderer.invoke("auth:open-external", url),
   openPath: (targetPath: string) => ipcRenderer.invoke("shell:open-path", targetPath),
+  showItemInFolder: (targetPath: string) => ipcRenderer.invoke("shell:show-item-in-folder", targetPath),
+  getDownloadsPath: () => ipcRenderer.invoke("app:get-downloads-path"),
   readFile: (filePath: string) => ipcRenderer.invoke("workspace:read-file", filePath),
   readMedia: (filePath: string) => ipcRenderer.invoke("workspace:read-media", filePath),
   openDirectoryDialog: () => ipcRenderer.invoke("dialog:open-directory"),
@@ -63,6 +65,7 @@ contextBridge.exposeInMainWorld("electron", {
       model?: string;
       workspacePath?: string;
       learnId?: string;
+      conversationId?: string;
       authToken?: string;
       mode?: "ask_before_changes" | "full_access";
       thinkingLevel?: string;
@@ -71,7 +74,7 @@ contextBridge.exposeInMainWorld("electron", {
       temperature?: number;
       mcpServers?: any;
     }) => ipcRenderer.invoke("agent:send-message", payload),
-    abort: () => ipcRenderer.invoke("agent:abort"),
+    abort: (conversationId?: string) => ipcRenderer.invoke("agent:abort", conversationId),
     answerQuestion: (toolCallId: string, answer: any) =>
       ipcRenderer.invoke("agent:answer-question", { toolCallId, answer }),
     respondApproval: (payload: {

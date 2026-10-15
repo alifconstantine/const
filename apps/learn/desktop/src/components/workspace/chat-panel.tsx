@@ -94,6 +94,7 @@ import {
 } from "../../lib/mention-search";
 import type { LocalSkill } from "../../lib/db";
 import { formatSkillsSystemPrompt } from "../../lib/skills/skills-service";
+import { DEFAULT_BUILTIN_SKILLS } from "../../lib/skills/default-skills";
 
 interface ChatPanelProps {
   learnId?: string;
@@ -1175,6 +1176,11 @@ export function ChatPanel({
     if (!electron?.agent?.onStreamEvent) return;
 
     const unsubscribe = electron.agent.onStreamEvent((event: any) => {
+      // If event belongs to an isolated sub-agent or side-chat, ignore in Main Chat
+      if (event?.conversationId && event.conversationId !== "main") {
+        return;
+      }
+
       // 1. Intercept standalone side-effect events (outside setMessages to prevent StrictMode duplicates)
       if (event.type === "source_created") {
         const source = event.source;
@@ -1225,17 +1231,44 @@ export function ChatPanel({
                     ? artifact.data
                     : JSON.stringify(artifact.data),
               })
-              .then(() => {
+              .then((createdArt) => {
+                const targetArt = createdArt || artifact;
+                onOpenStudioArtifact?.(targetArt);
                 toast.success(
                   language === "id"
                     ? `Artifact Studio "${artifact.title}" berhasil dibuat!`
                     : `Studio Artifact "${artifact.title}" created!`
                 );
               })
-              .catch(console.error);
+              .catch((err) => {
+                console.error(err);
+                onOpenStudioArtifact?.(artifact);
+              });
+          } else {
+            onOpenStudioArtifact?.(artifact);
           }
         }
         return;
+      }
+
+      if (event.type === "file_mutation" && event.record) {
+        const filePath = event.record.path || "";
+        const lower = filePath.toLowerCase();
+        if (lower.endsWith(".pdf")) {
+          const pdfUrl = `const-media://file/${filePath.replace(/\\/g, "/")}`;
+          window.dispatchEvent(
+            new CustomEvent("const:presentation-pdf-updated", {
+              detail: { filePath, pdfUrl },
+            })
+          );
+        } else if (lower.endsWith(".mp4")) {
+          const mp4Url = `const-media://file/${filePath.replace(/\\/g, "/")}`;
+          window.dispatchEvent(
+            new CustomEvent("const:video-rendered", {
+              detail: { mp4Path: filePath, mp4Url },
+            })
+          );
+        }
       }
 
       if (event.type === "approval_request") {
@@ -1897,15 +1930,33 @@ export function ChatPanel({
       systemPrompt += skillsCatalogPrompt;
     }
 
-    // Check if the user message explicitly invokes a skill via /{slug}
-    const skillSlashMatch = textToSend.match(/(?:^|\s)\/([a-zA-Z0-9_-]+)(?:\s|$)/);
-    if (skillSlashMatch && skillSlashMatch[1]) {
-      const invokedSlug = skillSlashMatch[1].toLowerCase();
-      const triggeredSkill = allSkills.find(
-        (s) => s.slug.toLowerCase() === invokedSlug && s.isEnabled
-      );
-      if (triggeredSkill) {
-        systemPrompt += `\n\n[USER EXPLICITLY TRIGGERED SKILL: "${triggeredSkill.name}" (/${triggeredSkill.slug})]:\n${triggeredSkill.content}\n\nSTRICT INSTRUCTION: The user explicitly invoked /${triggeredSkill.slug}. Prioritize and strictly apply the full instructions, methodology, and formatting guidelines of this skill.`;
+    // Check if the user message explicitly invokes skills via /{slug} or [SKILLS_TO_ACTIVATE: ...]
+    const skillSlashMatches = Array.from(textToSend.matchAll(/(?:^|\s)\/([a-zA-Z0-9_-]+)(?:\s|$)/g));
+    const triggeredSlugs = new Set<string>(
+      skillSlashMatches.map((m) => m[1]?.toLowerCase()).filter(Boolean) as string[]
+    );
+
+    const skillsTagMatch = textToSend.match(/\[SKILLS_TO_ACTIVATE:\s*([^\]]+)\]/i);
+    if (skillsTagMatch && skillsTagMatch[1]) {
+      skillsTagMatch[1].split(/[\s,]+/).forEach((s) => {
+        const cleaned = s.replace(/^\//, "").trim().toLowerCase();
+        if (cleaned) triggeredSlugs.add(cleaned);
+      });
+    }
+
+    if (triggeredSlugs.size > 0) {
+      for (const invokedSlug of triggeredSlugs) {
+        const triggeredSkill =
+          allSkills.find(
+            (s) => s.slug.toLowerCase() === invokedSlug || s.id.toLowerCase() === invokedSlug
+          ) ||
+          DEFAULT_BUILTIN_SKILLS.find(
+            (s) => s.slug.toLowerCase() === invokedSlug || s.id.toLowerCase() === invokedSlug
+          );
+
+        if (triggeredSkill) {
+          systemPrompt += `\n\n[USER EXPLICITLY TRIGGERED SKILL: "${triggeredSkill.name}" (/${triggeredSkill.slug})]:\n${triggeredSkill.content}\n\nSTRICT INSTRUCTION: The user explicitly invoked /${triggeredSkill.slug}. Prioritize and strictly apply the full instructions, methodology, and formatting guidelines of this skill.`;
+        }
       }
     }
 
@@ -2077,6 +2128,7 @@ export function ChatPanel({
           model: selectedModelId,
           workspacePath: workspacePath,
           learnId: learnId,
+          conversationId: "main",
           authToken: authToken || undefined,
           mode: permissionMode || "ask_before_changes",
           temperature: carriedSources.length > 0 ? 0.2 : 0.7,
@@ -2335,9 +2387,10 @@ export function ChatPanel({
     }
   };
 
+  // Consume external prompt (e.g. from Studio tools)
   useEffect(() => {
-    if (externalPrompt && !isStreaming) {
-      handleSend(externalPrompt);
+    if (externalPrompt && externalPrompt.trim() && !isStreaming) {
+      handleSend(externalPrompt.trim());
       onExternalPromptConsumed?.();
     }
   }, [externalPrompt, isStreaming]);
@@ -2354,14 +2407,6 @@ export function ChatPanel({
       prev.map((msg) => (msg.isStreaming ? { ...msg, isStreaming: false } : msg))
     );
   };
-
-  // Consume external prompt (e.g. from Studio tools)
-  useEffect(() => {
-    if (externalPrompt && externalPrompt.trim()) {
-      handleSend(externalPrompt.trim());
-      onExternalPromptConsumed?.();
-    }
-  }, [externalPrompt]);
 
   const handleClearHistory = async () => {
     if (learnId) {

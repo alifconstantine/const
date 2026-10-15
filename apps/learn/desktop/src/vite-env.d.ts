@@ -46,6 +46,8 @@ declare global {
       };
       openExternal: (url: string) => Promise<boolean>;
       openPath?: (targetPath: string) => Promise<boolean>;
+      showItemInFolder?: (targetPath: string) => Promise<boolean>;
+      getDownloadsPath?: () => Promise<string>;
       readFile?: (filePath: string) => Promise<string | null>;
       readMedia?: (filePath: string) => Promise<string | null>;
       openDirectoryDialog: () => Promise<string | null>;
@@ -76,12 +78,16 @@ declare global {
           model?: string;
           workspacePath?: string;
           learnId?: string;
+          conversationId?: string;
           authToken?: string;
           mode?: "ask_before_changes" | "full_access";
           thinkingLevel?: string;
           maxOutputTokens?: number;
+          systemPrompt?: string;
+          temperature?: number;
+          mcpServers?: any;
         }) => Promise<{ success: boolean; messages?: any[]; error?: string }>;
-        abort: () => Promise<boolean>;
+        abort: (conversationId?: string) => Promise<boolean>;
         answerQuestion?: (toolCallId: string, answer: any) => Promise<boolean>;
         respondApproval?: (payload: {
           approvalId: string;
