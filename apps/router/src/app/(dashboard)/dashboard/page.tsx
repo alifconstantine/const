@@ -41,7 +41,6 @@ import {
   CalendarDays,
   Activity,
   Cpu,
-  Boxes,
 } from "lucide-react";
 
 function formatTokens(tokens?: number): string {
@@ -114,20 +113,6 @@ export default function DashboardOverviewPage() {
   const [copiedEndpoint, setCopiedEndpoint] = useState(false);
   const [copiedModel, setCopiedModel] = useState(false);
   const [copiedCurl, setCopiedCurl] = useState(false);
-
-  // MCP Weekly Tool Calls Usage
-  const [mcpUsage, setMcpUsage] = useState<{ count: number; limit: number; remaining: number } | null>(null);
-
-  useEffect(() => {
-    fetch("/v1/mcp/usage")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (data?.usage) {
-          setMcpUsage(data.usage);
-        }
-      })
-      .catch(() => {});
-  }, []);
 
   // 52-Week aggregated data for the wave chart
   const { weeklyWaveData, maxWeeklyTokens, peakWeek } = useMemo<{
@@ -510,20 +495,17 @@ export default function DashboardOverviewPage() {
             </div>
           </div>
 
-          <Link
-            href="/mcp"
-            className="flex items-center gap-3 pt-2 sm:pt-0 sm:px-3 hover:opacity-80 transition-opacity"
-          >
-            <Boxes className="h-4 w-4 text-emerald-400 shrink-0" />
+          <div className="flex items-center gap-3 pt-2 sm:pt-0 sm:px-3">
+            <Activity className="h-4 w-4 text-muted-foreground shrink-0" />
             <div>
               <div className="text-[11px] font-sans text-muted-foreground uppercase tracking-wider font-semibold">
-                MCP Tool Calls
+                Avg Latency
               </div>
               <div className="text-base font-semibold font-sans text-foreground tabular-nums">
-                {mcpUsage ? `${mcpUsage.count} / ${mcpUsage.limit}` : "0 / 300"}
+                {analytics?.kpi?.avgDurationMs ? `${analytics.kpi.avgDurationMs}ms` : "—"}
               </div>
             </div>
-          </Link>
+          </div>
 
           <div className="flex items-center gap-3 pt-2 sm:pt-0 sm:px-3">
             <Scale className="h-4 w-4 text-muted-foreground shrink-0" />

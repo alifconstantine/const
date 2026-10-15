@@ -444,10 +444,10 @@ export function MobileLearnWorkspace({
   const [createArtifactType, setCreateArtifactType] = useState<"quiz" | "flashcard">("quiz");
   const [isCreateMindMapSheetOpen, setIsCreateMindMapSheetOpen] = useState(false);
   const [isCreateAudioSummaryOpen, setIsCreateAudioSummaryOpen] = useState(false);
-  const [isCreatePresentationOpen, setIsCreatePresentationOpen] = useState(false);
   const [isCreateInfographicOpen, setIsCreateInfographicOpen] = useState(false);
   const [isCreateReportSheetOpen, setIsCreateReportSheetOpen] = useState(false);
   const [isCreateCheatSheetOpen, setIsCreateCheatSheetOpen] = useState(false);
+  const [isCreatePresentationOpen, setIsCreatePresentationOpen] = useState(false);
   const [modelSelectionCategory, setModelSelectionCategory] = useState<"llm" | "voice" | "image">("voice");
   const [isModelSelectionSheetOpen, setIsModelSelectionSheetOpen] = useState(false);
   const [generatingArtifacts, setGeneratingArtifacts] = useState<GeneratingArtifactStatus[]>([]);
@@ -1687,10 +1687,6 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
       setIsCreateAudioSummaryOpen(true);
       return;
     }
-    if (toolId === "slides" || toolId === "presentation") {
-      setIsCreatePresentationOpen(true);
-      return;
-    }
     if (toolId === "infographic") {
       setIsCreateInfographicOpen(true);
       return;
@@ -1701,6 +1697,10 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
     }
     if (toolId === "cheatsheet" || toolId === "data_table") {
       setIsCreateCheatSheetOpen(true);
+      return;
+    }
+    if (toolId === "slides" || toolId === "presentation") {
+      setIsCreatePresentationOpen(true);
       return;
     }
     // Other tools: strictly no-op as requested
@@ -1816,69 +1816,6 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
     }
   };
 
-  const handleGeneratePresentation = async (options: {
-    selectedSourceIds: string[];
-    provider: "native" | "canva" | "slides";
-    lengthMode: "short" | "medium" | "long" | "auto";
-    slideCount?: number;
-    themeId?: "bold_dark" | "swiss_blue" | "sea_indigo" | "ash_lime";
-    customInstructions?: string;
-  }) => {
-    const selectedSources = (sources || []).filter((s) => options.selectedSourceIds.includes(s.id));
-    const targetLang = language === "id" ? "id" : "en";
-    const title = t("presentationTitle");
-
-    const artId = await localDb.createArtifact({
-      learnId,
-      title: t("creatingPresentationStatus"),
-      type: "slides",
-      status: "generating",
-      sourcesCount: selectedSources.length,
-      content: "",
-    });
-
-    setIsStudioSheetOpen(true);
-
-    try {
-      const result = await generatePresentationArtifact({
-        artifactId: artId,
-        learnId,
-        sources: selectedSources,
-        provider: options.provider,
-        lengthMode: options.lengthMode,
-        slideCount: options.slideCount,
-        language: targetLang,
-        themeId: options.themeId || "bold_dark",
-        customInstructions: options.customInstructions,
-      });
-
-      await localDb.updateArtifact(artId, {
-        title: result.title || title,
-        data: result.data,
-        content: JSON.stringify(result.data),
-        status: "completed",
-      });
-
-      toast.success(t("presentationCreatedSuccess"));
-
-      const fullArt = await localDb.getArtifact(artId);
-      if (fullArt) {
-        setIsStudioSheetOpen(false);
-        setSelectedReaderArtifact(fullArt);
-        setIsReaderOpen(true);
-      }
-    } catch (err: any) {
-      console.error("Failed to generate presentation on mobile:", err);
-      await localDb.updateArtifact(artId, {
-        title,
-        status: "error",
-        error: err?.message || "Generation failed",
-      });
-      toast.error(
-        t("failedCreatePresentation", { error: err?.message || t("errorOccurred") })
-      );
-    }
-  };
 
   const handleGenerateInfographic = async (params: {
     selectedSourceIds: string[];
@@ -2093,6 +2030,76 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
         setSelectedReaderArtifact(fullArt);
         setIsReaderOpen(true);
       }
+    }
+  };
+
+  const handleGeneratePresentation = async (params: {
+    selectedSourceIds: string[];
+    provider: "native";
+    lengthMode: "short" | "medium" | "long" | "auto";
+    slideCount?: number;
+    themeId?: "bold_dark" | "swiss_blue" | "sea_indigo" | "ash_lime";
+    customInstructions?: string;
+  }) => {
+    if (!learnId) return;
+
+    const selectedSources = (sources || []).filter((s) =>
+      params.selectedSourceIds.includes(s.id)
+    );
+    if (selectedSources.length === 0) return;
+
+    const targetLang = language === "id" ? "id" : "en";
+    const title = t("presentationTitle");
+
+    const artId = await localDb.createArtifact({
+      learnId,
+      title: t("creatingPresentationStatus"),
+      type: "slides",
+      status: "generating",
+      sourcesCount: selectedSources.length,
+      content: "",
+    });
+
+    setIsStudioSheetOpen(true);
+
+    try {
+      const result = await generatePresentationArtifact({
+        artifactId: artId,
+        learnId,
+        sources: selectedSources,
+        provider: "native",
+        lengthMode: params.lengthMode,
+        slideCount: params.slideCount,
+        themeId: params.themeId || "bold_dark",
+        language: targetLang,
+        customInstructions: params.customInstructions,
+      });
+
+      await localDb.updateArtifact(artId, {
+        title: result.title || title,
+        data: result.data,
+        content: JSON.stringify(result.data),
+        status: "completed",
+      });
+
+      toast.success(t("presentationCreatedSuccess"));
+
+      const fullArt = await localDb.getArtifact(artId);
+      if (fullArt) {
+        setIsStudioSheetOpen(false);
+        setSelectedReaderArtifact(fullArt);
+        setIsReaderOpen(true);
+      }
+    } catch (err: any) {
+      console.error("Failed to generate presentation on mobile:", err);
+      await localDb.updateArtifact(artId, {
+        title,
+        status: "error",
+        error: err?.message || "Generation failed",
+      });
+      toast.error(
+        t("failedCreatePresentation", { error: err?.message || t("errorOccurred") })
+      );
     }
   };
 
@@ -3252,14 +3259,6 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
         initialCategory={modelSelectionCategory}
       />
 
-      {/* Create Presentation Bottom Sheet */}
-      <CreatePresentationSheet
-        open={isCreatePresentationOpen}
-        onClose={() => setIsCreatePresentationOpen(false)}
-        sources={sources || []}
-        onGenerate={handleGeneratePresentation}
-      />
-
       {/* Create Infographic Bottom Sheet */}
       <CreateInfographicSheet
         open={isCreateInfographicOpen}
@@ -3286,6 +3285,14 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
         onClose={() => setIsCreateCheatSheetOpen(false)}
         sources={sources || []}
         onGenerate={handleGenerateCheatSheet}
+      />
+
+      {/* Create Presentation Bottom Sheet */}
+      <CreatePresentationSheet
+        open={isCreatePresentationOpen}
+        onClose={() => setIsCreatePresentationOpen(false)}
+        sources={sources || []}
+        onGenerate={handleGeneratePresentation}
       />
 
       {/* Interactive Full-Screen Reader Overlay */}

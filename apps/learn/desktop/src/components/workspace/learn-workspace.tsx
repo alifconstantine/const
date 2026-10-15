@@ -1061,8 +1061,8 @@ export function LearnWorkspace({
   };
 
   const handleGeneratePresentation = async (params: {
-    provider: "native" | "canva" | "slides";
     selectedSourceIds: string[];
+    provider: "native";
     lengthMode: "short" | "medium" | "long" | "auto";
     slideCount?: number;
     themeId?: "bold_dark" | "swiss_blue" | "sea_indigo" | "ash_lime";
@@ -1078,7 +1078,6 @@ export function LearnWorkspace({
     const targetLang: "id" | "en" = language === "id" ? "id" : "en";
     const title = t("presentationTitle");
 
-    // 1. Create generating artifact in Dexie
     const artId = await localDb.createArtifact({
       learnId,
       title: t("creatingPresentationStatus"),
@@ -1092,12 +1091,11 @@ export function LearnWorkspace({
     activeGenerationsRef.current.set(artId, { abortController, type: "slides" });
 
     try {
-      // 2. Call generator in background
       const result = await generatePresentationArtifact({
         artifactId: artId,
         learnId,
         sources: selectedSources,
-        provider: params.provider,
+        provider: "native",
         lengthMode: params.lengthMode,
         slideCount: params.slideCount,
         themeId: params.themeId || "bold_dark",
@@ -1110,7 +1108,6 @@ export function LearnWorkspace({
         return;
       }
 
-      // 3. Update artifact in Dexie
       await localDb.updateArtifact(artId, {
         title: result.title || title,
         data: result.data,
@@ -1120,8 +1117,6 @@ export function LearnWorkspace({
 
       if (isMountedRef.current) {
         toast.success(t("presentationCreatedSuccess"));
-
-        // 4. Auto-open in preview & auto-widen
         const fullArt = await localDb.getArtifact(artId);
         if (fullArt) {
           handleOpenStudioArtifact(fullArt);
@@ -2336,16 +2331,11 @@ Respond in ${language === "id" ? "Indonesian (Bahasa Indonesia)" : "English"}.`;
         }}
       />
 
-      {/* Dedicated Create Presentation Dialog */}
+      {/* Dedicated Create Presentation Dialog (Native Engine Only) */}
       <CreatePresentationDialog
         open={isCreatePresentationOpen}
         onOpenChange={setIsCreatePresentationOpen}
         sources={sources || []}
-        onNavigateToMcp={() => {
-          window.dispatchEvent(
-            new CustomEvent("const:navigate-home-tab", { detail: { tab: "mcp" } })
-          );
-        }}
         onGenerate={handleGeneratePresentation}
       />
 

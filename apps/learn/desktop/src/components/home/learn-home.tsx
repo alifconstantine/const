@@ -61,7 +61,6 @@ import { Sidebar, HomeNavTab } from "./sidebar";
 import { DesktopUpdateBadge } from "./desktop-update-badge";
 import { SourcesView } from "./sources-view";
 import { ModelsView } from "./views/models-view";
-import { McpToolsView } from "./views/mcp-tools-view";
 import { SkillsView } from "../settings/skills-settings";
 import { CreateLearnDialog } from "./dialogs/create-learn-dialog";
 import { CreateCollectionDialog } from "./dialogs/create-collection-dialog";
@@ -1909,11 +1908,6 @@ export function LearnHome({
             {activeTab === "models" && (
               <ModelsView onOpenSettings={() => handleOpenSettingsTab("models")} />
             )}
-
-            {/* ============================================================ */}
-            {/* TAB: MCP TOOLS & CONNECTORS                                  */}
-            {/* ============================================================ */}
-            {activeTab === "mcp" && <McpToolsView />}
 
             {/* ============================================================ */}
             {/* TAB: SKILLS                                                  */}

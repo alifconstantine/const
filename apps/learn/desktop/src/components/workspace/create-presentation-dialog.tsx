@@ -1,71 +1,33 @@
 import React, { useState, useEffect } from "react";
 import {
   X,
+  Presentation,
   Check,
   ChevronDown,
-  ChevronRight,
-  Presentation,
   Sliders,
   FileText,
-  Cable,
-  Link2,
-  Copy,
-  ExternalLink,
-  Settings,
 } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  ScrollArea,
-  BrandLogo,
-  toast,
-  cn,
-  isConfiguredCanvaClientId,
-  setCanvaClientId,
-  getCanvaClientId,
-} from "@const/ui";
+import { Dialog, DialogContent, ScrollArea, cn } from "@const/ui";
 import { useI18n } from "../../lib/i18n";
 import type { LocalSource } from "../../lib/db";
-import { isConnectorActive, syncConnectedConnectors } from "../../lib/connectors-service";
-import { connectCanvaDesktop } from "../../lib/canva-auth";
 
 export interface CreatePresentationDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   sources: LocalSource[];
-  onNavigateToMcp?: () => void;
   onGenerate: (options: {
     selectedSourceIds: string[];
-    provider: "native" | "canva" | "slides";
+    provider: "native";
     lengthMode: "short" | "medium" | "long" | "auto";
     slideCount?: number;
     customInstructions?: string;
   }) => void;
 }
 
-const PROVIDERS = [
-  {
-    id: "native" as const,
-    name: "Const Native",
-    logoId: null,
-  },
-  {
-    id: "canva" as const,
-    name: "Canva",
-    logoId: "canva",
-  },
-  {
-    id: "slides" as const,
-    name: "Slides",
-    logoId: "google-slides",
-  },
-];
-
 export function CreatePresentationDialog({
   open,
   onOpenChange,
   sources,
-  onNavigateToMcp,
   onGenerate,
 }: CreatePresentationDialogProps) {
   const { t } = useI18n();
@@ -73,74 +35,6 @@ export function CreatePresentationDialog({
   // Sources selection
   const [selectedSourceIds, setSelectedSourceIds] = useState<string[]>([]);
   const [isSourceDropdownOpen, setIsSourceDropdownOpen] = useState(false);
-
-  // Provider
-  const [provider, setProvider] = useState<"native" | "canva" | "slides">("native");
-
-  // Active MCP connector states (Canva MCP & Google Slides)
-  const [activeConnections, setActiveConnections] = useState<{
-    canva: boolean;
-    slides: boolean;
-  }>(() => ({
-    canva: isConnectorActive("canva_mcp") || isConnectorActive("canva"),
-    slides: isConnectorActive("google-slides") || isConnectorActive("googleslides"),
-  }));
-
-  useEffect(() => {
-    if (!open) return;
-    const updateActiveConnections = () => {
-      setActiveConnections({
-        canva: isConnectorActive("canva_mcp") || isConnectorActive("canva"),
-        slides: isConnectorActive("google-slides") || isConnectorActive("googleslides"),
-      });
-    };
-
-    updateActiveConnections();
-    syncConnectedConnectors()
-      .then(() => updateActiveConnections())
-      .catch(() => {});
-
-    window.addEventListener("connectors_changed", updateActiveConnections);
-    return () => {
-      window.removeEventListener("connectors_changed", updateActiveConnections);
-    };
-  }, [open]);
-
-  const handleOpenMcpMenu = () => {
-    onOpenChange(false);
-    if (onNavigateToMcp) {
-      onNavigateToMcp();
-    } else {
-      window.dispatchEvent(
-        new CustomEvent("const:navigate-home-tab", { detail: { tab: "mcp" } })
-      );
-    }
-  };
-
-  const [isConnectingCanvaDirect, setIsConnectingCanvaDirect] = useState(false);
-  const [showCanvaConfigInput, setShowCanvaConfigInput] = useState(false);
-  const [canvaClientIdInputValue, setCanvaClientIdInputValue] = useState(() => getCanvaClientId());
-
-  const handleQuickConnectCanva = async () => {
-    if (!isConfiguredCanvaClientId()) {
-      setShowCanvaConfigInput(true);
-      return;
-    }
-    setIsConnectingCanvaDirect(true);
-    try {
-      const res = await connectCanvaDesktop();
-      if (res.success) {
-        setActiveConnections((prev) => ({ ...prev, canva: true }));
-        toast.success(res.message || "Canva berhasil terhubung!");
-      } else {
-        toast.error(res.message || "Gagal menghubungkan Canva.");
-      }
-    } catch (err: any) {
-      toast.error(err?.message || "Gagal menghubungkan Canva.");
-    } finally {
-      setIsConnectingCanvaDirect(false);
-    }
-  };
 
   // Length mode & slide count
   const [lengthMode, setLengthMode] = useState<"short" | "medium" | "long" | "auto">("auto");
@@ -203,7 +97,7 @@ export function CreatePresentationDialog({
     onGenerate({
       selectedSourceIds:
         selectedSourceIds.length > 0 ? selectedSourceIds : sources.map((s) => s.id),
-      provider,
+      provider: "native",
       lengthMode,
       slideCount: targetCount,
       customInstructions: customInstructions.trim() || undefined,
@@ -236,7 +130,7 @@ export function CreatePresentationDialog({
         <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 overflow-hidden">
           <ScrollArea className="flex-1 min-h-0 w-full px-5 py-2">
             <div className="space-y-4 pb-2">
-              {/* Source Scope Dropdown (consistent with Video Summary) */}
+              {/* Source Scope Dropdown */}
               <div className="space-y-1.5 relative" data-studio-dropdown>
                 <label className="text-[11.5px] font-medium text-[#999999]">
                   {t("sourceScope")}
@@ -249,305 +143,68 @@ export function CreatePresentationDialog({
                   >
                     <span className="text-white font-medium truncate">
                       {selectedSourceIds.length === sources.length
-                        ? t("allSourcesCount", { count: sources.length })
-                        : t("selectedOfTotalSources", { selected: selectedSourceIds.length, total: sources.length })}
+                        ? t("videoAllSourcesSelected", { count: sources.length })
+                        : t("videoSourcesSelectedCount", {
+                            selected: selectedSourceIds.length,
+                            total: sources.length,
+                          })}
                     </span>
                     <ChevronDown
                       className={cn(
-                        "h-3.5 w-3.5 text-[#888888] shrink-0 transition-transform duration-150",
-                        isSourceDropdownOpen ? "rotate-180 text-white" : ""
+                        "h-3.5 w-3.5 text-[#888888] transition-transform",
+                        isSourceDropdownOpen && "rotate-180"
                       )}
                     />
                   </button>
 
                   {isSourceDropdownOpen && (
-                    <div className="absolute top-full mt-1.5 left-0 right-0 z-30 bg-[#222222] border border-[#2b2b2b] rounded-xl p-2 shadow-2xl animate-in fade-in-0 zoom-in-95 duration-100">
-                      <button
-                        type="button"
+                    <div className="absolute top-full left-0 right-0 mt-1 z-50 p-1.5 rounded-xl bg-[#1e1e1e] border border-[#2c2c2c] shadow-xl max-h-48 overflow-y-auto space-y-0.5">
+                      <div
                         onClick={handleSelectAllSources}
-                        className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-[#2b2b2b] text-xs text-[#cccccc] cursor-pointer transition-colors"
+                        className="px-2.5 py-1.5 rounded-lg text-xs font-semibold text-white hover:bg-[#272727] cursor-pointer flex items-center justify-between border-b border-[#282828] mb-1 pb-2"
                       >
-                        <span className="font-medium">
-                          {selectedSourceIds.length === sources.length ? t("deselectAll") : t("selectAllSources")}
+                        <span>
+                          {selectedSourceIds.length === sources.length
+                            ? t("videoDeselectAllSources")
+                            : t("videoSelectAllSources")}
                         </span>
-                        <div
-                          className={cn(
-                            "h-4 w-4 rounded border flex items-center justify-center transition-colors",
-                            selectedSourceIds.length === sources.length
-                              ? "bg-white border-white text-black"
-                              : "border-[#444449] bg-transparent"
-                          )}
-                        >
-                          {selectedSourceIds.length === sources.length && (
-                            <Check className="h-3 w-3 stroke-[3]" />
-                          )}
-                        </div>
-                      </button>
-
-                      <div className="h-px bg-[#2e2e2e] my-1.5" />
-
-                      <ScrollArea className="max-h-52 w-full" viewportClassName="space-y-1 pr-1.5">
-                        {sources.map((src) => {
-                          const isSelected = selectedSourceIds.includes(src.id);
-                          return (
-                            <button
-                              key={src.id}
-                              type="button"
-                              onClick={() => handleToggleSource(src.id)}
-                              className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg hover:bg-[#2b2b2b] text-xs text-left cursor-pointer transition-colors"
-                            >
-                              <div className="flex items-center gap-2 truncate pr-2">
-                                <FileText className="h-3.5 w-3.5 text-[#777777] shrink-0" />
-                                <span className="truncate text-[#e0e0e0]">{src.title}</span>
-                              </div>
-                              <div
-                                className={cn(
-                                  "h-4 w-4 rounded border flex items-center justify-center shrink-0 transition-colors",
-                                  isSelected
-                                    ? "bg-white border-white text-black"
-                                    : "border-[#444449] bg-transparent"
-                                )}
-                              >
-                                {isSelected && <Check className="h-3 w-3 stroke-[3]" />}
-                              </div>
-                            </button>
-                          );
-                        })}
-                      </ScrollArea>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Provider Selection */}
-              <div className="space-y-2">
-                <label className="text-[11.5px] font-medium text-[#999999] font-sans">
-                  {t("presentationEngine")}
-                </label>
-                <div className="grid grid-cols-3 gap-2.5">
-                  {PROVIDERS.map((p) => {
-                    const isSelected = provider === p.id;
-                    const isConnected =
-                      p.id === "native"
-                        ? true
-                        : p.id === "canva"
-                        ? activeConnections.canva
-                        : activeConnections.slides;
-
-                    return (
-                      <button
-                        key={p.id}
-                        type="button"
-                        onClick={() => setProvider(p.id)}
-                        className={cn(
-                          "p-3 rounded-xl border text-left flex flex-col justify-between gap-2.5 transition-all cursor-pointer font-sans min-h-[72px]",
-                          isSelected
-                            ? "bg-[#252525] border-white/40 shadow-lg text-white"
-                            : "bg-[#1f1f1f] border-[#2c2c2c] hover:border-[#383838] opacity-80 hover:opacity-100 text-[#888888]"
-                        )}
-                      >
-                        <div className="flex items-center gap-2 truncate w-full">
-                          {p.logoId ? (
-                            <BrandLogo
-                              id={p.logoId}
-                              size="xs"
-                              className="w-5 h-5 rounded-md p-0.5 border-0 shadow-none bg-transparent shrink-0"
-                            />
-                          ) : (
-                            <Presentation className="h-4 w-4 text-white shrink-0" />
-                          )}
-                          <span className="text-xs font-semibold text-white truncate">
-                            {p.id === "slides" ? "Google Slides" : p.name}
-                          </span>
-                        </div>
-
-                        {/* Connection status badge */}
-                        <div className="flex items-center">
-                          {p.id === "native" ? (
-                            <span className="text-[10px] font-sans font-medium text-[#969696] bg-[#222222] border border-[#2e2e2e] px-1.5 py-0.5 rounded-md">
-                              {t("connectorStatusBuiltin")}
-                            </span>
-                          ) : isConnected ? (
-                            <span className="text-[10px] font-sans font-medium text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5 rounded-md flex items-center gap-1">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
-                              {t("connectorStatusConnected")}
-                            </span>
-                          ) : (
-                            <span className="text-[10px] font-sans font-medium text-[#969696] bg-[#222222] border border-[#2e2e2e] px-1.5 py-0.5 rounded-md flex items-center gap-1">
-                              <span className="w-1.5 h-1.5 rounded-full bg-[#5d5d5d]"></span>
-                              {t("connectorStatusNotConnected")}
-                            </span>
-                          )}
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-
-                {/* Notice banner when selected provider is not connected */}
-                {provider !== "native" &&
-                  ((provider === "canva" && !activeConnections.canva) ||
-                    (provider === "slides" && !activeConnections.slides)) && (
-                    <div className="p-3 rounded-xl bg-[#1c1c1c] border border-[#2e2e2e] space-y-2.5 animate-in fade-in-0 duration-150">
-                      <div className="flex items-start gap-2.5">
-                        <div className="p-1.5 rounded-lg bg-[#252528] border border-[#2e2e2e] text-amber-400 shrink-0">
-                          <Cable className="h-4 w-4" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-xs font-semibold text-white font-sans">
-                            {provider === "canva"
-                              ? t("canvaMcpNotConnected")
-                              : t("googleSlidesNotConnected")}
-                          </div>
-                          <p className="text-[11.5px] text-[#d4d4d4] mt-0.5 leading-relaxed font-sans">
-                            {provider === "canva"
-                              ? t("canvaMcpNotConnectedDesc")
-                              : t("googleSlidesNotConnectedDesc")}
-                          </p>
-                        </div>
+                        <span className="text-[10px] text-[#777]">
+                          {selectedSourceIds.length}/{sources.length}
+                        </span>
                       </div>
 
-                      {provider === "canva" ? (
-                        !isConfiguredCanvaClientId() || showCanvaConfigInput ? (
-                          <div className="p-3 rounded-xl bg-[#232328] border border-[#383842] space-y-2.5">
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <span className="text-xs font-semibold text-white font-sans">
-                                  Konfigurasi Canva Client ID
-                                </span>
-                                <span className="text-[9.5px] font-sans font-medium uppercase tracking-wider px-1.5 py-0.2 rounded-full bg-cyan-500/20 text-cyan-400 border border-cyan-500/30">
-                                  canva.dev
-                                </span>
-                              </div>
-                              {isConfiguredCanvaClientId() && (
-                                <button
-                                  type="button"
-                                  onClick={() => setShowCanvaConfigInput(false)}
-                                  className="text-[11px] text-[#969696] hover:text-white cursor-pointer font-sans"
-                                >
-                                  Tutup
-                                </button>
+                      {sources.map((s) => {
+                        const isChecked = selectedSourceIds.includes(s.id);
+                        return (
+                          <div
+                            key={s.id}
+                            onClick={() => handleToggleSource(s.id)}
+                            className="px-2.5 py-1.5 rounded-lg text-xs hover:bg-[#272727] cursor-pointer flex items-center justify-between transition-colors"
+                          >
+                            <span
+                              className={cn(
+                                "truncate pr-2",
+                                isChecked ? "text-white font-medium" : "text-[#888]"
                               )}
-                            </div>
-
-                            <p className="text-[11px] text-[#cccccc] leading-relaxed font-sans">
-                              Canva memerlukan Client ID integrasi resmi Anda. Buat integrasi di{" "}
-                              <a
-                                href="https://www.canva.dev/apps"
-                                target="_blank"
-                                rel="noreferrer"
-                                className="text-cyan-400 hover:underline inline-flex items-center gap-0.5 font-medium"
-                              >
-                                canva.dev/apps <ExternalLink className="w-2.5 h-2.5" />
-                              </a>
-                              , lalu tempel Client ID Anda di bawah ini:
-                            </p>
-
-                            <div className="flex items-center gap-1.5">
-                              <input
-                                type="text"
-                                value={canvaClientIdInputValue}
-                                onChange={(e) => setCanvaClientIdInputValue(e.target.value)}
-                                placeholder="Tempel Client ID dari Canva Portal (contoh: OC-A...)"
-                                className="flex-1 px-2.5 py-1.5 text-xs rounded-xl bg-[#18181b] border border-[#3f3f46] text-white font-mono placeholder:text-[#71717a] focus:outline-none focus:border-cyan-500"
-                              />
-                              <button
-                                type="button"
-                                disabled={isConnectingCanvaDirect}
-                                onClick={async () => {
-                                  if (!canvaClientIdInputValue.trim()) {
-                                    toast.error("Masukkan Client ID yang valid dari canva.dev.");
-                                    return;
-                                  }
-                                  setCanvaClientId(canvaClientIdInputValue.trim());
-                                  setShowCanvaConfigInput(false);
-                                  setIsConnectingCanvaDirect(true);
-                                  try {
-                                    const res = await connectCanvaDesktop();
-                                    if (res.success) {
-                                      setActiveConnections((prev) => ({ ...prev, canva: true }));
-                                      toast.success(res.message || "Canva berhasil terhubung!");
-                                    } else {
-                                      toast.error(res.message || "Gagal menghubungkan Canva.");
-                                    }
-                                  } catch (err: any) {
-                                    toast.error(err?.message || "Gagal menghubungkan Canva.");
-                                  } finally {
-                                    setIsConnectingCanvaDirect(false);
-                                  }
-                                }}
-                                className="px-3 py-1.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-xs font-medium text-white transition-colors cursor-pointer shrink-0 font-sans disabled:opacity-50"
-                              >
-                                {isConnectingCanvaDirect ? "Menghubungkan..." : "Simpan & Hubungkan"}
-                              </button>
-                            </div>
-
-                            <div className="flex items-center justify-between p-2 rounded-xl bg-[#18181b] border border-[#2e2e2e] text-[10.5px] font-mono text-[#a1a1aa]">
-                              <span className="truncate">Redirect URI: http://127.0.0.1:24135/canva/callback</span>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  navigator.clipboard.writeText("http://127.0.0.1:24135/canva/callback");
-                                  toast.success("Redirect URI Desktop disalin!");
-                                }}
-                                className="p-1 hover:text-white text-[#a1a1aa] shrink-0 ml-1 cursor-pointer"
-                                title="Salin URI"
-                              >
-                                <Copy className="w-3 h-3" />
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-2 pt-0.5">
-                            <button
-                              type="button"
-                              disabled={isConnectingCanvaDirect}
-                              onClick={handleQuickConnectCanva}
-                              className="flex-1 py-1.5 px-3 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-xs font-medium text-white flex items-center justify-center gap-1.5 transition-colors cursor-pointer font-sans disabled:opacity-50"
                             >
-                              <Link2 className="h-3.5 w-3.5" />
-                              <span>
-                                {isConnectingCanvaDirect
-                                  ? "Menghubungkan di Browser..."
-                                  : "Hubungkan Canva (OAuth Direct)"}
-                              </span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setShowCanvaConfigInput(true)}
-                              className="py-1.5 px-2.5 rounded-xl bg-[#252528] hover:bg-[#383838] border border-[#2e2e2e] text-xs font-medium text-[#c4c4c4] hover:text-white flex items-center gap-1 transition-colors cursor-pointer font-sans"
-                              title="Ubah Client ID"
-                            >
-                              <Settings className="h-3.5 w-3.5" />
-                              <span>Ubah ID</span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={handleOpenMcpMenu}
-                              className="py-1.5 px-3 rounded-xl bg-[#252528] hover:bg-[#383838] border border-[#2e2e2e] text-xs font-medium text-white flex items-center gap-1 transition-colors cursor-pointer font-sans"
-                            >
-                              <span>Menu MCP</span>
-                            </button>
-                          </div>
-                        )
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={handleOpenMcpMenu}
-                          className="w-full py-1.5 px-3 rounded-xl bg-[#252528] hover:bg-[#383838] border border-[#2e2e2e] hover:border-[#383838] text-xs font-medium text-white flex items-center justify-between gap-1.5 transition-colors cursor-pointer font-sans"
-                        >
-                          <div className="flex items-center gap-1.5 min-w-0">
-                            <Cable className="h-3.5 w-3.5 text-white shrink-0" />
-                            <span>{t("openMcpMenuHome")}</span>
-                            <span className="text-[9.5px] font-sans font-medium uppercase tracking-wider px-1.5 py-0.5 rounded-full bg-primary/20 text-primary border border-primary/30 leading-none">
-                              Beta
+                              {s.title}
                             </span>
+                            <div
+                              className={cn(
+                                "h-3.5 w-3.5 rounded flex items-center justify-center shrink-0 border transition-colors",
+                                isChecked
+                                  ? "bg-white border-white text-black"
+                                  : "border-[#444] bg-transparent"
+                              )}
+                            >
+                              {isChecked && <Check className="h-2.5 w-2.5 stroke-[3]" />}
+                            </div>
                           </div>
-                          <ChevronRight className="h-3.5 w-3.5 text-[#969696] shrink-0" />
-                        </button>
-                      )}
+                        );
+                      })}
                     </div>
                   )}
+                </div>
               </div>
 
               {/* Slide Count / Length Mode */}
