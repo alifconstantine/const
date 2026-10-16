@@ -45,6 +45,7 @@ export interface ChatMessageItemProps {
   onAnswerQuestion?: (toolCallId: string, answer: any) => void;
   onOpenFileDiff?: (record: FileMutationRecord) => void;
   onOpenFilePreview?: (filePath: string, content?: string) => void;
+  onOpenTrajectory?: (conversationIdOrPath: string) => void;
   onOpenReview?: (mutations?: FileMutationRecord[]) => void;
   onOpenSubAgent?: (step: TraceStep) => void;
   renderAttachment?: (att: any) => React.ReactNode;
@@ -78,6 +79,7 @@ export function ChatMessageItem({
   onAnswerQuestion,
   onOpenFileDiff,
   onOpenFilePreview,
+  onOpenTrajectory,
   onOpenReview,
   onOpenSubAgent,
   renderAttachment,
@@ -147,6 +149,7 @@ export function ChatMessageItem({
                 <MarkdownContent
                   content={message.content}
                   onOpenFilePreview={onOpenFilePreview}
+                  onOpenTrajectory={onOpenTrajectory}
                   className="space-y-1 text-[14px]"
                 />
               </div>
@@ -156,6 +159,7 @@ export function ChatMessageItem({
               <MarkdownContent
                 content={message.content}
                 onOpenFilePreview={onOpenFilePreview}
+                onOpenTrajectory={onOpenTrajectory}
                 className="space-y-1 text-[14px]"
               />
             </div>
@@ -232,6 +236,7 @@ export function ChatMessageItem({
           <MarkdownContent
             content={message.content}
             onOpenFilePreview={onOpenFilePreview}
+            onOpenTrajectory={onOpenTrajectory}
           />
         </div>
       ) : null}

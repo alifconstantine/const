@@ -31,45 +31,45 @@ export function TrajectoryDialog({
   const [rawTranscript, setRawTranscript] = useState<string>("");
   const [copied, setCopied] = useState(false);
 
+  const generateFullJsonl = (msgs: any[]) => {
+    return msgs
+      .map((m, idx) =>
+        JSON.stringify({
+          step_index: idx,
+          source: m.role === "user" ? "USER_EXPLICIT" : "MODEL",
+          type: m.role === "user" ? "USER_INPUT" : "PLANNER_RESPONSE",
+          content: m.content || "",
+          thinking: m.thinking || undefined,
+          tool_calls: m.toolCalls && m.toolCalls.length > 0 ? m.toolCalls : undefined,
+          tool_results: m.toolResults && m.toolResults.length > 0 ? m.toolResults : undefined,
+          mutations: m.mutations && m.mutations.length > 0 ? m.mutations : undefined,
+          created_at: new Date(m.timestamp || m.createdAt || Date.now()).toISOString(),
+        })
+      )
+      .join("\n");
+  };
+
   useEffect(() => {
     if (open && conversationId) {
+      const generatedFromMessages = generateFullJsonl(messages);
       if (window.electron?.getTranscript) {
-        window.electron.getTranscript(conversationId).then((data) => {
-          if (data && data.trim()) {
-            setRawTranscript(data);
-          } else {
-            // Generate fallback JSONL from messages
-            const fallback = messages
-              .map((m, idx) =>
-                JSON.stringify({
-                  step_index: idx,
-                  source: m.role === "user" ? "USER_EXPLICIT" : "MODEL",
-                  type: m.role === "user" ? "USER_INPUT" : "PLANNER_RESPONSE",
-                  content: m.content,
-                  thinking: m.thinking,
-                  tool_calls: m.toolCalls,
-                  timestamp: m.timestamp || m.createdAt,
-                })
-              )
-              .join("\n");
-            setRawTranscript(fallback);
-          }
-        });
+        window.electron
+          .getTranscript(conversationId)
+          .then((data) => {
+            if (data && data.trim()) {
+              const diskLines = data.trim().split("\n").filter(Boolean);
+              if (diskLines.length >= messages.length) {
+                setRawTranscript(data);
+                return;
+              }
+            }
+            setRawTranscript(generatedFromMessages);
+          })
+          .catch(() => {
+            setRawTranscript(generatedFromMessages);
+          });
       } else {
-        const fallback = messages
-          .map((m, idx) =>
-            JSON.stringify({
-              step_index: idx,
-              source: m.role === "user" ? "USER_EXPLICIT" : "MODEL",
-              type: m.role === "user" ? "USER_INPUT" : "PLANNER_RESPONSE",
-              content: m.content,
-              thinking: m.thinking,
-              tool_calls: m.toolCalls,
-              timestamp: m.timestamp || m.createdAt,
-            })
-          )
-          .join("\n");
-        setRawTranscript(fallback);
+        setRawTranscript(generatedFromMessages);
       }
     }
   }, [open, conversationId, messages]);
@@ -83,6 +83,8 @@ export function TrajectoryDialog({
       setTimeout(() => setCopied(false), 2000);
     } catch {}
   };
+
+  const trajectoryLogPath = `~/.const/harness/brain/${conversationId}/.system_generated/logs/transcript.jsonl`;
 
   return (
     <div
@@ -108,8 +110,8 @@ export function TrajectoryDialog({
                   </span>
                 )}
               </div>
-              <span className="font-mono text-[11px] text-[#888888] dark:text-[#666666] truncate">
-                ID: {conversationId}
+              <span className="font-mono text-[11px] text-[#888888] dark:text-[#666666] truncate" title={trajectoryLogPath}>
+                Path: {trajectoryLogPath}
               </span>
             </div>
           </div>
@@ -281,6 +283,14 @@ function TimelineStepItem({ message, stepIndex }: { message: any; stepIndex: num
                           ? tc.args
                           : JSON.stringify(tc.args, null, 2)}
                       </pre>
+                    )}
+                    {tc.result && (
+                      <div className="mt-1 pt-1 border-t border-black/5 dark:border-white/5">
+                        <span className="text-[10px] font-medium text-[#888888]">Result:</span>
+                        <pre className="font-mono text-[10.5px] text-[#666666] dark:text-[#999999] max-h-32 overflow-y-auto whitespace-pre-wrap">
+                          {typeof tc.result === "string" ? tc.result : JSON.stringify(tc.result, null, 2)}
+                        </pre>
+                      </div>
                     )}
                   </div>
                 ))}

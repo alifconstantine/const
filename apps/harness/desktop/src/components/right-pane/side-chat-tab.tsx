@@ -15,7 +15,10 @@ import {
   loadSideConversation,
   saveSideConversation,
   deleteSideConversation,
+  loadConversations,
+  type ConversationItem,
 } from "../../lib/conversation-store";
+import { resolveMentionedSessionsInPrompt } from "../../lib/mention-search";
 
 export interface SideChatMessage {
   id: string;
@@ -48,6 +51,8 @@ interface SideChatTabProps {
   onRollbackAll?: (records: FileMutationRecord[]) => void;
   onInsertToMainPrompt?: (text: string) => void;
   onUpdateTab?: (tabId: string, updates: Partial<RightPaneTab>) => void;
+  onOpenTrajectory?: (conversationIdOrPath: string) => void;
+  conversations?: ConversationItem[];
 }
 
 function formatMessageTimestamp(ts: number): string {
@@ -72,7 +77,10 @@ export function SideChatTab({
   onRollbackAll,
   onInsertToMainPrompt,
   onUpdateTab,
+  onOpenTrajectory,
+  conversations: propConversations,
 }: SideChatTabProps) {
+  const effectiveConversations = propConversations || loadConversations();
   const effectiveParentId = tab.parentConversationId || parentConversationId || "root";
   const sideChatId = tab.id;
 
@@ -344,10 +352,11 @@ Answer the user's query directly. Only modify workspace files or run commands if
       }
     }
 
-    // Append current user message
+    // Append current user message (with resolved session mentions context)
+    const resolvedPrompt = resolveMentionedSessionsInPrompt(userMsg.content, effectiveConversations);
     payloadMessages.push({
       role: "user",
-      content: userMsg.content,
+      content: resolvedPrompt,
     });
 
     if (window.electron?.sendMessage) {
@@ -439,6 +448,7 @@ Answer the user's query directly. Only modify workspace files or run commands if
                     <MarkdownContent
                       content={msg.content}
                       onOpenFilePreview={onOpenFilePreview}
+                      onOpenTrajectory={onOpenTrajectory}
                       className="space-y-1 text-xs"
                     />
                   </div>
@@ -479,6 +489,7 @@ Answer the user's query directly. Only modify workspace files or run commands if
                       <MarkdownContent
                         content={msg.content}
                         onOpenFilePreview={onOpenFilePreview}
+                        onOpenTrajectory={onOpenTrajectory}
                       />
                     </div>
                   )}
@@ -535,6 +546,8 @@ Answer the user's query directly. Only modify workspace files or run commands if
           mode={activeMode}
           onModeChange={setActiveMode}
           onOpenFilePreview={onOpenFilePreview}
+          onOpenTrajectory={onOpenTrajectory}
+          conversations={effectiveConversations}
         />
       </div>
     </div>

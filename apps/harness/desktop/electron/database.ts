@@ -392,22 +392,48 @@ export class ConversationDatabase {
         fs.mkdirSync(scratchDir, { recursive: true });
       }
 
-      const fullTranscript = path.join(logsDir, "transcript_full.jsonl");
-      // Dump messages as transcript if full transcript doesn't exist
-      if (!fs.existsSync(fullTranscript) && convo.messages && convo.messages.length > 0) {
-        const lines = convo.messages
+      if (convo.messages && convo.messages.length > 0) {
+        const fullTranscript = path.join(logsDir, "transcript_full.jsonl");
+        const compactTranscript = path.join(logsDir, "transcript.jsonl");
+
+        const fullLines = convo.messages
           .map((m, idx) =>
             JSON.stringify({
               step_index: idx,
               source: m.role === "user" ? "USER_EXPLICIT" : "MODEL",
               type: m.role === "user" ? "USER_INPUT" : "PLANNER_RESPONSE",
-              content: m.content,
-              thinking: m.thinking,
+              content: m.content || "",
+              thinking: m.thinking || undefined,
+              tool_calls: m.toolCalls && m.toolCalls.length > 0 ? m.toolCalls : undefined,
+              tool_results: m.toolResults && m.toolResults.length > 0 ? m.toolResults : undefined,
+              mutations: m.mutations && m.mutations.length > 0 ? m.mutations : undefined,
               created_at: new Date(m.createdAt || convo.createdAt).toISOString(),
             })
           )
           .join("\n");
-        fs.writeFileSync(fullTranscript, lines + "\n", "utf-8");
+        fs.writeFileSync(fullTranscript, fullLines + "\n", "utf-8");
+
+        const compactLines = convo.messages
+          .map((m, idx) => {
+            const hasLongContent = typeof m.content === "string" && m.content.length > 300;
+            const hasLongThinking = typeof m.thinking === "string" && m.thinking.length > 300;
+            const truncated: string[] = [];
+            if (hasLongContent) truncated.push("content");
+            if (hasLongThinking) truncated.push("thinking");
+
+            return JSON.stringify({
+              step_index: idx,
+              source: m.role === "user" ? "USER_EXPLICIT" : "MODEL",
+              type: m.role === "user" ? "USER_INPUT" : "PLANNER_RESPONSE",
+              content: hasLongContent && typeof m.content === "string" ? m.content.slice(0, 300) + "..." : m.content || "",
+              thinking: hasLongThinking && typeof m.thinking === "string" ? m.thinking.slice(0, 300) + "..." : m.thinking || undefined,
+              tool_calls: m.toolCalls && m.toolCalls.length > 0 ? m.toolCalls : undefined,
+              truncated_fields: truncated.length > 0 ? truncated : undefined,
+              created_at: new Date(m.createdAt || convo.createdAt).toISOString(),
+            });
+          })
+          .join("\n");
+        fs.writeFileSync(compactTranscript, compactLines + "\n", "utf-8");
       }
     } catch (e) {
       console.warn("[ConversationDB] Failed to ensure brain transcript:", e);

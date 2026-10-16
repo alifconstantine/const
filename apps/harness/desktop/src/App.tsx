@@ -60,6 +60,7 @@ import {
   getDefaultAgentMode,
   type ConversationItem,
 } from "./lib/conversation-store";
+import { resolveMentionedSessionsInPrompt } from "./lib/mention-search";
 import type {
   FileMutationRecord,
   TraceStep,
@@ -166,6 +167,7 @@ function AuthenticatedContent({
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
   const [isTrajectoryOpen, setIsTrajectoryOpen] = useState(false);
+  const [trajectoryTargetConversationId, setTrajectoryTargetConversationId] = useState<string | null>(null);
   const [settingsTab, setSettingsTab] = useState<string>("general");
   const greeting = getGreeting();
 
@@ -174,6 +176,26 @@ function AuthenticatedContent({
     setSettingsTab(resolvedTab);
     setIsSettingsOpen(true);
   };
+
+  const handleOpenTrajectory = useCallback((idOrPath?: string) => {
+    if (!idOrPath) {
+      setTrajectoryTargetConversationId(null);
+      setIsTrajectoryOpen(true);
+      return;
+    }
+    const cleaned = idOrPath.replace(/^trajectory:\/\//, "");
+    const brainMatch = cleaned.match(/brain[/\\]([^/\\]+)/i);
+    const targetId = (brainMatch ? brainMatch[1] : cleaned.split(/[/\\]/)[0]) || null;
+
+    const allConvos = loadConversations();
+    const found = targetId ? allConvos.find((c) => c.id === targetId || cleaned.includes(c.id)) : null;
+    if (found) {
+      setTrajectoryTargetConversationId(found.id);
+    } else {
+      setTrajectoryTargetConversationId(targetId);
+    }
+    setIsTrajectoryOpen(true);
+  }, []);
 
   // Conversation history & state
   const [conversations, setConversations] = useState<ConversationItem[]>(() => {
@@ -2357,15 +2379,20 @@ function AuthenticatedContent({
       try {
         const payloadMessages = currentStreamMessages.map((m) => {
           let content = m.content;
-          if (m.role === "user" && m.attachments && m.attachments.length > 0) {
-            const hasExistingAttachmentSection = content.includes("[Attached media / Lampiran media:");
-            if (!hasExistingAttachmentSection) {
-              const attLines = m.attachments.map((att) => {
-                const pathInfo = att.path ? ` [Path: ${att.path}]` : "";
-                return `- ${att.type.toUpperCase()}: "${att.name}" (${formatFileSize(att.size)})${pathInfo}`;
-              });
-              const baseText = content.trim() ? content : "Please analyze the attached media/file(s).";
-              content = `${baseText}\n\n[Attached media / Lampiran media:\n${attLines.join("\n")}]`;
+          if (m.role === "user") {
+            const allConvos = conversations.length > 0 ? conversations : loadConversations();
+            content = resolveMentionedSessionsInPrompt(content, allConvos);
+
+            if (m.attachments && m.attachments.length > 0) {
+              const hasExistingAttachmentSection = content.includes("[Attached media / Lampiran media:");
+              if (!hasExistingAttachmentSection) {
+                const attLines = m.attachments.map((att) => {
+                  const pathInfo = att.path ? ` [Path: ${att.path}]` : "";
+                  return `- ${att.type.toUpperCase()}: "${att.name}" (${formatFileSize(att.size)})${pathInfo}`;
+                });
+                const baseText = content.trim() ? content : "Please analyze the attached media/file(s).";
+                content = `${baseText}\n\n[Attached media / Lampiran media:\n${attLines.join("\n")}]`;
+              }
             }
           }
           return {
@@ -2714,6 +2741,7 @@ function AuthenticatedContent({
     setIsSettingsOpen(false);
     setIsRenameDialogOpen(false);
     setIsTrajectoryOpen(false);
+    setTrajectoryTargetConversationId(null);
     setEditingMessageId(null);
     setMessages([]);
     setConversationTitle("");
@@ -3004,7 +3032,7 @@ function AuthenticatedContent({
                   onOpenRename={() => setIsRenameDialogOpen(true)}
                   onArchive={() => handleArchiveConversation(conversationId)}
                   onOpenSettings={handleOpenSettings}
-                  onOpenTrajectory={() => setIsTrajectoryOpen(true)}
+                  onOpenTrajectory={() => handleOpenTrajectory()}
                   isRightSidebarOpen={isRightSidebarOpen}
                   onToggleRightSidebar={handleToggleRightSidebar}
                   onOpenTerminal={handleOpenTerminal}
@@ -3053,6 +3081,7 @@ function AuthenticatedContent({
                   conversations={conversations}
                   sessionMedia={sessionMediaAttachments}
                   onOpenFilePreview={handleOpenFilePreview}
+                  onOpenTrajectory={handleOpenTrajectory}
                 />
               </div>
             </div>
@@ -3108,6 +3137,7 @@ function AuthenticatedContent({
                       onAnswerQuestion={handleAnswerQuestion}
                       onOpenFileDiff={handleOpenFileDiff}
                       onOpenFilePreview={handleOpenFilePreview}
+                      onOpenTrajectory={handleOpenTrajectory}
                       onOpenReview={handleOpenReview}
                       onOpenSubAgent={handleOpenSubAgentFromTrace}
                       renderAttachment={renderMessageAttachment}
@@ -3239,6 +3269,7 @@ function AuthenticatedContent({
                       conversations={conversations}
                       sessionMedia={sessionMediaAttachments}
                       onOpenFilePreview={handleOpenFilePreview}
+                      onOpenTrajectory={handleOpenTrajectory}
                     />
                   )}
                 </SmoothCardMorph>
@@ -3296,6 +3327,8 @@ function AuthenticatedContent({
                     parentConversationId={conversationId}
                     defaultModel={activeModelItem?.id || activeModelItem?.name || "gemini-3.8-flash"}
                     onOpenFilePreview={handleOpenFilePreview}
+                    onOpenTrajectory={handleOpenTrajectory}
+                    conversations={conversations}
                     onInsertToMainPrompt={(text) => {
                       setEditingPrompt((prev) => (prev ? `${prev}\n\n${text}` : text));
                     }}
@@ -3356,13 +3389,29 @@ function AuthenticatedContent({
       />
 
       {/* Trajectory Modal Dialog */}
-      <TrajectoryDialog
-        open={isTrajectoryOpen}
-        onClose={() => setIsTrajectoryOpen(false)}
-        conversationId={conversationId}
-        conversationTitle={conversationTitle}
-        messages={messages}
-      />
+      {(() => {
+        const activeTrajectoryConvoId = trajectoryTargetConversationId || conversationId;
+        const allConvos = conversations.length > 0 ? conversations : loadConversations();
+        const targetConvo =
+          activeTrajectoryConvoId === conversationId
+            ? null
+            : allConvos.find((c) => c.id === activeTrajectoryConvoId);
+        const activeTrajectoryTitle = targetConvo?.title || (activeTrajectoryConvoId === conversationId ? conversationTitle : "Session Trajectory");
+        const activeTrajectoryMessages = targetConvo?.messages || (activeTrajectoryConvoId === conversationId ? messages : []);
+
+        return (
+          <TrajectoryDialog
+            open={isTrajectoryOpen}
+            onClose={() => {
+              setIsTrajectoryOpen(false);
+              setTrajectoryTargetConversationId(null);
+            }}
+            conversationId={activeTrajectoryConvoId}
+            conversationTitle={activeTrajectoryTitle}
+            messages={activeTrajectoryMessages}
+          />
+        );
+      })()}
 
       {/* Settings Modal (Antigravity Style Pop-up) */}
       <SettingsView

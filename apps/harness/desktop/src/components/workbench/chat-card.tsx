@@ -219,6 +219,7 @@ interface ChatCardProps {
   conversations?: ConversationItem[];
   sessionMedia?: AttachedFile[];
   onOpenFilePreview?: (filePath: string) => void;
+  onOpenTrajectory?: (conversationIdOrPath: string) => void;
   forceIconOnly?: boolean;
 }
 
@@ -253,6 +254,7 @@ export function ChatCard({
   conversations,
   sessionMedia,
   onOpenFilePreview,
+  onOpenTrajectory,
   forceIconOnly = false,
 }: ChatCardProps) {
   const cardContainerRef = useRef<HTMLDivElement>(null);
@@ -1321,6 +1323,7 @@ export function ChatCard({
               onSerializedChange={handleSerializedChange}
               onMentionTokenChange={handleMentionTokenChange}
               onOpenFilePreview={onOpenFilePreview}
+              onOpenTrajectory={onOpenTrajectory}
               onSend={handleSend}
               onPasteFiles={handlePasteFiles}
               placeholder={

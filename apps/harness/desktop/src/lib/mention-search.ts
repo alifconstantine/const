@@ -40,6 +40,7 @@ export interface MentionCandidate {
   fileType?: "code" | "image" | "doc" | "generic";
   updatedAt?: number;
   fullPath?: string;
+  conversationId?: string;
 }
 
 export interface ActiveAtToken {
@@ -63,8 +64,8 @@ export function activeAtToken(text: string, cursorPosition: number): ActiveAtTok
   if (cursorPosition < 0 || cursorPosition > text.length) return null;
   const beforeCursor = text.slice(0, cursorPosition);
 
-  // Exclude completed/bracketed mention tokens @[...]
-  if (/@[^\]\s]*\]$/.test(beforeCursor)) {
+  // Exclude completed/bracketed mention tokens @[...] or @[...](...)
+  if (/@[^\]\n]*\](?:\([^)\n]*\))?$/.test(beforeCursor)) {
     return null;
   }
 
@@ -77,13 +78,16 @@ export function activeAtToken(text: string, cursorPosition: number): ActiveAtTok
     return { prefix, query, quoted: true, startCol, endCol: cursorPosition };
   }
 
-  // 2. Plain mention: @... (excludes bracketed @[path])
-  const plainMatch = /(?:^|\s)(@([^\s\[][^\s]*|))$/u.exec(beforeCursor);
+  // 2. Plain mention: @...
+  // Support multi-word queries (up to 40 characters without brackets, newlines, or double spaces)
+  const plainMatch = /(?:^|\s)(@([^\n\[\]@"]{0,40}))$/u.exec(beforeCursor);
   if (plainMatch && plainMatch[1] !== undefined && plainMatch[2] !== undefined) {
     const prefix = plainMatch[1];
     const query = plainMatch[2];
-    const startCol = cursorPosition - prefix.length;
-    return { prefix, query, quoted: false, startCol, endCol: cursorPosition };
+    if (!/\s{2,}$/.test(query)) {
+      const startCol = cursorPosition - prefix.length;
+      return { prefix, query, quoted: false, startCol, endCol: cursorPosition };
+    }
   }
 
   return null;
@@ -113,11 +117,15 @@ export function formatFileMention(
 }
 
 /**
- * Format a session reference as prompt text.
+ * Format a session reference as prompt text with its trajectory log path.
  */
-export function formatSessionMention(title: string): string {
-  const clean = title.replace(/[\r\n"]/g, " ").trim();
-  return `@"${clean}"`;
+export function formatSessionMention(title: string, conversationId?: string): string {
+  const clean = title.replace(/[\r\n[\]]/g, " ").trim();
+  if (conversationId) {
+    const trajectoryPath = `brain/${conversationId}/.system_generated/logs/transcript.jsonl`;
+    return `@[${clean}](${trajectoryPath})`;
+  }
+  return `@[${clean}]`;
 }
 
 /**
@@ -178,8 +186,8 @@ export function matchesProject(convoProject?: string, currentProject?: string): 
   if (!convoProject || convoProject === "Outside Project") {
     return false;
   }
-  const normConvo = convoProject.replace(/\\/g, "/").toLowerCase().trim();
-  const normCurrent = currentProject.replace(/\\/g, "/").toLowerCase().trim();
+  const normConvo = convoProject.replace(/\\/g, "/").toLowerCase().trim().replace(/\/+$/, "");
+  const normCurrent = currentProject.replace(/\\/g, "/").toLowerCase().trim().replace(/\/+$/, "");
   if (normConvo === normCurrent) return true;
   const convoBase = normConvo.split("/").filter(Boolean).pop();
   const currentBase = normCurrent.split("/").filter(Boolean).pop();
@@ -353,14 +361,17 @@ export function searchMentionCandidates({
             : undefined;
         const subtitle = projectDisplay ? `${projectDisplay} · ${timeAgo}` : timeAgo;
 
+        const trajectoryPath = `brain/${convo.id}/.system_generated/logs/transcript.jsonl`;
         sessionCandidates.push({
           id: `session:${convo.id}`,
           kind: "session",
           title: cleanTitle,
-          subtitle,
-          insertion: formatSessionMention(cleanTitle),
+          subtitle: subtitle ? `${subtitle} · Trajectory` : "Trajectory",
+          insertion: formatSessionMention(cleanTitle, convo.id),
           score,
           updatedAt: convo.updatedAt || convo.createdAt,
+          fullPath: trajectoryPath,
+          conversationId: convo.id,
         });
       }
     }
@@ -374,4 +385,101 @@ export function searchMentionCandidates({
   // Combine: Files & Folders first, followed by Sessions, capped at maxResults
   const combined = [...filesAndFolders.slice(0, 16), ...sessionCandidates.slice(0, 8)];
   return combined.slice(0, maxResults);
+}
+
+/**
+ * Scans prompt text for session mentions in the formats:
+ * 1. @[Title](brain/<id>/...transcript.jsonl)
+ * 2. @[Title](.../<id>/...transcript.jsonl)
+ * 3. @[Title] (legacy)
+ * 
+ * Extracts relevant history from referenced conversations and appends
+ * an informative context envelope so the backend agent immediately has the full
+ * discussion without having to guess or fail tools.
+ */
+export function resolveMentionedSessionsInPrompt(
+  prompt: string,
+  conversations: Array<{ id: string; title: string; messages?: any[] }>
+): string {
+  if (!prompt || !conversations || conversations.length === 0) return prompt;
+
+  const referencedIds = new Set<string>();
+
+  // 1. Regex for @[Title](path)
+  const linkRegex = /@\[([^\]]+)\]\(([^)]+)\)/g;
+  let match: RegExpExecArray | null;
+  while ((match = linkRegex.exec(prompt)) !== null) {
+    const rawPath = match[2];
+    if (!rawPath) continue;
+    const brainMatch = rawPath.match(/brain[/\\]([^/\\]+)/i);
+    if (brainMatch && brainMatch[1]) {
+      referencedIds.add(brainMatch[1]);
+    } else {
+      const foundConvo = conversations.find(
+        (c) => c.id === rawPath || rawPath.includes(c.id)
+      );
+      if (foundConvo) {
+        referencedIds.add(foundConvo.id);
+      }
+    }
+  }
+
+  // 2. Regex for legacy @[Title] without link
+  const bracketRegex = /@\[([^\]]+)\](?!\()/g;
+  while ((match = bracketRegex.exec(prompt)) !== null) {
+    const rawTitle = match[1];
+    if (!rawTitle) continue;
+    const title = rawTitle.trim().toLowerCase();
+    const foundConvo = conversations.find(
+      (c) => c.title.trim().toLowerCase() === title
+    );
+    if (foundConvo) {
+      referencedIds.add(foundConvo.id);
+    }
+  }
+
+  if (referencedIds.size === 0) {
+    return prompt;
+  }
+
+  // Build context envelopes for all referenced sessions
+  const envelopes: string[] = [];
+
+  for (const id of referencedIds) {
+    const convo = conversations.find((c) => c.id === id);
+    if (!convo) continue;
+
+    const msgs = convo.messages || [];
+    // Take recent meaningful turns (up to last 10 non-empty messages)
+    const recent = msgs
+      .filter((m) => m && (m.role === "user" || m.role === "assistant"))
+      .slice(-10);
+
+    const historyLines = recent.map((m) => {
+      const roleName = m.role === "user" ? "User" : "Assistant";
+      let text = (m.content || "").trim();
+      if (!text && m.thinking) {
+        text = `[Thinking: ${m.thinking.slice(0, 150)}...]`;
+      }
+      if (!text && m.toolCalls && m.toolCalls.length > 0) {
+        const calls = m.toolCalls.map((tc: any) => tc.name).join(", ");
+        text = `[Executed tools: ${calls}]`;
+      }
+      if (text.length > 400) {
+        text = text.slice(0, 400) + "... (truncated)";
+      }
+      return `- **${roleName}**: ${text || "(no content)"}`;
+    });
+
+    const trajectoryPath = `~/.const/harness/brain/${convo.id}/.system_generated/logs/transcript.jsonl`;
+    envelopes.push(
+      `\n\n---\n[Referenced Context from Chat Session: "${convo.title}"]\nLog path: ${trajectoryPath}\n` +
+      (historyLines.length > 0
+        ? `Session History:\n${historyLines.join("\n")}\n`
+        : `(Session history is empty)\n`) +
+      `[End of Referenced Context]\n---`
+    );
+  }
+
+  return prompt + envelopes.join("\n");
 }

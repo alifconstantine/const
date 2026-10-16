@@ -12,6 +12,7 @@ import { SubagentTab } from "./subagent-tab";
 import { SideChatTab } from "./side-chat-tab";
 import type { RightPaneTab, RightPaneTabType, BrowserSelectedElement } from "./types";
 import type { FileMutationRecord, SubAgentItem } from "../../vite-env";
+import type { ConversationItem } from "../../lib/conversation-store";
 
 interface RightPaneProps {
   width: number;
@@ -32,6 +33,8 @@ interface RightPaneProps {
   onRollbackAll?: (records: FileMutationRecord[]) => Promise<any> | void;
   onOpenFileDiff?: (record: FileMutationRecord) => void;
   onOpenFilePreview?: (filePath: string) => void;
+  onOpenTrajectory?: (conversationIdOrPath: string) => void;
+  conversations?: ConversationItem[];
   onStopTask?: (taskId: string) => void;
   onUpdateTab?: (tabId: string, updates: Partial<RightPaneTab>) => void;
   onSelectElementForChat?: (element: BrowserSelectedElement) => void;
@@ -64,6 +67,8 @@ export function RightPane({
   onRollbackAll,
   onOpenFileDiff,
   onOpenFilePreview,
+  onOpenTrajectory,
+  conversations,
   onStopTask,
   onUpdateTab,
   onSelectElementForChat,
@@ -155,6 +160,8 @@ export function RightPane({
             onRollbackAll={onRollbackAll}
             onInsertToMainPrompt={onInsertToMainPrompt}
             onUpdateTab={onUpdateTab}
+            onOpenTrajectory={onOpenTrajectory}
+            conversations={conversations}
           />
         );
       case "browser":

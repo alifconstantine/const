@@ -1427,21 +1427,30 @@ app.whenReady().then(() => {
     }
   });
 
-  ipcMain.handle("workspace:read-file", async (_event, filePath: string) => {
+  ipcMain.handle("workspace:read-file", async (_event, filePath: string, workspacePath?: string) => {
     if (!filePath) return { error: "Path is required" };
     try {
-      if (!fs.existsSync(filePath)) {
+      let resolvedPath = filePath;
+      if (resolvedPath.startsWith("~/") || resolvedPath.startsWith("~\\")) {
+        resolvedPath = path.join(os.homedir(), resolvedPath.slice(2));
+      } else if (resolvedPath.startsWith("brain/") || resolvedPath.startsWith("brain\\")) {
+        resolvedPath = path.join(harnessHomeDir, resolvedPath);
+      } else if (!path.isAbsolute(resolvedPath) && workspacePath && fs.existsSync(workspacePath)) {
+        resolvedPath = path.resolve(workspacePath, resolvedPath);
+      }
+
+      if (!fs.existsSync(resolvedPath)) {
         return { error: "File not found" };
       }
-      const stat = fs.statSync(filePath);
+      const stat = fs.statSync(resolvedPath);
       if (stat.isDirectory()) {
-        return { error: "Path is a directory" };
+        return { isDirectory: true, error: "Path is a directory" };
       }
       if (stat.size > 3 * 1024 * 1024) {
-        const content = fs.readFileSync(filePath, "utf-8");
+        const content = fs.readFileSync(resolvedPath, "utf-8");
         return { content: content.slice(0, 500000), truncated: true };
       }
-      const content = fs.readFileSync(filePath, "utf-8");
+      const content = fs.readFileSync(resolvedPath, "utf-8");
       return { content, truncated: false };
     } catch (err: any) {
       return { error: err?.message || String(err) };

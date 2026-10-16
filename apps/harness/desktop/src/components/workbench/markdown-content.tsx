@@ -3,17 +3,20 @@ import { marked, type Token, type Tokens } from "marked";
 import { Check, Copy, Download, Maximize2, X } from "lucide-react";
 import { cn } from "@const/ui";
 import { FileIcon } from "./file-icon";
+import { renderMentionBadgeHtml } from "./rich-mention-editor";
 
 interface MarkdownContentProps {
   content: string;
   className?: string;
   onOpenFilePreview?: (filePath: string) => void;
+  onOpenTrajectory?: (conversationIdOrPath: string) => void;
 }
 
 export function MarkdownContent({
   content,
   className = "",
   onOpenFilePreview,
+  onOpenTrajectory,
 }: MarkdownContentProps) {
   if (!content) return null;
 
@@ -23,12 +26,77 @@ export function MarkdownContent({
     breaks: true,
   });
 
-  // Normalize @[path] mentions into clickable file links
-  let processed = content.replace(/@\[([^\]]+)\]/g, (_, rawPath) => {
+  // 1. Normalize @[Title](path) mentions into native badge pills matching AI input
+  let processed = content.replace(/@\[([^\]]+)\](?:\(([^)]+)\))/g, (_, label, path) => {
+    const trimmedLabel = label.trim();
+    const trimmedPath = path.trim().replace(/\\/g, "/");
+    let kind = "file";
+    let href = `file:///${trimmedPath}`;
+
+    if (
+      trimmedPath.includes("transcript.jsonl") ||
+      trimmedPath.startsWith("brain/") ||
+      trimmedPath.startsWith("conversation://") ||
+      trimmedPath.startsWith("trajectory://")
+    ) {
+      const convoId =
+        trimmedPath.match(/brain\/([^\/\\]+)/)?.[1] ||
+        trimmedPath.replace(/^(?:conversation|trajectory):\/\/\/?/, "");
+      kind = "session";
+      href = `trajectory://${convoId || trimmedPath}`;
+    } else if (trimmedPath.endsWith("/")) {
+      kind = "directory";
+      href = `folder:///${trimmedPath}`;
+    }
+
+    return renderMentionBadgeHtml({ href, title: trimmedLabel, kind });
+  });
+
+  // 2. Normalize legacy/simple @[path] mentions
+  processed = processed.replace(/@\[([^\]]+)\]/g, (_, rawPath) => {
     const trimmed = rawPath.trim();
     const normalized = trimmed.replace(/\\/g, "/");
-    const fileName = normalized.split("/").filter(Boolean).pop() || trimmed;
-    return `[${fileName}](file;file:///${normalized})`;
+    let kind = "file";
+    let href = `file:///${normalized}`;
+    let title = normalized.split("/").filter(Boolean).pop() || trimmed;
+
+    if (normalized.includes("transcript.jsonl") || normalized.startsWith("brain/")) {
+      const convoId = normalized.match(/brain\/([^\/\\]+)/)?.[1];
+      kind = "session";
+      href = `trajectory://${convoId || normalized}`;
+    } else if (normalized.endsWith("/")) {
+      kind = "directory";
+      href = `folder:///${normalized}`;
+    }
+
+    return renderMentionBadgeHtml({ href, title, kind });
+  });
+
+  // 3. Normalize any previously formatted links: [💬 Title](trajectory://...), [📁 Title](folder://...), [Title](file://...)
+  processed = processed.replace(/\[(?:💬|📁|📄)?\s*([^\]]+)\]\((trajectory:\/\/[^)]+|folder:\/\/\/[^)]+|file:\/\/\/[^)]+)\)/g, (_, label, href) => {
+    const cleanLabel = label.trim().replace(/^[\s💬📁📄]+/, "");
+    let kind = "file";
+    if (href.startsWith("trajectory://")) {
+      kind = "session";
+    } else if (href.startsWith("folder://") || cleanLabel.endsWith("/")) {
+      kind = "directory";
+    }
+    return renderMentionBadgeHtml({ href, title: cleanLabel, kind });
+  });
+
+  // 4. Normalize standalone file/folder mentions like @"path/to/dir/" or @src/index.ts
+  processed = processed.replace(/(^|[\s(])@(?:"([^"]+)"|([a-zA-Z0-9_\-./\\]+\.[a-zA-Z0-9]+|[a-zA-Z0-9_\-./\\]+\/))(?=$|[\s),.?!])/g, (match, prefix, quotedPath, unquotedPath) => {
+    const raw = quotedPath || unquotedPath;
+    if (!raw) return match;
+    const normalized = raw.trim().replace(/\\/g, "/");
+    let kind = "file";
+    let href = `file:///${normalized}`;
+    let title = normalized.split("/").filter(Boolean).pop() || normalized;
+    if (normalized.endsWith("/")) {
+      kind = "directory";
+      href = `folder:///${normalized}`;
+    }
+    return `${prefix}${renderMentionBadgeHtml({ href, title, kind })}`;
   });
 
   // Normalize file;file:/// or file; links into valid file:/// links for marked
@@ -47,6 +115,31 @@ export function MarkdownContent({
     if (!target) return;
 
     const href = target.getAttribute("href") || "";
+
+    // Trajectory / Conversation links
+    if (href.startsWith("trajectory://") || href.startsWith("conversation://")) {
+      e.preventDefault();
+      const targetIdOrPath = href.replace(/^(?:trajectory|conversation):\/\/\/?/i, "");
+      onOpenTrajectory?.(targetIdOrPath);
+      return;
+    }
+
+    // Folder links
+    if (href.startsWith("folder://") || href.endsWith("/")) {
+      e.preventDefault();
+      let cleanDir = href.replace(/^folder:\/\/\/?/i, "").replace(/^file:\/\/\/?/i, "");
+      if (/^\/[a-zA-Z]:/i.test(cleanDir)) {
+        cleanDir = cleanDir.slice(1);
+      }
+      if (window.electron?.openPath) {
+        window.electron.openPath(cleanDir);
+      } else {
+        onOpenFilePreview?.(cleanDir);
+      }
+      return;
+    }
+
+    // File links
     if (
       href.startsWith("file://") ||
       href.startsWith("file;file://") ||
@@ -541,7 +634,7 @@ function InlineRenderer({ text }: { text: string }) {
     return (
       <span
         dangerouslySetInnerHTML={{ __html: html }}
-        className="[&_code]:bg-[#eaeaea] dark:[&_code]:bg-[#242424] [&_code]:text-[#161616] dark:[&_code]:text-[#e0e0e0] [&_code]:font-mono [&_code]:text-[12.5px] [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:border [&_code]:border-[#e2e2e4] dark:[&_code]:border-[#383838] [&_strong]:font-medium [&_b]:font-medium [&_strong]:text-[#161616] dark:[&_strong]:text-[#ececec] [&_em]:italic [&_em]:text-[#262626] dark:[&_em]:text-[#d4d4d4] [&_a]:text-[#2563eb] dark:[&_a]:text-[#60a5fa] [&_a]:hover:underline [&_a]:font-medium cursor-pointer"
+        className="[&_code]:bg-[#eaeaea] dark:[&_code]:bg-[#242424] [&_code]:text-[#161616] dark:[&_code]:text-[#e0e0e0] [&_code]:font-mono [&_code]:text-[12.5px] [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:rounded [&_code]:border [&_code]:border-[#e2e2e4] dark:[&_code]:border-[#383838] [&_strong]:font-medium [&_b]:font-medium [&_strong]:text-[#161616] dark:[&_strong]:text-[#ececec] [&_em]:italic [&_em]:text-[#262626] dark:[&_em]:text-[#d4d4d4] [&_a:not(.inline-mention-badge)]:text-[#2563eb] dark:[&_a:not(.inline-mention-badge)]:text-[#60a5fa] [&_a:not(.inline-mention-badge)]:hover:underline [&_a:not(.inline-mention-badge)]:font-medium cursor-pointer"
       />
     );
   }

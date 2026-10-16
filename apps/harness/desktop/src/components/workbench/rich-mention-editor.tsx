@@ -29,6 +29,7 @@ export interface RichMentionEditorProps {
   onSerializedChange?: (value: string) => void;
   onMentionTokenChange?: (token: ActiveAtToken | null) => void;
   onOpenFilePreview?: (path: string) => void;
+  onOpenTrajectory?: (conversationIdOrPath: string) => void;
   onSend?: () => void;
   onPasteFiles?: (files: FileList) => void;
   onKeyDown?: (e: React.KeyboardEvent<HTMLDivElement>) => void;
@@ -37,7 +38,7 @@ export interface RichMentionEditorProps {
 /**
  * Returns crisp SVG or HTML for file icons matching VS Code / Antigravity aesthetics.
  */
-function getMentionIconMarkup({
+export function getMentionIconMarkup({
   title,
   kind,
   fileType,
@@ -106,8 +107,50 @@ function getMentionIconMarkup({
 }
 
 /**
+ * Returns HTML string for an inline mention badge matching AI input design.
+ */
+export function renderMentionBadgeHtml({
+  href,
+  title,
+  kind,
+  fileType,
+}: {
+  href: string;
+  title: string;
+  kind?: string;
+  fileType?: string;
+}): string {
+  const isSession =
+    kind === "session" ||
+    href.startsWith("trajectory://") ||
+    href.startsWith("conversation://") ||
+    href.includes("transcript.jsonl") ||
+    href.includes("brain/");
+
+  const isDirectory =
+    !isSession &&
+    (kind === "directory" || href.startsWith("folder://") || title.endsWith("/") || href.endsWith("/"));
+
+  const resolvedKind = isSession ? "session" : isDirectory ? "directory" : (kind || "file");
+  const cleanTitle = title.replace(/^[\s💬📁📄]+/, "").replace(/\/$/, "");
+
+  const iconHtml = getMentionIconMarkup({
+    title: cleanTitle,
+    kind: resolvedKind,
+    fileType,
+  });
+
+  const tooltip = isSession
+    ? `Trajectory: ${cleanTitle} • Click to view`
+    : isDirectory
+    ? `Directory: ${cleanTitle} • Click to open`
+    : `File: ${cleanTitle} • Click to preview`;
+
+  return `<a href="${href}" class="inline-mention-badge inline-flex items-center gap-1.5 py-0.5 px-1.5 rounded select-none cursor-pointer text-[#262626] dark:text-[#ececec] bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/15 align-baseline font-sans text-[13.5px] mx-0.5 transition-colors no-underline !text-[#262626] dark:!text-[#ececec] hover:!no-underline" data-mention-token="true" title="${tooltip}">${iconHtml}<span class="leading-tight text-[13.5px] font-sans font-medium text-[#262626] dark:text-[#ececec]">${cleanTitle}</span></a>`;
+}
+
+/**
  * Creates an inline non-editable mention badge DOM element with icon and filename.
- * Does NOT contain any 'x' close button.
  */
 function createMentionBadgeElement(
   candidate: {
@@ -116,43 +159,64 @@ function createMentionBadgeElement(
     path?: string;
     kind?: string;
     fileType?: string;
+    conversationId?: string;
   },
-  onOpenFilePreview?: (path: string) => void
+  onOpenFilePreview?: (path: string) => void,
+  onOpenTrajectory?: (conversationIdOrPath: string) => void
 ): HTMLSpanElement {
   const badge = document.createElement("span");
   badge.contentEditable = "false";
   badge.setAttribute("data-mention-token", "true");
 
+  const isSession =
+    candidate.kind === "session" ||
+    Boolean(candidate.conversationId) ||
+    (candidate.path && candidate.path.includes("transcript.jsonl"));
+
   const targetPath = candidate.fullPath || candidate.path || candidate.title;
   badge.setAttribute("data-mention-path", targetPath);
-  badge.setAttribute("data-mention-kind", candidate.kind || "file");
+  badge.setAttribute("data-mention-kind", isSession ? "session" : (candidate.kind || "file"));
   badge.setAttribute("data-mention-title", candidate.title);
+  if (candidate.conversationId) {
+    badge.setAttribute("data-mention-id", candidate.conversationId);
+  }
 
   badge.className =
     "inline-flex items-center gap-1.5 py-0.5 px-1.5 rounded select-none cursor-pointer text-[#262626] dark:text-[#ececec] bg-black/5 dark:bg-white/10 hover:bg-black/10 dark:hover:bg-white/15 align-baseline font-sans text-[13.5px] mx-0.5 transition-colors group";
-  badge.title = `Click to preview ${candidate.title}`;
+  badge.title = isSession
+    ? `Trajectory: ${candidate.title} • Click to view`
+    : `Click to preview ${candidate.title}`;
 
   const cleanName = candidate.title.replace(/\/$/, "");
   const iconHtml = getMentionIconMarkup({
     title: cleanName,
-    kind: candidate.kind || "file",
+    kind: isSession ? "session" : (candidate.kind || "file"),
     fileType: candidate.fileType,
   });
 
   badge.innerHTML = `${iconHtml}<span class="leading-tight text-[13.5px] font-sans font-medium">${cleanName}</span>`;
 
-  if (onOpenFilePreview && candidate.kind !== "session") {
-    badge.addEventListener("click", (e) => {
-      e.stopPropagation();
+  badge.addEventListener("click", (e) => {
+    e.stopPropagation();
+    if (isSession) {
+      const convoId =
+        candidate.conversationId ||
+        (candidate.path ? candidate.path.match(/brain\/([^\/\\]+)/)?.[1] : undefined);
+      if (onOpenTrajectory && convoId) {
+        onOpenTrajectory(convoId);
+      } else if (onOpenFilePreview) {
+        onOpenFilePreview(targetPath);
+      }
+    } else if (onOpenFilePreview) {
       onOpenFilePreview(targetPath);
-    });
-  }
+    }
+  });
 
   return badge;
 }
 
 /**
- * Serializes container nodes to prompt string (mentions become @[path]).
+ * Serializes container nodes to prompt string (mentions become @[path] or @[title](path)).
  * When forActiveToken is true, completed mention badges serialize as spaces
  * so they never trigger autocomplete when the caret is adjacent to them.
  */
@@ -180,8 +244,15 @@ function serializeContainer(container: Node, forActiveToken = false): string {
         if (forActiveToken) {
           result += " ";
         } else {
-          const path = el.getAttribute("data-mention-path") || el.getAttribute("data-mention-title") || "";
-          result += `@[${path}]`;
+          const kind = el.getAttribute("data-mention-kind") || "file";
+          const title = el.getAttribute("data-mention-title") || "";
+          const path = el.getAttribute("data-mention-path") || title;
+          if (kind === "session") {
+            const cleanTitle = title || path.split("/").filter(Boolean).pop() || "Chat";
+            result += `@[${cleanTitle}](${path})`;
+          } else {
+            result += `@[${path}]`;
+          }
         }
       } else if (el.tagName === "BR") {
         result += "\n";
@@ -216,6 +287,7 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
       onSerializedChange,
       onMentionTokenChange,
       onOpenFilePreview,
+      onOpenTrajectory,
       onSend,
       onPasteFiles,
       onKeyDown,
@@ -292,7 +364,8 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
           return;
         }
 
-        const mentionRegex = /@\[([^\]]+)\]/g;
+        // Match @[Title](path) or @[path]
+        const mentionRegex = /@\[([^\]]+)\](?:\(([^)]+)\))?/g;
         let lastIndex = 0;
         let match: RegExpExecArray | null;
 
@@ -302,17 +375,41 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
             editor.appendChild(document.createTextNode(before));
           }
 
-          const rawPath = match[1];
-          if (!rawPath) continue;
-          const cleanName = rawPath.replace(/\\/g, "/").split("/").filter(Boolean).pop() || rawPath;
+          const rawTitle = match[1];
+          const rawLink = match[2];
+          if (!rawTitle) continue;
+
+          let kind: "file" | "directory" | "session" = "file";
+          let targetPath = rawLink || rawTitle;
+          let displayTitle = rawTitle;
+          let convoId: string | undefined = undefined;
+
+          if (rawLink && (rawLink.includes("transcript.jsonl") || rawLink.startsWith("brain/"))) {
+            kind = "session";
+            convoId = rawLink.match(/brain\/([^\/\\]+)/)?.[1];
+          } else if (rawTitle.startsWith("chat:") || rawTitle.startsWith("session:")) {
+            kind = "session";
+            const parts = rawTitle.split(":");
+            convoId = parts[1];
+            displayTitle = parts.slice(2).join(":") || convoId || "Chat";
+            targetPath = `brain/${convoId}/.system_generated/logs/transcript.jsonl`;
+          } else if (targetPath.endsWith("/")) {
+            kind = "directory";
+          } else {
+            kind = "file";
+            displayTitle = targetPath.replace(/\\/g, "/").split("/").filter(Boolean).pop() || targetPath;
+          }
+
           const badge = createMentionBadgeElement(
             {
-              title: cleanName,
-              fullPath: rawPath,
-              path: rawPath,
-              kind: rawPath.endsWith("/") ? "directory" : "file",
+              title: displayTitle,
+              fullPath: targetPath,
+              path: targetPath,
+              kind,
+              conversationId: convoId,
             },
-            onOpenFilePreview
+            onOpenFilePreview,
+            onOpenTrajectory
           );
           editor.appendChild(badge);
           lastIndex = mentionRegex.lastIndex;
@@ -328,7 +425,7 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
         lastEmittedValueRef.current = text;
         onSerializedChange?.(text);
       },
-      [onOpenFilePreview, onSerializedChange]
+      [onOpenFilePreview, onOpenTrajectory, onSerializedChange]
     );
 
     useEffect(() => {
@@ -521,7 +618,7 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
 
             // Look back from offset to find the '@' or '@"' trigger
             const beforeText = fullText.slice(0, offset);
-            const tokenMatch = /(?:^|\s)(@"[^"]*|@[^\s]*)$/.exec(beforeText);
+            const tokenMatch = /(?:^|\s)(@"[^"]*|@[^\n\[\]@"]{0,40})$/.exec(beforeText);
 
             if (tokenMatch && tokenMatch[1]) {
               const matchedPrefix = tokenMatch[1];
@@ -533,7 +630,7 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
           }
 
           // Create and insert badge
-          const badge = createMentionBadgeElement(candidate, onOpenFilePreview);
+          const badge = createMentionBadgeElement(candidate, onOpenFilePreview, onOpenTrajectory);
           range.insertNode(badge);
 
           // Insert trailing space so cursor is positioned right after
