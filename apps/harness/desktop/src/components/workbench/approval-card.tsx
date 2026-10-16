@@ -104,6 +104,18 @@ export function ApprovalCard({
     ? request.cwd.replace(/\\/g, "/").split("/").slice(-2).join("/")
     : "";
 
+  // Title derivation inspired by Image 2:
+  // e.g. "Allow running whoami?" or "Allow modifying App.tsx?"
+  const actionTitle = isMutation
+    ? targetFileName && targetFileName !== "file"
+      ? `Allow modifying ${targetFileName}?`
+      : "Allow modifying file?"
+    : firstLineCmd.length > 0 && firstLineCmd.length <= 32 && !firstLineCmd.includes("&&")
+    ? `Allow running ${firstLineCmd}?`
+    : cmdFirstWord
+    ? `Allow running ${cmdFirstWord}?`
+    : "Allow running command?";
+
   // 5. Four refined options matching Image 1 (without the redundant 'always allow in project')
   const options: OptionDef[] = [
     {
@@ -212,7 +224,7 @@ export function ApprovalCard({
   return (
     <div
       className={cn(
-        "w-full max-w-full rounded-2xl bg-[#18181b] dark:bg-[#18181b] border border-[#2e2e32] dark:border-[#2e2e32] p-4 sm:p-5 text-xs font-sans select-none shadow-2xl transition-colors",
+        "w-full max-w-full rounded-2xl bg-[#222222] border border-[#383838] p-3.5 sm:p-4 text-xs font-sans select-none shadow-none transition-colors",
         className
       )}
     >
@@ -222,69 +234,67 @@ export function ApprovalCard({
           tasks={runningTasks}
           onSelectTask={onSelectTask || (() => {})}
           onStopTask={onStopTask || (() => {})}
-          className="-mx-4 -mt-4 sm:-mx-5 sm:-mt-5 mb-3 rounded-t-2xl border-b border-[#2e2e32] bg-[#141416]"
+          className="-mx-3.5 -mt-3.5 sm:-mx-4 sm:-mt-4 mb-2.5 rounded-t-2xl border-b border-[#383838] bg-[#161616]"
         />
       )}
 
-      {/* 1. Header: Permission required (Image 1 reference) */}
-      <div className="text-[11.5px] font-medium text-[#888888] dark:text-[#888888] tracking-wide mb-1.5 select-none">
-        Permission required
+      {/* 1. Main Action Heading (inspired by Image 2 reference) */}
+      <div className="flex items-center gap-2 mb-2 select-none">
+        {isMutation ? (
+          <PenLine className="w-4 h-4 text-[#969696] shrink-0" />
+        ) : (
+          <FileIcon
+            filename={cmdFirstWord || "terminal"}
+            className="w-4 h-4 shrink-0"
+            fallbackIcon={<Terminal className="w-4 h-4 text-[#969696] shrink-0" />}
+          />
+        )}
+        <span className="text-[13.5px] font-semibold text-[#ffffff] leading-snug truncate">
+          {actionTitle}
+        </span>
       </div>
 
-      {/* 2. Target item row: [Icon] Awaiting approval [FileIcon] filename dir +diff */}
-      <div className="flex items-center gap-2 min-w-0 text-xs py-1 select-none mb-3">
-        {isMutation ? (
-          <PenLine className="w-3.5 h-3.5 text-[#888888] dark:text-[#888888] shrink-0" />
-        ) : (
-          <Terminal className="w-3.5 h-3.5 text-[#888888] dark:text-[#888888] shrink-0" />
-        )}
-        <span className="font-medium text-[#888888] dark:text-[#888888] shrink-0">
-          Awaiting approval
-        </span>
-
-        {isMutation ? (
-          <div className="flex items-center gap-1.5 min-w-0 truncate">
+      {/* 2. Dedicated Preview Box (Image 2 design for command / symmetric file info for mutation) */}
+      {isMutation ? (
+        <div className="w-full bg-[#161616] border border-[#2e2e2e] rounded-xl px-3 py-2 mb-2.5 flex items-center justify-between gap-2.5 min-w-0">
+          <div className="flex items-center gap-2 min-w-0 truncate">
             <FileIcon filename={targetFileName} className="w-3.5 h-3.5 shrink-0" />
-            <span className="font-mono font-semibold text-white truncate text-xs">
+            <span className="font-mono text-xs font-semibold text-[#ffffff] truncate">
               {targetFileName}
             </span>
             {dirPath && (
-              <span className="font-mono text-[#777777] truncate text-[11.5px]">
+              <span className="font-mono text-[11px] text-[#969696] truncate hidden sm:inline">
                 {dirPath}
               </span>
             )}
-            {diffStats && (diffStats.added > 0 || diffStats.removed > 0) && (
-              <span className="flex items-center gap-1 font-mono text-[11.5px] shrink-0 ml-1">
-                {diffStats.added > 0 && (
-                  <span className="text-[#409D62]">+{diffStats.added}</span>
-                )}
-                {diffStats.removed > 0 && (
-                  <span className="text-[#ff5c5c]">-{diffStats.removed}</span>
-                )}
-              </span>
-            )}
           </div>
-        ) : (
-          <div className="flex items-center gap-1.5 min-w-0 truncate">
-            <FileIcon
-              filename={cmdFirstWord || "terminal"}
-              className="w-3.5 h-3.5 shrink-0"
-              fallbackIcon={<Terminal className="w-3.5 h-3.5 text-[#888888] shrink-0" />}
-            />
-            <span className="font-mono font-semibold text-white truncate text-xs">
-              {truncatedCmd}
-            </span>
-            {cwdRel && (
-              <span className="font-mono text-[#777777] truncate text-[11.5px]">
-                {cwdRel}
-              </span>
-            )}
-          </div>
-        )}
-      </div>
+          {diffStats && (diffStats.added > 0 || diffStats.removed > 0) && (
+            <div className="flex items-center gap-1.5 font-mono text-xs shrink-0 select-none">
+              {diffStats.added > 0 && (
+                <span className="text-[#409D62] font-medium">+{diffStats.added}</span>
+              )}
+              {diffStats.removed > 0 && (
+                <span className="text-[#ff5c5c] font-medium">-{diffStats.removed}</span>
+              )}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="w-full bg-[#161616] border border-[#2e2e2e] rounded-xl px-3 py-2 mb-2.5 flex flex-col gap-0.5 min-w-0">
+          <pre className="font-mono text-xs text-[#e5c07b] whitespace-pre-wrap break-all select-text leading-relaxed">
+            {rawCommand || "command"}
+          </pre>
+          {cwdRel && (
+            <div className="flex items-center gap-1.5 pt-1 mt-0.5 text-[11px] text-[#969696] font-mono border-t border-[#262626]">
+              <span className="text-[#5d5d5d]">cwd:</span>
+              <span className="truncate">{cwdRel}</span>
+            </div>
+          )}
+        </div>
+      )}
 
-      {/* 3. Options list: 1..4 in clean pill rows */}
-      <div className="space-y-1.5 py-1">
+      {/* 3. Options list: 1..4 in compact pill rows */}
+      <div className="space-y-1 py-0.5">
         {options.map((opt, idx) => {
           const isSelected = selectedIdx === idx;
           const isTellModel = opt.id === "tell_model";
@@ -299,14 +309,19 @@ export function ApprovalCard({
                 }
               }}
               className={cn(
-                "w-full flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all cursor-pointer min-w-0 select-none",
+                "w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg transition-all cursor-pointer min-w-0 select-none",
                 isSelected
-                  ? "bg-[#2c2d30] text-white shadow-xs"
-                  : "bg-transparent hover:bg-white/[0.04] text-[#a0a0a0]"
+                  ? "bg-[#383838] text-[#ffffff]"
+                  : "bg-transparent hover:bg-[#2b2b2b]/60 text-[#d4d4d4]"
               )}
             >
               {/* Option number */}
-              <span className="font-semibold text-xs text-[#7f7f7f] shrink-0 w-3.5 text-right font-mono">
+              <span
+                className={cn(
+                  "font-semibold text-xs shrink-0 w-3.5 text-right font-mono",
+                  isSelected ? "text-[#ffffff]" : "text-[#777777]"
+                )}
+              >
                 {idx + 1}.
               </span>
 
@@ -320,25 +335,35 @@ export function ApprovalCard({
                       value={feedbackText}
                       onChange={(e) => setFeedbackText(e.target.value)}
                       placeholder="Tell the model what to do instead..."
-                      className="w-full bg-transparent text-xs text-white placeholder:text-[#888888] outline-none border-none p-0 focus:ring-0 font-normal leading-normal select-text"
+                      className="w-full bg-transparent text-xs text-[#ffffff] placeholder:text-[#5d5d5d] outline-none border-none p-0 focus:ring-0 font-normal leading-normal select-text"
                     />
                   ) : (
-                    <span className="text-xs text-[#888888] font-normal truncate">
+                    <span
+                      className={cn(
+                        "text-xs font-normal truncate",
+                        feedbackText ? "text-[#ffffff]" : "text-[#969696]"
+                      )}
+                    >
                       {feedbackText || "Tell the model what to do instead..."}
                     </span>
                   )}
                 </div>
               ) : (
-                <div className="flex items-center gap-2.5 min-w-0 truncate text-xs">
+                <div className="flex items-center gap-2 min-w-0 truncate text-xs">
                   <span
                     className={cn(
                       "font-bold shrink-0",
-                      isSelected ? "text-white" : "text-[#d4d4d4]"
+                      isSelected ? "text-[#ffffff]" : "text-[#d4d4d4]"
                     )}
                   >
                     {opt.title}
                   </span>
-                  <span className="text-[#888888] font-normal truncate text-[11.5px]">
+                  <span
+                    className={cn(
+                      "font-normal truncate text-[11.5px]",
+                      isSelected ? "text-[#d4d4d4]" : "text-[#969696]"
+                    )}
+                  >
                     {opt.desc}
                   </span>
                 </div>
@@ -349,9 +374,9 @@ export function ApprovalCard({
       </div>
 
       {/* 4. Footer Row: Info shortcut label on left + Confirm button on right */}
-      <div className="flex items-center justify-between pt-3 mt-1.5 select-none min-w-0">
-        <div className="flex items-center gap-1.5 text-[#777777] text-[11px] min-w-0 truncate pr-2">
-          <Info className="w-3.5 h-3.5 text-[#777777] shrink-0" />
+      <div className="flex items-center justify-between pt-2 mt-1 select-none min-w-0">
+        <div className="flex items-center gap-1.5 text-[#969696] text-[11px] min-w-0 truncate pr-2">
+          <Info className="w-3.5 h-3.5 text-[#969696] shrink-0" />
           <span className="truncate">
             Use Tab / arrow keys to choose, then press Enter to confirm
           </span>
@@ -361,7 +386,7 @@ export function ApprovalCard({
           type="button"
           onClick={handleConfirm}
           disabled={isResponding}
-          className="px-4 py-1.5 rounded-lg text-xs font-semibold bg-white text-black hover:bg-[#e6e6e6] active:scale-[0.98] disabled:opacity-30 disabled:pointer-events-none transition-all shadow-xs cursor-pointer shrink-0"
+          className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-[#ffffff] text-[#161616] hover:bg-[#eaeaea] active:scale-[0.98] disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer shrink-0"
           title="Confirm (Enter)"
         >
           Confirm
