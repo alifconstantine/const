@@ -370,8 +370,12 @@ function createWindow() {
 
   const appIcon = fs.existsSync(iconCandidate)
     ? iconCandidate
+    : fs.existsSync(path.join(__dirname, "../build/icon.png"))
+    ? path.join(__dirname, "../build/icon.png")
     : fs.existsSync(path.join(__dirname, "build/icon.png"))
     ? path.join(__dirname, "build/icon.png")
+    : fs.existsSync(path.join(__dirname, "../public/icon.png"))
+    ? path.join(__dirname, "../public/icon.png")
     : undefined;
 
   win = new BrowserWindow({
@@ -435,6 +439,10 @@ app.on("web-contents-created", (_event, contents) => {
 });
 
 app.whenReady().then(() => {
+  if (process.platform === "win32") {
+    app.setAppUserModelId("id.web.const.harness.desktop");
+  }
+
   // Window control handlers
   ipcMain.on("window:minimize", () => {
     win?.minimize();

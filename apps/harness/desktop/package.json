@@ -6,7 +6,13 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "check-types": "tsc --noEmit"
+    "check-types": "tsc --noEmit",
+    "package:win": "tsc && vite build && electron-builder --win --x64 --arm64",
+    "package:win:x64": "tsc && vite build && electron-builder --win --x64",
+    "package:win:arm64": "tsc && vite build && electron-builder --win --arm64",
+    "package:linux": "tsc && vite build && electron-builder --linux AppImage pacman",
+    "package:linux:appimage": "tsc && vite build && electron-builder --linux AppImage",
+    "package:linux:pacman": "tsc && vite build && electron-builder --linux pacman"
   },
   "dependencies": {
     "@const/agent": "workspace:*",
@@ -32,6 +38,7 @@
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.20",
     "electron": "^44.1.1",
+    "electron-builder": "^26.15.3",
     "postcss": "^8.5.3",
     "tailwindcss": "^3.4.17",
     "tailwindcss-animate": "^1.0.7",
