@@ -43,7 +43,7 @@ export function ConstLogoIcon({
           />
         </clipPath>
       </defs>
-      <g transform="translate(23 -35.5)">
+      <g transform="translate(256 256) scale(0.80) translate(-256 -256) translate(23 -35.5)">
         <g
           transform="translate(512 0) scale(-1 1) rotate(32 256 256)"
           clipPath="url(#const-logo-clip-clean)"

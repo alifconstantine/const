@@ -23,7 +23,7 @@ const SQUIRCLE_SVG = `
     </clipPath>
   </defs>
   <rect x="0" y="0" width="512" height="512" rx="104" ry="104" fill="#141413"/>
-  <g transform="translate(23, -35.5)">
+  <g transform="translate(256 256) scale(0.80) translate(-256 -256) translate(23, -35.5)">
     <g transform="translate(512 0) scale(-1 1) rotate(32 256 256)" clip-path="url(#const-squircle-clip)" fill="#FAF9F5">
       <rect x="-60" y="38" width="632" height="60"/>
       <rect x="-60" y="113" width="632" height="60"/>
@@ -45,7 +45,7 @@ const FOREGROUND_SVG = `
     </clipPath>
   </defs>
   <g transform="translate(24, 21.5) scale(0.127)">
-    <g transform="translate(23, -35.5)">
+    <g transform="translate(256 256) scale(0.80) translate(-256 -256) translate(23, -35.5)">
       <g transform="translate(512 0) scale(-1 1) rotate(32 256 256)" clip-path="url(#const-fg-clip)" fill="#FAF9F5">
         <rect x="-60" y="38" width="632" height="60"/>
         <rect x="-60" y="113" width="632" height="60"/>

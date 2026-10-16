@@ -7,12 +7,14 @@
 
   <circle cx="256" cy="256" r="256" fill="#141413"/>
 
-  <g transform="translate(512 0) scale(-1 1) rotate(32 256 256)" clip-path="url(#const-favicon-clip-pub)" fill="#FAF9F5">
-    <rect x="-60" y="38" width="632" height="60"/>
-    <rect x="-60" y="113" width="632" height="60"/>
-    <rect x="-60" y="188" width="632" height="60"/>
-    <rect x="-60" y="264" width="632" height="60"/>
-    <rect x="-60" y="339" width="632" height="60"/>
-    <rect x="-60" y="414" width="632" height="60"/>
+  <g transform="translate(256 256) scale(0.80) translate(-256 -256) translate(23, -35.5)">
+    <g transform="translate(512 0) scale(-1 1) rotate(32 256 256)" clip-path="url(#const-favicon-clip-pub)" fill="#FAF9F5">
+      <rect x="-60" y="38" width="632" height="60"/>
+      <rect x="-60" y="113" width="632" height="60"/>
+      <rect x="-60" y="188" width="632" height="60"/>
+      <rect x="-60" y="264" width="632" height="60"/>
+      <rect x="-60" y="339" width="632" height="60"/>
+      <rect x="-60" y="414" width="632" height="60"/>
+    </g>
   </g>
 </svg>
