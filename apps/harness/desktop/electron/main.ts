@@ -364,8 +364,19 @@ app.on("open-url", (event, url) => {
 
 function createWindow() {
   const isDark = nativeTheme.shouldUseDarkColors;
+  const iconCandidate = process.platform === "win32"
+    ? path.join(__dirname, "../build/icon.ico")
+    : path.join(__dirname, "../build/icon.png");
+
+  const appIcon = fs.existsSync(iconCandidate)
+    ? iconCandidate
+    : fs.existsSync(path.join(__dirname, "build/icon.png"))
+    ? path.join(__dirname, "build/icon.png")
+    : undefined;
+
   win = new BrowserWindow({
     title: "Const Harness",
+    icon: appIcon,
     width: 1280,
     height: 800,
     minWidth: 480,

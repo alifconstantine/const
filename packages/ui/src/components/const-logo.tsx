@@ -43,17 +43,19 @@ export function ConstLogoIcon({
           />
         </clipPath>
       </defs>
-      <g
-        transform="translate(512 0) scale(-1 1) rotate(32 256 256)"
-        clipPath="url(#const-logo-clip-clean)"
-        fill={color === "currentColor" ? "currentColor" : color}
-      >
-        <rect x="-60" y="38" width="632" height="60" />
-        <rect x="-60" y="113" width="632" height="60" />
-        <rect x="-60" y="188" width="632" height="60" />
-        <rect x="-60" y="264" width="632" height="60" />
-        <rect x="-60" y="339" width="632" height="60" />
-        <rect x="-60" y="414" width="632" height="60" />
+      <g transform="translate(23 -35.5)">
+        <g
+          transform="translate(512 0) scale(-1 1) rotate(32 256 256)"
+          clipPath="url(#const-logo-clip-clean)"
+          fill={color === "currentColor" ? "currentColor" : color}
+        >
+          <rect x="-60" y="38" width="632" height="60" />
+          <rect x="-60" y="113" width="632" height="60" />
+          <rect x="-60" y="188" width="632" height="60" />
+          <rect x="-60" y="264" width="632" height="60" />
+          <rect x="-60" y="339" width="632" height="60" />
+          <rect x="-60" y="414" width="632" height="60" />
+        </g>
       </g>
     </svg>
   );

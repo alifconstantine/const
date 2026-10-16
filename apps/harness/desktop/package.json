@@ -39,5 +39,27 @@
     "vite": "^6.2.0",
     "vite-plugin-electron": "^1.1.2",
     "vite-plugin-electron-renderer": "^1.0.0"
+  },
+  "build": {
+    "appId": "id.web.const.harness.desktop",
+    "productName": "Const Harness",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "build/**/*"
+    ],
+    "win": {
+      "icon": "build/icon.ico",
+      "artifactName": "${productName} Setup ${version}-${arch}.${ext}"
+    },
+    "linux": {
+      "icon": "build/icon.png",
+      "artifactName": "${productName}-${version}-${arch}.${ext}",
+      "category": "Development"
+    }
   }
 }
