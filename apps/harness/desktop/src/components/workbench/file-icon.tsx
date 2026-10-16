@@ -1,289 +1,365 @@
 import React from "react";
+import {
+  FileText,
+  FileCode,
+  Terminal,
+  FileSpreadsheet,
+  FileArchive,
+  Image as ImageIcon,
+  Music,
+  Video,
+} from "lucide-react";
+import {
+  Python,
+  Java,
+  Html5,
+  Markdown,
+  Typescript,
+  Javascript,
+  React as ReactIcon,
+  Css3,
+  Sass,
+  Cplusplus,
+  C,
+  Csharp,
+  Go,
+  Rust,
+  Php,
+  Ruby,
+  Kotlin,
+  Swift,
+  Dart,
+  Flutter,
+  Sqlite,
+  GnuBash,
+  Powershell,
+  Git,
+  Json,
+  Yaml,
+  Docker,
+  Vite,
+  Pnpm,
+  Vue,
+  Svelte,
+  Astro,
+  Graphql,
+  Prisma,
+  Lua,
+  Zig,
+  R,
+  Scala,
+  Elixir,
+  Haskell,
+  Solidity,
+} from "@thesvg/react";
 
 /**
- * VS Code Seti Icon Theme (matching user's exact VS Code setup from screenshot):
- * - JSON (*.json, package.json): {} in yellow/gold
- * - React (*.tsx, *.jsx): Cyan atom
- * - TypeScript (*.ts, tailwind.config.ts): TS in cyan/blue text (no box)
- * - JavaScript (*.js, *.mjs, postcss.config.mjs): JS in yellow text (no box)
- * - HTML (*.html): <> in orange/red
- * - CSS (*.css): # in cyan/blue
- * - SCSS/Sass (*.scss, *.sass): # or S in pink
- * - Markdown (*.md): Blue downward arrow ↓ (or ⓘ for README.md)
- * - Vite config (*vite.config.*): Yellow lightning bolt ⚡
- * - YAML (*.yaml, *.yml, pnpm-lock.yaml): Exclamation mark ! in purple
- * - Git (*.gitignore, .git): Git diamond in slate/orange
- * - Shell / Batch (*.bat, *.cmd, *.sh): Prompt >_ in green/amber
- * - Python (*.py): Dual snake glyph
+ * File & Programming Language Brand Icons powered by @thesvg/react
  */
 export function FileIcon({
   filename,
   className = "w-3.5 h-3.5",
+  fallbackIcon,
 }: {
   filename: string;
   className?: string;
+  fallbackIcon?: React.ReactNode;
 }) {
   const lower = filename.toLowerCase().trim();
   const basename = lower.replace(/\\/g, "/").split("/").filter(Boolean).pop() || lower;
-  const ext = basename.includes(".") ? basename.split(".").pop() || "" : "";
+  const ext = basename.includes(".") ? basename.split(".").pop() || "" : basename;
 
-  // 1. Vite Config -> Yellow Lightning Bolt ⚡
-  if (basename.startsWith("vite.config")) {
-    return (
-      <span
-        className={`${className} inline-flex items-center justify-center text-xs font-bold leading-none select-none text-[#ffd700] shrink-0`}
-        title={filename}
-      >
-        ⚡
-      </span>
-    );
-  }
+  const renderIcon = () => {
+    // 1. Vite Config -> Official Vite logo
+    if (basename.startsWith("vite.config") || ext === "vite") {
+      return <Vite className="w-full h-full shrink-0" />;
+    }
 
-  // 2. README.md -> Blue Info Circle ⓘ
-  if (basename === "readme.md" || basename === "readme") {
-    return (
-      <span
-        className={`${className} inline-flex items-center justify-center text-[11px] font-bold leading-none select-none text-[#519aba] shrink-0`}
-        title={filename}
-      >
-        ⓘ
-      </span>
-    );
-  }
+    // 2. pnpm files (pnpm-lock.yaml, pnpm-workspace.yaml) -> Official pnpm logo
+    if (basename.includes("pnpm-lock") || basename.includes("pnpm-workspace") || ext === "pnpm") {
+      return <Pnpm className="w-full h-full shrink-0" />;
+    }
 
-  // 3. JSON files (*.json, package.json, tsconfig.base.json, turbo.json, etc.) -> {} in yellow/gold
-  if (ext === "json" || basename.endsWith(".json")) {
-    return (
-      <span
-        className={`${className} inline-flex items-center justify-center font-mono font-bold text-[11px] leading-none select-none text-[#cbcb41] shrink-0`}
-        title={filename}
-      >
-        {"{}"}
-      </span>
-    );
-  }
+    // 3. Docker files (Dockerfile, docker-compose.yml, *.dockerfile) -> Official Docker logo
+    if (basename === "dockerfile" || basename.startsWith("docker-compose") || ext === "dockerfile" || ext === "docker") {
+      return <Docker className="w-full h-full shrink-0" />;
+    }
 
-  // 4. YAML files (*.yaml, *.yml, pnpm-lock.yaml, pnpm-workspace.yaml) -> ! in purple/magenta
-  if (ext === "yaml" || ext === "yml" || basename.includes("pnpm-lock") || basename.includes("pnpm-workspace")) {
-    return (
-      <span
-        className={`${className} inline-flex items-center justify-center font-mono font-bold text-[12px] leading-none select-none text-[#c678dd] shrink-0`}
-        title={filename}
-      >
-        !
-      </span>
-    );
-  }
+    // 4. Git (*.gitignore, .gitattributes, .gitmodules, .git) -> Official Git diamond
+    if (basename.startsWith(".git") || ext === "git") {
+      return <Git className="w-full h-full shrink-0" />;
+    }
 
-  // 5. React TSX / JSX -> Cyan Atom
-  if (ext === "tsx" || ext === "jsx") {
-    return (
-      <svg
-        viewBox="-11.5 -10.23174 23 20.46348"
-        className={`${className} text-[#00d8ff] shrink-0 inline-block`}
-        fill="currentColor"
-      >
-        <circle cx="0" cy="0" r="2.05" fill="#00d8ff" />
-        <g stroke="#00d8ff" strokeWidth="1.2" fill="none">
-          <ellipse rx="11" ry="4.2" />
-          <ellipse rx="11" ry="4.2" transform="rotate(60)" />
-          <ellipse rx="11" ry="4.2" transform="rotate(120)" />
-        </g>
-      </svg>
-    );
-  }
+    // 5. JSON (*.json, *.jsonc, *.json5, tsconfig.json) -> Official JSON logo
+    if (ext === "json" || ext === "jsonc" || ext === "json5" || basename.endsWith(".json")) {
+      return <Json className="w-full h-full shrink-0" />;
+    }
 
-  // 6. TypeScript (*.ts, tailwind.config.ts, vite-env.d.ts) -> TS in blue/cyan text
-  if (ext === "ts" || ext === "mts" || ext === "cts") {
-    return (
-      <span
-        className={`${className} inline-flex items-center justify-center font-mono font-bold text-[9.5px] tracking-tighter leading-none select-none text-[#519aba] shrink-0`}
-        title={filename}
-      >
-        TS
-      </span>
-    );
-  }
+    // 6. YAML (*.yaml, *.yml) -> Official YAML logo
+    if (ext === "yaml" || ext === "yml") {
+      return <Yaml className="w-full h-full shrink-0" />;
+    }
 
-  // 7. JavaScript (*.js, *.mjs, postcss.config.mjs) -> JS in yellow text
-  if (ext === "js" || ext === "mjs" || ext === "cjs") {
-    return (
-      <span
-        className={`${className} inline-flex items-center justify-center font-mono font-bold text-[9.5px] tracking-tighter leading-none select-none text-[#cbcb41] shrink-0`}
-        title={filename}
-      >
-        JS
-      </span>
-    );
-  }
+    // 7. React TSX / JSX -> React Atom with cyan branding
+    if (ext === "tsx" || ext === "jsx" || ext === "react") {
+      return <ReactIcon className="w-full h-full text-[#00d8ff] shrink-0" />;
+    }
 
-  // 8. HTML (*.html, *.htm) -> </> in orange
-  if (ext === "html" || ext === "htm") {
-    return (
-      <span
-        className={`${className} inline-flex items-center justify-center font-mono font-bold text-[10.5px] leading-none select-none text-[#e34c26] shrink-0`}
-        title={filename}
-      >
-        {"</>"}
-      </span>
-    );
-  }
+    // 8. TypeScript (*.ts, *.mts, *.cts) -> Official TypeScript badge
+    if (ext === "ts" || ext === "mts" || ext === "cts" || ext === "typescript") {
+      return <Typescript className="w-full h-full shrink-0" />;
+    }
 
-  // 9. CSS (*.css) -> # in cyan/blue
-  if (ext === "css") {
-    return (
-      <span
-        className={`${className} inline-flex items-center justify-center font-mono font-bold text-[11px] leading-none select-none text-[#519aba] shrink-0`}
-        title={filename}
-      >
-        #
-      </span>
-    );
-  }
+    // 9. JavaScript (*.js, *.mjs, *.cjs) -> Official JavaScript badge
+    if (ext === "js" || ext === "mjs" || ext === "cjs" || ext === "javascript") {
+      return <Javascript className="w-full h-full shrink-0" />;
+    }
 
-  // 10. SCSS / Sass (*.scss, *.sass) -> # in pink
-  if (ext === "scss" || ext === "sass") {
-    return (
-      <span
-        className={`${className} inline-flex items-center justify-center font-mono font-bold text-[11px] leading-none select-none text-[#f06292] shrink-0`}
-        title={filename}
-      >
-        #
-      </span>
-    );
-  }
+    // 10. HTML (*.html, *.htm) -> Official HTML5 shield
+    if (ext === "html" || ext === "htm") {
+      return <Html5 className="w-full h-full shrink-0" />;
+    }
 
-  // 11. Markdown (*.md, arsitektur.md, DESIGN.md) -> Blue downward arrow ↓
-  if (ext === "md" || ext === "markdown" || ext === "mdx") {
-    return (
-      <span
-        className={`${className} inline-flex items-center justify-center font-bold text-[11px] leading-none select-none text-[#519aba] shrink-0`}
-        title={filename}
-      >
-        ↓
-      </span>
-    );
-  }
+    // 11. CSS (*.css) -> Official CSS3 shield
+    if (ext === "css") {
+      return <Css3 className="w-full h-full shrink-0" />;
+    }
 
-  // 12. Git (*.gitignore, .gitattributes) -> Git diamond
-  if (basename.startsWith(".git")) {
-    return (
-      <span
-        className={`${className} inline-flex items-center justify-center font-bold text-[11px] leading-none select-none text-[#f34f29] shrink-0`}
-        title={filename}
-      >
-        ◈
-      </span>
-    );
-  }
+    // 12. SCSS / Sass (*.scss, *.sass) -> Official Sass logo
+    if (ext === "scss" || ext === "sass") {
+      return <Sass className="w-full h-full shrink-0" />;
+    }
 
-  // 13. Windows Batch / Cmd (*.bat, *.cmd) -> >_ prompt
-  if (ext === "bat" || ext === "cmd") {
-    return (
-      <span
-        className={`${className} inline-flex items-center justify-center font-mono font-bold text-[9px] leading-none select-none text-[#409D62] shrink-0`}
-        title={filename}
-      >
-        &gt;_
-      </span>
-    );
-  }
-
-  // 14. Shell / PowerShell (*.sh, *.bash, *.ps1) -> >_ prompt
-  if (ext === "sh" || ext === "bash" || ext === "zsh" || ext === "ps1") {
-    return (
-      <span
-        className={`${className} inline-flex items-center justify-center font-mono font-bold text-[9px] leading-none select-none text-[#409D62] shrink-0`}
-        title={filename}
-      >
-        &gt;_
-      </span>
-    );
-  }
-
-  // 15. Python (*.py, *.pyw) -> Python glyph
-  if (ext === "py" || ext === "pyw") {
-    return (
-      <svg viewBox="0 0 16 16" className={`${className} shrink-0 inline-block`}>
-        <path
-          d="M7.9 1C5.2 1 5.3 2.2 5.3 2.2V3.4H8V3.8H4.3C2.8 3.8 1.6 4.9 1.6 6.8C1.6 8.7 2.6 8.8 3.3 8.8H4.2V7.6C4.2 6.2 5.4 5 6.8 5H9.4C10.5 5 11.4 4.1 11.4 3V1.8C11.4 1.8 10.6 1 7.9 1ZM6.2 2.1C6.6 2.1 6.9 2.4 6.9 2.8C6.9 3.2 6.6 3.5 6.2 3.5C5.8 3.5 5.5 3.2 5.5 2.8C5.5 2.4 5.8 2.1 6.2 2.1Z"
-          fill="#3776ab"
+    // 13. Markdown (*.md, *.markdown, *.mdx) -> Official Markdown badge in BLUE (User Request)
+    if (ext === "md" || ext === "markdown" || ext === "mdx" || basename === "readme") {
+      return (
+        <Markdown
+          variant="mono"
+          className="w-full h-full text-blue-500 dark:text-blue-400 shrink-0 fill-current"
         />
-        <path
-          d="M8.1 15C10.8 15 10.7 13.8 10.7 13.8V12.6H8V12.2H11.7C13.2 12.2 14.4 11.1 14.4 9.2C14.4 7.3 13.4 7.2 12.7 7.2H11.8V8.4C11.8 9.8 10.6 11 9.2 11H6.6C5.5 11 4.6 11.9 4.6 13V14.2C4.6 14.2 5.4 15 8.1 15ZM9.8 13.9C9.4 13.9 9.1 13.6 9.1 13.2C9.1 12.8 9.4 12.5 9.8 12.5C10.2 12.5 10.5 12.8 10.5 13.2C10.5 13.6 10.2 13.9 9.8 13.9Z"
-          fill="#ffd438"
+      );
+    }
+
+    // 14. Python (*.py, *.pyw) -> Official Python blue & yellow logo
+    if (ext === "py" || ext === "pyw" || ext === "python") {
+      return <Python className="w-full h-full shrink-0" />;
+    }
+
+    // 15. Java (*.java, *.jar, *.class) -> Official Java coffee cup
+    if (ext === "java" || ext === "jar" || ext === "class") {
+      return <Java className="w-full h-full shrink-0" />;
+    }
+
+    // 16. C++ (*.cpp, *.cxx, *.cc, *.hpp, *.h) -> Official C++ logo
+    if (ext === "cpp" || ext === "cxx" || ext === "cc" || ext === "c++" || ext === "hpp") {
+      return <Cplusplus className="w-full h-full shrink-0" />;
+    }
+
+    // 17. C (*.c) -> Official C logo
+    if (ext === "c") {
+      return <C className="w-full h-full shrink-0" />;
+    }
+
+    // 18. C# (*.cs) -> Official C# logo
+    if (ext === "cs" || ext === "csharp" || ext === "c#") {
+      return <Csharp className="w-full h-full shrink-0" />;
+    }
+
+    // 19. Go (*.go) -> Official Go cyan logo
+    if (ext === "go" || ext === "golang") {
+      return <Go className="w-full h-full shrink-0" />;
+    }
+
+    // 20. Rust (*.rs) -> Official Rust gear
+    if (ext === "rs" || ext === "rust") {
+      return (
+        <Rust
+          variant="mono"
+          className="w-full h-full text-orange-600 dark:text-orange-400 shrink-0 fill-current"
         />
-      </svg>
-    );
-  }
+      );
+    }
 
-  // 16. Environment (*.env, *.env.*) -> Key / dot
-  if (basename.startsWith(".env")) {
-    return (
-      <span
-        className={`${className} inline-flex items-center justify-center font-mono font-bold text-[10px] leading-none select-none text-[#e5c07b] shrink-0`}
-        title={filename}
-      >
-        ⚙
-      </span>
-    );
-  }
+    // 21. PHP (*.php) -> Official PHP logo
+    if (ext === "php") {
+      return <Php className="w-full h-full shrink-0" />;
+    }
 
-  // 17. SQL (*.sql)
-  if (ext === "sql") {
-    return (
-      <span
-        className={`${className} inline-flex items-center justify-center font-mono font-bold text-[9px] leading-none select-none text-[#519aba] shrink-0`}
-        title={filename}
-      >
-        SQL
-      </span>
-    );
-  }
+    // 22. Ruby (*.rb) -> Official Ruby red gem
+    if (ext === "rb" || ext === "ruby") {
+      return <Ruby className="w-full h-full shrink-0" />;
+    }
 
-  // 18. Rust (*.rs)
-  if (ext === "rs") {
-    return (
-      <span
-        className={`${className} inline-flex items-center justify-center font-mono font-bold text-[9.5px] leading-none select-none text-[#dea584] shrink-0`}
-        title={filename}
-      >
-        RS
-      </span>
-    );
-  }
+    // 23. Kotlin (*.kt, *.kts) -> Official Kotlin gradient logo
+    if (ext === "kt" || ext === "kts" || ext === "kotlin") {
+      return <Kotlin className="w-full h-full shrink-0" />;
+    }
 
-  // 19. Go (*.go)
-  if (ext === "go") {
-    return (
-      <span
-        className={`${className} inline-flex items-center justify-center font-mono font-bold text-[9.5px] leading-none select-none text-[#00add8] shrink-0`}
-        title={filename}
-      >
-        GO
-      </span>
-    );
-  }
+    // 24. Swift (*.swift) -> Official Swift orange bird
+    if (ext === "swift") {
+      return <Swift className="w-full h-full shrink-0" />;
+    }
 
-  // 20. Images (*.png, *.jpg, *.jpeg, *.svg, *.webp, *.ico)
-  if (ext === "svg" || ext === "png" || ext === "jpg" || ext === "jpeg" || ext === "gif" || ext === "webp" || ext === "ico") {
-    return (
-      <span
-        className={`${className} inline-flex items-center justify-center text-[11px] leading-none select-none text-[#409D62] shrink-0`}
-        title={filename}
-      >
-        🖼
-      </span>
-    );
-  }
+    // 25. Dart / Flutter (*.dart) -> Official Dart logo
+    if (ext === "dart") {
+      return <Dart className="w-full h-full shrink-0" />;
+    }
+    if (ext === "flutter") {
+      return <Flutter className="w-full h-full shrink-0" />;
+    }
 
-  // Default File (Clean minimalist bullet / dot / sheet)
+    // 26. Vue (*.vue) -> Official Vue logo
+    if (ext === "vue") {
+      return <Vue className="w-full h-full shrink-0" />;
+    }
+
+    // 27. Svelte (*.svelte) -> Official Svelte logo
+    if (ext === "svelte") {
+      return <Svelte className="w-full h-full shrink-0" />;
+    }
+
+    // 28. Astro (*.astro) -> Official Astro logo
+    if (ext === "astro") {
+      return <Astro className="w-full h-full shrink-0" />;
+    }
+
+    // 29. GraphQL (*.graphql, *.gql) -> Official GraphQL logo
+    if (ext === "graphql" || ext === "gql") {
+      return <Graphql className="w-full h-full shrink-0" />;
+    }
+
+    // 30. Prisma (*.prisma) -> Official Prisma logo
+    if (ext === "prisma") {
+      return <Prisma className="w-full h-full shrink-0" />;
+    }
+
+    // 31. Lua (*.lua) -> Official Lua logo
+    if (ext === "lua") {
+      return <Lua className="w-full h-full shrink-0" />;
+    }
+
+    // 32. Zig (*.zig) -> Official Zig logo
+    if (ext === "zig") {
+      return <Zig className="w-full h-full shrink-0" />;
+    }
+
+    // 33. R (*.r, *.rmd) -> Official R logo
+    if (ext === "r" || ext === "rmd") {
+      return <R className="w-full h-full shrink-0" />;
+    }
+
+    // 34. Scala (*.scala) -> Official Scala logo
+    if (ext === "scala") {
+      return <Scala className="w-full h-full shrink-0" />;
+    }
+
+    // 35. Elixir (*.ex, *.exs) -> Official Elixir logo
+    if (ext === "ex" || ext === "exs" || ext === "elixir") {
+      return <Elixir className="w-full h-full shrink-0" />;
+    }
+
+    // 36. Haskell (*.hs) -> Official Haskell logo
+    if (ext === "hs" || ext === "haskell") {
+      return <Haskell className="w-full h-full shrink-0" />;
+    }
+
+    // 37. Solidity (*.sol) -> Official Solidity logo
+    if (ext === "sol" || ext === "solidity") {
+      return <Solidity className="w-full h-full shrink-0" />;
+    }
+
+    // 38. SQL (*.sql, *.sqlite, *.pgsql) -> SQLite / Database logo
+    if (ext === "sql" || ext === "sqlite" || ext === "sqlite3" || ext === "pgsql" || ext === "mysql") {
+      return <Sqlite className="w-full h-full shrink-0" />;
+    }
+
+    // 39. Shell / Bash (*.sh, *.bash, *.zsh) -> GNU Bash terminal green
+    if (ext === "sh" || ext === "bash" || ext === "zsh") {
+      return <GnuBash className="w-full h-full shrink-0" />;
+    }
+
+    // 40. PowerShell / Windows Batch (*.ps1, *.psm1, *.bat, *.cmd) -> Official PowerShell logo
+    if (ext === "ps1" || ext === "psm1" || ext === "powershell" || ext === "bat" || ext === "cmd") {
+      return <Powershell className="w-full h-full shrink-0" />;
+    }
+
+    // 41. Generic Console / Terminal tags
+    if (ext === "terminal" || ext === "console" || ext === "shell" || ext === "prompt") {
+      return <Terminal className="w-full h-full text-amber-500" />;
+    }
+
+    // 42. Environment (*.env, *.env.*) -> Key / gear
+    if (basename.startsWith(".env")) {
+      return (
+        <span className="font-mono font-bold text-[10px] leading-none text-[#e5c07b]">
+          ⚙
+        </span>
+      );
+    }
+
+    // 43. Spreadsheets (*.csv, *.tsv, *.xlsx, *.xls)
+    if (["csv", "tsv", "xlsx", "xls"].includes(ext)) {
+      return <FileSpreadsheet className="w-full h-full text-emerald-500" />;
+    }
+
+    // 44. Archives (*.zip, *.tar, *.gz, *.rar, *.7z)
+    if (["zip", "tar", "gz", "rar", "7z"].includes(ext)) {
+      return <FileArchive className="w-full h-full text-amber-500" />;
+    }
+
+    // 45. Images (*.png, *.jpg, *.jpeg, *.svg, *.webp, *.ico, *.gif)
+    if (["svg", "png", "jpg", "jpeg", "gif", "webp", "ico"].includes(ext)) {
+      return <ImageIcon className="w-full h-full text-[#409D62]" />;
+    }
+
+    // 46. Audio (*.mp3, *.wav, *.m4a, *.ogg, *.flac)
+    if (["mp3", "wav", "m4a", "ogg", "flac"].includes(ext)) {
+      return <Music className="w-full h-full text-purple-400" />;
+    }
+
+    // 47. Video (*.mp4, *.mkv, *.avi, *.mov, *.webm)
+    if (["mp4", "mkv", "avi", "mov", "webm"].includes(ext)) {
+      return <Video className="w-full h-full text-rose-400" />;
+    }
+
+    // 48. Explicit user-provided fallback
+    if (fallbackIcon) {
+      return <>{fallbackIcon}</>;
+    }
+
+    // 49. Generic Code fallback (if it's a code block language or code-like extension)
+    if (
+      ["code", "text", "txt", "plain", "plaintext"].includes(ext) ||
+      !basename.includes(".")
+    ) {
+      return <FileCode className="w-full h-full text-muted-foreground" />;
+    }
+
+    // 50. Default generic FileText fallback
+    return <FileText className="w-full h-full text-muted-foreground" />;
+  };
+
   return (
     <span
-      className={`${className} inline-flex items-center justify-center text-[10px] leading-none select-none text-[#777777] shrink-0`}
+      className={`${className} inline-flex items-center justify-center shrink-0 select-none`}
       title={filename}
     >
-      •
+      {renderIcon()}
     </span>
   );
+}
+
+/**
+ * Helper component to render language logo from a programming language name
+ */
+export function LanguageIcon({
+  language,
+  className = "w-3.5 h-3.5",
+  fallbackIcon,
+}: {
+  language: string;
+  className?: string;
+  fallbackIcon?: React.ReactNode;
+}) {
+  return <FileIcon filename={language} className={className} fallbackIcon={fallbackIcon} />;
 }

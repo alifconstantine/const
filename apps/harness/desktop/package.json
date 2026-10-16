@@ -13,6 +13,7 @@
     "@const/backend": "workspace:*",
     "@const/ui": "workspace:*",
     "@iconify/react": "^6.0.2",
+    "@thesvg/react": "^3.3.13",
     "@types/marked": "^6.0.0",
     "@xterm/addon-fit": "^0.11.0",
     "@xterm/xterm": "^6.0.0",

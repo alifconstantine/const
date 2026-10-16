@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { marked, type Token, type Tokens } from "marked";
 import { Check, Copy, Download, Maximize2, X } from "lucide-react";
 import { cn } from "@const/ui";
+import { FileIcon } from "./file-icon";
 
 interface MarkdownContentProps {
   content: string;
@@ -499,9 +500,12 @@ function CodeBlock({ code, language }: { code: string; language: string }) {
     <div className="rounded-xl overflow-hidden bg-[#f4f4f6] dark:bg-[#181818] border border-[#e2e2e4] dark:border-[#2e2e2e] my-3 select-none">
       {/* Code Header Strip */}
       <div className="flex items-center justify-between px-3.5 py-1.5 bg-[#eaeaea] dark:bg-[#202020] border-b border-[#e2e2e4] dark:border-[#2e2e2e] text-xs">
-        <span className="font-mono text-[11px] text-[#888888] dark:text-[#888888] lowercase">
-          {language}
-        </span>
+        <div className="flex items-center gap-1.5">
+          <FileIcon filename={language} className="w-3.5 h-3.5" />
+          <span className="font-mono text-[11px] text-[#888888] dark:text-[#888888] lowercase">
+            {language}
+          </span>
+        </div>
         <button
           type="button"
           onClick={handleCopy}

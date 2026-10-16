@@ -275,6 +275,20 @@ export function ExecutionTrace({
                 );
               }
 
+              // 1.5 Python Runner (run_python, python, code_interpreter)
+              if (
+                norm === "runpython" ||
+                norm === "python" ||
+                norm === "codeinterpreter"
+              ) {
+                return (
+                  <PythonRunnerTraceItem
+                    key={step.id || `py_${idx}`}
+                    tool={step}
+                  />
+                );
+              }
+
               // 2. File Mutation (write, edit, replace, apply_patch)
               if (
                 norm.includes("write") ||
@@ -526,6 +540,104 @@ function ThoughtItem({
 }
 
 // ---------------------------------------------------------------------------
+// Terminal Command Icon: displays language/tool brand icon powered by @thesvg/react
+// ---------------------------------------------------------------------------
+function TerminalCommandIcon({ cmd }: { cmd: string }) {
+  const trimmed = cmd.trim();
+  const firstWord = (trimmed.split(/\s+/)[0] || "")
+    .toLowerCase()
+    .replace(/^(?:\.\/|.*[\\/])/, "")
+    .replace(/\.exe$/, "");
+
+  const knownTools: Record<string, string> = {
+    python: "python",
+    python3: "python",
+    py: "python",
+    pytest: "python",
+    node: "js",
+    nodejs: "js",
+    ts: "ts",
+    tsx: "tsx",
+    "ts-node": "ts",
+    npm: "npm",
+    npx: "npm",
+    pnpm: "pnpm",
+    yarn: "js",
+    bun: "js",
+    cargo: "rust",
+    rustc: "rust",
+    go: "go",
+    golang: "go",
+    dart: "dart",
+    flutter: "flutter",
+    java: "java",
+    javac: "java",
+    mvn: "java",
+    gradle: "java",
+    php: "php",
+    ruby: "ruby",
+    gem: "ruby",
+    bundle: "ruby",
+    git: "git",
+    docker: "docker",
+    vite: "vite",
+    bash: "bash",
+    sh: "sh",
+    zsh: "sh",
+    powershell: "ps1",
+    pwsh: "ps1",
+  };
+
+  const matched = knownTools[firstWord];
+  if (matched) {
+    return (
+      <FileIcon
+        filename={matched}
+        className="w-3.5 h-3.5 shrink-0"
+        fallbackIcon={<TerminalIcon className="w-3.5 h-3.5 text-[#777777] shrink-0" />}
+      />
+    );
+  }
+
+  // Check if command runs a specific script file (e.g. ./main.py, test.rs, script.sh)
+  const args = trimmed.split(/\s+/);
+  for (const part of args) {
+    if (part.includes(".") && !part.startsWith("-")) {
+      const ext = part.split(".").pop()?.toLowerCase();
+      if (
+        ext &&
+        [
+          "py",
+          "ts",
+          "tsx",
+          "js",
+          "jsx",
+          "sh",
+          "bash",
+          "ps1",
+          "rs",
+          "go",
+          "dart",
+          "rb",
+          "php",
+          "java",
+        ].includes(ext)
+      ) {
+        return (
+          <FileIcon
+            filename={part}
+            className="w-3.5 h-3.5 shrink-0"
+            fallbackIcon={<TerminalIcon className="w-3.5 h-3.5 text-[#777777] shrink-0" />}
+          />
+        );
+      }
+    }
+  }
+
+  return <TerminalIcon className="w-3.5 h-3.5 text-[#777777] shrink-0" />;
+}
+
+// ---------------------------------------------------------------------------
 // Terminal Card: Clean single line row, click to expand terminal output
 // ---------------------------------------------------------------------------
 function TerminalCard({
@@ -588,7 +700,7 @@ function TerminalCard({
         onClick={() => setIsOpen((prev) => !prev)}
         className="w-full text-left inline-flex items-center gap-1.5 text-[13px] text-[#888888] hover:text-[#d4d4d4] transition-colors cursor-pointer py-1 px-1.5 rounded hover:bg-white/5 min-w-0 max-w-full justify-start select-none"
       >
-        <TerminalIcon className="w-3.5 h-3.5 text-[#777777] shrink-0" />
+        <TerminalCommandIcon cmd={cmd} />
         <span className="font-mono text-xs text-[#d4d4d4] truncate flex-1 min-w-0 text-left">
           {cmd || "command"}
         </span>
@@ -651,6 +763,166 @@ function TerminalCard({
               <div className="text-[#555555] italic text-xs">(Command completed with no output)</div>
             )}
           </ScrollArea>
+        </div>
+      </SmoothCollapse>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Python Runner Item (run_python, python, code_interpreter) with @thesvg/react Python logo
+// ---------------------------------------------------------------------------
+function PythonRunnerTraceItem({ tool }: { tool: TraceStep | TraceToolCall }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [mediaPreviews, setMediaPreviews] = useState<Record<string, string>>({});
+
+  let code = "";
+  if (tool.args) {
+    if (typeof tool.args === "string") {
+      try {
+        const parsed = JSON.parse(tool.args);
+        code = parsed.code || parsed.script || tool.args;
+      } catch {
+        code = tool.args;
+      }
+    } else {
+      code = tool.args.code || tool.args.script || "";
+    }
+  }
+
+  const stdout = tool.result?.stdout || (typeof tool.result === "string" ? tool.result : "");
+  const stderr = tool.result?.stderr || "";
+  const artifacts: string[] = Array.isArray(tool.result?.artifacts)
+    ? tool.result.artifacts
+    : [];
+
+  const isRunning = (tool as any).status === "running";
+  const isError = Boolean(tool.isError || (tool as any).status === "error");
+
+  useEffect(() => {
+    if (artifacts.length === 0) return;
+    const electron = (window as any).electron;
+    if (!electron?.readMedia) return;
+
+    let isMounted = true;
+    for (const artPath of artifacts) {
+      if (
+        artPath.endsWith(".png") ||
+        artPath.endsWith(".svg") ||
+        artPath.endsWith(".jpg") ||
+        artPath.endsWith(".jpeg")
+      ) {
+        electron.readMedia(artPath).then((dataUri: string | null) => {
+          if (isMounted && dataUri) {
+            setMediaPreviews((prev) => ({ ...prev, [artPath]: dataUri }));
+          }
+        });
+      }
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [artifacts]);
+
+  return (
+    <div className="w-full min-w-0 flex flex-col my-0.5">
+      <div
+        onClick={() => (code || stdout || stderr || artifacts.length > 0) && setIsOpen((prev) => !prev)}
+        className={`flex items-center justify-between py-1 px-1.5 rounded-md hover:bg-white/5 text-[13px] text-[#888888] min-w-0 select-none ${
+          code || stdout || stderr || artifacts.length > 0 ? "cursor-pointer group" : ""
+        }`}
+      >
+        <div className="flex items-center gap-2 min-w-0 pr-2">
+          <FileIcon filename="script.py" />
+          <span className="font-sans text-xs text-[#d4d4d4] truncate">
+            {code ? code.split("\n")[0]?.slice(0, 35) + "..." : "Python calculation"}
+          </span>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {isRunning ? (
+            <span className="w-1.5 h-1.5 rounded-full bg-[#e79737] dark:bg-[#ff7a00] animate-pulse" />
+          ) : isError ? (
+            <span className="w-1.5 h-1.5 rounded-full bg-[#ff5c5c]" />
+          ) : (
+            <span className="w-1.5 h-1.5 rounded-full bg-[#409D62]" />
+          )}
+          {(code || stdout || stderr || artifacts.length > 0) && (
+            <ChevronDown
+              className="w-3 h-3 text-[#666666] transition-transform duration-200 ease-out"
+              style={{ transform: isOpen ? "rotate(0deg)" : "rotate(-90deg)" }}
+            />
+          )}
+        </div>
+      </div>
+
+      <SmoothCollapse isOpen={isOpen}>
+        <div className="mt-1 p-2.5 rounded-xl bg-[#0e0e10] border border-[#232328] font-mono text-[12px] leading-relaxed select-text shadow-xs w-full min-w-0 space-y-2">
+          {/* Visual chart artifacts */}
+          {artifacts.length > 0 && (
+            <div className="space-y-2">
+              {artifacts.map((artPath) => {
+                const fileName = artPath.split(/[\\/]/).pop() || artPath;
+                const dataUri = mediaPreviews[artPath];
+
+                return (
+                  <div
+                    key={artPath}
+                    className="p-2 rounded-lg bg-[#141416] border border-[#232328] space-y-1.5"
+                  >
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-[#e0e0e0] flex items-center gap-1.5">
+                        <Layers className="h-3 w-3 text-[#ff7a00]" />
+                        <strong>{fileName}</strong>
+                      </span>
+                    </div>
+
+                    {dataUri && (
+                      <div className="rounded overflow-hidden border border-[#232328] bg-black p-1">
+                        <img
+                          src={dataUri}
+                          alt={fileName}
+                          className="max-h-60 w-auto mx-auto object-contain rounded"
+                        />
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {code && (
+            <div>
+              <div className="text-[#888888] text-[10px] mb-1">Python script:</div>
+              <ScrollArea className="max-h-40 w-full rounded-lg bg-[#141416] border border-[#232328]">
+                <pre className="p-2 text-[#e79737] dark:text-[#ff7a00] whitespace-pre text-[11px] font-mono">
+                  {code}
+                </pre>
+              </ScrollArea>
+            </div>
+          )}
+
+          {stdout && (
+            <div>
+              <div className="text-[#888888] text-[10px] mb-1">stdout:</div>
+              <ScrollArea className="max-h-40 w-full rounded-lg bg-[#141416] border border-[#232328]">
+                <pre className="p-2 text-[#409D62] whitespace-pre-wrap text-[11px] font-mono">
+                  {stdout}
+                </pre>
+              </ScrollArea>
+            </div>
+          )}
+
+          {stderr && (
+            <div>
+              <div className="text-[#ff5c5c] text-[10px] mb-1">stderr:</div>
+              <ScrollArea className="max-h-40 w-full rounded-lg bg-[#ff5c5c]/10 border border-[#ff5c5c]/30">
+                <pre className="p-2 text-[#ff5c5c] whitespace-pre-wrap text-[11px] font-mono">
+                  {stderr}
+                </pre>
+              </ScrollArea>
+            </div>
+          )}
         </div>
       </SmoothCollapse>
     </div>
