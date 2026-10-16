@@ -25,6 +25,7 @@ import {
   Gauge,
   Database,
   Box,
+  Eye,
 } from "lucide-react";
 import {
   ScrollArea,
@@ -193,7 +194,7 @@ interface ChatCardProps {
   onSendMessage?: (payload: {
     prompt: string;
     project: string;
-    mode: "ask_before_changes" | "full_access";
+    mode: "request_review" | "ask_before_changes" | "full_access";
     model?: string;
     thinkingLevel?: string;
     attachments?: AttachedFile[];
@@ -213,8 +214,8 @@ interface ChatCardProps {
   runningTasks?: BackgroundTaskItem[];
   onSelectTask?: (task: BackgroundTaskItem) => void;
   onStopTask?: (taskId: string) => void;
-  mode?: "ask_before_changes" | "full_access";
-  onModeChange?: (mode: "ask_before_changes" | "full_access") => void;
+  mode?: "request_review" | "ask_before_changes" | "full_access";
+  onModeChange?: (mode: "request_review" | "ask_before_changes" | "full_access") => void;
   conversations?: ConversationItem[];
   sessionMedia?: AttachedFile[];
   onOpenFilePreview?: (filePath: string) => void;
@@ -511,8 +512,8 @@ export function ChatCard({
   });
   const projectMenuRef = useRef<HTMLDivElement>(null);
 
-  // 2. Access Mode State (Only 2 options: ask_before_changes & full_access)
-  const [mode, setMode] = useState<"ask_before_changes" | "full_access">(() => {
+  // 2. Access Mode State (request_review, ask_before_changes, full_access)
+  const [mode, setMode] = useState<"request_review" | "ask_before_changes" | "full_access">(() => {
     if (controlledMode) return controlledMode;
     return getDefaultAgentMode();
   });
@@ -1507,31 +1508,69 @@ export function ChatCard({
                       ? "text-[#e79737] hover:bg-[#e79737]/10"
                       : "text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5"
                   )}
-                  title={mode === "full_access" ? "Full access" : "Ask before changes"}
+                  title={
+                    mode === "full_access"
+                      ? "Full access"
+                      : mode === "request_review"
+                      ? "Request review"
+                      : "Ask before changes"
+                  }
                 >
                   {mode === "full_access" ? (
                     <ShieldAlert className="w-4 h-4 text-[#e79737] stroke-[1.75] shrink-0" />
+                  ) : mode === "request_review" ? (
+                    <Eye className="w-4 h-4 text-[#262626] dark:text-[#d4d4d4] stroke-[1.75] shrink-0" />
                   ) : (
                     <Hand className="w-4 h-4 text-[#a9a9a9] dark:text-[#d4d4d4] stroke-[1.75] shrink-0" />
                   )}
                   {!isNarrow && (
                     <>
                       <span className="truncate min-w-0">
-                        {mode === "full_access" ? "Full access" : "Ask before changes"}
+                        {mode === "full_access"
+                          ? "Full access"
+                          : mode === "request_review"
+                          ? "Request review"
+                          : "Ask before changes"}
                       </span>
                       <ChevronDown
                         className={`w-3 h-3 ml-0.5 shrink-0 ${
-                          mode === "full_access" ? "text-[#e79737]" : "text-[#a9a9a9] dark:text-[#5d5d5d]"
+                          mode === "full_access"
+                            ? "text-[#e79737]"
+                            : "text-[#a9a9a9] dark:text-[#5d5d5d]"
                         }`}
                       />
                     </>
                   )}
                 </button>
 
-                {/* Mode Selector Popover (Only 2 items: Ask before changes & Full access) */}
+                {/* Mode Selector Popover (3 items: Request review, Ask before changes & Full access) */}
                 {isModeOpen && (
                   <div className="absolute bottom-full mb-2 left-0 w-64 sm:w-72 max-w-[calc(100vw-32px)] bg-white dark:bg-[#222222] border border-[#e2e2e4] dark:border-[#383838] rounded-2xl shadow-2xl p-1.5 z-[60] flex flex-col text-left select-none animate-in fade-in zoom-in-95 duration-100">
-                    {/* 1. Ask before changes */}
+                    {/* 1. Request review */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setMode("request_review");
+                        onModeChange?.("request_review");
+                        setIsModeOpen(false);
+                      }}
+                      className="w-full p-2.5 flex items-start gap-2.5 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 text-left transition-colors cursor-pointer group"
+                    >
+                      <Eye className="w-4 h-4 text-[#262626] dark:text-[#d4d4d4] shrink-0 mt-0.5" />
+                      <div className="flex-1">
+                        <div className="text-[13px] font-normal text-[#262626] dark:text-[#d4d4d4] group-hover:text-black dark:group-hover:text-white">
+                          Request review
+                        </div>
+                        <div className="text-[12px] text-[#a9a9a9] dark:text-[#888888] leading-tight mt-0.5">
+                          Request approval before every action (files, commands).
+                        </div>
+                      </div>
+                      {mode === "request_review" && (
+                        <Check className="w-3.5 h-3.5 text-[#262626] dark:text-[#d4d4d4] shrink-0 ml-auto mt-0.5" />
+                      )}
+                    </button>
+
+                    {/* 2. Ask before changes */}
                     <button
                       type="button"
                       onClick={() => {
@@ -1547,7 +1586,7 @@ export function ChatCard({
                           Ask before changes
                         </div>
                         <div className="text-[12px] text-[#a9a9a9] dark:text-[#888888] leading-tight mt-0.5">
-                          Ask before file changes.
+                          Ask before terminal & external changes.
                         </div>
                       </div>
                       {mode === "ask_before_changes" && (
@@ -1555,7 +1594,7 @@ export function ChatCard({
                       )}
                     </button>
 
-                    {/* 2. Full access */}
+                    {/* 3. Full access */}
                     <button
                       type="button"
                       onClick={() => {

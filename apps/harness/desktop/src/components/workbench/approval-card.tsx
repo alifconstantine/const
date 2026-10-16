@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect, useLayoutEffect } from "react";
-import { SquareTerminal, CornerDownLeft, Info } from "lucide-react";
-import { cn, ScrollArea } from "@const/ui";
+import { PenLine, Terminal, Info } from "lucide-react";
+import { cn } from "@const/ui";
 import { AttachedTaskBanner } from "./attached-task-banner";
+import { FileIcon } from "./file-icon";
 import type {
   ApprovalRequestData,
   ApprovalDecision,
@@ -19,57 +20,12 @@ export interface ApprovalCardProps {
   className?: string;
 }
 
-type OptionItem = {
-  id: ApprovalDecision;
-  label: string;
-};
+type ApprovalOptionId = "allow_once" | "full_access" | "deny" | "tell_model";
 
-function deriveApprovalTitle(command?: string, toolName?: string): string {
-  if (!command) {
-    return `Allow executing ${toolName || "command"}?`;
-  }
-  const cmd = command.trim();
-  // 1. git status
-  if (/^git\s+status\b/i.test(cmd)) {
-    return "Allow checking git status?";
-  }
-  // 2. Node -e with fs.writeFileSync or similar
-  const fsWriteMatch = cmd.match(/fs\.(?:writeFileSync|writeFile)\s*\(\s*['"`]([^'"`]+)['"`]/i);
-  if (fsWriteMatch && fsWriteMatch[1]) {
-    const fileName = fsWriteMatch[1].split(/[\/\\]/).pop();
-    if (fileName) return `Allow creating ${fileName}?`;
-  }
-  // 3. Shell redirection to file (> or >>)
-  const redirectMatch = cmd.match(/>+\s*([a-zA-Z0-9_\-\.\/\\]+)/);
-  if (redirectMatch && redirectMatch[1] && !redirectMatch[1].includes("/dev/null")) {
-    const fileName = redirectMatch[1].split(/[\/\\]/).pop();
-    if (fileName) return `Allow creating ${fileName}?`;
-  }
-  // 4. touch file
-  const touchMatch = cmd.match(/^touch\s+([a-zA-Z0-9_\-\.\/\\]+)/i);
-  if (touchMatch && touchMatch[1]) {
-    const fileName = touchMatch[1].split(/[\/\\]/).pop();
-    if (fileName) return `Allow creating ${fileName}?`;
-  }
-  // 5. rm / del / rmdir
-  if (/^(?:rm|del|rmdir|Remove-Item)\b/i.test(cmd)) {
-    return "Allow deleting files/directories?";
-  }
-  // 6. git other commands
-  if (/^git\b/i.test(cmd)) {
-    const sub = cmd.split(/\s+/)[1] || "command";
-    return `Allow git ${sub}?`;
-  }
-  // 7. package manager
-  if (/^(?:npm|pnpm|yarn|bun)\s+(?:install|i|add)\b/i.test(cmd)) {
-    return "Allow installing packages?";
-  }
-  // 8. General command
-  const firstWord = cmd.split(/\s+/)[0];
-  if (firstWord && firstWord.length < 25) {
-    return `Allow running ${firstWord}?`;
-  }
-  return "Allow executing terminal command?";
+interface OptionDef {
+  id: ApprovalOptionId;
+  title: string;
+  desc: string;
 }
 
 export function ApprovalCard({
@@ -82,119 +38,181 @@ export function ApprovalCard({
   onStopTask,
   className = "",
 }: ApprovalCardProps) {
-  const [selectedOption, setSelectedOption] = useState<ApprovalDecision>("allow_once");
+  const [selectedIdx, setSelectedIdx] = useState<number>(0);
   const [feedbackText, setFeedbackText] = useState("");
-  const feedbackInputRef = useRef<HTMLTextAreaElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    if (selectedOption === "deny") {
-      setTimeout(() => {
-        feedbackInputRef.current?.focus();
-      }, 50);
+  // 1. Detect if this approval is for a file mutation or command
+  const isMutation = Boolean(
+    request.isMutation ||
+      request.targetFile ||
+      request.filePath ||
+      (request.toolName &&
+        /write|edit|replace|patch|createfile|modify/i.test(request.toolName))
+  );
+
+  // 2. Extract target filename and directory path for mutations
+  const fullPath =
+    request.filePath ||
+    (typeof request.args === "object" && request.args
+      ? request.args.targetFile ||
+        request.args.TargetFile ||
+        request.args.filePath ||
+        request.args.path ||
+        ""
+      : "");
+
+  const targetFileName =
+    request.targetFile ||
+    (fullPath ? fullPath.replace(/\\/g, "/").split("/").filter(Boolean).pop() : "") ||
+    "file";
+
+  const rawDir =
+    request.dirPath ||
+    (fullPath ? fullPath.replace(/\\/g, "/").split("/").slice(0, -1).join("/") : "");
+  const dirPath = rawDir ? (rawDir.endsWith("/") ? rawDir : `${rawDir}/`) : "";
+
+  // 3. Diff stats (e.g. +385 / -12)
+  let diffStats = request.diffStats;
+  if (!diffStats && isMutation && request.args && typeof request.args === "object") {
+    if (request.args.CodeContent || request.args.content || request.args.code) {
+      const codeStr = request.args.CodeContent || request.args.content || request.args.code || "";
+      const lines = typeof codeStr === "string" ? codeStr.split("\n").length : 1;
+      diffStats = { added: lines, removed: 0 };
+    } else if (request.args.ReplacementContent) {
+      const rep = (request.args.ReplacementContent || "").split("\n").length;
+      const tar = (request.args.TargetContent || "").split("\n").length;
+      diffStats = { added: rep, removed: tar };
     }
-  }, [selectedOption]);
+  }
 
+  // 4. Command info for terminal/python
   const rawCommand =
-    request.command || (request.args?.command ?? JSON.stringify(request.args, null, 2));
-
-  const firstLineCmd = rawCommand.split("\n")[0].trim();
+    request.command ||
+    (typeof request.args === "string"
+      ? request.args
+      : request.args?.command || request.args?.cmd || JSON.stringify(request.args || ""));
+  const firstLineCmd = (
+    (typeof rawCommand === "string" ? rawCommand : "").split("\n")[0] || ""
+  ).trim();
   const truncatedCmd =
-    firstLineCmd.length > 60 ? `${firstLineCmd.slice(0, 57)}...` : firstLineCmd;
+    firstLineCmd.length > 55 ? `${firstLineCmd.slice(0, 52)}...` : firstLineCmd;
+  const cmdFirstWord = (
+    firstLineCmd.split(/\s+/)[0] || ""
+  ).toLowerCase().replace(/\.exe$/, "");
+  const cwdRel = request.cwd
+    ? request.cwd.replace(/\\/g, "/").split("/").slice(-2).join("/")
+    : "";
 
-  const isInsideProject = Boolean(project && project !== "Outside Project");
+  // 5. Four refined options matching Image 1 (without the redundant 'always allow in project')
+  const options: OptionDef[] = [
+    {
+      id: "allow_once",
+      title: "Allow",
+      desc: "Allow only this time",
+    },
+    {
+      id: "full_access",
+      title: "Full access",
+      desc: "Grant the agent full access without further confirmation.",
+    },
+    {
+      id: "deny",
+      title: "Deny",
+      desc: "Reject it for now",
+    },
+    {
+      id: "tell_model",
+      title: "",
+      desc: "Tell the model what to do instead...",
+    },
+  ];
 
-  // Dynamic options matching reference screenshot (Image 2)
-  const options: OptionItem[] = isInsideProject
-    ? [
-        { id: "allow_once", label: "Yes, allow this time" },
-        {
-          id: "allow_conversation",
-          label: `Yes, and always allow '${truncatedCmd}' in this conversation`,
-        },
-        {
-          id: "allow_project",
-          label: `Yes, and always allow '${truncatedCmd}' in this project`,
-        },
-        { id: "allow_always", label: `Yes, and always allow '${truncatedCmd}'` },
-        { id: "deny", label: "No (tell the agent what to do instead)" },
-      ]
-    : [
-        { id: "allow_once", label: "Yes, allow this time" },
-        {
-          id: "allow_conversation",
-          label: `Yes, and always allow '${truncatedCmd}' in this conversation`,
-        },
-        { id: "allow_always", label: `Yes, and always allow '${truncatedCmd}'` },
-        { id: "deny", label: "No (tell the agent what to do instead)" },
-      ];
-
-  const handleSubmit = () => {
+  const handleConfirm = () => {
     if (isResponding) return;
-    if (selectedOption === "deny") {
+    const opt = options[selectedIdx];
+    if (!opt) return;
+
+    if (opt.id === "allow_once") {
+      onDecide("allow_once");
+    } else if (opt.id === "full_access") {
+      onDecide("full_access");
+    } else if (opt.id === "deny") {
+      onDecide("deny");
+    } else if (opt.id === "tell_model") {
       onDecide("deny", feedbackText.trim() || undefined);
-    } else {
-      onDecide(selectedOption);
     }
   };
 
-  const handleSkip = () => {
-    if (isResponding) return;
-    onDecide("skip");
-  };
-
-  // Keyboard shortcuts matching options: 1..5 to select, Enter to submit, Esc to skip
+  // Keyboard navigation: Arrow Up/Down, Tab/Shift-Tab, 1..4 shortcuts, Enter to confirm, Esc to skip
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      const activeEl = document.activeElement;
-      const isInsideFeedback = activeEl === feedbackInputRef.current;
-      const tagName = (activeEl?.tagName || "").toLowerCase();
-      const isOtherInput =
-        !isInsideFeedback &&
-        (tagName === "input" ||
-          tagName === "textarea" ||
-          (activeEl as HTMLElement)?.isContentEditable);
+      const isInputFocused = document.activeElement === inputRef.current;
 
-      if (isOtherInput) {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        if (isResponding) return;
+        onDecide("skip");
         return;
       }
 
-      if (isInsideFeedback) {
-        if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+      if (isInputFocused) {
+        if (e.key === "Enter") {
           e.preventDefault();
-          handleSubmit();
-        } else if (e.key === "Escape") {
+          handleConfirm();
+        } else if (e.key === "ArrowUp") {
           e.preventDefault();
-          handleSkip();
+          setSelectedIdx((prev) => (prev - 1 + options.length) % options.length);
+        } else if (e.key === "ArrowDown") {
+          e.preventDefault();
+          setSelectedIdx((prev) => (prev + 1) % options.length);
         }
         return;
       }
 
-      const num = parseInt(e.key, 10);
-      if (!isNaN(num) && num >= 1 && num <= options.length) {
+      if (e.key === "ArrowDown") {
         e.preventDefault();
-        const target = options[num - 1];
-        if (target) {
-          setSelectedOption(target.id);
+        setSelectedIdx((prev) => (prev + 1) % options.length);
+      } else if (e.key === "ArrowUp") {
+        e.preventDefault();
+        setSelectedIdx((prev) => (prev - 1 + options.length) % options.length);
+      } else if (e.key === "Tab") {
+        e.preventDefault();
+        if (e.shiftKey) {
+          setSelectedIdx((prev) => (prev - 1 + options.length) % options.length);
+        } else {
+          setSelectedIdx((prev) => (prev + 1) % options.length);
         }
       } else if (e.key === "Enter") {
         e.preventDefault();
-        handleSubmit();
-      } else if (e.key === "Escape") {
-        e.preventDefault();
-        handleSkip();
+        handleConfirm();
+      } else {
+        const num = parseInt(e.key, 10);
+        if (!isNaN(num) && num >= 1 && num <= options.length) {
+          e.preventDefault();
+          setSelectedIdx(num - 1);
+          if (num === 4) {
+            setTimeout(() => inputRef.current?.focus(), 20);
+          }
+        }
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [selectedOption, feedbackText, isResponding, options]);
+  }, [selectedIdx, feedbackText, isResponding]);
 
-  const title = deriveApprovalTitle(request.command, request.toolName);
+  // Auto-focus input when option 4 is selected
+  useEffect(() => {
+    if (selectedIdx === 3) {
+      setTimeout(() => inputRef.current?.focus(), 30);
+    }
+  }, [selectedIdx]);
 
   return (
     <div
       className={cn(
-        "w-full max-w-full rounded-xl bg-white dark:bg-[#232323] border border-[#e2e2e4] dark:border-[#383838] p-3.5 sm:p-4 text-xs font-sans select-none shadow-md dark:shadow-none outline-none transition-colors",
+        "w-full max-w-full rounded-2xl bg-[#18181b] dark:bg-[#18181b] border border-[#2e2e32] dark:border-[#2e2e32] p-4 sm:p-5 text-xs font-sans select-none shadow-2xl transition-colors",
         className
       )}
     >
@@ -204,78 +222,125 @@ export function ApprovalCard({
           tasks={runningTasks}
           onSelectTask={onSelectTask || (() => {})}
           onStopTask={onStopTask || (() => {})}
-          className="-mx-3.5 -mt-3.5 sm:-mx-4 sm:-mt-4 mb-2 rounded-t-xl border-b border-[#e2e2e4] dark:border-[#383838] bg-[#f8f8f8] dark:bg-[#1e1e1e]"
+          className="-mx-4 -mt-4 sm:-mx-5 sm:-mt-5 mb-3 rounded-t-2xl border-b border-[#2e2e32] bg-[#141416]"
         />
       )}
 
-      {/* 1. Header Row: [ Terminal ] Title matching QuestionCard */}
-      <div className="flex items-center justify-between pb-1.5 min-w-0">
-        <div className="flex items-center gap-2.5 min-w-0 flex-1 pr-3">
-          <span className="px-2.5 py-0.5 rounded bg-black/5 dark:bg-[#343434] text-[#262626] dark:text-[#d4d4d4] font-medium text-[11px] shrink-0">
-            Terminal
-          </span>
-          <span className="font-semibold text-[13px] text-[#1c1c1e] dark:text-white truncate leading-snug">
-            {title}
-          </span>
-        </div>
+      {/* 1. Header: Permission required (Image 1 reference) */}
+      <div className="text-[11.5px] font-medium text-[#888888] dark:text-[#888888] tracking-wide mb-1.5 select-none">
+        Permission required
       </div>
 
-      {/* 2. Command Preview Box: Compact, rounded, dark bar */}
-      <div className="my-1.5 w-full rounded bg-[#f4f4f6] dark:bg-[#1c1c1e] border border-[#e2e2e4] dark:border-[#303030] px-3 py-2">
-        <ScrollArea className="max-h-32 w-full">
-          <pre className="text-[12px] font-mono text-[#262626] dark:text-[#dcdcdc] leading-relaxed select-text whitespace-pre-wrap break-all font-normal">
-            {rawCommand}
-          </pre>
-        </ScrollArea>
-      </div>
+      {/* 2. Target item row: [Icon] Awaiting approval [FileIcon] filename dir +diff */}
+      <div className="flex items-center gap-2 min-w-0 text-xs py-1 select-none mb-3">
+        {isMutation ? (
+          <PenLine className="w-3.5 h-3.5 text-[#888888] dark:text-[#888888] shrink-0" />
+        ) : (
+          <Terminal className="w-3.5 h-3.5 text-[#888888] dark:text-[#888888] shrink-0" />
+        )}
+        <span className="font-medium text-[#888888] dark:text-[#888888] shrink-0">
+          Awaiting approval
+        </span>
 
-      {/* 3. Numbered Options List matching QuestionCard styling */}
-      <div className="space-y-1 py-1.5">
-        {options.map((opt, idx) => {
-          const isSelected = selectedOption === opt.id;
-          return (
-            <div key={opt.id} className="flex flex-col">
-              <div
-                onClick={() => setSelectedOption(opt.id)}
-                className={cn(
-                  "flex items-center gap-2.5 px-2 py-1.5 rounded transition-colors cursor-pointer min-w-0",
-                  isSelected
-                    ? "bg-black/[0.07] dark:bg-white/[0.08] text-[#111111] dark:text-white"
-                    : "bg-transparent hover:bg-black/[0.03] dark:hover:bg-white/[0.04] text-[#444444] dark:text-[#b0b0b0]"
+        {isMutation ? (
+          <div className="flex items-center gap-1.5 min-w-0 truncate">
+            <FileIcon filename={targetFileName} className="w-3.5 h-3.5 shrink-0" />
+            <span className="font-mono font-semibold text-white truncate text-xs">
+              {targetFileName}
+            </span>
+            {dirPath && (
+              <span className="font-mono text-[#777777] truncate text-[11.5px]">
+                {dirPath}
+              </span>
+            )}
+            {diffStats && (diffStats.added > 0 || diffStats.removed > 0) && (
+              <span className="flex items-center gap-1 font-mono text-[11.5px] shrink-0 ml-1">
+                {diffStats.added > 0 && (
+                  <span className="text-[#409D62]">+{diffStats.added}</span>
                 )}
-              >
-                {/* Number: 1., 2., 3., 4., 5. */}
-                <span className="font-mono text-xs text-[#888888] dark:text-[#777777] font-medium shrink-0">
-                  {idx + 1}.
-                </span>
+                {diffStats.removed > 0 && (
+                  <span className="text-[#ff5c5c]">-{diffStats.removed}</span>
+                )}
+              </span>
+            )}
+          </div>
+        ) : (
+          <div className="flex items-center gap-1.5 min-w-0 truncate">
+            <FileIcon
+              filename={cmdFirstWord || "terminal"}
+              className="w-3.5 h-3.5 shrink-0"
+              fallbackIcon={<Terminal className="w-3.5 h-3.5 text-[#888888] shrink-0" />}
+            />
+            <span className="font-mono font-semibold text-white truncate text-xs">
+              {truncatedCmd}
+            </span>
+            {cwdRel && (
+              <span className="font-mono text-[#777777] truncate text-[11.5px]">
+                {cwdRel}
+              </span>
+            )}
+          </div>
+        )}
+      </div>
 
-                {/* Option Label */}
-                <span
-                  className={cn(
-                    "text-xs leading-snug truncate",
-                    isSelected
-                      ? "font-semibold text-[#1c1c1e] dark:text-white"
-                      : "text-[#333333] dark:text-[#cccccc]"
+      {/* 3. Options list: 1..4 in clean pill rows */}
+      <div className="space-y-1.5 py-1">
+        {options.map((opt, idx) => {
+          const isSelected = selectedIdx === idx;
+          const isTellModel = opt.id === "tell_model";
+
+          return (
+            <div
+              key={opt.id}
+              onClick={() => {
+                setSelectedIdx(idx);
+                if (isTellModel) {
+                  setTimeout(() => inputRef.current?.focus(), 20);
+                }
+              }}
+              className={cn(
+                "w-full flex items-center gap-2.5 px-3 py-2 rounded-xl transition-all cursor-pointer min-w-0 select-none",
+                isSelected
+                  ? "bg-[#2c2d30] text-white shadow-xs"
+                  : "bg-transparent hover:bg-white/[0.04] text-[#a0a0a0]"
+              )}
+            >
+              {/* Option number */}
+              <span className="font-semibold text-xs text-[#7f7f7f] shrink-0 w-3.5 text-right font-mono">
+                {idx + 1}.
+              </span>
+
+              {/* Option Title and Description or Inline Input */}
+              {isTellModel ? (
+                <div className="flex-1 flex items-center min-w-0">
+                  {isSelected ? (
+                    <input
+                      ref={inputRef}
+                      type="text"
+                      value={feedbackText}
+                      onChange={(e) => setFeedbackText(e.target.value)}
+                      placeholder="Tell the model what to do instead..."
+                      className="w-full bg-transparent text-xs text-white placeholder:text-[#888888] outline-none border-none p-0 focus:ring-0 font-normal leading-normal select-text"
+                    />
+                  ) : (
+                    <span className="text-xs text-[#888888] font-normal truncate">
+                      {feedbackText || "Tell the model what to do instead..."}
+                    </span>
                   )}
-                >
-                  {opt.label}
-                </span>
-              </div>
-
-              {/* Conditional Feedback Textarea on Deny */}
-              {opt.id === "deny" && isSelected && (
-                <div
-                  className="mt-1 pl-6 pr-1 animate-in fade-in slide-in-from-top-1 duration-150"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <textarea
-                    ref={feedbackInputRef}
-                    value={feedbackText}
-                    onChange={(e) => setFeedbackText(e.target.value)}
-                    rows={2}
-                    placeholder="Tell the agent what to do instead..."
-                    className="w-full rounded bg-white dark:bg-[#1a1a1a] border border-[#e2e2e4] dark:border-[#383838] p-2 text-xs text-[#1c1c1e] dark:text-white placeholder:text-[#777777] dark:placeholder:text-[#666666] outline-none font-sans leading-relaxed resize-none transition-colors"
-                  />
+                </div>
+              ) : (
+                <div className="flex items-center gap-2.5 min-w-0 truncate text-xs">
+                  <span
+                    className={cn(
+                      "font-bold shrink-0",
+                      isSelected ? "text-white" : "text-[#d4d4d4]"
+                    )}
+                  >
+                    {opt.title}
+                  </span>
+                  <span className="text-[#888888] font-normal truncate text-[11.5px]">
+                    {opt.desc}
+                  </span>
                 </div>
               )}
             </div>
@@ -283,34 +348,24 @@ export function ApprovalCard({
         })}
       </div>
 
-      {/* 4. Footer Action Buttons matching QuestionCard */}
-      <div className="flex items-center justify-between pt-2 select-none min-w-0">
-        <div className="flex items-center gap-1.5 text-[#777777] dark:text-[#888888] text-[11px] min-w-0 truncate pr-2">
-          <Info className="w-3.5 h-3.5 text-[#777777] dark:text-[#888888] shrink-0" />
-          <span className="truncate">Press 1..{options.length} to choose, Enter to submit, Esc to skip</span>
+      {/* 4. Footer Row: Info shortcut label on left + Confirm button on right */}
+      <div className="flex items-center justify-between pt-3 mt-1.5 select-none min-w-0">
+        <div className="flex items-center gap-1.5 text-[#777777] text-[11px] min-w-0 truncate pr-2">
+          <Info className="w-3.5 h-3.5 text-[#777777] shrink-0" />
+          <span className="truncate">
+            Use Tab / arrow keys to choose, then press Enter to confirm
+          </span>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            type="button"
-            onClick={handleSkip}
-            disabled={isResponding}
-            className="px-2.5 py-1 text-xs font-medium text-[#777777] dark:text-[#999999] hover:text-[#111111] dark:hover:text-white transition-colors cursor-pointer disabled:opacity-30"
-            title="Skip (Esc)"
-          >
-            Skip
-          </button>
-
-          <button
-            type="button"
-            onClick={handleSubmit}
-            disabled={isResponding}
-            className="px-3.5 py-1 rounded text-xs font-semibold bg-[#262626] dark:bg-white text-white dark:text-black hover:bg-black dark:hover:bg-[#e6e6e6] active:scale-[0.98] disabled:opacity-30 disabled:pointer-events-none transition-all shadow-xs cursor-pointer"
-            title="Submit (Enter)"
-          >
-            Submit
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={handleConfirm}
+          disabled={isResponding}
+          className="px-4 py-1.5 rounded-lg text-xs font-semibold bg-white text-black hover:bg-[#e6e6e6] active:scale-[0.98] disabled:opacity-30 disabled:pointer-events-none transition-all shadow-xs cursor-pointer shrink-0"
+          title="Confirm (Enter)"
+        >
+          Confirm
+        </button>
       </div>
     </div>
   );
@@ -370,7 +425,7 @@ export function SmoothCardMorph({
 
   const handleTransitionEnd = (e: React.TransitionEvent<HTMLDivElement>) => {
     if (e.target === containerRef.current && e.propertyName === "height") {
-      // Release explicit height to "auto" so dynamic inner content (like textareas) resizes naturally
+      // Release explicit height to "auto" so dynamic inner content resizes naturally
       setHeight(null);
       setIsTransitioning(false);
     }

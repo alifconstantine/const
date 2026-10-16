@@ -9,7 +9,7 @@ export interface ConversationItem {
   isArchived?: boolean;
   isScheduled?: boolean;
   model?: string;
-  mode?: "ask_before_changes" | "full_access";
+  mode?: "request_review" | "ask_before_changes" | "full_access";
   contextUsage?: {
     usedTokens: number;
     totalTokens: number;
@@ -23,10 +23,10 @@ export interface ConversationItem {
   };
 }
 
-export function getDefaultAgentMode(): "ask_before_changes" | "full_access" {
+export function getDefaultAgentMode(): "request_review" | "ask_before_changes" | "full_access" {
   try {
     const saved = localStorage.getItem("const_harness_default_mode");
-    if (saved === "full_access" || saved === "ask_before_changes") {
+    if (saved === "request_review" || saved === "full_access" || saved === "ask_before_changes") {
       return saved;
     }
   } catch {}
@@ -531,7 +531,7 @@ export interface SideConversationItem {
   messages: any[];
   model?: string;
   thinkingLevel?: string;
-  mode?: "ask_before_changes" | "full_access";
+  mode?: "request_review" | "ask_before_changes" | "full_access";
 }
 
 const SIDE_STORAGE_PREFIX = "const_harness_side_chat_";

@@ -708,7 +708,7 @@ app.whenReady().then(() => {
     conversationId: string;
     workspacePath: string;
     model: string;
-    mode?: "ask_before_changes" | "full_access";
+    mode?: "request_review" | "ask_before_changes" | "full_access";
     startedAt: number;
   }
   const activeSessions = new Map<string, ActiveAgentSession>();
@@ -770,7 +770,7 @@ app.whenReady().then(() => {
         model?: string;
         thinkingLevel?: string;
         workspacePath?: string;
-        mode?: "ask_before_changes" | "full_access";
+        mode?: "request_review" | "ask_before_changes" | "full_access";
         conversationId?: string;
         authToken?: string;
         maxOutputTokens?: number;
@@ -998,6 +998,7 @@ app.whenReady().then(() => {
         approvalId: string;
         decision:
           | "allow_once"
+          | "full_access"
           | "allow_conversation"
           | "allow_project"
           | "allow_always"
@@ -1041,7 +1042,7 @@ app.whenReady().then(() => {
     "agent:update-mode",
     async (
       _event,
-      payload: { mode: "ask_before_changes" | "full_access"; conversationId?: string }
+      payload: { mode: "request_review" | "ask_before_changes" | "full_access"; conversationId?: string }
     ) => {
       const { mode, conversationId } = payload;
       let targetSession = conversationId ? activeSessions.get(conversationId) : undefined;

@@ -39,6 +39,7 @@ import type { FileMutationRecord } from "./mutation-ledger.js";
 
 export type ApprovalDecision =
   | "allow_once"
+  | "full_access"
   | "allow_conversation"
   | "allow_project"
   | "allow_always"
@@ -58,6 +59,14 @@ export interface ApprovalRequestData {
   createdAt: number;
   timestamp?: number;
   approval?: any;
+  targetFile?: string;
+  filePath?: string;
+  dirPath?: string;
+  diffStats?: {
+    added: number;
+    removed: number;
+  };
+  isMutation?: boolean;
 }
 
 export interface ApprovalResponseData {
@@ -193,7 +202,7 @@ export interface AgentConfig {
   maxRecursionDepth?: number;
   softTurnBudget?: number;
   maxTurns?: number;
-  mode?: "ask_before_changes" | "full_access";
+  mode?: "request_review" | "ask_before_changes" | "full_access";
   initialAllowedTools?: Set<string> | string[];
   thinkingLevel?: ThinkingLevel | string;
   maxTokens?: number;

@@ -234,11 +234,11 @@ function AuthenticatedContent({
       }
     } catch {}
   }, []);
-  const [currentMode, setCurrentMode] = useState<"ask_before_changes" | "full_access">(() => {
+  const [currentMode, setCurrentMode] = useState<"request_review" | "ask_before_changes" | "full_access">(() => {
     return getDefaultAgentMode();
   });
 
-  const handleModeChange = async (newMode: "ask_before_changes" | "full_access") => {
+  const handleModeChange = async (newMode: "request_review" | "ask_before_changes" | "full_access") => {
     setCurrentMode(newMode);
     try {
       localStorage.setItem("const_harness_default_mode", newMode);
@@ -2269,7 +2269,7 @@ function AuthenticatedContent({
   }: {
     prompt: string;
     project: string;
-    mode: "ask_before_changes" | "full_access";
+    mode: "request_review" | "ask_before_changes" | "full_access";
     model?: string;
     thinkingLevel?: string;
     attachments?: AttachedFile[];
@@ -2688,6 +2688,12 @@ function AuthenticatedContent({
       if (!res.success) {
         toast.error(res.error || "Failed to submit approval response");
       } else {
+        if (decision === "full_access") {
+          setCurrentMode("full_access");
+          try {
+            localStorage.setItem("const_harness_default_mode", "full_access");
+          } catch {}
+        }
         setPendingApprovals((prev) => {
           const next = new Map(prev);
           next.delete(conversationId);

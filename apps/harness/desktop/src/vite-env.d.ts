@@ -38,6 +38,7 @@ export interface TraceStep {
 
 export type ApprovalDecision =
   | "allow_once"
+  | "full_access"
   | "allow_conversation"
   | "allow_project"
   | "allow_always"
@@ -58,6 +59,14 @@ export interface ApprovalRequestData {
   createdAt?: number;
   timestamp?: number;
   approval?: any;
+  targetFile?: string;
+  filePath?: string;
+  dirPath?: string;
+  diffStats?: {
+    added: number;
+    removed: number;
+  };
+  isMutation?: boolean;
 }
 
 export interface TodoItem {
@@ -247,7 +256,7 @@ declare global {
         model?: string;
         thinkingLevel?: string;
         workspacePath?: string;
-        mode?: "ask_before_changes" | "full_access";
+        mode?: "request_review" | "ask_before_changes" | "full_access";
         conversationId?: string;
         authToken?: string;
         maxOutputTokens?: number;
@@ -261,7 +270,7 @@ declare global {
       }>;
       abortAgent: (conversationId?: string) => Promise<boolean>;
       updateMode?: (payload: {
-        mode: "ask_before_changes" | "full_access";
+        mode: "request_review" | "ask_before_changes" | "full_access";
         conversationId?: string;
       }) => Promise<{ success: boolean; updated?: boolean; pending?: boolean }>;
       respondApproval?: (payload: {

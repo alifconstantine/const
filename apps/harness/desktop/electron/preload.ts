@@ -60,12 +60,12 @@ contextBridge.exposeInMainWorld("electron", {
     maxOutputTokens?: number;
   }) => ipcRenderer.invoke("agent:send-message", payload),
   abortAgent: (conversationId?: string) => ipcRenderer.invoke("agent:abort", conversationId),
-  updateMode: (payload: { mode: "ask_before_changes" | "full_access"; conversationId?: string }) =>
+  updateMode: (payload: { mode: "request_review" | "ask_before_changes" | "full_access"; conversationId?: string }) =>
     ipcRenderer.invoke("agent:update-mode", payload),
   respondApproval: (payload: {
     conversationId: string;
     approvalId: string;
-    decision: "allow_once" | "allow_conversation" | "allow_project" | "allow_always" | "deny" | "skip";
+    decision: "allow_once" | "full_access" | "allow_conversation" | "allow_project" | "allow_always" | "deny" | "skip";
     feedback?: string;
   }) => ipcRenderer.invoke("agent:respond-approval", payload),
   getRunningSessions: () => ipcRenderer.invoke("agent:get-running-sessions"),

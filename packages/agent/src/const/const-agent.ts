@@ -669,11 +669,11 @@ export class ConstAgent {
     return new Set(this.sessionAllowedTools);
   }
 
-  public get mode(): "ask_before_changes" | "full_access" {
+  public get mode(): "request_review" | "ask_before_changes" | "full_access" {
     return this.config.mode || "ask_before_changes";
   }
 
-  public updateMode(newMode: "ask_before_changes" | "full_access"): void {
+  public updateMode(newMode: "request_review" | "ask_before_changes" | "full_access"): void {
     this.config.mode = newMode;
     if (newMode === "full_access") {
       // Auto-resolve any pending approvals immediately so execution proceeds
@@ -1422,9 +1422,12 @@ export class ConstAgent {
           const isFileMutationTool =
             toolLower === "write" ||
             toolLower === "writefile" ||
+            toolLower === "write_to_file" ||
             toolLower === "edit" ||
             toolLower === "editfile" ||
+            toolLower === "edit_file" ||
             toolLower === "replaceinfile" ||
+            toolLower === "replace_file_content" ||
             toolLower === "applypatch" ||
             toolLower === "patch" ||
             toolLower === "mkdir" ||
@@ -1437,6 +1440,10 @@ export class ConstAgent {
           let description = "";
           let isOutside = false;
           let targetFilePath = "";
+
+          let diffStats: { added: number; removed: number } | undefined = undefined;
+          let fileName = "";
+          let dirPath = "";
 
           if (isTerminalTool) {
             const rawCwd = parsedArgs.cwd || parsedArgs.working_directory || parsedArgs.workdir || parsedArgs.path;
@@ -1457,6 +1464,28 @@ export class ConstAgent {
             cmd = `${tc.function.name}: ${targetFilePath || "file"}`;
             targetCwd = workspacePath;
             description = `Modify file: ${targetFilePath || tc.function.name}`;
+
+            const cleanRelPath = isOutside
+              ? targetFilePath
+              : path.relative(workspacePath, resolvedPath).replace(/\\/g, "/");
+            fileName = cleanRelPath.split("/").filter(Boolean).pop() || targetFilePath;
+            dirPath = cleanRelPath.split("/").slice(0, -1).join("/");
+            if (dirPath) dirPath = `${dirPath}/`;
+
+            // Compute added / removed lines estimate
+            if (toolLower === "write" || toolLower === "writefile" || toolLower === "write_to_file") {
+              const codeStr = parsedArgs.CodeContent || parsedArgs.code || parsedArgs.content || "";
+              const lineCount = typeof codeStr === "string" ? codeStr.split("\n").length : 1;
+              diffStats = { added: lineCount, removed: 0 };
+            } else if (toolLower === "replaceinfile" || toolLower === "replace_file_content") {
+              const rep = typeof parsedArgs.ReplacementContent === "string" ? parsedArgs.ReplacementContent.split("\n").length : 1;
+              const tar = typeof parsedArgs.TargetContent === "string" ? parsedArgs.TargetContent.split("\n").length : 1;
+              diffStats = { added: rep, removed: tar };
+            } else if (toolLower === "edit" || toolLower === "editfile" || toolLower === "edit_file") {
+              const codeStr = parsedArgs.code || parsedArgs.content || "";
+              const lineCount = typeof codeStr === "string" ? codeStr.split("\n").length : 1;
+              diffStats = { added: lineCount, removed: 0 };
+            }
           }
 
           const isAlreadyAllowed =
@@ -1469,17 +1498,19 @@ export class ConstAgent {
             ) ||
             Boolean(cmd && this.sessionAllowedTools.has(`cmd:${cmd.trim()}`));
 
-          // Workspace-write model (aligned with DeepSeek Harness):
-          // In "ask_before_changes", file mutations INSIDE workspace proceed without interruption.
-          // Terminal executions, Python executions, and out-of-workspace writes require approval.
+          // Mode behavior:
+          // In "request_review", EVERY action (including file edits inside workspace) requires approval.
+          // In "ask_before_changes", file mutations INSIDE workspace proceed without interruption,
+          // while terminal executions, Python executions, and out-of-workspace writes require approval.
+          const isRequestReview = this.config.mode === "request_review";
           const requiresApproval =
-            isTerminalTool ||
-            isPythonTool ||
-            (isFileMutationTool && isOutside);
+            isRequestReview
+              ? isTerminalTool || isPythonTool || isFileMutationTool
+              : this.config.mode === "ask_before_changes" && (isTerminalTool || isPythonTool || (isFileMutationTool && isOutside));
 
           let approvedThisTurn = false;
 
-          if (this.config.mode === "ask_before_changes" && requiresApproval && !isAlreadyAllowed) {
+          if ((isRequestReview || this.config.mode === "ask_before_changes") && requiresApproval && !isAlreadyAllowed) {
             const approvalId = `appr_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
             onEvent({
@@ -1497,6 +1528,11 @@ export class ConstAgent {
               cwd: targetCwd,
               description,
               createdAt: Date.now(),
+              targetFile: fileName || undefined,
+              filePath: targetFilePath || undefined,
+              dirPath: dirPath || undefined,
+              diffStats,
+              isMutation: isFileMutationTool,
             };
 
             onEvent({
@@ -1530,7 +1566,10 @@ export class ConstAgent {
               decision: userResponse.decision,
             });
 
-            if (
+            if (userResponse.decision === "full_access") {
+              this.updateMode("full_access");
+              approvedThisTurn = true;
+            } else if (
               userResponse.decision === "allow_always" ||
               userResponse.decision === "allow_conversation" ||
               userResponse.decision === "allow_project"

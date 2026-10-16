@@ -85,7 +85,7 @@ export function SideChatTab({
   const [isExecuting, setIsExecuting] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [activeModel, setActiveModel] = useState<string>(() => tab.model || defaultModel || "gemini-3.8-flash");
-  const [activeMode, setActiveMode] = useState<"ask_before_changes" | "full_access">("ask_before_changes");
+  const [activeMode, setActiveMode] = useState<"request_review" | "ask_before_changes" | "full_access">("ask_before_changes");
   const [showScrollBottomBtn, setShowScrollBottomBtn] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -261,7 +261,7 @@ export function SideChatTab({
   }: {
     prompt: string;
     project: string;
-    mode: "ask_before_changes" | "full_access";
+    mode: "request_review" | "ask_before_changes" | "full_access";
     model?: string;
     thinkingLevel?: string;
     attachments?: AttachedFile[];
