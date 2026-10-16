@@ -27,6 +27,7 @@ import {
   ArrowRightLeft,
 } from "lucide-react";
 import type { RightPaneTab, BrowserSelectedElement } from "./types";
+import { useTranslation } from "../../lib/i18n";
 
 interface BrowserTabProps {
   tab: RightPaneTab;
@@ -78,6 +79,7 @@ function normalizeUrl(input: any): string {
 }
 
 export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: BrowserTabProps) {
+  const { t } = useTranslation();
   const initialUrl =
     typeof tab.url === "string" && tab.url && tab.url !== "[object Object]"
       ? tab.url
@@ -695,8 +697,8 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
               ? "text-[#a0a0a0] hover:text-white hover:bg-white/10 cursor-pointer"
               : "text-[#4a4a4a] cursor-not-allowed"
           }`}
-          title="Click to go back"
-          aria-label="Back"
+          title={t("rightPane.browserBack")}
+          aria-label={t("rightPane.browserBack")}
         >
           <ChevronLeft className="w-4 h-4" />
         </button>
@@ -711,8 +713,8 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
               ? "text-[#a0a0a0] hover:text-white hover:bg-white/10 cursor-pointer"
               : "text-[#4a4a4a] cursor-not-allowed"
           }`}
-          title="Click to go forward"
-          aria-label="Forward"
+          title={t("rightPane.browserForward")}
+          aria-label={t("rightPane.browserForward")}
         >
           <ChevronRight className="w-4 h-4" />
         </button>
@@ -722,8 +724,8 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
           type="button"
           onClick={handleReloadOrStop}
           className="w-7 h-7 rounded-md flex items-center justify-center text-[#a0a0a0] hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
-          title={isLoading ? "Stop loading" : "Reload this page"}
-          aria-label="Reload"
+          title={isLoading ? "Stop loading" : t("rightPane.browserReload")}
+          aria-label={t("rightPane.browserReload")}
         >
           <RotateCw className={`w-3.5 h-3.5 ${isLoading ? "animate-spin text-[#888888]" : ""}`} />
         </button>
@@ -740,7 +742,7 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
                 handleNavigate(addressBarInput);
               }
             }}
-            placeholder="Search with Google or enter address..."
+            placeholder={t("rightPane.browserSearchPlaceholder")}
             className="w-full h-7 px-3 bg-[#242424] hover:bg-[#2a2a2a] focus:bg-[#202020] border border-[#333333] focus:border-[#4f4f4f] rounded-lg text-xs text-[#e0e0e0] placeholder-[#666666] outline-none transition-all font-sans"
           />
         </div>
@@ -754,7 +756,7 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
               type="button"
               onClick={handleHandBack}
               className="ml-0.5 text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 hover:bg-emerald-500/35 text-emerald-200 transition-colors cursor-pointer font-medium"
-              title="Hand control back to AI"
+              title={t("rightPane.browserHandControl")}
             >
               Hand back
             </button>
@@ -772,7 +774,7 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
               type="button"
               onClick={handleTakeControl}
               className="ml-0.5 text-[10px] px-1.5 py-0.5 rounded bg-blue-500/20 hover:bg-blue-500/35 text-blue-200 transition-colors cursor-pointer"
-              title="Take control of browser"
+              title={t("rightPane.browserTakeControl")}
             >
               Take over
             </button>
@@ -924,7 +926,7 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
                     onClick={handleZoomOut}
                     disabled={zoomLevel <= 50}
                     className="p-1 rounded hover:bg-white/10 text-[#a0a0a0] hover:text-white cursor-pointer disabled:opacity-40"
-                    title="Zoom out"
+                    title={t("rightPane.browserZoomOut")}
                   >
                     <ZoomOut className="w-3 h-3" />
                   </button>
@@ -933,7 +935,7 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
                     onClick={handleZoomReset}
                     disabled={zoomLevel === 100}
                     className="text-[10px] px-1.5 py-0.5 rounded hover:bg-white/10 text-[#a0a0a0] hover:text-white cursor-pointer disabled:opacity-40 font-mono"
-                    title="Reset zoom"
+                    title={t("rightPane.browserResetZoom")}
                   >
                     100%
                   </button>
@@ -942,7 +944,7 @@ export function BrowserTab({ tab, onUpdateTab, onSelectElementForChat }: Browser
                     onClick={handleZoomIn}
                     disabled={zoomLevel >= 200}
                     className="p-1 rounded hover:bg-white/10 text-[#a0a0a0] hover:text-white cursor-pointer disabled:opacity-40"
-                    title="Zoom in"
+                    title={t("rightPane.browserZoomIn")}
                   >
                     <ZoomIn className="w-3 h-3" />
                   </button>

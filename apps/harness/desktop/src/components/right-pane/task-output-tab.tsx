@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { Terminal, Square, Loader2 } from "lucide-react";
 import type { RightPaneTab } from "./types";
+import { useTranslation } from "../../lib/i18n";
 
 interface TaskOutputTabProps {
   tab: RightPaneTab;
@@ -8,6 +9,7 @@ interface TaskOutputTabProps {
 }
 
 export function TaskOutputTab({ tab, onStopTask }: TaskOutputTabProps) {
+  const { t } = useTranslation();
   const [logs, setLogs] = useState<string[]>([]);
   const [isRunning, setIsRunning] = useState<boolean>(true);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -70,7 +72,7 @@ export function TaskOutputTab({ tab, onStopTask }: TaskOutputTabProps) {
     <div className="flex-1 w-full h-full bg-[#141414] text-[#d4d4d4] flex flex-col min-h-0 font-sans select-none">
       <div className="flex items-center justify-between px-4 py-2.5 border-b border-[#262626] bg-[#1a1a1a]">
         <div className="flex flex-col gap-0.5 min-w-0">
-          <span className="text-xs font-semibold text-[#888888]">Background Task Output</span>
+          <span className="text-xs font-semibold text-[#888888]">{t("rightPane.taskOutput")}</span>
           <div className="flex items-center gap-2 min-w-0">
             {isRunning ? (
               <Loader2 className="w-3.5 h-3.5 text-[#0066ff] animate-spin shrink-0" />
@@ -89,14 +91,14 @@ export function TaskOutputTab({ tab, onStopTask }: TaskOutputTabProps) {
               type="button"
               onClick={handleStop}
               className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-[#e81123]/15 hover:bg-[#e81123]/25 text-[#ff6b6b] border border-[#e81123]/30 text-xs font-medium transition-colors cursor-pointer"
-              title="Stop / Terminate this background task"
+              title={t("rightPane.stopTask")}
             >
               <Square className="w-3 h-3 fill-current" />
-              <span>Stop Task</span>
+              <span>{t("rightPane.stopTask")}</span>
             </button>
           ) : (
             <span className="text-xs text-[#777777] px-2 py-0.5 rounded bg-white/5">
-              Stopped
+              {t("rightPane.taskStopped")}
             </span>
           )}
         </div>
@@ -109,13 +111,13 @@ export function TaskOutputTab({ tab, onStopTask }: TaskOutputTabProps) {
         <div className="text-[#888888] pb-2 mb-2 border-b border-[#222222] flex items-center justify-between">
           <span>$ {command}</span>
           <span className="text-[11px] text-[#555555]">
-            {isRunning ? "Running" : "Exited"}
+            {isRunning ? t("common.active") : t("rightPane.taskStopped")}
           </span>
         </div>
 
         {logs.length === 0 ? (
           <div className="py-4 text-[#666666] italic">
-            Waiting for output...
+            {t("rightPane.noOutputLogs")}
           </div>
         ) : (
           <div className="flex flex-col gap-0.5">

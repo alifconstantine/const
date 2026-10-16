@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { X, FileText } from "lucide-react";
+import { useTranslation } from "../../lib/i18n";
 
 export interface ImageLightboxProps {
   src: string;
@@ -16,6 +17,7 @@ export function ImageLightbox({
   type = "image",
   onClose,
 }: ImageLightboxProps) {
+  const { t } = useTranslation();
   const closeBtnRef = useRef<HTMLButtonElement>(null);
 
   const isVideo = type === "video";
@@ -39,7 +41,7 @@ export function ImageLightbox({
       className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4 sm:p-6 animate-in fade-in duration-150 select-none"
       role="dialog"
       aria-modal="true"
-      aria-label={alt || "Media preview"}
+      aria-label={alt || t("workbench.mediaPreview")}
       onClick={onClose}
     >
       {/* Pop-up Media Container with only top-right X button */}
@@ -53,8 +55,8 @@ export function ImageLightbox({
           type="button"
           onClick={onClose}
           className="absolute top-2.5 right-2.5 z-30 w-7 h-7 rounded-full bg-black/60 hover:bg-black/80 text-white/90 hover:text-white flex items-center justify-center transition-colors shadow-lg cursor-pointer border border-white/10"
-          title="Close (Esc)"
-          aria-label="Close"
+          title={t("workbench.closeEsc")}
+          aria-label={t("common.close")}
         >
           <X className="w-4 h-4 stroke-[2.5]" />
         </button>

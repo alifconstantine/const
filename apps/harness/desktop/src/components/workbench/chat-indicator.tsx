@@ -1,4 +1,5 @@
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useTranslation } from "../../lib/i18n";
 
 export interface TurnNavEntry {
   readonly turn: number;
@@ -100,6 +101,7 @@ export const ChatIndicator = memo(function ChatIndicator({
   isExecuting = false,
   scrollContainerRef,
 }: ChatIndicatorProps) {
+  const { t } = useTranslation();
   const entries = useMemo(
     () => deriveTurnNavEntries(messages, isExecuting),
     [messages, isExecuting]
@@ -316,11 +318,11 @@ export const ChatIndicator = memo(function ChatIndicator({
             </div>
           ) : hoveredEntry.isRunning ? (
             <div className="text-[11px] italic text-[#777777]">
-              Sedang memproses respons...
+              {t("workbench.turnIndicatorRunning")}
             </div>
           ) : (
             <div className="text-[11px] italic text-[#777777]">
-              Eksekusi selesai
+              {t("workbench.turnIndicatorFinished")}
             </div>
           )}
         </div>

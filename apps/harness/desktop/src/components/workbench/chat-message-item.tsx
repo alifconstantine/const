@@ -5,6 +5,7 @@ import type { FileMutationRecord, TraceStep } from "../../vite-env";
 import { MarkdownContent } from "./markdown-content";
 import { ExecutionTrace, MutationsSummaryCard } from "./execution-trace";
 import { InlineMessageEditor } from "./inline-message-editor";
+import { useTranslation } from "../../lib/i18n";
 
 export interface ChatMessage {
   id: string;
@@ -86,6 +87,7 @@ export function ChatMessageItem({
   userBubbleWidthClass = "max-w-[85%] sm:max-w-[78%] md:max-w-[72%]",
   isReadOnly = false,
 }: ChatMessageItemProps) {
+  const { t } = useTranslation();
   if (!message) return null;
 
   if (message.role === "user") {
@@ -179,7 +181,7 @@ export function ChatMessageItem({
                 type="button"
                 onClick={() => onCopyMessage(message.id, message.content)}
                 className="p-1 rounded hover:bg-black/5 dark:hover:bg-white/10 hover:text-[#262626] dark:hover:text-white transition-colors cursor-pointer"
-                title="Copy message"
+                title={t("workbench.copyMessage")}
               >
                 {copiedId === message.id ? (
                   <Check className="w-3.5 h-3.5 text-[#4ade80]" />
@@ -199,7 +201,7 @@ export function ChatMessageItem({
                   }
                 }}
                 className="p-1 rounded hover:bg-black/5 dark:hover:bg-white/10 hover:text-[#262626] dark:hover:text-white transition-colors cursor-pointer"
-                title="Edit message"
+                title={t("workbench.editMessage")}
               >
                 <Pencil className="w-3.5 h-3.5" />
               </button>

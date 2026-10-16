@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { ScrollArea, cn } from "@const/ui";
 import { FileIcon } from "./file-icon";
+import { useTranslation } from "../../lib/i18n";
 import type { MentionCandidate } from "../../lib/mention-search";
 
 export interface MentionPopoverProps {
@@ -40,6 +41,7 @@ export function MentionPopover({
   onHover,
   className,
 }: MentionPopoverProps) {
+  const { t } = useTranslation();
   const listRef = useRef<HTMLDivElement>(null);
   const activeItemRef = useRef<HTMLButtonElement>(null);
 
@@ -72,7 +74,7 @@ export function MentionPopover({
     >
       {candidates.length === 0 ? (
         <div className="py-6 px-4 text-center text-xs text-[#888888] dark:text-[#777777] font-sans">
-          No files, folders, or sessions found
+          {t("workbench.noFilesFound")}
         </div>
       ) : (
         <ScrollArea className="max-h-80 overflow-y-auto pr-1">
@@ -81,7 +83,7 @@ export function MentionPopover({
             {filesAndFolders.length > 0 && (
               <div>
                 <div className="px-3 pt-2 pb-1.5 text-[12px] font-medium text-[#888888] dark:text-[#888888] font-sans select-none">
-                  Files &amp; folders
+                  {t("workbench.filesAndFolders")}
                 </div>
                 <div className="flex flex-col gap-0.5">
                   {filesAndFolders.map((candidate) => {
@@ -152,7 +154,7 @@ export function MentionPopover({
             {sessions.length > 0 && (
               <div>
                 <div className="px-3 pt-3 pb-1.5 text-[12px] font-medium text-[#888888] dark:text-[#888888] font-sans select-none">
-                  Sessions
+                  {t("workbench.sessions")}
                 </div>
                 <div className="flex flex-col gap-0.5">
                   {sessions.map((candidate) => {

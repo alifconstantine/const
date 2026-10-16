@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { Plus, X, ArrowUp, FileText, Image as ImageIcon, Video, Code, FileCode } from "lucide-react";
 import { ScrollArea, cn } from "@const/ui";
 import { parseUploadedFiles, type AttachedFile } from "./chat-card";
+import { useTranslation } from "../../lib/i18n";
 
 export interface InlineMessageEditorProps {
   initialContent: string;
@@ -18,6 +19,7 @@ export function InlineMessageEditor({
   onCancel,
   userBubbleWidthClass = "max-w-[85%] sm:max-w-[78%] md:max-w-[72%]",
 }: InlineMessageEditorProps) {
+  const { t } = useTranslation();
   const [content, setContent] = useState(initialContent);
   const [attachments, setAttachments] = useState<AttachedFile[]>(initialAttachments);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -143,7 +145,7 @@ export function InlineMessageEditor({
           value={content}
           onChange={handleContentChange}
           onKeyDown={handleKeyDown}
-          placeholder="Edit your prompt... (Shift+Enter for new line, Esc to cancel)"
+          placeholder={t("workbench.editPromptPlaceholder")}
           rows={1}
           className="w-full bg-transparent resize-none outline-none border-0 text-[#262626] dark:text-[#ececec] text-[14px] leading-relaxed placeholder-[#888888] dark:placeholder-[#666666] min-h-[48px] overflow-hidden pr-2"
         />
@@ -165,7 +167,7 @@ export function InlineMessageEditor({
           type="button"
           onClick={() => fileInputRef.current?.click()}
           className="p-1.5 rounded-lg text-[#777777] dark:text-[#888888] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer flex items-center justify-center"
-          title="Add attachment"
+          title={t("workbench.addAttachment")}
         >
           <Plus className="w-4 h-4" />
         </button>
@@ -176,7 +178,7 @@ export function InlineMessageEditor({
             type="button"
             onClick={onCancel}
             className="p-1.5 rounded-lg text-[#777777] dark:text-[#888888] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/10 transition-colors cursor-pointer flex items-center justify-center"
-            title="Cancel (Esc)"
+            title={`${t("common.cancel")} (Esc)`}
           >
             <X className="w-4 h-4" />
           </button>
@@ -186,7 +188,7 @@ export function InlineMessageEditor({
             disabled={!content.trim() && attachments.length === 0}
             onClick={handleFinalSubmit}
             className="w-7 h-7 rounded-lg bg-black dark:bg-white text-white dark:text-black hover:bg-neutral-800 dark:hover:bg-neutral-200 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center transition-all cursor-pointer shadow-xs active:scale-95"
-            title="Send edited prompt (Enter)"
+            title={t("workbench.sendEditedPrompt")}
           >
             <ArrowUp className="w-4 h-4 stroke-[2.2]" />
           </button>

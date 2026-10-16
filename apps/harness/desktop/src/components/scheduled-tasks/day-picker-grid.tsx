@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { ChevronDown } from "lucide-react";
+import { useTranslation } from "../../lib/i18n";
 
 export interface DayPickerGridProps {
   value: number; // 1 to 31
@@ -7,6 +8,7 @@ export interface DayPickerGridProps {
 }
 
 export function DayPickerGrid({ value, onChange }: DayPickerGridProps): React.JSX.Element {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -43,7 +45,7 @@ export function DayPickerGrid({ value, onChange }: DayPickerGridProps): React.JS
         onClick={() => setOpen(!open)}
         aria-expanded={open}
       >
-        <span>Day {value}</span>
+        <span>{t("common.day")} {value}</span>
         <ChevronDown
           className={`w-3 h-3 text-[#969696] transition-transform duration-150 ${
             open ? "rotate-180" : ""
@@ -54,7 +56,7 @@ export function DayPickerGrid({ value, onChange }: DayPickerGridProps): React.JS
       {open && (
         <div className="absolute bottom-full mb-2 left-0 w-56 bg-[#222222] border border-[#383838] rounded-xl shadow-2xl p-2.5 z-50 flex flex-col text-left select-none animate-in fade-in zoom-in-95 duration-100">
           <div className="text-[11px] font-medium text-[#969696] mb-2 text-center uppercase tracking-wider">
-            Select day of month
+            {t("scheduledTasks.selectDayOfMonth")}
           </div>
           <div className="grid grid-cols-7 gap-1">
             {days.map((d) => (

@@ -19,6 +19,7 @@ import {
   type ConversationItem,
 } from "../../lib/conversation-store";
 import { resolveMentionedSessionsInPrompt } from "../../lib/mention-search";
+import { useTranslation } from "../../lib/i18n";
 
 export interface SideChatMessage {
   id: string;
@@ -80,6 +81,7 @@ export function SideChatTab({
   onOpenTrajectory,
   conversations: propConversations,
 }: SideChatTabProps) {
+  const { t } = useTranslation();
   const effectiveConversations = propConversations || loadConversations();
   const effectiveParentId = tab.parentConversationId || parentConversationId || "root";
   const sideChatId = tab.id;
@@ -407,14 +409,14 @@ Answer the user's query directly. Only modify workspace files or run commands if
     navigator.clipboard.writeText(text);
     setCopiedId(id);
     setTimeout(() => setCopiedId(null), 2000);
-    toast.success("Copied to clipboard");
+    toast.success(t("toast.copied"));
   };
 
   const handleClearChat = () => {
     if (messages.length === 0) return;
     deleteSideConversation(effectiveParentId, sideChatId);
     setMessages([]);
-    toast.info("Side chat cleared");
+    toast.info(t("rightPane.sideChatCleared"));
   };
 
   return (
@@ -426,8 +428,8 @@ Answer the user's query directly. Only modify workspace files or run commands if
           onClick={handleClearChat}
           disabled={messages.length === 0 || isExecuting}
           className="p-1 rounded text-[#8e8e8e] hover:text-[#e11d48] hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
-          title="Clear side chat"
-          aria-label="Clear side chat"
+          title={t("rightPane.clearSideChat")}
+          aria-label={t("rightPane.clearSideChat")}
         >
           <RotateCcw className="w-3.5 h-3.5" />
         </button>
@@ -500,14 +502,14 @@ Answer the user's query directly. Only modify workspace files or run commands if
                       type="button"
                       onClick={() => handleCopy(msg.id, msg.content)}
                       className="p-1 rounded hover:bg-black/5 dark:hover:bg-white/10 flex items-center gap-1 cursor-pointer"
-                      title="Copy text"
+                      title={t("common.copy")}
                     >
                       {copiedId === msg.id ? (
                         <Check className="w-3 h-3 text-emerald-500" />
                       ) : (
                         <Copy className="w-3 h-3" />
                       )}
-                      <span>Copy</span>
+                      <span>{t("common.copy")}</span>
                     </button>
 
                     {onInsertToMainPrompt && msg.content && (
@@ -515,13 +517,13 @@ Answer the user's query directly. Only modify workspace files or run commands if
                         type="button"
                         onClick={() => {
                           onInsertToMainPrompt(msg.content);
-                          toast.success("Sent to main chat input");
+                          toast.success(t("rightPane.sentToMainChat"));
                         }}
                         className="p-1 rounded hover:bg-black/5 dark:hover:bg-white/10 flex items-center gap-1 text-[#3b82f6] hover:text-[#2563eb] cursor-pointer"
-                        title="Insert snippet into main chat prompt"
+                        title={t("rightPane.insertSnippet")}
                       >
                         <ArrowUpRight className="w-3 h-3" />
-                        <span>To Main Chat</span>
+                        <span>{t("rightPane.toMainChat")}</span>
                       </button>
                     )}
                   </div>

@@ -4,6 +4,7 @@ import { Check, Copy, Download, Maximize2, X } from "lucide-react";
 import { cn } from "@const/ui";
 import { FileIcon } from "./file-icon";
 import { renderMentionBadgeHtml } from "./rich-mention-editor";
+import { useTranslation } from "../../lib/i18n";
 
 interface MarkdownContentProps {
   content: string;
@@ -345,6 +346,7 @@ function TableBlock({
   rows: Tokens.TableCell[][];
   align: Array<"center" | "left" | "right" | null>;
 }) {
+  const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -404,7 +406,7 @@ function TableBlock({
             type="button"
             onClick={handleCopy}
             className="p-1 rounded text-[#777777] dark:text-[#888888] hover:text-[#161616] dark:hover:text-[#e0e0e0] hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
-            title={copied ? "Copied table" : "Copy table (TSV)"}
+            title={copied ? t("workbench.copiedTable") : t("workbench.copyTable")}
           >
             {copied ? (
               <Check className="w-3.5 h-3.5 text-[#16a34a] dark:text-[#4ade80]" />
@@ -416,7 +418,7 @@ function TableBlock({
             type="button"
             onClick={handleDownloadCsv}
             className="p-1 rounded text-[#777777] dark:text-[#888888] hover:text-[#161616] dark:hover:text-[#e0e0e0] hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
-            title="Download CSV"
+            title={t("workbench.downloadCsv")}
           >
             <Download className="w-3.5 h-3.5" />
           </button>
@@ -424,7 +426,7 @@ function TableBlock({
             type="button"
             onClick={() => setIsExpanded(true)}
             className="p-1 rounded text-[#777777] dark:text-[#888888] hover:text-[#161616] dark:hover:text-[#e0e0e0] hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
-            title="Expand table"
+            title={t("workbench.expandTable")}
           >
             <Maximize2 className="w-3.5 h-3.5" />
           </button>
@@ -501,12 +503,12 @@ function TableBlock({
                   {copied ? (
                     <>
                       <Check className="w-3.5 h-3.5 text-[#16a34a] dark:text-[#4ade80]" />
-                      <span>Copied</span>
+                      <span>{t("common.copied")}</span>
                     </>
                   ) : (
                     <>
                       <Copy className="w-3.5 h-3.5" />
-                      <span>Copy TSV</span>
+                      <span>{t("workbench.copyTable")}</span>
                     </>
                   )}
                 </button>
@@ -516,7 +518,7 @@ function TableBlock({
                   className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg border border-[#e2e2e4] dark:border-[#383838] hover:bg-black/5 dark:hover:bg-white/5 text-[#262626] dark:text-[#d4d4d4] transition-colors cursor-pointer"
                 >
                   <Download className="w-3.5 h-3.5" />
-                  <span>Download CSV</span>
+                  <span>{t("workbench.downloadCsv")}</span>
                 </button>
                 <button
                   type="button"
@@ -577,6 +579,7 @@ function TableBlock({
 }
 
 function CodeBlock({ code, language }: { code: string; language: string }) {
+  const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
 
   const handleCopy = async () => {
@@ -603,17 +606,17 @@ function CodeBlock({ code, language }: { code: string; language: string }) {
           type="button"
           onClick={handleCopy}
           className="flex items-center gap-1 text-[11px] text-[#888888] dark:text-[#888888] hover:text-[#262626] dark:hover:text-[#d4d4d4] transition-colors cursor-pointer py-0.5 px-1.5 rounded hover:bg-black/5 dark:hover:bg-white/5"
-          title="Copy code"
+          title={t("workbench.copyCode")}
         >
           {copied ? (
             <>
               <Check className="w-3 h-3 text-[#16a34a] dark:text-[#4ade80]" />
-              <span className="text-[#16a34a] dark:text-[#4ade80]">Copied</span>
+              <span className="text-[#16a34a] dark:text-[#4ade80]">{t("common.copied")}</span>
             </>
           ) : (
             <>
               <Copy className="w-3 h-3" />
-              <span>Copy</span>
+              <span>{t("common.copy")}</span>
             </>
           )}
         </button>

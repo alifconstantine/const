@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { Play, Trash2, ExternalLink } from "lucide-react";
 import type { ScheduledTaskItem, ScheduledTaskRunHistory } from "../../vite-env";
 import { SegmentedToggle } from "./segmented-toggle";
+import { useTranslation } from "../../lib/i18n";
 
 export interface ScheduledTaskHistoryContentProps {
   historyList: ScheduledTaskRunHistory[];
@@ -13,6 +14,7 @@ export function ScheduledTaskHistoryContent({
   historyList,
   onOpenSession,
 }: ScheduledTaskHistoryContentProps): React.JSX.Element {
+  const { t } = useTranslation();
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
 
@@ -46,7 +48,7 @@ export function ScheduledTaskHistoryContent({
   if (historyList.length === 0) {
     return (
       <div className="bg-[#222222] border border-dashed border-[#383838] rounded-xl p-10 text-center text-[#969696] text-xs">
-        <span>No runs yet.</span>
+        <span>{t("scheduledTasks.noHistory")}</span>
       </div>
     );
   }
@@ -58,16 +60,16 @@ export function ScheduledTaskHistoryContent({
           <thead>
             <tr className="bg-[#1b1b1b] border-b border-[#383838]">
               <th className="px-3.5 py-2.5 text-[11px] font-medium text-[#969696] uppercase tracking-wider">
-                Triggered
+                {t("common.triggered")}
               </th>
               <th className="px-3.5 py-2.5 text-[11px] font-medium text-[#969696] uppercase tracking-wider">
-                Source
+                {t("common.source")}
               </th>
               <th className="px-3.5 py-2.5 text-[11px] font-medium text-[#969696] uppercase tracking-wider">
-                Status
+                {t("common.status")}
               </th>
               <th className="px-3.5 py-2.5 text-[11px] font-medium text-[#969696] uppercase tracking-wider">
-                Duration
+                {t("common.duration")}
               </th>
               <th className="w-10"></th>
             </tr>
@@ -83,37 +85,37 @@ export function ScheduledTaskHistoryContent({
                   onClick={() => {
                     if (sid && onOpenSession) onOpenSession(sid);
                   }}
-                  title={sid ? "Click to open dedicated chat session" : undefined}
+                  title={sid ? t("scheduledTasks.clickToOpenSession") : undefined}
                 >
                   <td className="px-3.5 py-3 text-[#d4d4d4]">
                     {formatTimestamp(timeStr)}
                   </td>
                   <td className="px-3.5 py-3 text-[#969696]">
-                    {run.source === "scheduled" ? "Scheduled" : "Manual"}
+                    {run.source === "scheduled" ? t("common.scheduled") : t("common.manual")}
                   </td>
                   <td className="px-3.5 py-3">
                     {run.status === "completed" && (
                       <span className="inline-flex items-center gap-1.5 text-emerald-400 font-medium">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                        <span>Succeeded</span>
+                        <span>{t("common.succeeded")}</span>
                       </span>
                     )}
                     {run.status === "failed" && (
                       <span className="inline-flex items-center gap-1.5 text-rose-400 font-medium">
                         <span className="w-1.5 h-1.5 rounded-full bg-rose-500" />
-                        <span>Failure</span>
+                        <span>{t("common.failure")}</span>
                       </span>
                     )}
                     {run.status === "skipped" && (
                       <span className="inline-flex items-center gap-1.5 text-amber-400 font-medium">
                         <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
-                        <span>Skipped</span>
+                        <span>{t("common.skipped")}</span>
                       </span>
                     )}
                     {run.status === "in-progress" && (
                       <span className="inline-flex items-center gap-1.5 text-blue-400 font-medium">
                         <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
-                        <span>Running</span>
+                        <span>{t("common.running")}</span>
                       </span>
                     )}
                   </td>
@@ -129,7 +131,7 @@ export function ScheduledTaskHistoryContent({
                           e.stopPropagation();
                           onOpenSession(sid);
                         }}
-                        title="Open chat session"
+                        title={t("scheduledTasks.clickToOpenSession")}
                       >
                         <ExternalLink className="w-3.5 h-3.5" />
                       </button>
@@ -147,11 +149,12 @@ export function ScheduledTaskHistoryContent({
         <div className="flex items-center justify-between pt-2">
           <button
             type="button"
-            className="h-8 px-3 rounded-lg text-xs bg-[#222222] hover:bg-[#2b2b2b] border border-[#383838] text-[#d4d4d4] disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer flex items-center justify-center"
+            className="h-8 px-3 rounded-lg text-xs bg-[#222222] hover:bg-[#2b2b2b] border border-[#383838] text-[#d4d4d4] disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer flex items-center justify-center gap-1"
             disabled={currentPage <= 1}
             onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
           >
-            &larr; Previous
+            <span>&larr;</span>
+            <span>{t("common.previous")}</span>
           </button>
 
           <div className="flex items-center gap-1">
@@ -173,11 +176,12 @@ export function ScheduledTaskHistoryContent({
 
           <button
             type="button"
-            className="h-8 px-3 rounded-lg text-xs bg-[#222222] hover:bg-[#2b2b2b] border border-[#383838] text-[#d4d4d4] disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer flex items-center justify-center"
+            className="h-8 px-3 rounded-lg text-xs bg-[#222222] hover:bg-[#2b2b2b] border border-[#383838] text-[#d4d4d4] disabled:opacity-30 disabled:cursor-not-allowed transition-colors cursor-pointer flex items-center justify-center gap-1"
             disabled={currentPage >= totalPages}
             onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
           >
-            Next &rarr;
+            <span>{t("common.next")}</span>
+            <span>&rarr;</span>
           </button>
         </div>
       )}
@@ -205,15 +209,16 @@ export function ScheduledTaskHistory({
   onDeleteRun,
   onSwitchToSettings,
 }: ScheduledTaskHistoryProps): React.JSX.Element {
+  const { t } = useTranslation();
   const taskTitle = task.name || task.title;
 
   return (
     <div className="w-full max-w-4xl mx-auto px-6 sm:px-10 py-12 flex flex-col select-none">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-white tracking-tight mb-1">Edit scheduled task</h1>
+        <h1 className="text-2xl font-semibold text-white tracking-tight mb-1">{t("common.edit")}</h1>
         <p className="text-[13px] text-[#969696]">
-          Adjust when this task runs, what it does, and how it works.
+          {t("scheduledTasks.subtitle")}
         </p>
       </div>
 
@@ -227,8 +232,8 @@ export function ScheduledTaskHistory({
             }
           }}
           options={[
-            { id: "settings", label: "Settings" },
-            { id: "history", label: "History" },
+            { id: "settings", label: t("sidebar.settings") },
+            { id: "history", label: t("scheduledTasks.history") },
           ]}
         />
 
@@ -237,8 +242,8 @@ export function ScheduledTaskHistory({
             type="button"
             className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#222222] hover:bg-[#2b2b2b] border border-[#383838] hover:border-[#484848] text-[#969696] hover:text-white transition-colors cursor-pointer"
             onClick={() => onRunNow(task.id)}
-            title="Run Now"
-            aria-label="Run Now"
+            title={t("scheduledTasks.runNow")}
+            aria-label={t("scheduledTasks.runNow")}
           >
             <Play className="w-3.5 h-3.5 fill-current" />
           </button>
@@ -247,12 +252,12 @@ export function ScheduledTaskHistory({
             type="button"
             className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#222222] hover:bg-[#2b2b2b] border border-[#383838] hover:border-rose-900 text-[#969696] hover:text-rose-400 transition-colors cursor-pointer"
             onClick={() => {
-              if (window.confirm(`Delete "${taskTitle}"?`)) {
+              if (window.confirm(t("scheduledTasks.deleteTaskConfirm").replace("{title}", taskTitle || ""))) {
                 onDeleteTask(task.id);
               }
             }}
-            title="Delete task"
-            aria-label="Delete task"
+            title={t("scheduledTasks.deleteScheduledTask")}
+            aria-label={t("scheduledTasks.deleteScheduledTask")}
           >
             <Trash2 className="w-3.5 h-3.5" />
           </button>

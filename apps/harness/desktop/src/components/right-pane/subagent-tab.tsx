@@ -4,6 +4,7 @@ import { ScrollArea } from "@const/ui";
 import type { RightPaneTab } from "./types";
 import type { SubAgentItem, TraceStep } from "../../vite-env";
 import { ChatMessageItem } from "../workbench/chat-message-item";
+import { useTranslation } from "../../lib/i18n";
 
 export interface SubagentTabProps {
   tab: RightPaneTab;
@@ -52,6 +53,7 @@ export function SubagentTab({
   onKillAgent,
   onOpenFilePreview,
 }: SubagentTabProps) {
+  const { t } = useTranslation();
   const currentAgent: SubAgentItem | undefined =
     subagents.find(
       (a) =>
@@ -63,9 +65,9 @@ export function SubagentTab({
     return (
       <div className="flex-1 w-full h-full flex flex-col items-center justify-center p-6 text-center select-none bg-[#141414] text-white">
         <Bot className="w-8 h-8 mb-2.5 text-[#5d5d5d]" />
-        <h4 className="text-sm font-medium text-[#d4d4d4] mb-1">Sub-Agent Not Found</h4>
+        <h4 className="text-sm font-medium text-[#d4d4d4] mb-1">{t("rightPane.subagentNotFound")}</h4>
         <p className="text-xs text-[#808080] max-w-xs">
-          The requested sub-agent may have finished or been cleared.
+          {t("rightPane.subagentNotFoundDesc")}
         </p>
       </div>
     );
@@ -188,7 +190,7 @@ export function SubagentTab({
         <div className="flex items-center gap-2.5 shrink-0">
           {typeof currentAgent.turnCount === "number" && currentAgent.turnCount > 0 && (
             <span className="text-[11px] text-[#737373] tabular-nums">
-              {currentAgent.turnCount} {currentAgent.turnCount === 1 ? "turn" : "turns"}
+              {currentAgent.turnCount} {t("common.turn").toLowerCase()}
             </span>
           )}
           <span className="text-[11px] text-[#737373] tabular-nums">
@@ -198,25 +200,25 @@ export function SubagentTab({
           {currentAgent.status === "running" && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20">
               <Loader2 className="w-3 h-3 animate-spin" />
-              Running
+              {t("common.running")}
             </span>
           )}
           {currentAgent.status === "completed" && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
               <CheckCircle2 className="w-3 h-3" />
-              Completed
+              {t("common.completed")}
             </span>
           )}
           {currentAgent.status === "failed" && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-red-500/10 text-red-400 border border-red-500/20">
               <AlertCircle className="w-3 h-3" />
-              Failed
+              {t("common.failed")}
             </span>
           )}
           {currentAgent.status === "killed" && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-neutral-500/10 text-neutral-400 border border-neutral-500/20">
               <Ban className="w-3 h-3" />
-              Cancelled
+              {t("common.cancelled")}
             </span>
           )}
 
@@ -224,11 +226,11 @@ export function SubagentTab({
             <button
               type="button"
               onClick={() => onOpenFilePreview(currentAgent.artifactPath!)}
-              title="Open Full Output Artifact"
+              title={t("rightPane.openFullArtifact")}
               className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium bg-[#222222] hover:bg-[#2c2c2c] text-[#d4d4d4] border border-[#333333] transition-colors"
             >
               <FileText className="w-3 h-3" />
-              Artifact
+              {t("rightPane.artifact")}
             </button>
           )}
 
@@ -236,11 +238,11 @@ export function SubagentTab({
             <button
               type="button"
               onClick={() => onKillAgent(currentAgent.id)}
-              title="Terminate Sub-Agent"
+              title={t("rightPane.terminateSubAgent")}
               className="inline-flex items-center gap-1 px-2 py-1 rounded text-[11px] font-medium bg-red-500/15 hover:bg-red-500/25 text-red-300 border border-red-500/30 transition-colors"
             >
               <Square className="w-2.5 h-2.5 fill-current" />
-              Stop
+              {t("common.stop")}
             </button>
           )}
         </div>

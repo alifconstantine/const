@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { ChevronDown, Check } from "lucide-react";
+import { useTranslation } from "../../lib/i18n";
 
 export interface DropdownOption {
   value: string;
@@ -21,9 +22,11 @@ export function CustomDropdown({
   options,
   onChange,
   icon,
-  placeholder = "Select...",
+  placeholder,
   className,
 }: CustomDropdownProps): React.JSX.Element {
+  const { t } = useTranslation();
+  const effectivePlaceholder = placeholder ?? t("common.selectPlaceholder");
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -62,7 +65,7 @@ export function CustomDropdown({
       >
         <span className="inline-flex items-center gap-1.5">
           {icon || selectedOption?.icon}
-          <span>{selectedOption ? selectedOption.label : placeholder}</span>
+          <span>{selectedOption ? selectedOption.label : effectivePlaceholder}</span>
         </span>
         <ChevronDown
           className={`w-3 h-3 text-[#969696] transition-transform duration-150 ${

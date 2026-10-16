@@ -1,6 +1,7 @@
 import React, { useState, useRef } from "react";
 import { ChevronLeft, ChevronRight, Info } from "lucide-react";
 import type { QuestionItem } from "../../vite-env";
+import { useTranslation } from "../../lib/i18n";
 
 export interface QuestionCardProps {
   toolCallId: string;
@@ -10,27 +11,27 @@ export interface QuestionCardProps {
   className?: string;
 }
 
-function deriveCategory(questionText: string, explicitCategory?: string): string {
+function deriveCategory(questionText: string, t: (k: string) => string, explicitCategory?: string): string {
   if (explicitCategory && explicitCategory.trim().length > 0) {
     return explicitCategory.trim();
   }
   const lower = questionText.toLowerCase();
   if (lower.includes("tema") || lower.includes("theme") || lower.includes("desain") || lower.includes("design")) {
-    return "Tema Desain";
+    return t("workbench.questionTheme");
   }
   if (lower.includes("warna") || lower.includes("color") || lower.includes("palet") || lower.includes("palette")) {
-    return "Palet Warna";
+    return t("workbench.questionColor");
   }
   if (lower.includes("font") || lower.includes("tipografi") || lower.includes("typography")) {
-    return "Tipografi";
+    return t("workbench.questionTypography");
   }
   if (lower.includes("fitur") || lower.includes("feature") || lower.includes("layout")) {
-    return "Struktur Layout";
+    return t("workbench.questionLayout");
   }
   if (lower.includes("animasi") || lower.includes("animation") || lower.includes("interaksi")) {
-    return "Interaksi";
+    return t("workbench.questionInteraction");
   }
-  return "Konfirmasi";
+  return t("workbench.questionConfirmation");
 }
 
 export function QuestionCard({
@@ -40,6 +41,7 @@ export function QuestionCard({
   onDismiss,
   className = "",
 }: QuestionCardProps) {
+  const { t } = useTranslation();
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<number, string>>({});
   const [customInputs, setCustomInputs] = useState<Record<number, string>>({});
@@ -49,7 +51,7 @@ export function QuestionCard({
   if (!questions || questions.length === 0) return null;
 
   const currentQ = questions[currentIndex] || questions[0]!;
-  const category = deriveCategory(currentQ.question, currentQ.category);
+  const category = deriveCategory(currentQ.question, t, currentQ.category);
 
   // Normalize options list
   const rawOptions: Array<{ label: string; description?: string; isRecommended: boolean }> =
@@ -301,7 +303,7 @@ export function QuestionCard({
           <input
             ref={customInputRef}
             type="text"
-            placeholder="Enter your answer..."
+            placeholder={t("workbench.questionCardPlaceholder")}
             value={customInputs[currentIndex] || ""}
             onChange={(e) => handleCustomChange(e.target.value)}
             onFocus={() => setFocusedOptIdx(sortedOptions.length)}
@@ -331,7 +333,7 @@ export function QuestionCard({
             onClick={handleDismiss}
             className="px-2.5 py-1 text-xs font-medium text-[#777777] dark:text-[#999999] hover:text-[#111111] dark:hover:text-white transition-colors cursor-pointer"
           >
-            Dismiss
+            {t("common.cancel")}
           </button>
           <button
             type="button"
@@ -339,7 +341,7 @@ export function QuestionCard({
             disabled={!isCurrentAnswered}
             className="px-3.5 py-1 rounded text-xs font-semibold bg-[#262626] dark:bg-white text-white dark:text-black hover:bg-black dark:hover:bg-[#e6e6e6] active:scale-[0.98] disabled:opacity-30 disabled:pointer-events-none transition-all shadow-xs cursor-pointer"
           >
-            {currentIndex === questions.length - 1 ? "Confirm" : "Continue"}
+            {currentIndex === questions.length - 1 ? t("common.confirm") : t("common.continue")}
           </button>
         </div>
       </div>

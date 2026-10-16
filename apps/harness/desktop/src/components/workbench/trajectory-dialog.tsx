@@ -11,6 +11,7 @@ import {
   ExternalLink,
 } from "lucide-react";
 import { ScrollArea, cn } from "@const/ui";
+import { useTranslation } from "../../lib/i18n";
 
 interface TrajectoryDialogProps {
   open: boolean;
@@ -27,6 +28,7 @@ export function TrajectoryDialog({
   conversationTitle,
   messages,
 }: TrajectoryDialogProps) {
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<"timeline" | "raw">("timeline");
   const [rawTranscript, setRawTranscript] = useState<string>("");
   const [copied, setCopied] = useState(false);
@@ -102,7 +104,7 @@ export function TrajectoryDialog({
             <div className="flex flex-col min-w-0">
               <div className="flex items-center gap-2">
                 <span className="text-[14px] font-semibold text-[#161616] dark:text-white truncate">
-                  Model Trajectory
+                  {t("workbench.modelTrajectory")}
                 </span>
                 {conversationTitle && (
                   <span className="text-xs text-[#888888] dark:text-[#777777] truncate hidden sm:inline max-w-[200px]">
@@ -129,7 +131,7 @@ export function TrajectoryDialog({
                     : "text-[#777777] dark:text-[#888888] hover:text-black dark:hover:text-white"
                 )}
               >
-                Timeline
+                {t("workbench.timeline")}
               </button>
               <button
                 type="button"
@@ -141,7 +143,7 @@ export function TrajectoryDialog({
                     : "text-[#777777] dark:text-[#888888] hover:text-black dark:hover:text-white"
                 )}
               >
-                Raw JSONL
+                {t("workbench.rawJsonl")}
               </button>
             </div>
 
@@ -154,12 +156,12 @@ export function TrajectoryDialog({
               {copied ? (
                 <>
                   <Check className="w-3.5 h-3.5 text-[#16a34a] dark:text-[#4ade80]" />
-                  <span>Copied</span>
+                  <span>{t("common.copied")}</span>
                 </>
               ) : (
                 <>
                   <Copy className="w-3.5 h-3.5" />
-                  <span>Copy JSONL</span>
+                  <span>{t("workbench.copyJsonl")}</span>
                 </>
               )}
             </button>
@@ -182,7 +184,7 @@ export function TrajectoryDialog({
               <div className="max-w-3xl mx-auto flex flex-col gap-4">
                 {messages.length === 0 ? (
                   <div className="text-center py-12 text-sm text-[#888888]">
-                    No messages or trajectory recorded for this task yet.
+                    {t("workbench.noTrajectory")}
                   </div>
                 ) : (
                   messages.map((msg, idx) => (
@@ -205,6 +207,7 @@ export function TrajectoryDialog({
 }
 
 function TimelineStepItem({ message, stepIndex }: { message: any; stepIndex: number }) {
+  const { t } = useTranslation();
   const isUser = message.role === "user";
 
   return (
@@ -215,12 +218,12 @@ function TimelineStepItem({ message, stepIndex }: { message: any; stepIndex: num
           {isUser ? (
             <span className="flex items-center gap-1.5 font-semibold text-[#161616] dark:text-white">
               <MessageSquare className="w-3.5 h-3.5 text-[#0066ff]" />
-              User Turn #{stepIndex + 1}
+              {t("workbench.userTurn")} #{stepIndex + 1}
             </span>
           ) : (
             <span className="flex items-center gap-1.5 font-semibold text-[#161616] dark:text-white">
               <Brain className="w-3.5 h-3.5 text-[#ff7a00]" />
-              Agent Turn #{stepIndex + 1}
+              {t("workbench.agentTurn")} #{stepIndex + 1}
             </span>
           )}
         </div>
@@ -246,7 +249,7 @@ function TimelineStepItem({ message, stepIndex }: { message: any; stepIndex: num
             <div className="p-3 rounded-lg bg-[#f6f6f8] dark:bg-[#1f1f21] border border-[#e2e2e4] dark:border-[#2a2a2d] text-xs text-[#666666] dark:text-[#a0a0a0] flex flex-col gap-1.5 select-text">
               <div className="flex items-center gap-1.5 font-medium text-[#161616] dark:text-[#cfcfcf]">
                 <Brain className="w-3.5 h-3.5 text-[#ff7a00]" />
-                <span>Model Thinking</span>
+                <span>{t("workbench.modelThinking")}</span>
               </div>
               <p className="whitespace-pre-wrap leading-relaxed line-clamp-6 hover:line-clamp-none">
                 {message.thinking}
@@ -258,7 +261,7 @@ function TimelineStepItem({ message, stepIndex }: { message: any; stepIndex: num
           {message.toolCalls && message.toolCalls.length > 0 && (
             <div className="flex flex-col gap-1.5">
               <span className="text-[11px] font-semibold uppercase tracking-wider text-[#888888]">
-                Tool Executions ({message.toolCalls.length})
+                {t("workbench.toolExecutions")} ({message.toolCalls.length})
               </span>
               <div className="flex flex-col gap-1.5">
                 {message.toolCalls.map((tc: any, tcIdx: number) => (
@@ -273,7 +276,7 @@ function TimelineStepItem({ message, stepIndex }: { message: any; stepIndex: num
                       </div>
                       {tc.isError && (
                         <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/10 text-red-400 font-medium">
-                          Failed
+                          {t("common.failed")}
                         </span>
                       )}
                     </div>

@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Loader2, ChevronDown, Square } from "lucide-react";
 import { cn } from "@const/ui";
+import { useTranslation } from "../../lib/i18n";
 import type { BackgroundTaskItem } from "../../vite-env";
 
 export interface AttachedTaskBannerProps {
@@ -16,6 +17,7 @@ export function AttachedTaskBanner({
   onStopTask,
   className = "",
 }: AttachedTaskBannerProps) {
+  const { t } = useTranslation();
   const [isExpanded, setIsExpanded] = useState(true);
 
   if (!tasks || tasks.length === 0) return null;
@@ -33,7 +35,7 @@ export function AttachedTaskBanner({
         className="flex items-center justify-between text-neutral-500 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-200 cursor-pointer py-0.5"
       >
         <span className="font-medium text-xs">
-          {tasks.length} {tasks.length === 1 ? "task running" : "tasks running"}
+          {tasks.length} {tasks.length === 1 ? t("workbench.taskRunning") : t("workbench.tasksRunning")}
         </span>
         <ChevronDown
           className={`w-3.5 h-3.5 transition-transform duration-200 ${
@@ -52,7 +54,7 @@ export function AttachedTaskBanner({
                 key={task.id}
                 onClick={() => onSelectTask(task)}
                 className="group flex items-center justify-between px-2.5 py-1.5 rounded bg-white dark:bg-[#282828] hover:bg-neutral-100 dark:hover:bg-[#333333] border border-[#e2e2e4] dark:border-[#383838] cursor-pointer transition-colors"
-                title="Click to view live logs in sidebar"
+                title={t("workbench.viewInSidebar")}
               >
                 <div className="flex items-center gap-2.5 min-w-0 flex-1">
                   {isRunning ? (
@@ -67,7 +69,7 @@ export function AttachedTaskBanner({
 
                 <div className="flex items-center gap-2 shrink-0 ml-2">
                   <span className="text-[10px] text-neutral-500 group-hover:text-neutral-400">
-                    View in sidebar ↗
+                    {t("workbench.viewInSidebar")}
                   </span>
                   {isRunning && (
                     <button
@@ -77,7 +79,7 @@ export function AttachedTaskBanner({
                         onStopTask(task.id);
                       }}
                       className="p-1 rounded hover:bg-red-500/20 text-neutral-400 hover:text-red-400 transition-colors cursor-pointer"
-                      title="Terminate task"
+                      title={t("workbench.terminateTask")}
                     >
                       <Square className="w-3 h-3 fill-current" />
                     </button>

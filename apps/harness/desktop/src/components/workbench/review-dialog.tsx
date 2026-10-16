@@ -6,6 +6,7 @@ import {
   Layers,
 } from "lucide-react";
 import { ScrollArea } from "@const/ui";
+import { useTranslation } from "../../lib/i18n";
 import type { FileMutationRecord } from "../../vite-env";
 import { FileIcon } from "./file-icon";
 
@@ -233,6 +234,7 @@ export function ReviewDialog({
   onRollbackFile,
   onRollbackAll,
 }: ReviewDialogProps) {
+  const { t } = useTranslation();
   const [selectedIndex, setSelectedIndex] = useState(0);
 
   const activeMutation = mutations[selectedIndex] || mutations[0];
@@ -263,10 +265,10 @@ export function ReviewDialog({
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-2">
               <Layers className="w-4 h-4 text-[#e79737] dark:text-[#ff7a00]" />
-              <h2 className="text-sm font-medium text-[#161616] dark:text-[#e5e5e5]">Review Changes</h2>
+              <h2 className="text-sm font-medium text-[#161616] dark:text-[#e5e5e5]">{t("workbench.reviewChanges")}</h2>
             </div>
             <div className="flex items-center gap-1.5 font-sans tabular-nums text-xs text-[#a9a9a9] dark:text-[#888888]">
-              <span>({mutations.length} file{mutations.length > 1 ? "s" : ""})</span>
+              <span>({mutations.length} {mutations.length > 1 ? t("common.files").toLowerCase() : t("common.file").toLowerCase()})</span>
               <span className="text-[#409D62]">+{totalStats.added}</span>
               <span className="text-[#ff5c5c]">-{totalStats.removed}</span>
             </div>
@@ -279,13 +281,13 @@ export function ReviewDialog({
               className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#f4f4f6] hover:bg-[#eaeaea] dark:bg-[#242424] dark:hover:bg-[#2e2e2e] border border-[#e2e2e4] dark:border-[#383838] hover:border-[#d5d5d9] dark:hover:border-[#484848] text-xs text-[#262626] dark:text-[#d4d4d4] transition-all cursor-pointer font-medium"
             >
               <RotateCcw className="w-3 h-3 text-[#e79737] dark:text-[#ff7a00]" />
-              <span>Undo all</span>
+              <span>{t("common.undoAll")}</span>
             </button>
             <button
               type="button"
               onClick={() => onOpenChange(false)}
               className="p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/10 text-[#a9a9a9] dark:text-[#888888] hover:text-[#262626] dark:hover:text-white transition-colors cursor-pointer"
-              title="Close review"
+              title={t("workbench.closeReview")}
             >
               <X className="w-4 h-4" />
             </button>
@@ -343,7 +345,7 @@ export function ReviewDialog({
                         {mut.rolledBack ? (
                           <span className="text-[10px] text-[#409D62] flex items-center gap-0.5">
                             <Check className="w-2.5 h-2.5" />
-                            <span>Undone</span>
+                            <span>{t("workbench.undone")}</span>
                           </span>
                         ) : (
                           <button
@@ -353,10 +355,10 @@ export function ReviewDialog({
                               onRollbackFile(mut);
                             }}
                             className="opacity-0 group-hover:opacity-100 flex items-center gap-1 px-1.5 py-0.5 rounded bg-white hover:bg-[#eaeaea] dark:bg-[#1e1e1e] dark:hover:bg-[#333333] border border-[#e2e2e4] dark:border-[#333333] text-[10px] text-[#262626] dark:text-[#cccccc] transition-all cursor-pointer"
-                            title="Undo only this file"
+                            title={t("workbench.undoFile")}
                           >
                             <RotateCcw className="w-2.5 h-2.5 text-[#e79737] dark:text-[#ff7a00]" />
-                            <span>Undo</span>
+                            <span>{t("common.undo")}</span>
                           </button>
                         )}
                       </div>

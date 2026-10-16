@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { X } from "lucide-react";
 import { CustomDropdown } from "./custom-dropdown";
+import { useTranslation } from "../../lib/i18n";
 
 export interface CustomRepeatConfig {
   frequency: number;
@@ -20,6 +21,7 @@ export function CustomRepeatModal({
   onConfirm,
   onClose,
 }: CustomRepeatModalProps): React.JSX.Element {
+  const { t } = useTranslation();
   const [frequency, setFrequency] = useState(initialConfig?.frequency ?? 1);
   const [unit, setUnit] = useState<"minutes" | "hours" | "days" | "weeks" | "months">(
     initialConfig?.unit ?? "days"
@@ -30,11 +32,11 @@ export function CustomRepeatModal({
   );
 
   const unitOptions = [
-    { value: "minutes", label: "minutes" },
-    { value: "hours", label: "hours" },
-    { value: "days", label: "days" },
-    { value: "weeks", label: "weeks" },
-    { value: "months", label: "months" },
+    { value: "minutes", label: t("scheduledTasks.minutes") },
+    { value: "hours", label: t("scheduledTasks.hours") },
+    { value: "days", label: t("scheduledTasks.days") },
+    { value: "weeks", label: t("scheduledTasks.weeks") },
+    { value: "months", label: t("scheduledTasks.months") },
   ];
 
   const handleConfirm = () => {
@@ -54,12 +56,12 @@ export function CustomRepeatModal({
       >
         {/* Modal Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-[#383838]">
-          <h3 className="text-sm font-semibold text-white">Custom Repeat</h3>
+          <h3 className="text-sm font-semibold text-white">{t("scheduledTasks.custom")}</h3>
           <button
             type="button"
             className="w-6 h-6 flex items-center justify-center rounded-md text-[#969696] hover:text-white hover:bg-[#2b2b2b] transition-colors cursor-pointer"
             onClick={onClose}
-            aria-label="Close"
+            aria-label={t("common.close")}
           >
             <X className="w-4 h-4" />
           </button>
@@ -69,7 +71,7 @@ export function CustomRepeatModal({
         <div className="p-4 flex flex-col gap-4 text-xs">
           {/* Repetition frequency */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium text-[#969696]">Repetition frequency</label>
+            <label className="text-xs font-medium text-[#969696]">{t("scheduledTasks.repetitionFrequency")}</label>
             <div className="flex items-center gap-2">
               <input
                 type="number"
@@ -90,7 +92,7 @@ export function CustomRepeatModal({
 
           {/* Ends options */}
           <div className="flex flex-col gap-1.5">
-            <label className="text-xs font-medium text-[#969696]">Ends</label>
+            <label className="text-xs font-medium text-[#969696]">{t("scheduledTasks.ends")}</label>
             <div className="flex flex-col gap-2">
               <label className="flex items-center gap-2 text-xs text-[#d4d4d4] cursor-pointer">
                 <input
@@ -100,7 +102,7 @@ export function CustomRepeatModal({
                   checked={endsNever}
                   onChange={() => setEndsNever(true)}
                 />
-                <span>Never ends</span>
+                <span>{t("scheduledTasks.neverEnds")}</span>
               </label>
 
               <label className="flex items-center gap-2 text-xs text-[#d4d4d4] cursor-pointer">
@@ -111,7 +113,7 @@ export function CustomRepeatModal({
                   checked={!endsNever}
                   onChange={() => setEndsNever(false)}
                 />
-                <span>Ends on date</span>
+                <span>{t("scheduledTasks.endsOnDate")}</span>
               </label>
 
               {!endsNever && (
@@ -135,14 +137,14 @@ export function CustomRepeatModal({
             className="px-3 py-1.5 rounded-lg text-xs font-medium text-[#d4d4d4] hover:text-white bg-[#222222] hover:bg-[#2b2b2b] border border-[#383838] transition-colors cursor-pointer"
             onClick={onClose}
           >
-            Cancel
+            {t("common.cancel")}
           </button>
           <button
             type="button"
             className="px-3 py-1.5 rounded-lg text-xs font-medium text-[#161616] bg-[#d4d4d4] hover:bg-white transition-colors cursor-pointer"
             onClick={handleConfirm}
           >
-            Confirm
+            {t("common.confirm")}
           </button>
         </div>
       </div>

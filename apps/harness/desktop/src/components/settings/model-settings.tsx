@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
+import { useTranslation } from "../../lib/i18n";
 import {
   toast,
   cn,
@@ -67,6 +68,7 @@ export function ModelSettings({
   initialCategory = "llm",
   onActiveModelChanged,
 }: ModelSettingsProps) {
+  const { t } = useTranslation();
   // 1. Modality category state: "llm" | "speech" | "image" | "video"
   const [activeCategory, setActiveCategory] = useState<ModelCategory>(initialCategory);
 
@@ -572,7 +574,7 @@ export function ModelSettings({
   const handlePlayTestSpeech = (voiceName: string, speed = 1.0) => {
     setIsPlayingSpeech(true);
     playSampleSpeechAudio(
-      "Halo! Suara berhasil terhubung dan siap digunakan.",
+      t("settings.ttsTestText"),
       voiceName,
       speed,
       () => setIsPlayingSpeech(false)

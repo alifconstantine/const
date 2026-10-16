@@ -9,6 +9,7 @@ import {
   Check,
 } from "lucide-react";
 import type { TodoItem } from "../../vite-env";
+import { useTranslation } from "../../lib/i18n";
 
 export interface TodoPillProps {
   todos: TodoItem[];
@@ -17,6 +18,7 @@ export interface TodoPillProps {
 }
 
 export function TodoPill({ todos, className = "", defaultExpanded = false }: TodoPillProps) {
+  const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(defaultExpanded);
   const [showCompletedPanel, setShowCompletedPanel] = useState(false);
   const popoverRef = useRef<HTMLDivElement>(null);
@@ -97,7 +99,7 @@ export function TodoPill({ todos, className = "", defaultExpanded = false }: Tod
             {/* Header: Progress X/Y and actions */}
             <div className="flex items-center justify-between pb-2.5 mb-2 border-b border-[#2a2a2a]">
               <div className="flex items-center gap-2">
-                <span className="text-neutral-400 font-medium">Progress</span>
+                <span className="text-neutral-400 font-medium">{t("common.progress")}</span>
                 <span className="text-emerald-400 font-sans tabular-nums font-medium">
                   {completedCount}/{totalCount}
                 </span>
@@ -107,7 +109,7 @@ export function TodoPill({ todos, className = "", defaultExpanded = false }: Tod
                   type="button"
                   onClick={() => setIsOpen(false)}
                   className="p-1 rounded hover:bg-white/10 text-neutral-400 hover:text-white transition-colors cursor-pointer"
-                  title="Minimize"
+                  title={t("common.minimize")}
                 >
                   <Minimize2 className="w-3.5 h-3.5" />
                 </button>
@@ -128,10 +130,10 @@ export function TodoPill({ todos, className = "", defaultExpanded = false }: Tod
                         showCompletedPanel ? "-rotate-90 md:rotate-0" : "rotate-0"
                       }`}
                     />
-                    <span>{completedCount} completed</span>
+                    <span>{completedCount} {t("common.completed").toLowerCase()}</span>
                   </div>
                   <span className="text-[10px] text-neutral-500">
-                    {showCompletedPanel ? "Hide" : "Show"}
+                    {showCompletedPanel ? t("common.collapse") : t("common.expand")}
                   </span>
                 </button>
 
@@ -154,7 +156,7 @@ export function TodoPill({ todos, className = "", defaultExpanded = false }: Tod
               {remainingItems.length === 0 ? (
                 <div className="py-3 text-center text-emerald-400/80 font-medium flex items-center justify-center gap-1.5">
                   <Check className="w-4 h-4" />
-                  <span>All tasks completed!</span>
+                  <span>{t("workbench.allTasksCompleted")}</span>
                 </div>
               ) : (
                 remainingItems.map((item, idx) => {

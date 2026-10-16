@@ -6,6 +6,7 @@ import React, {
   useState,
 } from "react";
 import { cn } from "@const/ui";
+import { useI18n } from "../../lib/i18n";
 import { activeAtToken, type ActiveAtToken, type MentionCandidate } from "../../lib/mention-search";
 
 export interface RichMentionEditorRef {
@@ -281,7 +282,7 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
   (
     {
       initialValue = "",
-      placeholder = "Ask Const anything, @ to add context, / for commands...",
+      placeholder,
       disabled = false,
       className,
       onSerializedChange,
@@ -294,6 +295,8 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
     },
     ref
   ) => {
+    const { t } = useI18n();
+    const effectivePlaceholder = placeholder ?? t("workbench.askPlaceholder");
     const editorRef = useRef<HTMLDivElement>(null);
     const [isEmpty, setIsEmpty] = useState(true);
     const savedRangeRef = useRef<Range | null>(null);
@@ -887,7 +890,7 @@ export const RichMentionEditor = React.forwardRef<RichMentionEditorRef, RichMent
       <div className="relative w-full min-h-[28px] flex flex-col justify-start">
         {isEmpty && (
           <div className="absolute top-0.5 left-0 pointer-events-none select-none text-[14px] leading-5 text-[#a9a9a9] dark:text-[#5d5d5d] font-sans">
-            {placeholder}
+            {effectivePlaceholder}
           </div>
         )}
 

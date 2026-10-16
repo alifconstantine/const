@@ -19,6 +19,7 @@ import type { FileMutationRecord, TraceStep } from "../../vite-env";
 import { FileIcon } from "./file-icon";
 import { MarkdownContent } from "./markdown-content";
 import { getMutationDiffStats } from "./review-dialog";
+import { useTranslation } from "../../lib/i18n";
 
 export interface TraceToolCall {
   id: string;
@@ -93,6 +94,7 @@ export function ExecutionTrace({
   onAnswerQuestion,
   onOpenSubAgent,
 }: ExecutionTraceProps) {
+  const { t } = useTranslation();
   // Default: Open while executing to view progress live; automatically closed when worked/finished
   const [isMainOpen, setIsMainOpen] = useState(isExecuting);
   const wasExecutingRef = useRef(isExecuting);
@@ -157,21 +159,21 @@ export function ExecutionTrace({
   // Format execution duration e.g. "Worked for 1m 56s", "Worked for 22s", or "Working for 12s..."
   const formatDuration = () => {
     if (isExecuting) {
-      if (!durationMs || durationMs < 1000) return "Working...";
+      if (!durationMs || durationMs < 1000) return `${t("workbench.workingFor")}...`;
       const s = Math.round(durationMs / 1000);
-      if (s < 60) return `Working for ${s}s...`;
+      if (s < 60) return `${t("workbench.workingFor")} ${s}s...`;
       const m = Math.floor(s / 60);
       const remS = s % 60;
-      if (remS === 0) return `Working for ${m}m...`;
-      return `Working for ${m}m ${remS}s...`;
+      if (remS === 0) return `${t("workbench.workingFor")} ${m}m...`;
+      return `${t("workbench.workingFor")} ${m}m ${remS}s...`;
     }
-    if (!durationMs || durationMs < 1000) return "Worked for a few seconds";
+    if (!durationMs || durationMs < 1000) return `${t("workbench.workedFor")} 1s`;
     const s = Math.round(durationMs / 1000);
-    if (s < 60) return `Worked for ${s}s`;
+    if (s < 60) return `${t("workbench.workedFor")} ${s}s`;
     const m = Math.floor(s / 60);
     const remS = s % 60;
-    if (remS === 0) return `Worked for ${m}m`;
-    return `Worked for ${m}m ${remS}s`;
+    if (remS === 0) return `${t("workbench.workedFor")} ${m}m`;
+    return `${t("workbench.workedFor")} ${m}m ${remS}s`;
   };
 
   return (
@@ -240,7 +242,7 @@ export function ExecutionTrace({
                       className="flex items-center gap-2 py-0.5 text-[13px] text-[#888888] font-sans select-none"
                     >
                       <HelpCircle className="w-3.5 h-3.5 text-[#777777] shrink-0" />
-                      <span>Asking questions</span>
+                      <span>{t("workbench.askingQuestions")}</span>
                     </div>
                   );
                 }
@@ -468,6 +470,7 @@ function ThoughtItem({
   durationMs?: number;
   startTime?: number;
 }) {
+  const { t } = useTranslation();
   // 1. Auto open when thinking starts, and auto close when thinking completes
   const [isOpen, setIsOpen] = useState(Boolean(isExecuting));
   const prevExecutingRef = useRef(Boolean(isExecuting));
@@ -496,16 +499,16 @@ function ThoughtItem({
   const thoughtLabel = () => {
     if (isExecuting) {
       if (liveStepDuration >= 1000) {
-        return `Thinking (${Math.round(liveStepDuration / 1000)}s)...`;
+        return t("workbench.thinkingWithDuration", { duration: String(Math.round(liveStepDuration / 1000)) });
       }
-      return "Thinking...";
+      return `${t("workbench.thinkingEffort")}...`;
     }
     const finalMs = durationMs ?? (liveStepDuration > 0 ? liveStepDuration : undefined);
     if (finalMs !== undefined && finalMs > 0) {
       const s = Math.max(1, Math.round(finalMs / 1000));
-      return `Thought for ${s}s`;
+      return t("workbench.thoughtFor", { duration: String(s) });
     }
-    return "Thought for a few seconds";
+    return t("workbench.thoughtFor", { duration: "1" });
   };
 
   if (!thinking && !isExecuting) return null;
@@ -649,6 +652,7 @@ function TerminalCard({
   isDefaultOpen?: boolean;
   isWaitingApproval?: boolean;
 }) {
+  const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(isDefaultOpen);
 
   let cmd = "";
@@ -705,13 +709,13 @@ function TerminalCard({
           {cmd || "command"}
         </span>
         {isWaitingApproval ? (
-          <span className="w-1.5 h-1.5 rounded-full bg-[#ff7a00] animate-ping shrink-0" title="Waiting for user approval" />
+          <span className="w-1.5 h-1.5 rounded-full bg-[#ff7a00] animate-ping shrink-0" title={t("workbench.waitingApproval")} />
         ) : isFailed ? (
-          <span className="w-1.5 h-1.5 rounded-full bg-[#ff5c5c] shrink-0" title="Failed" />
+          <span className="w-1.5 h-1.5 rounded-full bg-[#ff5c5c] shrink-0" title={t("common.error")} />
         ) : tool.result !== undefined ? (
-          <span className="w-1.5 h-1.5 rounded-full bg-[#409D62] shrink-0" title="Success" />
+          <span className="w-1.5 h-1.5 rounded-full bg-[#409D62] shrink-0" title={t("common.success")} />
         ) : (
-          <span className="w-1.5 h-1.5 rounded-full bg-[#e79737] dark:bg-[#ff7a00] animate-pulse shrink-0" title="Running command..." />
+          <span className="w-1.5 h-1.5 rounded-full bg-[#e79737] dark:bg-[#ff7a00] animate-pulse shrink-0" title={t("common.loading")} />
         )}
         <ChevronDown
           className="w-3 h-3 text-[#666666] shrink-0 ml-1 transition-transform duration-200 ease-out"
@@ -1028,6 +1032,7 @@ function ExplorationItem({
   mutations: FileMutationRecord[];
   onOpenFilePreview?: (filePath: string, content?: string) => void;
 }) {
+  const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
   const norm = (tool.name || "").toLowerCase().replace(/[-_]/g, "");
 
@@ -1169,9 +1174,9 @@ function ExplorationItem({
                 );
               }}
               className="flex items-center gap-1 px-2 py-0.5 rounded bg-black/5 hover:bg-black/10 dark:bg-white/5 dark:hover:bg-white/10 text-[11px] text-[#555555] dark:text-[#a0a0a0] hover:text-black dark:hover:text-white border border-[#d5d5d9] dark:border-[#333333] transition-colors cursor-pointer"
-              title="Preview file in sidebar"
+              title={t("rightPane.filePreview")}
             >
-              <span>Preview</span>
+              <span>{t("common.preview")}</span>
             </button>
           )}
           {!onOpenFilePreview && hasResult && (
@@ -1446,6 +1451,7 @@ export function MutationsSummaryCard({
   onOpenReview?: () => void;
   onOpenFileDiff?: (record: FileMutationRecord) => void;
 }) {
+  const { t } = useTranslation();
   // Default: Open while executing, automatically closes when finished
   const [isOpen, setIsOpen] = useState(isExecuting);
   const wasExecutingRef = useRef(isExecuting);
@@ -1478,7 +1484,9 @@ export function MutationsSummaryCard({
           className="inline-flex items-center gap-2 text-[13px] text-[#262626] dark:text-[#cccccc] hover:text-black dark:hover:text-white transition-colors cursor-pointer group/card"
         >
           <span className="font-normal text-[#262626] dark:text-[#d4d4d4]">
-            {mutations.length} file{mutations.length > 1 ? "s" : ""} changed
+            {mutations.length > 1
+              ? t("workbench.filesChanged", { count: String(mutations.length) })
+              : t("workbench.fileChanged", { count: String(mutations.length) })}
           </span>
           <span className="font-sans tabular-nums text-xs text-[#409D62] font-medium">+{totalAdded}</span>
           <span className="font-sans tabular-nums text-xs text-[#ff5c5c] font-medium">-{totalRemoved}</span>
@@ -1496,10 +1504,10 @@ export function MutationsSummaryCard({
               type="button"
               onClick={() => onRollbackAll(mutations)}
               className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#f4f4f6] hover:bg-[#eaeaea] dark:bg-[#1e1e1e] dark:hover:bg-[#282828] border border-[#e2e2e4] hover:border-[#d5d5d9] dark:border-[#333333] dark:hover:border-[#444444] text-[11.5px] text-[#262626] hover:text-black dark:text-[#d4d4d4] dark:hover:text-white transition-all cursor-pointer font-medium shadow-xs"
-              title="Undo all changes in this turn"
+              title={t("common.undoAll")}
             >
               <RotateCcw className="w-3 h-3 text-[#262626] dark:text-[#d4d4d4]" />
-              <span>Undo all</span>
+              <span>{t("common.undoAll")}</span>
             </button>
           )}
 
@@ -1508,10 +1516,10 @@ export function MutationsSummaryCard({
               type="button"
               onClick={onOpenReview}
               className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-[#f4f4f6] hover:bg-[#eaeaea] dark:bg-[#1e1e1e] dark:hover:bg-[#282828] border border-[#e2e2e4] hover:border-[#d5d5d9] dark:border-[#333333] dark:hover:border-[#444444] text-[11.5px] text-[#262626] hover:text-black dark:text-[#e0e0e0] dark:hover:text-white transition-all cursor-pointer font-medium shadow-xs"
-              title="Review line by line diffs"
+              title={t("workbench.reviewDialogTitle")}
             >
               <FileSearch className="w-3.5 h-3.5 text-[#a9a9a9] dark:text-[#9e9e9e]" />
-              <span>Review</span>
+              <span>{t("rightPane.review")}</span>
             </button>
           )}
         </div>

@@ -22,6 +22,7 @@ import {
   toast,
 } from "@const/ui";
 import { AutoScrollTitle } from "../auto-scroll-title";
+import { useTranslation } from "../../lib/i18n";
 
 interface TopToolbarProps {
   isSidebarOpen: boolean;
@@ -62,6 +63,7 @@ export function TopToolbar({
   onOpenTerminal,
   onOpenBrowser,
 }: TopToolbarProps) {
+  const { t } = useTranslation();
   const [isMaximized, setIsMaximized] = useState(false);
 
   useEffect(() => {
@@ -105,7 +107,7 @@ export function TopToolbar({
         }
       }
     } catch {
-      toast.error("Failed to open file explorer");
+      toast.error(t("toast.failedToOpenExplorer"));
     }
   };
 
@@ -118,12 +120,12 @@ export function TopToolbar({
       }
       if (targetPath) {
         await navigator.clipboard.writeText(targetPath);
-        toast.success("Path copied to clipboard");
+        toast.success(t("toast.pathCopied"));
       } else {
-        toast.error("No active path available");
+        toast.error(t("toast.noActivePath"));
       }
     } catch {
-      toast.error("Failed to copy path");
+      toast.error(t("toast.failedToCopyPath"));
     }
   };
 
@@ -133,16 +135,16 @@ export function TopToolbar({
         const paths = await window.electron.getConversationPaths(conversationId, workspacePath);
         if (paths.taskPath) {
           await navigator.clipboard.writeText(paths.taskPath);
-          toast.success("Task path copied to clipboard");
+          toast.success(t("toast.taskPathCopied"));
           return;
         }
       }
       if (conversationId) {
         await navigator.clipboard.writeText(`task://${conversationId}`);
-        toast.success("Task path copied");
+        toast.success(t("toast.taskPathCopied"));
       }
     } catch {
-      toast.error("Failed to copy task path");
+      toast.error(t("toast.failedToCopyTaskPath"));
     }
   };
 
@@ -152,13 +154,13 @@ export function TopToolbar({
         const paths = await window.electron.getConversationPaths(conversationId, workspacePath);
         if (paths.logPath) {
           await navigator.clipboard.writeText(paths.logPath);
-          toast.success("Log path copied to clipboard");
+          toast.success(t("toast.logPathCopied"));
           return;
         }
       }
-      toast.error("No log path found");
+      toast.error(t("toast.noLogPath"));
     } catch {
-      toast.error("Failed to copy log path");
+      toast.error(t("toast.failedToCopyLogPath"));
     }
   };
 
@@ -166,9 +168,9 @@ export function TopToolbar({
     if (conversationId) {
       try {
         await navigator.clipboard.writeText(conversationId);
-        toast.success("Session ID copied to clipboard");
+        toast.success(t("toast.sessionIdCopied"));
       } catch {
-        toast.error("Failed to copy session ID");
+        toast.error(t("toast.failedToCopySessionId"));
       }
     }
   };
@@ -198,8 +200,8 @@ export function TopToolbar({
               type="button"
               onClick={onToggleSidebar}
               className="p-1.5 rounded-lg hover:bg-black/5 dark:hover:bg-[#222222] text-[#262626] dark:text-[#d4d4d4] transition-colors cursor-pointer flex items-center justify-center"
-              title="Open sidebar (Ctrl+B)"
-              aria-label="Open sidebar"
+              title={t("topToolbar.toggleSidebar")}
+              aria-label={t("topToolbar.toggleSidebar")}
             >
               <PanelLeft className="w-4 h-4 text-[#262626] dark:text-[#d4d4d4]" />
             </button>
@@ -208,8 +210,8 @@ export function TopToolbar({
               type="button"
               onClick={() => onNewChat?.()}
               className="p-1.5 rounded-lg text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-[#222222] transition-colors cursor-pointer flex items-center justify-center"
-              title={typeof navigator !== "undefined" && navigator?.userAgent?.includes("Mac") ? "New chat (⌘K)" : "New chat (Ctrl+K)"}
-              aria-label="New chat"
+              title={typeof navigator !== "undefined" && navigator?.userAgent?.includes("Mac") ? `${t("sidebar.newChat")} (⌘K)` : `${t("sidebar.newChat")} (Ctrl+K)`}
+              aria-label={t("sidebar.newChat")}
             >
               <MessageCirclePlus className="w-4 h-4" />
             </button>
@@ -238,8 +240,8 @@ export function TopToolbar({
                 <button
                   type="button"
                   className="p-1 rounded hover:bg-black/5 dark:hover:bg-[#222222] text-[#a9a9a9] dark:text-[#888888] hover:text-[#262626] dark:hover:text-[#d4d4d4] transition-colors cursor-pointer data-[state=open]:bg-black/5 dark:data-[state=open]:bg-[#222222] data-[state=open]:text-white"
-                  title="Task options"
-                  aria-label="Task options"
+                  title={t("topToolbar.taskOptions")}
+                  aria-label={t("topToolbar.taskOptions")}
                 >
                   <MoreHorizontal className="w-3.5 h-3.5" />
                 </button>
@@ -253,21 +255,21 @@ export function TopToolbar({
                   onClick={onTogglePin}
                   className="px-3 py-1.5 text-[13px] text-[#d4d4d4] hover:text-white focus:text-white hover:bg-[#303030] focus:bg-[#303030] rounded-lg cursor-pointer outline-none transition-colors"
                 >
-                  {isPinned ? "Unpin task" : "Pin task"}
+                  {isPinned ? t("topToolbar.unpinTask") : t("topToolbar.pinTask")}
                 </DropdownMenuItem>
 
                 <DropdownMenuItem
                   onClick={onOpenRename}
                   className="px-3 py-1.5 text-[13px] text-[#d4d4d4] hover:text-white focus:text-white hover:bg-[#303030] focus:bg-[#303030] rounded-lg cursor-pointer outline-none transition-colors"
                 >
-                  Rename task
+                  {t("topToolbar.renameTask")}
                 </DropdownMenuItem>
 
                 <DropdownMenuItem
                   onClick={onArchive}
                   className="px-3 py-1.5 text-[13px] text-[#d4d4d4] hover:text-white focus:text-white hover:bg-[#303030] focus:bg-[#303030] rounded-lg cursor-pointer outline-none transition-colors"
                 >
-                  Archive task
+                  {t("topToolbar.archiveTask")}
                 </DropdownMenuItem>
 
                 <DropdownMenuSeparator className="h-[1px] bg-[#383838] my-1 -mx-1" />
@@ -276,42 +278,42 @@ export function TopToolbar({
                   onClick={handleOpenInExplorer}
                   className="px-3 py-1.5 text-[13px] text-[#d4d4d4] hover:text-white focus:text-white hover:bg-[#303030] focus:bg-[#303030] rounded-lg cursor-pointer outline-none transition-colors"
                 >
-                  Open in File Explorer
+                  {t("topToolbar.openInExplorer")}
                 </DropdownMenuItem>
 
                 <DropdownMenuItem
                   onClick={handleCopyPath}
                   className="px-3 py-1.5 text-[13px] text-[#d4d4d4] hover:text-white focus:text-white hover:bg-[#303030] focus:bg-[#303030] rounded-lg cursor-pointer outline-none transition-colors"
                 >
-                  Copy path
+                  {t("topToolbar.copyPath")}
                 </DropdownMenuItem>
 
                 <DropdownMenuItem
                   onClick={handleCopyTaskPath}
                   className="px-3 py-1.5 text-[13px] text-[#d4d4d4] hover:text-white focus:text-white hover:bg-[#303030] focus:bg-[#303030] rounded-lg cursor-pointer outline-none transition-colors"
                 >
-                  Copy task path
+                  {t("topToolbar.copyTaskPath")}
                 </DropdownMenuItem>
 
                 <DropdownMenuItem
                   onClick={handleCopyLogPath}
                   className="px-3 py-1.5 text-[13px] text-[#d4d4d4] hover:text-white focus:text-white hover:bg-[#303030] focus:bg-[#303030] rounded-lg cursor-pointer outline-none transition-colors"
                 >
-                  Copy log path
+                  {t("topToolbar.copyLogPath")}
                 </DropdownMenuItem>
 
                 <DropdownMenuItem
                   onClick={handleCopySessionId}
                   className="px-3 py-1.5 text-[13px] text-[#d4d4d4] hover:text-white focus:text-white hover:bg-[#303030] focus:bg-[#303030] rounded-lg cursor-pointer outline-none transition-colors"
                 >
-                  Copy session ID
+                  {t("topToolbar.copySessionId")}
                 </DropdownMenuItem>
 
                 <DropdownMenuItem
                   onClick={() => onOpenSettings?.("general")}
                   className="px-3 py-1.5 text-[13px] text-[#d4d4d4] hover:text-white focus:text-white hover:bg-[#303030] focus:bg-[#303030] rounded-lg cursor-pointer outline-none transition-colors"
                 >
-                  Go to config
+                  {t("topToolbar.goToConfig")}
                 </DropdownMenuItem>
 
                 <DropdownMenuSeparator className="h-[1px] bg-[#383838] my-1 -mx-1" />
@@ -320,14 +322,14 @@ export function TopToolbar({
                   onClick={onOpenTrajectory}
                   className="px-3 py-1.5 text-[13px] text-[#d4d4d4] hover:text-white focus:text-white hover:bg-[#303030] focus:bg-[#303030] rounded-lg cursor-pointer outline-none transition-colors"
                 >
-                  View model trajectory
+                  {t("topToolbar.viewModelTrajectory")}
                 </DropdownMenuItem>
 
                 <DropdownMenuItem
                   onClick={handleReportIssue}
                   className="px-3 py-1.5 text-[13px] text-[#d4d4d4] hover:text-white focus:text-white hover:bg-[#303030] focus:bg-[#303030] rounded-lg cursor-pointer outline-none transition-colors"
                 >
-                  Report issue
+                  {t("topToolbar.reportIssue")}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -345,8 +347,8 @@ export function TopToolbar({
           type="button"
           onClick={() => onOpenBrowser?.()}
           className="p-1.5 rounded-lg text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-[#222222] transition-colors cursor-pointer"
-          title="Open browser"
-          aria-label="Open browser"
+          title={t("topToolbar.openBrowser")}
+          aria-label={t("topToolbar.openBrowser")}
         >
           <Globe className="w-4 h-4" />
         </button>
@@ -355,8 +357,8 @@ export function TopToolbar({
           type="button"
           onClick={onOpenTerminal}
           className="p-1.5 rounded-lg text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-[#222222] transition-colors cursor-pointer"
-          title="Open terminal"
-          aria-label="Open terminal"
+          title={t("topToolbar.openTerminal")}
+          aria-label={t("topToolbar.openTerminal")}
         >
           <SquareTerminal className="w-4 h-4" />
         </button>
@@ -369,8 +371,8 @@ export function TopToolbar({
               ? "bg-black/10 dark:bg-white/10 text-black dark:text-white border border-black/10 dark:border-white/10 shadow-xs"
               : "text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white hover:bg-black/5 dark:hover:bg-[#222222]"
           }`}
-          title={isRightSidebarOpen ? "Close right sidebar" : "Open right sidebar"}
-          aria-label="Toggle right sidebar"
+          title={isRightSidebarOpen ? t("topToolbar.closeRightSidebar") : t("topToolbar.openRightSidebar")}
+          aria-label={t("topToolbar.toggleRightPane")}
         >
           <PanelRight className="w-4 h-4" />
         </button>
@@ -384,8 +386,8 @@ export function TopToolbar({
             type="button"
             onClick={handleMinimize}
             className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-black/5 dark:hover:bg-white/10 text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white transition-colors cursor-pointer"
-            title="Minimize"
-            aria-label="Minimize"
+            title={t("common.minimize")}
+            aria-label={t("common.minimize")}
           >
             <Minus className="w-3.5 h-3.5" />
           </button>
@@ -394,8 +396,8 @@ export function TopToolbar({
             type="button"
             onClick={handleMaximize}
             className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-black/5 dark:hover:bg-white/10 text-[#262626] dark:text-[#d4d4d4] hover:text-black dark:hover:text-white transition-colors cursor-pointer"
-            title={isMaximized ? "Restore" : "Maximize"}
-            aria-label={isMaximized ? "Restore" : "Maximize"}
+            title={isMaximized ? t("common.restore") : t("common.maximize")}
+            aria-label={isMaximized ? t("common.restore") : t("common.maximize")}
           >
             {isMaximized ? (
               <Copy className="w-3 h-3 rotate-180" />
@@ -408,8 +410,8 @@ export function TopToolbar({
             type="button"
             onClick={handleClose}
             className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[#e81123] text-[#262626] dark:text-[#d4d4d4] hover:text-white transition-colors cursor-pointer"
-            title="Close"
-            aria-label="Close"
+            title={t("common.close")}
+            aria-label={t("common.close")}
           >
             <X className="w-3.5 h-3.5" />
           </button>

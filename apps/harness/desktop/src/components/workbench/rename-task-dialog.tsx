@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from "react";
 import { X } from "lucide-react";
+import { useTranslation } from "../../lib/i18n";
 
 interface RenameTaskDialogProps {
   open: boolean;
@@ -14,6 +15,7 @@ export function RenameTaskDialog({
   onClose,
   onConfirm,
 }: RenameTaskDialogProps) {
+  const { t } = useTranslation();
   const [title, setTitle] = useState(currentTitle);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -47,7 +49,7 @@ export function RenameTaskDialog({
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-[#e2e2e4] dark:border-[#2e2e2e] bg-[#fafafa] dark:bg-[#222222]">
           <h2 className="text-[15px] font-semibold text-[#161616] dark:text-[#ececec]">
-            Rename Task
+            {t("workbench.renameTaskTitle")}
           </h2>
           <button
             type="button"
@@ -62,14 +64,14 @@ export function RenameTaskDialog({
         <form onSubmit={handleSubmit} className="p-5 flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-medium text-[#777777] dark:text-[#969696]">
-              Task Title
+              {t("scheduledTasks.taskName")}
             </label>
             <input
               ref={inputRef}
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Enter task title..."
+              placeholder={t("workbench.renameTaskPlaceholder")}
               className="w-full px-3.5 py-2 rounded-xl bg-[#f4f4f6] dark:bg-[#2b2b2b] border border-[#e2e2e4] dark:border-[#383838] text-[14px] text-[#161616] dark:text-[#d4d4d4] placeholder-[#888888] dark:placeholder-[#5d5d5d] focus:outline-none focus:border-[#555555] transition-colors"
             />
           </div>
@@ -80,14 +82,14 @@ export function RenameTaskDialog({
               onClick={onClose}
               className="px-3.5 py-1.5 rounded-xl border border-[#e2e2e4] dark:border-[#383838] text-xs font-medium text-[#666666] dark:text-[#a0a0a0] hover:text-[#161616] dark:hover:text-white hover:bg-black/5 dark:hover:bg-white/5 transition-colors cursor-pointer"
             >
-              Cancel
+              {t("common.cancel")}
             </button>
             <button
               type="submit"
               disabled={!title.trim() || title.trim() === currentTitle}
               className="px-4 py-1.5 rounded-xl bg-[#161616] dark:bg-[#d4d4d4] text-white dark:text-[#161616] text-xs font-semibold hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed transition-opacity cursor-pointer"
             >
-              Save
+              {t("common.save")}
             </button>
           </div>
         </form>

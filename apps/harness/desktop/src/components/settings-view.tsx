@@ -62,6 +62,7 @@ import {
 import { ModelSettings } from "./settings/model-settings";
 import { MemorySettings } from "./settings/memory-settings";
 import { loadMultiModalConfig } from "../lib/models-config";
+import { useTranslation } from "../lib/i18n";
 import { Volume2, Image as ImageIcon, Video as VideoIcon } from "lucide-react";
 
 export interface SettingsViewProps {
@@ -212,6 +213,7 @@ export function SettingsView({
   }, [open]);
 
   // Appearance & Theme settings
+  const { t } = useTranslation();
   const [theme, setTheme] = useTheme();
   const [conversationWidth, setConversationWidth] = useConversationWidth();
   const [zoom, setZoom] = useInterfaceZoom();
@@ -294,7 +296,7 @@ export function SettingsView({
 
   const handleRefresh = () => {
     setRefreshKey((prev) => prev + 1);
-    toast.success("Settings & models refreshed");
+    toast.success(t("toast.settingsRefreshed"));
   };
 
   const handleSelectActiveModel = (modelId: string) => {
@@ -305,38 +307,38 @@ export function SettingsView({
     if (window.electron?.saveConfig) {
       window.electron.saveConfig({ activeModel: modelId }).catch(() => {});
     }
-    toast.success(`Active model set to ${displayName}`);
+    toast.success(t("toast.activeModelSet", { model: displayName }));
   };
 
   // Original Const Harness Nav Categories
   const navCategories = [
     {
-      label: "Basics",
+      label: t("settings.basics"),
       items: [
-        { id: "general", label: "General", icon: SlidersHorizontal },
-        { id: "appearance", label: "Appearance", icon: Palette },
-        { id: "model-settings", label: "Model settings", icon: Box },
-        { id: "browser-use", label: "Browser Use", icon: Globe },
-        { id: "computer-use", label: "Computer Use", icon: Monitor },
+        { id: "general", label: t("settings.general"), icon: SlidersHorizontal },
+        { id: "appearance", label: t("settings.appearance"), icon: Palette },
+        { id: "model-settings", label: t("settings.modelSettings"), icon: Box },
+        { id: "browser-use", label: t("settings.browserUse"), icon: Globe },
+        { id: "computer-use", label: t("settings.computerUse"), icon: Monitor },
       ],
     },
     {
-      label: "Agent capabilities",
+      label: t("settings.agentCapabilities"),
       items: [
-        { id: "memory", label: "Memory", icon: Brain },
-        { id: "subagents", label: "Subagents", icon: Bot },
-        { id: "plugins", label: "Plugins", icon: Puzzle },
-        { id: "mcp-servers", label: "MCP Servers", icon: Server },
-        { id: "skills", label: "Skills", icon: Sparkles },
-        { id: "commands", label: "Commands", icon: Terminal },
-        { id: "hooks", label: "Hooks", icon: Anchor },
+        { id: "memory", label: t("settings.memory"), icon: Brain },
+        { id: "subagents", label: t("settings.subagents"), icon: Bot },
+        { id: "plugins", label: t("settings.plugins"), icon: Puzzle },
+        { id: "mcp-servers", label: t("settings.mcpServers"), icon: Server },
+        { id: "skills", label: t("settings.skills"), icon: Sparkles },
+        { id: "commands", label: t("settings.commands"), icon: Terminal },
+        { id: "hooks", label: t("settings.hooks"), icon: Anchor },
       ],
     },
     {
-      label: "Data and statistics",
+      label: t("settings.dataAndStats"),
       items: [
-        { id: "indexing", label: "Indexing", icon: Database },
-        { id: "usage-stats", label: "Usage stats", icon: BarChart3 },
+        { id: "indexing", label: t("settings.indexing"), icon: Database },
+        { id: "usage-stats", label: t("settings.usageStats"), icon: BarChart3 },
       ],
     },
   ];
@@ -351,7 +353,7 @@ export function SettingsView({
       onClick={handleClose}
       role="dialog"
       aria-modal="true"
-      aria-label="Settings"
+      aria-label={t("settings.title")}
     >
       <div
         className="w-[980px] max-w-[95vw] h-[670px] max-h-[88vh] bg-[#ffffff] dark:bg-[#161616] border border-[#dedee2] dark:border-[#383838] rounded-2xl flex overflow-hidden text-[#262626] dark:text-[#d4d4d4] font-sans outline-none focus:outline-none focus-visible:outline-none ring-0 focus-visible:ring-0 shadow-2xl dark:shadow-[0_24px_70px_rgba(0,0,0,0.7)] animate-in fade-in zoom-in-[0.985] duration-150"
@@ -365,7 +367,7 @@ export function SettingsView({
           {/* Top Branding Strip */}
           <div className="flex items-center gap-2 px-2.5 py-1.5 shrink-0 mb-1">
             <ConstLogoIcon size="sm" className="w-5 h-5 text-[#262626] dark:text-white" />
-            <span className="text-xs font-semibold text-[#262626] dark:text-white tracking-tight">Settings</span>
+            <span className="text-xs font-semibold text-[#262626] dark:text-white tracking-tight">{t("settings.title")}</span>
           </div>
 
           {/* Navigation Categories using Radix ScrollArea */}
@@ -426,7 +428,7 @@ export function SettingsView({
                   activeTab === "onboard" ? "text-[#262626] dark:text-white" : "text-[#737373] dark:text-[#969696]"
                 )}
               />
-              <span>Onboard</span>
+              <span>{t("settings.onboard")}</span>
             </button>
 
             {/* User Profile Bar */}

@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect, useCallback } from "react";
 import { cn } from "@const/ui/lib/utils";
+import { useTranslation } from "../lib/i18n";
 
 export interface AutoScrollTitleProps {
   text?: string;
@@ -18,7 +19,7 @@ export interface AutoScrollTitleProps {
  * holds at the end so the user can read it, and resets smoothly.
  */
 export function AutoScrollTitle({
-  text = "Untitled task",
+  text,
   className,
   textClassName,
   isParentHovered,
@@ -26,12 +27,14 @@ export function AutoScrollTitle({
   speed = 35,
   holdMs = 2500,
 }: AutoScrollTitleProps) {
+  const { t } = useTranslation();
+  const defaultText = t("common.untitled");
   const containerRef = useRef<HTMLDivElement>(null);
   const textRef = useRef<HTMLSpanElement>(null);
 
   // Clean any hardcoded trailing ellipsis from title so the full text is displayed
   const displayTitle =
-    (text || "Untitled task").replace(/…|\.{2,}$/, "").trim() || "Untitled task";
+    (text || defaultText).replace(/…|\.{2,}$/, "").trim() || defaultText;
 
   const [overflow, setOverflow] = useState(0);
   const [offset, setOffset] = useState(0);

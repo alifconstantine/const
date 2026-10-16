@@ -4,12 +4,14 @@ import { ScrollArea, cn } from "@const/ui";
 import { FileIcon } from "../workbench/file-icon";
 import { MarkdownContent } from "../workbench/markdown-content";
 import type { RightPaneTab } from "./types";
+import { useTranslation } from "../../lib/i18n";
 
 interface FilePreviewTabProps {
   tab: RightPaneTab;
 }
 
 export function FilePreviewTab({ tab }: FilePreviewTabProps) {
+  const { t } = useTranslation();
   const [content, setContent] = useState<string>(tab.newContent || tab.previousContent || "");
   const [isLoading, setIsLoading] = useState<boolean>(!content && Boolean(tab.filePath));
   const [copied, setCopied] = useState(false);
@@ -106,10 +108,10 @@ export function FilePreviewTab({ tab }: FilePreviewTabProps) {
                     ? "bg-[#333333] text-white"
                     : "text-neutral-400 hover:text-white"
                 )}
-                title="Formatted Markdown preview"
+                title={t("rightPane.filePreview")}
               >
                 <Eye className="w-3 h-3" />
-                <span>Preview</span>
+                <span>{t("common.preview")}</span>
               </button>
               <button
                 type="button"
@@ -120,10 +122,10 @@ export function FilePreviewTab({ tab }: FilePreviewTabProps) {
                     ? "bg-[#333333] text-white"
                     : "text-neutral-400 hover:text-white"
                 )}
-                title="Raw source code view"
+                title={t("common.raw")}
               >
                 <Code className="w-3 h-3" />
-                <span>Raw</span>
+                <span>{t("common.raw")}</span>
               </button>
             </div>
           )}
@@ -133,7 +135,7 @@ export function FilePreviewTab({ tab }: FilePreviewTabProps) {
             type="button"
             onClick={handleCopy}
             className="p-1 rounded hover:bg-white/10 text-neutral-400 hover:text-white transition-colors cursor-pointer"
-            title="Copy file content"
+            title={t("rightPane.copyFileContent")}
           >
             {copied ? (
               <Check className="w-3.5 h-3.5 text-green-400" />
@@ -148,7 +150,7 @@ export function FilePreviewTab({ tab }: FilePreviewTabProps) {
               type="button"
               onClick={handleOpenExternal}
               className="p-1 rounded hover:bg-white/10 text-neutral-400 hover:text-white transition-colors cursor-pointer"
-              title="Open file in external editor"
+              title={t("rightPane.openExternally")}
             >
               <ExternalLink className="w-3.5 h-3.5" />
             </button>
@@ -161,7 +163,7 @@ export function FilePreviewTab({ tab }: FilePreviewTabProps) {
         {isLoading ? (
           <div className="flex items-center justify-center p-12 gap-2 text-xs text-neutral-500 font-sans">
             <Loader2 className="w-4 h-4 animate-spin text-neutral-400" />
-            <span>Reading file...</span>
+            <span>{t("common.loading")}</span>
           </div>
         ) : isMarkdown && mode === "formatted" ? (
           /* Formatted Markdown Rendering matching Image 2 */

@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useLayoutEffect } from "react";
 import { PenLine, Terminal, Info } from "lucide-react";
 import { cn } from "@const/ui";
+import { useTranslation } from "../../lib/i18n";
 import { AttachedTaskBanner } from "./attached-task-banner";
 import { FileIcon } from "./file-icon";
 import type {
@@ -38,6 +39,7 @@ export function ApprovalCard({
   onStopTask,
   className = "",
 }: ApprovalCardProps) {
+  const { t } = useTranslation();
   const [selectedIdx, setSelectedIdx] = useState<number>(0);
   const [feedbackText, setFeedbackText] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
@@ -108,35 +110,35 @@ export function ApprovalCard({
   // e.g. "Allow running whoami?" or "Allow modifying App.tsx?"
   const actionTitle = isMutation
     ? targetFileName && targetFileName !== "file"
-      ? `Allow modifying ${targetFileName}?`
-      : "Allow modifying file?"
+      ? t("workbench.allowModifyingNamedFile").replace("{name}", targetFileName)
+      : t("workbench.allowModifyingFile")
     : firstLineCmd.length > 0 && firstLineCmd.length <= 32 && !firstLineCmd.includes("&&")
-    ? `Allow running ${firstLineCmd}?`
+    ? t("workbench.allowRunningNamedCommand").replace("{command}", firstLineCmd)
     : cmdFirstWord
-    ? `Allow running ${cmdFirstWord}?`
-    : "Allow running command?";
+    ? t("workbench.allowRunningNamedCommand").replace("{command}", cmdFirstWord)
+    : t("workbench.allowRunningCommand");
 
   // 5. Four refined options matching Image 1 (without the redundant 'always allow in project')
   const options: OptionDef[] = [
     {
       id: "allow_once",
-      title: "Allow",
-      desc: "Allow only this time",
+      title: t("common.allow"),
+      desc: t("workbench.approvalAllowOnceDesc"),
     },
     {
       id: "full_access",
-      title: "Full access",
-      desc: "Grant the agent full access without further confirmation.",
+      title: t("workbench.approvalFullAccessTitle"),
+      desc: t("workbench.approvalFullAccessDesc"),
     },
     {
       id: "deny",
-      title: "Deny",
-      desc: "Reject it for now",
+      title: t("workbench.approvalRejectTitle"),
+      desc: t("workbench.approvalRejectDesc"),
     },
     {
       id: "tell_model",
       title: "",
-      desc: "Tell the model what to do instead...",
+      desc: t("workbench.approvalTellModel"),
     },
   ];
 
@@ -334,7 +336,7 @@ export function ApprovalCard({
                       type="text"
                       value={feedbackText}
                       onChange={(e) => setFeedbackText(e.target.value)}
-                      placeholder="Tell the model what to do instead..."
+                      placeholder={t("workbench.approvalTellModel")}
                       className="w-full bg-transparent text-xs text-[#ffffff] placeholder:text-[#5d5d5d] outline-none border-none p-0 focus:ring-0 font-normal leading-normal select-text"
                     />
                   ) : (
@@ -344,7 +346,7 @@ export function ApprovalCard({
                         feedbackText ? "text-[#ffffff]" : "text-[#969696]"
                       )}
                     >
-                      {feedbackText || "Tell the model what to do instead..."}
+                      {feedbackText || t("workbench.approvalTellModel")}
                     </span>
                   )}
                 </div>
@@ -378,7 +380,7 @@ export function ApprovalCard({
         <div className="flex items-center gap-1.5 text-[#969696] text-[11px] min-w-0 truncate pr-2">
           <Info className="w-3.5 h-3.5 text-[#969696] shrink-0" />
           <span className="truncate">
-            Use Tab / arrow keys to choose, then press Enter to confirm
+            {t("workbench.approvalShortcuts")}
           </span>
         </div>
 
@@ -387,9 +389,9 @@ export function ApprovalCard({
           onClick={handleConfirm}
           disabled={isResponding}
           className="px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-[#ffffff] text-[#161616] hover:bg-[#eaeaea] active:scale-[0.98] disabled:opacity-30 disabled:pointer-events-none transition-all cursor-pointer shrink-0"
-          title="Confirm (Enter)"
+          title={`${t("common.confirm")} (Enter)`}
         >
-          Confirm
+          {t("common.confirm")}
         </button>
       </div>
     </div>

@@ -1,61 +1,57 @@
 import {
   MessageSquare,
-  FileText,
   SquareTerminal,
   Globe,
   Layers,
 } from "lucide-react";
 import type { RightPaneTabType } from "./types";
+import { useTranslation } from "../../lib/i18n";
 
 interface OpenTabViewProps {
   onSelectTabType: (type: RightPaneTabType) => void;
 }
 
-interface TabOption {
-  type: RightPaneTabType;
-  title: string;
-  icon: React.ComponentType<{ className?: string }>;
-}
-
-const TAB_OPTIONS: TabOption[] = [
-  {
-    type: "review",
-    title: "Review changes",
-    icon: Layers,
-  },
-  {
-    type: "terminal",
-    title: "Terminal",
-    icon: SquareTerminal,
-  },
-  {
-    type: "side_conversation",
-    title: "Side chat",
-    icon: MessageSquare,
-  },
-  {
-    type: "browser",
-    title: "Browser",
-    icon: Globe,
-  },
-];
-
 export function OpenTabView({ onSelectTabType }: OpenTabViewProps) {
+  const { t } = useTranslation();
+
+  const tabOptions = [
+    {
+      type: "review" as RightPaneTabType,
+      title: t("rightPane.reviewChangesDesc"),
+      icon: Layers,
+    },
+    {
+      type: "terminal" as RightPaneTabType,
+      title: t("rightPane.terminal"),
+      icon: SquareTerminal,
+    },
+    {
+      type: "side_conversation" as RightPaneTabType,
+      title: t("rightPane.sideChat"),
+      icon: MessageSquare,
+    },
+    {
+      type: "browser" as RightPaneTabType,
+      title: t("rightPane.browser"),
+      icon: Globe,
+    },
+  ];
+
   return (
     <div className="flex-1 w-full h-full flex flex-col items-center justify-center px-6 py-8 select-none bg-[#141414] text-white">
       {/* Title & Subtitle matching Image 2 */}
       <div className="text-center mb-6">
         <h2 className="text-lg font-semibold tracking-tight text-[#ededed] mb-1.5 font-sans">
-          Open tab
+          {t("rightPane.openTab")}
         </h2>
         <p className="text-xs text-[#808080] font-normal">
-          Choose a tab to open in the side pane.
+          {t("rightPane.chooseTabDesc")}
         </p>
       </div>
 
       {/* Grid of 4 tab options matching Image 2 (3 columns on top row, 1 on second row) */}
       <div className="grid grid-cols-3 gap-3 w-full max-w-[420px]">
-        {TAB_OPTIONS.map((opt) => {
+        {tabOptions.map((opt) => {
           const Icon = opt.icon;
           return (
             <button

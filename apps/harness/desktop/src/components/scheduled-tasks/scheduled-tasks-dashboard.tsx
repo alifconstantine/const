@@ -10,6 +10,7 @@ import {
   BookOpen,
 } from "lucide-react";
 import type { ScheduledTaskItem, ScheduledTaskSchedule } from "../../vite-env";
+import { useTranslation } from "../../lib/i18n";
 
 export interface StarterTemplate {
   title: string;
@@ -80,6 +81,7 @@ export function ScheduledTasksDashboard({
   onRunNow,
   onRefresh,
 }: ScheduledTasksDashboardProps): React.JSX.Element {
+  const { t } = useTranslation();
   const [keepAwake, setKeepAwake] = useState(() => {
     return localStorage.getItem("const_harness_keep_awake") !== "false";
   });
@@ -138,9 +140,9 @@ export function ScheduledTasksDashboard({
       {/* Page Heading & Actions */}
       <div className="flex items-start justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-semibold text-white tracking-tight mb-1">Scheduled Tasks</h1>
+          <h1 className="text-2xl font-semibold text-white tracking-tight mb-1">{t("scheduledTasks.title")}</h1>
           <p className="text-[13px] text-[#969696]">
-            Run tasks on a schedule or whenever you need them.
+            {t("scheduledTasks.subtitle")}
           </p>
         </div>
 
@@ -150,8 +152,8 @@ export function ScheduledTasksDashboard({
               type="button"
               className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#222222] hover:bg-[#2b2b2b] border border-[#383838] hover:border-[#484848] text-[#969696] hover:text-white transition-colors cursor-pointer"
               onClick={onRefresh}
-              title="Refresh"
-              aria-label="Refresh scheduled tasks"
+              title={t("common.refresh")}
+              aria-label={t("common.refresh")}
             >
               <RotateCw className="w-3.5 h-3.5" />
             </button>
@@ -163,7 +165,7 @@ export function ScheduledTasksDashboard({
             onClick={onCreateNew}
           >
             <Plus className="w-3.5 h-3.5" />
-            <span>Create scheduled task</span>
+            <span>{t("scheduledTasks.newTask")}</span>
           </button>
         </div>
       </div>
@@ -172,7 +174,7 @@ export function ScheduledTasksDashboard({
       <div className="flex items-center justify-between bg-[#222222] border border-[#383838] rounded-xl px-4 py-3 mb-8">
         <div className="flex items-center gap-2.5 text-xs text-[#d4d4d4]">
           <Info className="w-4 h-4 text-[#969696] shrink-0" />
-          <span>Keep your computer awake while Const is running a scheduled task.</span>
+          <span>{t("scheduledTasks.keepAwake")}</span>
         </div>
         <button
           type="button"
@@ -193,13 +195,12 @@ export function ScheduledTasksDashboard({
       {/* Task Created Section */}
       <div className="mb-8">
         <div className="flex items-center justify-between mb-3.5">
-          <h2 className="text-sm font-semibold text-white tracking-tight">Task created</h2>
+          <h2 className="text-sm font-semibold text-white tracking-tight">{t("scheduledTasks.title")}</h2>
         </div>
 
         {tasks.length === 0 ? (
           <div className="bg-[#222222] border border-dashed border-[#383838] rounded-xl p-8 text-center text-[#969696] text-xs flex flex-col gap-1">
-            <span>No scheduled tasks yet.</span>
-            <span>Create one from the templates below or click Create scheduled task.</span>
+            <span>{t("scheduledTasks.noTasks")}</span>
           </div>
         ) : (
           <div className="flex flex-col gap-2.5">
@@ -226,10 +227,10 @@ export function ScheduledTasksDashboard({
                         type="button"
                         className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs bg-[#2b2b2b] hover:bg-[#383838] border border-[#383838] text-[#d4d4d4] hover:text-white transition-colors cursor-pointer"
                         onClick={() => onRunNow(task.id)}
-                        title="Run this task right now"
+                        title={t("scheduledTasks.runNow")}
                       >
-                        <Play className="w-3 h-3 fill-current" />
-                        <span>Run Now</span>
+                        <Play className="w-3.5 h-3.5 fill-current" />
+                        <span>{t("scheduledTasks.runNow")}</span>
                       </button>
                     </div>
                   </div>
@@ -247,7 +248,9 @@ export function ScheduledTasksDashboard({
                     </div>
 
                     <span className="text-[11px] text-[#5d5d5d]">
-                      {task.runCount > 0 ? `Ran ${task.runCount} times` : "Not run yet"}
+                      {task.runCount > 0
+                        ? t("scheduledTasks.ranTimes").replace("{count}", String(task.runCount))
+                        : t("scheduledTasks.notRunYet")}
                     </span>
                   </div>
                 </div>
@@ -260,7 +263,7 @@ export function ScheduledTasksDashboard({
       {/* Scheduled Task Template Section */}
       <div>
         <div className="flex items-center justify-between mb-3.5">
-          <h2 className="text-sm font-semibold text-white tracking-tight">Scheduled task template</h2>
+          <h2 className="text-sm font-semibold text-white tracking-tight">{t("scheduledTasks.scheduledTemplateTitle")}</h2>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

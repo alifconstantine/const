@@ -11,6 +11,7 @@ import {
   type ScheduledTaskFormData,
 } from "./scheduled-task-form";
 import { ScheduledTaskHistory } from "./scheduled-task-history";
+import { useTranslation } from "../../lib/i18n";
 
 export interface ScheduledTasksViewProps {
   onBackToWorkspace: () => void;
@@ -23,6 +24,7 @@ export function ScheduledTasksView({
   onOpenSession,
   currentWorkspacePath,
 }: ScheduledTasksViewProps): React.JSX.Element {
+  const { t } = useTranslation();
   const [view, setView] = useState<"dashboard" | "create" | "settings" | "history">("dashboard");
   const [tasks, setTasks] = useState<ScheduledTaskItem[]>([]);
   const [selectedTask, setSelectedTask] = useState<ScheduledTaskItem | null>(null);
@@ -95,14 +97,14 @@ export function ScheduledTasksView({
   const handleRunNow = async (taskId: string) => {
     if (!window.electron?.scheduledTasks?.run) return;
     try {
-      toast.info("Scheduled task execution started");
+      toast.info(t("toast.scheduledTaskStarted"));
       await window.electron.scheduledTasks.run(taskId);
       await refreshTasks();
       if (selectedTask?.id === taskId) {
         await refreshHistory(taskId);
       }
     } catch (err: any) {
-      toast.error(err?.message || "Failed to run scheduled task");
+      toast.error(err?.message || t("toast.scheduledTaskFailedToStart"));
     }
   };
 
@@ -129,11 +131,11 @@ export function ScheduledTasksView({
     if (!window.electron?.scheduledTasks?.create) return;
     try {
       await window.electron.scheduledTasks.create(data);
-      toast.success("Scheduled task created");
+      toast.success(t("toast.scheduledTaskCreated"));
       await refreshTasks();
       setView("dashboard");
     } catch (err: any) {
-      toast.error(err?.message || "Failed to create scheduled task");
+      toast.error(err?.message || t("toast.scheduledTaskFailedToCreate"));
     }
   };
 
@@ -147,10 +149,10 @@ export function ScheduledTasksView({
       if (updated) {
         setSelectedTask(updated);
       }
-      toast.success("Scheduled task updated");
+      toast.success(t("toast.scheduledTaskUpdated"));
       await refreshTasks();
     } catch (err: any) {
-      toast.error(err?.message || "Failed to update scheduled task");
+      toast.error(err?.message || t("toast.scheduledTaskFailedToUpdate"));
     }
   };
 
@@ -158,12 +160,12 @@ export function ScheduledTasksView({
     if (!window.electron?.scheduledTasks?.delete) return;
     try {
       await window.electron.scheduledTasks.delete(taskId);
-      toast.success("Scheduled task deleted");
+      toast.success(t("toast.scheduledTaskDeleted"));
       await refreshTasks();
       setSelectedTask(null);
       setView("dashboard");
     } catch (err: any) {
-      toast.error(err?.message || "Failed to delete scheduled task");
+      toast.error(err?.message || t("toast.scheduledTaskFailedToDelete"));
     }
   };
 
@@ -171,11 +173,12 @@ export function ScheduledTasksView({
     if (!window.electron?.scheduledTasks?.deleteRun) return;
     try {
       await window.electron.scheduledTasks.deleteRun(runId);
+      toast.success(t("toast.scheduledTaskRunDeleted"));
       if (selectedTask) {
         await refreshHistory(selectedTask.id);
       }
     } catch (err: any) {
-      toast.error(err?.message || "Failed to delete run");
+      toast.error(err?.message || t("toast.scheduledTaskFailedToDeleteRun"));
     }
   };
 
@@ -195,7 +198,7 @@ export function ScheduledTasksView({
               className="flex items-center gap-1.5 text-xs text-[#969696] hover:text-white hover:bg-[#222222] px-2.5 py-1 rounded-md transition-colors cursor-pointer"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
-              <span>Back to workspace</span>
+              <span>{t("common.back")}</span>
             </button>
           ) : (
             <div className="flex items-center gap-1.5">
@@ -207,18 +210,18 @@ export function ScheduledTasksView({
                   setView("dashboard");
                 }}
                 className="inline-flex items-center gap-1.5 text-[#969696] hover:text-white hover:bg-[#222222] px-2 py-1 rounded-md transition-colors cursor-pointer"
-                title="Back to Scheduled Tasks"
+                title={t("scheduledTasks.backToScheduled")}
               >
                 <ArrowLeft className="w-3.5 h-3.5" />
-                <span>Scheduled Tasks</span>
+                <span>{t("scheduledTasks.title")}</span>
               </button>
               <span className="text-[#5d5d5d] select-none">/</span>
               <span className="text-[#d4d4d4] font-medium px-1 truncate max-w-[240px]">
                 {view === "create"
-                  ? (formTaskName.trim() || "New task")
+                  ? (formTaskName.trim() || t("scheduledTasks.newTask"))
                   : view === "history"
-                  ? (selectedTask?.name || selectedTask?.title || "History")
-                  : (formTaskName.trim() || selectedTask?.name || selectedTask?.title || "Edit task")}
+                  ? (selectedTask?.name || selectedTask?.title || t("scheduledTasks.history"))
+                  : (formTaskName.trim() || selectedTask?.name || selectedTask?.title || t("common.edit"))}
               </span>
             </div>
           )}
@@ -233,8 +236,8 @@ export function ScheduledTasksView({
             type="button"
             onClick={handleMinimize}
             className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
-            title="Minimize"
-            aria-label="Minimize"
+            title={t("topToolbar.minimize")}
+            aria-label={t("topToolbar.minimize")}
           >
             <Minus className="w-3.5 h-3.5" />
           </button>
@@ -243,8 +246,8 @@ export function ScheduledTasksView({
             type="button"
             onClick={handleMaximize}
             className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-white/10 hover:text-white transition-colors cursor-pointer"
-            title={isMaximized ? "Restore" : "Maximize"}
-            aria-label={isMaximized ? "Restore" : "Maximize"}
+            title={isMaximized ? t("topToolbar.restore") : t("topToolbar.maximize")}
+            aria-label={isMaximized ? t("topToolbar.restore") : t("topToolbar.maximize")}
           >
             {isMaximized ? (
               <Copy className="w-3 h-3 rotate-180" />
@@ -257,8 +260,8 @@ export function ScheduledTasksView({
             type="button"
             onClick={handleClose}
             className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[#e81123] hover:text-white transition-colors cursor-pointer"
-            title="Close"
-            aria-label="Close"
+            title={t("topToolbar.close")}
+            aria-label={t("topToolbar.close")}
           >
             <X className="w-3.5 h-3.5" />
           </button>

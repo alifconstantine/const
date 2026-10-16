@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { FileIcon } from "../workbench/file-icon";
 import type { RightPaneTab, RightPaneTabType } from "./types";
+import { useTranslation } from "../../lib/i18n";
 
 interface TabHeaderProps {
   tabs: RightPaneTab[];
@@ -95,6 +96,7 @@ export function TabHeader({
   onReorderTabs,
   onToggleMuteTab,
 }: TabHeaderProps) {
+  const { t } = useTranslation();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -205,8 +207,8 @@ export function TabHeader({
               ? "bg-white/10 text-white"
               : "text-[#8e8e8e] hover:text-white hover:bg-white/5"
           }`}
-          title="Switch and search open tabs"
-          aria-label="Switch and search open tabs"
+          title={t("rightPane.switchSearchTabs")}
+          aria-label={t("rightPane.switchSearchTabs")}
         >
           <ChevronsDown className="w-3.5 h-3.5" />
         </button>
@@ -220,7 +222,7 @@ export function TabHeader({
               <input
                 type="text"
                 autoFocus
-                placeholder="Search open tabs..."
+                placeholder={t("rightPane.searchOpenTabs")}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full bg-transparent text-white placeholder-[#666666] outline-none text-xs"
@@ -231,17 +233,17 @@ export function TabHeader({
             <div className="max-h-56 overflow-y-auto space-y-0.5">
               {filteredTabs.length === 0 ? (
                 <div className="text-center py-4 text-xs text-[#666666]">
-                  No tabs found
+                  {t("rightPane.noTabsFound")}
                 </div>
               ) : (
-                filteredTabs.map((t) => {
-                  const Icon = getTabIcon(t.type);
-                  const isActive = !isOpeningNewTab && t.id === activeTabId;
+                filteredTabs.map((tItem) => {
+                  const Icon = getTabIcon(tItem.type);
+                  const isActive = !isOpeningNewTab && tItem.id === activeTabId;
                   return (
                     <div
-                      key={t.id}
+                      key={tItem.id}
                       onClick={() => {
-                        onSelectTab(t.id);
+                        onSelectTab(tItem.id);
                         setIsDropdownOpen(false);
                       }}
                       className={`flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs cursor-pointer group transition-colors ${
@@ -251,23 +253,23 @@ export function TabHeader({
                       }`}
                     >
                       <div className="flex items-center gap-2 min-w-0">
-                        {t.type === "file_diff" || t.type === "file_preview" ? (
-                          <FileIcon filename={t.filePath || t.title} className="w-3.5 h-3.5 shrink-0" />
-                        ) : t.type === "browser" ? (
-                          <TabFavicon favicon={t.favicon} fallbackIcon={Icon} isActive={isActive} />
+                        {tItem.type === "file_diff" || tItem.type === "file_preview" ? (
+                          <FileIcon filename={tItem.filePath || tItem.title} className="w-3.5 h-3.5 shrink-0" />
+                        ) : tItem.type === "browser" ? (
+                          <TabFavicon favicon={tItem.favicon} fallbackIcon={Icon} isActive={isActive} />
                         ) : (
                           <Icon className="w-3.5 h-3.5 shrink-0" />
                         )}
-                        <span className="truncate">{t.title}</span>
+                        <span className="truncate">{tItem.title}</span>
                       </div>
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
-                          onCloseTab(t.id, e);
+                          onCloseTab(tItem.id, e);
                         }}
                         className="p-0.5 rounded hover:bg-white/10 text-[#666666] hover:text-white transition-colors cursor-pointer shrink-0 opacity-0 group-hover:opacity-100"
-                        title="Close tab"
+                        title={t("rightPane.closeTab")}
                       >
                         <X className="w-3 h-3" />
                       </button>
@@ -288,7 +290,7 @@ export function TabHeader({
                 className="w-full flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs text-[#8e8e8e] hover:text-white hover:bg-white/5 transition-colors cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5 shrink-0" />
-                <span>Open new tab...</span>
+                <span>{t("rightPane.openNewTab")}</span>
               </button>
             </div>
           </div>
@@ -375,8 +377,8 @@ export function TabHeader({
                       ? "text-amber-400 hover:text-amber-300"
                       : "text-blue-400 hover:text-blue-300 animate-pulse"
                   }`}
-                  title={tab.isMuted ? "Unmute tab" : "Mute tab"}
-                  aria-label={tab.isMuted ? "Unmute tab" : "Mute tab"}
+                  title={tab.isMuted ? t("rightPane.unmuteTab") : t("rightPane.muteTab")}
+                  aria-label={tab.isMuted ? t("rightPane.unmuteTab") : t("rightPane.muteTab")}
                 >
                   {tab.isMuted ? (
                     <VolumeX className="w-3 h-3 pointer-events-none" />
@@ -399,7 +401,7 @@ export function TabHeader({
                     ? "text-[#888888] hover:text-white hover:bg-white/10"
                     : "text-transparent group-hover:text-[#888888] hover:!text-white hover:bg-white/10"
                 }`}
-                title="Close tab"
+                title={t("rightPane.closeTab")}
               >
                 <X className="w-3 h-3 pointer-events-none" />
               </button>
@@ -431,8 +433,8 @@ export function TabHeader({
               ? "bg-white/10 text-white"
               : "text-[#8e8e8e] hover:text-white hover:bg-white/10"
           }`}
-          title="Open new tab"
-          aria-label="Open new tab"
+          title={t("rightPane.openNewTab")}
+          aria-label={t("rightPane.openNewTab")}
         >
           <Plus className="w-3.5 h-3.5" />
         </button>

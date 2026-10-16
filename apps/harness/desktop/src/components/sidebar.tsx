@@ -73,6 +73,7 @@ import {
   getCleanConversationTitle,
 } from "../lib/conversation-store";
 import { useTheme, type Theme, useInterfaceZoom } from "../lib/theme";
+import { useTranslation, type SupportedLanguage } from "../lib/i18n";
 
 export interface UserProfile {
   name?: string | null;
@@ -177,16 +178,10 @@ export function Sidebar({
 }: SidebarProps) {
   const [theme, setTheme] = useTheme();
   const [currentZoom, setCurrentZoom] = useInterfaceZoom();
-  const [currentLanguage, setCurrentLanguage] = useState<string>(() => {
-    if (typeof window === "undefined") return "en";
-    return localStorage.getItem("const_app_language") || "en";
-  });
+  const { t, language: currentLanguage, setLanguage } = useTranslation();
 
   const handleSelectLanguage = (code: string) => {
-    setCurrentLanguage(code);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("const_app_language", code);
-    }
+    setLanguage(code as SupportedLanguage);
   };
 
   const [activeTab, setActiveTab] = useState<"project" | "recent" | "outside">("project");
@@ -569,7 +564,7 @@ export function Sidebar({
             <div className="flex items-center gap-2">
               <MessageCirclePlus className="w-4 h-4 text-black dark:text-white transition-colors stroke-[1.8]" />
               <span className="font-medium text-black dark:text-white">
-                New chat
+                {t("sidebar.newChat")}
               </span>
             </div>
             <span className="text-xs text-black/70 dark:text-white/70 group-hover:text-black dark:group-hover:text-white font-sans transition-colors select-none tracking-tight">
@@ -588,7 +583,7 @@ export function Sidebar({
             className="w-full flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-[#666666] dark:text-[#999999] hover:bg-[#dedee2] dark:hover:bg-[#383838] hover:text-black dark:hover:text-white transition-colors cursor-pointer group"
           >
             <Search className="w-4 h-4 text-[#777777] dark:text-[#888888] group-hover:text-black dark:group-hover:text-white transition-colors" />
-            <span>Search</span>
+            <span>{t("common.search")}</span>
           </button>
 
           {/* Scheduled Tasks */}
@@ -606,7 +601,7 @@ export function Sidebar({
                 ? "text-black dark:text-white"
                 : "text-[#777777] dark:text-[#888888] group-hover:text-black dark:group-hover:text-white"
             }`} />
-            <span>Scheduled Tasks</span>
+            <span>{t("sidebar.scheduledTasks")}</span>
           </button>
         </div>
 
@@ -623,19 +618,19 @@ export function Sidebar({
                   {activeTab === "recent" && (
                     <>
                       <Clock className="w-3.5 h-3.5 text-[#777777] dark:text-[#888888] group-hover:text-black dark:group-hover:text-white transition-colors" />
-                      <span>Recent</span>
+                      <span>{t("sidebar.recent")}</span>
                     </>
                   )}
                   {activeTab === "project" && (
                     <>
                       <Folder className="w-3.5 h-3.5 text-[#777777] dark:text-[#888888] group-hover:text-black dark:group-hover:text-white transition-colors" />
-                      <span>Project</span>
+                      <span>{t("sidebar.projects")}</span>
                     </>
                   )}
                   {activeTab === "outside" && (
                     <>
                       <MessageSquare className="w-3.5 h-3.5 text-[#777777] dark:text-[#888888] group-hover:text-black dark:group-hover:text-white transition-colors" />
-                      <span>Conversation</span>
+                      <span>{t("sidebar.outsideProject")}</span>
                     </>
                   )}
                   <ChevronDown className="w-3 h-3 text-[#777777] dark:text-[#888888] group-hover:text-black dark:group-hover:text-white ml-0.5 transition-colors" />
@@ -654,7 +649,7 @@ export function Sidebar({
                   }`}
                 >
                   <Clock className="w-3.5 h-3.5 text-[#8a8a8a] dark:text-[#d4d4d4] shrink-0" />
-                  <span>Recent</span>
+                  <span>{t("sidebar.recent")}</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => setActiveTab("project")}
@@ -665,7 +660,7 @@ export function Sidebar({
                   }`}
                 >
                   <Folder className="w-3.5 h-3.5 text-[#8a8a8a] dark:text-[#d4d4d4] shrink-0" />
-                  <span>Project</span>
+                  <span>{t("sidebar.projects")}</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => setActiveTab("outside")}
@@ -676,7 +671,7 @@ export function Sidebar({
                   }`}
                 >
                   <MessageSquare className="w-3.5 h-3.5 text-[#8a8a8a] dark:text-[#d4d4d4] shrink-0" />
-                  <span>Conversation</span>
+                  <span>{t("sidebar.outsideProject")}</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -1448,14 +1443,14 @@ export function Sidebar({
               onClick={() => onOpenSettings?.("general")}
             >
               <Settings className="w-4 h-4 text-[#737373] dark:text-[#8e8e93] shrink-0" />
-              <span>Settings</span>
+              <span>{t("sidebar.settings")}</span>
             </DropdownMenuItem>
 
             {/* 2. Language (Submenu) */}
             <DropdownMenuSub>
               <DropdownMenuSubTrigger className="cursor-pointer flex items-center gap-2.5 text-[13px] py-2 px-2.5 text-[#262626] dark:text-[#d4d4d4] hover:text-[#111111] dark:hover:text-white hover:bg-[#f4f4f5] dark:hover:bg-[#2e2e2e] focus:bg-[#f4f4f5] dark:focus:bg-[#2e2e2e] focus:text-[#111111] dark:focus:text-white data-[state=open]:bg-[#f4f4f5] dark:data-[state=open]:bg-[#2e2e2e] data-[state=open]:text-[#111111] dark:data-[state=open]:text-white rounded-xl outline-none transition-colors [&>svg:last-child]:text-[#737373] dark:[&>svg:last-child]:text-[#737373] [&>svg:last-child]:w-3.5 [&>svg:last-child]:h-3.5">
                 <Globe className="w-4 h-4 text-[#737373] dark:text-[#8e8e93] shrink-0" />
-                <span>Language</span>
+                <span>{t("sidebar.language")}</span>
               </DropdownMenuSubTrigger>
               <DropdownMenuSubContent className="min-w-[170px] p-1.5 rounded-2xl bg-white dark:bg-[#222222] border border-[#dedee2] dark:border-[#383838] text-[#262626] dark:text-[#d4d4d4] shadow-2xl select-none">
                 {LANGUAGE_OPTIONS.map((lang) => (
@@ -1477,7 +1472,7 @@ export function Sidebar({
             <DropdownMenuSub>
               <DropdownMenuSubTrigger className="cursor-pointer flex items-center gap-2.5 text-[13px] py-2 px-2.5 text-[#262626] dark:text-[#d4d4d4] hover:text-[#111111] dark:hover:text-white hover:bg-[#f4f4f5] dark:hover:bg-[#2e2e2e] focus:bg-[#f4f4f5] dark:focus:bg-[#2e2e2e] focus:text-[#111111] dark:focus:text-white data-[state=open]:bg-[#f4f4f5] dark:data-[state=open]:bg-[#2e2e2e] data-[state=open]:text-[#111111] dark:data-[state=open]:text-white rounded-xl outline-none transition-colors [&>svg:last-child]:text-[#737373] dark:[&>svg:last-child]:text-[#737373] [&>svg:last-child]:w-3.5 [&>svg:last-child]:h-3.5">
                 <Palette className="w-4 h-4 text-[#737373] dark:text-[#8e8e93] shrink-0" />
-                <span>App theme</span>
+                <span>{t("sidebar.theme")}</span>
               </DropdownMenuSubTrigger>
               <DropdownMenuSubContent className="min-w-[150px] p-1.5 rounded-2xl bg-white dark:bg-[#222222] border border-[#dedee2] dark:border-[#383838] text-[#262626] dark:text-[#d4d4d4] shadow-2xl select-none">
                 {THEME_OPTIONS.map((item) => (
@@ -1486,7 +1481,7 @@ export function Sidebar({
                     className="cursor-pointer flex items-center justify-between text-[13px] py-1.5 px-2.5 text-[#262626] dark:text-[#d4d4d4] hover:text-[#111111] dark:hover:text-white hover:bg-[#f4f4f5] dark:hover:bg-[#2e2e2e] focus:bg-[#f4f4f5] dark:focus:bg-[#2e2e2e] focus:text-[#111111] dark:focus:text-white rounded-xl outline-none transition-colors"
                     onClick={() => setTheme(item.value)}
                   >
-                    <span>{item.label}</span>
+                    <span>{item.value === "system" ? t("sidebar.defaultTheme") : item.value === "light" ? t("sidebar.lightTheme") : t("sidebar.darkTheme")}</span>
                     {theme === item.value && (
                       <Check className="w-3.5 h-3.5 text-[#111111] dark:text-white ml-2 shrink-0" />
                     )}
@@ -1499,7 +1494,7 @@ export function Sidebar({
             <DropdownMenuSub>
               <DropdownMenuSubTrigger className="cursor-pointer flex items-center gap-2.5 text-[13px] py-2 px-2.5 text-[#262626] dark:text-[#d4d4d4] hover:text-[#111111] dark:hover:text-white hover:bg-[#f4f4f5] dark:hover:bg-[#2e2e2e] focus:bg-[#f4f4f5] dark:focus:bg-[#2e2e2e] focus:text-[#111111] dark:focus:text-white data-[state=open]:bg-[#f4f4f5] dark:data-[state=open]:bg-[#2e2e2e] data-[state=open]:text-[#111111] dark:data-[state=open]:text-white rounded-xl outline-none transition-colors [&>svg:last-child]:text-[#737373] dark:[&>svg:last-child]:text-[#737373] [&>svg:last-child]:w-3.5 [&>svg:last-child]:h-3.5">
                 <ZoomIn className="w-4 h-4 text-[#737373] dark:text-[#8e8e93] shrink-0" />
-                <span>Interface zoom</span>
+                <span>{t("sidebar.zoom")}</span>
               </DropdownMenuSubTrigger>
               <DropdownMenuSubContent className="min-w-[160px] p-1.5 rounded-2xl bg-white dark:bg-[#222222] border border-[#dedee2] dark:border-[#383838] text-[#262626] dark:text-[#d4d4d4] shadow-2xl select-none">
                 {ZOOM_OPTIONS.map((item) => (
@@ -1525,7 +1520,7 @@ export function Sidebar({
               onClick={() => onOpenSettings?.("usage-stats")}
             >
               <BarChart2 className="w-4 h-4 text-[#737373] dark:text-[#8e8e93] shrink-0" />
-              <span>Usage stats</span>
+              <span>{t("settings.usageStats")}</span>
             </DropdownMenuItem>
 
             {/* (Upgrade excluded as requested) */}
@@ -1539,7 +1534,7 @@ export function Sidebar({
                 onClick={onSwitchAccount}
               >
                 <ArrowLeftRight className="w-4 h-4 text-[#737373] dark:text-[#8e8e93] shrink-0" />
-                <span>Switch account</span>
+                <span>{t("sidebar.switchAccount")}</span>
               </DropdownMenuItem>
             )}
 
@@ -1549,7 +1544,7 @@ export function Sidebar({
               onClick={onSignOut}
             >
               <LogOut className="w-4 h-4 text-[#737373] dark:text-[#8e8e93] shrink-0" />
-              <span>Log out</span>
+              <span>{t("sidebar.signOut")}</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -1573,7 +1568,7 @@ export function Sidebar({
             <div className="flex items-center justify-between px-5 py-3.5 border-b border-[#e2e2e4] dark:border-[#333333] shrink-0">
               <div className="flex items-center gap-2 text-sm font-semibold text-[#161616] dark:text-white">
                 <Archive className="w-4 h-4 text-[#a9a9a9] dark:text-[#888888]" />
-                <span>Archived Sessions</span>
+                <span>{t("sidebar.archivedSessions")}</span>
                 {archivedSessions.length > 0 && (
                   <span className="text-xs px-2 py-0.5 rounded-full bg-[#f0f0f2] dark:bg-[#2a2a2a] text-[#262626] dark:text-[#888888] font-sans tabular-nums">
                     {archivedSessions.length}
@@ -1584,8 +1579,8 @@ export function Sidebar({
                 type="button"
                 onClick={() => setIsArchiveModalOpen(false)}
                 className="p-1.5 rounded-lg text-[#737373] dark:text-[#969696] hover:text-[#262626] dark:hover:text-white hover:bg-[#f0f0f2] dark:hover:bg-[#2b2b2b] transition-colors cursor-pointer outline-none focus:outline-none shrink-0"
-                title="Close (Esc)"
-                aria-label="Close"
+                title={`${t("common.close")} (Esc)`}
+                aria-label={t("common.close")}
               >
                 <X className="w-4 h-4" />
               </button>
@@ -1599,7 +1594,7 @@ export function Sidebar({
                     type="text"
                     value={archiveSearchQuery}
                     onChange={(e) => setArchiveSearchQuery(e.target.value)}
-                    placeholder="Search archived sessions..."
+                    placeholder={t("sidebar.searchArchived")}
                     className="w-full pl-9 pr-8 py-1.5 text-xs bg-[#f4f4f6] dark:bg-[#282828] border border-[#e2e2e4] dark:border-[#383838] rounded-lg text-[#262626] dark:text-[#d4d4d4] placeholder-[#a9a9a9] dark:placeholder-[#777777] focus:outline-none focus:border-[#a9a9a9] dark:focus:border-[#555555]"
                   />
                   {archiveSearchQuery && (
@@ -1720,9 +1715,9 @@ export function Sidebar({
       <Dialog open={renameTarget !== null} onOpenChange={(open) => !open && setRenameTarget(null)}>
         <DialogContent className="max-w-sm bg-white dark:bg-[#1e1e1e] border border-[#e2e2e4] dark:border-[#383838] text-[#262626] dark:text-[#d4d4d4] p-5 rounded-2xl shadow-2xl">
           <DialogHeader>
-            <DialogTitle className="text-sm font-semibold text-[#161616] dark:text-white">Rename Task</DialogTitle>
+            <DialogTitle className="text-sm font-semibold text-[#161616] dark:text-white">{t("sidebar.renameConvo")}</DialogTitle>
             <DialogDescription className="text-xs text-[#a9a9a9] dark:text-[#777777]">
-              Enter a new title for this conversation.
+              {t("workbench.renameTaskPlaceholder")}
             </DialogDescription>
           </DialogHeader>
 
@@ -1737,7 +1732,7 @@ export function Sidebar({
                 }
               }}
               autoFocus
-              placeholder="Conversation title..."
+              placeholder={t("sidebar.renameConvo")}
               className="bg-[#f4f4f6] dark:bg-[#282828] border-[#e2e2e4] dark:border-[#383838] text-[#262626] dark:text-white text-xs focus-visible:ring-1 focus-visible:ring-[#888888]"
             />
           </div>
@@ -1750,7 +1745,7 @@ export function Sidebar({
               onClick={() => setRenameTarget(null)}
               className="bg-transparent border-[#e2e2e4] dark:border-[#383838] text-xs hover:bg-[#eaeaea] dark:hover:bg-[#303030] text-[#262626] dark:text-[#d4d4d4]"
             >
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button
               type="button"
@@ -1759,7 +1754,7 @@ export function Sidebar({
               disabled={!renameDraft.trim()}
               className="bg-[#262626] hover:bg-black dark:bg-white dark:hover:bg-zinc-200 text-white dark:text-black text-xs font-medium"
             >
-              Save
+              {t("common.save")}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -1769,10 +1764,9 @@ export function Sidebar({
       <Dialog open={deleteTarget !== null} onOpenChange={(open) => !open && setDeleteTarget(null)}>
         <DialogContent className="max-w-sm bg-white dark:bg-[#1e1e1e] border border-[#e2e2e4] dark:border-[#383838] text-[#262626] dark:text-[#d4d4d4] p-5 rounded-2xl shadow-2xl">
           <DialogHeader>
-            <DialogTitle className="text-sm font-semibold text-[#161616] dark:text-white">Delete Task</DialogTitle>
+            <DialogTitle className="text-sm font-semibold text-[#161616] dark:text-white">{t("sidebar.deleteConvoTitle")}</DialogTitle>
             <DialogDescription className="text-xs text-[#a9a9a9] dark:text-[#999999] pt-1">
-              Are you sure you want to permanently delete{" "}
-              <span className="text-[#161616] dark:text-white font-medium">"{deleteTarget?.title || "Untitled task"}"</span>? This action cannot be undone.
+              {t("sidebar.deleteConvoDesc")}
             </DialogDescription>
           </DialogHeader>
 
@@ -1784,7 +1778,7 @@ export function Sidebar({
               onClick={() => setDeleteTarget(null)}
               className="bg-transparent border-[#e2e2e4] dark:border-[#383838] text-xs hover:bg-[#eaeaea] dark:hover:bg-[#303030] text-[#262626] dark:text-[#d4d4d4]"
             >
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button
               type="button"
@@ -1792,7 +1786,7 @@ export function Sidebar({
               onClick={handleConfirmDelete}
               className="bg-red-600 hover:bg-red-700 text-white text-xs font-medium"
             >
-              Delete
+              {t("common.delete")}
             </Button>
           </DialogFooter>
         </DialogContent>

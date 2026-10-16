@@ -44,6 +44,7 @@ import { RightPane, type RightPaneTab, type RightPaneTabType, type BrowserSelect
 import { LoginTitleBar } from "./components/login-titlebar";
 import { useAppAuth } from "./components/convex-provider";
 import { useConversationWidth } from "./lib/theme";
+import { useTranslation } from "./lib/i18n";
 import {
   loadConversations,
   saveConversation,
@@ -73,11 +74,11 @@ import type {
 } from "./vite-env";
 import authArt from "./assets/auth-art.jpg";
 
-function getGreeting(): string {
+function getGreeting(t: (key: any) => string): string {
   const hour = new Date().getHours();
-  if (hour >= 4 && hour < 12) return "Morning, how can I help?";
-  if (hour >= 12 && hour < 18) return "Afternoon, how can I help?";
-  return "Evening, how can I help?";
+  if (hour >= 4 && hour < 12) return t("workbench.greetingMorning");
+  if (hour >= 12 && hour < 18) return t("workbench.greetingAfternoon");
+  return t("workbench.greetingEvening");
 }
 
 function formatMessageTimestamp(ts: number): string {
@@ -161,6 +162,7 @@ function AuthenticatedContent({
 }) {
   const user = useQuery(api.auth.queries.currentUser, {});
   const { token } = useAppAuth();
+  const { t } = useTranslation();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isScheduledTasksOpen, setIsScheduledTasksOpen] = useState(false);
@@ -169,7 +171,7 @@ function AuthenticatedContent({
   const [isTrajectoryOpen, setIsTrajectoryOpen] = useState(false);
   const [trajectoryTargetConversationId, setTrajectoryTargetConversationId] = useState<string | null>(null);
   const [settingsTab, setSettingsTab] = useState<string>("general");
-  const greeting = getGreeting();
+  const greeting = getGreeting(t);
 
   const handleOpenSettings = (tab: string = "general") => {
     const resolvedTab = tab === "model" ? "model-settings" : tab;
@@ -1167,10 +1169,10 @@ function AuthenticatedContent({
     try {
       await navigator.clipboard.writeText(text);
       setCopiedId(id);
-      toast.success("Copied to clipboard");
+      toast.success(t("toast.copied"));
       setTimeout(() => setCopiedId(null), 2000);
     } catch {
-      toast.error("Failed to copy");
+      toast.error(t("toast.copyFailed"));
     }
   };
 
@@ -1179,7 +1181,7 @@ function AuthenticatedContent({
       ...prev,
       [id]: prev[id] === type ? undefined! : type,
     }));
-    toast.success(type === "good" ? "Response marked as helpful" : "Feedback recorded");
+    toast.success(type === "good" ? t("toast.responseHelpful") : t("toast.feedbackRecorded"));
   };
 
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
@@ -1200,13 +1202,13 @@ function AuthenticatedContent({
     attachments?: AttachedFile[]
   ) => {
     if (isExecuting) {
-      toast.warning("Please wait or stop the current task before editing a message");
+      toast.warning(t("toast.waitBeforeEditing"));
       return;
     }
 
     const trimmed = newContent.trim();
     if (!trimmed && (!attachments || attachments.length === 0)) {
-      toast.error("Message content cannot be empty");
+      toast.error(t("toast.emptyMessage"));
       return;
     }
 
@@ -1233,7 +1235,7 @@ function AuthenticatedContent({
         } catch {}
       }
       if (revertedCount > 0) {
-        toast.info(`Reverted ${revertedCount} previous file change(s)`);
+        toast.info(t("toast.revertedFiles").replace("{count}", String(revertedCount)));
       }
     }
 
@@ -2461,13 +2463,13 @@ function AuthenticatedContent({
 
   const handleRollback = async (record: FileMutationRecord) => {
     if (!window.electron?.rollbackFile) {
-      toast.error("Rollback is only available in the desktop application");
+      toast.error(t("toast.rollbackDesktopOnly"));
       return;
     }
     try {
       const res = await window.electron.rollbackFile(record);
       if (res.success) {
-        toast.success(res.message || `Reverted ${record.targetFile}`);
+        toast.success(res.message || t("toast.revertedFile").replace("{file}", record.targetFile));
         setMessages((prev) => {
           const next = prev.map((msg) => ({
             ...msg,
@@ -2495,12 +2497,12 @@ function AuthenticatedContent({
 
   const handleRollbackAll = async (records: FileMutationRecord[]) => {
     if (!window.electron?.rollbackFile) {
-      toast.error("Rollback is only available in the desktop application");
+      toast.error(t("toast.rollbackDesktopOnly"));
       return;
     }
     const unrolled = records.filter((r) => !r.rolledBack);
     if (unrolled.length === 0) {
-      toast.info("All changes have already been reverted");
+      toast.info(t("toast.allReverted"));
       return;
     }
     let successCount = 0;
@@ -2515,7 +2517,7 @@ function AuthenticatedContent({
       } catch {}
     }
     if (successCount > 0) {
-      toast.success(`Reverted ${successCount} file(s)`);
+      toast.success(t("toast.revertedFiles").replace("{count}", String(successCount)));
       setMessages((prev) => {
         const next = prev.map((msg) => ({
           ...msg,
@@ -2695,7 +2697,7 @@ function AuthenticatedContent({
       window.electron.abortAgent(idToAbort).catch(() => {});
     }
 
-    toast.info("Agent execution stopped");
+    toast.info(t("toast.agentStopped"));
   };
 
   const handleRespondApproval = async (
@@ -2873,14 +2875,14 @@ function AuthenticatedContent({
     if (id === conversationId) {
       handleNewChat();
     }
-    toast.success("Conversation archived");
+    toast.success(t("toast.convoArchived"));
   };
 
   const handleUnarchiveConversation = async (id: string) => {
     await unarchiveConversation(id);
     const updated = loadConversations();
     setConversations(updated);
-    toast.success("Conversation restored");
+    toast.success(t("toast.convoRestored"));
   };
 
   const handleTogglePinConversation = async (id: string) => {
@@ -2889,7 +2891,7 @@ function AuthenticatedContent({
     await pinConversation(id, nextPinned);
     const updated = loadConversations();
     setConversations(updated);
-    toast.success(nextPinned ? "Task pinned" : "Task unpinned");
+    toast.success(nextPinned ? t("toast.taskPinned") : t("toast.taskUnpinned"));
   };
 
   const handleOpenWorkspaceFromPalette = async () => {
@@ -3429,6 +3431,7 @@ function AuthenticatedContent({
 }
 
 export default function App() {
+  const { t, language } = useTranslation();
   const [token, setToken] = useState<string | null>(() => {
     return localStorage.getItem("const_harness_auth_token");
   });
@@ -3450,13 +3453,13 @@ export default function App() {
         (data: { url: string; token?: string; cancelled?: boolean; error?: string }) => {
           // If cancelled by main process or state invalidated
           if (data.cancelled) {
-            toast.info("Sign-in attempt was cancelled. Click 'Sign in' to try again.");
+            toast.info(t("toast.signInCancelled"));
             return;
           }
 
           // Strict UI guard: If user is no longer waiting (clicked Cancel), reject callback
           if (!isWaitingAuthRef.current) {
-            toast.info("Sign-in attempt was cancelled. Click 'Sign in' to try again.");
+            toast.info(t("toast.signInCancelled"));
             return;
           }
 
@@ -3465,7 +3468,7 @@ export default function App() {
             setToken(data.token);
             setIsWaitingAuth(false);
             isWaitingAuthRef.current = false;
-            toast.success("Signed in successfully");
+            toast.success(t("toast.signedIn"));
           }
         }
       );
@@ -3552,7 +3555,7 @@ export default function App() {
 
     localStorage.removeItem("const_harness_auth_token");
     localStorage.removeItem("const_sso_token");
-    toast.info("Sign-in cancelled");
+    toast.info(t("toast.signInCancelled"));
   };
 
   const handleManualTokenSubmit = (e?: React.FormEvent) => {
@@ -3565,7 +3568,7 @@ export default function App() {
     localStorage.setItem("const_harness_auth_token", cleanToken);
     setToken(cleanToken);
     setIsWaitingAuth(false);
-    toast.success("Authenticated successfully");
+    toast.success(t("toast.signedIn"));
   };
 
   const handleSignOut = () => {
@@ -3645,10 +3648,10 @@ export default function App() {
           {/* Center: Sign in content */}
           <div className="my-auto mx-auto w-full max-w-sm shrink-0 py-2">
             <h1 className="font-serif text-3xl font-normal tracking-tight text-foreground sm:text-4xl">
-              Sign in to Const Harness.
+              {t("auth.signInTitle")}
             </h1>
             <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-              Sign in to start building and debugging with native AI agents — no complex setup required.
+              {t("auth.signInDesc")}
             </p>
 
             <div className="mt-8 min-h-[148px]">
@@ -3659,14 +3662,14 @@ export default function App() {
                   className="w-full h-12 rounded-xl text-sm font-medium gap-2 cursor-pointer transition-all active:scale-[0.99]"
                 >
                   <LogIn className="h-4 w-4" />
-                  Sign in to Const Harness
+                  {t("auth.signInButton")}
                 </Button>
               ) : (
                 <div className="space-y-3 animate-in fade-in duration-300">
                   {/* Button 1: Waiting state matching user reference image */}
                   <div className="w-full h-12 rounded-xl text-sm font-medium gap-2.5 flex items-center justify-center bg-[#222222] border border-[#383838] text-[#969696] select-none cursor-wait transition-all">
                     <Loader2 className="h-4 w-4 animate-spin text-[#969696]" />
-                    <span>Waiting for Const authentication...</span>
+                    <span>{t("auth.waitingAuth")}</span>
                   </div>
 
                   {/* Button 2: Cancel button smoothly animated in */}
@@ -3676,7 +3679,7 @@ export default function App() {
                     onClick={handleCancelAuth}
                     className="w-full h-12 rounded-xl text-sm font-medium border border-[#383838] bg-[#2b2b2b] hover:bg-[#383838] text-[#d4d4d4] hover:text-white cursor-pointer transition-all active:scale-[0.99] animate-in fade-in slide-in-from-top-1 duration-200"
                   >
-                    Cancel
+                    {t("common.cancel")}
                   </Button>
 
                   {/* Manual token fallback */}
@@ -3687,7 +3690,7 @@ export default function App() {
                         onClick={() => setShowManualInput(true)}
                         className="text-[11px] text-[#5d5d5d] hover:text-[#969696] underline underline-offset-4 cursor-pointer transition-colors"
                       >
-                        Having trouble? Enter token manually
+                        {t("auth.havingTrouble")}
                       </button>
                     ) : (
                       <form
@@ -3695,7 +3698,7 @@ export default function App() {
                         className="space-y-2 text-left mt-2 p-3 rounded-xl bg-[#222222] border border-[#383838] animate-in fade-in duration-200"
                       >
                         <label className="text-[11px] font-medium text-[#969696]">
-                          Paste authentication token:
+                          {t("auth.pasteToken")}
                         </label>
                         <div className="flex gap-2">
                           <input
@@ -3710,7 +3713,7 @@ export default function App() {
                             size="sm"
                             className="h-9 px-3 text-xs rounded-xl"
                           >
-                            Verify
+                            {t("auth.verify")}
                           </Button>
                         </div>
                       </form>
@@ -3725,9 +3728,9 @@ export default function App() {
           <div className="flex items-center justify-between pt-4 text-xs text-muted-foreground shrink-0">
             <div className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs text-muted-foreground">
               <Globe className="h-3.5 w-3.5" />
-              <span>English</span>
+              <span>{language === "id" ? "Indonesia" : language === "ja" ? "日本語" : language === "zh" ? "中文" : language === "es" ? "Español" : "English"}</span>
             </div>
-            <span>© 2026 Const · All rights reserved.</span>
+            <span>{t("auth.allRightsReserved")}</span>
           </div>
         </div>
 

@@ -5,6 +5,7 @@ import { FileIcon } from "../workbench/file-icon";
 import { getMutationDiffStats } from "../workbench/review-dialog";
 import type { RightPaneTab } from "./types";
 import type { FileMutationRecord } from "../../vite-env";
+import { useTranslation } from "../../lib/i18n";
 
 interface FileDiffTabProps {
   tab: RightPaneTab;
@@ -12,6 +13,7 @@ interface FileDiffTabProps {
 }
 
 export function FileDiffTab({ tab, onRollbackFile }: FileDiffTabProps) {
+  const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
   const [isUndoing, setIsUndoing] = useState(false);
 
@@ -86,7 +88,7 @@ export function FileDiffTab({ tab, onRollbackFile }: FileDiffTabProps) {
             <FileIcon filename={fileName} />
             <span className="truncate">{fileName}</span>
             <span className="text-[10px] font-sans px-1.5 py-0.2 rounded bg-blue-500/15 text-blue-400 border border-blue-500/25 ml-1">
-              (single edit)
+              {t("rightPane.singleEdit")}
             </span>
           </div>
         </div>
@@ -104,7 +106,7 @@ export function FileDiffTab({ tab, onRollbackFile }: FileDiffTabProps) {
             type="button"
             onClick={handleCopy}
             className="p-1 rounded hover:bg-white/10 text-neutral-400 hover:text-white transition-colors cursor-pointer"
-            title="Copy diff"
+            title={t("rightPane.copyDiff")}
           >
             {copied ? (
               <Check className="w-3.5 h-3.5 text-green-400" />
@@ -120,10 +122,10 @@ export function FileDiffTab({ tab, onRollbackFile }: FileDiffTabProps) {
               onClick={handleRollback}
               disabled={isUndoing}
               className="flex items-center gap-1 px-2 py-1 rounded bg-[#222222] hover:bg-[#2c2c2c] border border-[#333333] hover:border-[#444444] text-[11px] text-neutral-300 hover:text-white transition-all cursor-pointer disabled:opacity-50 font-medium"
-              title="Revert changes to this file"
+              title={t("rightPane.revertFile")}
             >
               <RotateCcw className={`w-3 h-3 text-neutral-400 ${isUndoing ? "animate-spin" : ""}`} />
-              <span>Undo</span>
+              <span>{t("common.undo")}</span>
             </button>
           )}
         </div>

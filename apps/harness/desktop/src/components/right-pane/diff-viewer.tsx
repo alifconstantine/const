@@ -2,6 +2,7 @@ import React, { useState, useMemo } from "react";
 import { ChevronDown, ChevronUp, ChevronsUpDown, Plus } from "lucide-react";
 import { ScrollArea, cn } from "@const/ui";
 import { computeDiff, type DiffLine } from "../workbench/review-dialog";
+import { useTranslation } from "../../lib/i18n";
 
 export interface DiffViewerProps {
   previousContent: string | null | undefined;
@@ -24,6 +25,7 @@ export function DiffViewer({
   className = "",
   maxHeight,
 }: DiffViewerProps) {
+  const { t } = useTranslation();
   const [unfoldedHunkIds, setUnfoldedHunkIds] = useState<Set<string>>(new Set());
   const [expandedChunkCounts, setExpandedChunkCounts] = useState<Record<string, number>>({});
 
@@ -150,7 +152,7 @@ export function DiffViewer({
   if (allLines.length === 0) {
     return (
       <div className="p-8 text-center text-xs text-neutral-500 font-sans">
-        No content to compare.
+        {t("rightPane.noContentToCompare")}
       </div>
     );
   }
@@ -164,10 +166,10 @@ export function DiffViewer({
             type="button"
             onClick={handleToggleAllFolds}
             className="flex items-center gap-1 hover:text-white transition-colors cursor-pointer py-0.5 px-1.5 rounded hover:bg-white/5"
-            title={allUnfolded ? "Collapse unchanged blocks" : "Expand all unchanged blocks"}
+            title={allUnfolded ? t("rightPane.collapseContext") : t("rightPane.expandAllLines")}
           >
             <ChevronsUpDown className="w-3 h-3 text-neutral-400" />
-            <span>{allUnfolded ? "Collapse context" : "Expand all lines"}</span>
+            <span>{allUnfolded ? t("rightPane.collapseContext") : t("rightPane.expandAllLines")}</span>
           </button>
         </div>
       )}
@@ -222,7 +224,7 @@ export function DiffViewer({
                         onClick={() => handleToggleFold(block.id)}
                         className="flex-1 text-center py-0.5 font-sans font-medium text-neutral-300 hover:text-white transition-colors cursor-pointer flex items-center justify-center gap-1.5"
                       >
-                        <span>+{remainingCount} more lines</span>
+                        <span>+{remainingCount} {t("rightPane.moreLines")}</span>
                       </button>
 
                       <button

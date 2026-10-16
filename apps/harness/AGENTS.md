@@ -24,6 +24,10 @@ Welcome, Agent. This document establishes the operational principles, technical 
    - **16px/24px geometry**, borderless panels, zero harsh divider lines (`border-b`, `border-t`, `divide-y`).
    - Suppress unwanted OS/browser focus outlines and yellow accent rings on modal dialogs and dropdown containers (`outline-none focus:outline-none focus-visible:outline-none ring-0`).
 
+3. **Mandatory Internationalization (i18n):**
+   - For any UI work in `apps/harness/desktop`, refer to [`apps/harness/desktop/AGENTS.md`](./desktop/AGENTS.md).
+   - **Zero hardcoded user-facing strings:** All labels, placeholders, buttons, toasts, and dialogs must use `useTranslation()` / `t(...)` across all 5 languages (`en`, `id`, `ja`, `zh`, `es`).
+
 ---
 
 ## 2. Post-Change Quality & Audit Protocol

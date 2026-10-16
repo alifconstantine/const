@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Clock, ChevronDown } from "lucide-react";
 import { ScrollArea } from "@const/ui";
+import { useTranslation } from "../../lib/i18n";
 
 export interface TimePickerProps {
   value: string; // e.g. "09:00"
@@ -8,6 +9,7 @@ export interface TimePickerProps {
 }
 
 export function TimePicker({ value, onChange }: TimePickerProps): React.JSX.Element {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const activeHourRef = useRef<HTMLButtonElement>(null);
@@ -107,13 +109,13 @@ export function TimePicker({ value, onChange }: TimePickerProps): React.JSX.Elem
               maxLength={5}
               placeholder="09:00"
             />
-            <span className="text-[11px] text-[#969696]">24h format</span>
+            <span className="text-[11px] text-[#969696]">{t("scheduledTasks.format24h")}</span>
           </div>
 
           {/* Symmetrical Dual Column Picker with Radix ScrollArea */}
           <div className="flex items-start gap-1">
             <div className="flex-1 flex flex-col min-w-0">
-              <div className="text-[10px] font-medium text-[#969696] mb-1 text-center uppercase">Hour</div>
+              <div className="text-[10px] font-medium text-[#969696] mb-1 text-center uppercase">{t("common.hour")}</div>
               <ScrollArea className="h-36 pr-1" thumbClassName="bg-white/20 hover:bg-white/30">
                 <div className="flex flex-col gap-0.5">
                   {hoursList.map((h) => (
@@ -138,7 +140,7 @@ export function TimePicker({ value, onChange }: TimePickerProps): React.JSX.Elem
             <div className="w-[1px] h-36 bg-[#383838] mx-0.5" />
 
             <div className="flex-1 flex flex-col min-w-0">
-              <div className="text-[10px] font-medium text-[#969696] mb-1 text-center uppercase">Min</div>
+              <div className="text-[10px] font-medium text-[#969696] mb-1 text-center uppercase">{t("common.minute")}</div>
               <ScrollArea className="h-36 pr-1" thumbClassName="bg-white/20 hover:bg-white/30">
                 <div className="flex flex-col gap-0.5">
                   {minutesList.map((m) => (

@@ -23,6 +23,7 @@ import { DayPickerGrid } from "./day-picker-grid";
 import { CustomRepeatModal, type CustomRepeatConfig } from "./custom-repeat-modal";
 import { SegmentedToggle } from "./segmented-toggle";
 import { ScheduledTaskHistoryContent } from "./scheduled-task-history";
+import { useTranslation } from "../../lib/i18n";
 
 export interface ScheduledTaskFormData {
   name: string;
@@ -96,6 +97,7 @@ export function ScheduledTaskForm({
   onOpenSession,
   onDeleteRun,
 }: ScheduledTaskFormProps): React.JSX.Element {
+  const { t } = useTranslation();
   const [name, setName] = useState(initialValues?.name || initialValues?.title || "");
   const [prompt, setPrompt] = useState(initialValues?.prompt || initialValues?.instructions || "");
   const [hasSchedule, setHasSchedule] = useState(Boolean(initialValues?.schedule));
@@ -320,10 +322,10 @@ export function ScheduledTaskForm({
 
   const displayWorkspaceName = useMemo(() => {
     if (!workspacePath || workspacePath === "Outside Project") {
-      return "Work outside a project";
+      return t("scheduledTasks.workOutsideProject");
     }
     return workspacePath.replace(/\\/g, "/").split("/").filter(Boolean).pop() || workspacePath;
-  }, [workspacePath]);
+  }, [workspacePath, t]);
 
   const handleSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -357,43 +359,69 @@ export function ScheduledTaskForm({
   };
 
   const scheduleTypeOptions = [
-    { value: "hourly", label: "Hourly" },
-    { value: "daily", label: "Daily" },
-    { value: "weekdays", label: "Weekdays" },
-    { value: "weekly", label: "Weekly" },
-    { value: "monthly", label: "Monthly" },
-    { value: "custom", label: "Custom" },
+    { value: "hourly", label: t("scheduledTasks.hourly") },
+    { value: "daily", label: t("scheduledTasks.daily") },
+    { value: "weekdays", label: t("scheduledTasks.weekdays") },
+    { value: "weekly", label: t("scheduledTasks.weekly") },
+    { value: "monthly", label: t("scheduledTasks.monthly") },
+    { value: "custom", label: t("scheduledTasks.custom") },
   ];
 
   const weekDayOptions = [
-    { value: "1", label: "Monday" },
-    { value: "2", label: "Tuesday" },
-    { value: "3", label: "Wednesday" },
-    { value: "4", label: "Thursday" },
-    { value: "5", label: "Friday" },
-    { value: "6", label: "Saturday" },
-    { value: "0", label: "Sunday" },
+    { value: "1", label: t("scheduledTasks.monday") },
+    { value: "2", label: t("scheduledTasks.tuesday") },
+    { value: "3", label: t("scheduledTasks.wednesday") },
+    { value: "4", label: t("scheduledTasks.thursday") },
+    { value: "5", label: t("scheduledTasks.friday") },
+    { value: "6", label: t("scheduledTasks.saturday") },
+    { value: "0", label: t("scheduledTasks.sunday") },
   ];
 
   const getSummaryText = (): string => {
-    if (!hasSchedule) return "No schedule";
+    if (!hasSchedule) return t("scheduledTasks.noSchedule");
     switch (scheduleType) {
       case "hourly":
-        return "Every hour";
+        return t("scheduledTasks.everyHour");
       case "daily":
-        return `Every day at ${scheduleTime}`;
+        return t("scheduledTasks.everyDayAt").replace("{time}", scheduleTime);
       case "weekdays":
-        return `Every weekday at ${scheduleTime}`;
+        return t("scheduledTasks.everyWeekdayAt").replace("{time}", scheduleTime);
       case "weekly": {
-        const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-        return `Weekly on ${days[scheduleDayOfWeek]} at ${scheduleTime}`;
+        const days = [
+          t("scheduledTasks.sun"),
+          t("scheduledTasks.mon"),
+          t("scheduledTasks.tue"),
+          t("scheduledTasks.wed"),
+          t("scheduledTasks.thu"),
+          t("scheduledTasks.fri"),
+          t("scheduledTasks.sat"),
+        ];
+        return t("scheduledTasks.weeklyOnAt")
+          .replace("{day}", days[scheduleDayOfWeek] || "")
+          .replace("{time}", scheduleTime);
       }
       case "monthly":
-        return `Monthly on day ${scheduleDayOfMonth} at ${scheduleTime}`;
-      case "custom":
-        return `Every ${customConfig.frequency} ${customConfig.unit} at ${scheduleTime}`;
+        return t("scheduledTasks.monthlyOnDayAt")
+          .replace("{day}", String(scheduleDayOfMonth))
+          .replace("{time}", scheduleTime);
+      case "custom": {
+        const unitName =
+          customConfig.unit === "minutes"
+            ? t("scheduledTasks.minutes")
+            : customConfig.unit === "hours"
+            ? t("scheduledTasks.hours")
+            : customConfig.unit === "days"
+            ? t("scheduledTasks.days")
+            : customConfig.unit === "weeks"
+            ? t("scheduledTasks.weeks")
+            : t("scheduledTasks.months");
+        return t("scheduledTasks.everyCustomAt")
+          .replace("{freq}", String(customConfig.frequency))
+          .replace("{unit}", unitName)
+          .replace("{time}", scheduleTime);
+      }
       default:
-        return "Custom";
+        return t("scheduledTasks.custom");
     }
   };
 
@@ -403,10 +431,10 @@ export function ScheduledTaskForm({
       <div className="w-full max-w-4xl mx-auto px-6 sm:px-10 py-12 flex flex-col select-none">
         <div className="mb-6">
           <h1 className="text-2xl font-semibold text-white tracking-tight mb-1">
-            {isEditing ? "Edit scheduled task" : "New scheduled task"}
+            {isEditing ? t("common.edit") : t("scheduledTasks.newTask")}
           </h1>
           <p className="text-[13px] text-[#969696]">
-            Configure when this task runs, what it does, and how it works.
+            {t("scheduledTasks.subtitle")}
           </p>
         </div>
 
@@ -416,8 +444,8 @@ export function ScheduledTaskForm({
             value={activeSubTab}
             onChange={handleSubTabChange}
             options={[
-              { id: "settings", label: "Settings" },
-              { id: "history", label: "History" },
+              { id: "settings", label: t("sidebar.settings") },
+              { id: "history", label: t("scheduledTasks.history") },
             ]}
           />
 
@@ -429,7 +457,7 @@ export function ScheduledTaskForm({
                   className="h-8 px-3.5 flex items-center justify-center rounded-lg text-xs font-medium text-[#d4d4d4] hover:text-white bg-[#222222] hover:bg-[#2b2b2b] border border-[#383838] transition-colors cursor-pointer"
                   onClick={onCancel}
                 >
-                  Cancel
+                  {t("common.cancel")}
                 </button>
                 <button
                   type="button"
@@ -437,7 +465,7 @@ export function ScheduledTaskForm({
                   onClick={() => handleSubmit()}
                   disabled={!name.trim() || !prompt.trim()}
                 >
-                  {isEditing ? "Save changes" : "Create scheduled task"}
+                  {isEditing ? t("common.save") : t("scheduledTasks.newTask")}
                 </button>
               </div>
             ) : (
@@ -449,8 +477,8 @@ export function ScheduledTaskForm({
                         type="button"
                         className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#222222] hover:bg-[#2b2b2b] border border-[#383838] hover:border-[#484848] text-[#969696] hover:text-white transition-colors cursor-pointer"
                         onClick={() => onRunNow((task?.id || initialValues?.id)!)}
-                        title="Run Now"
-                        aria-label="Run Now"
+                        title={t("scheduledTasks.runNow")}
+                        aria-label={t("scheduledTasks.runNow")}
                       >
                         <Play className="w-3.5 h-3.5 fill-current" />
                       </button>
@@ -465,8 +493,8 @@ export function ScheduledTaskForm({
                             onDeleteTask((task?.id || initialValues?.id)!);
                           }
                         }}
-                        title="Delete task"
-                        aria-label="Delete task"
+                        title={t("scheduledTasks.deleteScheduledTask")}
+                        aria-label={t("scheduledTasks.deleteScheduledTask")}
                       >
                         <Trash2 className="w-3.5 h-3.5" />
                       </button>
@@ -479,7 +507,7 @@ export function ScheduledTaskForm({
                     className="h-8 px-3.5 flex items-center justify-center rounded-lg text-xs font-medium text-[#d4d4d4] hover:text-white bg-[#222222] hover:bg-[#2b2b2b] border border-[#383838] transition-colors cursor-pointer"
                     onClick={onCancel}
                   >
-                    Cancel
+                    {t("common.cancel")}
                   </button>
                 )}
               </div>
@@ -498,7 +526,7 @@ export function ScheduledTaskForm({
               />
             ) : (
               <div className="bg-[#222222] border border-dashed border-[#383838] rounded-xl p-10 text-center text-[#969696] text-xs">
-                <span>No runs yet.</span>
+                <span>{t("scheduledTasks.noHistory")}</span>
               </div>
             )}
           </div>
@@ -507,11 +535,11 @@ export function ScheduledTaskForm({
           <form className="flex flex-col gap-5" onSubmit={handleSubmit}>
             {/* Field: Task Title */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium text-[#969696]">Task title</label>
+              <label className="text-xs font-medium text-[#969696]">{t("scheduledTasks.taskName")}</label>
               <input
                 type="text"
                 className="w-full bg-[#2b2b2b] border border-[#383838] rounded-lg px-3 py-2 text-[13px] text-white outline-none focus:border-[#5d5d5d] placeholder:text-[#5d5d5d] transition-colors"
-                placeholder="Untitled Scheduled Task"
+                placeholder={t("scheduledTasks.taskNamePlaceholder")}
                 value={name}
                 onChange={(e) => {
                   setName(e.target.value);
@@ -523,14 +551,14 @@ export function ScheduledTaskForm({
 
             {/* Field: Schedule Bar */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium text-[#969696]">Schedule</label>
+              <label className="text-xs font-medium text-[#969696]">{t("scheduledTasks.recurrence")}</label>
               {!hasSchedule ? (
                 <div
                   className="inline-flex items-center gap-2 bg-[#222222] hover:bg-[#262626] border border-dashed border-[#383838] hover:border-[#5d5d5d] text-[#969696] hover:text-white rounded-lg px-3.5 py-2 text-xs transition-colors cursor-pointer w-fit"
                   onClick={() => setHasSchedule(true)}
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  <span>Add schedule</span>
+                  <span>{t("scheduledTasks.recurrence")}</span>
                 </div>
               ) : (
                 <div className="flex items-center justify-between gap-3 bg-[#222222] border border-[#383838] rounded-lg p-2 flex-wrap">
@@ -555,7 +583,20 @@ export function ScheduledTaskForm({
                         onClick={() => setShowCustomModal(true)}
                       >
                         <span>
-                          Every {customConfig.frequency} {customConfig.unit}
+                          {t("scheduledTasks.everyInterval")
+                            .replace("{freq}", String(customConfig.frequency))
+                            .replace(
+                              "{unit}",
+                              customConfig.unit === "minutes"
+                                ? t("scheduledTasks.minutes")
+                                : customConfig.unit === "hours"
+                                ? t("scheduledTasks.hours")
+                                : customConfig.unit === "days"
+                                ? t("scheduledTasks.days")
+                                : customConfig.unit === "weeks"
+                                ? t("scheduledTasks.weeks")
+                                : t("scheduledTasks.months")
+                            )}
                         </span>
                         <ChevronDown className="w-3 h-3 text-[#969696]" />
                       </button>
@@ -564,7 +605,7 @@ export function ScheduledTaskForm({
                     {/* If Weekly: Day dropdown */}
                     {scheduleType === "weekly" && (
                       <>
-                        <span className="text-xs text-[#969696]">on</span>
+                        <span className="text-xs text-[#969696]">{t("scheduledTasks.on")}</span>
                         <CustomDropdown
                           value={String(scheduleDayOfWeek)}
                           options={weekDayOptions}
@@ -576,7 +617,7 @@ export function ScheduledTaskForm({
                     {/* If Monthly: Day grid picker */}
                     {scheduleType === "monthly" && (
                       <>
-                        <span className="text-xs text-[#969696]">day</span>
+                        <span className="text-xs text-[#969696]">{t("scheduledTasks.dayLabel")}</span>
                         <DayPickerGrid
                           value={scheduleDayOfMonth}
                           onChange={setScheduleDayOfMonth}
@@ -587,7 +628,7 @@ export function ScheduledTaskForm({
                     {/* Time picker for non-hourly */}
                     {scheduleType !== "hourly" && (
                       <>
-                        <span className="text-xs text-[#969696]">at</span>
+                        <span className="text-xs text-[#969696]">{t("scheduledTasks.at")}</span>
                         <TimePicker
                           value={scheduleTime}
                           onChange={setScheduleTime}
@@ -606,7 +647,7 @@ export function ScheduledTaskForm({
                     type="button"
                     className="p-1.5 rounded text-[#969696] hover:text-rose-400 hover:bg-rose-950/30 transition-colors cursor-pointer"
                     onClick={() => setHasSchedule(false)}
-                    title="Remove schedule"
+                    title={t("scheduledTasks.removeSchedule")}
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
@@ -616,11 +657,11 @@ export function ScheduledTaskForm({
 
             {/* Field: Instructions with Bottom Toolbar (Workspace, Permission, Model - exactly matching ChatCard) */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium text-[#969696]">Instructions</label>
+              <label className="text-xs font-medium text-[#969696]">{t("workbench.editPrompt")}</label>
               <div className="bg-[#2b2b2b] border border-[#383838] rounded-xl focus-within:border-[#5d5d5d] transition-colors flex flex-col">
                 <textarea
                   className="w-full min-h-[140px] bg-transparent text-[13px] text-white placeholder:text-[#5d5d5d] p-3 outline-none resize-y font-sans leading-relaxed rounded-t-xl"
-                  placeholder="e.g. Review commits from the last 24 hours and summarize likely bugs and fixes"
+                  placeholder={t("scheduledTasks.promptPlaceholder")}
                   value={prompt}
                   onChange={(e) => setPrompt(e.target.value)}
                   required
@@ -639,7 +680,7 @@ export function ScheduledTaskForm({
                           setIsAccessInfoOpen(false);
                         }}
                         className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[13px] bg-[#2b2b2b] hover:bg-[#383838] border border-[#383838] text-[#d4d4d4] hover:text-white transition-colors cursor-pointer"
-                        title={workspacePath || "Work outside a project"}
+                        title={workspacePath || t("workbench.outsideWorkspace")}
                       >
                         <Folder className="w-3.5 h-3.5 text-[#969696]" />
                         <span className="truncate max-w-[160px]">{displayWorkspaceName}</span>
@@ -656,7 +697,7 @@ export function ScheduledTaskForm({
                                   type="text"
                                   value={searchWorkspace}
                                   onChange={(e) => setSearchWorkspace(e.target.value)}
-                                  placeholder="Search workspaces"
+                                  placeholder={t("scheduledTasks.searchWorkspaces")}
                                   className="w-full bg-transparent text-xs text-white placeholder:text-[#5d5d5d] outline-none"
                                   autoFocus
                                 />
@@ -704,7 +745,7 @@ export function ScheduledTaskForm({
                             className="w-full px-2.5 py-1.5 flex items-center gap-2 text-xs text-[#d4d4d4] hover:text-white hover:bg-[#2b2b2b] rounded-lg transition-colors cursor-pointer"
                           >
                             <FolderPlus className="w-3.5 h-3.5 text-[#969696] shrink-0" />
-                            <span>Open folder</span>
+                            <span>{t("workbench.openFolder")}</span>
                           </button>
 
                           <button
@@ -717,7 +758,7 @@ export function ScheduledTaskForm({
                           >
                             <div className="flex items-center gap-2">
                               <MessageSquare className="w-3.5 h-3.5 text-[#969696] shrink-0" />
-                              <span>Work outside a project</span>
+                              <span>{t("workbench.outsideWorkspace")}</span>
                             </div>
                             {!workspacePath && <Check className="w-3.5 h-3.5 text-white shrink-0" />}
                           </button>
@@ -735,7 +776,7 @@ export function ScheduledTaskForm({
                           setIsModelOpen(false);
                         }}
                         className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-[#2b2b2b] hover:bg-[#383838] border border-[#383838] text-white hover:text-white transition-colors cursor-pointer"
-                        title="Full access: Scheduled tasks run autonomously in the background with full access"
+                        title={t("scheduledTasks.fullAccessDesc")}
                         aria-label="Full access info"
                       >
                         <Info className="w-3.5 h-3.5 text-white" />
@@ -745,10 +786,10 @@ export function ScheduledTaskForm({
                         <div className="absolute bottom-full mb-2 left-0 w-64 bg-[#222222] border border-[#383838] rounded-xl shadow-2xl p-2.5 z-50 flex flex-col text-left select-none animate-in fade-in zoom-in-95 duration-100">
                           <div className="flex items-center gap-1.5 text-xs font-medium text-white mb-1">
                             <Info className="w-3.5 h-3.5 text-white shrink-0" />
-                            <span>Full access</span>
+                            <span>{t("workbench.modeFullAccess")}</span>
                           </div>
                           <p className="text-[11px] text-[#969696] leading-relaxed">
-                            Scheduled tasks run autonomously in the background with full access permissions.
+                            {t("scheduledTasks.fullAccessDesc")}
                           </p>
                         </div>
                       )}
@@ -773,10 +814,10 @@ export function ScheduledTaskForm({
                     {isModelOpen && (
                       <div className="absolute bottom-full mb-2 right-0 w-72 bg-[#222222] border border-[#383838] rounded-xl shadow-2xl p-2 z-50 flex flex-col text-left select-none animate-in fade-in zoom-in-95 duration-100">
                         <div className="px-2 py-1 flex items-center justify-between text-[11px] font-medium tracking-wider text-[#969696] border-b border-[#383838] mb-1">
-                          <span className="uppercase tracking-wider">Models</span>
+                          <span className="uppercase tracking-wider">{t("workbench.models")}</span>
                           {quota && (
                             <span className="text-[10px] text-[#4ade80] font-sans tabular-nums">
-                              {formatTokenDisplay(quota.remainingTokens)} left
+                              {t("workbench.tokensLeft").replace("{tokens}", formatTokenDisplay(quota.remainingTokens))}
                             </span>
                           )}
                         </div>

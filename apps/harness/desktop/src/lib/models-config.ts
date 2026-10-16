@@ -623,7 +623,7 @@ export function loadMultiModalConfig(): UnifiedMultiModalConfig {
       activeProviderId: speechActiveProvider,
       activeModelId: speechActiveModel,
       activeVoice: speechActiveVoice,
-      testText: "Halo! Suara berhasil terhubung dan siap digunakan.",
+      testText: "Hello! Voice is connected and ready to use.",
     },
     image: {
       providers: imageProviders,

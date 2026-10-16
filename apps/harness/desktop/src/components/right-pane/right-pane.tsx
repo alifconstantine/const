@@ -13,6 +13,7 @@ import { SideChatTab } from "./side-chat-tab";
 import type { RightPaneTab, RightPaneTabType, BrowserSelectedElement } from "./types";
 import type { FileMutationRecord, SubAgentItem } from "../../vite-env";
 import type { ConversationItem } from "../../lib/conversation-store";
+import { useTranslation } from "../../lib/i18n";
 
 interface RightPaneProps {
   width: number;
@@ -81,6 +82,7 @@ export function RightPane({
   defaultModel,
   onInsertToMainPrompt,
 }: RightPaneProps) {
+  const { t } = useTranslation();
   const isDraggingRef = useRef(false);
   const startXRef = useRef(0);
   const startWidthRef = useRef(width);
@@ -187,7 +189,7 @@ export function RightPane({
         onMouseDown={handleMouseDown}
         onDoubleClick={() => onWidthChange(480)}
         className="absolute top-0 left-0 w-1 h-full cursor-col-resize hover:bg-white/20 transition-colors z-30 group"
-        title="Drag to resize, double-click to reset"
+        title={t("rightPane.dragToResize")}
       >
         <div className="w-0.5 h-full bg-transparent group-hover:bg-blue-500/50" />
       </div>

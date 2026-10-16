@@ -23,6 +23,7 @@ import {
   isScheduledTaskConversation,
 } from "../lib/conversation-store";
 import { getProjectDisplayName } from "./sidebar";
+import { useTranslation } from "../lib/i18n";
 
 export type PaletteTab = "all" | "actions" | "tasks";
 export type TaskCategoryFilter = "all" | "project" | "outside";
@@ -146,6 +147,7 @@ export function CommandPaletteModal({
   onOpenSettings,
   onToggleSidebar,
 }: CommandPaletteModalProps) {
+  const { t } = useTranslation();
   const [query, setQuery] = useState("");
   const [tab, setTab] = useState<PaletteTab>("all");
   const [taskCategory, setTaskCategory] = useState<TaskCategoryFilter>("all");
@@ -273,7 +275,7 @@ export function CommandPaletteModal({
     () => [
       {
         id: "act-new-chat",
-        title: "New chat",
+        title: t("commandPalette.newChat"),
         shortcut: typeof navigator !== "undefined" && navigator?.userAgent?.includes("Mac") ? "⌘K" : "Ctrl+K",
         icon: <MessageCirclePlus size={16} />,
         category: "suggested",
@@ -284,7 +286,7 @@ export function CommandPaletteModal({
       },
       {
         id: "act-open-workspace",
-        title: "Open workspace",
+        title: t("commandPalette.openWorkspace"),
         shortcut: "Ctrl+O",
         icon: <FolderPlus size={16} />,
         category: "suggested",
@@ -295,7 +297,7 @@ export function CommandPaletteModal({
       },
       {
         id: "act-scheduled-tasks",
-        title: "Scheduled Tasks",
+        title: t("commandPalette.openScheduledTasks"),
         icon: <CalendarClock size={16} />,
         category: "tools",
         run: () => {
@@ -305,7 +307,7 @@ export function CommandPaletteModal({
       },
       {
         id: "act-archived-sessions",
-        title: "Archived sessions",
+        title: t("commandPalette.archivedSessions"),
         icon: <Archive size={16} />,
         category: "navigation",
         run: () => {
@@ -315,7 +317,7 @@ export function CommandPaletteModal({
       },
       {
         id: "act-settings",
-        title: "Settings",
+        title: t("commandPalette.openSettings"),
         icon: <Settings size={16} />,
         category: "settings",
         run: () => {
@@ -325,7 +327,7 @@ export function CommandPaletteModal({
       },
       {
         id: "act-toggle-sidebar",
-        title: "Toggle sidebar",
+        title: t("commandPalette.toggleSidebar"),
         shortcut: "Ctrl+B",
         icon: <PanelLeft size={16} />,
         category: "navigation",
@@ -336,6 +338,7 @@ export function CommandPaletteModal({
       },
     ],
     [
+      t,
       onClose,
       onNewChat,
       onOpenWorkspace,
@@ -457,7 +460,7 @@ export function CommandPaletteModal({
               ref={inputRef}
               type="text"
               className="flex-1 h-full bg-transparent border-none text-white text-sm outline-none placeholder:text-white/40 p-0 font-sans"
-              placeholder="Search actions, tasks, or messages..."
+              placeholder={t("commandPalette.searchPlaceholder")}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               onKeyDown={onKeyDown}
@@ -497,7 +500,7 @@ export function CommandPaletteModal({
             aria-selected={tab === "all"}
           >
             <List size={13} />
-            <span>All</span>
+            <span>{t("commandPalette.all")}</span>
           </button>
           <button
             type="button"
@@ -512,7 +515,7 @@ export function CommandPaletteModal({
             aria-selected={tab === "actions"}
           >
             <Rocket size={13} />
-            <span>Actions</span>
+            <span>{t("commandPalette.actions")}</span>
           </button>
           <button
             type="button"
@@ -527,7 +530,7 @@ export function CommandPaletteModal({
             aria-selected={tab === "tasks"}
           >
             <MessageSquare size={13} />
-            <span>Tasks</span>
+            <span>{t("commandPalette.tasks")}</span>
           </button>
         </div>
 
@@ -544,7 +547,7 @@ export function CommandPaletteModal({
               )}
               onClick={() => setTaskCategory("all")}
             >
-              All Tasks ({allTasks.length})
+              {t("commandPalette.all")} ({allTasks.length})
             </button>
             <button
               type="button"
@@ -556,7 +559,7 @@ export function CommandPaletteModal({
               )}
               onClick={() => setTaskCategory("project")}
             >
-              In Project ({allTasks.filter((t) => t.isProject).length})
+              {t("commandPalette.project")} ({allTasks.filter((t) => t.isProject).length})
             </button>
             <button
               type="button"
@@ -568,7 +571,7 @@ export function CommandPaletteModal({
               )}
               onClick={() => setTaskCategory("outside")}
             >
-              Outside Project ({allTasks.filter((t) => !t.isProject).length})
+              {t("commandPalette.outside")} ({allTasks.filter((t) => !t.isProject).length})
             </button>
           </div>
         )}
@@ -696,7 +699,7 @@ export function CommandPaletteModal({
             {flatSelectableItems.length === 0 && (
               <div className="py-10 px-4 text-center flex flex-col items-center gap-1.5">
                 <p className="text-sm font-medium text-white/70 m-0">
-                  No matching actions or tasks found
+                  {t("commandPalette.noResults")}
                 </p>
                 <span className="text-xs text-white/40">
                   Try searching for chat titles, workspace names, or actions like "new chat"
