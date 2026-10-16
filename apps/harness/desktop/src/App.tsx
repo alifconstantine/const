@@ -1426,9 +1426,9 @@ function AuthenticatedContent({
   }, [conversationWidth]);
 
   const userBubbleWidthClass = useMemo(() => {
-    if (conversationWidth === "narrow") return "max-w-xl";
-    if (conversationWidth === "wide") return "max-w-3xl";
-    return "max-w-2xl";
+    if (conversationWidth === "narrow") return "max-w-[85%] sm:max-w-xl";
+    if (conversationWidth === "wide") return "max-w-[85%] sm:max-w-3xl";
+    return "max-w-[85%] sm:max-w-2xl";
   }, [conversationWidth]);
 
   // Dynamic Context Usage computation (Image 3)

@@ -446,12 +446,12 @@ Answer the user's query directly. Only modify workspace files or run commands if
               {msg.role === "user" ? (
                 /* User Bubble */
                 <div className="w-full flex flex-col items-end group">
-                  <div className="w-full max-w-[95%] rounded-xl bg-[#f0f0f0] dark:bg-[#242424] border border-[#e2e2e4] dark:border-[#363636] px-3 py-2 text-xs text-[#262626] dark:text-[#ececec] leading-relaxed whitespace-pre-wrap break-words">
+                  <div className="w-fit max-w-[85%] rounded-2xl rounded-tr-sm bg-[#f0f0f0] dark:bg-[#242424] border border-[#e2e2e4] dark:border-[#363636] px-3.5 py-2 text-xs text-[#262626] dark:text-[#ececec] leading-relaxed whitespace-pre-wrap break-words">
                     <MarkdownContent
                       content={msg.content}
                       onOpenFilePreview={onOpenFilePreview}
                       onOpenTrajectory={onOpenTrajectory}
-                      className="space-y-1 text-xs"
+                      className="space-y-1 text-xs [&_p]:my-0 [&_p]:leading-relaxed"
                     />
                   </div>
                   {/* Hover actions */}

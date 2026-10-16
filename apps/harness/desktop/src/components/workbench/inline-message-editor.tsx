@@ -92,7 +92,7 @@ export function InlineMessageEditor({
   return (
     <div
       className={cn(
-        "w-full rounded-2xl bg-[#f0f0f0] dark:bg-[#1f1f1f] border border-[#d5d5d9] dark:border-[#383838] p-3 text-[14px] shadow-sm flex flex-col gap-2.5 transition-all duration-150 animate-in fade-in zoom-in-[0.99]",
+        "w-full rounded-3xl rounded-tr-md bg-[#f0f0f0] dark:bg-[#1f1f1f] border border-[#d5d5d9] dark:border-[#383838] p-3 text-[13.5px] shadow-sm flex flex-col gap-2.5 transition-all duration-150 animate-in fade-in zoom-in-[0.99]",
         userBubbleWidthClass
       )}
     >

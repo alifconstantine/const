@@ -134,7 +134,7 @@ export function ChatMessageItem({
             }
           }}
           className={cn(
-            "w-full rounded-2xl bg-[#f0f0f0] dark:bg-[#222222] border border-[#e2e2e4] dark:border-[#383838] px-4 py-3 text-[14px] text-[#262626] dark:text-[#ececec] select-text leading-relaxed whitespace-pre-wrap break-words [overflow-wrap:anywhere] [word-break:break-word] shadow-xs overflow-hidden transition-all duration-200",
+            "w-fit rounded-3xl rounded-tr-md bg-[#f0f0f0] dark:bg-[#222222] border border-[#e2e2e4] dark:border-[#383838] px-4 py-2.5 text-[13.5px] text-[#262626] dark:text-[#ececec] select-text leading-relaxed whitespace-pre-wrap break-words [overflow-wrap:anywhere] [word-break:break-word] shadow-xs overflow-hidden transition-all duration-200",
             userBubbleWidthClass,
             !isReadOnly && isLongPrompt && !isExpanded && "cursor-pointer hover:border-[#b0b0b0] dark:hover:border-[#484848]"
           )}
@@ -152,7 +152,7 @@ export function ChatMessageItem({
                   content={message.content}
                   onOpenFilePreview={onOpenFilePreview}
                   onOpenTrajectory={onOpenTrajectory}
-                  className="space-y-1 text-[14px]"
+                  className="space-y-1.5 text-[13.5px] [&_p]:my-0 [&_p]:leading-relaxed"
                 />
               </div>
             </ScrollArea>
@@ -162,7 +162,7 @@ export function ChatMessageItem({
                 content={message.content}
                 onOpenFilePreview={onOpenFilePreview}
                 onOpenTrajectory={onOpenTrajectory}
-                className="space-y-1 text-[14px]"
+                className="space-y-1.5 text-[13.5px] [&_p]:my-0 [&_p]:leading-relaxed"
               />
             </div>
           )}
@@ -170,7 +170,7 @@ export function ChatMessageItem({
 
         {/* User action bar (Copy, Edit, Timestamp) - hidden in read-only mode */}
         {!isReadOnly && !isEditing && (
-          <div className="flex items-center gap-2 pt-1.5 opacity-0 group-hover:opacity-100 transition-opacity text-xs text-[#a9a9a9] dark:text-[#888888] select-none">
+          <div className="flex items-center gap-2 pt-1.5 pr-1 opacity-0 group-hover:opacity-100 transition-opacity text-xs text-[#a9a9a9] dark:text-[#888888] select-none font-sans">
             {message.timestamp && (
               <span className="text-[11px] font-sans tabular-nums text-[#a9a9a9] dark:text-[#777777]">
                 {formatMessageTimestamp(message.timestamp)}

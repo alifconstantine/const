@@ -254,7 +254,7 @@ export function SubagentTab({
             message={userMessage}
             onOpenFilePreview={onOpenFilePreview}
             isReadOnly={true}
-            userBubbleWidthClass="w-full"
+            userBubbleWidthClass="max-w-[85%]"
           />
           <ChatMessageItem
             message={assistantMessage}
