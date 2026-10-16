@@ -1,4 +1,4 @@
-import { webContents, type WebContents } from "electron";
+import { webContents, nativeImage, type WebContents, type BrowserWindow } from "electron";
 import * as fs from "node:fs";
 import * as os from "node:os";
 import * as path from "node:path";
@@ -23,6 +23,49 @@ import {
   type BrowserConsoleLevel,
   TabTelemetryBuffer,
 } from "./browser/telemetry.js";
+
+function getCdpModifiers(modifiers?: string[]): number {
+  if (!modifiers || !Array.isArray(modifiers)) return 0;
+  let mask = 0;
+  for (const m of modifiers) {
+    const lower = String(m || "").toLowerCase();
+    if (lower.includes("alt")) mask |= 1;
+    if (lower.includes("ctrl") || lower.includes("control")) mask |= 2;
+    if (lower.includes("meta") || lower.includes("command") || lower.includes("cmd") || lower.includes("win")) mask |= 4;
+    if (lower.includes("shift")) mask |= 8;
+  }
+  return mask;
+}
+
+function getCdpCodeForKey(key: string): string {
+  const map: Record<string, string> = {
+    Enter: "Enter",
+    Return: "Enter",
+    Tab: "Tab",
+    Escape: "Escape",
+    Esc: "Escape",
+    Backspace: "Backspace",
+    Delete: "Delete",
+    ArrowUp: "ArrowUp",
+    ArrowDown: "ArrowDown",
+    ArrowLeft: "ArrowLeft",
+    ArrowRight: "ArrowRight",
+    PageUp: "PageUp",
+    PageDown: "PageDown",
+    Home: "Home",
+    End: "End",
+    Space: "Space",
+    " ": "Space",
+  };
+  if (map[key]) return map[key]!;
+  if (key.length === 1 && /[a-zA-Z]/.test(key)) {
+    return `Key${key.toUpperCase()}`;
+  }
+  if (key.length === 1 && /[0-9]/.test(key)) {
+    return `Digit${key}`;
+  }
+  return key;
+}
 
 export interface ControlState {
   holder: "bot" | "human";
@@ -99,6 +142,7 @@ export class BrowserController {
     requested: false,
   };
 
+  private parentWindow: BrowserWindow | null = null;
   private registeredTabs = new Map<string, RegisteredTab>();
   private activeTabId: string | null = null;
   private snapshotCounter = 0;
@@ -140,6 +184,87 @@ export class BrowserController {
     if (callbacks.onStateChange) this.onStateChangeCallback = callbacks.onStateChange;
     if (callbacks.onAiAction) this.onAiActionCallback = callbacks.onAiAction;
     if (callbacks.onTabOpenRequest) this.onTabOpenRequestCallback = callbacks.onTabOpenRequest;
+  }
+
+  public setParentWindow(win: BrowserWindow | null) {
+    this.parentWindow = win;
+  }
+
+  public async ensureCdp(contents: WebContents): Promise<boolean> {
+    if (!contents || contents.isDestroyed()) return false;
+    try {
+      if (!contents.debugger.isAttached()) {
+        contents.debugger.attach("1.3");
+        await Promise.allSettled([
+          contents.debugger.sendCommand("Page.enable"),
+          contents.debugger.sendCommand("DOM.enable"),
+          contents.debugger.sendCommand("Runtime.enable"),
+          contents.debugger.sendCommand("Input.setIgnoreInputEvents", { ignore: false }),
+        ]);
+      }
+      return true;
+    } catch (err) {
+      console.warn("[BrowserController] CDP debugger attach warning:", err);
+      return false;
+    }
+  }
+
+  public async goBack(tabId?: string): Promise<boolean> {
+    const tab = this.getTargetTab(tabId);
+    if (tab && !tab.contents.isDestroyed() && tab.contents.canGoBack()) {
+      tab.contents.goBack();
+      return true;
+    }
+    return false;
+  }
+
+  public async goForward(tabId?: string): Promise<boolean> {
+    const tab = this.getTargetTab(tabId);
+    if (tab && !tab.contents.isDestroyed() && tab.contents.canGoForward()) {
+      tab.contents.goForward();
+      return true;
+    }
+    return false;
+  }
+
+  public async reload(tabId?: string, ignoreCache = false): Promise<boolean> {
+    const tab = this.getTargetTab(tabId);
+    if (tab && !tab.contents.isDestroyed()) {
+      if (ignoreCache) {
+        tab.contents.reloadIgnoringCache();
+      } else {
+        tab.contents.reload();
+      }
+      return true;
+    }
+    return false;
+  }
+
+  public async stop(tabId?: string): Promise<boolean> {
+    const tab = this.getTargetTab(tabId);
+    if (tab && !tab.contents.isDestroyed()) {
+      tab.contents.stop();
+      return true;
+    }
+    return false;
+  }
+
+  public async setAudioMuted(tabId: string, muted: boolean): Promise<boolean> {
+    const tab = this.getTargetTab(tabId);
+    if (tab && !tab.contents.isDestroyed()) {
+      tab.contents.setAudioMuted(muted);
+      return true;
+    }
+    return false;
+  }
+
+  public async setZoomFactor(tabId: string, factor: number): Promise<boolean> {
+    const tab = this.getTargetTab(tabId);
+    if (tab && !tab.contents.isDestroyed()) {
+      tab.contents.setZoomFactor(factor);
+      return true;
+    }
+    return false;
   }
 
   // ---------------------------------------------------------------------------
@@ -196,7 +321,7 @@ export class BrowserController {
     }
 
     console.log(
-      `[BrowserController] Registered webview for tab ${tabId} (webContentsId: ${guestContentsId}, totalTabs: ${this.registeredTabs.size})`
+      `[BrowserController] Registered browser view for tab ${tabId} (webContentsId: ${guestContentsId}, totalTabs: ${this.registeredTabs.size})`
     );
 
     this.setupGuestWebContentsHooks(tabRecord);
@@ -903,29 +1028,63 @@ export class BrowserController {
     const button = params.button || "left";
     const clickCount = params.clickCount || 1;
 
-    target.sendInputEvent({
-      type: "mouseMove",
-      x: targetX,
-      y: targetY,
-    });
+    await this.ensureCdp(target);
 
-    target.sendInputEvent({
-      type: "mouseDown",
-      x: targetX,
-      y: targetY,
-      button,
-      clickCount,
-    });
+    let cdpSuccess = false;
+    if (target.debugger.isAttached()) {
+      try {
+        const cdpButton = button === "right" ? "right" : button === "middle" ? "middle" : "left";
+        await target.debugger.sendCommand("Input.dispatchMouseEvent", {
+          type: "mouseMoved",
+          x: targetX,
+          y: targetY,
+        });
+        await target.debugger.sendCommand("Input.dispatchMouseEvent", {
+          type: "mousePressed",
+          x: targetX,
+          y: targetY,
+          button: cdpButton,
+          clickCount,
+        });
+        await new Promise((r) => setTimeout(r, 50));
+        await target.debugger.sendCommand("Input.dispatchMouseEvent", {
+          type: "mouseReleased",
+          x: targetX,
+          y: targetY,
+          button: cdpButton,
+          clickCount,
+        });
+        cdpSuccess = true;
+      } catch (err) {
+        console.warn("[BrowserController] CDP click dispatch failed, falling back to sendInputEvent:", err);
+      }
+    }
 
-    await new Promise((r) => setTimeout(r, 50));
+    if (!cdpSuccess) {
+      target.sendInputEvent({
+        type: "mouseMove",
+        x: targetX,
+        y: targetY,
+      });
 
-    target.sendInputEvent({
-      type: "mouseUp",
-      x: targetX,
-      y: targetY,
-      button,
-      clickCount,
-    });
+      target.sendInputEvent({
+        type: "mouseDown",
+        x: targetX,
+        y: targetY,
+        button,
+        clickCount,
+      });
+
+      await new Promise((r) => setTimeout(r, 50));
+
+      target.sendInputEvent({
+        type: "mouseUp",
+        x: targetX,
+        y: targetY,
+        button,
+        clickCount,
+      });
+    }
 
     await new Promise((r) => setTimeout(r, 120));
 
@@ -1019,12 +1178,26 @@ export class BrowserController {
       details: { tabId: tab.tabId, ref: rawTarget, characters: params.text.length },
     });
 
-    for (const char of params.text) {
-      target.sendInputEvent({
-        type: "char",
-        keyCode: char,
-      });
-      await new Promise((r) => setTimeout(r, 8));
+    await this.ensureCdp(target);
+
+    let cdpTyped = false;
+    if (target.debugger.isAttached()) {
+      try {
+        await target.debugger.sendCommand("Input.insertText", { text: params.text });
+        cdpTyped = true;
+      } catch (err) {
+        console.warn("[BrowserController] CDP insertText failed, falling back to sendInputEvent:", err);
+      }
+    }
+
+    if (!cdpTyped) {
+      for (const char of params.text) {
+        target.sendInputEvent({
+          type: "char",
+          keyCode: char,
+        });
+        await new Promise((r) => setTimeout(r, 8));
+      }
     }
 
     // Ensure React controlled inputs & contenteditable elements accurately reflect the typed value
@@ -1049,9 +1222,36 @@ export class BrowserController {
 
     if (params.submit) {
       await new Promise((r) => setTimeout(r, 80));
-      target.sendInputEvent({ type: "keyDown", keyCode: "Enter" });
-      target.sendInputEvent({ type: "char", keyCode: "\r" });
-      target.sendInputEvent({ type: "keyUp", keyCode: "Enter" });
+      let cdpSubmitSuccess = false;
+      if (target.debugger.isAttached()) {
+        try {
+          await target.debugger.sendCommand("Input.dispatchKeyEvent", {
+            type: "rawKeyDown",
+            key: "Enter",
+            code: "Enter",
+            windowsVirtualKeyCode: 13,
+            nativeVirtualKeyCode: 13,
+          });
+          await target.debugger.sendCommand("Input.dispatchKeyEvent", {
+            type: "char",
+            text: "\r",
+            unmodifiedText: "\r",
+          });
+          await target.debugger.sendCommand("Input.dispatchKeyEvent", {
+            type: "keyUp",
+            key: "Enter",
+            code: "Enter",
+            windowsVirtualKeyCode: 13,
+            nativeVirtualKeyCode: 13,
+          });
+          cdpSubmitSuccess = true;
+        } catch {}
+      }
+      if (!cdpSubmitSuccess) {
+        target.sendInputEvent({ type: "keyDown", keyCode: "Enter" });
+        target.sendInputEvent({ type: "char", keyCode: "\r" });
+        target.sendInputEvent({ type: "keyUp", keyCode: "Enter" });
+      }
       await new Promise((r) => setTimeout(r, 150));
     }
 
@@ -1077,28 +1277,64 @@ export class BrowserController {
 
     this.onAiActionCallback?.({ type: "key", details: { ...params, tabId: tab.tabId } });
 
-    const modifiers = (params.modifiers || []) as any;
-    target.sendInputEvent({
-      type: "keyDown",
-      keyCode: params.key,
-      modifiers,
-    });
+    await this.ensureCdp(target);
 
-    if (params.key === "Enter" || params.key === "Return") {
+    let cdpKeySuccess = false;
+    if (target.debugger.isAttached()) {
+      try {
+        const modifiers = getCdpModifiers(params.modifiers);
+        const code = getCdpCodeForKey(params.key);
+        await target.debugger.sendCommand("Input.dispatchKeyEvent", {
+          type: "rawKeyDown",
+          key: params.key,
+          code,
+          modifiers,
+        });
+        if (params.key === "Enter" || params.key === "Return") {
+          await target.debugger.sendCommand("Input.dispatchKeyEvent", {
+            type: "char",
+            text: "\r",
+            unmodifiedText: "\r",
+            modifiers,
+          });
+        }
+        await new Promise((r) => setTimeout(r, 40));
+        await target.debugger.sendCommand("Input.dispatchKeyEvent", {
+          type: "keyUp",
+          key: params.key,
+          code,
+          modifiers,
+        });
+        cdpKeySuccess = true;
+      } catch (err) {
+        console.warn("[BrowserController] CDP key dispatch failed, falling back to sendInputEvent:", err);
+      }
+    }
+
+    if (!cdpKeySuccess) {
+      const modifiers = (params.modifiers || []) as any;
       target.sendInputEvent({
-        type: "char",
-        keyCode: "\r",
+        type: "keyDown",
+        keyCode: params.key,
+        modifiers,
+      });
+
+      if (params.key === "Enter" || params.key === "Return") {
+        target.sendInputEvent({
+          type: "char",
+          keyCode: "\r",
+          modifiers,
+        });
+      }
+
+      await new Promise((r) => setTimeout(r, 40));
+
+      target.sendInputEvent({
+        type: "keyUp",
+        keyCode: params.key,
         modifiers,
       });
     }
-
-    await new Promise((r) => setTimeout(r, 40));
-
-    target.sendInputEvent({
-      type: "keyUp",
-      keyCode: params.key,
-      modifiers,
-    });
 
     return { action: "key", tabId: tab.tabId, key: params.key };
   }
@@ -1159,6 +1395,18 @@ export class BrowserController {
         `window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'instant' });`
       );
     } else {
+      await this.ensureCdp(target);
+      if (target.debugger.isAttached() && (deltaX !== 0 || deltaY !== 0)) {
+        try {
+          await target.debugger.sendCommand("Input.dispatchMouseEvent", {
+            type: "mouseWheel",
+            x: 200,
+            y: 200,
+            deltaX,
+            deltaY,
+          });
+        } catch {}
+      }
       await target.executeJavaScript(
         `window.scrollBy({ left: ${deltaX}, top: ${deltaY}, behavior: 'instant' });`
       );
@@ -1254,9 +1502,29 @@ export class BrowserController {
       } catch {}
     }
 
-    let image;
+    let image: Electron.NativeImage | null = null;
     try {
-      image = await target.capturePage();
+      await this.ensureCdp(target);
+      if (target.debugger.isAttached()) {
+        try {
+          const cdpFormat = params?.format === "png" ? "png" : "jpeg";
+          const quality = Math.max(10, Math.min(100, Math.round(params?.quality ?? 80)));
+          const res = (await target.debugger.sendCommand("Page.captureScreenshot", {
+            format: cdpFormat,
+            quality: cdpFormat === "jpeg" ? quality : undefined,
+            fromSurface: true,
+          })) as { data: string };
+          if (res && res.data) {
+            image = nativeImage.createFromBuffer(Buffer.from(res.data, "base64"));
+          }
+        } catch (cdpErr) {
+          console.warn("[BrowserController] CDP captureScreenshot failed, falling back to capturePage:", cdpErr);
+        }
+      }
+
+      if (!image) {
+        image = await target.capturePage();
+      }
     } finally {
       if (annotationToken && !target.isDestroyed()) {
         await target

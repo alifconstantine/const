@@ -238,7 +238,7 @@ contextBridge.exposeInMainWorld("electron", {
     takeControl: () => ipcRenderer.invoke("browser:take-control"),
     releaseControl: () => ipcRenderer.invoke("browser:release-control"),
     supplySecret: (text: string) => ipcRenderer.invoke("browser:supply-secret", text),
-    navigate: (url: string) => ipcRenderer.invoke("browser:navigate", url),
+    navigate: (url: string, options?: any) => ipcRenderer.invoke("browser:navigate", url, options),
     snapshot: (args?: any) => ipcRenderer.invoke("browser:snapshot", args),
     click: (args: any) => ipcRenderer.invoke("browser:click", args),
     type: (args: any) => ipcRenderer.invoke("browser:type", args),

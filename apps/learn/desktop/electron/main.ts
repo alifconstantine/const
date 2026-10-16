@@ -579,6 +579,12 @@ app.on("second-instance", (_event, commandLine) => {
       },
     });
 
+    browserController.setParentWindow(win);
+    win.on("closed", () => {
+      browserController.setParentWindow(null);
+      win = null;
+    });
+
     win.on("maximize", () => {
       win?.webContents.send("window:maximized-change", true);
     });
@@ -3048,8 +3054,8 @@ app.on("second-instance", (_event, commandLine) => {
     return await browserController.supplySecret(text);
   });
 
-  ipcMain.handle("browser:navigate", async (_event, url: string) => {
-    return await browserController.navigate(url);
+  ipcMain.handle("browser:navigate", async (_event, url: string, options?: any) => {
+    return await browserController.navigate(url, options);
   });
 
   ipcMain.handle("browser:snapshot", async (_event, args?: any) => {

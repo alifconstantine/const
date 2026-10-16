@@ -379,7 +379,7 @@ declare global {
         takeControl: () => Promise<any>;
         releaseControl: () => Promise<any>;
         supplySecret: (text: string) => Promise<{ success: boolean; characters: number }>;
-        navigate: (url: string) => Promise<{ url: string; title: string }>;
+        navigate: (url: string, options?: { tabId?: string; newTab?: boolean }) => Promise<any>;
         snapshot: (args?: any) => Promise<any>;
         click: (args: any) => Promise<any>;
         type: (args: any) => Promise<any>;
