@@ -14,7 +14,7 @@ import {
 import {
   SlidersHorizontal,
   Palette,
-  Cpu,
+  Box,
   Globe,
   Monitor,
   Brain,
@@ -312,7 +312,7 @@ export function SettingsView({
       items: [
         { id: "general", label: "General", icon: SlidersHorizontal },
         { id: "appearance", label: "Appearance", icon: Palette },
-        { id: "model-settings", label: "Model settings", icon: Cpu },
+        { id: "model-settings", label: "Model settings", icon: Box },
         { id: "browser-use", label: "Browser Use", icon: Globe },
         { id: "computer-use", label: "Computer Use", icon: Monitor },
       ],

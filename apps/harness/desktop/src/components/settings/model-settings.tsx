@@ -14,6 +14,7 @@ import {
   SelectItem,
 } from "@const/ui";
 import {
+  Box,
   Bot,
   Volume2,
   Image as ImageIcon,
@@ -635,7 +636,7 @@ export function ModelSettings({
                 : "text-muted-foreground hover:text-foreground"
             )}
           >
-            <Bot className="w-3.5 h-3.5" />
+            <Box className="w-3.5 h-3.5" />
             <span>LLM</span>
           </button>
 
@@ -724,122 +725,22 @@ export function ModelSettings({
       {/* ===================================================================== */}
       <div className="space-y-3">
         {currentProviders.length === 0 ? (
-          <div className="rounded-2xl border border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb] dark:bg-[#222222] px-6 py-11 sm:px-10 sm:py-13 flex flex-col items-center text-center">
-            {/* Bespoke Studio Modality Schematic Stage */}
-            <div className="mb-6">
+          <div className="rounded-2xl border border-dashed border-[#dedee2] dark:border-[#383838] bg-[#f9f9fb]/40 dark:bg-[#222222]/30 py-12 px-6 flex flex-col items-center justify-center text-center select-none">
+            {/* Category Icon */}
+            <div className="w-12 h-12 rounded-2xl bg-[#ebebed] dark:bg-[#2b2b2b] border border-[#dedee2] dark:border-[#383838] flex items-center justify-center text-[#262626] dark:text-white mb-3.5 shadow-2xs">
               {activeCategory === "speech" ? (
-                <div className="w-68 rounded-2xl bg-[#ffffff] dark:bg-[#1a1a1a] border border-[#dedee2] dark:border-[#303030] p-3.5 shadow-2xs flex flex-col gap-3 select-none">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#262626]/60 dark:bg-white/60" />
-                      <span className="text-[11px] font-medium text-[#262626] dark:text-[#d4d4d4]">
-                        Neural Voice Engine
-                      </span>
-                    </div>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-[#f0f0f2] dark:bg-[#262626] text-[#737373] dark:text-[#969696]">
-                      24kHz • 1.0x
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2.5 p-2 rounded-xl bg-[#f5f5f7] dark:bg-[#222222]">
-                    <div className="w-7 h-7 rounded-lg bg-[#262626] dark:bg-white text-white dark:text-[#161616] flex items-center justify-center shrink-0">
-                      <Play className="w-3 h-3 fill-current ml-0.5" />
-                    </div>
-                    <div className="flex items-center gap-[3px] h-5 flex-1 px-0.5">
-                      {[35, 65, 95, 50, 80, 100, 60, 40, 85, 70, 45, 90, 55, 30, 60, 40, 25, 45].map(
-                        (h, idx) => (
-                          <span
-                            key={idx}
-                            style={{ height: `${h}%` }}
-                            className={cn(
-                              "flex-1 rounded-full",
-                              idx < 11
-                                ? "bg-[#262626]/75 dark:bg-white/75"
-                                : "bg-[#262626]/20 dark:bg-white/20"
-                            )}
-                          />
-                        )
-                      )}
-                    </div>
-                    <span className="text-[10px] font-medium text-[#737373] dark:text-[#969696] shrink-0">
-                      0:14
-                    </span>
-                  </div>
-                </div>
+                <Volume2 className="w-5 h-5 text-[#737373] dark:text-[#969696]" />
               ) : activeCategory === "image" ? (
-                <div className="w-68 rounded-2xl bg-[#ffffff] dark:bg-[#1a1a1a] border border-[#dedee2] dark:border-[#303030] p-3 shadow-2xs flex flex-col gap-2.5 select-none">
-                  <div className="h-24 rounded-xl bg-[#f3f3f6] dark:bg-[#222222] border border-[#dedee2]/70 dark:border-[#2e2e2e] relative overflow-hidden flex items-center justify-center">
-                    {/* Corner Framing Marks */}
-                    <span className="absolute top-2.5 left-2.5 w-2.5 h-2.5 border-t border-l border-[#262626]/30 dark:border-white/30" />
-                    <span className="absolute top-2.5 right-2.5 w-2.5 h-2.5 border-t border-r border-[#262626]/30 dark:border-white/30" />
-                    <span className="absolute bottom-2.5 left-2.5 w-2.5 h-2.5 border-b border-l border-[#262626]/30 dark:border-white/30" />
-                    <span className="absolute bottom-2.5 right-2.5 w-2.5 h-2.5 border-b border-r border-[#262626]/30 dark:border-white/30" />
-
-                    {/* Minimalist Geometric Horizon Composition */}
-                    <div className="w-4 h-4 rounded-full bg-[#262626]/20 dark:bg-white/20 absolute top-4 right-9" />
-                    <div className="w-28 h-28 rounded-full bg-[#262626]/[0.06] dark:bg-white/[0.06] absolute -bottom-16 -left-4" />
-                    <div className="w-32 h-32 rounded-full bg-[#262626]/[0.11] dark:bg-white/[0.11] absolute -bottom-20 right-2" />
-                    <div className="w-8 h-8 rounded-xl bg-[#ffffff]/90 dark:bg-[#2b2b2b]/90 border border-[#dedee2] dark:border-[#383838] flex items-center justify-center shadow-2xs z-10">
-                      <ImageIcon className="w-4 h-4 text-[#262626] dark:text-white" />
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between px-0.5">
-                    <span className="text-[11px] font-medium text-[#262626] dark:text-[#d4d4d4]">
-                      Canvas Synthesis
-                    </span>
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-[#f0f0f2] dark:bg-[#262626] text-[#737373] dark:text-[#969696]">
-                        1024×1024
-                      </span>
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-[#f0f0f2] dark:bg-[#262626] text-[#737373] dark:text-[#969696]">
-                        HD
-                      </span>
-                    </div>
-                  </div>
-                </div>
+                <ImageIcon className="w-5 h-5 text-[#737373] dark:text-[#969696]" />
               ) : activeCategory === "video" ? (
-                <div className="w-68 rounded-2xl bg-[#ffffff] dark:bg-[#1a1a1a] border border-[#dedee2] dark:border-[#303030] p-3 shadow-2xs flex flex-col gap-2.5 select-none">
-                  <div className="h-20 rounded-xl bg-[#f3f3f6] dark:bg-[#222222] border border-[#dedee2]/70 dark:border-[#2e2e2e] relative flex items-center justify-center overflow-hidden">
-                    <span className="absolute top-2 left-2.5 text-[9.5px] font-medium px-1.5 py-0.5 rounded bg-[#ffffff]/80 dark:bg-[#161616]/80 text-[#555555] dark:text-[#969696]">
-                      1080p • 16:9
-                    </span>
-                    <span className="absolute top-2 right-2.5 text-[9.5px] font-medium text-[#737373] dark:text-[#969696]">
-                      24 FPS
-                    </span>
-                    <div className="w-8 h-8 rounded-xl bg-[#262626] dark:bg-white text-white dark:text-[#161616] flex items-center justify-center shadow-2xs">
-                      <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
-                    </div>
-                  </div>
-                  {/* Mini Timeline Scrubber */}
-                  <div className="h-6 rounded-lg bg-[#f3f3f6] dark:bg-[#222222] px-2 flex items-center gap-1.5 relative">
-                    <div className="h-2 rounded-xs bg-[#262626]/65 dark:bg-white/65 w-12" />
-                    <div className="h-2 rounded-xs bg-[#262626]/35 dark:bg-white/35 w-16" />
-                    <div className="h-2 rounded-xs bg-[#262626]/15 dark:bg-white/15 flex-1" />
-                    <div className="absolute left-15 top-1 bottom-1 w-[1.5px] bg-[#262626] dark:bg-white rounded-full" />
-                  </div>
-                </div>
+                <VideoIcon className="w-5 h-5 text-[#737373] dark:text-[#969696]" />
               ) : (
-                <div className="w-68 rounded-2xl bg-[#ffffff] dark:bg-[#1a1a1a] border border-[#dedee2] dark:border-[#303030] p-3.5 shadow-2xs flex flex-col gap-2.5 select-none">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5">
-                      <Bot className="w-3.5 h-3.5 text-[#262626] dark:text-white" />
-                      <span className="text-[11px] font-medium text-[#262626] dark:text-[#d4d4d4]">
-                        Reasoning Stream
-                      </span>
-                    </div>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-md bg-[#f0f0f2] dark:bg-[#262626] text-[#737373] dark:text-[#969696]">
-                      128K
-                    </span>
-                  </div>
-                  <div className="space-y-1.5 pt-0.5">
-                    <div className="h-2 w-5/6 rounded-full bg-[#262626]/20 dark:bg-white/20" />
-                    <div className="h-2 w-2/3 rounded-full bg-[#262626]/12 dark:bg-white/12" />
-                  </div>
-                </div>
+                <Box className="w-5 h-5 text-[#737373] dark:text-[#969696]" />
               )}
             </div>
 
             {/* Title & Description */}
-            <h3 className="text-[15px] font-semibold text-[#262626] dark:text-white tracking-tight">
+            <h3 className="text-sm font-semibold text-[#262626] dark:text-white tracking-tight">
               {activeCategory === "speech"
                 ? "No speech providers configured"
                 : activeCategory === "image"
@@ -848,41 +749,22 @@ export function ModelSettings({
                 ? "No video providers configured"
                 : "No language model providers configured"}
             </h3>
-            <p className="text-xs text-[#737373] dark:text-[#969696] max-w-md mt-1.5 leading-relaxed">
+            <p className="text-xs text-[#737373] dark:text-[#969696] max-w-sm mt-1 leading-relaxed">
               {activeCategory === "speech"
-                ? "Connect a speech synthesis adapter or custom audio endpoint to enable voice responses, character selection, and live audio previews."
+                ? "Connect a speech synthesis adapter or custom audio endpoint to get started."
                 : activeCategory === "image"
-                ? "Connect an image generation adapter or custom endpoint to synthesize visual assets, diagrams, and high-resolution artwork."
+                ? "Connect an image generation adapter or custom endpoint to get started."
                 : activeCategory === "video"
-                ? "Connect a video synthesis adapter or custom endpoint to generate widescreen clips, motion graphics, and visual sequences."
-                : "Connect an LLM adapter or custom completion endpoint to power coding tasks, reasoning, and agent workflows."}
+                ? "Connect a video generation adapter or custom endpoint to get started."
+                : "Connect an LLM provider adapter or custom endpoint to get started."}
             </p>
 
-            {/* Subtle Capability Chips */}
-            <div className="flex flex-wrap items-center justify-center gap-1.5 mt-4">
-              {(activeCategory === "speech"
-                ? ["OpenAI Speech API", "Multi-Voice & Rate", "Live Voice Preview"]
-                : activeCategory === "image"
-                ? ["OpenRouter & OpenAI", "Multi-Aspect Ratio", "HD Synthesis"]
-                : activeCategory === "video"
-                ? ["1080p & 720p HD", "16:9 & 9:16", "Motion Generation"]
-                : ["Chat Completions", "Anthropic Messages", "Dynamic Model Sync"]
-              ).map((feature) => (
-                <span
-                  key={feature}
-                  className="text-[11px] text-[#737373] dark:text-[#969696] bg-[#ebebed]/80 dark:bg-[#1a1a1a] border border-[#dedee2] dark:border-[#2e2e2e] px-2.5 py-1 rounded-lg"
-                >
-                  {feature}
-                </span>
-              ))}
-            </div>
-
             {/* Action Buttons */}
-            <div className="flex items-center justify-center gap-2.5 mt-6">
+            <div className="flex items-center justify-center gap-2 mt-5">
               <button
                 type="button"
                 onClick={() => setIsPresetModalOpen(true)}
-                className="h-9 px-4 rounded-xl bg-[#262626] dark:bg-white text-white dark:text-[#161616] text-xs font-semibold hover:opacity-90 active:scale-[0.98] transition-all flex items-center gap-1.5 cursor-pointer"
+                className="h-8 px-3.5 rounded-xl bg-[#262626] dark:bg-white text-white dark:text-[#161616] text-xs font-medium hover:opacity-90 active:scale-[0.98] transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>Choose Adapter</span>
@@ -890,7 +772,7 @@ export function ModelSettings({
               <button
                 type="button"
                 onClick={handleAddCustomProvider}
-                className="h-9 px-4 rounded-xl bg-[#ffffff] dark:bg-[#2b2b2b] hover:bg-[#ebebed] dark:hover:bg-[#333333] text-[#262626] dark:text-[#d4d4d4] border border-[#dedee2] dark:border-[#383838] text-xs font-medium transition-all flex items-center gap-1.5 cursor-pointer"
+                className="h-8 px-3.5 rounded-xl bg-[#ffffff] dark:bg-[#2b2b2b] hover:bg-[#ebebed] dark:hover:bg-[#333333] text-[#262626] dark:text-[#d4d4d4] border border-[#dedee2] dark:border-[#383838] text-xs font-medium transition-all flex items-center gap-1.5 cursor-pointer"
               >
                 <span>Custom Endpoint</span>
               </button>
